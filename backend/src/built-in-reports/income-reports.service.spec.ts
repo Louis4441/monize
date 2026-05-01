@@ -307,6 +307,20 @@ describe("IncomeReportsService", () => {
 
       expect(result.data[0].total).toBe(33.33);
     });
+
+    it("filters out the asset value change category in the SQL query", async () => {
+      transactionsRepository.query.mockResolvedValue([]);
+      categoriesRepository.find.mockResolvedValue([]);
+
+      await service.getIncomeBySource(mockUserId, "2025-01-01", "2025-12-31");
+
+      const sql = transactionsRepository.query.mock.calls[0][0];
+      expect(sql).toContain("NOT EXISTS");
+      expect(sql).toContain("asset_category_id");
+      expect(sql).toMatch(
+        /ax\.asset_category_id\s*=\s*COALESCE\(ts\.category_id,\s*t\.category_id\)/,
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -488,6 +502,19 @@ describe("IncomeReportsService", () => {
       const sql = transactionsRepository.query.mock.calls[0][0];
       expect(sql).toContain("LEFT JOIN categories c");
       expect(sql).toContain("c.is_income");
+    });
+
+    it("filters out the asset value change category in the SQL query", async () => {
+      transactionsRepository.query.mockResolvedValue([]);
+
+      await service.getIncomeVsExpenses(mockUserId, "2025-01-01", "2025-12-31");
+
+      const sql = transactionsRepository.query.mock.calls[0][0];
+      expect(sql).toContain("NOT EXISTS");
+      expect(sql).toContain("asset_category_id");
+      expect(sql).toMatch(
+        /ax\.asset_category_id\s*=\s*COALESCE\(ts\.category_id,\s*t\.category_id\)/,
+      );
     });
 
     it("handles month with zero income correctly", async () => {

@@ -50,6 +50,12 @@ export class IncomeReportsService {
         AND t.parent_transaction_id IS NULL
         AND a.account_type != 'INVESTMENT'
         AND (ts.transfer_account_id IS NULL OR ts.id IS NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM accounts ax
+          WHERE ax.user_id = t.user_id
+            AND ax.asset_category_id IS NOT NULL
+            AND ax.asset_category_id = COALESCE(ts.category_id, t.category_id)
+        )
     `;
 
     const params: (string | undefined)[] = [userId, endDate];
@@ -172,6 +178,12 @@ export class IncomeReportsService {
         AND t.parent_transaction_id IS NULL
         AND a.account_type != 'INVESTMENT'
         AND (ts.transfer_account_id IS NULL OR ts.id IS NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM accounts ax
+          WHERE ax.user_id = t.user_id
+            AND ax.asset_category_id IS NOT NULL
+            AND ax.asset_category_id = COALESCE(ts.category_id, t.category_id)
+        )
     `;
 
     const params: (string | undefined)[] = [userId, endDate];
