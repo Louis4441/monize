@@ -1,10 +1,7 @@
 import { firstValueFrom, of } from "rxjs";
 import { RequestContextInterceptor } from "./request-context.interceptor";
 import type { RequestContext } from "../request-context";
-import {
-  getRequestContext,
-  requestContextStorage,
-} from "../request-context";
+import { getRequestContext, requestContextStorage } from "../request-context";
 
 describe("RequestContextInterceptor", () => {
   let preferencesRepository: { findOne: jest.Mock };
@@ -35,9 +32,7 @@ describe("RequestContextInterceptor", () => {
 
   beforeEach(() => {
     preferencesRepository = { findOne: jest.fn() };
-    interceptor = new RequestContextInterceptor(
-      preferencesRepository as any,
-    );
+    interceptor = new RequestContextInterceptor(preferencesRepository as any);
   });
 
   it("bypasses non-http contexts and returns next.handle() directly", async () => {

@@ -1,6 +1,11 @@
 import "reflect-metadata";
 import { validate } from "class-validator";
-import { IsSafeUrl } from "./safe-url.validator";
+import {
+  IsSafeUrl,
+  IsSafeProviderBaseUrlConstraint,
+  validateUrlBasicSafety,
+  validateUrlIsSafe,
+} from "./safe-url.validator";
 
 // Mock dns module before importing the validator class
 jest.mock("dns", () => ({
@@ -268,9 +273,6 @@ describe("IsSafeUrl validator", () => {
 });
 
 describe("validateUrlIsSafe()", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { validateUrlIsSafe } = require("./safe-url.validator");
-
   beforeEach(() => {
     mockResolve4.mockImplementation((_h, cb) => cb(null, ["93.184.216.34"]));
     mockResolve6.mockImplementation((_h, cb) => cb(null, []));
@@ -290,9 +292,6 @@ describe("validateUrlIsSafe()", () => {
 });
 
 describe("validateUrlBasicSafety()", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { validateUrlBasicSafety } = require("./safe-url.validator");
-
   it("returns true for an http URL", () => {
     expect(validateUrlBasicSafety("http://localhost:11434")).toBe(true);
   });
@@ -315,11 +314,6 @@ describe("validateUrlBasicSafety()", () => {
 });
 
 describe("IsSafeProviderBaseUrlConstraint", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const {
-    IsSafeProviderBaseUrlConstraint,
-  } = require("./safe-url.validator");
-
   beforeEach(() => {
     mockResolve4.mockImplementation((_h, cb) => cb(null, ["93.184.216.34"]));
     mockResolve6.mockImplementation((_h, cb) => cb(null, []));
@@ -351,9 +345,9 @@ describe("IsSafeProviderBaseUrlConstraint", () => {
 
   it("returns false (and updates message) for missing provider with bad URL", async () => {
     const c = new IsSafeProviderBaseUrlConstraint();
-    expect(
-      await c.validate("ftp://evil.com", { object: {} } as any),
-    ).toBe(false);
+    expect(await c.validate("ftp://evil.com", { object: {} } as any)).toBe(
+      false,
+    );
     expect(c.defaultMessage()).toContain("without embedded credentials");
   });
 

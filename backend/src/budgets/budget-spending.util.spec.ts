@@ -159,14 +159,18 @@ describe("queryCategorySpending", () => {
 
   it("aggregates transaction and split spending for category budgets", async () => {
     const txRepo: any = {
-      createQueryBuilder: jest.fn().mockImplementation(() =>
-        makeQbReturning([{ categoryId: "cat-1", total: "-50" }]),
-      ),
+      createQueryBuilder: jest
+        .fn()
+        .mockImplementation(() =>
+          makeQbReturning([{ categoryId: "cat-1", total: "-50" }]),
+        ),
     };
     const splitRepo: any = {
-      createQueryBuilder: jest.fn().mockImplementation(() =>
-        makeQbReturning([{ categoryId: "cat-1", total: "-25" }]),
-      ),
+      createQueryBuilder: jest
+        .fn()
+        .mockImplementation(() =>
+          makeQbReturning([{ categoryId: "cat-1", total: "-25" }]),
+        ),
     };
 
     const result = await queryCategorySpending(
@@ -187,15 +191,13 @@ describe("queryCategorySpending", () => {
         .fn()
         // first call: category SUM (no category, returns nothing as no categoryId budgets)
         .mockReturnValueOnce(
-          makeQbReturning([
-            { destinationAccountId: "acc-1", total: "300" },
-          ]),
+          makeQbReturning([{ destinationAccountId: "acc-1", total: "300" }]),
         ),
     };
     const splitRepo: any = {
-      createQueryBuilder: jest.fn().mockImplementation(() =>
-        makeQbReturning([]),
-      ),
+      createQueryBuilder: jest
+        .fn()
+        .mockImplementation(() => makeQbReturning([])),
     };
 
     const result = await queryCategorySpending(
@@ -218,14 +220,18 @@ describe("queryCategorySpending", () => {
 
   it("treats null totals as 0", async () => {
     const txRepo: any = {
-      createQueryBuilder: jest.fn().mockImplementation(() =>
-        makeQbReturning([{ categoryId: "cat-1", total: null }]),
-      ),
+      createQueryBuilder: jest
+        .fn()
+        .mockImplementation(() =>
+          makeQbReturning([{ categoryId: "cat-1", total: null }]),
+        ),
     };
     const splitRepo: any = {
-      createQueryBuilder: jest.fn().mockImplementation(() =>
-        makeQbReturning([{ categoryId: "cat-1", total: null }]),
-      ),
+      createQueryBuilder: jest
+        .fn()
+        .mockImplementation(() =>
+          makeQbReturning([{ categoryId: "cat-1", total: null }]),
+        ),
     };
 
     const result = await queryCategorySpending(

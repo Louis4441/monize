@@ -73,9 +73,7 @@ describe("IsSafeConfigObjectConstraint", () => {
   });
 
   it("accepts string, number, boolean values", () => {
-    expect(
-      constraint.validate({ a: "x", b: 1, c: true, d: false }),
-    ).toBe(true);
+    expect(constraint.validate({ a: "x", b: 1, c: true, d: false })).toBe(true);
   });
 
   it("ignores null/undefined values inside the object", () => {
