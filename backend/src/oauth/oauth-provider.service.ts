@@ -83,7 +83,20 @@ export class OAuthProviderService implements OnModuleInit {
         methods: ["S256"],
       },
       responseTypes: ["code"],
-      grantTypes: ["authorization_code", "refresh_token"],
+      // node-oidc-provider derives the supported `grantTypes` set from
+      // responseTypes + scopes + features + the `issueRefreshToken` policy
+      // (see configuration.collectGrantTypes). Setting `grantTypes` directly
+      // is silently ignored. To allow `refresh_token` for clients that
+      // don't request the OIDC `offline_access` scope (which is the OAuth
+      // 2.1 norm — and what Claude Desktop does), we provide a custom
+      // issueRefreshToken policy: refresh tokens are issued whenever the
+      // client registered with the refresh_token grant type. Providing any
+      // non-default function for this option is also what causes
+      // configuration.collectGrantTypes() to add 'refresh_token' to the
+      // allowed enum used during DCR validation.
+      issueRefreshToken: async (_ctx, client, _code) => {
+        return client.grantTypeAllowed("refresh_token");
+      },
       features: {
         devInteractions: { enabled: false },
         registration: {
