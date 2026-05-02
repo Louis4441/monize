@@ -133,14 +133,15 @@ export class OAuthProviderService implements OnModuleInit {
         backchannelLogout: { enabled: false },
       },
       interactions: {
-        // Mount under /api/v1 so it goes through the existing frontend
-        // proxy (which only forwards /api/*) without needing a global-
-        // prefix exclusion. The provider middleware itself sits at /oauth
-        // (which is also forwarded), but the interaction routes can't
-        // nest under /oauth because the provider middleware is a Koa app
-        // that 404s any path it doesn't own.
+        // Absolute URL (not a relative path) because some reverse-proxy
+        // setups (Envoy in particular) rewrite or drop relative
+        // redirects, especially across path namespaces — leaving the
+        // browser stuck on /oauth/auth instead of following the 303 to
+        // the consent page.
+        // Mounted under /api/v1 so it traverses the existing frontend
+        // proxy without needing global-prefix exclusion gymnastics.
         url: (_ctx, interaction) =>
-          `/api/v1/oauth-consent/${interaction.uid}`,
+          `${publicUrl}/api/v1/oauth-consent/${interaction.uid}`,
       },
       ttl: {
         AccessToken: 60 * 60, // 1 hour
