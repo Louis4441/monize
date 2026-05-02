@@ -7,6 +7,7 @@ import * as cookieParser from "cookie-parser";
 import * as pg from "pg";
 import { AppModule } from "./app.module";
 import { OAuthProviderService } from "./oauth/oauth-provider.service";
+import { oauthDebugLogger } from "./oauth/oauth-debug-logger.middleware";
 
 // Configure pg to return DATE types as strings instead of Date objects
 // This prevents timezone-related date shifting issues
@@ -172,6 +173,15 @@ async function bootstrap() {
   // have run yet at this point (it fires inside app.listen() / app.init()).
   const oauthProviderService = app.get(OAuthProviderService);
   const oauthProvider = await oauthProviderService.ensureInitialized();
+  // Debug-logging middleware mounted in front of every OAuth-related path so
+  // we can trace MCP-client handshakes (Claude Desktop, mcp-remote, etc.).
+  app.use("/oauth", oauthDebugLogger("provider"));
+  app.use("/oauth-consent", oauthDebugLogger("consent"));
+  app.use(
+    "/.well-known/oauth-protected-resource",
+    oauthDebugLogger("prm"),
+  );
+  app.use("/api/v1/mcp", oauthDebugLogger("mcp"));
   app.use("/oauth", oauthProvider.callback());
 
   // Swagger documentation (disabled in production)

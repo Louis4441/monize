@@ -150,14 +150,71 @@ export class OAuthProviderService implements OnModuleInit {
     // Trust the same proxy level as the rest of the app (Docker/nginx).
     provider.proxy = true;
 
-    provider.on("server_error", (_ctx, err) => {
-      this.logger.error("OAuth provider server error", err.stack ?? err);
+    const errorDetail = (err: unknown): string => {
+      const e = err as {
+        message?: string;
+        error?: string;
+        error_description?: string;
+        stack?: string;
+      };
+      const parts = [e.message, e.error, e.error_description].filter(Boolean);
+      const msg = parts.join(" — ");
+      return e.stack ? `${msg}\n${e.stack}` : msg;
+    };
+
+    provider.on("server_error", (ctx, err) => {
+      this.logger.error(
+        `OAuth server error on ${ctx?.method} ${ctx?.path}: ${errorDetail(err)}`,
+      );
     });
-    provider.on("authorization.error", (_ctx, err) => {
-      this.logger.warn(`OAuth authorization error: ${err.message}`);
+    provider.on("authorization.error", (ctx, err) => {
+      this.logger.warn(
+        `OAuth authorization.error on ${ctx?.method} ${ctx?.path}: ${errorDetail(err)}`,
+      );
     });
-    provider.on("grant.error", (_ctx, err) => {
-      this.logger.warn(`OAuth grant error: ${err.message}`);
+    provider.on("grant.error", (ctx, err) => {
+      this.logger.warn(
+        `OAuth grant.error on ${ctx?.method} ${ctx?.path}: ${errorDetail(err)}`,
+      );
+    });
+    provider.on("introspection.error", (ctx, err) => {
+      this.logger.warn(`OAuth introspection.error: ${errorDetail(err)}`);
+    });
+    provider.on("revocation.error", (ctx, err) => {
+      this.logger.warn(`OAuth revocation.error: ${errorDetail(err)}`);
+    });
+    provider.on("registration_create.error", (ctx, err) => {
+      this.logger.warn(
+        `OAuth DCR registration error: ${errorDetail(err)}`,
+      );
+    });
+    provider.on("registration_update.error", (ctx, err) => {
+      this.logger.warn(`OAuth DCR update error: ${errorDetail(err)}`);
+    });
+    provider.on("interaction.started", (ctx, prompt) => {
+      this.logger.log(
+        `OAuth interaction.started uid=${ctx.oidc?.entities?.Interaction?.uid} prompt=${prompt?.name} client=${ctx.oidc?.client?.clientId}`,
+      );
+    });
+    provider.on("interaction.ended", (ctx) => {
+      this.logger.log(
+        `OAuth interaction.ended uid=${ctx.oidc?.entities?.Interaction?.uid}`,
+      );
+    });
+    provider.on("authorization.success", (ctx) => {
+      this.logger.log(
+        `OAuth authorization.success client=${ctx.oidc?.client?.clientId} account=${ctx.oidc?.session?.accountId}`,
+      );
+    });
+    provider.on("grant.success", (ctx) => {
+      this.logger.log(
+        `OAuth grant.success client=${ctx.oidc?.client?.clientId} grant_type=${ctx.oidc?.params?.grant_type}`,
+      );
+    });
+    provider.on("registration_create.success", (ctx, client) => {
+      this.logger.log(
+        `OAuth DCR success client_id=${client.clientId} redirect_uris=${JSON.stringify(client.redirectUris)}`,
+      );
     });
 
     this.logger.log(`OAuth provider initialized — issuer ${issuer}`);

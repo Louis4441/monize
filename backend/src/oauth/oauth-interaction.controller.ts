@@ -41,14 +41,23 @@ export class OAuthInteractionController {
     const provider = this.providerService.getProvider();
     const interaction = await provider.interactionDetails(req, res);
     const { prompt, params, uid } = interaction;
+    this.logger.log(
+      `interaction.render uid=${uid} prompt=${prompt.name} client=${params.client_id} scope="${params.scope}"`,
+    );
 
     if (prompt.name === "login") {
       const user = await this.resolveCookieUser(req);
       if (!user) {
         const loginUrl = this.buildLoginRedirect(req.originalUrl || req.url);
+        this.logger.log(
+          `interaction.render uid=${uid} -> redirect to login (no auth_token cookie)`,
+        );
         res.redirect(302, loginUrl);
         return;
       }
+      this.logger.log(
+        `interaction.render uid=${uid} -> finishing login for account=${user.id}`,
+      );
       await provider.interactionFinished(
         req,
         res,
@@ -63,9 +72,15 @@ export class OAuthInteractionController {
       if (!user) {
         // Lost session mid-flow — bounce back through login.
         const loginUrl = this.buildLoginRedirect(req.originalUrl || req.url);
+        this.logger.log(
+          `interaction.render uid=${uid} consent prompt with no cookie -> back to login`,
+        );
         res.redirect(302, loginUrl);
         return;
       }
+      this.logger.log(
+        `interaction.render uid=${uid} -> rendering consent for account=${user.id}`,
+      );
 
       const requestedScopes =
         (params.scope as string | undefined)?.split(" ") ?? [];
@@ -152,6 +167,9 @@ export class OAuthInteractionController {
     grant.addOIDCScope(grantedScopes.join(" "));
     grant.addResourceScope(resource, grantedScopes.join(" "));
     const grantId = await grant.save();
+    this.logger.log(
+      `interaction.confirm grant saved id=${grantId} account=${user.id} client=${clientId} scopes=${grantedScopes.join(",")}`,
+    );
 
     await provider.interactionFinished(
       req,
