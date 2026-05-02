@@ -6,6 +6,7 @@ import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
 import { AdminService } from "./admin.service";
 import { AdminController } from "./admin.controller";
+import { OAuthModule } from "../oauth/oauth.module";
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { AdminController } from "./admin.controller";
       RefreshToken,
       PersonalAccessToken,
     ]),
+    OAuthModule,
   ],
   providers: [AdminService],
   controllers: [AdminController],

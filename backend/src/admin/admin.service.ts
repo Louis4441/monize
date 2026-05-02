@@ -12,6 +12,7 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
 import { generateReadablePassword } from "./utils/password-generator";
+import { OAuthProviderService } from "../oauth/oauth-provider.service";
 
 @Injectable()
 export class AdminService {
@@ -24,6 +25,7 @@ export class AdminService {
     private refreshTokensRepository: Repository<RefreshToken>,
     @InjectRepository(PersonalAccessToken)
     private patRepository: Repository<PersonalAccessToken>,
+    private oauthProviderService: OAuthProviderService,
   ) {}
 
   async findAllUsers() {
@@ -106,8 +108,12 @@ export class AdminService {
     targetUser.isActive = isActive;
     const saved = await this.usersRepository.save(targetUser);
 
-    // SECURITY: Revoke all refresh tokens and PATs when deactivating a user
-    // to immediately invalidate all sessions and API access
+    // SECURITY: Revoke all refresh tokens, PATs, and OIDC artifacts when
+    // deactivating a user to immediately invalidate every authenticated
+    // surface — web sessions (refresh tokens), CLI/API access (PATs), and
+    // MCP/OAuth clients (access + refresh tokens, authorization codes,
+    // grants, sessions). Without the OIDC sweep, an MCP client could keep
+    // calling tools for up to the access-token TTL even after deactivation.
     if (!isActive) {
       await this.refreshTokensRepository.update(
         { userId: targetUserId, isRevoked: false },
@@ -117,6 +123,7 @@ export class AdminService {
         { userId: targetUserId, isRevoked: false },
         { isRevoked: true },
       );
+      await this.oauthProviderService.revokeAllForUser(targetUserId);
     }
 
     return this.sanitizeUser(saved);
@@ -144,8 +151,12 @@ export class AdminService {
       }
     }
 
-    // Delete preferences first (FK constraint)
+    // Delete preferences first (FK constraint), then sweep OIDC artifacts
+    // to avoid leaving orphan oauth_payloads rows referencing the deleted
+    // subject. (The findAccount gate would reject them anyway, but the
+    // rows are cheap to delete and keep the table clean.)
     await this.preferencesRepository.delete({ userId: targetUserId });
+    await this.oauthProviderService.revokeAllForUser(targetUserId);
     await this.usersRepository.remove(targetUser);
   }
 
@@ -180,7 +191,8 @@ export class AdminService {
     targetUser.resetTokenExpiry = null;
     await this.usersRepository.save(targetUser);
 
-    // SECURITY: Revoke all refresh tokens and PATs to force re-login on all devices
+    // SECURITY: Revoke all refresh tokens, PATs, and OIDC artifacts so the
+    // forced password change applies everywhere — web, CLI/API, and MCP.
     await this.refreshTokensRepository.update(
       { userId: targetUserId, isRevoked: false },
       { isRevoked: true },
@@ -189,6 +201,7 @@ export class AdminService {
       { userId: targetUserId, isRevoked: false },
       { isRevoked: true },
     );
+    await this.oauthProviderService.revokeAllForUser(targetUserId);
 
     return { temporaryPassword };
   }

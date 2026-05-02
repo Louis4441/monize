@@ -52,7 +52,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (payload.type === "2fa_pending") {
       throw new UnauthorizedException("2FA verification required");
     }
-    const user = await this.authService.getUserById(payload.sub);
+    // mustChangePassword is intentionally NOT enforced here — the global
+    // MustChangePasswordGuard handles it, which lets the password-change
+    // endpoints themselves remain reachable. The OAuth/PAT bearer paths
+    // bypass that guard via @SkipPasswordCheck and enforce it inline instead.
+    const user = await this.authService.getUserStateById(payload.sub);
     if (!user || !user.isActive) {
       throw new UnauthorizedException("User not found or inactive");
     }

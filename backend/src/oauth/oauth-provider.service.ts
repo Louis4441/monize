@@ -10,6 +10,9 @@ import { DataSource } from "typeorm";
 import type { default as ProviderType } from "oidc-provider";
 import { makeAdapterFactory } from "./postgres.adapter";
 import { derivePurposeKey } from "../auth/crypto.util";
+import { AuthService } from "../auth/auth.service";
+import { checkUserAuthState } from "../auth/user-state.util";
+import { OAuthPayload } from "./entities/oauth-payload.entity";
 
 export const MCP_RESOURCE_SCOPES = ["monize:read", "monize:write"] as const;
 export type McpScope = (typeof MCP_RESOURCE_SCOPES)[number];
@@ -23,6 +26,7 @@ export class OAuthProviderService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     @InjectDataSource() private readonly dataSource: DataSource,
+    private readonly authService: AuthService,
   ) {}
 
   async onModuleInit() {
@@ -163,6 +167,20 @@ export class OAuthProviderService implements OnModuleInit {
         requestObjectSigningAlgValues: [],
       },
       findAccount: async (_ctx, sub: string) => {
+        // Block refresh-token rotations and any other grant lookups for users
+        // who have been deactivated, deleted, or flagged for password reset.
+        // Without this gate, a disabled user keeps minting fresh access
+        // tokens for up to the refresh-token TTL.
+        const user = await this.authService.getUserStateById(sub);
+        const denial = checkUserAuthState(user, {
+          enforceMustChangePassword: true,
+        });
+        if (denial) {
+          this.logger.warn(
+            `OAuth findAccount denied for sub=${sub} reason=${denial}`,
+          );
+          return undefined;
+        }
         return {
           accountId: sub,
           claims: () => ({ sub }),
@@ -286,6 +304,20 @@ export class OAuthProviderService implements OnModuleInit {
         : aud === expectedAudience;
       if (!audMatches) return null;
 
+      // Mirror the PAT and cookie auth paths: an OAuth access token must not
+      // outlive the user's account-state gate. Reject tokens whose subject
+      // has been deactivated, deleted, or flagged for password reset.
+      const user = await this.authService.getUserStateById(token.accountId);
+      const denial = checkUserAuthState(user, {
+        enforceMustChangePassword: true,
+      });
+      if (denial) {
+        this.logger.warn(
+          `OAuth access token rejected sub=${token.accountId} reason=${denial}`,
+        );
+        return null;
+      }
+
       const rawScopes = token.scope ?? "";
       // Translate the OAuth-issued scope set ("monize:read monize:write")
       // into the comma-separated bare-name format the existing MCP tool
@@ -305,6 +337,32 @@ export class OAuthProviderService implements OnModuleInit {
       );
       return null;
     }
+  }
+
+  /**
+   * Revoke every OIDC artifact bound to a user — access tokens, refresh
+   * tokens, authorization codes, grants, sessions. Called from admin flows
+   * (deactivate, password reset) so revocation takes effect immediately
+   * instead of waiting for the access-token TTL to expire.
+   *
+   * Implementation: a single SQL DELETE on the payload store, keyed on the
+   * subject embedded in the JSON payload. Covers every grantable model
+   * because oidc-provider stores `accountId` in the payload of each.
+   */
+  async revokeAllForUser(userId: string): Promise<number> {
+    const result = await this.dataSource
+      .getRepository(OAuthPayload)
+      .createQueryBuilder()
+      .delete()
+      .where("payload ->> 'accountId' = :userId", { userId })
+      .execute();
+    const affected = result.affected ?? 0;
+    if (affected > 0) {
+      this.logger.log(
+        `Revoked ${affected} OIDC payload(s) for user=${userId}`,
+      );
+    }
+    return affected;
   }
 
   private requirePublicUrl(): string {

@@ -11,16 +11,14 @@ describe("JwtStrategy", () => {
 
   const mockUser = {
     id: "user-1",
-    email: "test@example.com",
-    firstName: "Test",
-    lastName: "User",
     isActive: true,
+    mustChangePassword: false,
     role: "user",
   };
 
   beforeEach(async () => {
     authService = {
-      getUserById: jest.fn(),
+      getUserStateById: jest.fn(),
     };
 
     configService = {
@@ -86,7 +84,7 @@ describe("JwtStrategy", () => {
 
     it("rejects inactive users", async () => {
       const payload = { sub: "user-1" };
-      authService.getUserById.mockResolvedValue({
+      authService.getUserStateById.mockResolvedValue({
         ...mockUser,
         isActive: false,
       });
@@ -101,7 +99,7 @@ describe("JwtStrategy", () => {
 
     it("rejects when user is not found", async () => {
       const payload = { sub: "nonexistent" };
-      authService.getUserById.mockResolvedValue(null);
+      authService.getUserStateById.mockResolvedValue(null);
 
       await expect(strategy.validate(payload)).rejects.toThrow(
         UnauthorizedException,
@@ -110,11 +108,11 @@ describe("JwtStrategy", () => {
 
     it("returns user for valid payload", async () => {
       const payload = { sub: "user-1" };
-      authService.getUserById.mockResolvedValue(mockUser);
+      authService.getUserStateById.mockResolvedValue(mockUser);
 
       const result = await strategy.validate(payload);
 
-      expect(authService.getUserById).toHaveBeenCalledWith("user-1");
+      expect(authService.getUserStateById).toHaveBeenCalledWith("user-1");
       expect(result).toEqual(mockUser);
     });
   });

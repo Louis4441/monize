@@ -10,6 +10,7 @@ import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
+import { OAuthProviderService } from "../oauth/oauth-provider.service";
 
 describe("AdminService", () => {
   let service: AdminService;
@@ -17,6 +18,7 @@ describe("AdminService", () => {
   let preferencesRepository: Record<string, jest.Mock>;
   let refreshTokensRepository: Record<string, jest.Mock>;
   let patRepository: Record<string, jest.Mock>;
+  let oauthProviderService: Record<string, jest.Mock>;
 
   const mockAdmin = {
     id: "admin-1",
@@ -71,6 +73,10 @@ describe("AdminService", () => {
       update: jest.fn(),
     };
 
+    oauthProviderService = {
+      revokeAllForUser: jest.fn().mockResolvedValue(0),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
@@ -86,6 +92,10 @@ describe("AdminService", () => {
         {
           provide: getRepositoryToken(PersonalAccessToken),
           useValue: patRepository,
+        },
+        {
+          provide: OAuthProviderService,
+          useValue: oauthProviderService,
         },
       ],
     }).compile();
@@ -215,6 +225,27 @@ describe("AdminService", () => {
       );
     });
 
+    it("revokes all OIDC artifacts when deactivating a user", async () => {
+      usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
+
+      await service.updateUserStatus("admin-1", "user-2", false);
+
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        "user-2",
+      );
+    });
+
+    it("does not revoke OIDC artifacts when activating a user", async () => {
+      usersRepository.findOne.mockResolvedValue({
+        ...mockTargetUser,
+        isActive: false,
+      });
+
+      await service.updateUserStatus("admin-1", "user-2", true);
+
+      expect(oauthProviderService.revokeAllForUser).not.toHaveBeenCalled();
+    });
+
     it("throws ForbiddenException when disabling own account", async () => {
       await expect(
         service.updateUserStatus("admin-1", "admin-1", false),
@@ -279,6 +310,16 @@ describe("AdminService", () => {
 
       expect(usersRepository.remove).toHaveBeenCalled();
     });
+
+    it("revokes all OIDC artifacts on delete", async () => {
+      usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
+
+      await service.deleteUser("admin-1", "user-2");
+
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        "user-2",
+      );
+    });
   });
 
   describe("resetUserPassword", () => {
@@ -318,6 +359,16 @@ describe("AdminService", () => {
       expect(patRepository.update).toHaveBeenCalledWith(
         { userId: "user-2", isRevoked: false },
         { isRevoked: true },
+      );
+    });
+
+    it("revokes all OIDC artifacts on password reset", async () => {
+      usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
+
+      await service.resetUserPassword("admin-1", "user-2");
+
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        "user-2",
       );
     });
 

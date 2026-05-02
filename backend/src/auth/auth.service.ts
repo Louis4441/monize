@@ -441,6 +441,18 @@ export class AuthService {
     return this.usersRepository.findOne({ where: { id } });
   }
 
+  async getUserStateById(
+    id: string,
+  ): Promise<Pick<
+    User,
+    "id" | "isActive" | "mustChangePassword" | "role"
+  > | null> {
+    return this.usersRepository.findOne({
+      where: { id },
+      select: ["id", "isActive", "mustChangePassword", "role"],
+    });
+  }
+
   // M6: OIDC account linking with confirmation
 
   async initiateOidcLink(
