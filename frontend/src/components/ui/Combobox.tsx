@@ -123,8 +123,13 @@ export function Combobox({
       setInputValue(initialDisplayValue);
       setSelectedLabel(initialDisplayValue);
       setHasInitialized(true);
+    } else if (selectedLabel && options.some(opt => opt.label === selectedLabel)) {
+      // Programmatic clear: value is empty but the displayed label was a known
+      // option (not a user-typed custom value), so sync the display to empty.
+      setSelectedLabel('');
+      setInputValue('');
     }
-  }, [value, options, isTyping, allowCustomValue, initialDisplayValue, hasInitialized]);
+  }, [value, options, isTyping, allowCustomValue, initialDisplayValue, hasInitialized, selectedLabel]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Close dropdown when clicking outside
