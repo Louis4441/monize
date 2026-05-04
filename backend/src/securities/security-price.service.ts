@@ -961,7 +961,20 @@ export class SecurityPriceService {
    * provider override + user default + preferredExchanges.
    */
   async backfillSecurity(security: Security): Promise<void> {
-    if (security.skipPriceUpdates) return;
+    await this.backfillSecurityRange(security, "1y");
+  }
+
+  /**
+   * Backfill historical prices for a single security over a configurable
+   * range ("1y", "5y", "10y", "max", etc.). Returns the number of price rows
+   * upserted. Used by callers that need deeper history than the daily-1y
+   * default (e.g. Monte Carlo's per-holding stats).
+   */
+  async backfillSecurityRange(
+    security: Security,
+    range: string,
+  ): Promise<number> {
+    if (security.skipPriceUpdates) return 0;
 
     const [ctx] =
       (await this.loadUserContexts([security.userId])).values() || [];
@@ -972,12 +985,12 @@ export class SecurityPriceService {
 
     const bundle = await this.fetchHistoricalWithFallback(
       security,
-      "1y",
+      range,
       userCtx,
     );
     if (!bundle || bundle.prices.length === 0) {
       this.logger.warn(`No historical prices available for ${security.symbol}`);
-      return;
+      return 0;
     }
 
     if (bundle.provider === "msn") {
@@ -991,12 +1004,14 @@ export class SecurityPriceService {
         sourceFor(bundle.provider),
       );
       this.logger.log(
-        `Backfilled ${bundle.prices.length} daily prices for ${security.symbol} via ${bundle.provider}`,
+        `Backfilled ${bundle.prices.length} ${range} prices for ${security.symbol} via ${bundle.provider}`,
       );
+      return bundle.prices.length;
     } catch (error) {
       this.logger.error(
-        `Failed to backfill daily prices for ${security.symbol}: ${error.message}`,
+        `Failed to upsert backfilled prices for ${security.symbol}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return 0;
     }
   }
 

@@ -26,7 +26,7 @@ export interface SimulationResult {
   successRate: number | null;
   /** Echo of the inputs that produced this result. Lets the UI show "ran with…". */
   inputsSnapshot: Record<string, unknown>;
-  /** Whether values are deflated to today's dollars. */
+  /** Whether values are deflated to today's value (real terms). */
   realValues: boolean;
   ranAt: string;
 }

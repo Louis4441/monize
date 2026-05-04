@@ -98,10 +98,12 @@ export class MonteCarloSimulationService {
 
       if (pathDepleted) depleted++;
       finalBalances[s] = columns[totalYears - 1][s];
-      if (
-        params.targetValue != null &&
-        finalBalances[s] >= params.targetValue
-      ) {
+      // The user enters their target in today's value, so always compare
+      // against the deflated final balance regardless of the showRealValues
+      // display toggle. Otherwise nominal runs over a long horizon would
+      // always beat any reasonable target and report 100% success.
+      const realFinal = value / Math.pow(1 + params.inflationRate, totalYears);
+      if (params.targetValue != null && realFinal >= params.targetValue) {
         aboveTarget++;
       }
     }

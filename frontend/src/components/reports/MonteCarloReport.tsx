@@ -476,7 +476,7 @@ export function MonteCarloReport() {
                 prefix={currencySymbol}
               />
               <CurrencyInput
-                label="Target portfolio"
+                label="Target (today's value)"
                 value={form.targetValue ?? undefined}
                 onChange={(v) => updateField('targetValue', v ?? null)}
                 allowNegative={false}
@@ -484,9 +484,11 @@ export function MonteCarloReport() {
               />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Annual withdrawal is in today&apos;s dollars and is grown by the
+              Annual withdrawal is in today&apos;s value and is grown by the
               inflation rate each year so purchasing power stays constant
-              throughout the withdrawal phase.
+              throughout the withdrawal phase. The success-rate target is also
+              compared against each path&apos;s final value in today&apos;s
+              terms.
             </p>
           </fieldset>
 
@@ -575,7 +577,10 @@ export function MonteCarloReport() {
                 checked={form.showRealValues}
                 onChange={(e) => updateField('showRealValues', e.target.checked)}
               />
-              Show in today&apos;s dollars (real, inflation-adjusted)
+              Show in today&apos;s value (real, inflation-adjusted) —
+              <span className="text-gray-500 dark:text-gray-400 ml-1">
+                applies after the next Run
+              </span>
             </label>
           </fieldset>
 
@@ -632,7 +637,7 @@ export function MonteCarloReport() {
                 Projected portfolio value{' '}
                 <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
                   (in {defaultCurrency},{' '}
-                  {result.realValues ? "today's dollars" : 'nominal'})
+                  {result.realValues ? "real / today's value" : 'nominal / future value'})
                 </span>
               </h3>
               <div className="h-80 w-full">

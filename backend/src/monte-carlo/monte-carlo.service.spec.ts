@@ -5,8 +5,10 @@ import { MonteCarloService } from "./monte-carlo.service";
 import { MonteCarloSimulationService } from "./monte-carlo-simulation.service";
 import { MonteCarloScenario } from "./entities/monte-carlo-scenario.entity";
 import { Holding } from "../securities/entities/holding.entity";
+import { Security } from "../securities/entities/security.entity";
 import { SecurityPrice } from "../securities/entities/security-price.entity";
 import { Account } from "../accounts/entities/account.entity";
+import { SecurityPriceService } from "../securities/security-price.service";
 import { PortfolioService } from "../securities/portfolio.service";
 import { CreateScenarioDto } from "./dto/create-scenario.dto";
 
@@ -89,6 +91,12 @@ describe("MonteCarloService", () => {
     accountsRepository = {
       find: jest.fn().mockResolvedValue([]),
     };
+    const securitiesRepository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+    const securityPriceService = {
+      backfillSecurityRange: jest.fn().mockResolvedValue(0),
+    };
     portfolioService = {
       getPortfolioSummary: jest.fn().mockResolvedValue({
         totalPortfolioValue: 250000,
@@ -116,6 +124,14 @@ describe("MonteCarloService", () => {
         {
           provide: getRepositoryToken(Account),
           useValue: accountsRepository,
+        },
+        {
+          provide: getRepositoryToken(Security),
+          useValue: securitiesRepository,
+        },
+        {
+          provide: SecurityPriceService,
+          useValue: securityPriceService,
         },
         {
           provide: PortfolioService,

@@ -13,7 +13,9 @@ import { RunScenarioDto } from "./dto/run-scenario.dto";
 import { MonteCarloSimulationService } from "./monte-carlo-simulation.service";
 import { SimulationResult } from "./dto/simulation-result.dto";
 import { PortfolioService } from "../securities/portfolio.service";
+import { SecurityPriceService } from "../securities/security-price.service";
 import { Holding } from "../securities/entities/holding.entity";
+import { Security } from "../securities/entities/security.entity";
 import { SecurityPrice } from "../securities/entities/security-price.entity";
 import { Account } from "../accounts/entities/account.entity";
 
@@ -59,8 +61,11 @@ export class MonteCarloService {
     private securityPriceRepository: Repository<SecurityPrice>,
     @InjectRepository(Account)
     private accountsRepository: Repository<Account>,
+    @InjectRepository(Security)
+    private securitiesRepository: Repository<Security>,
     private simulationService: MonteCarloSimulationService,
     private portfolioService: PortfolioService,
+    private securityPriceService: SecurityPriceService,
   ) {}
 
   async create(
@@ -447,6 +452,41 @@ export class MonteCarloService {
     securityIds: string[],
   ): Promise<Map<string, Map<number, number>>> {
     if (securityIds.length === 0) return new Map();
+
+    let yearlyReturns = await this.queryYearlyReturns(securityIds);
+
+    // For securities with fewer than 2 yearly returns we can't compute
+    // volatility — usually because they were added recently and only have a
+    // few months of local price history. Fall back to Yahoo/MSN: pull 5
+    // years of daily prices on demand, then re-query.
+    const sparseIds = securityIds.filter(
+      (id) => (yearlyReturns.get(id)?.size ?? 0) < 2,
+    );
+    if (sparseIds.length > 0) {
+      const securities = await this.securitiesRepository.find({
+        where: { id: In(sparseIds) },
+      });
+      await Promise.all(
+        securities.map((s) =>
+          this.securityPriceService
+            .backfillSecurityRange(s, "5y")
+            .catch((err) => {
+              this.logger.warn(
+                `Provider backfill failed for ${s.symbol}: ${err instanceof Error ? err.message : String(err)}`,
+              );
+              return 0;
+            }),
+        ),
+      );
+      yearlyReturns = await this.queryYearlyReturns(securityIds);
+    }
+
+    return yearlyReturns;
+  }
+
+  private async queryYearlyReturns(
+    securityIds: string[],
+  ): Promise<Map<string, Map<number, number>>> {
     const yearEndRows: Array<{
       security_id: string;
       year: string;
@@ -495,12 +535,12 @@ export class MonteCarloService {
         userId,
         accountIds,
       );
-      // NaN serializes to JSON null and would break the frontend form. Clamp
-      // any non-finite portfolio value (e.g. caused by a missing exchange
-      // rate) to 0.
-      return Number.isFinite(summary.totalPortfolioValue)
-        ? summary.totalPortfolioValue
-        : 0;
+      const value = summary.totalPortfolioValue;
+      // NaN serializes to JSON null and would break the frontend form. Floats
+      // with more than 4 decimals fail the DTO's @IsNumber maxDecimalPlaces
+      // check. Clamp non-finite values to 0 and round to 4 decimal places.
+      if (!Number.isFinite(value)) return 0;
+      return Math.round(value * 10000) / 10000;
     } catch (err) {
       this.logger.warn(
         `Failed to compute current portfolio value for accounts ${accountIds.join(",")}: ${
