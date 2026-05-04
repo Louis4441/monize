@@ -19,6 +19,7 @@ import {
   SimulationResult,
 } from '@/lib/monte-carlo';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { getCurrencySymbol } from '@/lib/format';
 import { Button } from '@/components/ui/Button';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
@@ -68,6 +69,7 @@ const EMPTY_FORM: FormState = {
 
 export function MonteCarloReport() {
   const { formatCurrency, formatCurrencyLabel, defaultCurrency } = useNumberFormat();
+  const currencySymbol = useMemo(() => getCurrencySymbol(defaultCurrency), [defaultCurrency]);
   const [accounts, setAccounts] = useState<BrokerageAccount[]>([]);
   const [scenarios, setScenarios] = useState<MonteCarloScenario[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -103,6 +105,32 @@ export function MonteCarloReport() {
     };
     load();
   }, []);
+
+  // Auto-populate the starting value when "Use current balance" is on. Refetches
+  // when the selected accounts change so the displayed value matches what the
+  // simulation will actually use.
+  useEffect(() => {
+    if (!form.useCurrentBalance || form.accountIds.length === 0) return;
+    let cancelled = false;
+    monteCarloApi
+      .historicalStats(form.accountIds)
+      .then((stats) => {
+        if (cancelled) return;
+        setForm((prev) =>
+          prev.useCurrentBalance &&
+          prev.accountIds.length > 0 &&
+          prev.accountIds.every((id) => form.accountIds.includes(id))
+            ? { ...prev, startingValue: stats.currentBalance }
+            : prev,
+        );
+      })
+      .catch((err) => {
+        logger.error('Failed to fetch current balance:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.useCurrentBalance, form.accountIds]);
 
   const updateField = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -329,7 +357,7 @@ export function MonteCarloReport() {
               value={form.startingValue}
               onChange={(v) => updateField('startingValue', v ?? 0)}
               allowNegative={false}
-              prefix={defaultCurrency}
+              prefix={currencySymbol}
               disabled={form.useCurrentBalance}
             />
             <div className="flex items-end pb-2">
@@ -363,7 +391,7 @@ export function MonteCarloReport() {
                 value={form.annualContribution}
                 onChange={(v) => updateField('annualContribution', v ?? 0)}
                 allowNegative={false}
-                prefix={defaultCurrency}
+                prefix={currencySymbol}
               />
               <NumericInput
                 label="Contribution growth"
@@ -395,14 +423,14 @@ export function MonteCarloReport() {
                 value={form.annualWithdrawal}
                 onChange={(v) => updateField('annualWithdrawal', v ?? 0)}
                 allowNegative={false}
-                prefix={defaultCurrency}
+                prefix={currencySymbol}
               />
               <CurrencyInput
                 label="Target portfolio"
                 value={form.targetValue ?? undefined}
                 onChange={(v) => updateField('targetValue', v ?? null)}
                 allowNegative={false}
-                prefix={defaultCurrency}
+                prefix={currencySymbol}
               />
             </div>
           </fieldset>
