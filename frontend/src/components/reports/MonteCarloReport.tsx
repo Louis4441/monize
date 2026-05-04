@@ -26,6 +26,7 @@ import { getCurrencySymbol } from '@/lib/format';
 import { showErrorToast } from '@/lib/errors';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { NumericInput } from '@/components/ui/NumericInput';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { MultiSelect } from '@/components/ui/MultiSelect';
@@ -109,6 +110,7 @@ export function MonteCarloReport() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -422,9 +424,16 @@ export function MonteCarloReport() {
     }
   };
 
-  const removeActive = async () => {
+  const requestDelete = () => {
     if (!activeId) return;
-    if (!window.confirm('Delete this scenario?')) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!activeId) {
+      setShowDeleteConfirm(false);
+      return;
+    }
     try {
       await monteCarloApi.remove(activeId);
       setScenarios((prev) => prev.filter((s) => s.id !== activeId));
@@ -433,6 +442,8 @@ export function MonteCarloReport() {
     } catch (err) {
       logger.error('Delete failed:', err);
       showErrorToast(err, 'Could not delete scenario.');
+    } finally {
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -865,7 +876,7 @@ export function MonteCarloReport() {
                   : 'Save scenario'}
             </Button>
             {activeId && (
-              <Button variant="danger" onClick={removeActive}>
+              <Button variant="danger" onClick={requestDelete}>
                 Delete
               </Button>
             )}
@@ -980,6 +991,17 @@ export function MonteCarloReport() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Delete scenario?"
+        message={`This will permanently delete "${form.name || 'this scenario'}" and any cash flows attached to it.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

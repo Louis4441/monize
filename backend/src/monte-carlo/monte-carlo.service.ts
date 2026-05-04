@@ -106,10 +106,17 @@ export class MonteCarloService {
   }
 
   async findAll(userId: string): Promise<MonteCarloScenario[]> {
-    return this.scenariosRepository.find({
+    const scenarios = await this.scenariosRepository.find({
       where: { userId },
+      relations: ["cashFlows"],
       order: { isFavourite: "DESC", updatedAt: "DESC" },
     });
+    for (const s of scenarios) {
+      if (s.cashFlows) {
+        s.cashFlows.sort((a, b) => a.sortOrder - b.sortOrder);
+      }
+    }
+    return scenarios;
   }
 
   async findOne(userId: string, id: string): Promise<MonteCarloScenario> {
