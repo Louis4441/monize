@@ -761,13 +761,11 @@ export function MonteCarloReport() {
               disabled={form.useCurrentBalance}
             />
             <div className="flex items-end pb-2">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input
-                  type="checkbox"
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                <ToggleSwitch
                   checked={form.useCurrentBalance}
-                  onChange={(e) =>
-                    updateField('useCurrentBalance', e.target.checked)
-                  }
+                  onChange={(v) => updateField('useCurrentBalance', v)}
+                  label="Use current balance on each run"
                 />
                 Use current balance on each run
               </label>
@@ -936,15 +934,13 @@ export function MonteCarloReport() {
                     <div
                       className={`flex items-center gap-2 ${cf.flowType === 'RECURRING' ? 'md:col-span-1' : 'md:col-span-3'}`}
                     >
-                      <label className="inline-flex items-center gap-1 text-xs text-gray-700 dark:text-gray-300">
-                        <input
-                          type="checkbox"
+                      <label className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <ToggleSwitch
                           checked={cf.inflationAdjust}
-                          onChange={(e) =>
-                            updateCashFlow(idx, {
-                              inflationAdjust: e.target.checked,
-                            })
+                          onChange={(v) =>
+                            updateCashFlow(idx, { inflationAdjust: v })
                           }
+                          label="Inflate"
                         />
                         Inflate
                       </label>
@@ -1044,13 +1040,14 @@ export function MonteCarloReport() {
                 min={100}
               />
             </div>
-            <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300 mt-3">
-              <input
-                type="checkbox"
-                className="mt-0.5 shrink-0"
-                checked={form.showRealValues}
-                onChange={(e) => updateField('showRealValues', e.target.checked)}
-              />
+            <label className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300 mt-3 cursor-pointer">
+              <span className="mt-0.5 shrink-0">
+                <ToggleSwitch
+                  checked={form.showRealValues}
+                  onChange={(v) => updateField('showRealValues', v)}
+                  label="Show in today's value"
+                />
+              </span>
               <span className="flex-1">
                 Show in today&apos;s value (real, inflation-adjusted)
                 <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -1418,6 +1415,40 @@ function CashFlowMarker({
       ? `${cx},${cy - size} ${cx - size},${cy + size} ${cx + size},${cy + size}`
       : `${cx},${cy + size} ${cx - size},${cy - size} ${cx + size},${cy - size}`;
   return <polygon points={points} fill={fill} stroke={stroke} strokeWidth={1.5} />;
+}
+
+function ToggleSwitch({
+  checked,
+  onChange,
+  disabled,
+  label,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800 ${
+        checked
+          ? 'bg-blue-600'
+          : 'bg-gray-300 dark:bg-gray-600'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+          checked ? 'translate-x-[1.125rem]' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  );
 }
 
 function CashFlowLegendSwatch({
