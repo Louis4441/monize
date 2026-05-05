@@ -24,11 +24,6 @@ Migrations run automatically when the backend starts (both dev and production). 
 ## Development Database Connection
 Credentials are in the root `.env` file (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`).
 
-### Running a migration manually (optional — migrations run automatically on startup)
-```bash
-PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U $POSTGRES_USER -d $POSTGRES_DB -f database/migrations/<filename>.sql
-```
-
 ## Creating a New Migration
 
 1. **Create the migration file** in `database/migrations/` with the next sequential number prefix:
@@ -55,17 +50,6 @@ PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -U $POSTGRES_USER -d $POSTGRES_D
 - Keep migrations small and focused on a single change
 - Migrations must be idempotent (safe to run multiple times)
 
-## Key Tables
-- `schema_migrations` - Tracks which migration files have been applied
-- `users` - User accounts and authentication
-- `user_preferences` - Per-user settings (currency, date format, theme, etc.)
-- `user_currency_preferences` - Per-user currency visibility and active state
-- `accounts` - Financial accounts (chequing, savings, credit, investment, etc.)
-- `transactions` - Financial transactions linked to accounts
-- `categories` - Transaction categories (hierarchical via `parent_id`)
-- `payees` - Transaction payees
-- `budgets` / `budget_categories` - Budget definitions and category allocations
-- `scheduled_transactions` / `scheduled_transaction_splits` - Recurring transactions
-- `securities` / `investment_transactions` / `investment_holdings` - Investment tracking
-- `ai_provider_configs` / `ai_conversations` / `ai_messages` - AI assistant
-- `custom_reports` - Saved report configurations
+## Tables
+
+`schema.sql` is the authoritative source. Use it (or the TypeORM entities under `backend/src/*/entities/`) to look up table and column definitions rather than maintaining a duplicate list here.

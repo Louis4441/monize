@@ -15,35 +15,9 @@ npm run test:cov           # Coverage report (80% minimum all metrics)
 npm run test:e2e           # E2E tests (test/**/*.spec.ts, 30s timeout, sequential)
 ```
 
-## Feature Modules
+## Module Structure
 
-21 modules in `src/`, each following the standard structure:
-
-| Module | Description |
-|--------|-------------|
-| accounts | Financial accounts (chequing, savings, credit, loan, mortgage, investment, asset) |
-| admin | User management (roles, status, password reset) |
-| ai | AI providers, query engine, insights, usage tracking |
-| auth | JWT, OIDC, 2FA/TOTP, PATs, refresh tokens, local strategy |
-| budgets | Budget CRUD, period management, alerts |
-| built-in-reports | Pre-built reports (spending, income, trends, anomalies, tax) |
-| categories | Transaction categories (hierarchical tree via `parent_id`) |
-| common | Shared guards, filters, decorators, pipes, validators, utilities |
-| currencies | Currency management, exchange rate fetching |
-| database | DB init, migrations, seeding, demo reset |
-| health | Health check (no auth) |
-| import | QIF/OFX file import and transaction processing |
-| mcp | Model Context Protocol server integration |
-| net-worth | Net worth calculations and snapshots |
-| notifications | Email service, bill reminders, mortgage reminders |
-| payees | Payee management with default categories |
-| reports | Custom report builder |
-| scheduled-transactions | Recurring transactions, loan transactions |
-| securities | Stocks/ETFs, holdings, investment transactions, price updates |
-| transactions | Core transaction CRUD, splits, transfers, reconciliation, analytics |
-| users | User profiles, preferences, trusted devices |
-
-## Module File Naming
+Each feature module under `src/` follows the standard layout. Use `ls src/` or LSP `workspaceSymbol` to discover modules; the cron schedule lives in `docs/cron-jobs.md`.
 
 ```
 {feature}/
@@ -56,6 +30,8 @@ npm run test:e2e           # E2E tests (test/**/*.spec.ts, 30s timeout, sequenti
   dto/create-{entity}.dto.ts
   dto/update-{entity}.dto.ts
 ```
+
+Controllers are thin and delegate to services. Services always take `userId` as the first parameter and filter by it for multi-tenancy.
 
 ## Configuration
 
@@ -91,36 +67,10 @@ Also configured: `ConfigModule` (global), `TypeOrmModule` (async, PostgreSQL), `
 - **Cookie parser:** Required for OIDC state/nonce and auth tokens
 - **Trust proxy:** Level 1 (Docker/nginx real client IP)
 
-## Common Utilities (`src/common/`)
-
-```
-common/
-  date-utils.ts              # formatDateYMD, todayYMD, getMonthEndYMD, isTransactionInFuture
-  query-param-utils.ts       # parseIds, parseUuids, parseCategoryIds, validateDateParam, UUID_REGEX
-  csrf.util.ts               # CSRF token utilities
-  category-tree.util.ts      # Category hierarchy utilities
-  demo-mode.module.ts        # DemoModeService (global)
-  decorators/
-    sanitize-html.decorator  # @SanitizeHtml() -- strips < and > to prevent stored XSS
-    skip-csrf.decorator      # @SkipCsrf() -- skip CSRF for non-cookie auth (PAT bearer)
-    demo-restricted.decorator # @DemoRestricted() -- block operation in demo mode
-  filters/
-    http-exception.filter    # GlobalExceptionFilter
-  guards/
-    csrf.guard               # CSRF double-submit cookie validation
-    demo-mode.guard           # Demo mode write restriction
-  interceptors/
-    csrf-refresh.interceptor # Refreshes CSRF cookie on response
-  pipes/
-    parse-currency-code.pipe # Validates currency codes
-    parse-symbol.pipe        # Validates security symbols
-  validators/
-    is-future-date.validator # Custom class-validator for future dates
-```
-
 ## Entity Conventions
 
-**DATE columns** use string transformers to avoid timezone issues:
+**DATE columns** must use a string transformer to avoid timezone issues -- without this, PostgreSQL returns a `Date` parsed in UTC and reading `.toISOString()` can shift the day:
+
 ```typescript
 @Column({
   type: 'date',
@@ -137,58 +87,12 @@ common/
 transactionDate: string;
 ```
 
-**Decimal columns** use `numericTransformer` to convert PostgreSQL string representation to JavaScript number:
-```typescript
-const numericTransformer = {
-  to: (value: number | null): number | null => value,
-  from: (value: string | null): number | null => value === null ? null : Number(value),
-};
-```
-
-**Timestamp columns** are always present:
-```typescript
-@CreateDateColumn({ name: 'created_at' })
-createdAt: Date;
-
-@UpdateDateColumn({ name: 'updated_at' })
-updatedAt: Date;
-```
+**Decimal columns** use a `numericTransformer` to convert PostgreSQL's string representation to `number`. **Timestamps** are `@CreateDateColumn({ name: 'created_at' })` and `@UpdateDateColumn({ name: 'updated_at' })`.
 
 ## Testing Conventions
 
-**Mock repositories** use `Record<string, jest.Mock>`:
-```typescript
-const mockRepo = {
-  find: jest.fn(),
-  findOne: jest.fn(),
-  save: jest.fn(),
-  create: jest.fn(),
-  delete: jest.fn(),
-};
-```
-
-**Test module setup** uses `Test.createTestingModule` with providers injecting mocks via `getRepositoryToken()`.
-
-**E2E tests** live in `test/` with helpers:
-- `test/helpers/auth-helper.ts` -- auth test utilities
-- `test/helpers/test-database.ts` -- database setup
-- `test/helpers/test-factories.ts` -- test data factories
+Mock repositories use `Record<string, jest.Mock>`; tests use `Test.createTestingModule` with mocks injected via `getRepositoryToken()`. E2E tests live in `test/` with helpers under `test/helpers/` (`auth-helper.ts`, `test-database.ts`, `test-factories.ts`).
 
 ## Cron Jobs
 
-Cron jobs use the `@Cron()` decorator from `@nestjs/schedule`. They run in a separate process (`npm run start:scheduler`).
-
-| Service | Schedule | Purpose |
-|---------|----------|---------|
-| `demo-reset.service` | Daily 4 AM, every 3 hours | Demo database reset |
-| `ai-usage.service` | Daily 4 AM | AI usage cleanup |
-| `ai-insights.service` | Daily 6 AM | Generate AI insights |
-| `auth.service` | Daily 3 AM | Expired token cleanup |
-| `scheduled-transactions.service` | Every 5 min past hour | Post due recurring transactions |
-| `exchange-rate.service` | 5 PM ET weekdays | Fetch exchange rates |
-| `accounts.service` | Midnight daily | Account maintenance |
-| `mortgage-reminder.service` | Daily 8 AM | Mortgage payment reminders |
-| `bill-reminder.service` | Daily 8 AM | Bill payment reminders |
-| `budget-period-cron.service` | 1st of month midnight | Create new budget periods |
-| `budget-alert.service` | Daily 7 AM, Mon 7 AM, Daily 3 AM | Budget threshold alerts |
-| `security-price.service` | 5 PM ET weekdays | Fetch security prices |
+Cron jobs use `@Cron()` from `@nestjs/schedule` and run in a separate process (`npm run start:scheduler`). For the full schedule, see `docs/cron-jobs.md` or grep `@Cron(`.
