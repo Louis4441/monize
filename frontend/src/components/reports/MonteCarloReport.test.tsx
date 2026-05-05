@@ -323,7 +323,8 @@ describe('MonteCarloReport', () => {
       });
       // Summary cards
       expect(screen.getByText(/Median final/i)).toBeInTheDocument();
-      expect(screen.getByText('$160.00')).toBeInTheDocument(); // median
+      // $160.00 also renders inside the Performance Summary table.
+      expect(screen.getAllByText('$160.00').length).toBeGreaterThan(0);
       expect(
         screen.getByText(/Probability of Depletion/i),
       ).toBeInTheDocument();
