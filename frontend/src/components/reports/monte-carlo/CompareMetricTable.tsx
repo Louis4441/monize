@@ -51,7 +51,7 @@ export function CompareMetricTable({
             {columns.map((col) => (
               <th
                 key={col.id}
-                className="bg-gray-50 dark:bg-gray-900/40 px-3 py-3 text-left font-medium text-gray-700 dark:text-gray-200 min-w-[200px]"
+                className="bg-gray-50 dark:bg-gray-900/40 px-3 py-3 text-left font-medium text-gray-700 dark:text-gray-200 min-w-[200px] overflow-hidden"
                 scope="col"
               >
                 <ColumnHeader
@@ -90,9 +90,9 @@ function ColumnHeader({
 }) {
   const title = column.scenario?.name ?? 'Scenario';
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+    <div className="flex flex-col gap-1 min-w-0">
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <span className="font-semibold text-gray-900 dark:text-gray-100 truncate min-w-0 flex-1">
           {title}
         </span>
         <button
