@@ -1657,6 +1657,7 @@ function ResultsTable({
 
 type SummaryRow = {
   label: string;
+  description: string;
   band: PerformanceSummary[keyof PerformanceSummary];
   format: 'currency' | 'percent' | 'ratio';
 };
@@ -1671,51 +1672,71 @@ function PerformanceSummaryTable({
   const rows: SummaryRow[] = [
     {
       label: 'Time Weighted Rate of Return (nominal)',
+      description:
+        'Geometric mean of the simulated annual returns. Ignores cash flows and is reported in nominal terms (not adjusted for inflation).',
       band: summary.twrNominal,
       format: 'percent',
     },
     {
       label: 'Time Weighted Rate of Return (real)',
+      description:
+        'Geometric mean of the simulated annual returns, adjusted for inflation so the result is in today’s purchasing power.',
       band: summary.twrReal,
       format: 'percent',
     },
     {
       label: 'Portfolio End Balance (nominal)',
+      description:
+        'Final portfolio value at the end of the simulation horizon, in future-dollar (nominal) terms.',
       band: summary.endBalanceNominal,
       format: 'currency',
     },
     {
       label: 'Portfolio End Balance (real)',
+      description:
+        'Final portfolio value discounted back to today’s purchasing power using the inflation rate.',
       band: summary.endBalanceReal,
       format: 'currency',
     },
     {
       label: 'Annual Mean Return (nominal)',
+      description:
+        'Arithmetic average of the simulated annual returns. Always greater than or equal to the time-weighted return when volatility is non-zero.',
       band: summary.meanReturnNominal,
       format: 'percent',
     },
     {
       label: 'Annualized Volatility',
+      description:
+        'Standard deviation of the simulated annual returns — a measure of how much returns vary year-to-year.',
       band: summary.annualizedVolatility,
       format: 'percent',
     },
     {
       label: 'Maximum Drawdown',
+      description:
+        'Largest peak-to-trough drop in portfolio value during the simulation, including the effect of contributions and withdrawals.',
       band: summary.maxDrawdown,
       format: 'percent',
     },
     {
       label: 'Maximum Drawdown Excluding Cashflows',
+      description:
+        'Largest peak-to-trough drop driven purely by investment returns, ignoring contributions and withdrawals.',
       band: summary.maxDrawdownExcludingCashflows,
       format: 'percent',
     },
     {
       label: 'Safe Withdrawal Rate',
+      description:
+        'Largest constant inflation-adjusted withdrawal, expressed as a percentage of the starting balance, that exactly depletes the portfolio at the end of the horizon.',
       band: summary.safeWithdrawalRate,
       format: 'percent',
     },
     {
       label: 'Perpetual Withdrawal Rate',
+      description:
+        'Largest constant inflation-adjusted withdrawal, as a percentage of the starting balance, that preserves the real value of the portfolio at the end of the horizon.',
       band: summary.perpetualWithdrawalRate,
       format: 'percent',
     },
@@ -1747,7 +1768,12 @@ function PerformanceSummaryTable({
           {rows.map((row) => (
             <tr key={row.label}>
               <td className="px-3 py-1.5 text-gray-900 dark:text-gray-100">
-                {row.label}
+                <span
+                  title={row.description}
+                  className="md:cursor-help md:underline md:decoration-dotted md:decoration-gray-400 md:underline-offset-4"
+                >
+                  {row.label}
+                </span>
               </td>
               <td className="px-3 py-1.5 text-right tabular-nums">
                 {formatValue(row.band.p10, row.format)}
