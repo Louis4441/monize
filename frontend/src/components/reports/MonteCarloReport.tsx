@@ -609,9 +609,10 @@ export function MonteCarloReport() {
             result.percentiles.p90[result.percentiles.p90.length - 1] ?? 0,
           )}`,
           color: '#111827',
-          // Currency-range value is much wider than the others; give it
-          // 3x the column width so it doesn't truncate in the PDF.
-          widthRatio: 3,
+          // Currency-range value is wider than the others; give it 2x the
+          // column width so it doesn't truncate in the PDF without
+          // crowding the probability cards beside it.
+          widthRatio: 2,
         },
         {
           label: 'Probability of Depletion',
