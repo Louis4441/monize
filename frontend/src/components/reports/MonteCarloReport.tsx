@@ -1088,12 +1088,19 @@ export function MonteCarloReport() {
               </label>
             </div>
             {form.useHistoricalReturns && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Mean and volatility are recomputed from the year-over-year
-                price history of the holdings in the selected accounts each
-                time you run. Inflation and simulation count below still
-                apply.
-              </p>
+              <>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Mean and volatility are recomputed from the year-over-year
+                  price history of the holdings in the selected accounts each
+                  time you run. Inflation and simulation count below still
+                  apply.
+                </p>
+                <HoldingStatsTable
+                  data={holdingStats}
+                  loading={holdingStatsLoading}
+                  formatCurrency={formatCurrency}
+                />
+              </>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className={form.useHistoricalReturns ? 'opacity-50' : ''}>
@@ -1186,22 +1193,6 @@ export function MonteCarloReport() {
             </div>
           )}
         </div>
-
-        {/* Per-holding historical stats summary -- lives outside the inputs
-            card so it stays visible after the form collapses post-run. Only
-            relevant when historical-returns mode is on. */}
-        {form.useHistoricalReturns && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">
-              Per-holding historical stats
-            </h3>
-            <HoldingStatsTable
-              data={holdingStats}
-              loading={holdingStatsLoading}
-              formatCurrency={formatCurrency}
-            />
-          </div>
-        )}
 
         {result && (
           <div className="space-y-4">
