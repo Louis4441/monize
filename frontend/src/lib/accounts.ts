@@ -172,11 +172,16 @@ export const accountsApi = {
       params,
       responseType: 'blob',
     });
-    const contentDisposition = response.headers['content-disposition'] || '';
+    const contentDisposition = String(
+      response.headers['content-disposition'] ?? '',
+    );
     const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
     const filename = filenameMatch ? filenameMatch[1] : `account.${format}`;
 
-    const blob = new Blob([response.data], { type: response.headers['content-type'] });
+    const contentType = response.headers['content-type'];
+    const blob = new Blob([response.data], {
+      type: typeof contentType === 'string' ? contentType : undefined,
+    });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

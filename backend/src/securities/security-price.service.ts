@@ -905,8 +905,8 @@ export class SecurityPriceService {
       const batch = prices.slice(i, i + batchSize);
       const values = batch
         .map((_, idx) => {
-          const offset = idx * 8;
-          return `($${offset + 1}::UUID, $${offset + 2}::DATE, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`;
+          const offset = idx * 9;
+          return `($${offset + 1}::UUID, $${offset + 2}::DATE, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9})`;
         })
         .join(", ");
 
@@ -919,19 +919,24 @@ export class SecurityPriceService {
           p.high,
           p.low,
           p.close,
+          p.adjClose,
           p.volume,
           source,
         );
       }
 
+      // Only overwrite adjusted_close on conflict when the new payload has a
+      // non-null value, so providers without adjclose support (MSN today)
+      // don't blow away a previously-stored Yahoo value.
       await this.dataSource.query(
-        `INSERT INTO security_prices (security_id, price_date, open_price, high_price, low_price, close_price, volume, source)
+        `INSERT INTO security_prices (security_id, price_date, open_price, high_price, low_price, close_price, adjusted_close, volume, source)
          VALUES ${values}
          ON CONFLICT (security_id, price_date) DO UPDATE SET
            close_price = EXCLUDED.close_price,
            open_price = EXCLUDED.open_price,
            high_price = EXCLUDED.high_price,
            low_price = EXCLUDED.low_price,
+           adjusted_close = COALESCE(EXCLUDED.adjusted_close, security_prices.adjusted_close),
            volume = EXCLUDED.volume,
            source = EXCLUDED.source`,
         params,
@@ -961,7 +966,20 @@ export class SecurityPriceService {
    * provider override + user default + preferredExchanges.
    */
   async backfillSecurity(security: Security): Promise<void> {
-    if (security.skipPriceUpdates) return;
+    await this.backfillSecurityRange(security, "1y");
+  }
+
+  /**
+   * Backfill historical prices for a single security over a configurable
+   * range ("1y", "5y", "10y", "max", etc.). Returns the number of price rows
+   * upserted. Used by callers that need deeper history than the daily-1y
+   * default (e.g. Monte Carlo's per-holding stats).
+   */
+  async backfillSecurityRange(
+    security: Security,
+    range: string,
+  ): Promise<number> {
+    if (security.skipPriceUpdates) return 0;
 
     const [ctx] =
       (await this.loadUserContexts([security.userId])).values() || [];
@@ -972,12 +990,12 @@ export class SecurityPriceService {
 
     const bundle = await this.fetchHistoricalWithFallback(
       security,
-      "1y",
+      range,
       userCtx,
     );
     if (!bundle || bundle.prices.length === 0) {
       this.logger.warn(`No historical prices available for ${security.symbol}`);
-      return;
+      return 0;
     }
 
     if (bundle.provider === "msn") {
@@ -991,12 +1009,14 @@ export class SecurityPriceService {
         sourceFor(bundle.provider),
       );
       this.logger.log(
-        `Backfilled ${bundle.prices.length} daily prices for ${security.symbol} via ${bundle.provider}`,
+        `Backfilled ${bundle.prices.length} ${range} prices for ${security.symbol} via ${bundle.provider}`,
       );
+      return bundle.prices.length;
     } catch (error) {
       this.logger.error(
-        `Failed to backfill daily prices for ${security.symbol}: ${error.message}`,
+        `Failed to upsert backfilled prices for ${security.symbol}: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return 0;
     }
   }
 

@@ -103,8 +103,8 @@ describe('AutoBackupSection', () => {
 
     await renderAutoBackupSection();
 
-    const checkbox = screen.getByRole('checkbox');
-    expect(checkbox).toBeChecked();
+    const toggle = screen.getByRole('switch', { name: 'Enable automatic backups' });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByLabelText('Backup Folder')).toHaveValue('/backups');
     expect(screen.getByLabelText('Backup Frequency')).toHaveValue('weekly');
     expect(screen.getByLabelText('Daily backups')).toHaveValue(14);
