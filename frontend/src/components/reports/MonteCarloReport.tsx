@@ -1362,7 +1362,15 @@ export function MonteCarloReport() {
                           strokeWidth={2.5}
                           label={{
                             value: 'Withdrawal phase →',
-                            position: 'insideTopRight',
+                            // Flip the label to the left side of the divider
+                            // when the divider sits in the right half of the
+                            // chart, otherwise it overflows the right edge.
+                            position:
+                              form.yearsToRetirement /
+                                result.yearLabels.length >
+                              0.5
+                                ? 'insideTopLeft'
+                                : 'insideTopRight',
                             fill: '#d97706',
                             fontSize: 12,
                             fontWeight: 600,
