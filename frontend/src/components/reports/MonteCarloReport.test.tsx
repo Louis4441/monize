@@ -721,13 +721,11 @@ describe('MonteCarloReport', () => {
         fireEvent.click(newBtn);
       });
       // The collapsed toggle state is preserved (no auto-expand), but the
-      // form is cleared so the next save creates a fresh scenario.
+      // form is cleared so the collapsed header reverts to the empty placeholder.
       expect(
         screen.getByRole('button', { name: /Edit inputs/i }),
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: /Save scenario/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Untitled scenario/)).toBeInTheDocument();
     });
 
     it('switching scenarios preserves the user’s Hide/Show inputs choice', async () => {

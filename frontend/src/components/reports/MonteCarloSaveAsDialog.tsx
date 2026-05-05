@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 
@@ -17,11 +17,16 @@ export function MonteCarloSaveAsDialog({
   onCancel,
   onSubmit,
 }: MonteCarloSaveAsDialogProps) {
+  // Reset the field whenever the dialog transitions from closed to open. We
+  // store the previous open state and update during render so the field
+  // already shows the correct value on the first paint -- no useEffect, no
+  // cascading re-render.
+  const [prevOpen, setPrevOpen] = useState(isOpen);
   const [name, setName] = useState(initialName);
-
-  useEffect(() => {
+  if (prevOpen !== isOpen) {
+    setPrevOpen(isOpen);
     if (isOpen) setName(initialName);
-  }, [isOpen, initialName]);
+  }
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
