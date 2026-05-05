@@ -1068,8 +1068,8 @@ export function MonteCarloReport() {
                 min={100}
               />
             </div>
-            <label className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300 mt-3 cursor-pointer">
-              <span className="mt-0.5 shrink-0">
+            <label className="flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300 mt-3 cursor-pointer">
+              <span className="shrink-0">
                 <ToggleSwitch
                   checked={form.showRealValues}
                   onChange={(v) => updateField('showRealValues', v)}
