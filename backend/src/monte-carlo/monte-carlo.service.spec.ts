@@ -20,6 +20,8 @@ describe("MonteCarloService", () => {
   let holdingsRepository: Record<string, jest.Mock>;
   let securityPriceRepository: Record<string, jest.Mock>;
   let accountsRepository: Record<string, jest.Mock>;
+  let securitiesRepository: Record<string, jest.Mock>;
+  let securityPriceService: { backfillSecurityRange: jest.Mock };
   let portfolioService: {
     getPortfolioSummary: jest.Mock;
     getLatestPrices: jest.Mock;
@@ -101,10 +103,11 @@ describe("MonteCarloService", () => {
     accountsRepository = {
       find: jest.fn().mockResolvedValue([]),
     };
-    const securitiesRepository = {
+    securitiesRepository = {
       find: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue({ affected: 0 }),
     };
-    const securityPriceService = {
+    securityPriceService = {
       backfillSecurityRange: jest.fn().mockResolvedValue(0),
     };
     portfolioService = {
@@ -348,6 +351,102 @@ describe("MonteCarloService", () => {
       expect(stats.meanReturn).not.toBeNull();
       // Expected mean of yearly returns ≈ 0.10
       expect(stats.meanReturn!).toBeCloseTo(0.1, 4);
+    });
+  });
+
+  describe("backfill cooldown", () => {
+    it("calls the provider for a sparse holding that has never been backfilled", async () => {
+      const holding = {
+        id: "h1",
+        accountId: "acct-1",
+        securityId: "sec-new",
+        quantity: 1,
+        security: { symbol: "NEWCO", name: "Newly Listed", currencyCode: "USD" },
+      };
+      holdingsRepository.find.mockResolvedValueOnce([holding]);
+      // Sparse: only 1 yearly return → triggers backfill check.
+      securityPriceRepository.query.mockResolvedValue([
+        { security_id: "sec-new", year: "2024", close_price: "100" },
+        { security_id: "sec-new", year: "2025", close_price: "110" },
+      ]);
+      securitiesRepository.find.mockResolvedValueOnce([
+        {
+          id: "sec-new",
+          symbol: "NEWCO",
+          historicalBackfillAttemptedAt: null,
+        },
+      ]);
+      portfolioService.getLatestPrices = jest
+        .fn()
+        .mockResolvedValue(new Map([["sec-new", 110]]));
+
+      await service.getHistoricalStats(userId, ["acct-1"]);
+      expect(securityPriceService.backfillSecurityRange).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "sec-new" }),
+        "10y",
+      );
+      expect(securitiesRepository.update).toHaveBeenCalled();
+    });
+
+    it("skips the provider when a recent backfill attempt is on file", async () => {
+      const recent = new Date(Date.now() - 24 * 60 * 60 * 1000); // 1 day ago
+      const holding = {
+        id: "h1",
+        accountId: "acct-1",
+        securityId: "sec-recent",
+        quantity: 1,
+        security: { symbol: "RCNT", name: "Recent", currencyCode: "USD" },
+      };
+      holdingsRepository.find.mockResolvedValueOnce([holding]);
+      securityPriceRepository.query.mockResolvedValue([
+        { security_id: "sec-recent", year: "2024", close_price: "100" },
+        { security_id: "sec-recent", year: "2025", close_price: "110" },
+      ]);
+      securitiesRepository.find.mockResolvedValueOnce([
+        {
+          id: "sec-recent",
+          symbol: "RCNT",
+          historicalBackfillAttemptedAt: recent,
+        },
+      ]);
+      portfolioService.getLatestPrices = jest
+        .fn()
+        .mockResolvedValue(new Map([["sec-recent", 110]]));
+
+      await service.getHistoricalStats(userId, ["acct-1"]);
+      expect(securityPriceService.backfillSecurityRange).not.toHaveBeenCalled();
+      expect(securitiesRepository.update).not.toHaveBeenCalled();
+    });
+
+    it("retries the provider once the cooldown window has expired", async () => {
+      const stale = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
+      const holding = {
+        id: "h1",
+        accountId: "acct-1",
+        securityId: "sec-stale",
+        quantity: 1,
+        security: { symbol: "STAL", name: "Stale", currencyCode: "USD" },
+      };
+      holdingsRepository.find.mockResolvedValueOnce([holding]);
+      securityPriceRepository.query.mockResolvedValue([
+        { security_id: "sec-stale", year: "2024", close_price: "100" },
+        { security_id: "sec-stale", year: "2025", close_price: "110" },
+      ]);
+      securitiesRepository.find.mockResolvedValueOnce([
+        {
+          id: "sec-stale",
+          symbol: "STAL",
+          historicalBackfillAttemptedAt: stale,
+        },
+      ]);
+      portfolioService.getLatestPrices = jest
+        .fn()
+        .mockResolvedValue(new Map([["sec-stale", 110]]));
+
+      await service.getHistoricalStats(userId, ["acct-1"]);
+      expect(securityPriceService.backfillSecurityRange).toHaveBeenCalledTimes(
+        1,
+      );
     });
   });
 

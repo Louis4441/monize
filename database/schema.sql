@@ -392,6 +392,7 @@ CREATE TABLE securities (
     sector_data_updated_at TIMESTAMP, -- cache staleness check
     quote_provider VARCHAR(20),      -- per-security provider override: 'yahoo' | 'msn' | NULL = user default
     msn_instrument_id VARCHAR(50),   -- cached MSN Financial Instrument ID (SecId)
+    historical_backfill_attempted_at TIMESTAMP, -- last time we asked the provider for a multi-year backfill
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, symbol),

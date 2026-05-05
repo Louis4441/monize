@@ -499,6 +499,12 @@ export class MonteCarloService {
    * Fetch year-end closing prices for the given securities and convert to
    * per-year returns. Returned map: securityId → Map<year, return>.
    */
+  /** Skip provider backfill for any security we've asked about within this
+   * window. Prevents the Monte Carlo report from re-hitting Yahoo / MSN on
+   * every account-selection change for holdings whose history simply doesn't
+   * span the full 10-year window. */
+  private static BACKFILL_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
   private async fetchYearlyReturnsBySecurity(
     securityIds: string[],
   ): Promise<Map<string, Map<number, number>>> {
@@ -512,25 +518,47 @@ export class MonteCarloService {
     const sparseIds = securityIds.filter(
       (id) => (yearlyReturns.get(id)?.size ?? 0) < 10,
     );
-    if (sparseIds.length > 0) {
-      const securities = await this.securitiesRepository.find({
-        where: { id: In(sparseIds) },
-      });
-      await Promise.all(
-        securities.map((s) =>
-          this.securityPriceService
-            .backfillSecurityRange(s, "10y")
-            .catch((err) => {
-              this.logger.warn(
-                `Provider backfill failed for ${s.symbol}: ${err instanceof Error ? err.message : String(err)}`,
-              );
-              return 0;
-            }),
-        ),
-      );
-      yearlyReturns = await this.queryYearlyReturns(securityIds);
-    }
+    if (sparseIds.length === 0) return yearlyReturns;
 
+    const securities = await this.securitiesRepository.find({
+      where: { id: In(sparseIds) },
+    });
+    const now = Date.now();
+    const dueForBackfill = securities.filter((s) => {
+      const last = s.historicalBackfillAttemptedAt;
+      if (!last) return true;
+      const lastMs =
+        last instanceof Date ? last.getTime() : Date.parse(String(last));
+      return (
+        !Number.isFinite(lastMs) ||
+        now - lastMs > MonteCarloService.BACKFILL_COOLDOWN_MS
+      );
+    });
+
+    if (dueForBackfill.length === 0) return yearlyReturns;
+
+    await Promise.all(
+      dueForBackfill.map((s) =>
+        this.securityPriceService
+          .backfillSecurityRange(s, "10y")
+          .catch((err) => {
+            this.logger.warn(
+              `Provider backfill failed for ${s.symbol}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+            return 0;
+          }),
+      ),
+    );
+
+    // Stamp every security we attempted, regardless of whether the provider
+    // actually returned new rows. The cooldown is about not hammering the
+    // API, not about whether the data improved.
+    await this.securitiesRepository.update(
+      { id: In(dueForBackfill.map((s) => s.id)) },
+      { historicalBackfillAttemptedAt: new Date() },
+    );
+
+    yearlyReturns = await this.queryYearlyReturns(securityIds);
     return yearlyReturns;
   }
 

@@ -115,6 +115,20 @@ export class Security {
   })
   msnInstrumentId: string | null;
 
+  /**
+   * Last time we asked the quote provider for a multi-year historical
+   * backfill. Lets the Monte Carlo "Use historical returns" path skip
+   * provider calls when we've already pulled what's available — so
+   * selecting the same accounts repeatedly doesn't keep hitting the API.
+   */
+  @ApiProperty({ required: false })
+  @Column({
+    type: "timestamp",
+    nullable: true,
+    name: "historical_backfill_attempted_at",
+  })
+  historicalBackfillAttemptedAt: Date | null;
+
   @ApiProperty()
   @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
