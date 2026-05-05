@@ -50,6 +50,7 @@ export type MonteCarloScenarioInputs = Omit<
   | 'name'
   | 'description'
   | 'isFavourite'
+  | 'sortOrder'
   | 'lastRunAt'
   | 'createdAt'
   | 'updatedAt'
