@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { userSettingsApi } from '@/lib/user-settings';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -260,18 +261,19 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
           onChange={(e) => setWeekStartsOn(Number(e.target.value))}
         />
 
-        <div className="flex items-center">
-          <input
-            id="showCreatedAt"
-            type="checkbox"
+        <label
+          htmlFor="showCreatedAt"
+          className="flex items-center gap-2 cursor-pointer"
+        >
+          <ToggleSwitch
             checked={showCreatedAt}
-            onChange={(e) => setShowCreatedAt(e.target.checked)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+            onChange={setShowCreatedAt}
+            label="Show Create Date in transaction forms"
           />
-          <label htmlFor="showCreatedAt" className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
+          <span className="text-sm text-gray-900 dark:text-gray-100">
             Show Create Date in transaction forms
-          </label>
-        </div>
+          </span>
+        </label>
 
         {showCreatedAt && (
           <Select

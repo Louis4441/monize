@@ -10,6 +10,7 @@ import { getErrorMessage } from '@/lib/errors';
 import { resolveTimezone, isoToDatetimeLocal, formatDatetimeLocal } from '@/lib/utils';
 import { AutoBackupSettings, UpdateAutoBackupSettingsData } from '@/types/auth';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 
 const FREQUENCY_OPTIONS = [
   { value: 'every6hours', label: 'Every 6 Hours' },
@@ -217,15 +218,13 @@ export function AutoBackupSection() {
       {/* Enable toggle */}
       <div className="mb-6">
         <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
+          <ToggleSwitch
             checked={enabled}
-            onChange={(e) => {
-              setEnabled(e.target.checked);
+            onChange={(v) => {
+              setEnabled(v);
               markDirty();
             }}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500
-              dark:border-gray-600 dark:bg-gray-700"
+            label="Enable automatic backups"
           />
           <span className="text-sm font-medium text-gray-900 dark:text-white">
             Enable automatic backups
