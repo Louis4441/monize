@@ -453,6 +453,19 @@ export function MonteCarloReport() {
     }
   };
 
+  const duplicateScenario = async () => {
+    if (!activeId) return;
+    try {
+      const created = await monteCarloApi.duplicate(activeId);
+      setScenarios((prev) => [created, ...prev]);
+      loadScenario(created);
+      toast.success('Scenario duplicated.');
+    } catch (err) {
+      logger.error('Duplicate failed:', err);
+      showErrorToast(err, 'Could not duplicate scenario.');
+    }
+  };
+
   const requestDelete = () => {
     if (!activeId) return;
     setShowDeleteConfirm(true);
@@ -1226,6 +1239,11 @@ export function MonteCarloReport() {
                   ? 'Save changes'
                   : 'Save scenario'}
             </Button>
+            {activeId && (
+              <Button variant="outline" onClick={duplicateScenario}>
+                Duplicate
+              </Button>
+            )}
             {activeId && (
               <Button variant="danger" onClick={requestDelete}>
                 Delete

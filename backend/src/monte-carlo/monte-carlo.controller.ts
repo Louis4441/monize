@@ -67,6 +67,14 @@ export class MonteCarloController {
     return this.monteCarloService.runSaved(req.user.id, id);
   }
 
+  @Post("scenarios/:id/duplicate")
+  duplicate(
+    @Request() req: AuthRequest,
+    @Param("id", ParseUUIDPipe) id: string,
+  ) {
+    return this.monteCarloService.duplicate(req.user.id, id);
+  }
+
   @Post("run")
   run(@Request() req: AuthRequest, @Body() dto: RunScenarioDto) {
     return this.monteCarloService.runAdHoc(req.user.id, dto);
