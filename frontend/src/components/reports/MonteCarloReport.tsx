@@ -18,6 +18,7 @@ import {
   monteCarloApi,
   MonteCarloScenario,
   MonteCarloScenarioInputs,
+  PerformanceSummary,
   SimulationResult,
   AccountHoldingStats,
   CashFlow,
@@ -1425,6 +1426,18 @@ export function MonteCarloReport() {
                 </div>
               )}
             </div>
+
+            {result.performanceSummary && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                  Performance Summary
+                </h3>
+                <PerformanceSummaryTable
+                  summary={result.performanceSummary}
+                  formatCurrency={formatCurrency}
+                />
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -1633,6 +1646,123 @@ function ResultsTable({
                     ))}
                   </div>
                 )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+type SummaryRow = {
+  label: string;
+  band: PerformanceSummary[keyof PerformanceSummary];
+  format: 'currency' | 'percent' | 'ratio';
+};
+
+function PerformanceSummaryTable({
+  summary,
+  formatCurrency,
+}: {
+  summary: PerformanceSummary;
+  formatCurrency: (v: number) => string;
+}) {
+  const rows: SummaryRow[] = [
+    {
+      label: 'Time Weighted Rate of Return (nominal)',
+      band: summary.twrNominal,
+      format: 'percent',
+    },
+    {
+      label: 'Time Weighted Rate of Return (real)',
+      band: summary.twrReal,
+      format: 'percent',
+    },
+    {
+      label: 'Portfolio End Balance (nominal)',
+      band: summary.endBalanceNominal,
+      format: 'currency',
+    },
+    {
+      label: 'Portfolio End Balance (real)',
+      band: summary.endBalanceReal,
+      format: 'currency',
+    },
+    {
+      label: 'Annual Mean Return (nominal)',
+      band: summary.meanReturnNominal,
+      format: 'percent',
+    },
+    {
+      label: 'Annualized Volatility',
+      band: summary.annualizedVolatility,
+      format: 'percent',
+    },
+    {
+      label: 'Maximum Drawdown',
+      band: summary.maxDrawdown,
+      format: 'percent',
+    },
+    {
+      label: 'Maximum Drawdown Excluding Cashflows',
+      band: summary.maxDrawdownExcludingCashflows,
+      format: 'percent',
+    },
+    {
+      label: 'Safe Withdrawal Rate',
+      band: summary.safeWithdrawalRate,
+      format: 'percent',
+    },
+    {
+      label: 'Perpetual Withdrawal Rate',
+      band: summary.perpetualWithdrawalRate,
+      format: 'percent',
+    },
+  ];
+
+  const formatValue = (v: number, kind: SummaryRow['format']): string => {
+    if (!Number.isFinite(v)) return '—';
+    if (kind === 'currency') return formatCurrency(v);
+    if (kind === 'percent') return `${(v * 100).toFixed(2)}%`;
+    return v.toFixed(2);
+  };
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-xs">
+        <thead className="bg-gray-50 dark:bg-gray-900/40 text-gray-500 dark:text-gray-400">
+          <tr>
+            <th className="px-3 py-2 text-left font-medium">
+              Summary Statistics
+            </th>
+            <th className="px-3 py-2 text-right font-medium">10th Percentile</th>
+            <th className="px-3 py-2 text-right font-medium">25th Percentile</th>
+            <th className="px-3 py-2 text-right font-medium">50th Percentile</th>
+            <th className="px-3 py-2 text-right font-medium">75th Percentile</th>
+            <th className="px-3 py-2 text-right font-medium">90th Percentile</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+          {rows.map((row) => (
+            <tr key={row.label}>
+              <td className="px-3 py-1.5 text-gray-900 dark:text-gray-100">
+                {row.label}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums">
+                {formatValue(row.band.p10, row.format)}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums">
+                {formatValue(row.band.p25, row.format)}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums font-medium text-gray-900 dark:text-gray-100">
+                {formatValue(row.band.p50, row.format)}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums">
+                {formatValue(row.band.p75, row.format)}
+              </td>
+              <td className="px-3 py-1.5 text-right tabular-nums">
+                {formatValue(row.band.p90, row.format)}
               </td>
             </tr>
           ))}
