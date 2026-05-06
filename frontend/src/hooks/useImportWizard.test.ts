@@ -885,7 +885,7 @@ describe('useImportWizard - security lookup', () => {
 
     // pick a candidate
     act(() => {
-      result.current.handleLookupPickerPick({ symbol: 'XYZ', name: 'B', securityType: 'STOCK', exchange: 'TSX' });
+      result.current.handleLookupPickerPick({ symbol: 'XYZ', name: 'B', securityType: 'STOCK', exchange: 'TSX', currencyCode: 'CAD' });
     });
     expect(result.current.lookupPickerCandidates).toHaveLength(0);
   });

@@ -2753,9 +2753,10 @@ describe('TransactionForm', () => {
       const tx = createSplitTransaction();
       // mismatch: amount is -50, splits total to -50 in default test - we need to override
       // by tweaking splits' amounts
+      const existingSplits = (tx as any).splits ?? [];
       (tx as any).splits = [
-        { ...tx.splits[0], amount: -25 },
-        { ...tx.splits[1], amount: -10 },
+        { ...existingSplits[0], amount: -25 },
+        { ...existingSplits[1], amount: -10 },
       ];
 
       render(<TransactionForm transaction={tx} onSuccess={mockOnSuccess} onCancel={mockOnCancel} />);

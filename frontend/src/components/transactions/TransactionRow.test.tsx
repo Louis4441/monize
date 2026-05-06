@@ -33,6 +33,8 @@ function makeTx(overrides: Partial<Transaction> = {}): Transaction {
     linkedTransaction: null,
     splits: [],
     tags: [],
+    createdAt: '2025-06-15T00:00:00Z',
+    updatedAt: '2025-06-15T00:00:00Z',
     ...overrides,
   };
 }

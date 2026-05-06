@@ -32,6 +32,8 @@ const tx: Transaction = {
   linkedTransaction: null,
   splits: [],
   tags: [{ id: 'tag1', name: 'Coffee' } as any],
+  createdAt: '2025-06-15T00:00:00Z',
+  updatedAt: '2025-06-15T00:00:00Z',
 };
 
 describe('TransactionActionSheet', () => {

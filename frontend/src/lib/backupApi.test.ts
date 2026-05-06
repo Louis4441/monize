@@ -20,12 +20,11 @@ class FakeCompressionStream {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // @ts-expect-error mock global for jsdom
-  globalThis.CompressionStream = FakeCompressionStream;
+  (globalThis as any).CompressionStream = FakeCompressionStream;
   // Polyfill Blob.prototype.stream for jsdom — pass the bytes through
   // unchanged via a simple ReadableStream so the gzip pipeline can complete.
   if (!Blob.prototype.stream) {
-    Blob.prototype.stream = function () {
+    Blob.prototype.stream = function (this: Blob) {
       const blob = this;
       return new ReadableStream({
         async start(controller) {
