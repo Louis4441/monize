@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { format, subMonths, subDays, subYears, subWeeks, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subMonths, subDays, subYears, subWeeks, startOfMonth } from 'date-fns';
 
 interface UseDateRangeOptions {
   /** Which preset is selected by default. */
@@ -41,12 +41,12 @@ export function useDateRange(options: UseDateRangeOptions): UseDateRangeReturn {
 
       const now = new Date();
       const isMonth = alignment === 'month';
-      // Short-range presets always use today as end date (day-level precision).
-      // Long-range presets with month alignment snap to end of month.
-      const useDayLevel = ['1d', '1w', '1m', '3m', 'ytd', '1y'].includes(range);
-      const end = isMonth && !useDayLevel
-        ? format(endOfMonth(now), 'yyyy-MM-dd')
-        : format(now, 'yyyy-MM-dd');
+      // End date is always today: data only exists up to today, so snapping
+      // the end to end-of-month (the previous behaviour for long-range
+      // month-aligned presets like 2y/5y) just produced a flat-line tail
+      // from today through the rest of the month. Month alignment now
+      // affects the start date only.
+      const end = format(now, 'yyyy-MM-dd');
 
       let start: string;
 
