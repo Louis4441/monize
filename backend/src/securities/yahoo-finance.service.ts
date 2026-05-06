@@ -135,15 +135,15 @@ export class YahooFinanceService implements QuoteProvider {
         if (attempt === maxRetries) return response;
 
         // Honor Retry-After (delta-seconds) when the server provides one,
-        // otherwise back off exponentially with a touch of jitter so a herd
-        // of concurrent retries doesn't synchronize.
+        // otherwise back off exponentially. The MAX_CONCURRENT_REQUESTS gate
+        // and INTER_REQUEST_GAP_MS already keep retries naturally
+        // staggered, so we don't add explicit jitter on top.
         const retryAfter = response.headers.get("retry-after");
         const retryAfterMs = retryAfter ? Number(retryAfter) * 1000 : 0;
         const backoff =
           YahooFinanceService.RETRY_INITIAL_DELAY_MS * 2 ** attempt;
-        const jitter = Math.floor(Math.random() * 250);
         const delayMs = Math.min(
-          Math.max(retryAfterMs, backoff + jitter),
+          Math.max(retryAfterMs, backoff),
           YahooFinanceService.RETRY_MAX_DELAY_MS,
         );
         this.logger.warn(
