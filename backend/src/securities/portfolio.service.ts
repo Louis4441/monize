@@ -867,15 +867,15 @@ export class PortfolioService {
       }),
     );
 
-    // If any holding's intraday fetch failed we cannot render an accurate
-    // aggregate -- the failed holdings would silently contribute 0 and the
-    // total would be materially lower than the actual portfolio value (the
-    // 1D-vs-1W discrepancy users have reported). Bail out and let the
-    // frontend use the daily-snapshot endpoint instead. We deliberately do
-    // NOT cache this failure payload: caching it for 60s would leave the
-    // "Couldn't load intraday prices" banner stuck on screen even after the
-    // user clicks Refresh and the underlying provider issue resolves.
-    if (failedSymbols.length > 0) {
+    // If literally every holding failed we have nothing to chart -- assume
+    // a real upstream outage and fall back to daily for the whole series.
+    // We deliberately do NOT cache this failure payload: caching it would
+    // leave the "Couldn't load intraday prices" banner pinned on screen
+    // even after the user clicks Refresh and the issue resolves.
+    if (
+      failedSymbols.length > 0 &&
+      failedSymbols.length === intradayHoldings.length
+    ) {
       return {
         points: [],
         interval: yahooParams.interval,
@@ -928,6 +928,35 @@ export class PortfolioService {
     );
     const cashCents = Math.round(totalCashValue * 10000);
 
+    // For holdings whose intraday fetch failed (Yahoo errored, was
+    // rate-limited past the retry budget, or simply has no minute-resolution
+    // data for this security -- common for mutual funds and illiquid names),
+    // fall back to the security's latest known daily close. Treat that
+    // value as a constant additive offset, the same way cash is handled.
+    // Without this, a single mutual fund in the user's portfolio would
+    // either undercount the chart (if we ignored it) or pin the
+    // "Couldn't load intraday prices" banner permanently (if we treated
+    // it as a hard failure).
+    const failedHoldings = intradayHoldings.filter(
+      (h) => !seriesBySecurity.has(h.securityId),
+    );
+    let staleHoldingsCents = 0;
+    if (failedHoldings.length > 0) {
+      const latestPrices = await this.getLatestPrices(
+        failedHoldings.map((h) => h.securityId),
+      );
+      for (const h of failedHoldings) {
+        const lastClose = latestPrices.get(h.securityId);
+        if (lastClose == null) continue;
+        const fxRate =
+          rateCache.get(`${h.currencyCode}->${displayCurrency}`) ?? 1;
+        staleHoldingsCents += Math.round(
+          h.quantity * lastClose * fxRate * 10000,
+        );
+      }
+    }
+    const constantCents = cashCents + staleHoldingsCents;
+
     // Build per-security ordered timestamp/close arrays and a cursor-based
     // forward-fill so each grid point uses the latest known close.
     const sources = intradayHoldings
@@ -949,7 +978,7 @@ export class PortfolioService {
     const points: IntradayValuePoint[] = [];
 
     for (const ts of timestamps) {
-      let totalCents = cashCents; // integer arithmetic to avoid float drift
+      let totalCents = constantCents; // integer arithmetic to avoid float drift
       for (let i = 0; i < sources.length; i++) {
         const src = sources[i];
         // Advance cursor to the latest sample at-or-before ts.

@@ -2837,27 +2837,52 @@ describe("PortfolioService", () => {
       expect(result.points[0].value).toBeCloseTo(3400, 4);
     });
 
-    it("returns fallbackToDaily=true with failedSymbols when any intraday fetch fails", async () => {
-      // Repro: when one holding's intraday fetch threw and another's
-      // succeeded, the aggregate quietly omitted the failing holding's
-      // contribution -- producing a 1D total much lower than the 1W total
-      // that uses daily snapshots. Now we bail out and let the frontend
-      // fall back to daily for the whole series.
+    it("uses each failed holding's latest known close as a constant offset", async () => {
+      // When some intraday fetches fail (Yahoo errored, was rate-limited
+      // past retry, or simply has no minute-resolution data for the
+      // security -- common for mutual funds), keep showing intraday for
+      // the holdings that succeeded and value the failed ones at their
+      // latest daily close. Treats them like cash: a flat additive offset.
       accountsRepository.find.mockResolvedValue([mockBrokerageAccount]);
       holdingsRepository.find.mockResolvedValue([
         mockHoldingAAPL,
         mockHoldingVFV,
       ]);
 
+      const ts = new Date("2026-05-06T13:30:00.000Z");
       yahooFinanceService.fetchIntradaySeries.mockImplementation(
         async (symbol: string) => {
-          if (symbol === "AAPL") {
-            return [
-              { timestamp: new Date("2026-05-06T13:30:00.000Z"), close: 100 },
-            ];
-          }
+          if (symbol === "AAPL") return [{ timestamp: ts, close: 100 }];
           throw new Error("yahoo 500");
         },
+      );
+      // VFV's latest daily close = 80 CAD per share, 50 shares = 4000 CAD.
+      securityPriceRepository.query.mockResolvedValue([
+        { security_id: "sec-2", close_price: "80", price_date: "2026-05-05" },
+      ]);
+      exchangeRateService.getLatestRate.mockResolvedValue(1.4);
+
+      const result = await service.getIntradayValueSeries(userId, {
+        range: "1d",
+      });
+
+      // Don't fall back -- the failure is partial and we have a fallback price.
+      expect(result.fallbackToDaily).toBe(false);
+      expect(result.failedSymbols).toEqual([]);
+      expect(result.points).toHaveLength(1);
+      // 10 * 100 * 1.4 (AAPL intraday) + 50 * 80 (VFV stale) = 5400.
+      expect(result.points[0].value).toBeCloseTo(5400, 4);
+    });
+
+    it("falls back only when EVERY intraday fetch fails", async () => {
+      accountsRepository.find.mockResolvedValue([mockBrokerageAccount]);
+      holdingsRepository.find.mockResolvedValue([
+        mockHoldingAAPL,
+        mockHoldingVFV,
+      ]);
+
+      yahooFinanceService.fetchIntradaySeries.mockRejectedValue(
+        new Error("yahoo 500"),
       );
 
       const result = await service.getIntradayValueSeries(userId, {
@@ -2865,7 +2890,7 @@ describe("PortfolioService", () => {
       });
 
       expect(result.fallbackToDaily).toBe(true);
-      expect(result.failedSymbols).toEqual(["VFV.TO"]);
+      expect(result.failedSymbols.sort()).toEqual(["AAPL", "VFV.TO"]);
       expect(result.points).toEqual([]);
     });
 
@@ -2897,7 +2922,11 @@ describe("PortfolioService", () => {
       expect(yahooFinanceService.fetchIntradaySeries).toHaveBeenCalledTimes(2);
     });
 
-    it("returns fallbackToDaily=true with failedSymbols when a fetch returns no bars", async () => {
+    it("does not surface failedSymbols on partial failures (fallback price covers it)", async () => {
+      // Mutual funds and illiquid securities legitimately return no
+      // intraday bars from Yahoo. Treat that the same as a fetch failure:
+      // value the holding at its latest close instead of pinning the
+      // "Couldn't load intraday prices" banner.
       accountsRepository.find.mockResolvedValue([mockBrokerageAccount]);
       holdingsRepository.find.mockResolvedValue([
         mockHoldingAAPL,
@@ -2914,14 +2943,18 @@ describe("PortfolioService", () => {
           return null;
         },
       );
+      securityPriceRepository.query.mockResolvedValue([
+        { security_id: "sec-2", close_price: "80", price_date: "2026-05-05" },
+      ]);
+      exchangeRateService.getLatestRate.mockResolvedValue(1.4);
 
       const result = await service.getIntradayValueSeries(userId, {
         range: "1d",
       });
 
-      expect(result.fallbackToDaily).toBe(true);
-      expect(result.failedSymbols).toEqual(["VFV.TO"]);
-      expect(result.points).toEqual([]);
+      expect(result.fallbackToDaily).toBe(false);
+      expect(result.failedSymbols).toEqual([]);
+      expect(result.points).toHaveLength(1);
     });
   });
 });
