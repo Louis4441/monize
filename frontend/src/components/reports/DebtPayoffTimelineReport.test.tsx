@@ -521,10 +521,10 @@ describe('DebtPayoffTimelineReport', () => {
       expect(screen.getByTestId('area-chart')).toBeInTheDocument();
     });
     // Switch to breakdown
-    fireEvent.click(screen.getByText('Payment Breakdown'));
+    await act(async () => { fireEvent.click(screen.getByText('Payment Breakdown')); });
     expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
     // Switch back to balance
-    fireEvent.click(screen.getByText('Balance Over Time'));
+    await act(async () => { fireEvent.click(screen.getByText('Balance Over Time')); });
     expect(screen.getByTestId('area-chart')).toBeInTheDocument();
   });
 

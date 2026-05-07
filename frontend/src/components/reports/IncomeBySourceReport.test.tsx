@@ -17,18 +17,21 @@ vi.mock("@/hooks/useNumberFormat", () => ({
 }));
 
 let mockIsValid = true;
-vi.mock("@/hooks/useDateRange", () => ({
-  useDateRange: () => ({
-    dateRange: "1y",
-    setDateRange: vi.fn(),
-    startDate: "",
-    setStartDate: vi.fn(),
-    endDate: "",
-    setEndDate: vi.fn(),
-    resolvedRange: { start: "2024-01-01", end: "2025-01-01" },
-    get isValid() { return mockIsValid; },
-  }),
-}));
+vi.mock("@/hooks/useDateRange", () => {
+  const resolvedRange = { start: "2024-01-01", end: "2025-01-01" };
+  return {
+    useDateRange: () => ({
+      dateRange: "1y",
+      setDateRange: vi.fn(),
+      startDate: "",
+      setStartDate: vi.fn(),
+      endDate: "",
+      setEndDate: vi.fn(),
+      resolvedRange,
+      get isValid() { return mockIsValid; },
+    }),
+  };
+});
 
 vi.mock("@/lib/chart-colours", () => ({
   CHART_COLOURS_INCOME: ["#22c55e", "#3b82f6", "#8b5cf6"],

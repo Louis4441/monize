@@ -365,6 +365,14 @@ describe('evaluateExpression', () => {
   });
 });
 
+describe('parseAmount – additional edge cases', () => {
+  it('returns undefined when filtered string produces NaN (e.g. multiple dots)', () => {
+    // '..' passes the empty/'.'/ '-' checks but parseFloat('..') = NaN
+    expect(parseAmount('..')).toBeUndefined();
+    expect(parseAmount('..5')).toBeUndefined();
+  });
+});
+
 describe('formatRelativeTime', () => {
   it('returns "Never" for null', () => {
     expect(formatRelativeTime(null)).toBe('Never');

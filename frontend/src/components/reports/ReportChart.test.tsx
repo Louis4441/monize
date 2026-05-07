@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@/test/render';
+import { render, screen, fireEvent, act } from '@/test/render';
 import { ReportChart } from './ReportChart';
 import { ReportViewType, GroupByType, TableColumn } from '@/types/custom-report';
 
@@ -385,12 +385,10 @@ describe('ReportChart', () => {
         reportSubtitle="Subtitle"
       />
     );
-    const exportBtn = screen.getByRole('button', { name: /export/i });
-    fireEvent.click(exportBtn);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /export/i })); });
     const pdfBtn = screen.queryByText(/PDF/i);
     if (pdfBtn) {
-      fireEvent.click(pdfBtn);
-      await new Promise((r) => setTimeout(r, 50));
+      await act(async () => { fireEvent.click(pdfBtn); });
     }
     expect(exportToPdf).toHaveBeenCalled();
   });
@@ -438,12 +436,10 @@ describe('ReportChart', () => {
         tableColumns={[TableColumn.DATE, TableColumn.VALUE, TableColumn.PERCENTAGE, TableColumn.COUNT]}
       />
     );
-    const exportBtn = screen.getByRole('button', { name: /export/i });
-    fireEvent.click(exportBtn);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /export/i })); });
     const pdfBtn = screen.queryByText(/PDF/i);
     if (pdfBtn) {
-      fireEvent.click(pdfBtn);
-      await new Promise((r) => setTimeout(r, 50));
+      await act(async () => { fireEvent.click(pdfBtn); });
     }
   });
 
@@ -458,12 +454,10 @@ describe('ReportChart', () => {
         tableColumns={[TableColumn.DATE, TableColumn.VALUE, TableColumn.PERCENTAGE, TableColumn.COUNT]}
       />
     );
-    const exportBtn = screen.getByRole('button', { name: /export/i });
-    fireEvent.click(exportBtn);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /export/i })); });
     const pdfBtn = screen.queryByText(/PDF/i);
     if (pdfBtn) {
-      fireEvent.click(pdfBtn);
-      await new Promise((r) => setTimeout(r, 50));
+      await act(async () => { fireEvent.click(pdfBtn); });
     }
   });
 

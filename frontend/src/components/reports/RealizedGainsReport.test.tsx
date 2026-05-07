@@ -18,18 +18,21 @@ vi.mock('@/hooks/useExchangeRates', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useDateRange', () => ({
-  useDateRange: () => ({
-    dateRange: '1y',
-    setDateRange: vi.fn(),
-    startDate: '',
-    setStartDate: vi.fn(),
-    endDate: '',
-    setEndDate: vi.fn(),
-    resolvedRange: { start: '2025-01-01', end: '2026-01-01' },
-    isValid: true,
-  }),
-}));
+vi.mock('@/hooks/useDateRange', () => {
+  const resolvedRange = { start: '2025-01-01', end: '2026-01-01' };
+  return {
+    useDateRange: () => ({
+      dateRange: '1y',
+      setDateRange: vi.fn(),
+      startDate: '',
+      setStartDate: vi.fn(),
+      endDate: '',
+      setEndDate: vi.fn(),
+      resolvedRange,
+      isValid: true,
+    }),
+  };
+});
 
 vi.mock('@/lib/utils', () => ({
   parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),

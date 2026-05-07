@@ -277,15 +277,14 @@ describe('useUndoRedo', () => {
     );
     const { result } = renderHook(() => useUndoRedo());
 
-    const first = act(async () => {
-      await result.current.handleUndo();
-    });
-    // Second call while first pending
+    // Start first undo without awaiting so the second call races with it
+    const firstPromise = result.current.handleUndo();
+    // Second call while first is pending — should be deduped
     await act(async () => {
       await result.current.handleUndo();
     });
     expect(actionHistoryApi.undo).toHaveBeenCalledTimes(1);
     resolve({ description: 'done' });
-    await first;
+    await act(async () => { await firstPromise; });
   });
 });

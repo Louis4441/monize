@@ -401,4 +401,93 @@ describe('aiChatStore', () => {
       expect(useAiChatStore.getState().messages).toEqual([]);
     });
   });
+
+  describe('streaming edge cases – fallback values', () => {
+    it('handles assistant_text with no text (empty fallback)', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onEvent({ type: 'assistant_text' } as any);
+      expect(useAiChatStore.getState().thinking.liveText).toBe('');
+    });
+
+    it('handles tool_start with no name (empty fallback)', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onEvent({ type: 'tool_start' } as any);
+      const tools = useAiChatStore.getState().thinking.tools;
+      expect(tools[0]).toMatchObject({ name: '', status: 'running' });
+    });
+
+    it('handles tool_result when no matching tool exists', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onEvent({ type: 'tool_start', name: 'tool_a' });
+      capturedCallbacks?.onEvent({ type: 'tool_result', name: 'nonexistent' });
+      const tools = useAiChatStore.getState().thinking.tools;
+      // tool_a still running since result was for a different name
+      expect(tools[0]).toMatchObject({ name: 'tool_a', status: 'running' });
+    });
+
+    it('handles tool_result with no summary (empty fallback)', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onEvent({ type: 'tool_start', name: 'tool_a' });
+      capturedCallbacks?.onEvent({ type: 'tool_result', name: 'tool_a' } as any);
+      const tools = useAiChatStore.getState().thinking.tools;
+      expect(tools[0].summary).toBeUndefined();
+    });
+
+    it('handles chart event with no chart data (no-op)', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onEvent({ type: 'chart' } as any);
+      capturedCallbacks?.onEvent({ type: 'content', text: 'Answer' });
+      const messages = useAiChatStore.getState().messages;
+      expect(messages[1].charts).toBeUndefined();
+    });
+
+    it('handles multiple content events (second updates without re-creating message)', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onEvent({ type: 'content', text: 'Part 1 ' });
+      capturedCallbacks?.onEvent({ type: 'content', text: 'Part 1 Part 2' });
+      const messages = useAiChatStore.getState().messages;
+      expect(messages[1].content).toBe('Part 1 Part 2');
+    });
+
+    it('handles content event with no text (empty fallback)', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onEvent({ type: 'content' } as any);
+      const messages = useAiChatStore.getState().messages;
+      expect(messages[1].content).toBe('');
+    });
+
+    it('handles error event with no message (default message used)', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onEvent({ type: 'error' } as any);
+      const messages = useAiChatStore.getState().messages;
+      expect(messages[1].error).toBe('An error occurred');
+    });
+
+    it('onDone is a no-op when already not loading', () => {
+      useAiChatStore.getState().submit('Q');
+      // First onDone clears loading state
+      capturedCallbacks?.onDone?.();
+      expect(useAiChatStore.getState().isLoading).toBe(false);
+      // Second call should not throw and stays not loading
+      capturedCallbacks?.onDone?.();
+      expect(useAiChatStore.getState().isLoading).toBe(false);
+    });
+
+    it('onError before any content creates an error assistant message', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onError?.(new Error('connect failed'));
+      const state = useAiChatStore.getState();
+      expect(state.isLoading).toBe(false);
+      const assistant = state.messages.find((m) => m.role === 'assistant');
+      expect(assistant?.error).toBe('connect failed');
+    });
+
+    it('onError with no message uses fallback message', () => {
+      useAiChatStore.getState().submit('Q');
+      capturedCallbacks?.onError?.({ message: '' } as Error);
+      const state = useAiChatStore.getState();
+      const assistant = state.messages.find((m) => m.role === 'assistant');
+      expect(assistant?.error).toBe('Failed to connect to the AI service.');
+    });
+  });
 });

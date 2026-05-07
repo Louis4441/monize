@@ -190,4 +190,85 @@ describe('captureSingleSvg via captureSvgAsImage (with mocked Image)', () => {
     const result = await captureSvgAsImage(container);
     expect(result).toBeNull();
   });
+
+  it('falls back to SVG bounding rect when element attributes are too small', async () => {
+    const container = document.createElement('div');
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('recharts-wrapper');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('recharts-surface');
+    svg.setAttribute('width', '10');
+    svg.setAttribute('height', '10');
+    wrapper.appendChild(svg);
+    container.appendChild(wrapper);
+
+    vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({
+      width: 600, height: 350, top: 0, left: 0, right: 600, bottom: 350, x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    const result = await captureSvgAsImage(container);
+    expect(result).not.toBeNull();
+    expect(result?.width).toBe(600);
+    expect(result?.height).toBe(350);
+  });
+
+  it('falls back to container bounding rect when SVG rect is also too small', async () => {
+    const container = document.createElement('div');
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('recharts-wrapper');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('recharts-surface');
+    wrapper.appendChild(svg);
+    container.appendChild(wrapper);
+
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+      width: 700, height: 400, top: 0, left: 0, right: 700, bottom: 400, x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    const result = await captureSvgAsImage(container);
+    expect(result).not.toBeNull();
+    expect(result?.width).toBe(700);
+    expect(result?.height).toBe(400);
+  });
+
+  it('skips fill normalization for text with explicit color and skips stroke for plain lines', async () => {
+    const container = document.createElement('div');
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('recharts-wrapper');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('recharts-surface');
+    svg.setAttribute('width', '800');
+    svg.setAttribute('height', '400');
+    // Text with explicit non-currentColor fill → covers the false branch of fill normalization
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('fill', 'black');
+    svg.appendChild(text);
+    // Line without stroke-gray classes → covers the false branch of stroke normalization
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    svg.appendChild(line);
+    wrapper.appendChild(svg);
+    container.appendChild(wrapper);
+
+    const result = await captureSvgAsImage(container);
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when canvas 2d context is unavailable', async () => {
+    HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(null) as any;
+
+    const container = document.createElement('div');
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('recharts-wrapper');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('recharts-surface');
+    svg.setAttribute('width', '800');
+    svg.setAttribute('height', '400');
+    wrapper.appendChild(svg);
+    container.appendChild(wrapper);
+
+    const result = await captureSvgAsImage(container);
+    expect(result).toBeNull();
+  });
 });

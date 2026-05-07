@@ -252,5 +252,34 @@ describe('authStore', () => {
 
       vi.doUnmock('@/lib/auth');
     });
+
+    it('logs out on non-AxiosError during rehydration', async () => {
+      useAuthStore.setState({
+        isAuthenticated: true,
+        user: null,
+        _hasHydrated: false,
+        isLoading: true,
+      });
+
+      const persistApi = (useAuthStore as any).persist;
+      const options = persistApi.getOptions();
+      const onRehydrate = options.onRehydrateStorage();
+
+      vi.doMock('@/lib/auth', () => ({
+        authApi: {
+          getProfile: vi.fn().mockRejectedValue(new Error('unexpected')),
+        },
+      }));
+
+      onRehydrate(useAuthStore.getState());
+
+      await new Promise(r => setTimeout(r, 50));
+
+      const state = useAuthStore.getState();
+      expect(state.isAuthenticated).toBe(false);
+      expect(state._hasHydrated).toBe(true);
+
+      vi.doUnmock('@/lib/auth');
+    });
   });
 });

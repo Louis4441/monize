@@ -38,4 +38,20 @@ describe('netWorthApi', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/net-worth/recalculate');
     expect(result.success).toBe(true);
   });
+
+  it('getInvestmentsDaily fetches /net-worth/investments-daily', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    await netWorthApi.getInvestmentsDaily({ accountIds: 'a1', displayCurrency: 'CAD' });
+    expect(apiClient.get).toHaveBeenCalledWith('/net-worth/investments-daily', {
+      params: { accountIds: 'a1', displayCurrency: 'CAD' },
+    });
+  });
+
+  it('getInvestmentsDaily passes no params when called without arguments', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    await netWorthApi.getInvestmentsDaily();
+    expect(apiClient.get).toHaveBeenCalledWith('/net-worth/investments-daily', {
+      params: undefined,
+    });
+  });
 });
