@@ -802,6 +802,7 @@ export class InvestmentTransactionsService {
 
     const data = await query
       .orderBy("it.transactionDate", "DESC")
+      .addOrderBy("it.createdAt", "DESC")
       .skip((pageNum - 1) * pageSize)
       .take(pageSize)
       .getMany();
@@ -1626,7 +1627,7 @@ export class InvestmentTransactionsService {
       });
     }
 
-    query.orderBy("it.transactionDate", "DESC");
+    query.orderBy("it.transactionDate", "DESC").addOrderBy("it.createdAt", "DESC");
 
     const rows = await query.getMany();
 

@@ -170,6 +170,7 @@ describe("InvestmentTransactionsService", () => {
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
     skip: jest.fn().mockReturnThis(),
     take: jest.fn().mockReturnThis(),
     getOne: jest.fn().mockResolvedValue(result),
@@ -1587,7 +1588,7 @@ describe("InvestmentTransactionsService", () => {
       expect(result.data).toEqual([]);
     });
 
-    it("orders transactions by date descending", async () => {
+    it("orders transactions by date descending, breaking ties by creation order", async () => {
       const mockQB = createMockQueryBuilder([], 0);
       investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
         mockQB,
@@ -1596,6 +1597,7 @@ describe("InvestmentTransactionsService", () => {
       await service.findAll(userId);
 
       expect(mockQB.orderBy).toHaveBeenCalledWith("it.transactionDate", "DESC");
+      expect(mockQB.addOrderBy).toHaveBeenCalledWith("it.createdAt", "DESC");
     });
   });
 
