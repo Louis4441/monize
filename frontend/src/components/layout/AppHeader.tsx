@@ -273,7 +273,7 @@ export function AppHeader() {
 
             <button
               onClick={() => router.push('/dashboard')}
-              className="flex items-center gap-2 text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              className="hidden lg:flex items-center gap-2 text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
             >
               <Image src="/icons/monize-logo.svg" alt="Monize" width={32} height={32} className="rounded" priority />
               <span className="hidden lg:inline">Monize</span>
