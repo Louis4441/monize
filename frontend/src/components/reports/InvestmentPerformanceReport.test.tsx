@@ -263,4 +263,33 @@ describe('InvestmentPerformanceReport', () => {
     });
     expect(screen.getAllByText(/Unknown account/i).length).toBeGreaterThan(0);
   });
+
+  it('exercises every sortable column on the holdings table', async () => {
+    mockGetPortfolioSummary.mockResolvedValue({
+      holdings: [
+        { id: 'h1', accountId: 'a1', securityId: 's1', symbol: 'AAA', name: 'Alpha', currencyCode: 'USD', securityType: 'STOCK', quantity: 10, averageCost: 50, costBasis: 500, currentPrice: 100, marketValue: 1000, gainLoss: 500, gainLossPercent: 100 },
+        { id: 'h2', accountId: 'a1', securityId: 's2', symbol: 'BBB', name: 'Bravo', currencyCode: 'USD', securityType: 'ETF', quantity: 5, averageCost: 80, costBasis: 400, currentPrice: 90, marketValue: 450, gainLoss: 50, gainLossPercent: 12.5 },
+      ],
+      allocation: [],
+      totalPortfolioValue: 1450,
+      totalCostBasis: 900,
+      totalGainLoss: 550,
+      totalGainLossPercent: 61.1,
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    const { container } = render(<InvestmentPerformanceReport />);
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('table thead th').length;
+    expect(headerCount).toBeGreaterThan(0);
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+  });
 });

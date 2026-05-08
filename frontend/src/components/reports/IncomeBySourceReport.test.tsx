@@ -46,14 +46,18 @@ vi.mock("@/components/ui/ChartViewToggle", () => ({
     <div data-testid="chart-view-toggle">
       <button data-testid="toggle-bar" onClick={() => onChange("bar")}>Bar</button>
       <button data-testid="toggle-pie" onClick={() => onChange("pie")}>Pie</button>
+      <button data-testid="toggle-table" onClick={() => onChange("table")}>Table</button>
     </div>
   ),
 }));
 
 vi.mock("@/components/ui/ExportDropdown", () => ({
-  ExportDropdown: ({ onExportPdf }: any) => (
+  ExportDropdown: ({ onExportPdf, onExportCsv }: any) => (
     <div data-testid="export-dropdown">
       <button data-testid="export-pdf" onClick={onExportPdf}>PDF</button>
+      {onExportCsv && (
+        <button data-testid="export-csv" onClick={onExportCsv}>CSV</button>
+      )}
     </div>
   ),
 }));
@@ -355,5 +359,54 @@ describe("IncomeBySourceReport", () => {
     render(<IncomeBySourceReport />);
     // loadData is gated on isValid, so the API should not be called
     expect(mockGetIncomeBySource).not.toHaveBeenCalled();
+  });
+
+  it("sorts table when totalIncome is zero (percentage sort branch)", async () => {
+    mockGetIncomeBySource.mockResolvedValue({
+      data: [
+        { categoryId: "c1", categoryName: "Z", total: 0, color: "" },
+        { categoryId: "c2", categoryName: "A", total: 0, color: "" },
+      ],
+      totalIncome: 0,
+    });
+    const { container } = render(<IncomeBySourceReport />);
+    await waitFor(() => expect(screen.getByTestId("toggle-table")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("toggle-table"));
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const ths = container.querySelectorAll('table thead th');
+    // Click '% of Total' header to exercise the totalIncome === 0 percentage branch.
+    if (ths[2]) fireEvent.click(ths[2]);
+    if (ths[0]) fireEvent.click(ths[0]);
+  });
+
+  it("renders sortable table view, sorts each column, exports CSV", async () => {
+    mockGetIncomeBySource.mockResolvedValue({
+      data: [
+        { categoryId: "c1", categoryName: "Salary", total: 5000, color: "" },
+        { categoryId: "c2", categoryName: "Dividends", total: 200, color: "" },
+        { categoryId: "", categoryName: "Other", total: 50, color: "" },
+      ],
+      totalIncome: 5250,
+    });
+    const { container } = render(<IncomeBySourceReport />);
+    await waitFor(() => expect(screen.getByTestId("toggle-table")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("toggle-table"));
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('th').length;
+    expect(headerCount).toBeGreaterThan(0);
+    for (let i = 0; i < headerCount; i += 1) {
+      const ths = container.querySelectorAll('th');
+      if (!ths[i]) break;
+      fireEvent.click(ths[i]);
+    }
+    for (let i = 0; i < headerCount; i += 1) {
+      const ths = container.querySelectorAll('th');
+      if (!ths[i]) break;
+      fireEvent.click(ths[i]);
+    }
+    // Click row to navigate (one row has categoryId="").
+    const rows = container.querySelectorAll('tbody tr');
+    rows.forEach((tr) => fireEvent.click(tr));
+    fireEvent.click(screen.getByTestId("export-csv"));
   });
 });

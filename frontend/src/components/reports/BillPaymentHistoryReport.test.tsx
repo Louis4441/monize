@@ -236,4 +236,55 @@ describe('BillPaymentHistoryReport', () => {
     // Just verify no error is thrown when isLoading
     expect(document.querySelector('.animate-pulse')).toBeTruthy();
   });
+
+  it('exercises every sortable column on the bill payment table', async () => {
+    mockGetBillPaymentHistory.mockResolvedValue({
+      summary: { totalPaid: 700, monthlyAverage: 100, uniqueBills: 3, totalPayments: 8 },
+      billPayments: [
+        {
+          scheduledTransactionId: 'st1',
+          scheduledTransactionName: 'Bill A',
+          payeeName: 'Payee A',
+          paymentCount: 5,
+          averagePayment: 100,
+          totalPaid: 500,
+          lastPaymentDate: '2024-06-15',
+        },
+        {
+          scheduledTransactionId: 'st2',
+          scheduledTransactionName: 'Bill B',
+          payeeName: 'Payee B',
+          paymentCount: 2,
+          averagePayment: 100,
+          totalPaid: 200,
+          lastPaymentDate: '2024-05-10',
+        },
+        {
+          scheduledTransactionId: 'st3',
+          scheduledTransactionName: 'Bill C',
+          payeeName: '',
+          paymentCount: 1,
+          averagePayment: 50,
+          totalPaid: 50,
+          lastPaymentDate: null,
+        },
+      ],
+    });
+    const { container } = render(<BillPaymentHistoryReport />);
+    // The view is "overview" by default; switch to "By Bill" view to render the table.
+    await waitFor(() => expect(screen.getByText('By Bill')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('By Bill'));
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const __headerCount = container.querySelectorAll('table thead th').length;
+    for (let __i = 0; __i < __headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+    for (let __i = 0; __i < __headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+  });
 });

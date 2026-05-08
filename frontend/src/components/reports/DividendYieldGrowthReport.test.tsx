@@ -801,4 +801,94 @@ describe('DividendYieldGrowthReport', () => {
       expect(screen.getByText('Per-Security Dividend Yield (Trailing 12 Months)')).toBeInTheDocument();
     });
   });
+
+  it('exercises sort headers on yield, growth, and frequency tables', async () => {
+    // Use recent dates so they fall within the trailing 12-month cutoff that
+    // securityYields filters on; otherwise the table renders empty and the
+    // sort comparator never runs.
+    const today = new Date();
+    const recentDate = (monthsAgo: number) => {
+      const d = new Date(today);
+      d.setMonth(d.getMonth() - monthsAgo);
+      return d.toISOString().slice(0, 10);
+    };
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        // sec-1: Monthly cadence (multiple recent dividends)
+        ...[1, 2, 3, 4].map((m, i) => ({
+          id: `tx-1-${i}`,
+          accountId: 'acc-1',
+          securityId: 'sec-1',
+          security: { symbol: 'AAA', name: 'Alpha' },
+          transactionDate: recentDate(m),
+          totalAmount: 100,
+          action: 'DIVIDEND' as const,
+        })),
+        // sec-2: Quarterly cadence
+        ...[1, 4].map((m, i) => ({
+          id: `tx-2-${i}`,
+          accountId: 'acc-1',
+          securityId: 'sec-2',
+          security: { symbol: 'BBB', name: 'Bravo' },
+          transactionDate: recentDate(m),
+          totalAmount: 50,
+          action: 'DIVIDEND' as const,
+        })),
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetPortfolioSummary.mockResolvedValue({
+      holdings: [
+        { securityId: 'sec-1', symbol: 'AAA', name: 'Alpha', currencyCode: 'CAD', marketValue: 5000 },
+        { securityId: 'sec-2', symbol: 'BBB', name: 'Bravo', currencyCode: 'CAD', marketValue: 2500 },
+      ],
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    const { container } = render(<DividendYieldGrowthReport />);
+    await waitFor(() => expect(screen.getByText('Per-Security Dividend Yield (Trailing 12 Months)')).toBeInTheDocument());
+    // Yield table sort.
+    let __headerCount = container.querySelectorAll('table thead th').length;
+    for (let __i = 0; __i < __headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+    for (let __i = 0; __i < __headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+    // Switch to Year-over-Year.
+    fireEvent.click(screen.getByText('Year-over-Year'));
+    await waitFor(() => expect(screen.getByText('Annual Dividend Income')).toBeInTheDocument());
+    {
+      const yHeaderCount = container.querySelectorAll('table thead th').length;
+      for (let __i = 0; __i < yHeaderCount; __i += 1) {
+        const __ths = container.querySelectorAll('table thead th');
+        if (!__ths[__i]) break;
+        fireEvent.click(__ths[__i]);
+      }
+      for (let __i = 0; __i < yHeaderCount; __i += 1) {
+        const __ths = container.querySelectorAll('table thead th');
+        if (!__ths[__i]) break;
+        fireEvent.click(__ths[__i]);
+      }
+    }
+    // Switch to Frequency view.
+    fireEvent.click(screen.getByText('Frequency'));
+    await waitFor(() => expect(screen.getByText('Dividend Frequency Analysis')).toBeInTheDocument());
+    {
+      const fHeaderCount = container.querySelectorAll('table thead th').length;
+      for (let __i = 0; __i < fHeaderCount; __i += 1) {
+        const __ths = container.querySelectorAll('table thead th');
+        if (!__ths[__i]) break;
+        fireEvent.click(__ths[__i]);
+      }
+      for (let __i = 0; __i < fHeaderCount; __i += 1) {
+        const __ths = container.querySelectorAll('table thead th');
+        if (!__ths[__i]) break;
+        fireEvent.click(__ths[__i]);
+      }
+    }
+  });
 });

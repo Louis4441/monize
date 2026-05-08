@@ -467,4 +467,35 @@ describe('RealizedGainsReport', () => {
     // No account selected -> toDisplay calls convertToDefault (which is identity in mock)
     expect(screen.getByText(/Sell Transactions/)).toBeInTheDocument();
   });
+
+  it('exercises sort headers on security and sells tables', async () => {
+    mockGetRealizedGains.mockResolvedValue([
+      gainEntry({ symbol: 'BBB', securityName: 'Bravo', transactionDate: '2024-02-15', quantity: 5, price: 100, proceeds: 500, costBasis: 400, realizedGain: 100, accountCurrencyCode: 'CAD' }),
+      gainEntry({ symbol: 'AAA', securityName: 'Alpha', transactionDate: '2024-01-15', quantity: 10, price: 50, proceeds: 500, costBasis: 600, realizedGain: -100, accountCurrencyCode: 'CAD' }),
+      gainEntry({ symbol: 'CCC', securityName: 'Charlie', transactionDate: '2024-03-15', quantity: 2, price: 200, proceeds: 400, costBasis: 300, realizedGain: 100, accountCurrencyCode: 'CAD' }),
+    ]);
+    const { container } = render(<RealizedGainsReport />);
+    await waitFor(() => expect(screen.getByTitle('Table')).toBeInTheDocument());
+    // Switch to security table view.
+    fireEvent.click(screen.getByTitle('Table'));
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const tables = container.querySelectorAll('table');
+    // First table = securities (Symbol/Trades/Proceeds/Cost Basis/Gain) summary.
+    // Second table = individual sell transactions.
+    const tableCount = container.querySelectorAll('table').length;
+    for (let t = 0; t < tableCount; t += 1) {
+      const tableNow = container.querySelectorAll('table')[t];
+      const headerCount = tableNow.querySelectorAll('thead th').length;
+      for (let i = 0; i < headerCount; i += 1) {
+        const ths = container.querySelectorAll('table')[t].querySelectorAll('thead th');
+        if (!ths[i]) break;
+        fireEvent.click(ths[i]);
+      }
+      for (let i = 0; i < headerCount; i += 1) {
+        const ths = container.querySelectorAll('table')[t].querySelectorAll('thead th');
+        if (!ths[i]) break;
+        fireEvent.click(ths[i]);
+      }
+    }
+  });
 });

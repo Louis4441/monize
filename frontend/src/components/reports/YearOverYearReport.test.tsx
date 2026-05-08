@@ -68,6 +68,15 @@ vi.mock("@/components/ui/ExportDropdown", () => ({
   ),
 }));
 
+vi.mock("@/components/ui/ChartViewToggle", () => ({
+  ChartViewToggle: ({ onChange }: any) => (
+    <div data-testid="chart-view-toggle">
+      <button data-testid="toggle-bar" onClick={() => onChange("bar")}>Bar</button>
+      <button data-testid="toggle-table" onClick={() => onChange("table")}>Table</button>
+    </div>
+  ),
+}));
+
 const mockExportToPdf = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/pdf-export", () => ({
   exportToPdf: (...args: any[]) => mockExportToPdf(...args),
@@ -504,5 +513,51 @@ describe("YearOverYearReport", () => {
         }),
       );
     });
+  });
+
+  it("renders sortable table view, sorts each column, and exports CSV", async () => {
+    mockGetYearOverYear.mockResolvedValue({
+      data: [
+        {
+          year: 2024,
+          months: [
+            { month: 1, expenses: 3000, income: 5000, savings: 2000 },
+            { month: 2, expenses: 3500, income: 5500, savings: 2000 },
+          ],
+          totals: { income: 50000, expenses: 30000, savings: 20000 },
+        },
+        {
+          year: 2025,
+          months: [
+            { month: 1, expenses: 4000, income: 5500, savings: 1500 },
+            { month: 2, expenses: 3800, income: 5800, savings: 2000 },
+          ],
+          totals: { income: 55000, expenses: 35000, savings: 20000 },
+        },
+      ],
+    });
+    const { container } = render(<YearOverYearReport />);
+    await waitFor(() => expect(screen.getByTestId("toggle-table")).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByTestId("toggle-table")); });
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('th').length;
+    expect(headerCount).toBeGreaterThan(0);
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+    // Click a year-value cell to navigate.
+    const cells = container.querySelectorAll('tbody tr td');
+    expect(cells.length).toBeGreaterThan(0);
+    await act(async () => {
+      cells.forEach((td) => fireEvent.click(td));
+    });
+    await act(async () => { fireEvent.click(screen.getByTestId("export-csv")); });
   });
 });

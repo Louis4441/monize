@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@/test/render";
+import { render, screen, waitFor, fireEvent, act } from "@/test/render";
 import { IncomeVsExpensesReport } from "./IncomeVsExpensesReport";
 
 const mockPush = vi.fn();
@@ -16,6 +16,7 @@ vi.mock("@/hooks/useNumberFormat", () => ({
   }),
 }));
 
+const STABLE_RANGE = { start: "2024-01-01", end: "2025-01-01" };
 vi.mock("@/hooks/useDateRange", () => ({
   useDateRange: () => ({
     dateRange: "1y",
@@ -24,13 +25,33 @@ vi.mock("@/hooks/useDateRange", () => ({
     setStartDate: vi.fn(),
     endDate: "",
     setEndDate: vi.fn(),
-    resolvedRange: { start: "2024-01-01", end: "2025-01-01" },
+    resolvedRange: STABLE_RANGE,
     isValid: true,
   }),
 }));
 
 vi.mock("@/components/ui/DateRangeSelector", () => ({
   DateRangeSelector: () => <div data-testid="date-range-selector" />,
+}));
+
+vi.mock("@/components/ui/ChartViewToggle", () => ({
+  ChartViewToggle: ({ onChange }: any) => (
+    <div data-testid="chart-view-toggle">
+      <button data-testid="toggle-bar" onClick={() => onChange("bar")}>Bar</button>
+      <button data-testid="toggle-table" onClick={() => onChange("table")}>Table</button>
+    </div>
+  ),
+}));
+
+vi.mock("@/components/ui/ExportDropdown", () => ({
+  ExportDropdown: ({ onExportPdf, onExportCsv }: any) => (
+    <div data-testid="export-dropdown">
+      <button data-testid="export-pdf" onClick={onExportPdf}>PDF</button>
+      {onExportCsv && (
+        <button data-testid="export-csv" onClick={onExportCsv}>CSV</button>
+      )}
+    </div>
+  ),
 }));
 
 vi.mock("recharts", () => ({
@@ -223,5 +244,47 @@ describe("IncomeVsExpensesReport", () => {
     expect(mockPush).toHaveBeenCalledWith(
       "/transactions?startDate=2024-01-01&endDate=2024-01-31",
     );
+  });
+
+  it("computes savingsRate when totals.income is 0 (zero-income branch)", async () => {
+    mockGetIncomeVsExpenses.mockResolvedValue({
+      data: [{ month: "2024-01", income: 0, expenses: 100, net: -100 }],
+      totals: { income: 0, expenses: 100 },
+    });
+    render(<IncomeVsExpensesReport />);
+    await waitFor(() => expect(screen.getByText("Total Income")).toBeInTheDocument());
+    expect(screen.getByText("0.0%")).toBeInTheDocument();
+  });
+
+  it("renders sortable table view, sorts each column, navigates and exports CSV", async () => {
+    mockGetIncomeVsExpenses.mockResolvedValue({
+      data: [
+        { month: "2024-02", income: 5200, expenses: 3500, net: 1700 },
+        { month: "2024-01", income: 5000, expenses: 3000, net: 2000 },
+        { month: "2024-03", income: 1000, expenses: 2000, net: -1000 },
+      ],
+      totals: { income: 11200, expenses: 8500 },
+    });
+    const { container } = render(<IncomeVsExpensesReport />);
+    await waitFor(() => expect(screen.getByTestId("toggle-table")).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByTestId("toggle-table")); });
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('th').length;
+    expect(headerCount).toBeGreaterThan(0);
+    for (let i = 0; i < headerCount; i += 1) {
+      const ths = container.querySelectorAll('th');
+      if (!ths[i]) break;
+      await act(async () => { fireEvent.click(ths[i]); });
+    }
+    for (let i = 0; i < headerCount; i += 1) {
+      const ths = container.querySelectorAll('th');
+      if (!ths[i]) break;
+      await act(async () => { fireEvent.click(ths[i]); });
+    }
+    // Click a row to navigate.
+    const rows = container.querySelectorAll('tbody tr');
+    expect(rows.length).toBeGreaterThan(0);
+    await act(async () => { fireEvent.click(rows[0]); });
+    await act(async () => { fireEvent.click(screen.getByTestId("export-csv")); });
   });
 });

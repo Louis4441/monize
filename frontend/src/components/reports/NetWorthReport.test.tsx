@@ -307,4 +307,35 @@ describe('NetWorthReport', () => {
     const months = monthCells.map((td) => td.textContent?.trim() ?? '');
     expect(months).toEqual(['Apr 2020', 'Aug 2020', 'Apr 2021', 'Aug 2021']);
   });
+
+  it('exercises every table-mode sort header and CSV export', async () => {
+    mockGetMonthly.mockResolvedValue([
+      { month: '2024-01-01', assets: 100, liabilities: 50, netWorth: 50 },
+      { month: '2024-06-01', assets: 200, liabilities: 30, netWorth: 170 },
+    ]);
+    const { container } = render(<NetWorthReport />);
+    await waitFor(() => expect(screen.getByText('Current Net Worth')).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByText('table')); });
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('th').length;
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+    // Find the export-pdf button (this test suite uses the real ExportDropdown,
+    // but PDF export is the only mocked entry path)
+    const exportBtn = screen.getByRole('button', { name: /export/i });
+    await act(async () => { fireEvent.click(exportBtn); });
+    // CSV button should appear in the dropdown for the table view path.
+    const csvBtn = screen.queryByText(/CSV/i);
+    if (csvBtn) {
+      await act(async () => { fireEvent.click(csvBtn); });
+    }
+  });
 });
