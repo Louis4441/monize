@@ -15,6 +15,7 @@ import { CreateTransactionDto } from "./dto/create-transaction.dto";
 import { UpdateTransactionDto } from "./dto/update-transaction.dto";
 import { CreateTransactionSplitDto } from "./dto/create-transaction-split.dto";
 import { CreateTransferDto } from "./dto/create-transfer.dto";
+import { UpdateTransferDto } from "./dto/update-transfer.dto";
 import { TagsService } from "../tags/tags.service";
 import { AccountsService } from "../accounts/accounts.service";
 import { PayeesService } from "../payees/payees.service";
@@ -1828,7 +1829,7 @@ export class TransactionsService {
   async updateTransfer(
     userId: string,
     transactionId: string,
-    updateDto: Partial<CreateTransferDto>,
+    updateDto: Partial<UpdateTransferDto>,
   ): Promise<TransferResult> {
     const result = await this.transferService.updateTransfer(
       userId,
