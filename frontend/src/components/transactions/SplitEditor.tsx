@@ -748,7 +748,9 @@ export function createEmptySplits(transactionAmount: number): SplitRow[] {
   ];
 }
 
-// Convert API splits to SplitRow format
+// Convert API splits to SplitRow format. Accepts both transaction splits (with
+// `investmentTransaction` relation) and scheduled-transaction splits (with the
+// investment payload denormalized as `investment*` columns on the row itself).
 export function toSplitRows(splits: {
   id?: string;
   kind?: 'category' | 'transfer' | 'investment';
@@ -765,24 +767,64 @@ export function toSplitRows(splits: {
     commission: number;
     exchangeRate: number;
   } | null;
+  // Scheduled-transaction-split shape
+  investmentAction?: string | null;
+  investmentSecurityId?: string | null;
+  investmentQuantity?: number | null;
+  investmentPrice?: number | null;
+  investmentCommission?: number | null;
+  investmentExchangeRate?: number | null;
+  // Override JSON shape
+  splitKind?: 'category' | 'transfer' | 'investment';
+  investment?: {
+    action: string;
+    securityId?: string;
+    quantity?: number;
+    price?: number;
+    commission?: number;
+    exchangeRate?: number;
+  };
 }[]): SplitRow[] {
   return splits.map((split, index) => {
     const kind: SplitType =
-      split.kind === 'investment' || split.investmentTransaction
+      split.kind === 'investment' ||
+      split.splitKind === 'investment' ||
+      split.investmentTransaction ||
+      split.investmentAction ||
+      split.investment
         ? 'investment'
         : split.transferAccountId
           ? 'transfer'
           : 'category';
-    const investment = split.investmentTransaction
-      ? {
-          action: split.investmentTransaction.action as InvestmentSplitDetails['action'],
-          securityId: split.investmentTransaction.securityId ?? undefined,
-          quantity: Number(split.investmentTransaction.quantity ?? 0),
-          price: Number(split.investmentTransaction.price ?? 0),
-          commission: Number(split.investmentTransaction.commission ?? 0),
-          exchangeRate: Number(split.investmentTransaction.exchangeRate ?? 1),
-        }
-      : undefined;
+    let investment: InvestmentSplitDetails | undefined;
+    if (split.investmentTransaction) {
+      investment = {
+        action: split.investmentTransaction.action as InvestmentSplitDetails['action'],
+        securityId: split.investmentTransaction.securityId ?? undefined,
+        quantity: Number(split.investmentTransaction.quantity ?? 0),
+        price: Number(split.investmentTransaction.price ?? 0),
+        commission: Number(split.investmentTransaction.commission ?? 0),
+        exchangeRate: Number(split.investmentTransaction.exchangeRate ?? 1),
+      };
+    } else if (split.investmentAction) {
+      investment = {
+        action: split.investmentAction as InvestmentSplitDetails['action'],
+        securityId: split.investmentSecurityId ?? undefined,
+        quantity: Number(split.investmentQuantity ?? 0),
+        price: Number(split.investmentPrice ?? 0),
+        commission: Number(split.investmentCommission ?? 0),
+        exchangeRate: Number(split.investmentExchangeRate ?? 1),
+      };
+    } else if (split.investment) {
+      investment = {
+        action: split.investment.action as InvestmentSplitDetails['action'],
+        securityId: split.investment.securityId,
+        quantity: split.investment.quantity,
+        price: split.investment.price,
+        commission: split.investment.commission,
+        exchangeRate: split.investment.exchangeRate,
+      };
+    }
     return {
       id: split.id || `temp-${Date.now()}-${index}`,
       splitType: kind,

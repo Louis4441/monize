@@ -366,6 +366,10 @@ export function PostTransactionDialog({
                 categories={categories}
                 accounts={accounts}
                 sourceAccountId={scheduledTransaction.accountId}
+                parentAccountSubType={
+                  accounts.find((a) => a.id === scheduledTransaction.accountId)
+                    ?.accountSubType ?? null
+                }
                 transactionAmount={amount}
                 onTransactionAmountChange={handleAmountChange}
                 currencyCode={scheduledTransaction.currencyCode}
