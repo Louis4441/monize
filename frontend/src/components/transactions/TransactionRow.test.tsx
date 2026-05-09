@@ -57,6 +57,7 @@ function renderRow(overrides: Partial<TransactionRowProps> = {}, txOverrides: Pa
     onLongPressStartTouch: vi.fn(),
     onLongPressEnd: vi.fn(),
     onTouchMove: vi.fn(),
+    onContextMenu: vi.fn(),
     onCycleStatus: vi.fn(),
     onDeleteClick: vi.fn(),
     ...overrides,
@@ -707,6 +708,14 @@ describe('TransactionRow', () => {
     const tr = screen.getByText('Coffee Co').closest('tr')!;
     fireEvent.touchCancel(tr);
     expect(onLongPressEnd).toHaveBeenCalled();
+  });
+
+  it('row triggers onContextMenu on right-click', () => {
+    const onContextMenu = vi.fn();
+    renderRow({ onContextMenu });
+    const tr = screen.getByText('Coffee Co').closest('tr')!;
+    fireEvent.contextMenu(tr);
+    expect(onContextMenu).toHaveBeenCalled();
   });
 
   it('selection checkbox cell stops propagation on click', () => {
