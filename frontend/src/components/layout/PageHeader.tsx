@@ -32,7 +32,6 @@ export function PageHeader({ title, subtitle, actions, helpUrl }: PageHeaderProp
                 rel="noopener noreferrer"
                 className="text-gray-400 hover:text-blue-500 transition-colors"
                 aria-label="Open the Monize wiki for help with this section"
-                title="Open the Monize wiki for help with this section"
               >
                 <QuestionMarkCircleIcon className="h-5 w-5" />
               </a>
