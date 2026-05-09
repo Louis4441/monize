@@ -21,9 +21,14 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { exportToCsv } from '@/lib/csv-export';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('RealizedGainsReport');
+
+type SecurityGainsSortField = 'symbol' | 'transactionCount' | 'totalProceeds' | 'totalCostBasis' | 'realizedGain';
+type SellTransactionsSortField = 'date' | 'symbol' | 'quantity' | 'price' | 'proceeds';
 
 function CustomTooltip({ active, payload, fmtValue }: {
   active?: boolean;
@@ -61,6 +66,14 @@ export function RealizedGainsReport() {
   const { dateRange, setDateRange, resolvedRange, isValid } = useDateRange({ defaultRange: '1y', alignment: 'month' });
   const [isLoading, setIsLoading] = useState(true);
   const [viewType, setViewType] = useState<'chart' | 'table'>('chart');
+  const securityGainsSort = useSortableTable<SecurityGainsSortField>(
+    'reports.realized-gains.securities.sort',
+    { field: 'realizedGain', direction: 'desc' },
+  );
+  const sellTransactionsSort = useSortableTable<SellTransactionsSortField>(
+    'reports.realized-gains.sells.sort',
+    { field: 'date', direction: 'desc' },
+  );
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
   const displayCurrency = selectedAccount?.currencyCode || defaultCurrency;
@@ -134,8 +147,34 @@ export function RealizedGainsReport() {
       bucket.transactionCount += 1;
     });
 
-    return Array.from(map.values()).sort((a, b) => b.realizedGain - a.realizedGain);
+    return Array.from(map.values());
   }, [entries, toDisplay]);
+
+  const sortedSecurityGains = useMemo(() => {
+    const sorted = [...securityGains];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (securityGainsSort.sortField) {
+        case 'symbol':
+          comparison = compareValues(a.symbol, b.symbol);
+          break;
+        case 'transactionCount':
+          comparison = compareValues(a.transactionCount, b.transactionCount);
+          break;
+        case 'totalProceeds':
+          comparison = compareValues(a.totalProceeds, b.totalProceeds);
+          break;
+        case 'totalCostBasis':
+          comparison = compareValues(a.totalCostBasis, b.totalCostBasis);
+          break;
+        case 'realizedGain':
+          comparison = compareValues(a.realizedGain, b.realizedGain);
+          break;
+      }
+      return securityGainsSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [securityGains, securityGainsSort.sortField, securityGainsSort.sortDirection]);
 
   const chartData = useMemo(() => {
     return securityGains
@@ -159,10 +198,34 @@ export function RealizedGainsReport() {
     return { totalProceeds, totalCostBasis, totalGain, totalTransactions, gainers, losers };
   }, [securityGains]);
 
-  const sortedEntries = useMemo(
-    () => [...entries].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)),
-    [entries],
-  );
+  const sortedEntries = useMemo(() => {
+    const sorted = [...entries];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (sellTransactionsSort.sortField) {
+        case 'date':
+          comparison = compareValues(a.transactionDate, b.transactionDate);
+          break;
+        case 'symbol':
+          comparison = compareValues(a.symbol || '', b.symbol || '');
+          break;
+        case 'quantity':
+          comparison = compareValues(a.quantity, b.quantity);
+          break;
+        case 'price':
+          comparison = compareValues(a.price, b.price);
+          break;
+        case 'proceeds':
+          comparison = compareValues(
+            toDisplay(a.proceeds, a.accountCurrencyCode),
+            toDisplay(b.proceeds, b.accountCurrencyCode),
+          );
+          break;
+      }
+      return sellTransactionsSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [entries, sellTransactionsSort.sortField, sellTransactionsSort.sortDirection, toDisplay]);
 
   const getExportData = useCallback(() => {
     const headers = ['Security', 'Date Sold', 'Quantity', 'Proceeds', 'Cost Basis', 'Gain/Loss', 'Return %'];
@@ -352,25 +415,59 @@ export function RealizedGainsReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <SortableHeader<SecurityGainsSortField>
+                    field="symbol"
+                    sortField={securityGainsSort.sortField}
+                    sortDirection={securityGainsSort.sortDirection}
+                    onSort={securityGainsSort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Security
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SecurityGainsSortField>
+                    field="transactionCount"
+                    sortField={securityGainsSort.sortField}
+                    sortDirection={securityGainsSort.sortDirection}
+                    onSort={securityGainsSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Trades
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SecurityGainsSortField>
+                    field="totalProceeds"
+                    sortField={securityGainsSort.sortField}
+                    sortDirection={securityGainsSort.sortDirection}
+                    onSort={securityGainsSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Proceeds
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SecurityGainsSortField>
+                    field="totalCostBasis"
+                    sortField={securityGainsSort.sortField}
+                    sortDirection={securityGainsSort.sortDirection}
+                    onSort={securityGainsSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Cost Basis
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SecurityGainsSortField>
+                    field="realizedGain"
+                    sortField={securityGainsSort.sortField}
+                    sortDirection={securityGainsSort.sortDirection}
+                    onSort={securityGainsSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Gain/Loss
-                  </th>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {securityGains.map((sg) => (
+                {sortedSecurityGains.map((sg) => (
                   <tr key={sg.symbol} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900 dark:text-gray-100">
@@ -431,21 +528,54 @@ export function RealizedGainsReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <SortableHeader<SellTransactionsSortField>
+                    field="date"
+                    sortField={sellTransactionsSort.sortField}
+                    sortDirection={sellTransactionsSort.sortDirection}
+                    onSort={sellTransactionsSort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SellTransactionsSortField>
+                    field="symbol"
+                    sortField={sellTransactionsSort.sortField}
+                    sortDirection={sellTransactionsSort.sortDirection}
+                    onSort={sellTransactionsSort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Security
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SellTransactionsSortField>
+                    field="quantity"
+                    sortField={sellTransactionsSort.sortField}
+                    sortDirection={sellTransactionsSort.sortDirection}
+                    onSort={sellTransactionsSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Shares
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SellTransactionsSortField>
+                    field="price"
+                    sortField={sellTransactionsSort.sortField}
+                    sortDirection={sellTransactionsSort.sortDirection}
+                    onSort={sellTransactionsSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Price
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SellTransactionsSortField>
+                    field="proceeds"
+                    sortField={sellTransactionsSort.sortField}
+                    sortDirection={sellTransactionsSort.sortDirection}
+                    onSort={sellTransactionsSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Proceeds
-                  </th>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">

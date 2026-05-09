@@ -21,8 +21,15 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
+import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
+import { exportToCsv } from '@/lib/csv-export';
 import { createLogger } from '@/lib/logger';
+
+type PortfolioBreakdownSortField = 'account' | 'holdings' | 'cash' | 'total' | 'gainLoss';
+type PortfolioChartSortField = 'name' | 'value';
 import {
   INTRADAY_RANGES,
   buildIntradayCacheKey,
@@ -64,6 +71,15 @@ export function PortfolioValueReport() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [chartViewType, setChartViewType] = useState<'area' | 'table'>('area');
+  const { sortField, sortDirection, handleSort } = useSortableTable<PortfolioBreakdownSortField>(
+    'reports.portfolio-value.breakdown.sort',
+    { field: 'total', direction: 'desc' },
+  );
+  const chartTableSort = useSortableTable<PortfolioChartSortField>(
+    'reports.portfolio-value.chart-table.sort',
+    { field: 'name', direction: 'asc' },
+  );
   const [intradayUnavailable, setIntradayUnavailable] = useState<{
     skipped: string[];
   } | null>(null);
@@ -300,6 +316,20 @@ export function PortfolioValueReport() {
     return { change, changePercent, highest, lowest };
   }, [chartPoints]);
 
+  const sortedChartTableData = useMemo(() => {
+    const sorted = chartPoints.map((p, idx) => ({ ...p, index: idx }));
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      if (chartTableSort.sortField === 'name') {
+        comparison = compareValues(a.index, b.index);
+      } else {
+        comparison = compareValues(a.Value, b.Value);
+      }
+      return chartTableSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [chartPoints, chartTableSort.sortField, chartTableSort.sortDirection]);
+
   const xAxisTicks = useMemo(() => {
     if (chartPoints.length <= 36) return undefined;
     if (isIntraday || useDaily) {
@@ -364,6 +394,12 @@ export function PortfolioValueReport() {
       }] : undefined,
       filename: 'portfolio-value',
     });
+  };
+
+  const handleExportCsv = () => {
+    const headers = ['Date', 'Portfolio Value'];
+    const rows = sortedChartTableData.map((p) => [p.name, p.Value]);
+    exportToCsv('portfolio-value', headers, rows);
   };
 
   // Only show the full-card skeleton on the very first paint. Subsequent
@@ -436,7 +472,19 @@ export function PortfolioValueReport() {
               activeColour="bg-emerald-600"
             />
           </div>
-          <ExportDropdown onExportPdf={handleExportPdf} />
+          <div className="flex items-center gap-3">
+            <ChartViewToggle
+              value={chartViewType}
+              onChange={(v) => setChartViewType(v as 'area' | 'table')}
+              options={['area', 'table']}
+              activeColour="bg-emerald-600"
+            />
+            <ExportDropdown
+              onExportPdf={handleExportPdf}
+              onExportCsv={handleExportCsv}
+              disabled={chartPoints.length === 0}
+            />
+          </div>
         </div>
       </div>
 
@@ -507,6 +555,44 @@ export function PortfolioValueReport() {
           <p className="text-gray-500 dark:text-gray-400 text-center py-8">
             No investment data for this period.
           </p>
+        ) : chartViewType === 'table' ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900/50">
+                <tr>
+                  <SortableHeader<PortfolioChartSortField>
+                    field="name"
+                    sortField={chartTableSort.sortField}
+                    sortDirection={chartTableSort.sortDirection}
+                    onSort={chartTableSort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
+                    Date
+                  </SortableHeader>
+                  <SortableHeader<PortfolioChartSortField>
+                    field="value"
+                    sortField={chartTableSort.sortField}
+                    sortDirection={chartTableSort.sortDirection}
+                    onSort={chartTableSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
+                    Portfolio Value
+                  </SortableHeader>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {sortedChartTableData.map((row) => (
+                  <tr key={`${row.index}-${row.name}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">{row.name}</td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {fmtFull(row.Value)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div
             className={`h-80 transition-opacity duration-200 ${
@@ -594,7 +680,32 @@ export function PortfolioValueReport() {
       </div>
 
       {/* Portfolio Breakdown */}
-      {portfolio && portfolio.holdingsByAccount.length > 0 && (
+      {portfolio && portfolio.holdingsByAccount.length > 0 && (() => {
+        const sortedBreakdown = [...portfolio.holdingsByAccount].sort((a, b) => {
+          let comparison = 0;
+          switch (sortField) {
+            case 'account':
+              comparison = compareValues(a.accountName, b.accountName);
+              break;
+            case 'holdings':
+              comparison = compareValues(a.totalMarketValue, b.totalMarketValue);
+              break;
+            case 'cash':
+              comparison = compareValues(a.cashBalance, b.cashBalance);
+              break;
+            case 'total':
+              comparison = compareValues(
+                a.totalMarketValue + a.cashBalance,
+                b.totalMarketValue + b.cashBalance,
+              );
+              break;
+            case 'gainLoss':
+              comparison = compareValues(a.totalGainLoss, b.totalGainLoss);
+              break;
+          }
+          return sortDirection === 'asc' ? comparison : -comparison;
+        });
+        return (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -605,25 +716,59 @@ export function PortfolioValueReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <SortableHeader<PortfolioBreakdownSortField>
+                    field="account"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Account
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<PortfolioBreakdownSortField>
+                    field="holdings"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Holdings
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<PortfolioBreakdownSortField>
+                    field="cash"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Cash
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<PortfolioBreakdownSortField>
+                    field="total"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Total
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<PortfolioBreakdownSortField>
+                    field="gainLoss"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Gain/Loss
-                  </th>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {portfolio.holdingsByAccount.map((acct) => (
+                {sortedBreakdown.map((acct) => (
                   <tr key={acct.accountId} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
                       {acct.accountName}
@@ -646,7 +791,8 @@ export function PortfolioValueReport() {
             </table>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

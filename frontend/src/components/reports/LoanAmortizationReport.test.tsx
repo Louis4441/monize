@@ -673,4 +673,44 @@ describe('LoanAmortizationReport', () => {
       expect(screen.getByText(/2 payments made/)).toBeInTheDocument();
     });
   });
+
+  it('exercises every sortable column on the amortization table', async () => {
+    mockGetAllAccounts.mockResolvedValue([
+      {
+        id: 'acc-loan-1',
+        name: 'Mortgage',
+        accountType: 'MORTGAGE',
+        currencyCode: 'CAD',
+        currentBalance: -200000,
+        interestRate: 5,
+        loanTerm: 360,
+        loanFrequency: 'MONTHLY',
+        loanStartDate: '2020-01-01',
+        loanEndDate: '2050-01-01',
+        loanPayment: 1500,
+      },
+    ]);
+    mockGetAllTransactions.mockResolvedValue({
+      data: [
+        { id: 'tx-1', transactionDate: '2024-01-15', amount: 1500, linkedTransaction: null },
+        { id: 'tx-2', transactionDate: '2024-02-15', amount: 1500, linkedTransaction: null },
+        { id: 'tx-3', transactionDate: '2024-03-15', amount: 1500, linkedTransaction: null },
+      ],
+      pagination: { hasMore: false },
+    });
+    const { container } = render(<LoanAmortizationReport />);
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('table thead th').length;
+    expect(headerCount).toBeGreaterThan(0);
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+  });
 });

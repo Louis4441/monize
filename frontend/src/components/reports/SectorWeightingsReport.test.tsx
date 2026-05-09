@@ -285,4 +285,34 @@ describe('SectorWeightingsReport', () => {
     fireEvent.mouseDown(document.body);
     expect(screen.queryByText('TFSA')).not.toBeInTheDocument();
   });
+
+  it('exercises every sortable column on the sector table', async () => {
+    mockGetSectorWeightings.mockResolvedValue({
+      items: [
+        { sector: 'Tech', directValue: 5000, etfValue: 1000, totalValue: 6000, percentage: 60 },
+        { sector: 'Finance', directValue: 2000, etfValue: 500, totalValue: 2500, percentage: 25 },
+        { sector: 'Energy', directValue: 1000, etfValue: 0, totalValue: 1000, percentage: 10 },
+      ],
+      unclassifiedValue: 0,
+      totalDirectValue: 8000,
+      totalEtfValue: 1500,
+      totalPortfolioValue: 9500,
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetSecurities.mockResolvedValue([]);
+    const { container } = render(<SectorWeightingsReport />);
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('table thead th').length;
+    expect(headerCount).toBeGreaterThan(0);
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+  });
 });

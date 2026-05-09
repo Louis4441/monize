@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -16,9 +16,13 @@ import { budgetsApi } from '@/lib/budgets';
 import type { Budget, FlexGroupStatus } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('FlexGroupAnalysisReport');
+
+type FlexGroupSortField = 'category' | 'budgeted' | 'spent' | 'remaining' | 'percentUsed';
 
 
 export function FlexGroupAnalysisReport() {
@@ -28,6 +32,38 @@ export function FlexGroupAnalysisReport() {
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>('');
   const [flexGroups, setFlexGroups] = useState<FlexGroupStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { sortField, sortDirection, handleSort } = useSortableTable<FlexGroupSortField>(
+    'reports.flex-group-analysis.sort',
+    { field: 'spent', direction: 'desc' },
+  );
+
+  const sortedFlexGroups = useMemo(() => {
+    return flexGroups.map((group) => {
+      const sortedCategories = [...group.categories];
+      sortedCategories.sort((a, b) => {
+        let comparison = 0;
+        switch (sortField) {
+          case 'category':
+            comparison = compareValues(a.categoryName, b.categoryName);
+            break;
+          case 'budgeted':
+            comparison = compareValues(a.budgeted, b.budgeted);
+            break;
+          case 'spent':
+            comparison = compareValues(a.spent, b.spent);
+            break;
+          case 'remaining':
+            comparison = compareValues(a.budgeted - a.spent, b.budgeted - b.spent);
+            break;
+          case 'percentUsed':
+            comparison = compareValues(a.percentUsed, b.percentUsed);
+            break;
+        }
+        return sortDirection === 'asc' ? comparison : -comparison;
+      });
+      return { ...group, categories: sortedCategories };
+    });
+  }, [flexGroups, sortField, sortDirection]);
 
   useEffect(() => {
     const loadBudgets = async () => {
@@ -152,7 +188,7 @@ export function FlexGroupAnalysisReport() {
 
       {/* Per-group charts */}
       <div ref={chartRef}>
-      {flexGroups.map((group) => {
+      {sortedFlexGroups.map((group) => {
         const chartData = group.categories.map((cat) => ({
           name: cat.categoryName,
           spent: cat.spent,
@@ -232,11 +268,55 @@ export function FlexGroupAnalysisReport() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400">Category</th>
-                    <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Budget</th>
-                    <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Spent</th>
-                    <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Remaining</th>
-                    <th className="py-2 text-right font-medium text-gray-500 dark:text-gray-400">% Used</th>
+                    <SortableHeader<FlexGroupSortField>
+                      field="category"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Category
+                    </SortableHeader>
+                    <SortableHeader<FlexGroupSortField>
+                      field="budgeted"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Budget
+                    </SortableHeader>
+                    <SortableHeader<FlexGroupSortField>
+                      field="spent"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Spent
+                    </SortableHeader>
+                    <SortableHeader<FlexGroupSortField>
+                      field="remaining"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Remaining
+                    </SortableHeader>
+                    <SortableHeader<FlexGroupSortField>
+                      field="percentUsed"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="py-2 font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      % Used
+                    </SortableHeader>
                   </tr>
                 </thead>
                 <tbody>

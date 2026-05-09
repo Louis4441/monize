@@ -46,14 +46,18 @@ vi.mock("@/components/ui/ChartViewToggle", () => ({
     <div data-testid="chart-view-toggle">
       <button data-testid="toggle-bar" onClick={() => onChange("bar")}>Bar</button>
       <button data-testid="toggle-pie" onClick={() => onChange("pie")}>Pie</button>
+      <button data-testid="toggle-table" onClick={() => onChange("table")}>Table</button>
     </div>
   ),
 }));
 
 vi.mock("@/components/ui/ExportDropdown", () => ({
-  ExportDropdown: ({ onExportPdf }: any) => (
+  ExportDropdown: ({ onExportPdf, onExportCsv }: any) => (
     <div data-testid="export-dropdown">
       <button data-testid="export-pdf" onClick={onExportPdf}>PDF</button>
+      {onExportCsv && (
+        <button data-testid="export-csv" onClick={onExportCsv}>CSV</button>
+      )}
     </div>
   ),
 }));
@@ -368,5 +372,66 @@ describe("SpendingByCategoryReport", () => {
     render(<SpendingByCategoryReport />);
     // loadData is gated on isValid, so the API should not be called
     expect(mockGetSpendingByCategory).not.toHaveBeenCalled();
+  });
+
+  it("sorts the percentage column when totalExpenses is 0", async () => {
+    mockGetSpendingByCategory.mockResolvedValue({
+      data: [
+        { categoryId: "c1", categoryName: "A", total: 0, color: "" },
+        { categoryId: "c2", categoryName: "B", total: 0, color: "" },
+      ],
+      totalSpending: 0,
+    });
+    const { container } = render(<SpendingByCategoryReport />);
+    await waitFor(() => expect(screen.getByTestId("toggle-table")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("toggle-table"));
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const ths = container.querySelectorAll('table thead th');
+    if (ths[2]) fireEvent.click(ths[2]);
+  });
+
+  it("renders sortable table view with rows and totals row", async () => {
+    mockGetSpendingByCategory.mockResolvedValue({
+      data: [
+        { categoryId: "cat-1", categoryName: "Food", total: 300, color: "" },
+        { categoryId: "cat-2", categoryName: "Rent", total: 700, color: "" },
+        { categoryId: "", categoryName: "Uncategorized", total: 50, color: "" },
+      ],
+      totalSpending: 1050,
+    });
+    render(<SpendingByCategoryReport />);
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-table")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("toggle-table"));
+    // Click each sort header to exercise comparators (default desc by value).
+    const categoryHeader = screen.getByText("Category");
+    const amountHeader = screen.getByText("Amount");
+    const pctHeader = screen.getByText("% of Total");
+    fireEvent.click(categoryHeader); // sort by name
+    fireEvent.click(categoryHeader); // toggle desc
+    fireEvent.click(pctHeader);
+    fireEvent.click(amountHeader);
+    expect(screen.getByText("Total")).toBeInTheDocument();
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    // Clicking a row navigates if it has a categoryId.
+    fireEvent.click(screen.getAllByText("Food")[0].closest("tr")!);
+    expect(mockPush).toHaveBeenCalled();
+  });
+
+  it("exports CSV from the table view", async () => {
+    mockGetSpendingByCategory.mockResolvedValue({
+      data: [
+        { categoryId: "cat-1", categoryName: "Food", total: 300, color: "" },
+      ],
+      totalSpending: 300,
+    });
+    render(<SpendingByCategoryReport />);
+    await waitFor(() => {
+      expect(screen.getByTestId("toggle-table")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("toggle-table"));
+    // CSV button should appear; it just needs to fire without throwing.
+    fireEvent.click(screen.getByTestId("export-csv"));
   });
 });

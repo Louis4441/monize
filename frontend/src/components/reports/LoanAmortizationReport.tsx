@@ -9,9 +9,13 @@ import { Transaction } from '@/types/transaction';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('LoanAmortizationReport');
+
+type AmortizationSortField = 'paymentNumber' | 'date' | 'payment' | 'principal' | 'interest' | 'balance';
 
 interface PaymentRow {
   paymentNumber: number;
@@ -109,6 +113,10 @@ export function LoanAmortizationReport() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllRows, setShowAllRows] = useState(false);
+  const { sortField, sortDirection, handleSort } = useSortableTable<AmortizationSortField>(
+    'reports.loan-amortization.sort',
+    { field: 'paymentNumber', direction: 'asc' },
+  );
 
   // Load all accounts and filter for loans
   useEffect(() => {
@@ -355,9 +363,38 @@ export function LoanAmortizationReport() {
     });
   };
 
+  const sortedPaymentHistory = useMemo(() => {
+    const sorted = [...paymentHistory];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'paymentNumber':
+          comparison = compareValues(a.paymentNumber, b.paymentNumber);
+          break;
+        case 'date':
+          comparison = compareValues(a.date, b.date);
+          break;
+        case 'payment':
+          comparison = compareValues(a.payment, b.payment);
+          break;
+        case 'principal':
+          comparison = compareValues(a.principal, b.principal);
+          break;
+        case 'interest':
+          comparison = compareValues(a.interest, b.interest);
+          break;
+        case 'balance':
+          comparison = compareValues(a.balance, b.balance);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [paymentHistory, sortField, sortDirection]);
+
   const displayedRows = showAllRows
-    ? paymentHistory
-    : paymentHistory.slice(0, 24);
+    ? sortedPaymentHistory
+    : sortedPaymentHistory.slice(0, 24);
 
   if (isLoading) {
     return (
@@ -515,24 +552,64 @@ export function LoanAmortizationReport() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-900/50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <SortableHeader<AmortizationSortField>
+                      field="paymentNumber"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       #
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    </SortableHeader>
+                    <SortableHeader<AmortizationSortField>
+                      field="date"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Date
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    </SortableHeader>
+                    <SortableHeader<AmortizationSortField>
+                      field="payment"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Payment
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    </SortableHeader>
+                    <SortableHeader<AmortizationSortField>
+                      field="principal"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Principal
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    </SortableHeader>
+                    <SortableHeader<AmortizationSortField>
+                      field="interest"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Interest
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    </SortableHeader>
+                    <SortableHeader<AmortizationSortField>
+                      field="balance"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                    >
                       Balance
-                    </th>
+                    </SortableHeader>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">

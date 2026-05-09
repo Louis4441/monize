@@ -19,9 +19,14 @@ import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('GeographicAllocationReport');
+
+type GeoRegionSortField = 'region' | 'count' | 'marketValue' | 'percentage';
+type GeoExchangeSortField = 'exchange' | 'country' | 'count' | 'marketValue' | 'percentage';
 
 const EXCHANGE_TO_REGION: Record<string, { country: string; region: string }> = {
   NYSE: { country: 'United States', region: 'North America' },
@@ -115,6 +120,14 @@ export function GeographicAllocationReport() {
   const [showAccountFilter, setShowAccountFilter] = useState(false);
   const accountFilterRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const regionSort = useSortableTable<GeoRegionSortField>(
+    'reports.geographic-allocation.region.sort',
+    { field: 'marketValue', direction: 'desc' },
+  );
+  const exchangeSort = useSortableTable<GeoExchangeSortField>(
+    'reports.geographic-allocation.exchange.sort',
+    { field: 'marketValue', direction: 'desc' },
+  );
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -221,6 +234,55 @@ export function GeographicAllocationReport() {
 
     return { exchangeData: exchanges, regionData: regions, totalValue: total };
   }, [holdings, convertToDefault, securityExchangeMap]);
+
+  const sortedRegionData = useMemo(() => {
+    const sorted = [...regionData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (regionSort.sortField) {
+        case 'region':
+          comparison = compareValues(a.region, b.region);
+          break;
+        case 'count':
+          comparison = compareValues(a.count, b.count);
+          break;
+        case 'marketValue':
+          comparison = compareValues(a.marketValue, b.marketValue);
+          break;
+        case 'percentage':
+          comparison = compareValues(a.percentage, b.percentage);
+          break;
+      }
+      return regionSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [regionData, regionSort.sortField, regionSort.sortDirection]);
+
+  const sortedExchangeData = useMemo(() => {
+    const sorted = [...exchangeData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (exchangeSort.sortField) {
+        case 'exchange':
+          comparison = compareValues(a.exchange, b.exchange);
+          break;
+        case 'country':
+          comparison = compareValues(a.country, b.country);
+          break;
+        case 'count':
+          comparison = compareValues(a.count, b.count);
+          break;
+        case 'marketValue':
+          comparison = compareValues(a.marketValue, b.marketValue);
+          break;
+        case 'percentage':
+          comparison = compareValues(a.percentage, b.percentage);
+          break;
+      }
+      return exchangeSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [exchangeData, exchangeSort.sortField, exchangeSort.sortDirection]);
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -464,28 +526,112 @@ export function GeographicAllocationReport() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  {viewType === 'region' ? 'Region' : 'Exchange'}
-                </th>
-                {viewType === 'exchange' && (
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Country
-                  </th>
+                {viewType === 'region' ? (
+                  <SortableHeader<GeoRegionSortField>
+                    field="region"
+                    sortField={regionSort.sortField}
+                    sortDirection={regionSort.sortDirection}
+                    onSort={regionSort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    Region
+                  </SortableHeader>
+                ) : (
+                  <SortableHeader<GeoExchangeSortField>
+                    field="exchange"
+                    sortField={exchangeSort.sortField}
+                    sortDirection={exchangeSort.sortDirection}
+                    onSort={exchangeSort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    Exchange
+                  </SortableHeader>
                 )}
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Holdings
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Market Value
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  % of Portfolio
-                </th>
+                {viewType === 'exchange' && (
+                  <SortableHeader<GeoExchangeSortField>
+                    field="country"
+                    sortField={exchangeSort.sortField}
+                    sortDirection={exchangeSort.sortDirection}
+                    onSort={exchangeSort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    Country
+                  </SortableHeader>
+                )}
+                {viewType === 'region' ? (
+                  <SortableHeader<GeoRegionSortField>
+                    field="count"
+                    sortField={regionSort.sortField}
+                    sortDirection={regionSort.sortDirection}
+                    onSort={regionSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    Holdings
+                  </SortableHeader>
+                ) : (
+                  <SortableHeader<GeoExchangeSortField>
+                    field="count"
+                    sortField={exchangeSort.sortField}
+                    sortDirection={exchangeSort.sortDirection}
+                    onSort={exchangeSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    Holdings
+                  </SortableHeader>
+                )}
+                {viewType === 'region' ? (
+                  <SortableHeader<GeoRegionSortField>
+                    field="marketValue"
+                    sortField={regionSort.sortField}
+                    sortDirection={regionSort.sortDirection}
+                    onSort={regionSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    Market Value
+                  </SortableHeader>
+                ) : (
+                  <SortableHeader<GeoExchangeSortField>
+                    field="marketValue"
+                    sortField={exchangeSort.sortField}
+                    sortDirection={exchangeSort.sortDirection}
+                    onSort={exchangeSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    Market Value
+                  </SortableHeader>
+                )}
+                {viewType === 'region' ? (
+                  <SortableHeader<GeoRegionSortField>
+                    field="percentage"
+                    sortField={regionSort.sortField}
+                    sortDirection={regionSort.sortDirection}
+                    onSort={regionSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    % of Portfolio
+                  </SortableHeader>
+                ) : (
+                  <SortableHeader<GeoExchangeSortField>
+                    field="percentage"
+                    sortField={exchangeSort.sortField}
+                    sortDirection={exchangeSort.sortDirection}
+                    onSort={exchangeSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                  >
+                    % of Portfolio
+                  </SortableHeader>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {viewType === 'region'
-                ? regionData.map((item) => (
+                ? sortedRegionData.map((item) => (
                     <tr key={item.region} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                         <div className="flex items-center gap-2">
@@ -507,7 +653,7 @@ export function GeographicAllocationReport() {
                       </td>
                     </tr>
                   ))
-                : exchangeData.map((item, idx) => (
+                : sortedExchangeData.map((item, idx) => (
                     <tr key={item.exchange} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                         <div className="flex items-center gap-2">

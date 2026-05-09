@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@/test/render';
+import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import { InvestmentTransactionHistoryReport } from './InvestmentTransactionHistoryReport';
 
 vi.mock('@/hooks/useNumberFormat', () => ({
@@ -18,6 +18,7 @@ vi.mock('@/hooks/useExchangeRates', () => ({
   }),
 }));
 
+const STABLE_RANGE = { start: '2025-01-01', end: '2026-01-01' };
 vi.mock('@/hooks/useDateRange', () => ({
   useDateRange: () => ({
     dateRange: '1y',
@@ -26,7 +27,7 @@ vi.mock('@/hooks/useDateRange', () => ({
     setStartDate: vi.fn(),
     endDate: '',
     setEndDate: vi.fn(),
-    resolvedRange: { start: '2025-01-01', end: '2026-01-01' },
+    resolvedRange: STABLE_RANGE,
     isValid: true,
   }),
 }));
@@ -247,5 +248,60 @@ describe('InvestmentTransactionHistoryReport', () => {
     });
     // 2 unique securities: AAPL and MSFT
     expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
+  it('exercises every sortable column on the transaction table', async () => {
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        {
+          id: 'tx1',
+          accountId: 'acc-1',
+          security: { symbol: 'AAPL', name: 'Apple Inc.' },
+          transactionDate: '2024-01-15',
+          quantity: 10,
+          price: 150,
+          totalAmount: 1500,
+          action: 'BUY',
+        },
+        {
+          id: 'tx2',
+          accountId: 'acc-1',
+          security: { symbol: 'MSFT', name: 'Microsoft' },
+          transactionDate: '2024-02-20',
+          quantity: 5,
+          price: 300,
+          totalAmount: 1500,
+          action: 'BUY',
+        },
+        {
+          id: 'tx3',
+          accountId: 'acc-1',
+          security: null,
+          transactionDate: '2024-03-10',
+          quantity: null,
+          price: null,
+          totalAmount: 50,
+          action: 'DIVIDEND',
+        },
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'Brokerage', accountSubType: 'INVESTMENT_CASH', currencyCode: 'CAD' },
+    ]);
+    const { container } = render(<InvestmentTransactionHistoryReport />);
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('table thead th').length;
+    expect(headerCount).toBeGreaterThan(0);
+    for (let i = 0; i < headerCount; i += 1) {
+      const ths = container.querySelectorAll('table thead th');
+      if (!ths[i]) break;
+      await act(async () => { fireEvent.click(ths[i]); });
+    }
+    for (let i = 0; i < headerCount; i += 1) {
+      const ths = container.querySelectorAll('table thead th');
+      if (!ths[i]) break;
+      await act(async () => { fireEvent.click(ths[i]); });
+    }
   });
 });

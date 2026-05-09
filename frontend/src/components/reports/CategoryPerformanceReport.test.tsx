@@ -177,26 +177,28 @@ describe('CategoryPerformanceReport', () => {
     await waitFor(() => {
       expect(screen.getByText('Apples')).toBeInTheDocument();
     });
-    // Default sort is avgPercent desc (High). Click name to switch field, toggling direction logic.
-    const nameHeader = screen.getByText(/Category/i);
+    // Default sort is avgPercent desc. Click name to switch field, which resets direction to asc.
+    const nameHeader = screen.getByText('Category');
+    const nameTh = nameHeader.closest('th')!;
     await act(async () => { fireEvent.click(nameHeader); });
-    // The header now should include direction marker
+    // After switching to name, direction is asc (↑)
     await waitFor(() => {
-      expect(screen.getByText(/Category .*Z-A/i)).toBeInTheDocument();
+      expect(nameTh.textContent).toContain('↑');
     });
-    // Toggling sort dir on same field
+    // Toggle to desc on the same field
     await act(async () => { fireEvent.click(nameHeader); });
     await waitFor(() => {
-      expect(screen.getByText(/Category .*A-Z/i)).toBeInTheDocument();
+      expect(nameTh.textContent).toContain('↓');
     });
-    // Switch to variance
-    const varianceHeader = screen.getByText(/Total Variance/i);
+    // Switch to variance (resets to asc)
+    const varianceHeader = screen.getByText('Total Variance');
     await act(async () => { fireEvent.click(varianceHeader); });
-    // Switch back to avgPercent
-    const pctHeader = screen.getByText(/% Used/i);
+    // Switch to avgPercent (% Used)
+    const pctHeader = screen.getByText('% Used');
+    const pctTh = pctHeader.closest('th')!;
     await act(async () => { fireEvent.click(pctHeader); });
     await waitFor(() => {
-      expect(screen.getByText(/% Used .*High/i)).toBeInTheDocument();
+      expect(pctTh.textContent).toContain('↑');
     });
   });
 

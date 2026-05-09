@@ -12,11 +12,15 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { exportToCsv } from '@/lib/csv-export';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('InvestmentTransactionHistoryReport');
 
 const MAX_PAGES = 50;
+
+type InvestmentTxSortField = 'date' | 'action' | 'security' | 'account' | 'quantity' | 'price' | 'total';
 
 const ACTION_LABELS: Record<InvestmentAction, string> = {
   BUY: 'Buy',
@@ -61,6 +65,10 @@ export function InvestmentTransactionHistoryReport() {
   const [selectedAction, setSelectedAction] = useState<string>('');
   const { dateRange, setDateRange, resolvedRange, isValid } = useDateRange({ defaultRange: '1y', alignment: 'month' });
   const [isLoading, setIsLoading] = useState(true);
+  const { sortField, sortDirection, handleSort } = useSortableTable<InvestmentTxSortField>(
+    'reports.investment-transactions.sort',
+    { field: 'date', direction: 'desc' },
+  );
 
   const accountCurrencyMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -153,10 +161,43 @@ export function InvestmentTransactionHistoryReport() {
     return map;
   }, [accounts]);
 
-  const sortedTransactions = useMemo(
-    () => [...transactions].sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)),
-    [transactions],
-  );
+  const sortedTransactions = useMemo(() => {
+    const sorted = [...transactions];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'date':
+          comparison = compareValues(a.transactionDate, b.transactionDate);
+          break;
+        case 'action':
+          comparison = compareValues(a.action, b.action);
+          break;
+        case 'security':
+          comparison = compareValues(a.security?.symbol || '', b.security?.symbol || '');
+          break;
+        case 'account':
+          comparison = compareValues(
+            accountNameMap.get(a.accountId) || '',
+            accountNameMap.get(b.accountId) || '',
+          );
+          break;
+        case 'quantity':
+          comparison = compareValues(
+            a.quantity != null ? Math.abs(a.quantity) : null,
+            b.quantity != null ? Math.abs(b.quantity) : null,
+          );
+          break;
+        case 'price':
+          comparison = compareValues(a.price, b.price);
+          break;
+        case 'total':
+          comparison = compareValues(getTxAmount(a), getTxAmount(b));
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [transactions, sortField, sortDirection, accountNameMap, getTxAmount]);
 
   const getExportData = useCallback((formatted: boolean) => {
     const headers = ['Date', 'Action', 'Security', 'Account', 'Quantity', 'Price', 'Total'];
@@ -327,27 +368,72 @@ export function InvestmentTransactionHistoryReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <SortableHeader<InvestmentTxSortField>
+                    field="date"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Date
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<InvestmentTxSortField>
+                    field="action"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Action
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<InvestmentTxSortField>
+                    field="security"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Security
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">
+                  </SortableHeader>
+                  <SortableHeader<InvestmentTxSortField>
+                    field="account"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell"
+                  >
                     Account
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<InvestmentTxSortField>
+                    field="quantity"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Quantity
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<InvestmentTxSortField>
+                    field="price"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Price
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<InvestmentTxSortField>
+                    field="total"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Total
-                  </th>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">

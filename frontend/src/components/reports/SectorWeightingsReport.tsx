@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -16,9 +16,13 @@ import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('SectorWeightingsReport');
+
+type SectorSortField = 'sector' | 'direct' | 'etf' | 'total' | 'percentage';
 
 const SECTOR_COLOURS = [
   '#3b82f6', '#22c55e', '#f97316', '#8b5cf6', '#ec4899',
@@ -62,6 +66,37 @@ export function SectorWeightingsReport() {
   const accountFilterRef = useRef<HTMLDivElement>(null);
   const securityFilterRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const { sortField, sortDirection, handleSort } = useSortableTable<SectorSortField>(
+    'reports.sector-weightings.sort',
+    { field: 'total', direction: 'desc' },
+  );
+
+  const sortedItems = useMemo(() => {
+    if (!data) return [];
+    const items = [...data.items];
+    items.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'sector':
+          comparison = compareValues(a.sector, b.sector);
+          break;
+        case 'direct':
+          comparison = compareValues(a.directValue, b.directValue);
+          break;
+        case 'etf':
+          comparison = compareValues(a.etfValue, b.etfValue);
+          break;
+        case 'total':
+          comparison = compareValues(a.totalValue, b.totalValue);
+          break;
+        case 'percentage':
+          comparison = compareValues(a.percentage, b.percentage);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return items;
+  }, [data, sortField, sortDirection]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -347,25 +382,61 @@ export function SectorWeightingsReport() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <SortableHeader<SectorSortField>
+                  field="sector"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Sector
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<SectorSortField>
+                  field="direct"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Direct Value
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<SectorSortField>
+                  field="etf"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   ETF Value
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<SectorSortField>
+                  field="total"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Total Value
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<SectorSortField>
+                  field="percentage"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   % of Portfolio
-                </th>
+                </SortableHeader>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {data.items.map((item, idx) => (
+              {sortedItems.map((item) => {
+                const idx = data.items.indexOf(item);
+                return (
                 <tr key={item.sector} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                     <div className="flex items-center gap-2">
@@ -389,7 +460,8 @@ export function SectorWeightingsReport() {
                     {item.percentage.toFixed(1)}%
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {data.unclassifiedValue > 0 && (
                 <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 bg-gray-50/50 dark:bg-gray-900/20">
                   <td className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 italic">

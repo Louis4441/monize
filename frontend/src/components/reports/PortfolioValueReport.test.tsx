@@ -46,6 +46,7 @@ vi.mock('@/hooks/useLocalStorage', () => ({
 
 vi.mock('@/lib/utils', () => ({
   parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),
+  cn: (...inputs: any[]) => inputs.filter(Boolean).join(' '),
 }));
 
 const mockDateRangeSelectorProps = vi.fn();
@@ -692,5 +693,58 @@ describe('PortfolioValueReport', () => {
       fireEvent.click(screen.getByTestId('export-pdf'));
     });
     expect(exportToPdf).toHaveBeenCalled();
+  });
+
+  it('switches to table view, exercises sort, and exports CSV', async () => {
+    mockGetInvestmentsMonthly.mockResolvedValue([
+      { month: '2024-01-01', value: 50000 },
+      { month: '2024-02-01', value: 52000 },
+      { month: '2024-03-01', value: 51000 },
+    ]);
+    mockGetPortfolioSummary.mockResolvedValue({
+      ...emptyPortfolio,
+      holdingsByAccount: [
+        {
+          accountId: 'a1',
+          accountName: 'Account A',
+          totalMarketValue: 25000,
+          cashBalance: 1000,
+          totalGainLoss: 500,
+        },
+        {
+          accountId: 'a2',
+          accountName: 'Account B',
+          totalMarketValue: 25000,
+          cashBalance: 500,
+          totalGainLoss: -200,
+        },
+      ],
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    const { container } = render(<PortfolioValueReport />);
+    // Wait for the chart to render so the toggle is mounted.
+    await waitFor(() => expect(screen.getByTitle('Table')).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByTitle('Table')); });
+    // The chart card now renders a table; click each header to exercise sort.
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const tables = container.querySelectorAll('table');
+    expect(tables.length).toBeGreaterThan(0);
+    // Exercise sort headers on every rendered table (chart-table + breakdown table).
+    const tableCount = tables.length;
+    for (let t = 0; t < tableCount; t += 1) {
+      const headerCount = container.querySelectorAll('table')[t].querySelectorAll('th').length;
+      for (let __i = 0; __i < headerCount; __i += 1) {
+        const __ths = container.querySelectorAll('table')[t].querySelectorAll('th');
+        if (!__ths[__i]) break;
+        await act(async () => { fireEvent.click(__ths[__i]); });
+      }
+      for (let __i = 0; __i < headerCount; __i += 1) {
+        const __ths = container.querySelectorAll('table')[t].querySelectorAll('th');
+        if (!__ths[__i]) break;
+        await act(async () => { fireEvent.click(__ths[__i]); });
+      }
+    }
+    // Trigger CSV export.
+    await act(async () => { fireEvent.click(screen.getByTestId('export-csv')); });
   });
 });

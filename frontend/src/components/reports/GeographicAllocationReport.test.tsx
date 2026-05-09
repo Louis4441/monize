@@ -336,4 +336,41 @@ describe('GeographicAllocationReport', () => {
     });
     expect(screen.getByText('100%')).toBeInTheDocument();
   });
+
+  it('exercises every sortable column on region and exchange tables', async () => {
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    const { container } = render(<GeographicAllocationReport />);
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    // Region view (default).
+    let __headerCount = container.querySelectorAll('table thead th').length;
+    for (let __i = 0; __i < __headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+    for (let __i = 0; __i < __headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+    // Switch to Exchange view by clicking the toggle button (text: Exchange).
+    const exchangeBtns = screen.queryAllByRole('button', { name: 'Exchange' });
+    if (exchangeBtns.length > 0) {
+      fireEvent.click(exchangeBtns[0]);
+      await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+      const __exHeaderCount = container.querySelectorAll('table thead th').length;
+      for (let __i = 0; __i < __exHeaderCount; __i += 1) {
+        const __ths = container.querySelectorAll('table thead th');
+        if (!__ths[__i]) break;
+        fireEvent.click(__ths[__i]);
+      }
+      for (let __i = 0; __i < __exHeaderCount; __i += 1) {
+        const __ths = container.querySelectorAll('table thead th');
+        if (!__ths[__i]) break;
+        fireEvent.click(__ths[__i]);
+      }
+    }
+  });
 });

@@ -5,9 +5,21 @@ import { budgetsApi } from '@/lib/budgets';
 import type { Budget, CategoryTrendSeries } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('CategoryPerformanceReport');
+
+type CategoryPerformanceSortField =
+  | 'name'
+  | 'avgBudgeted'
+  | 'avgActual'
+  | 'avgPercent'
+  | 'variance'
+  | 'overCount'
+  | 'trend'
+  | 'status';
 
 function getTrendArrow(values: number[]): { arrow: string; color: string } {
   if (values.length < 2) return { arrow: '--', color: 'text-gray-400' };
@@ -43,8 +55,10 @@ export function CategoryPerformanceReport() {
   const [months, setMonths] = useState(6);
   const [categoryData, setCategoryData] = useState<CategoryTrendSeries[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [sortField, setSortField] = useState<'name' | 'avgPercent' | 'variance'>('avgPercent');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const { sortField, sortDirection, handleSort } = useSortableTable<CategoryPerformanceSortField>(
+    'reports.category-performance.sort',
+    { field: 'avgPercent', direction: 'desc' },
+  );
 
   useEffect(() => {
     const loadBudgets = async () => {
@@ -123,29 +137,37 @@ export function CategoryPerformanceReport() {
   const sortedData = useMemo(() => {
     const sorted = [...processedData];
     sorted.sort((a, b) => {
-      const mul = sortDir === 'asc' ? 1 : -1;
+      let comparison = 0;
       switch (sortField) {
         case 'name':
-          return mul * a.categoryName.localeCompare(b.categoryName);
+          comparison = compareValues(a.categoryName, b.categoryName);
+          break;
+        case 'avgBudgeted':
+          comparison = compareValues(a.avgBudgeted, b.avgBudgeted);
+          break;
+        case 'avgActual':
+          comparison = compareValues(a.avgActual, b.avgActual);
+          break;
         case 'avgPercent':
-          return mul * (a.avgPercent - b.avgPercent);
+          comparison = compareValues(a.avgPercent, b.avgPercent);
+          break;
         case 'variance':
-          return mul * (a.totalVariance - b.totalVariance);
-        default:
-          return 0;
+          comparison = compareValues(a.totalVariance, b.totalVariance);
+          break;
+        case 'overCount':
+          comparison = compareValues(a.overCount, b.overCount);
+          break;
+        case 'trend':
+          comparison = compareValues(a.trend.arrow, b.trend.arrow);
+          break;
+        case 'status':
+          comparison = compareValues(a.status.label, b.status.label);
+          break;
       }
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [processedData, sortField, sortDir]);
-
-  const toggleSort = (field: typeof sortField) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDir('desc');
-    }
-  };
+  }, [processedData, sortField, sortDirection]);
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -228,29 +250,85 @@ export function CategoryPerformanceReport() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th
-                    className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200"
-                    onClick={() => toggleSort('name')}
+                  <SortableHeader<CategoryPerformanceSortField>
+                    field="name"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
                   >
-                    Category {sortField === 'name' ? (sortDir === 'asc' ? '(A-Z)' : '(Z-A)') : ''}
-                  </th>
-                  <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Avg Budget</th>
-                  <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Avg Actual</th>
-                  <th
-                    className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200"
-                    onClick={() => toggleSort('avgPercent')}
+                    Category
+                  </SortableHeader>
+                  <SortableHeader<CategoryPerformanceSortField>
+                    field="avgBudgeted"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
                   >
-                    % Used {sortField === 'avgPercent' ? (sortDir === 'asc' ? '(Low)' : '(High)') : ''}
-                  </th>
-                  <th
-                    className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-200"
-                    onClick={() => toggleSort('variance')}
+                    Avg Budget
+                  </SortableHeader>
+                  <SortableHeader<CategoryPerformanceSortField>
+                    field="avgActual"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Avg Actual
+                  </SortableHeader>
+                  <SortableHeader<CategoryPerformanceSortField>
+                    field="avgPercent"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    % Used
+                  </SortableHeader>
+                  <SortableHeader<CategoryPerformanceSortField>
+                    field="variance"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
                   >
                     Total Variance
-                  </th>
-                  <th className="py-2 pr-4 text-center font-medium text-gray-500 dark:text-gray-400">Over/Total</th>
-                  <th className="py-2 pr-4 text-center font-medium text-gray-500 dark:text-gray-400">Trend</th>
-                  <th className="py-2 text-center font-medium text-gray-500 dark:text-gray-400">Status</th>
+                  </SortableHeader>
+                  <SortableHeader<CategoryPerformanceSortField>
+                    field="overCount"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="center"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Over/Total
+                  </SortableHeader>
+                  <SortableHeader<CategoryPerformanceSortField>
+                    field="trend"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="center"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Trend
+                  </SortableHeader>
+                  <SortableHeader<CategoryPerformanceSortField>
+                    field="status"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="center"
+                    className="py-2 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Status
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody>

@@ -209,4 +209,27 @@ describe('SecurityTypeAllocationReport', () => {
       expect(screen.getByText('Clear Filters')).toBeInTheDocument();
     });
   });
+
+  it('exercises every sortable column on the allocation table', async () => {
+    mockGetPortfolioSummary.mockResolvedValue({
+      holdings: [
+        { securityId: 's1', symbol: 'AAA', name: 'Alpha', currencyCode: 'CAD', securityType: 'STOCK', marketValue: 5000, quantity: 50, accountId: 'a1' },
+        { securityId: 's2', symbol: 'BBB', name: 'Bravo', currencyCode: 'CAD', securityType: 'ETF', marketValue: 3000, quantity: 30, accountId: 'a1' },
+        { securityId: 's3', symbol: 'CCC', name: 'Charlie', currencyCode: 'CAD', securityType: 'BOND', marketValue: 2000, quantity: 20, accountId: 'a1' },
+      ],
+    });
+    const { container } = render(<SecurityTypeAllocationReport />);
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const __headerCount = container.querySelectorAll('table thead th').length;
+    for (let __i = 0; __i < __headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+    for (let __i = 0; __i < __headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+  });
 });

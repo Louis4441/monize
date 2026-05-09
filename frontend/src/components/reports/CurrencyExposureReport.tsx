@@ -15,9 +15,13 @@ import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('CurrencyExposureReport');
+
+type CurrencyExposureSortField = 'currency' | 'nativeValue' | 'rate' | 'convertedValue' | 'percentage' | 'count';
 
 const CURRENCY_COLOURS: Record<string, string> = {
   CAD: '#ef4444',
@@ -76,6 +80,10 @@ export function CurrencyExposureReport() {
   const [showAccountFilter, setShowAccountFilter] = useState(false);
   const accountFilterRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const { sortField, sortDirection, handleSort } = useSortableTable<CurrencyExposureSortField>(
+    'reports.currency-exposure.sort',
+    { field: 'convertedValue', direction: 'desc' },
+  );
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -154,6 +162,35 @@ export function CurrencyExposureReport() {
     () => allocationData.reduce((sum, a) => sum + a.convertedValue, 0),
     [allocationData],
   );
+
+  const sortedAllocationData = useMemo(() => {
+    const sorted = [...allocationData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'currency':
+          comparison = compareValues(a.currency, b.currency);
+          break;
+        case 'nativeValue':
+          comparison = compareValues(a.nativeValue, b.nativeValue);
+          break;
+        case 'rate':
+          comparison = compareValues(a.rate, b.rate);
+          break;
+        case 'convertedValue':
+          comparison = compareValues(a.convertedValue, b.convertedValue);
+          break;
+        case 'percentage':
+          comparison = compareValues(a.percentage, b.percentage);
+          break;
+        case 'count':
+          comparison = compareValues(a.count, b.count);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [allocationData, sortField, sortDirection]);
 
   const foreignCurrencyExposure = useMemo(
     () => allocationData.filter((a) => a.currency !== defaultCurrency).reduce((sum, a) => sum + a.convertedValue, 0),
@@ -329,28 +366,69 @@ export function CurrencyExposureReport() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <SortableHeader<CurrencyExposureSortField>
+                  field="currency"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Currency
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<CurrencyExposureSortField>
+                  field="nativeValue"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Native Value
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<CurrencyExposureSortField>
+                  field="rate"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Rate to {defaultCurrency}
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<CurrencyExposureSortField>
+                  field="convertedValue"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   {defaultCurrency} Value
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<CurrencyExposureSortField>
+                  field="percentage"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   % of Portfolio
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<CurrencyExposureSortField>
+                  field="count"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Holdings
-                </th>
+                </SortableHeader>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {allocationData.map((item) => (
+              {sortedAllocationData.map((item) => (
                 <tr key={item.currency} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                     <div className="flex items-center gap-2">

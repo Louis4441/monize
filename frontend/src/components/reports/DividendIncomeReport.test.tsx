@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@/test/render';
+import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import { DividendIncomeReport } from './DividendIncomeReport';
 
 vi.mock('@/hooks/useNumberFormat', () => ({
@@ -1966,4 +1966,118 @@ describe('DividendIncomeReport', () => {
       expect(screen.getAllByText('$200.00').length).toBeGreaterThan(0);
     });
   });
+
+  it('renders monthly, daily, and security tables and exercises sortable columns + CSV export', async () => {
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'Brokerage', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        {
+          id: 'tx1',
+          accountId: 'acc-1',
+          securityId: 'sec-a',
+          security: { symbol: 'AAA', name: 'Alpha' },
+          transactionDate: '2024-03-10',
+          totalAmount: 50,
+          action: 'DIVIDEND',
+        },
+        {
+          id: 'tx2',
+          accountId: 'acc-1',
+          securityId: 'sec-b',
+          security: { symbol: 'BBB', name: 'Bravo' },
+          transactionDate: '2024-04-12',
+          totalAmount: 30,
+          action: 'INTEREST',
+        },
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetCapitalGains.mockResolvedValue([
+      {
+        securityId: 'sec-a',
+        symbol: 'AAA',
+        securityName: 'Alpha',
+        accountId: 'acc-1',
+        accountCurrencyCode: 'CAD',
+        month: '2024-03',
+        startValue: 1000,
+        endValue: 1100,
+        buys: 0,
+        sells: 0,
+        realizedGain: 0,
+        unrealizedGain: 100,
+        totalCapitalGain: 100,
+      },
+    ]);
+    const { container } = render(<DividendIncomeReport />);
+    await waitFor(() => expect(screen.getByTestId('bar-chart')).toBeInTheDocument());
+    // Switch to monthly table view by clicking the "Table" button in the
+    // monthly/daily display group (text "Table" is unique among controls).
+    const tableBtn = screen.getByText('Table');
+    await act(async () => { fireEvent.click(tableBtn); });
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    // Click each column header in sequence, re-querying between each click
+    // so we hit every switch case in the comparator even if React preserves
+    // the same DOM nodes across re-renders.
+    const monthlyHeaderCount = container.querySelectorAll('table thead th').length;
+    for (let i = 0; i < monthlyHeaderCount; i += 1) {
+      const headersNow = container.querySelectorAll('table thead th');
+      await act(async () => { fireEvent.click(headersNow[i]); });
+    }
+    // Click each one a second time to flip asc/desc.
+    for (let i = 0; i < monthlyHeaderCount; i += 1) {
+      const headersNow = container.querySelectorAll('table thead th');
+      await act(async () => { fireEvent.click(headersNow[i]); });
+    }
+    // Toggle visible series buttons to flip the rowTotal branches in the table.
+    const seriesButtons = ['Dividends', 'Interest', 'Capital Gains'].flatMap((label) =>
+      screen.getAllByRole('button', { name: label }),
+    );
+    for (const btn of seriesButtons) {
+      await act(async () => { fireEvent.click(btn); });
+    }
+    for (const btn of seriesButtons) {
+      await act(async () => { fireEvent.click(btn); });
+    }
+    // Switch to By Security view.
+    const bySecBtn = screen.getByText('By Security');
+    await act(async () => { fireEvent.click(bySecBtn); });
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const secHeaderCount = container.querySelectorAll('table thead th').length;
+    for (let i = 0; i < secHeaderCount; i += 1) {
+      const ths = container.querySelectorAll('table thead th');
+      if (!ths[i]) break;
+      await act(async () => { fireEvent.click(ths[i]); });
+    }
+    for (let i = 0; i < secHeaderCount; i += 1) {
+      const ths = container.querySelectorAll('table thead th');
+      if (!ths[i]) break;
+      await act(async () => { fireEvent.click(ths[i]); });
+    }
+    // Switch to Daily view and into table mode there.
+    const dailyBtn = screen.getByText('Daily');
+    await act(async () => { fireEvent.click(dailyBtn); });
+    const dailyTableBtn = screen.queryByText('Table');
+    if (dailyTableBtn) {
+      await act(async () => { fireEvent.click(dailyTableBtn); });
+      const dailyHeaderCount = container.querySelectorAll('table thead th').length;
+      for (let i = 0; i < dailyHeaderCount; i += 1) {
+        const ths = container.querySelectorAll('table thead th');
+        if (!ths[i]) break;
+        await act(async () => { fireEvent.click(ths[i]); });
+      }
+      for (let i = 0; i < dailyHeaderCount; i += 1) {
+        const ths = container.querySelectorAll('table thead th');
+        if (!ths[i]) break;
+        await act(async () => { fireEvent.click(ths[i]); });
+      }
+      // Toggle "Hide inactive days" to flip the displayedDailyData filter branch.
+      const hideToggle = screen.queryByRole('switch');
+      if (hideToggle) {
+        await act(async () => { fireEvent.click(hideToggle); });
+      }
+    }
+  }, 15000);
 });

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { budgetsApi } from '@/lib/budgets';
 import type { Budget, HealthScoreResult } from '@/types/budget';
 import { BudgetHealthGauge } from '@/components/budgets/BudgetHealthGauge';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('BudgetHealthScoreReport');
@@ -29,12 +31,41 @@ function getGroupColor(group: string | null): string {
   return 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
 }
 
+type CategoryImpactSortField = 'category' | 'group' | 'percentUsed' | 'impact';
+
 export function BudgetHealthScoreReport() {
   const chartRef = useRef<HTMLDivElement>(null);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>('');
   const [healthScore, setHealthScore] = useState<HealthScoreResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { sortField, sortDirection, handleSort } = useSortableTable<CategoryImpactSortField>(
+    'reports.budget-health-score.categoryImpact.sort',
+    { field: 'impact', direction: 'asc' },
+  );
+
+  const sortedCategoryScores = useMemo(() => {
+    if (!healthScore) return [];
+    const sorted = [...healthScore.categoryScores].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'category':
+          comparison = compareValues(a.categoryName, b.categoryName);
+          break;
+        case 'group':
+          comparison = compareValues(a.categoryGroup, b.categoryGroup);
+          break;
+        case 'percentUsed':
+          comparison = compareValues(a.percentUsed, b.percentUsed);
+          break;
+        case 'impact':
+          comparison = compareValues(a.impact, b.impact);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [healthScore, sortField, sortDirection]);
 
   useEffect(() => {
     const loadBudgets = async () => {
@@ -221,16 +252,48 @@ export function BudgetHealthScoreReport() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400">Category</th>
-                      <th className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400">Group</th>
-                      <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">% Used</th>
-                      <th className="py-2 text-right font-medium text-gray-500 dark:text-gray-400">Score Impact</th>
+                      <SortableHeader<CategoryImpactSortField>
+                        field="category"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        Category
+                      </SortableHeader>
+                      <SortableHeader<CategoryImpactSortField>
+                        field="group"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        Group
+                      </SortableHeader>
+                      <SortableHeader<CategoryImpactSortField>
+                        field="percentUsed"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        align="right"
+                        className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        % Used
+                      </SortableHeader>
+                      <SortableHeader<CategoryImpactSortField>
+                        field="impact"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        align="right"
+                        className="py-2 font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        Score Impact
+                      </SortableHeader>
                     </tr>
                   </thead>
                   <tbody>
-                    {healthScore.categoryScores
-                      .sort((a, b) => a.impact - b.impact)
-                      .map((cat) => (
+                    {sortedCategoryScores.map((cat) => (
                         <tr key={cat.categoryId} className="border-b border-gray-100 dark:border-gray-700/50">
                           <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{cat.categoryName}</td>
                           <td className="py-2 pr-4">

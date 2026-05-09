@@ -16,10 +16,14 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { CHART_COLOURS } from '@/lib/chart-colours';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { aggregateHoldingsBySecurity, AggregatedHolding } from '@/lib/aggregate-holdings';
 
 const logger = createLogger('InvestmentPerformanceReport');
+
+type HoldingsSortField = 'symbol' | 'quantity' | 'averageCost' | 'currentPrice' | 'marketValue' | 'gainLoss' | 'gainLossPercent';
 
 export function InvestmentPerformanceReport() {
   const { formatCurrency: formatCurrencyFull } = useNumberFormat();
@@ -31,6 +35,10 @@ export function InvestmentPerformanceReport() {
   const [expandedSecurityId, setExpandedSecurityId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [viewType, setViewType] = useState<'performance' | 'allocation'>('performance');
+  const { sortField, sortDirection, handleSort } = useSortableTable<HoldingsSortField>(
+    'reports.investment-performance.holdings.sort',
+    { field: 'marketValue', direction: 'desc' },
+  );
 
   useEffect(() => {
     const loadData = async () => {
@@ -112,13 +120,36 @@ export function InvestmentPerformanceReport() {
 
   const aggregatedHoldings = useMemo((): AggregatedHolding[] => {
     if (!portfolio) return [];
-    return aggregateHoldingsBySecurity(portfolio.holdings).sort((a, b) => {
-      if (a.marketValue === null && b.marketValue === null) return 0;
-      if (a.marketValue === null) return 1;
-      if (b.marketValue === null) return -1;
-      return b.marketValue - a.marketValue;
+    const aggregated = aggregateHoldingsBySecurity(portfolio.holdings);
+    aggregated.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'symbol':
+          comparison = compareValues(a.symbol, b.symbol);
+          break;
+        case 'quantity':
+          comparison = compareValues(a.quantity, b.quantity);
+          break;
+        case 'averageCost':
+          comparison = compareValues(a.averageCost, b.averageCost);
+          break;
+        case 'currentPrice':
+          comparison = compareValues(a.currentPrice, b.currentPrice);
+          break;
+        case 'marketValue':
+          comparison = compareValues(a.marketValue, b.marketValue);
+          break;
+        case 'gainLoss':
+          comparison = compareValues(a.gainLoss, b.gainLoss);
+          break;
+        case 'gainLossPercent':
+          comparison = compareValues(a.gainLossPercent, b.gainLossPercent);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [portfolio]);
+    return aggregated;
+  }, [portfolio, sortField, sortDirection]);
 
   const holdingsData = useMemo(() => {
     return aggregatedHoldings
@@ -347,27 +378,75 @@ export function InvestmentPerformanceReport() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-900/50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    <SortableHeader<HoldingsSortField>
+                      field="symbol"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Security
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<HoldingsSortField>
+                      field="quantity"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Shares
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<HoldingsSortField>
+                      field="averageCost"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Avg Cost
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<HoldingsSortField>
+                      field="currentPrice"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Current Price
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<HoldingsSortField>
+                      field="marketValue"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Market Value
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<HoldingsSortField>
+                      field="gainLoss"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Gain/Loss
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<HoldingsSortField>
+                      field="gainLossPercent"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Return
-                    </th>
+                    </SortableHeader>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">

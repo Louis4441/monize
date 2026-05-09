@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   LineChart,
   Line,
@@ -16,9 +16,13 @@ import { budgetsApi } from '@/lib/budgets';
 import type { Budget, SavingsRatePoint } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('SavingsRateReport');
+
+type SavingsRateSortField = 'month' | 'income' | 'expenses' | 'savings' | 'rate';
 
 export function SavingsRateReport() {
   const { formatCurrencyCompact: formatCurrency } = useNumberFormat();
@@ -29,6 +33,36 @@ export function SavingsRateReport() {
   const [data, setData] = useState<SavingsRatePoint[]>([]);
   const [targetRate, setTargetRate] = useState(20);
   const [isLoading, setIsLoading] = useState(true);
+  const { sortField, sortDirection, handleSort } = useSortableTable<SavingsRateSortField>(
+    'reports.savings-rate.sort',
+    { field: 'month', direction: 'asc' },
+  );
+
+  const sortedData = useMemo(() => {
+    const sorted = [...data];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'month':
+          comparison = compareValues(a.month, b.month);
+          break;
+        case 'income':
+          comparison = compareValues(a.income, b.income);
+          break;
+        case 'expenses':
+          comparison = compareValues(a.expenses, b.expenses);
+          break;
+        case 'savings':
+          comparison = compareValues(a.savings, b.savings);
+          break;
+        case 'rate':
+          comparison = compareValues(a.savingsRate, b.savingsRate);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [data, sortField, sortDirection]);
 
   useEffect(() => {
     const loadBudgets = async () => {
@@ -259,15 +293,59 @@ export function SavingsRateReport() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400">Month</th>
-                  <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Income</th>
-                  <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Expenses</th>
-                  <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Savings</th>
-                  <th className="py-2 text-right font-medium text-gray-500 dark:text-gray-400">Rate</th>
+                  <SortableHeader<SavingsRateSortField>
+                    field="month"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Month
+                  </SortableHeader>
+                  <SortableHeader<SavingsRateSortField>
+                    field="income"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Income
+                  </SortableHeader>
+                  <SortableHeader<SavingsRateSortField>
+                    field="expenses"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Expenses
+                  </SortableHeader>
+                  <SortableHeader<SavingsRateSortField>
+                    field="savings"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Savings
+                  </SortableHeader>
+                  <SortableHeader<SavingsRateSortField>
+                    field="rate"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Rate
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody>
-                {data.map((point) => (
+                {sortedData.map((point) => (
                   <tr key={point.month} className="border-b border-gray-100 dark:border-gray-700/50">
                     <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{point.month}</td>
                     <td className="py-2 pr-4 text-right text-gray-600 dark:text-gray-400">{formatCurrency(point.income)}</td>

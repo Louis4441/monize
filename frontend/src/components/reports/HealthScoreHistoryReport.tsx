@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   LineChart,
   Line,
@@ -14,9 +14,13 @@ import {
 import { budgetsApi } from '@/lib/budgets';
 import type { Budget, HealthScoreHistoryPoint } from '@/types/budget';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('HealthScoreHistoryReport');
+
+type HealthHistorySortField = 'month' | 'score' | 'grade' | 'change';
 
 function getScoreColor(score: number): string {
   if (score >= 80) return '#10b981';
@@ -40,6 +44,38 @@ export function HealthScoreHistoryReport() {
   const [months, setMonths] = useState(12);
   const [data, setData] = useState<HealthScoreHistoryPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { sortField, sortDirection, handleSort } = useSortableTable<HealthHistorySortField>(
+    'reports.health-score-history.sort',
+    { field: 'month', direction: 'asc' },
+  );
+
+  const sortedData = useMemo(() => {
+    const indexed = data.map((point, idx) => {
+      const grade = getScoreGrade(point.score);
+      const prev = idx > 0 ? data[idx - 1].score : null;
+      const change = prev !== null ? point.score - prev : null;
+      return { point, grade, change };
+    });
+    indexed.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'month':
+          comparison = compareValues(a.point.month, b.point.month);
+          break;
+        case 'score':
+          comparison = compareValues(a.point.score, b.point.score);
+          break;
+        case 'grade':
+          comparison = compareValues(a.grade.label, b.grade.label);
+          break;
+        case 'change':
+          comparison = compareValues(a.change, b.change);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return indexed;
+  }, [data, sortField, sortDirection]);
 
   useEffect(() => {
     const loadBudgets = async () => {
@@ -269,17 +305,49 @@ export function HealthScoreHistoryReport() {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400">Month</th>
-                  <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Score</th>
-                  <th className="py-2 pr-4 text-center font-medium text-gray-500 dark:text-gray-400">Grade</th>
-                  <th className="py-2 text-right font-medium text-gray-500 dark:text-gray-400">Change</th>
+                  <SortableHeader<HealthHistorySortField>
+                    field="month"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Month
+                  </SortableHeader>
+                  <SortableHeader<HealthHistorySortField>
+                    field="score"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Score
+                  </SortableHeader>
+                  <SortableHeader<HealthHistorySortField>
+                    field="grade"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="center"
+                    className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Grade
+                  </SortableHeader>
+                  <SortableHeader<HealthHistorySortField>
+                    field="change"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="py-2 font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    Change
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody>
-                {data.map((point, idx) => {
-                  const grade = getScoreGrade(point.score);
-                  const prev = idx > 0 ? data[idx - 1].score : null;
-                  const change = prev !== null ? point.score - prev : null;
+                {sortedData.map(({ point, grade, change }) => {
                   return (
                     <tr key={point.month} className="border-b border-gray-100 dark:border-gray-700/50">
                       <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{point.month}</td>

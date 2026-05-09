@@ -18,9 +18,15 @@ import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('DividendYieldGrowthReport');
+
+type YieldSortField = 'symbol' | 'dividends' | 'marketValue' | 'yield' | 'frequency';
+type GrowthSortField = 'year' | 'amount' | 'growth';
+type FrequencySortField = 'frequency' | 'count' | 'totalDividends';
 
 const MAX_PAGES = 50;
 
@@ -69,6 +75,18 @@ export function DividendYieldGrowthReport() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [viewType, setViewType] = useState<'yield' | 'growth' | 'frequency'>('yield');
+  const yieldSort = useSortableTable<YieldSortField>(
+    'reports.dividend-yield-growth.yield.sort',
+    { field: 'yield', direction: 'desc' },
+  );
+  const growthSort = useSortableTable<GrowthSortField>(
+    'reports.dividend-yield-growth.growth.sort',
+    { field: 'year', direction: 'asc' },
+  );
+  const frequencySort = useSortableTable<FrequencySortField>(
+    'reports.dividend-yield-growth.frequency.sort',
+    { field: 'totalDividends', direction: 'desc' },
+  );
 
   const accountCurrencyMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -201,8 +219,34 @@ export function DividendYieldGrowthReport() {
       });
     });
 
-    return results.sort((a, b) => b.yield - a.yield);
+    return results;
   }, [transactions, holdings, getTxAmount, convertToDefault]);
+
+  const sortedSecurityYields = useMemo(() => {
+    const sorted = [...securityYields];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (yieldSort.sortField) {
+        case 'symbol':
+          comparison = compareValues(a.symbol, b.symbol);
+          break;
+        case 'dividends':
+          comparison = compareValues(a.trailing12mDividends, b.trailing12mDividends);
+          break;
+        case 'marketValue':
+          comparison = compareValues(a.marketValue, b.marketValue);
+          break;
+        case 'yield':
+          comparison = compareValues(a.yield, b.yield);
+          break;
+        case 'frequency':
+          comparison = compareValues(a.frequency, b.frequency);
+          break;
+      }
+      return yieldSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [securityYields, yieldSort.sortField, yieldSort.sortDirection]);
 
   // Year-over-year growth
   const annualData = useMemo((): AnnualDividend[] => {
@@ -239,8 +283,48 @@ export function DividendYieldGrowthReport() {
         count: data.count,
         totalDividends: data.total,
       }))
-      .sort((a, b) => b.totalDividends - a.totalDividends);
+      ;
   }, [securityYields]);
+
+  const sortedAnnualData = useMemo(() => {
+    const sorted = [...annualData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (growthSort.sortField) {
+        case 'year':
+          comparison = compareValues(a.year, b.year);
+          break;
+        case 'amount':
+          comparison = compareValues(a.amount, b.amount);
+          break;
+        case 'growth':
+          comparison = compareValues(a.growth, b.growth);
+          break;
+      }
+      return growthSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [annualData, growthSort.sortField, growthSort.sortDirection]);
+
+  const sortedFrequencyData = useMemo(() => {
+    const sorted = [...frequencyData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (frequencySort.sortField) {
+        case 'frequency':
+          comparison = compareValues(a.frequency, b.frequency);
+          break;
+        case 'count':
+          comparison = compareValues(a.count, b.count);
+          break;
+        case 'totalDividends':
+          comparison = compareValues(a.totalDividends, b.totalDividends);
+          break;
+      }
+      return frequencySort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [frequencyData, frequencySort.sortField, frequencySort.sortDirection]);
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -406,25 +490,59 @@ export function DividendYieldGrowthReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <SortableHeader<YieldSortField>
+                    field="symbol"
+                    sortField={yieldSort.sortField}
+                    sortDirection={yieldSort.sortDirection}
+                    onSort={yieldSort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Security
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<YieldSortField>
+                    field="dividends"
+                    sortField={yieldSort.sortField}
+                    sortDirection={yieldSort.sortDirection}
+                    onSort={yieldSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     12M Dividends
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<YieldSortField>
+                    field="marketValue"
+                    sortField={yieldSort.sortField}
+                    sortDirection={yieldSort.sortDirection}
+                    onSort={yieldSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Market Value
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<YieldSortField>
+                    field="yield"
+                    sortField={yieldSort.sortField}
+                    sortDirection={yieldSort.sortDirection}
+                    onSort={yieldSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Yield
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<YieldSortField>
+                    field="frequency"
+                    sortField={yieldSort.sortField}
+                    sortDirection={yieldSort.sortDirection}
+                    onSort={yieldSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Frequency
-                  </th>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {securityYields.map((sy) => (
+                {sortedSecurityYields.map((sy) => (
                   <tr key={sy.symbol} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900 dark:text-gray-100">{sy.symbol}</div>
@@ -490,13 +608,39 @@ export function DividendYieldGrowthReport() {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Year</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Dividend Income</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">YoY Growth</th>
+                      <SortableHeader<GrowthSortField>
+                        field="year"
+                        sortField={growthSort.sortField}
+                        sortDirection={growthSort.sortDirection}
+                        onSort={growthSort.handleSort}
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Year
+                      </SortableHeader>
+                      <SortableHeader<GrowthSortField>
+                        field="amount"
+                        sortField={growthSort.sortField}
+                        sortDirection={growthSort.sortDirection}
+                        onSort={growthSort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Dividend Income
+                      </SortableHeader>
+                      <SortableHeader<GrowthSortField>
+                        field="growth"
+                        sortField={growthSort.sortField}
+                        sortDirection={growthSort.sortDirection}
+                        onSort={growthSort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        YoY Growth
+                      </SortableHeader>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {annualData.map((row) => (
+                    {sortedAnnualData.map((row) => (
                       <tr key={row.year} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{row.year}</td>
                         <td className="px-4 py-3 text-sm text-right text-green-600 dark:text-green-400">{fmtValue(row.amount)}</td>
@@ -548,13 +692,39 @@ export function DividendYieldGrowthReport() {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Frequency</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Securities</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total Dividends</th>
+                      <SortableHeader<FrequencySortField>
+                        field="frequency"
+                        sortField={frequencySort.sortField}
+                        sortDirection={frequencySort.sortDirection}
+                        onSort={frequencySort.handleSort}
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Frequency
+                      </SortableHeader>
+                      <SortableHeader<FrequencySortField>
+                        field="count"
+                        sortField={frequencySort.sortField}
+                        sortDirection={frequencySort.sortDirection}
+                        onSort={frequencySort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Securities
+                      </SortableHeader>
+                      <SortableHeader<FrequencySortField>
+                        field="totalDividends"
+                        sortField={frequencySort.sortField}
+                        sortDirection={frequencySort.sortDirection}
+                        onSort={frequencySort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Total Dividends
+                      </SortableHeader>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {frequencyData.map((row) => (
+                    {sortedFrequencyData.map((row) => (
                       <tr key={row.frequency} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{row.frequency}</td>
                         <td className="px-4 py-3 text-sm text-right text-gray-600 dark:text-gray-400">{row.count}</td>

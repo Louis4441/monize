@@ -308,4 +308,46 @@ describe("RecurringExpensesReport", () => {
     fireEvent.change(select, { target: { value: "5" } });
     await waitFor(() => expect(mockGetRecurringExpenses).toHaveBeenCalledWith(5));
   });
+
+  it("exercises every sortable column on the recurring expenses table", async () => {
+    mockGetRecurringExpenses.mockResolvedValue({
+      data: [
+        {
+          payeeId: "p1",
+          payeeName: "Netflix",
+          categoryName: "Entertainment",
+          frequency: "Monthly",
+          occurrences: 6,
+          averageAmount: 15,
+          totalAmount: 90,
+          lastTransactionDate: "2024-06-15",
+        },
+        {
+          payeeId: "p2",
+          payeeName: "Spotify",
+          categoryName: "Entertainment",
+          frequency: "Monthly",
+          occurrences: 6,
+          averageAmount: 10,
+          totalAmount: 60,
+          lastTransactionDate: "2024-06-10",
+        },
+      ],
+      summary: { uniquePayees: 2, totalRecurring: 150, monthlyEstimate: 25 },
+    });
+    const { container } = render(<RecurringExpensesReport />);
+    await waitFor(() => expect(container.querySelector("table")).toBeInTheDocument());
+    const headerCount = container.querySelectorAll("table thead th").length;
+    expect(headerCount).toBeGreaterThan(0);
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll("table thead th");
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll("table thead th");
+      if (!__ths[__i]) break;
+      fireEvent.click(__ths[__i]);
+    }
+  });
 });

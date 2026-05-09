@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -22,9 +22,14 @@ import {
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { CHART_COLOURS } from '@/lib/chart-colours';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('MonthlyComparisonReport');
+
+type ComparisonSortField = 'category' | 'current' | 'previous' | 'change' | 'changePercent';
+type TopMoversSortField = 'symbol' | 'name' | 'price' | 'change' | 'changePercent';
 
 function getDefaultMonth(): string {
   const now = new Date();
@@ -62,6 +67,68 @@ export function MonthlyComparisonReport() {
   const [month, setMonth] = useState(getDefaultMonth);
   const [data, setData] = useState<MonthlyComparisonResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const comparisonSort = useSortableTable<ComparisonSortField>(
+    'reports.monthly-comparison.expenses.sort',
+    { field: 'current', direction: 'desc' },
+  );
+  const topMoversSort = useSortableTable<TopMoversSortField>(
+    'reports.monthly-comparison.topMovers.sort',
+    { field: 'changePercent', direction: 'desc' },
+  );
+
+  const sortedComparison = useMemo(() => {
+    if (!data) return [];
+    const sorted = [...data.expenses.comparison];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (comparisonSort.sortField) {
+        case 'category':
+          comparison = compareValues(a.categoryName, b.categoryName);
+          break;
+        case 'current':
+          comparison = compareValues(a.currentTotal, b.currentTotal);
+          break;
+        case 'previous':
+          comparison = compareValues(a.previousTotal, b.previousTotal);
+          break;
+        case 'change':
+          comparison = compareValues(a.change, b.change);
+          break;
+        case 'changePercent':
+          comparison = compareValues(a.changePercent, b.changePercent);
+          break;
+      }
+      return comparisonSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [data, comparisonSort.sortField, comparisonSort.sortDirection]);
+
+  const sortedTopMovers = useMemo(() => {
+    if (!data) return [];
+    const sorted = [...data.investments.topMovers];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (topMoversSort.sortField) {
+        case 'symbol':
+          comparison = compareValues(a.symbol, b.symbol);
+          break;
+        case 'name':
+          comparison = compareValues(a.name, b.name);
+          break;
+        case 'price':
+          comparison = compareValues(a.currentPrice, b.currentPrice);
+          break;
+        case 'change':
+          comparison = compareValues(a.change, b.change);
+          break;
+        case 'changePercent':
+          comparison = compareValues(a.changePercent, b.changePercent);
+          break;
+      }
+      return topMoversSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [data, topMoversSort.sortField, topMoversSort.sortDirection]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -354,15 +421,59 @@ export function MonthlyComparisonReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Category</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{data.currentMonthLabel}</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{data.previousMonthLabel}</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Change</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Change %</th>
+                  <SortableHeader<ComparisonSortField>
+                    field="category"
+                    sortField={comparisonSort.sortField}
+                    sortDirection={comparisonSort.sortDirection}
+                    onSort={comparisonSort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
+                    Category
+                  </SortableHeader>
+                  <SortableHeader<ComparisonSortField>
+                    field="current"
+                    sortField={comparisonSort.sortField}
+                    sortDirection={comparisonSort.sortDirection}
+                    onSort={comparisonSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
+                    {data.currentMonthLabel}
+                  </SortableHeader>
+                  <SortableHeader<ComparisonSortField>
+                    field="previous"
+                    sortField={comparisonSort.sortField}
+                    sortDirection={comparisonSort.sortDirection}
+                    onSort={comparisonSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
+                    {data.previousMonthLabel}
+                  </SortableHeader>
+                  <SortableHeader<ComparisonSortField>
+                    field="change"
+                    sortField={comparisonSort.sortField}
+                    sortDirection={comparisonSort.sortDirection}
+                    onSort={comparisonSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
+                    Change
+                  </SortableHeader>
+                  <SortableHeader<ComparisonSortField>
+                    field="changePercent"
+                    sortField={comparisonSort.sortField}
+                    sortDirection={comparisonSort.sortDirection}
+                    onSort={comparisonSort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
+                    Change %
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {expenses.comparison.map((item) => (
+                {sortedComparison.map((item) => (
                   <tr key={item.categoryId || item.categoryName}>
                     <td className="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 flex items-center gap-2">
                       {item.color && (
@@ -491,15 +602,58 @@ export function MonthlyComparisonReport() {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead>
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Symbol</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Price</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Change</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Change %</th>
+                      <SortableHeader<TopMoversSortField>
+                        field="symbol"
+                        sortField={topMoversSort.sortField}
+                        sortDirection={topMoversSort.sortDirection}
+                        onSort={topMoversSort.handleSort}
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Symbol
+                      </SortableHeader>
+                      <SortableHeader<TopMoversSortField>
+                        field="name"
+                        sortField={topMoversSort.sortField}
+                        sortDirection={topMoversSort.sortDirection}
+                        onSort={topMoversSort.handleSort}
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Name
+                      </SortableHeader>
+                      <SortableHeader<TopMoversSortField>
+                        field="price"
+                        sortField={topMoversSort.sortField}
+                        sortDirection={topMoversSort.sortDirection}
+                        onSort={topMoversSort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Price
+                      </SortableHeader>
+                      <SortableHeader<TopMoversSortField>
+                        field="change"
+                        sortField={topMoversSort.sortField}
+                        sortDirection={topMoversSort.sortDirection}
+                        onSort={topMoversSort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Change
+                      </SortableHeader>
+                      <SortableHeader<TopMoversSortField>
+                        field="changePercent"
+                        sortField={topMoversSort.sortField}
+                        sortDirection={topMoversSort.sortDirection}
+                        onSort={topMoversSort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
+                        Change %
+                      </SortableHeader>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {investments.topMovers.map((mover) => (
+                    {sortedTopMovers.map((mover) => (
                       <tr key={mover.securityId}>
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{mover.symbol}</td>
                         <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{mover.name}</td>

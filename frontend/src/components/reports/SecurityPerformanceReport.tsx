@@ -19,12 +19,17 @@ import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { aggregateHoldingsBySecurity } from '@/lib/aggregate-holdings';
 
 const logger = createLogger('SecurityPerformanceReport');
 
 const MAX_PAGES = 50;
+
+type TradeSortField = 'date' | 'account' | 'action' | 'shares' | 'price' | 'total';
+type DividendSortField = 'date' | 'account' | 'type' | 'amount';
 
 interface PriceChartPoint {
   date: string;
@@ -47,6 +52,14 @@ export function SecurityPerformanceReport() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [viewType, setViewType] = useState<'chart' | 'transactions' | 'dividends'>('chart');
+  const tradeSort = useSortableTable<TradeSortField>(
+    'reports.security-performance.trades.sort',
+    { field: 'date', direction: 'desc' },
+  );
+  const dividendSort = useSortableTable<DividendSortField>(
+    'reports.security-performance.dividends.sort',
+    { field: 'date', direction: 'desc' },
+  );
 
   // Load securities on mount
   useEffect(() => {
@@ -198,20 +211,68 @@ export function SecurityPerformanceReport() {
   }, [prices, transactions]);
 
   // Dividend history
-  const dividendTx = useMemo(
-    () => transactions
-      .filter((tx) => tx.action === 'DIVIDEND' || tx.action === 'REINVEST')
-      .sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)),
-    [transactions],
-  );
+  const dividendTx = useMemo(() => {
+    const list = transactions.filter(
+      (tx) => tx.action === 'DIVIDEND' || tx.action === 'REINVEST',
+    );
+    list.sort((a, b) => {
+      let comparison = 0;
+      switch (dividendSort.sortField) {
+        case 'date':
+          comparison = compareValues(a.transactionDate, b.transactionDate);
+          break;
+        case 'account':
+          comparison = compareValues(
+            accountNameById.get(a.accountId) || '',
+            accountNameById.get(b.accountId) || '',
+          );
+          break;
+        case 'type':
+          comparison = compareValues(a.action, b.action);
+          break;
+        case 'amount':
+          comparison = compareValues(Math.abs(a.totalAmount), Math.abs(b.totalAmount));
+          break;
+      }
+      return dividendSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return list;
+  }, [transactions, dividendSort.sortField, dividendSort.sortDirection, accountNameById]);
 
   // Transaction history (non-dividend)
-  const tradeTx = useMemo(
-    () => transactions
-      .filter((tx) => tx.action !== 'DIVIDEND' && tx.action !== 'INTEREST' && tx.action !== 'CAPITAL_GAIN')
-      .sort((a, b) => b.transactionDate.localeCompare(a.transactionDate)),
-    [transactions],
-  );
+  const tradeTx = useMemo(() => {
+    const list = transactions.filter(
+      (tx) => tx.action !== 'DIVIDEND' && tx.action !== 'INTEREST' && tx.action !== 'CAPITAL_GAIN',
+    );
+    list.sort((a, b) => {
+      let comparison = 0;
+      switch (tradeSort.sortField) {
+        case 'date':
+          comparison = compareValues(a.transactionDate, b.transactionDate);
+          break;
+        case 'account':
+          comparison = compareValues(
+            accountNameById.get(a.accountId) || '',
+            accountNameById.get(b.accountId) || '',
+          );
+          break;
+        case 'action':
+          comparison = compareValues(a.action, b.action);
+          break;
+        case 'shares':
+          comparison = compareValues(a.quantity, b.quantity);
+          break;
+        case 'price':
+          comparison = compareValues(a.price, b.price);
+          break;
+        case 'total':
+          comparison = compareValues(Math.abs(a.totalAmount), Math.abs(b.totalAmount));
+          break;
+      }
+      return tradeSort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return list;
+  }, [transactions, tradeSort.sortField, tradeSort.sortDirection, accountNameById]);
 
   const displayCurrency = selectedSecurity?.currencyCode || defaultCurrency;
 
@@ -524,12 +585,63 @@ export function SecurityPerformanceReport() {
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-900/50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Account</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Action</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Shares</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Price</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
+                        <SortableHeader<TradeSortField>
+                          field="date"
+                          sortField={tradeSort.sortField}
+                          sortDirection={tradeSort.sortDirection}
+                          onSort={tradeSort.handleSort}
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Date
+                        </SortableHeader>
+                        <SortableHeader<TradeSortField>
+                          field="account"
+                          sortField={tradeSort.sortField}
+                          sortDirection={tradeSort.sortDirection}
+                          onSort={tradeSort.handleSort}
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Account
+                        </SortableHeader>
+                        <SortableHeader<TradeSortField>
+                          field="action"
+                          sortField={tradeSort.sortField}
+                          sortDirection={tradeSort.sortDirection}
+                          onSort={tradeSort.handleSort}
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Action
+                        </SortableHeader>
+                        <SortableHeader<TradeSortField>
+                          field="shares"
+                          sortField={tradeSort.sortField}
+                          sortDirection={tradeSort.sortDirection}
+                          onSort={tradeSort.handleSort}
+                          align="right"
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Shares
+                        </SortableHeader>
+                        <SortableHeader<TradeSortField>
+                          field="price"
+                          sortField={tradeSort.sortField}
+                          sortDirection={tradeSort.sortDirection}
+                          onSort={tradeSort.handleSort}
+                          align="right"
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Price
+                        </SortableHeader>
+                        <SortableHeader<TradeSortField>
+                          field="total"
+                          sortField={tradeSort.sortField}
+                          sortDirection={tradeSort.sortDirection}
+                          onSort={tradeSort.handleSort}
+                          align="right"
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Total
+                        </SortableHeader>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -583,10 +695,43 @@ export function SecurityPerformanceReport() {
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-900/50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Account</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                        <SortableHeader<DividendSortField>
+                          field="date"
+                          sortField={dividendSort.sortField}
+                          sortDirection={dividendSort.sortDirection}
+                          onSort={dividendSort.handleSort}
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Date
+                        </SortableHeader>
+                        <SortableHeader<DividendSortField>
+                          field="account"
+                          sortField={dividendSort.sortField}
+                          sortDirection={dividendSort.sortDirection}
+                          onSort={dividendSort.handleSort}
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Account
+                        </SortableHeader>
+                        <SortableHeader<DividendSortField>
+                          field="type"
+                          sortField={dividendSort.sortField}
+                          sortDirection={dividendSort.sortDirection}
+                          onSort={dividendSort.handleSort}
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Type
+                        </SortableHeader>
+                        <SortableHeader<DividendSortField>
+                          field="amount"
+                          sortField={dividendSort.sortField}
+                          sortDirection={dividendSort.sortDirection}
+                          onSort={dividendSort.handleSort}
+                          align="right"
+                          className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                        >
+                          Amount
+                        </SortableHeader>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">

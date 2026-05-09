@@ -15,9 +15,13 @@ import { budgetsApi } from '@/lib/budgets';
 import type { Budget, SeasonalPattern } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('BudgetSeasonalPatternsReport');
+
+type SeasonalPatternsSortField = 'category' | 'typical' | 'highMonths';
 
 export function BudgetSeasonalPatternsReport() {
   const { formatCurrencyCompact: formatCurrency } = useNumberFormat();
@@ -27,6 +31,30 @@ export function BudgetSeasonalPatternsReport() {
   const [patterns, setPatterns] = useState<SeasonalPattern[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const { sortField, sortDirection, handleSort } = useSortableTable<SeasonalPatternsSortField>(
+    'reports.budget-seasonal-patterns.sort',
+    { field: 'typical', direction: 'desc' },
+  );
+
+  const sortedPatterns = useMemo(() => {
+    const sorted = [...patterns];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'category':
+          comparison = compareValues(a.categoryName, b.categoryName);
+          break;
+        case 'typical':
+          comparison = compareValues(a.typicalMonthlySpend, b.typicalMonthlySpend);
+          break;
+        case 'highMonths':
+          comparison = compareValues(a.highMonths.length, b.highMonths.length);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [patterns, sortField, sortDirection]);
 
   useEffect(() => {
     const loadBudgets = async () => {
@@ -230,13 +258,38 @@ export function BudgetSeasonalPatternsReport() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-700">
-                    <th className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400">Category</th>
-                    <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Typical/Mo</th>
-                    <th className="py-2 text-left font-medium text-gray-500 dark:text-gray-400">High Months</th>
+                    <SortableHeader<SeasonalPatternsSortField>
+                      field="category"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Category
+                    </SortableHeader>
+                    <SortableHeader<SeasonalPatternsSortField>
+                      field="typical"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      Typical/Mo
+                    </SortableHeader>
+                    <SortableHeader<SeasonalPatternsSortField>
+                      field="highMonths"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className="py-2 font-medium text-gray-500 dark:text-gray-400"
+                    >
+                      High Months
+                    </SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
-                  {patterns.map((p) => (
+                  {sortedPatterns.map((p) => (
                     <tr
                       key={p.categoryId}
                       onClick={() => setSelectedCategory(p.categoryId)}

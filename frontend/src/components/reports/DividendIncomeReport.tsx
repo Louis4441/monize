@@ -23,12 +23,17 @@ import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { exportToCsv } from '@/lib/csv-export';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('DividendIncomeReport');
 
 type SeriesKey = 'dividends' | 'interest' | 'capitalGains';
+type MonthlyIncomeSortField = 'month' | 'startValue' | 'endValue' | 'dividends' | 'interest' | 'capitalGains' | 'total';
+type DailyIncomeSortField = 'date' | 'startValue' | 'endValue' | 'dividends' | 'interest' | 'capitalGains' | 'total';
+type SecurityIncomeSortField = 'symbol' | 'dividends' | 'interest' | 'capitalGains' | 'total';
 
 interface MonthlyIncome {
   month: string;
@@ -87,6 +92,18 @@ export function DividendIncomeReport() {
     interest: true,
     capitalGains: true,
   });
+  const monthlySort = useSortableTable<MonthlyIncomeSortField>(
+    'reports.dividend-income.monthly.sort',
+    { field: 'month', direction: 'asc' },
+  );
+  const dailySort = useSortableTable<DailyIncomeSortField>(
+    'reports.dividend-income.daily.sort',
+    { field: 'date', direction: 'asc' },
+  );
+  const securitySort = useSortableTable<SecurityIncomeSortField>(
+    'reports.dividend-income.security.sort',
+    { field: 'total', direction: 'desc' },
+  );
 
   // Build account currency lookup
   const accountCurrencyMap = useMemo(() => {
@@ -477,8 +494,112 @@ export function DividendIncomeReport() {
       bucket.total += gain;
     });
 
-    return Array.from(securityMap.values()).sort((a, b) => b.total - a.total);
+    return Array.from(securityMap.values());
   }, [filteredTransactions, filteredCapitalGains, getTxAmount, convertCapitalGain]);
+
+  const sortedMonthlyData = useMemo(() => {
+    const sorted = [...monthlyData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (monthlySort.sortField) {
+        case 'month':
+          comparison = compareValues(a.month, b.month);
+          break;
+        case 'startValue':
+          comparison = compareValues(a.startValue, b.startValue);
+          break;
+        case 'endValue':
+          comparison = compareValues(a.endValue, b.endValue);
+          break;
+        case 'dividends':
+          comparison = compareValues(a.dividends, b.dividends);
+          break;
+        case 'interest':
+          comparison = compareValues(a.interest, b.interest);
+          break;
+        case 'capitalGains':
+          comparison = compareValues(a.capitalGains, b.capitalGains);
+          break;
+        case 'total':
+          comparison = compareValues(
+            (visibleSeries.dividends ? a.dividends : 0) +
+              (visibleSeries.interest ? a.interest : 0) +
+              (visibleSeries.capitalGains ? a.capitalGains : 0),
+            (visibleSeries.dividends ? b.dividends : 0) +
+              (visibleSeries.interest ? b.interest : 0) +
+              (visibleSeries.capitalGains ? b.capitalGains : 0),
+          );
+          break;
+      }
+      return monthlySort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [monthlyData, monthlySort.sortField, monthlySort.sortDirection, visibleSeries]);
+
+  const sortedDailyData = useMemo(() => {
+    const sorted = [...displayedDailyData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (dailySort.sortField) {
+        case 'date':
+          comparison = compareValues(a.date, b.date);
+          break;
+        case 'startValue':
+          comparison = compareValues(a.startValue, b.startValue);
+          break;
+        case 'endValue':
+          comparison = compareValues(a.endValue, b.endValue);
+          break;
+        case 'dividends':
+          comparison = compareValues(a.dividends, b.dividends);
+          break;
+        case 'interest':
+          comparison = compareValues(a.interest, b.interest);
+          break;
+        case 'capitalGains':
+          comparison = compareValues(a.capitalGains, b.capitalGains);
+          break;
+        case 'total':
+          comparison = compareValues(
+            (visibleSeries.dividends ? a.dividends : 0) +
+              (visibleSeries.interest ? a.interest : 0) +
+              (visibleSeries.capitalGains ? a.capitalGains : 0),
+            (visibleSeries.dividends ? b.dividends : 0) +
+              (visibleSeries.interest ? b.interest : 0) +
+              (visibleSeries.capitalGains ? b.capitalGains : 0),
+          );
+          break;
+      }
+      return dailySort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [displayedDailyData, dailySort.sortField, dailySort.sortDirection, visibleSeries]);
+
+  const sortedSecurityData = useMemo(() => {
+    const sorted = [...securityData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (securitySort.sortField) {
+        case 'symbol':
+          comparison = compareValues(a.symbol, b.symbol);
+          break;
+        case 'dividends':
+          comparison = compareValues(a.dividends, b.dividends);
+          break;
+        case 'interest':
+          comparison = compareValues(a.interest, b.interest);
+          break;
+        case 'capitalGains':
+          comparison = compareValues(a.capitalGains, b.capitalGains);
+          break;
+        case 'total':
+          comparison = compareValues(a.total, b.total);
+          break;
+      }
+      return securitySort.sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [securityData, securitySort.sortField, securitySort.sortDirection]);
 
   const totals = useMemo(() => {
     const dividends = filteredTransactions
@@ -1066,37 +1187,85 @@ export function DividendIncomeReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <SortableHeader<MonthlyIncomeSortField>
+                    field="month"
+                    sortField={monthlySort.sortField}
+                    sortDirection={monthlySort.sortDirection}
+                    onSort={monthlySort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Month
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<MonthlyIncomeSortField>
+                    field="startValue"
+                    sortField={monthlySort.sortField}
+                    sortDirection={monthlySort.sortDirection}
+                    onSort={monthlySort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Start Value
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<MonthlyIncomeSortField>
+                    field="endValue"
+                    sortField={monthlySort.sortField}
+                    sortDirection={monthlySort.sortDirection}
+                    onSort={monthlySort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     End Value
-                  </th>
+                  </SortableHeader>
                   {visibleSeries.dividends && (
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    <SortableHeader<MonthlyIncomeSortField>
+                      field="dividends"
+                      sortField={monthlySort.sortField}
+                      sortDirection={monthlySort.sortDirection}
+                      onSort={monthlySort.handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Dividends
-                    </th>
+                    </SortableHeader>
                   )}
                   {visibleSeries.interest && (
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    <SortableHeader<MonthlyIncomeSortField>
+                      field="interest"
+                      sortField={monthlySort.sortField}
+                      sortDirection={monthlySort.sortDirection}
+                      onSort={monthlySort.handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Interest
-                    </th>
+                    </SortableHeader>
                   )}
                   {visibleSeries.capitalGains && (
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    <SortableHeader<MonthlyIncomeSortField>
+                      field="capitalGains"
+                      sortField={monthlySort.sortField}
+                      sortDirection={monthlySort.sortDirection}
+                      onSort={monthlySort.handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Capital Gains
-                    </th>
+                    </SortableHeader>
                   )}
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <SortableHeader<MonthlyIncomeSortField>
+                    field="total"
+                    sortField={monthlySort.sortField}
+                    sortDirection={monthlySort.sortDirection}
+                    onSort={monthlySort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Total
-                  </th>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {monthlyData.map((row) => {
+                {sortedMonthlyData.map((row) => {
                   const rowTotal =
                     (visibleSeries.dividends ? row.dividends : 0) +
                     (visibleSeries.interest ? row.interest : 0) +
@@ -1226,37 +1395,85 @@ export function DividendIncomeReport() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-900/50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    <SortableHeader<DailyIncomeSortField>
+                      field="date"
+                      sortField={dailySort.sortField}
+                      sortDirection={dailySort.sortDirection}
+                      onSort={dailySort.handleSort}
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Date
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<DailyIncomeSortField>
+                      field="startValue"
+                      sortField={dailySort.sortField}
+                      sortDirection={dailySort.sortDirection}
+                      onSort={dailySort.handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Start Value
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<DailyIncomeSortField>
+                      field="endValue"
+                      sortField={dailySort.sortField}
+                      sortDirection={dailySort.sortDirection}
+                      onSort={dailySort.handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       End Value
-                    </th>
+                    </SortableHeader>
                     {visibleSeries.dividends && (
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      <SortableHeader<DailyIncomeSortField>
+                        field="dividends"
+                        sortField={dailySort.sortField}
+                        sortDirection={dailySort.sortDirection}
+                        onSort={dailySort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
                         Dividends
-                      </th>
+                      </SortableHeader>
                     )}
                     {visibleSeries.interest && (
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      <SortableHeader<DailyIncomeSortField>
+                        field="interest"
+                        sortField={dailySort.sortField}
+                        sortDirection={dailySort.sortDirection}
+                        onSort={dailySort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
                         Interest
-                      </th>
+                      </SortableHeader>
                     )}
                     {visibleSeries.capitalGains && (
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                      <SortableHeader<DailyIncomeSortField>
+                        field="capitalGains"
+                        sortField={dailySort.sortField}
+                        sortDirection={dailySort.sortDirection}
+                        onSort={dailySort.handleSort}
+                        align="right"
+                        className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                      >
                         Capital Gains
-                      </th>
+                      </SortableHeader>
                     )}
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    <SortableHeader<DailyIncomeSortField>
+                      field="total"
+                      sortField={dailySort.sortField}
+                      sortDirection={dailySort.sortDirection}
+                      onSort={dailySort.handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Total
-                    </th>
+                    </SortableHeader>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {displayedDailyData.map((row) => {
+                  {sortedDailyData.map((row) => {
                     const rowTotal =
                       (visibleSeries.dividends ? row.dividends : 0) +
                       (visibleSeries.interest ? row.interest : 0) +
@@ -1322,25 +1539,59 @@ export function DividendIncomeReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <SortableHeader<SecurityIncomeSortField>
+                    field="symbol"
+                    sortField={securitySort.sortField}
+                    sortDirection={securitySort.sortDirection}
+                    onSort={securitySort.handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Security
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SecurityIncomeSortField>
+                    field="dividends"
+                    sortField={securitySort.sortField}
+                    sortDirection={securitySort.sortDirection}
+                    onSort={securitySort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Dividends
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SecurityIncomeSortField>
+                    field="interest"
+                    sortField={securitySort.sortField}
+                    sortDirection={securitySort.sortDirection}
+                    onSort={securitySort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Interest
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SecurityIncomeSortField>
+                    field="capitalGains"
+                    sortField={securitySort.sortField}
+                    sortDirection={securitySort.sortDirection}
+                    onSort={securitySort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Capital Gains
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<SecurityIncomeSortField>
+                    field="total"
+                    sortField={securitySort.sortField}
+                    sortDirection={securitySort.sortDirection}
+                    onSort={securitySort.handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Total
-                  </th>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {securityData.map((security) => (
+                {sortedSecurityData.map((security) => (
                   <tr key={security.symbol} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900 dark:text-gray-100">

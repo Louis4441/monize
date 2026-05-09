@@ -16,10 +16,13 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { CHART_COLOURS } from '@/lib/chart-colours';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('RecurringExpensesReport');
 
+type RecurringSortField = 'payee' | 'category' | 'frequency' | 'count' | 'average' | 'total' | 'lastPaid';
 
 export function RecurringExpensesReport() {
   const router = useRouter();
@@ -28,6 +31,42 @@ export function RecurringExpensesReport() {
   const [recurringData, setRecurringData] = useState<RecurringExpensesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [minOccurrences, setMinOccurrences] = useState(3);
+  const { sortField, sortDirection, handleSort } = useSortableTable<RecurringSortField>(
+    'reports.recurring-expenses.sort',
+    { field: 'total', direction: 'desc' },
+  );
+
+  const sortedExpenses = useMemo(() => {
+    if (!recurringData) return [];
+    const sorted = [...recurringData.data].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'payee':
+          comparison = compareValues(a.payeeName, b.payeeName);
+          break;
+        case 'category':
+          comparison = compareValues(a.categoryName, b.categoryName);
+          break;
+        case 'frequency':
+          comparison = compareValues(a.frequency, b.frequency);
+          break;
+        case 'count':
+          comparison = compareValues(a.occurrences, b.occurrences);
+          break;
+        case 'average':
+          comparison = compareValues(a.averageAmount, b.averageAmount);
+          break;
+        case 'total':
+          comparison = compareValues(a.totalAmount, b.totalAmount);
+          break;
+        case 'lastPaid':
+          comparison = compareValues(a.lastTransactionDate, b.lastTransactionDate);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [recurringData, sortField, sortDirection]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -242,31 +281,78 @@ export function RecurringExpensesReport() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-900/50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    <SortableHeader<RecurringSortField>
+                      field="payee"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Payee
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<RecurringSortField>
+                      field="category"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Category
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<RecurringSortField>
+                      field="frequency"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="center"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Frequency
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<RecurringSortField>
+                      field="count"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="center"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Count
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<RecurringSortField>
+                      field="average"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Avg Amount
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<RecurringSortField>
+                      field="total"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       6-Mo Total
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    </SortableHeader>
+                    <SortableHeader<RecurringSortField>
+                      field="lastPaid"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                    >
                       Last Paid
-                    </th>
+                    </SortableHeader>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {recurringData.data.map((expense, index) => (
+                  {sortedExpenses.map((expense, index) => (
                     <tr
                       key={index}
                       className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${expense.payeeId ? 'cursor-pointer' : ''}`}

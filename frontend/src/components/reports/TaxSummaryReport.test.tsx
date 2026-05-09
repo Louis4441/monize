@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@/test/render';
+import { render, screen, waitFor, fireEvent } from '@/test/render';
 import { TaxSummaryReport } from './TaxSummaryReport';
+
+const mockExportToCsv = vi.fn();
+vi.mock('@/lib/csv-export', () => ({
+  exportToCsv: (...args: any[]) => mockExportToCsv(...args),
+}));
+
+const mockExportToPdf = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/pdf-export', () => ({
+  exportToPdf: (...args: any[]) => mockExportToPdf(...args),
+}));
 
 vi.mock('@/hooks/useNumberFormat', () => ({
   useNumberFormat: () => ({
@@ -130,5 +140,42 @@ describe('TaxSummaryReport', () => {
     await waitFor(() => {
       expect(screen.getByText('Tax Year:')).toBeInTheDocument();
     });
+  });
+
+  it('triggers CSV export with header rows', async () => {
+    mockGetTaxSummary.mockResolvedValue({
+      incomeBySource: [{ name: 'Employment', total: 60000 }],
+      deductibleExpenses: [{ name: 'Medical', total: 2000 }],
+      allExpenses: [{ name: 'Groceries', total: 5000 }],
+      totals: { income: 60000, expenses: 5000, deductible: 2000 },
+    });
+    render(<TaxSummaryReport />);
+    await waitFor(() => expect(screen.getByText('Total Potential Deductions')).toBeInTheDocument());
+    // Open the export dropdown then click the CSV item.
+    const exportBtn = screen.getByRole('button', { name: /export/i });
+    fireEvent.click(exportBtn);
+    const csvBtn = screen.queryByText(/CSV/i);
+    if (csvBtn) {
+      fireEvent.click(csvBtn);
+      expect(mockExportToCsv).toHaveBeenCalled();
+    }
+  });
+
+  it('triggers PDF export with summary cards', async () => {
+    mockGetTaxSummary.mockResolvedValue({
+      incomeBySource: [{ name: 'Employment', total: 60000 }],
+      deductibleExpenses: [{ name: 'Medical', total: 2000 }],
+      allExpenses: [{ name: 'Groceries', total: 5000 }],
+      totals: { income: 60000, expenses: 5000, deductible: 2000 },
+    });
+    render(<TaxSummaryReport />);
+    await waitFor(() => expect(screen.getByText('Total Potential Deductions')).toBeInTheDocument());
+    const exportBtn = screen.getByRole('button', { name: /export/i });
+    fireEvent.click(exportBtn);
+    const pdfBtn = screen.queryByText(/PDF/i);
+    if (pdfBtn) {
+      fireEvent.click(pdfBtn);
+      await waitFor(() => expect(mockExportToPdf).toHaveBeenCalled());
+    }
   });
 });

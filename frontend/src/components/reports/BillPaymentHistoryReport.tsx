@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   BarChart,
@@ -20,9 +20,13 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('BillPaymentHistoryReport');
+
+type BillSortField = 'bill' | 'count' | 'average' | 'total' | 'lastPayment';
 
 export function BillPaymentHistoryReport() {
   const router = useRouter();
@@ -32,6 +36,37 @@ export function BillPaymentHistoryReport() {
   const { dateRange, setDateRange, resolvedRange } = useDateRange({ defaultRange: '1y', alignment: 'day' });
   const [isLoading, setIsLoading] = useState(true);
   const [viewType, setViewType] = useState<'overview' | 'byBill'>('overview');
+  const { sortField, sortDirection, handleSort } = useSortableTable<BillSortField>(
+    'reports.bill-payment-history.sort',
+    { field: 'total', direction: 'desc' },
+  );
+
+  const sortedBillPayments = useMemo(() => {
+    if (!billData) return [];
+    const sorted = [...billData.billPayments];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'bill':
+          comparison = compareValues(a.scheduledTransactionName, b.scheduledTransactionName);
+          break;
+        case 'count':
+          comparison = compareValues(a.paymentCount, b.paymentCount);
+          break;
+        case 'average':
+          comparison = compareValues(a.averagePayment, b.averagePayment);
+          break;
+        case 'total':
+          comparison = compareValues(a.totalPaid, b.totalPaid);
+          break;
+        case 'lastPayment':
+          comparison = compareValues(a.lastPaymentDate, b.lastPaymentDate);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [billData, sortField, sortDirection]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -231,25 +266,59 @@ export function BillPaymentHistoryReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  <SortableHeader<BillSortField>
+                    field="bill"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Bill
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<BillSortField>
+                    field="count"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="center"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Payments
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<BillSortField>
+                    field="average"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Average
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<BillSortField>
+                    field="total"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Total Paid
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                  </SortableHeader>
+                  <SortableHeader<BillSortField>
+                    field="lastPayment"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Last Payment
-                  </th>
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {billData.billPayments.map((bp) => (
+                {sortedBillPayments.map((bp) => (
                   <tr
                     key={bp.scheduledTransactionId}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"

@@ -11,12 +11,13 @@ import { useDateRange } from '@/hooks/useDateRange';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { exportToCsv } from '@/lib/csv-export';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('UncategorizedTransactionsReport');
 
-type SortField = 'date' | 'amount' | 'payee';
-type SortOrder = 'asc' | 'desc';
+type SortField = 'date' | 'amount' | 'payee' | 'account';
 
 export function UncategorizedTransactionsReport() {
   const router = useRouter();
@@ -24,8 +25,10 @@ export function UncategorizedTransactionsReport() {
   const [reportData, setReportData] = useState<UncategorizedTransactionsResponse | null>(null);
   const { dateRange, setDateRange, resolvedRange, isValid } = useDateRange({ defaultRange: '3m', alignment: 'day' });
   const [isLoading, setIsLoading] = useState(true);
-  const [sortField, setSortField] = useState<SortField>('date');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const { sortField, sortDirection, handleSort } = useSortableTable<SortField>(
+    'reports.uncategorized-transactions.sort',
+    { field: 'date', direction: 'desc' },
+  );
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
 
   useEffect(() => {
@@ -66,22 +69,23 @@ export function UncategorizedTransactionsReport() {
       let comparison = 0;
       switch (sortField) {
         case 'date':
-          comparison = new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime();
+          comparison = compareValues(a.transactionDate, b.transactionDate);
           break;
         case 'amount':
-          comparison = Math.abs(a.amount) - Math.abs(b.amount);
+          comparison = compareValues(Math.abs(a.amount), Math.abs(b.amount));
           break;
         case 'payee':
-          const payeeA = (a.payeeName || '').toLowerCase();
-          const payeeB = (b.payeeName || '').toLowerCase();
-          comparison = payeeA.localeCompare(payeeB);
+          comparison = compareValues((a.payeeName || '').toLowerCase(), (b.payeeName || '').toLowerCase());
+          break;
+        case 'account':
+          comparison = compareValues((a.accountName || '').toLowerCase(), (b.accountName || '').toLowerCase());
           break;
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
 
     return filtered;
-  }, [reportData, filterType, sortField, sortOrder]);
+  }, [reportData, filterType, sortField, sortDirection]);
 
   const handleTransactionClick = (tx: UncategorizedTransactionItem) => {
     const params = new URLSearchParams();
@@ -90,15 +94,6 @@ export function UncategorizedTransactionsReport() {
     const search = tx.payeeName || tx.description;
     if (search) params.set('search', search);
     router.push(`/transactions?${params.toString()}`);
-  };
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('desc');
-    }
   };
 
   const getExportData = () => {
@@ -127,25 +122,6 @@ export function UncategorizedTransactionsReport() {
       tableData: { headers, rows },
       filename: 'uncategorized-transactions',
     });
-  };
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return (
-        <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-        </svg>
-      );
-    }
-    return sortOrder === 'asc' ? (
-      <svg className="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-      </svg>
-    ) : (
-      <svg className="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      </svg>
-    );
   };
 
   if (isLoading) {
@@ -278,36 +254,43 @@ export function UncategorizedTransactionsReport() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
-                  <th
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => handleSort('date')}
+                  <SortableHeader<SortField>
+                    field="date"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
                   >
-                    <div className="flex items-center gap-1">
-                      Date
-                      <SortIcon field="date" />
-                    </div>
-                  </th>
-                  <th
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => handleSort('payee')}
+                    Date
+                  </SortableHeader>
+                  <SortableHeader<SortField>
+                    field="payee"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
                   >
-                    <div className="flex items-center gap-1">
-                      Payee / Description
-                      <SortIcon field="payee" />
-                    </div>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                    Payee / Description
+                  </SortableHeader>
+                  <SortableHeader<SortField>
+                    field="account"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
+                  >
                     Account
-                  </th>
-                  <th
-                    className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => handleSort('amount')}
+                  </SortableHeader>
+                  <SortableHeader<SortField>
+                    field="amount"
+                    sortField={sortField}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase"
                   >
-                    <div className="flex items-center justify-end gap-1">
-                      Amount
-                      <SortIcon field="amount" />
-                    </div>
-                  </th>
+                    Amount
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">

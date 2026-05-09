@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -18,9 +18,13 @@ import type { Budget, BudgetTrendPoint, CategoryTrendSeries } from '@/types/budg
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { BudgetCategoryTrend } from '@/components/budgets/BudgetCategoryTrend';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('BudgetVsActualReport');
+
+type BudgetTrendSortField = 'month' | 'budgeted' | 'actual' | 'variance' | 'percentUsed';
 
 export function BudgetVsActualReport() {
   const { formatCurrencyCompact: formatCurrency } = useNumberFormat();
@@ -32,6 +36,36 @@ export function BudgetVsActualReport() {
   const [viewMode, setViewMode] = useState<'overview' | 'categories'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const chartRef = useRef<HTMLDivElement>(null);
+  const { sortField, sortDirection, handleSort } = useSortableTable<BudgetTrendSortField>(
+    'reports.budget-vs-actual.trend.sort',
+    { field: 'month', direction: 'asc' },
+  );
+
+  const sortedTrendData = useMemo(() => {
+    const sorted = [...trendData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'month':
+          comparison = compareValues(a.month, b.month);
+          break;
+        case 'budgeted':
+          comparison = compareValues(a.budgeted, b.budgeted);
+          break;
+        case 'actual':
+          comparison = compareValues(a.actual, b.actual);
+          break;
+        case 'variance':
+          comparison = compareValues(a.variance, b.variance);
+          break;
+        case 'percentUsed':
+          comparison = compareValues(a.percentUsed, b.percentUsed);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [trendData, sortField, sortDirection]);
 
   useEffect(() => {
     const loadBudgets = async () => {
@@ -248,15 +282,59 @@ export function BudgetVsActualReport() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className="py-2 pr-4 text-left font-medium text-gray-500 dark:text-gray-400">Month</th>
-                      <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Budgeted</th>
-                      <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Actual</th>
-                      <th className="py-2 pr-4 text-right font-medium text-gray-500 dark:text-gray-400">Variance</th>
-                      <th className="py-2 text-right font-medium text-gray-500 dark:text-gray-400">% Used</th>
+                      <SortableHeader<BudgetTrendSortField>
+                        field="month"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        Month
+                      </SortableHeader>
+                      <SortableHeader<BudgetTrendSortField>
+                        field="budgeted"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        align="right"
+                        className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        Budgeted
+                      </SortableHeader>
+                      <SortableHeader<BudgetTrendSortField>
+                        field="actual"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        align="right"
+                        className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        Actual
+                      </SortableHeader>
+                      <SortableHeader<BudgetTrendSortField>
+                        field="variance"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        align="right"
+                        className="py-2 pr-4 font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        Variance
+                      </SortableHeader>
+                      <SortableHeader<BudgetTrendSortField>
+                        field="percentUsed"
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        align="right"
+                        className="py-2 font-medium text-gray-500 dark:text-gray-400"
+                      >
+                        % Used
+                      </SortableHeader>
                     </tr>
                   </thead>
                   <tbody>
-                    {trendData.map((point) => (
+                    {sortedTrendData.map((point) => (
                       <tr key={point.month} className="border-b border-gray-100 dark:border-gray-700/50">
                         <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{point.month}</td>
                         <td className="py-2 pr-4 text-right text-gray-600 dark:text-gray-400">{formatCurrency(point.budgeted)}</td>

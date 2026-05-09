@@ -935,4 +935,64 @@ describe('SecurityPerformanceReport', () => {
     // transactions view produces tableData with headers
     expect(call.tableData.headers).toEqual(['Date', 'Account', 'Action', 'Shares', 'Price', 'Total']);
   });
+
+  it('exercises sort headers on transactions and dividends tables', async () => {
+    mockGetSecurities.mockResolvedValue([
+      { id: 'sec-1', symbol: 'VFV', name: 'Vanguard S&P 500', currencyCode: 'CAD', isActive: true, exchange: 'TSX' },
+    ]);
+    mockGetPortfolioSummary.mockResolvedValue({
+      holdings: [
+        { id: 'h1', accountId: 'acc-1', securityId: 'sec-1', symbol: 'VFV', name: 'Vanguard S&P 500', currencyCode: 'CAD', securityType: 'ETF', quantity: 10, averageCost: 100, costBasis: 1000, currentPrice: 110, marketValue: 1100, gainLoss: 100, gainLossPercent: 10 },
+      ],
+      allocation: [],
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    mockGetTransactions.mockResolvedValue({
+      data: [
+        { id: 'tx1', accountId: 'acc-1', securityId: 'sec-1', security: { symbol: 'VFV', name: 'Vanguard S&P 500' }, transactionDate: '2024-01-15', quantity: 5, price: 100, totalAmount: 500, action: 'BUY' },
+        { id: 'tx2', accountId: 'acc-1', securityId: 'sec-1', security: { symbol: 'VFV', name: 'Vanguard S&P 500' }, transactionDate: '2024-03-15', quantity: 3, price: 110, totalAmount: 330, action: 'SELL' },
+        { id: 'tx3', accountId: 'acc-1', securityId: 'sec-1', security: { symbol: 'VFV', name: 'Vanguard S&P 500' }, transactionDate: '2024-04-10', quantity: null, price: null, totalAmount: 50, action: 'DIVIDEND' },
+        { id: 'tx4', accountId: 'acc-1', securityId: 'sec-1', security: { symbol: 'VFV', name: 'Vanguard S&P 500' }, transactionDate: '2024-06-10', quantity: null, price: null, totalAmount: 60, action: 'DIVIDEND' },
+      ],
+      pagination: { hasMore: false },
+    });
+    mockGetSecurityPrices.mockResolvedValue([]);
+    const { container } = render(<SecurityPerformanceReport />);
+    await waitFor(() => expect(document.querySelector('select')).toBeTruthy());
+    const select = document.querySelector('select') as HTMLSelectElement;
+    await act(async () => {
+      fireEvent.change(select, { target: { value: 'sec-1' } });
+    });
+    // Switch to Transactions view and exercise sort headers.
+    await waitFor(() => expect(screen.getByText('Transactions')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Transactions'));
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    let headerCount = container.querySelectorAll('table thead th').length;
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+    // Switch to Dividends view and exercise sort headers there too.
+    fireEvent.click(screen.getByText('Dividends'));
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    headerCount = container.querySelectorAll('table thead th').length;
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+    for (let __i = 0; __i < headerCount; __i += 1) {
+      const __ths = container.querySelectorAll('table thead th');
+      if (!__ths[__i]) break;
+      await act(async () => { fireEvent.click(__ths[__i]); });
+    }
+  });
 });

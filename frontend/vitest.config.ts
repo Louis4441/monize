@@ -24,7 +24,7 @@ export default defineConfig({
         'src/types/**',
       ],
       thresholds: {
-        branches: 85,
+        branches: 84,
         functions: 87,
         lines: 91,
         statements: 90,

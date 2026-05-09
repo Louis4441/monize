@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@/test/render";
+import { render, screen, waitFor, fireEvent, act } from "@/test/render";
 import { SpendingByPayeeReport } from "./SpendingByPayeeReport";
 
 const mockPush = vi.fn();
@@ -16,6 +16,7 @@ vi.mock("@/hooks/useNumberFormat", () => ({
   }),
 }));
 
+const STABLE_RANGE = { start: "2025-01-01", end: "2025-03-31" };
 vi.mock("@/hooks/useDateRange", () => ({
   useDateRange: () => ({
     dateRange: "3m",
@@ -24,7 +25,7 @@ vi.mock("@/hooks/useDateRange", () => ({
     setStartDate: vi.fn(),
     endDate: "",
     setEndDate: vi.fn(),
-    resolvedRange: { start: "2025-01-01", end: "2025-03-31" },
+    resolvedRange: STABLE_RANGE,
     isValid: true,
   }),
 }));
@@ -80,6 +81,16 @@ vi.mock("@/components/ui/ExportDropdown", () => ({
     <div data-testid="export-dropdown">
       <button data-testid="export-csv" onClick={onExportCsv}>CSV</button>
       <button data-testid="export-pdf" onClick={onExportPdf}>PDF</button>
+    </div>
+  ),
+}));
+
+vi.mock("@/components/ui/ChartViewToggle", () => ({
+  ChartViewToggle: ({ value, onChange }: any) => (
+    <div data-testid="chart-view-toggle">
+      <button data-testid="toggle-bar" onClick={() => onChange("bar")}>bar</button>
+      <button data-testid="toggle-table" onClick={() => onChange("table")}>table</button>
+      <span>val:{value}</span>
     </div>
   ),
 }));
@@ -248,5 +259,50 @@ describe("SpendingByPayeeReport", () => {
     const pdfButton = screen.getByTestId("export-pdf");
     expect(pdfButton).toBeInTheDocument();
     expect(pdfButton).toBeEnabled();
+  });
+
+  it("sorts the percentage column when totalSpending is 0", async () => {
+    mockGetSpendingByPayee.mockResolvedValue({
+      data: [
+        { payeeId: "p1", payeeName: "A", total: 0 },
+        { payeeId: "p2", payeeName: "B", total: 0 },
+      ],
+      totalSpending: 0,
+    });
+    const { container } = render(<SpendingByPayeeReport />);
+    await waitFor(() => expect(screen.getByTestId("toggle-table")).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByTestId("toggle-table")); });
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const ths = container.querySelectorAll('table thead th');
+    if (ths[2]) await act(async () => { fireEvent.click(ths[2]); });
+  });
+
+  it("renders sortable table view and exports CSV", async () => {
+    mockGetSpendingByPayee.mockResolvedValue({
+      data: [
+        { payeeId: "p-1", payeeName: "Superstore", total: 300 },
+        { payeeId: "p-2", payeeName: "Costco", total: 200 },
+        { payeeId: "", payeeName: "Unknown", total: 50 },
+      ],
+      totalSpending: 550,
+    });
+    const { container } = render(<SpendingByPayeeReport />);
+    await waitFor(() => expect(screen.queryByTestId("toggle-table")).toBeInTheDocument());
+    await act(async () => { fireEvent.click(screen.getByTestId("toggle-table")); });
+    // After toggling, wait for the table to render (data may briefly reload)
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('th').length;
+    expect(headerCount).toBeGreaterThan(0);
+    for (let i = 0; i < headerCount; i += 1) {
+      const ths = container.querySelectorAll('th');
+      if (!ths[i]) break;
+      await act(async () => { fireEvent.click(ths[i]); });
+    }
+    for (let i = 0; i < headerCount; i += 1) {
+      const ths = container.querySelectorAll('th');
+      if (!ths[i]) break;
+      await act(async () => { fireEvent.click(ths[i]); });
+    }
+    await act(async () => { fireEvent.click(screen.getByTestId("export-csv")); });
   });
 });

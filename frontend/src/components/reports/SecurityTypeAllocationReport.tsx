@@ -15,10 +15,14 @@ import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { aggregateHoldingsBySecurity, AggregatedHolding } from '@/lib/aggregate-holdings';
 
 const logger = createLogger('SecurityTypeAllocationReport');
+
+type SecurityTypeSortField = 'label' | 'totalValue' | 'percentage' | 'count';
 
 const TYPE_COLOURS: Record<string, string> = {
   STOCK: '#3b82f6',
@@ -79,6 +83,10 @@ export function SecurityTypeAllocationReport() {
   const [showAccountFilter, setShowAccountFilter] = useState(false);
   const accountFilterRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const { sortField, sortDirection, handleSort } = useSortableTable<SecurityTypeSortField>(
+    'reports.security-type-allocation.sort',
+    { field: 'totalValue', direction: 'desc' },
+  );
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -164,6 +172,29 @@ export function SecurityTypeAllocationReport() {
     () => allocationData.reduce((sum, a) => sum + a.totalValue, 0),
     [allocationData],
   );
+
+  const sortedAllocationData = useMemo(() => {
+    const sorted = [...allocationData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'label':
+          comparison = compareValues(a.label, b.label);
+          break;
+        case 'totalValue':
+          comparison = compareValues(a.totalValue, b.totalValue);
+          break;
+        case 'percentage':
+          comparison = compareValues(a.percentage, b.percentage);
+          break;
+        case 'count':
+          comparison = compareValues(a.count, b.count);
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [allocationData, sortField, sortDirection]);
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -332,22 +363,49 @@ export function SecurityTypeAllocationReport() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900/50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <SortableHeader<SecurityTypeSortField>
+                  field="label"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Asset Type
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<SecurityTypeSortField>
+                  field="totalValue"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Total Value
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<SecurityTypeSortField>
+                  field="percentage"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   % of Portfolio
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                </SortableHeader>
+                <SortableHeader<SecurityTypeSortField>
+                  field="count"
+                  sortField={sortField}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  align="right"
+                  className="px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
                   Holdings
-                </th>
+                </SortableHeader>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {allocationData.map((item) => (
+              {sortedAllocationData.map((item) => (
                 <React.Fragment key={item.type}>
                   <tr
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer"

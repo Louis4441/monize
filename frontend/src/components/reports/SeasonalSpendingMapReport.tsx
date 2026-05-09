@@ -5,9 +5,13 @@ import { budgetsApi } from '@/lib/budgets';
 import type { Budget, SeasonalPattern } from '@/types/budget';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { SortableHeader } from '@/components/ui/SortableHeader';
+import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('SeasonalSpendingMapReport');
+
+type SeasonalMapSortField = 'category' | 'typical' | `month${number}`;
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -38,6 +42,10 @@ export function SeasonalSpendingMapReport() {
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>('');
   const [patterns, setPatterns] = useState<SeasonalPattern[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { sortField, sortDirection, handleSort } = useSortableTable<SeasonalMapSortField>(
+    'reports.seasonal-spending-map.sort',
+    { field: 'typical', direction: 'desc' },
+  );
 
   useEffect(() => {
     const loadBudgets = async () => {
@@ -97,6 +105,23 @@ export function SeasonalSpendingMapReport() {
     });
     return { gridData: grid, globalMax: max };
   }, [patterns]);
+
+  const sortedGridData = useMemo(() => {
+    const sorted = [...gridData];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'category') {
+        comparison = compareValues(a.categoryName, b.categoryName);
+      } else if (sortField === 'typical') {
+        comparison = compareValues(a.typical, b.typical);
+      } else if (sortField.startsWith('month')) {
+        const idx = Number(sortField.slice(5));
+        comparison = compareValues(a.values[idx] ?? 0, b.values[idx] ?? 0);
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [gridData, sortField, sortDirection]);
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -189,24 +214,42 @@ export function SeasonalSpendingMapReport() {
               <table className="min-w-full">
                 <thead>
                   <tr>
-                    <th className="py-2 pr-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 sticky left-0 bg-white dark:bg-gray-800">
+                    <SortableHeader<SeasonalMapSortField>
+                      field="category"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      className="py-2 pr-3 text-xs font-medium text-gray-500 dark:text-gray-400 sticky left-0 bg-white dark:bg-gray-800"
+                    >
                       Category
-                    </th>
-                    {MONTH_LABELS.map((month) => (
-                      <th
+                    </SortableHeader>
+                    {MONTH_LABELS.map((month, idx) => (
+                      <SortableHeader<SeasonalMapSortField>
                         key={month}
-                        className="px-1 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 min-w-[60px]"
+                        field={`month${idx}` as SeasonalMapSortField}
+                        sortField={sortField}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                        align="center"
+                        className="px-1 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 min-w-[60px]"
                       >
                         {month}
-                      </th>
+                      </SortableHeader>
                     ))}
-                    <th className="pl-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400">
+                    <SortableHeader<SeasonalMapSortField>
+                      field="typical"
+                      sortField={sortField}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      align="right"
+                      className="pl-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400"
+                    >
                       Typical/Mo
-                    </th>
+                    </SortableHeader>
                   </tr>
                 </thead>
                 <tbody>
-                  {gridData.map((row) => (
+                  {sortedGridData.map((row) => (
                     <tr key={row.categoryId} className="border-t border-gray-100 dark:border-gray-700/50">
                       <td className="py-1.5 pr-3 text-xs font-medium text-gray-900 dark:text-gray-100 sticky left-0 bg-white dark:bg-gray-800 whitespace-nowrap max-w-[140px] truncate">
                         {row.categoryName}
