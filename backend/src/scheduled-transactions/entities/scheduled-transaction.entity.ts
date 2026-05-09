@@ -26,6 +26,18 @@ export type FrequencyType =
   | "QUARTERLY"
   | "YEARLY";
 
+const dateStringTransformer = {
+  from: (value: string | Date | null): string | null => {
+    if (value === null || value === undefined) return value as null;
+    if (typeof value === "string") return value;
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  },
+  to: (value: string | Date | null): string | Date | null => value,
+};
+
 @Entity("scheduled_transactions")
 export class ScheduledTransaction {
   @PrimaryGeneratedColumn("uuid")
@@ -81,14 +93,27 @@ export class ScheduledTransaction {
   })
   frequency: FrequencyType;
 
-  @Column({ type: "date", name: "next_due_date" })
-  nextDueDate: Date;
+  @Column({
+    type: "date",
+    name: "next_due_date",
+    transformer: dateStringTransformer,
+  })
+  nextDueDate: string;
 
-  @Column({ type: "date", name: "start_date" })
-  startDate: Date;
+  @Column({
+    type: "date",
+    name: "start_date",
+    transformer: dateStringTransformer,
+  })
+  startDate: string;
 
-  @Column({ type: "date", name: "end_date", nullable: true })
-  endDate: Date | null;
+  @Column({
+    type: "date",
+    name: "end_date",
+    nullable: true,
+    transformer: dateStringTransformer,
+  })
+  endDate: string | null;
 
   @Column({ type: "int", name: "occurrences_remaining", nullable: true })
   occurrencesRemaining: number | null;
@@ -105,8 +130,13 @@ export class ScheduledTransaction {
   @Column({ type: "int", name: "reminder_days_before", default: 3 })
   reminderDaysBefore: number;
 
-  @Column({ type: "date", name: "last_posted_date", nullable: true })
-  lastPostedDate: Date | null;
+  @Column({
+    type: "date",
+    name: "last_posted_date",
+    nullable: true,
+    transformer: dateStringTransformer,
+  })
+  lastPostedDate: string | null;
 
   @Column({ name: "is_split", default: false })
   isSplit: boolean;

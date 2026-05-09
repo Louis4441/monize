@@ -98,7 +98,7 @@ describe("BillReminderService", () => {
         payee: null,
         amount: -150.0,
         currencyCode: "USD",
-        nextDueDate: new Date(),
+        nextDueDate: daysFromNow(0),
         isActive: true,
         autoPost: false,
         reminderDaysBefore: 3,
@@ -113,8 +113,8 @@ describe("BillReminderService", () => {
       return {
         id: "override-uuid-1",
         scheduledTransactionId: "bill-uuid-1",
-        originalDate: daysFromNow(1).toISOString().split("T")[0],
-        overrideDate: daysFromNow(1).toISOString().split("T")[0],
+        originalDate: daysFromNow(1),
+        overrideDate: daysFromNow(1),
         amount: null,
         categoryId: null,
         description: null,
@@ -124,11 +124,14 @@ describe("BillReminderService", () => {
       };
     }
 
-    function daysFromNow(days: number): Date {
+    function daysFromNow(days: number): string {
       const date = new Date();
       date.setHours(0, 0, 0, 0);
       date.setDate(date.getDate() + days);
-      return date;
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
     }
 
     describe("when SMTP is not configured", () => {
@@ -749,7 +752,7 @@ describe("BillReminderService", () => {
 
       describe("occurrence overrides", () => {
         it("uses overridden amount instead of base amount in email", async () => {
-          const dueDateStr = daysFromNow(1).toISOString().split("T")[0];
+          const dueDateStr = daysFromNow(1);
           const bill = makeBill({
             userId: userId1,
             nextDueDate: dueDateStr as any,
@@ -777,8 +780,8 @@ describe("BillReminderService", () => {
         });
 
         it("uses overridden date instead of base date in email", async () => {
-          const baseDateStr = daysFromNow(1).toISOString().split("T")[0];
-          const overrideDateStr = daysFromNow(2).toISOString().split("T")[0];
+          const baseDateStr = daysFromNow(1);
+          const overrideDateStr = daysFromNow(2);
           const bill = makeBill({
             userId: userId1,
             nextDueDate: baseDateStr as any,
@@ -803,7 +806,7 @@ describe("BillReminderService", () => {
         });
 
         it("uses base amount when override amount is null", async () => {
-          const dueDateStr = daysFromNow(1).toISOString().split("T")[0];
+          const dueDateStr = daysFromNow(1);
           const bill = makeBill({
             userId: userId1,
             nextDueDate: dueDateStr as any,
@@ -831,8 +834,8 @@ describe("BillReminderService", () => {
 
         it("uses overridden date for reminder window calculation", async () => {
           // Base date is within window, but override pushes it far out
-          const baseDateStr = daysFromNow(1).toISOString().split("T")[0];
-          const overrideDateStr = daysFromNow(30).toISOString().split("T")[0];
+          const baseDateStr = daysFromNow(1);
+          const overrideDateStr = daysFromNow(30);
           const bill = makeBill({
             userId: userId1,
             nextDueDate: baseDateStr as any,
@@ -855,8 +858,8 @@ describe("BillReminderService", () => {
 
         it("uses overridden date to bring bill into reminder window", async () => {
           // Base date is far out, but override brings it within window
-          const baseDateStr = daysFromNow(30).toISOString().split("T")[0];
-          const overrideDateStr = daysFromNow(1).toISOString().split("T")[0];
+          const baseDateStr = daysFromNow(30);
+          const overrideDateStr = daysFromNow(1);
           const bill = makeBill({
             userId: userId1,
             nextDueDate: baseDateStr as any,
@@ -879,8 +882,8 @@ describe("BillReminderService", () => {
         });
 
         it("ignores overrides for non-matching dates", async () => {
-          const dueDateStr = daysFromNow(1).toISOString().split("T")[0];
-          const otherDateStr = daysFromNow(15).toISOString().split("T")[0];
+          const dueDateStr = daysFromNow(1);
+          const otherDateStr = daysFromNow(15);
           const bill = makeBill({
             userId: userId1,
             nextDueDate: dueDateStr as any,
@@ -953,7 +956,7 @@ describe("BillReminderService", () => {
 
         it("handles nextDueDate as ISO string from database", async () => {
           // When TypeORM returns a date column as a string (common for date type)
-          const dueDateStr = daysFromNow(1).toISOString().split("T")[0];
+          const dueDateStr = daysFromNow(1);
           const bill = makeBill({
             userId: userId1,
             nextDueDate: dueDateStr as any,

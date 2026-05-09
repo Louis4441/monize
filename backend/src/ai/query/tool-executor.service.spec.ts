@@ -7,6 +7,7 @@ import { NetWorthService } from "../../net-worth/net-worth.service";
 import { BudgetReportsService } from "../../budgets/budget-reports.service";
 import { PortfolioService } from "../../securities/portfolio.service";
 import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
+import { ScheduledInvestmentTransactionsService } from "../../scheduled-investment-transactions/scheduled-investment-transactions.service";
 
 describe("ToolExecutorService", () => {
   let service: ToolExecutorService;
@@ -193,6 +194,10 @@ describe("ToolExecutorService", () => {
         {
           provide: InvestmentTransactionsService,
           useValue: investmentTransactions,
+        },
+        {
+          provide: ScheduledInvestmentTransactionsService,
+          useValue: { getLlmUpcoming: jest.fn().mockResolvedValue([]) },
         },
       ],
     }).compile();

@@ -45,8 +45,8 @@ describe("ScheduledTransactionsService", () => {
       currencyCode: "USD",
       description: "Rent payment",
       frequency: "MONTHLY",
-      nextDueDate: new Date("2025-02-15"),
-      startDate: new Date("2025-01-15"),
+      nextDueDate: "2025-02-15",
+      startDate: "2025-01-15",
       endDate: null,
       occurrencesRemaining: null,
       totalOccurrences: null,
@@ -168,6 +168,12 @@ describe("ScheduledTransactionsService", () => {
 
     mockDataSource = {
       createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
+      // Default to a single UTC user so cron logic that buckets by timezone
+      // continues to operate against legacy tests that pre-date the cron
+      // refactor and assume a one-user world.
+      query: jest
+        .fn()
+        .mockResolvedValue([{ user_id: "user-1", timezone: "UTC" }]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -446,7 +452,7 @@ describe("ScheduledTransactionsService", () => {
     });
 
     it("should populate futureOverrides with overrides on or after nextDueDate", async () => {
-      const st = makeScheduled({ nextDueDate: new Date("2025-02-15") });
+      const st = makeScheduled({ nextDueDate: "2025-02-15" });
       const qb = mockQueryBuilder([st]);
       scheduledRepo.createQueryBuilder.mockReturnValue(qb);
 
@@ -718,9 +724,9 @@ describe("ScheduledTransactionsService", () => {
     const day = String(d.getUTCDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   };
-  // Build a UTC date to match database DATE column parsing
-  const utcDate = (y: number, m: number, d: number) =>
-    new Date(Date.UTC(y, m - 1, d));
+  // Build a YYYY-MM-DD date string matching the entity's string-typed DATE columns
+  const utcDate = (y: number, m: number, d: number): string =>
+    `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
   describe("skip", () => {
     it("should advance DAILY by 1 day", async () => {
@@ -841,7 +847,7 @@ describe("ScheduledTransactionsService", () => {
     });
 
     it("should delete override for the skipped date", async () => {
-      const scheduled = makeScheduled({ nextDueDate: new Date("2025-02-15") });
+      const scheduled = makeScheduled({ nextDueDate: "2025-02-15" });
       stubFindOne(scheduled);
 
       await service.skip(userId, stId);
@@ -876,8 +882,8 @@ describe("ScheduledTransactionsService", () => {
     it("should deactivate when next date is past endDate", async () => {
       const scheduled = makeScheduled({
         frequency: "MONTHLY",
-        nextDueDate: new Date("2025-12-15"),
-        endDate: new Date("2025-12-31"),
+        nextDueDate: "2025-12-15",
+        endDate: "2025-12-31",
       });
       stubFindOne(scheduled);
 
@@ -1432,7 +1438,7 @@ describe("ScheduledTransactionsService", () => {
     it("should clean stale overrides after advancing date", async () => {
       const scheduled = makeScheduled({
         frequency: "MONTHLY",
-        nextDueDate: new Date("2025-02-15"),
+        nextDueDate: "2025-02-15",
       });
       stubFindOne(scheduled);
       const overrideQb = mockQueryBuilder(null);
@@ -1903,7 +1909,7 @@ describe("ScheduledTransactionsService", () => {
         autoPost: true,
         isTransfer: true,
         transferAccountId: "acc-2",
-        nextDueDate: new Date("2025-03-15"),
+        nextDueDate: "2025-03-15",
       });
 
       // First find (base nextDueDate) returns nothing — the 15th hasn't arrived
@@ -1947,7 +1953,7 @@ describe("ScheduledTransactionsService", () => {
       const scheduled = makeScheduled({
         id: "st-postponed",
         autoPost: true,
-        nextDueDate: new Date("2026-04-26"),
+        nextDueDate: "2026-04-26",
       });
       scheduledRepo.find.mockResolvedValue([scheduled]);
 
@@ -1969,7 +1975,7 @@ describe("ScheduledTransactionsService", () => {
 
     it("should use override date as transaction date in post()", async () => {
       const scheduled = makeScheduled({
-        nextDueDate: new Date("2025-03-15"),
+        nextDueDate: "2025-03-15",
       });
       scheduledRepo.findOne.mockResolvedValue(scheduled);
 
@@ -2103,7 +2109,10 @@ describe("ScheduledTransactionsService", () => {
       scheduledRepo.create.mockImplementation((d) => ({ id: stId, ...d }));
       scheduledRepo.save.mockImplementation(async (d) => d);
       splitsRepo.create.mockImplementation((d) => d);
-      splitsRepo.save.mockImplementation(async (d) => ({ id: "split-x", ...d }));
+      splitsRepo.save.mockImplementation(async (d) => ({
+        id: "split-x",
+        ...d,
+      }));
 
       // findOne returns the saved scheduled transaction
       scheduledRepo.findOne.mockResolvedValue(makeScheduled({ amount: 0 }));
@@ -2171,7 +2180,10 @@ describe("ScheduledTransactionsService", () => {
       scheduledRepo.create.mockImplementation((d) => ({ id: stId, ...d }));
       scheduledRepo.save.mockImplementation(async (d) => d);
       splitsRepo.create.mockImplementation((d) => d);
-      splitsRepo.save.mockImplementation(async (d) => ({ id: "split-x", ...d }));
+      splitsRepo.save.mockImplementation(async (d) => ({
+        id: "split-x",
+        ...d,
+      }));
       scheduledRepo.findOne.mockResolvedValue(makeScheduled({ amount: -750 }));
 
       await expect(service.create(userId, dto as any)).resolves.toBeDefined();
@@ -2218,13 +2230,11 @@ describe("ScheduledTransactionsService", () => {
         frequency: "ONCE",
       });
       scheduledRepo.findOne.mockResolvedValue(scheduled);
-      overridesRepo.createQueryBuilder = jest
-        .fn()
-        .mockReturnValue({
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getOne: jest.fn().mockResolvedValue(null),
-        });
+      overridesRepo.createQueryBuilder = jest.fn().mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+      });
       mockQueryRunner.manager.delete = jest
         .fn()
         .mockResolvedValue({ affected: 1 });
@@ -2249,9 +2259,7 @@ describe("ScheduledTransactionsService", () => {
       expect(investmentPayload.amount).toBe(-750);
 
       // Cash splits passed through with splitKind='category'
-      const incomePayload = callArg.splits.find(
-        (s: any) => s.amount === 1000,
-      );
+      const incomePayload = callArg.splits.find((s: any) => s.amount === 1000);
       expect(incomePayload.splitKind).toBe("category");
       expect(incomePayload.investment).toBeUndefined();
     });
@@ -2290,9 +2298,7 @@ describe("ScheduledTransactionsService", () => {
 
       const callArg = transactionsService.create.mock.calls[0][1];
       expect(callArg.splits).toHaveLength(3);
-      const inv = callArg.splits.find(
-        (s: any) => s.splitKind === "investment",
-      );
+      const inv = callArg.splits.find((s: any) => s.splitKind === "investment");
       expect(inv).toBeDefined();
       expect(inv.investment).toMatchObject(buyInvestment);
     });
@@ -2332,9 +2338,7 @@ describe("ScheduledTransactionsService", () => {
       await service.post(userId, stId);
 
       const callArg = transactionsService.create.mock.calls[0][1];
-      const inv = callArg.splits.find(
-        (s: any) => s.splitKind === "investment",
-      );
+      const inv = callArg.splits.find((s: any) => s.splitKind === "investment");
       expect(inv).toBeDefined();
       expect(inv.investment).toMatchObject(buyInvestment);
     });

@@ -29,7 +29,11 @@ import { AccountsService } from "../accounts/accounts.service";
 import { TransactionsService } from "../transactions/transactions.service";
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
-import { formatDateYMD, todayYMD } from "../common/date-utils";
+import { todayInTimezone, todayYMD } from "../common/date-utils";
+import {
+  calculateNextDueDate as calcNextDueDate,
+  ensureYMD,
+} from "../common/recurrence";
 import { ActionHistoryService } from "../action-history/action-history.service";
 
 @Injectable()
@@ -59,104 +63,120 @@ export class ScheduledTransactionsService {
     this.logger.log("Starting auto-post processing for scheduled transactions");
 
     try {
-      const today = todayYMD();
+      // Bucket users by their effective IANA timezone so "today" is computed
+      // per-user rather than against container UTC. Without this, an EST user
+      // sees transactions auto-post at 21:00 the previous local day (when
+      // 02:00 UTC ticks over to the new UTC date).
+      const userRows: { user_id: string; timezone: string | null }[] =
+        await this.dataSource.query(
+          `SELECT u.id as user_id, p.timezone
+             FROM users u
+             LEFT JOIN user_preferences p ON p.user_id = u.id`,
+        );
 
-      // Find candidates whose base nextDueDate is on/before today.
-      const candidates = await this.scheduledTransactionsRepository.find({
-        where: {
-          isActive: true,
-          autoPost: true,
-          nextDueDate: LessThanOrEqual(today) as any,
-        },
-        relations: [
-          "account",
-          "payee",
-          "category",
-          "transferAccount",
-          "splits",
-          "splits.category",
-          "splits.transferAccount",
-          "splits.tags",
-          "splits.investmentSecurity",
-        ],
-        order: { nextDueDate: "ASC" },
-      });
+      if (userRows.length === 0) return;
 
-      // Defer candidates whose next occurrence has an override pushing the
-      // effective date past today (e.g. user moved the 26th to the 27th).
-      const postponedIds = await this.findPostponedIds(
-        candidates.map((t) => t.id),
-        today,
-      );
-      const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
-
-      // Find transactions with overrides that moved the date earlier
-      const overrideDueIds = await this.overridesRepository
-        .createQueryBuilder("o")
-        .innerJoin("o.scheduledTransaction", "st")
-        .where("o.overrideDate <= :today", { today })
-        .andWhere("o.originalDate = st.nextDueDate")
-        .andWhere("st.isActive = :active", { active: true })
-        .andWhere("st.autoPost = :autoPost", { autoPost: true })
-        .select("st.id", "id")
-        .distinct(true)
-        .getRawMany();
-
-      // Merge and deduplicate
-      const dueByDateIds = new Set(dueByDate.map((t) => t.id));
-      const overrideOnlyIds = overrideDueIds
-        .map((r) => r.id as string)
-        .filter((id) => !dueByDateIds.has(id));
-
-      let overrideDueTransactions: ScheduledTransaction[] = [];
-      if (overrideOnlyIds.length > 0) {
-        overrideDueTransactions =
-          await this.scheduledTransactionsRepository.find({
-            where: overrideOnlyIds.map((id) => ({ id })),
-            relations: [
-              "account",
-              "payee",
-              "category",
-              "transferAccount",
-              "splits",
-              "splits.category",
-              "splits.transferAccount",
-            ],
-          });
+      const userIdsByTz = new Map<string, string[]>();
+      for (const { user_id, timezone } of userRows) {
+        const normalised = timezone?.trim();
+        const tz = normalised && normalised !== "browser" ? normalised : "UTC";
+        const list = userIdsByTz.get(tz) ?? [];
+        list.push(user_id);
+        userIdsByTz.set(tz, list);
       }
 
-      const dueTransactions = [...dueByDate, ...overrideDueTransactions];
+      let totalSuccess = 0;
+      let totalError = 0;
 
-      if (dueTransactions.length === 0) {
-        this.logger.log("No auto-post transactions due");
-        return;
-      }
-
-      this.logger.log(
-        `Found ${dueTransactions.length} auto-post transaction(s) to process`,
-      );
-
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const scheduled of dueTransactions) {
-        try {
-          await this.post(scheduled.userId, scheduled.id);
-          successCount++;
-          this.logger.log(
-            `Auto-posted: "${scheduled.name}" (ID: ${scheduled.id})`,
+      for (const [tz, userIds] of userIdsByTz) {
+        const today = todayInTimezone(tz);
+        if (!today) {
+          this.logger.warn(
+            `Skipping ${userIds.length} user(s) with invalid timezone "${tz}"`,
           );
-        } catch (error) {
-          errorCount++;
-          this.logger.error(
-            `Failed to auto-post "${scheduled.name}" (ID: ${scheduled.id}): ${error.message}`,
-            error.stack,
-          );
+          continue;
+        }
+
+        const candidates = await this.scheduledTransactionsRepository.find({
+          where: {
+            userId: In(userIds),
+            isActive: true,
+            autoPost: true,
+            nextDueDate: LessThanOrEqual(today) as any,
+          },
+          relations: [
+            "account",
+            "payee",
+            "category",
+            "transferAccount",
+            "splits",
+            "splits.category",
+            "splits.transferAccount",
+            "splits.tags",
+            "splits.investmentSecurity",
+          ],
+          order: { nextDueDate: "ASC" },
+        });
+
+        const postponedIds = await this.findPostponedIds(
+          candidates.map((t) => t.id),
+          today,
+        );
+        const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
+
+        const overrideDueIds = await this.overridesRepository
+          .createQueryBuilder("o")
+          .innerJoin("o.scheduledTransaction", "st")
+          .where("st.userId IN (:...userIds)", { userIds })
+          .andWhere("o.overrideDate <= :today", { today })
+          .andWhere("o.originalDate = st.nextDueDate")
+          .andWhere("st.isActive = :active", { active: true })
+          .andWhere("st.autoPost = :autoPost", { autoPost: true })
+          .select("st.id", "id")
+          .distinct(true)
+          .getRawMany();
+
+        const dueByDateIds = new Set(dueByDate.map((t) => t.id));
+        const overrideOnlyIds = overrideDueIds
+          .map((r) => r.id as string)
+          .filter((id) => !dueByDateIds.has(id));
+
+        let overrideDueTransactions: ScheduledTransaction[] = [];
+        if (overrideOnlyIds.length > 0) {
+          overrideDueTransactions =
+            await this.scheduledTransactionsRepository.find({
+              where: overrideOnlyIds.map((id) => ({ id })),
+              relations: [
+                "account",
+                "payee",
+                "category",
+                "transferAccount",
+                "splits",
+                "splits.category",
+                "splits.transferAccount",
+              ],
+            });
+        }
+
+        const dueTransactions = [...dueByDate, ...overrideDueTransactions];
+        if (dueTransactions.length === 0) continue;
+
+        for (const scheduled of dueTransactions) {
+          try {
+            await this.post(scheduled.userId, scheduled.id);
+            totalSuccess++;
+          } catch (error) {
+            totalError++;
+            this.logger.error(
+              `Failed to auto-post "${scheduled.name}" (ID: ${scheduled.id}): ${error.message}`,
+              error.stack,
+            );
+          }
         }
       }
 
       this.logger.log(
-        `Auto-post processing complete: ${successCount} succeeded, ${errorCount} failed`,
+        `Auto-post processing complete: ${totalSuccess} succeeded, ${totalError} failed`,
       );
     } catch (error) {
       this.logger.error("Auto-post processing failed", error.stack);
@@ -285,9 +305,7 @@ export class ScheduledTransactionsService {
         scheduledTransactionId,
         kind: inferredKind,
         categoryId:
-          inferredKind === SplitKind.CATEGORY
-            ? split.categoryId || null
-            : null,
+          inferredKind === SplitKind.CATEGORY ? split.categoryId || null : null,
         transferAccountId:
           inferredKind === SplitKind.TRANSFER
             ? split.transferAccountId || null
@@ -364,10 +382,7 @@ export class ScheduledTransactionsService {
 
     const txDueDates = new Map<string, string>();
     const txIds = transactions.map((t) => {
-      const d =
-        t.nextDueDate instanceof Date
-          ? formatDateYMD(t.nextDueDate)
-          : String(t.nextDueDate).split("T")[0];
+      const d = ensureYMD(t.nextDueDate);
       txDueDates.set(t.id, d);
       return t.id;
     });
@@ -677,23 +692,20 @@ export class ScheduledTransactionsService {
   async skip(userId: string, id: string): Promise<ScheduledTransaction> {
     const scheduled = await this.findOne(userId, id);
 
-    const nextDueDateStr =
-      scheduled.nextDueDate instanceof Date
-        ? formatDateYMD(scheduled.nextDueDate)
-        : String(scheduled.nextDueDate).split("T")[0];
+    const nextDueDateStr = ensureYMD(scheduled.nextDueDate);
 
     await this.overridesRepository.delete({
       scheduledTransactionId: id,
       originalDate: nextDueDateStr,
     });
 
-    const nextDate = this.calculateNextDueDate(
-      new Date(scheduled.nextDueDate),
+    const newNextDueDateStr = calcNextDueDate(
+      nextDueDateStr,
       scheduled.frequency,
     );
 
     const updateFields: Record<string, any> = {
-      nextDueDate: formatDateYMD(nextDate),
+      nextDueDate: newNextDueDateStr,
     };
 
     if (
@@ -707,7 +719,7 @@ export class ScheduledTransactionsService {
       }
     }
 
-    if (scheduled.endDate && nextDate > new Date(scheduled.endDate)) {
+    if (scheduled.endDate && newNextDueDateStr > ensureYMD(scheduled.endDate)) {
       updateFields.isActive = false;
     }
 
@@ -722,10 +734,7 @@ export class ScheduledTransactionsService {
   ): Promise<ScheduledTransaction | null> {
     const scheduled = await this.findOne(userId, id);
 
-    const nextDueDateStr =
-      scheduled.nextDueDate instanceof Date
-        ? formatDateYMD(scheduled.nextDueDate)
-        : String(scheduled.nextDueDate).split("T")[0];
+    const nextDueDateStr = ensureYMD(scheduled.nextDueDate);
 
     const storedOverride = await this.overridesRepository
       .createQueryBuilder("override")
@@ -893,11 +902,10 @@ export class ScheduledTransactionsService {
 
       // Recurring frequency: advance nextDueDate, prune stale overrides,
       // decrement occurrencesRemaining, deactivate if past endDate.
-      const newNextDueDate = this.calculateNextDueDate(
-        new Date(scheduled.nextDueDate),
+      const newNextDueDateStr = calcNextDueDate(
+        ensureYMD(scheduled.nextDueDate),
         scheduled.frequency,
       );
-      const newNextDueDateStr = formatDateYMD(newNextDueDate);
 
       await queryRunner.manager
         .createQueryBuilder()
@@ -910,7 +918,7 @@ export class ScheduledTransactionsService {
         .execute();
 
       const updateFields: Record<string, any> = {
-        lastPostedDate: new Date(),
+        lastPostedDate: todayYMD(),
         nextDueDate: newNextDueDateStr,
       };
 
@@ -925,7 +933,10 @@ export class ScheduledTransactionsService {
         }
       }
 
-      if (scheduled.endDate && newNextDueDate > new Date(scheduled.endDate)) {
+      if (
+        scheduled.endDate &&
+        newNextDueDateStr > ensureYMD(scheduled.endDate)
+      ) {
         updateFields.isActive = false;
       }
 
@@ -952,46 +963,12 @@ export class ScheduledTransactionsService {
   }
 
   private calculateNextDueDate(
-    currentDate: Date,
+    currentDate: Date | string,
     frequency: FrequencyType,
   ): Date {
-    const date = new Date(currentDate);
-
-    switch (frequency) {
-      case "DAILY":
-        date.setUTCDate(date.getUTCDate() + 1);
-        break;
-      case "WEEKLY":
-        date.setUTCDate(date.getUTCDate() + 7);
-        break;
-      case "BIWEEKLY":
-        date.setUTCDate(date.getUTCDate() + 14);
-        break;
-      case "EVERY4WEEKS":
-        date.setUTCDate(date.getUTCDate() + 28);
-        break;
-      case "SEMIMONTHLY":
-        if (date.getUTCDate() <= 15) {
-          date.setUTCMonth(date.getUTCMonth() + 1, 0);
-        } else {
-          date.setUTCMonth(date.getUTCMonth() + 1, 15);
-        }
-        break;
-      case "MONTHLY":
-        date.setUTCMonth(date.getUTCMonth() + 1);
-        break;
-      case "QUARTERLY":
-        date.setUTCMonth(date.getUTCMonth() + 3);
-        break;
-      case "YEARLY":
-        date.setUTCFullYear(date.getUTCFullYear() + 1);
-        break;
-      case "ONCE":
-      default:
-        break;
-    }
-
-    return date;
+    const ymd = ensureYMD(currentDate);
+    const next = calcNextDueDate(ymd, frequency);
+    return new Date(`${next}T00:00:00.000Z`);
   }
 
   // Delegated override methods
