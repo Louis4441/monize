@@ -188,6 +188,7 @@ function TransactionsContent() {
           targetTransactionId: targetTransactionId || undefined,
           amountFrom: parsedAmountFrom,
           amountTo: parsedAmountTo,
+          statuses: filters.filterStatuses.length > 0 ? filters.filterStatuses : undefined,
         }),
         chartPromise,
       ]);
@@ -225,7 +226,7 @@ function TransactionsContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [filters.filterAccountIds, filters.filterAccountStatus, filters.filteredAccounts, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters.filterAccountIds, filters.filterAccountStatus, filters.filteredAccounts, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = useCallback(async (page: number = filters.currentPage) => {
     await loadTransactions(page);
@@ -278,6 +279,7 @@ function TransactionsContent() {
         search: filters.filterSearch,
         amountFrom: filters.filterAmountFrom,
         amountTo: filters.filterAmountTo,
+        statuses: filters.filterStatuses,
       }, wasFilterChange);
     }
 
@@ -289,7 +291,7 @@ function TransactionsContent() {
     } else {
       loadTransactions(page);
     }
-  }, [filters.currentPage, filters.filterAccountIds, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.updateUrl, loadTransactions, filters.filtersInitialized, undoRedoTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters.currentPage, filters.filterAccountIds, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.updateUrl, loadTransactions, filters.filtersInitialized, undoRedoTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Patch popstate handler to skip when modals open
   useEffect(() => {
@@ -598,6 +600,7 @@ function TransactionsContent() {
         search: filters.filterSearch || undefined,
         amountFrom: parsedAmountFrom,
         amountTo: parsedAmountTo,
+        statuses: filters.filterStatuses.length > 0 ? filters.filterStatuses : undefined,
       };
 
       // Fetch all pages of filtered transactions
@@ -665,7 +668,7 @@ function TransactionsContent() {
     } finally {
       setIsExporting(false);
     }
-  }, [filters.filterAccountIds, filters.filteredAccounts, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo]);
+  }, [filters.filterAccountIds, filters.filteredAccounts, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses]);
 
   return (
     <PageLayout>
@@ -771,6 +774,7 @@ function TransactionsContent() {
           filterAmountFrom={filters.filterAmountFrom}
           filterAmountTo={filters.filterAmountTo}
           filterTagIds={filters.filterTagIds}
+          filterStatuses={filters.filterStatuses}
           weekStartsOn={weekStartsOn}
           handleArrayFilterChange={filters.handleArrayFilterChange}
           handleFilterChange={filters.handleFilterChange}
@@ -786,6 +790,7 @@ function TransactionsContent() {
           setFilterAmountFrom={filters.setFilterAmountFrom}
           setFilterAmountTo={filters.setFilterAmountTo}
           setFilterTagIds={filters.setFilterTagIds}
+          setFilterStatuses={filters.setFilterStatuses}
           filtersExpanded={filters.filtersExpanded}
           setFiltersExpanded={filters.setFiltersExpanded}
           activeFilterCount={filters.activeFilterCount}

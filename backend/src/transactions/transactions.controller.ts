@@ -24,6 +24,7 @@ import {
 } from "@nestjs/swagger";
 import { AuthGuard } from "@nestjs/passport";
 import { TransactionsService } from "./transactions.service";
+import { TransactionStatus } from "./entities/transaction.entity";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
 import { UpdateTransactionDto } from "./dto/update-transaction.dto";
 import { CreateTransactionSplitDto } from "./dto/create-transaction-split.dto";
@@ -44,6 +45,26 @@ import {
   UUID_REGEX,
   DATE_REGEX,
 } from "../common/query-param-utils";
+
+const ALL_TRANSACTION_STATUSES = new Set<string>(
+  Object.values(TransactionStatus),
+);
+
+function parseTransactionStatuses(
+  value?: string,
+): TransactionStatus[] | undefined {
+  if (!value) return undefined;
+  const statuses = value
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter((s) => s);
+  for (const status of statuses) {
+    if (!ALL_TRANSACTION_STATUSES.has(status)) {
+      throw new BadRequestException(`Invalid transaction status: ${status}`);
+    }
+  }
+  return statuses.length > 0 ? (statuses as TransactionStatus[]) : undefined;
+}
 
 @ApiTags("Transactions")
 @Controller("transactions")
@@ -144,6 +165,12 @@ export class TransactionsController {
     description: "Filter by tag IDs (comma-separated)",
   })
   @ApiQuery({
+    name: "statuses",
+    required: false,
+    description:
+      "Filter by reconciliation statuses (comma-separated: UNRECONCILED, CLEARED, RECONCILED, VOID)",
+  })
+  @ApiQuery({
     name: "targetTransactionId",
     required: false,
     description:
@@ -173,6 +200,7 @@ export class TransactionsController {
     @Query("amountFrom") amountFrom?: string,
     @Query("amountTo") amountTo?: string,
     @Query("tagIds") tagIdsParam?: string,
+    @Query("statuses") statusesParam?: string,
   ) {
     // Validate pagination parameters
     if (page !== undefined) {
@@ -230,6 +258,7 @@ export class TransactionsController {
       parsedAmountFrom,
       parsedAmountTo,
       parseUuids(tagIdsParam),
+      parseTransactionStatuses(statusesParam),
     );
   }
 

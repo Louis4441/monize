@@ -291,6 +291,7 @@ export class TransactionsService {
     amountFrom?: number,
     amountTo?: number,
     tagIds?: string[],
+    statuses?: TransactionStatus[],
   ): Promise<PaginatedTransactions> {
     let safePage = Math.max(1, page);
     const safeLimit = Math.min(200, Math.max(1, limit));
@@ -390,6 +391,12 @@ export class TransactionsService {
           });
         }),
       );
+    }
+
+    if (statuses && statuses.length > 0) {
+      queryBuilder.andWhere("transaction.status IN (:...statuses)", {
+        statuses,
+      });
     }
 
     if (targetTransactionId) {

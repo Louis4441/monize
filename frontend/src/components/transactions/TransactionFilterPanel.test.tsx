@@ -101,6 +101,8 @@ describe('TransactionFilterPanel', () => {
     setFilterTagIds: vi.fn(),
     selectedTags: [],
     tagFilterOptions: [],
+    filterStatuses: [] as never[],
+    setFilterStatuses: vi.fn(),
     onClearFilters: vi.fn(),
   };
 
@@ -1633,6 +1635,54 @@ describe('TransactionFilterPanel', () => {
       );
 
       expect(screen.queryByLabelText('Remove amount filter')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Reconciliation status filter', () => {
+    it('renders the Reconciliation MultiSelect when expanded', () => {
+      render(
+        <TransactionFilterPanel
+          {...defaultProps}
+          filtersExpanded={true}
+        />,
+      );
+
+      expect(screen.getByText('Reconciliation')).toBeInTheDocument();
+      expect(screen.getByText('All statuses')).toBeInTheDocument();
+    });
+
+    it('shows a chip per selected status when collapsed', () => {
+      render(
+        <TransactionFilterPanel
+          {...defaultProps}
+          filtersExpanded={false}
+          activeFilterCount={2}
+          filterStatuses={['UNRECONCILED', 'VOID'] as any}
+        />,
+      );
+
+      expect(screen.getByText('Unreconciled')).toBeInTheDocument();
+      expect(screen.getByText('Void')).toBeInTheDocument();
+      expect(screen.getByLabelText('Remove Unreconciled filter')).toBeInTheDocument();
+      expect(screen.getByLabelText('Remove Void filter')).toBeInTheDocument();
+    });
+
+    it('removes a status from filterStatuses when its chip remove button is clicked', () => {
+      render(
+        <TransactionFilterPanel
+          {...defaultProps}
+          filtersExpanded={false}
+          activeFilterCount={2}
+          filterStatuses={['UNRECONCILED', 'CLEARED'] as any}
+        />,
+      );
+
+      fireEvent.click(screen.getByLabelText('Remove Cleared filter'));
+
+      expect(defaultProps.handleArrayFilterChange).toHaveBeenCalledWith(
+        defaultProps.setFilterStatuses,
+        ['UNRECONCILED'],
+      );
     });
   });
 });
