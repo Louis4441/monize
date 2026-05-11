@@ -9,7 +9,22 @@ import { Account } from '@/types/account';
 import { Category } from '@/types/category';
 import { Payee } from '@/types/payee';
 import { Tag } from '@/types/tag';
+import { TransactionStatus } from '@/types/transaction';
 import { TimePeriod, TIME_PERIOD_OPTIONS, resolveTimePeriod } from '@/lib/time-periods';
+
+const STATUS_LABELS: Record<TransactionStatus, string> = {
+  [TransactionStatus.UNRECONCILED]: 'Unreconciled',
+  [TransactionStatus.CLEARED]: 'Cleared',
+  [TransactionStatus.RECONCILED]: 'Reconciled',
+  [TransactionStatus.VOID]: 'Void',
+};
+
+const STATUS_FILTER_OPTIONS: MultiSelectOption[] = [
+  { value: TransactionStatus.UNRECONCILED, label: STATUS_LABELS[TransactionStatus.UNRECONCILED] },
+  { value: TransactionStatus.CLEARED, label: STATUS_LABELS[TransactionStatus.CLEARED] },
+  { value: TransactionStatus.RECONCILED, label: STATUS_LABELS[TransactionStatus.RECONCILED] },
+  { value: TransactionStatus.VOID, label: STATUS_LABELS[TransactionStatus.VOID] },
+];
 
 interface TransactionFilterPanelProps {
   filterAccountIds: string[];
@@ -24,6 +39,7 @@ interface TransactionFilterPanelProps {
   filterAmountFrom: string;
   filterAmountTo: string;
   filterTagIds: string[];
+  filterStatuses: TransactionStatus[];
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   handleArrayFilterChange: <T>(setter: (value: T) => void, value: T) => void;
   handleFilterChange: (setter: (value: string) => void, value: string) => void;
@@ -39,6 +55,7 @@ interface TransactionFilterPanelProps {
   setFilterAmountFrom: (value: string) => void;
   setFilterAmountTo: (value: string) => void;
   setFilterTagIds: (value: string[]) => void;
+  setFilterStatuses: (value: TransactionStatus[]) => void;
   filtersExpanded: boolean;
   setFiltersExpanded: (value: boolean) => void;
   activeFilterCount: number;
@@ -70,6 +87,7 @@ export function TransactionFilterPanel({
   filterAmountFrom,
   filterAmountTo,
   filterTagIds,
+  filterStatuses,
   weekStartsOn,
   handleArrayFilterChange,
   handleFilterChange,
@@ -85,6 +103,7 @@ export function TransactionFilterPanel({
   setFilterAmountFrom,
   setFilterAmountTo,
   setFilterTagIds,
+  setFilterStatuses,
   filtersExpanded,
   setFiltersExpanded,
   activeFilterCount,
@@ -320,6 +339,24 @@ export function TransactionFilterPanel({
                   </button>
                 </span>
               )}
+              {/* Reconciliation status chips - Indigo */}
+              {filterStatuses.map(status => (
+                <span
+                  key={`status-${status}`}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 whitespace-nowrap"
+                >
+                  {STATUS_LABELS[status]}
+                  <button
+                    onClick={() => handleArrayFilterChange(setFilterStatuses, filterStatuses.filter(s => s !== status))}
+                    className="ml-0.5 -mr-1 p-0.5 rounded-full inline-flex items-center justify-center hover:bg-indigo-200 dark:hover:bg-indigo-800"
+                    aria-label={`Remove ${STATUS_LABELS[status]} filter`}
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
               {/* Search chip - Gray */}
               {filterSearch && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 whitespace-nowrap">
@@ -428,8 +465,10 @@ export function TransactionFilterPanel({
                 />
               </div>
 
-              {/* Second row: Time period, dates, amount range, and search */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mt-4">
+              {/* Second row: Time period, dates, amount range, reconciliation status, and search.
+                  Uses an explicit fr template so Reconciliation can be a fraction
+                  of the width of the other inputs. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[2fr_2fr_2fr_1fr_1fr_2fr_3fr] gap-4 mt-4">
                 <Select
                   label="Time Period"
                   options={TIME_PERIOD_OPTIONS}
@@ -495,6 +534,15 @@ export function TransactionFilterPanel({
                   value={filterAmountTo}
                   onChange={(e) => handleFilterChange(setFilterAmountTo, e.target.value)}
                   placeholder="Max"
+                />
+
+                <MultiSelect
+                  label="Status"
+                  options={STATUS_FILTER_OPTIONS}
+                  value={filterStatuses}
+                  onChange={(values) => handleArrayFilterChange(setFilterStatuses, values as TransactionStatus[])}
+                  placeholder="All statuses"
+                  showSearch={false}
                 />
 
                 <Input

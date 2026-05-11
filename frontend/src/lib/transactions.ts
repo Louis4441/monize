@@ -83,6 +83,7 @@ export const transactionsApi = {
     amountFrom?: number;
     amountTo?: number;
     tagIds?: string[];
+    statuses?: TransactionStatus[];
   }): Promise<PaginatedTransactions> => {
     const apiParams = {
       ...buildFilterParams(params),
@@ -94,6 +95,7 @@ export const transactionsApi = {
       targetTransactionId: params?.targetTransactionId,
       amountFrom: params?.amountFrom,
       amountTo: params?.amountTo,
+      statuses: params?.statuses && params.statuses.length > 0 ? params.statuses.join(',') : undefined,
     };
 
     const response = await apiClient.get<PaginatedTransactions>('/transactions', {

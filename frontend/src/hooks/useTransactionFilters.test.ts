@@ -140,6 +140,18 @@ describe('useTransactionFilters - URL/localStorage initialization', () => {
     expect(result.current.filterTagIds).toEqual(['t1', 't2']);
   });
 
+  it('reads valid statuses from URL params and drops unknown values', () => {
+    mockSearchParams = new URLSearchParams('statuses=UNRECONCILED,CLEARED,BOGUS');
+    const { result } = renderHook(() => useTransactionFilters(defaultOptions));
+    expect(result.current.filterStatuses).toEqual(['UNRECONCILED', 'CLEARED']);
+  });
+
+  it('reads statuses from localStorage when no URL params present', () => {
+    localStorage.setItem('transactions.filter.statuses', JSON.stringify(['VOID']));
+    const { result } = renderHook(() => useTransactionFilters(defaultOptions));
+    expect(result.current.filterStatuses).toEqual(['VOID']);
+  });
+
   it('initializes currentPage from URL', () => {
     mockSearchParams = new URLSearchParams('page=3');
     const { result } = renderHook(() => useTransactionFilters(defaultOptions));
@@ -312,6 +324,7 @@ describe('useTransactionFilters - URL update', () => {
         search: 'foo',
         amountFrom: '1',
         amountTo: '5',
+        statuses: [],
       });
     });
     expect(mockReplace).toHaveBeenCalled();
@@ -327,6 +340,7 @@ describe('useTransactionFilters - URL update', () => {
       result.current.updateUrl(1, {
         accountIds: [], categoryIds: [], payeeIds: [], tagIds: [],
         startDate: '', endDate: '', search: '', amountFrom: '', amountTo: '',
+        statuses: [],
       }, true);
     });
     expect(mockPush).toHaveBeenCalledWith('/transactions', { scroll: false });
@@ -532,6 +546,46 @@ describe('useTransactionFilters - filter persistence', () => {
     });
     expect(localStorage.getItem('transactions.filter.accountStatus')).toBe('"active"');
   });
+
+  it('persists filterStatuses to localStorage', () => {
+    const { result } = renderHook(() => useTransactionFilters(defaultOptions));
+    act(() => {
+      result.current.setFilterStatuses(['UNRECONCILED' as any, 'CLEARED' as any]);
+    });
+    expect(localStorage.getItem('transactions.filter.statuses')).toBe(
+      JSON.stringify(['UNRECONCILED', 'CLEARED']),
+    );
+  });
+
+  it('includes statuses in updateUrl output and counts them in activeFilterCount', () => {
+    const { result } = renderHook(() => useTransactionFilters(defaultOptions));
+    act(() => {
+      result.current.setFilterStatuses(['RECONCILED' as any, 'VOID' as any]);
+    });
+    expect(result.current.activeFilterCount).toBe(2);
+
+    act(() => {
+      result.current.updateUrl(1, {
+        accountIds: [], categoryIds: [], payeeIds: [], tagIds: [],
+        startDate: '', endDate: '', search: '', amountFrom: '', amountTo: '',
+        statuses: result.current.filterStatuses,
+      });
+    });
+    expect(mockReplace).toHaveBeenCalled();
+    expect(mockReplace.mock.calls[0][0]).toContain('statuses=RECONCILED%2CVOID');
+  });
+
+  it('clearFilters resets filterStatuses', () => {
+    const { result } = renderHook(() => useTransactionFilters(defaultOptions));
+    act(() => {
+      result.current.setFilterStatuses(['CLEARED' as any]);
+    });
+    expect(result.current.filterStatuses).toEqual(['CLEARED']);
+    act(() => {
+      result.current.clearFilters();
+    });
+    expect(result.current.filterStatuses).toEqual([]);
+  });
 });
 
 describe('useTransactionFilters - header search event', () => {
@@ -571,6 +625,7 @@ describe('useTransactionFilters - header search event', () => {
     expect(result.current.filterTimePeriod).toBe('');
     expect(result.current.filterAmountFrom).toBe('');
     expect(result.current.filterAmountTo).toBe('');
+    expect(result.current.filterStatuses).toEqual([]);
     expect(result.current.filterAccountStatus).toBe('');
     expect(result.current.filterSearch).toBe('walmart');
     expect(result.current.searchInput).toBe('walmart');

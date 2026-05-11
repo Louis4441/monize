@@ -1658,6 +1658,67 @@ describe("TransactionsService", () => {
       );
     });
 
+    it("filters by reconciliation statuses when provided", async () => {
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
+      transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
+      investmentTxRepository.find.mockResolvedValue([]);
+
+      await service.findAll(
+        "user-1",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        1,
+        50,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        [TransactionStatus.UNRECONCILED, TransactionStatus.CLEARED],
+      );
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        "transaction.status IN (:...statuses)",
+        { statuses: [TransactionStatus.UNRECONCILED, TransactionStatus.CLEARED] },
+      );
+    });
+
+    it("does not apply status filter when statuses is empty", async () => {
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
+      transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
+      investmentTxRepository.find.mockResolvedValue([]);
+
+      await service.findAll(
+        "user-1",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        1,
+        50,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        [],
+      );
+
+      const statusCalls = mockQb.andWhere.mock.calls.filter(
+        (call: any[]) =>
+          typeof call[0] === "string" && call[0].includes("transaction.status"),
+      );
+      expect(statusCalls.length).toBe(0);
+    });
+
     it("includes investment brokerage accounts when requested", async () => {
       const mockQb = createMockQueryBuilder();
       mockQb.getManyAndCount.mockResolvedValue([[], 0]);

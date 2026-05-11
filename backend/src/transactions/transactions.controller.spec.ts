@@ -149,6 +149,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -178,6 +179,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -196,6 +198,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         false,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -231,6 +234,7 @@ describe("TransactionsController", () => {
         2,
         25,
         false,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -272,6 +276,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -307,6 +312,7 @@ describe("TransactionsController", () => {
         false,
         "grocery",
         uuid3,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -448,6 +454,74 @@ describe("TransactionsController", () => {
       expect(() => controller.findAll(mockReq, "not-a-uuid")).toThrow(
         BadRequestException,
       );
+    });
+
+    it("parses statuses from comma-separated string", async () => {
+      mockService.findAll.mockResolvedValue({ data: [], total: 0 });
+
+      await controller.findAll(
+        mockReq,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "UNRECONCILED,CLEARED",
+      );
+
+      expect(mockService.findAll).toHaveBeenCalledWith(
+        "user-1",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        ["UNRECONCILED", "CLEARED"],
+      );
+    });
+
+    it("rejects an unknown reconciliation status", () => {
+      expect(() =>
+        controller.findAll(
+          mockReq,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          "BOGUS",
+        ),
+      ).toThrow(BadRequestException);
     });
 
     it("rejects invalid targetTransactionId", () => {
@@ -912,6 +986,7 @@ describe("TransactionsController", () => {
         undefined,
         -100.5,
         500.25,
+        undefined,
         undefined,
       );
     });
