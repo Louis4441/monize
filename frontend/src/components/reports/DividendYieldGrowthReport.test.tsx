@@ -687,17 +687,19 @@ describe('DividendYieldGrowthReport', () => {
   });
 
   it('detects annual dividend frequency', async () => {
-    // 2 payments ~365 days apart within trailing 12 months. Pin Date so the
-    // trailing-12-months cutoff stays consistent regardless of when the test
-    // runs (other timers stay real so waitFor still works).
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-05-06T12:00:00'));
+    // 2 payments far enough apart to count as annual, both well inside trailing 12 months
+    const now = new Date();
+    const ymd = (d: Date) => d.toISOString().slice(0, 10);
+    const recent = new Date(now);
+    recent.setDate(recent.getDate() - 14);
+    const older = new Date(recent);
+    older.setDate(older.getDate() - 250);
     mockGetTransactions.mockImplementation(async ({ action }: { action: string }) => {
       if (action === 'DIVIDEND') {
         return {
           data: [
-            { id: 'tx-1', transactionDate: '2025-05-10', action: 'DIVIDEND', totalAmount: 300, accountId: 'acc-1', securityId: 's-1' },
-            { id: 'tx-2', transactionDate: '2026-05-01', action: 'DIVIDEND', totalAmount: 300, accountId: 'acc-1', securityId: 's-1' },
+            { id: 'tx-1', transactionDate: ymd(older), action: 'DIVIDEND', totalAmount: 300, accountId: 'acc-1', securityId: 's-1' },
+            { id: 'tx-2', transactionDate: ymd(recent), action: 'DIVIDEND', totalAmount: 300, accountId: 'acc-1', securityId: 's-1' },
           ],
           pagination: { hasMore: false },
         };
@@ -706,15 +708,11 @@ describe('DividendYieldGrowthReport', () => {
     });
     mockGetInvestmentAccounts.mockResolvedValue([]);
     mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
-    try {
-      render(<DividendYieldGrowthReport />);
-      await waitFor(() => {
-        expect(screen.getByText('Per-Security Dividend Yield (Trailing 12 Months)')).toBeInTheDocument();
-      });
-      expect(screen.getByText('Annual')).toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
+    render(<DividendYieldGrowthReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Per-Security Dividend Yield (Trailing 12 Months)')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Annual')).toBeInTheDocument();
   });
 
   it('detects semi-annual dividend frequency', async () => {

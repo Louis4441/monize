@@ -375,6 +375,45 @@ describe('TransactionList', () => {
     expect(deleteButtons.length).toBeGreaterThanOrEqual(2); // row Delete + action sheet Delete
   });
 
+  it('shows action sheet immediately on right-click', async () => {
+    const mockOnCategoryClick = vi.fn();
+    const transaction = createTransaction();
+
+    render(
+      <TransactionList
+        transactions={[transaction]}
+        onEdit={mockOnEdit}
+        onRefresh={mockOnRefresh}
+        onCategoryClick={mockOnCategoryClick}
+      />
+    );
+
+    const row = screen.getByText('Grocery Store').closest('tr')!;
+    fireEvent.contextMenu(row);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Filter by.*Groceries/)).toBeInTheDocument();
+    });
+  });
+
+  it('does not invoke onEdit on right-click followed by click', async () => {
+    const transaction = createTransaction();
+
+    render(
+      <TransactionList
+        transactions={[transaction]}
+        onEdit={mockOnEdit}
+        onRefresh={mockOnRefresh}
+      />
+    );
+
+    const row = screen.getByText('Grocery Store').closest('tr')!;
+    fireEvent.contextMenu(row);
+    fireEvent.click(row);
+
+    expect(mockOnEdit).not.toHaveBeenCalled();
+  });
+
   it('shows all filter options in action sheet when all callbacks provided', async () => {
     const transaction = createTransaction();
 
