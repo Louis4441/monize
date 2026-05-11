@@ -87,6 +87,16 @@ vi.mock('@/lib/scheduled-transactions', () => ({
   },
 }));
 
+const mockGetSecurities = vi.fn();
+const mockGetSecurityPrices = vi.fn();
+
+vi.mock('@/lib/investments', () => ({
+  investmentsApi: {
+    getSecurities: (...args: any[]) => mockGetSecurities(...args),
+    getSecurityPrices: (...args: any[]) => mockGetSecurityPrices(...args),
+  },
+}));
+
 vi.mock('@/lib/logger', () => ({
   createLogger: () => ({ error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() }),
 }));
@@ -193,6 +203,26 @@ const mockPayees = [
   { id: 'payee-3', name: 'No Default', defaultCategoryId: null, defaultCategory: null },
 ];
 
+const mockSecurities = [
+  {
+    id: 'sec-voo',
+    symbol: 'VOO',
+    name: 'Vanguard S&P 500 ETF',
+    currencyCode: 'USD',
+    securityType: 'ETF',
+    exchange: 'NYSE',
+    isActive: true,
+    skipPriceUpdates: false,
+    sector: null,
+    industry: null,
+    sectorWeightings: null,
+    quoteProvider: null,
+    msnInstrumentId: null,
+    createdAt: '',
+    updatedAt: '',
+  },
+];
+
 describe('ScheduledTransactionForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -201,6 +231,10 @@ describe('ScheduledTransactionForm', () => {
     mockPayeesGetAll.mockResolvedValue(mockPayees);
     mockPayeesGetById.mockResolvedValue({ id: 'inactive-payee', name: 'Inactive Payee' });
     mockTagsCreate.mockResolvedValue({ id: 'new-tag', name: 'New Tag' });
+    mockGetSecurities.mockResolvedValue(mockSecurities);
+    mockGetSecurityPrices.mockResolvedValue([
+      { id: 1, securityId: 'sec-voo', priceDate: '2026-05-09', closePrice: 500, openPrice: 499, highPrice: 501, lowPrice: 498, volume: 1000, source: 'manual', createdAt: '' },
+    ]);
   });
 
   // --- Basic rendering ---
@@ -2067,6 +2101,265 @@ describe('ScheduledTransactionForm', () => {
 
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [] }));
+    });
+  });
+
+  // ============================================================
+  // Investment tab
+  // ============================================================
+
+  describe('investment tab', () => {
+    async function openInvestmentTab() {
+      render(<ScheduledTransactionForm />);
+      await waitFor(() => {
+        expect(mockAccountsGetAll).toHaveBeenCalled();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Investment'));
+      });
+      await waitFor(() => {
+        expect(mockGetSecurities).toHaveBeenCalled();
+      });
+    }
+
+    it('renders the Investment tab and an Action selector', async () => {
+      await openInvestmentTab();
+      expect(screen.getByLabelText('Action')).toBeInTheDocument();
+      expect(screen.getByLabelText('Investment Account')).toBeInTheDocument();
+    });
+
+    it('shows Quantity / Price / Commission inputs for BUY', async () => {
+      await openInvestmentTab();
+      expect(screen.getByLabelText('Quantity (shares)')).toBeInTheDocument();
+      expect(screen.getByLabelText('Price per share')).toBeInTheDocument();
+      expect(screen.getByLabelText('Commission')).toBeInTheDocument();
+      expect(screen.getByLabelText('Total Value')).toBeInTheDocument();
+    });
+
+    it('switches to amount-only fields for DIVIDEND', async () => {
+      await openInvestmentTab();
+      fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'DIVIDEND' } });
+      await waitFor(() => {
+        expect(screen.queryByLabelText('Quantity (shares)')).not.toBeInTheDocument();
+      });
+      expect(screen.getByLabelText('Total Amount')).toBeInTheDocument();
+    });
+
+    it('switches to quantity-only fields for ADD_SHARES', async () => {
+      await openInvestmentTab();
+      fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'ADD_SHARES' } });
+      await waitFor(() => {
+        expect(screen.queryByLabelText('Price per share')).not.toBeInTheDocument();
+      });
+      expect(screen.getByLabelText('Quantity (shares)')).toBeInTheDocument();
+    });
+
+    it('shows Funding Account dropdown for BUY only', async () => {
+      await openInvestmentTab();
+      expect(screen.getByLabelText('Funding Account (optional)')).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'DIVIDEND' } });
+      await waitFor(() => {
+        expect(screen.queryByLabelText('Funding Account (optional)')).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides the Security selector for INTEREST (security not required)', async () => {
+      await openInvestmentTab();
+      fireEvent.change(screen.getByLabelText('Action'), { target: { value: 'INTEREST' } });
+      await waitFor(() => {
+        expect(screen.queryByLabelText('Security')).not.toBeInTheDocument();
+      });
+    });
+
+    it('fetches the latest market price when a security is chosen', async () => {
+      await openInvestmentTab();
+      // Pick a brokerage account to satisfy the form
+      fireEvent.change(screen.getByLabelText('Investment Account'), {
+        target: { value: 'acc-4' },
+      });
+      fireEvent.change(screen.getByLabelText('Security'), {
+        target: { value: 'sec-voo' },
+      });
+      await waitFor(() => {
+        expect(mockGetSecurityPrices).toHaveBeenCalledWith('sec-voo', 1);
+      });
+      await waitFor(() => {
+        const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
+        expect(priceInput.value).toBe('500');
+      });
+    });
+
+    it('back-derives Quantity from Total Value using the effective price', async () => {
+      await openInvestmentTab();
+      fireEvent.change(screen.getByLabelText('Investment Account'), {
+        target: { value: 'acc-4' },
+      });
+      fireEvent.change(screen.getByLabelText('Security'), {
+        target: { value: 'sec-voo' },
+      });
+      // Wait for price to auto-populate
+      await waitFor(() => {
+        const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
+        expect(priceInput.value).toBe('500');
+      });
+      const totalInput = screen.getByLabelText('Total Value') as HTMLInputElement;
+      // 1000 / 500 = 2 shares
+      fireEvent.change(totalInput, { target: { value: '1000' } });
+      await waitFor(() => {
+        const qtyInput = screen.getByLabelText('Quantity (shares)') as HTMLInputElement;
+        expect(qtyInput.value).toBe('2');
+      });
+    });
+
+    it('forward-derives Total Value from Quantity', async () => {
+      await openInvestmentTab();
+      fireEvent.change(screen.getByLabelText('Investment Account'), {
+        target: { value: 'acc-4' },
+      });
+      fireEvent.change(screen.getByLabelText('Security'), {
+        target: { value: 'sec-voo' },
+      });
+      await waitFor(() => {
+        const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
+        expect(priceInput.value).toBe('500');
+      });
+      fireEvent.change(screen.getByLabelText('Quantity (shares)'), {
+        target: { value: '3' },
+      });
+      await waitFor(() => {
+        const totalInput = screen.getByLabelText('Total Value') as HTMLInputElement;
+        // 3 * 500 = 1500 (no commission). CurrencyInput formats with commas.
+        expect(Number(totalInput.value.replace(/,/g, ''))).toBe(1500);
+      });
+    });
+
+    it('errors out when submitted without a brokerage account', async () => {
+      const { container } = render(<ScheduledTransactionForm />);
+      await waitFor(() => {
+        expect(mockAccountsGetAll).toHaveBeenCalled();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Investment'));
+      });
+      fireEvent.change(screen.getByLabelText('Name'), {
+        target: { value: 'Bad investment' },
+      });
+      const submitBtn = container.querySelector('button[type="submit"]')!;
+      await act(async () => {
+        fireEvent.click(submitBtn);
+      });
+      // Form bails before reaching the API
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalled();
+      });
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('errors out when BUY is submitted without a quantity', async () => {
+      const { container } = await (async () => {
+        const r = render(<ScheduledTransactionForm />);
+        await waitFor(() => {
+          expect(mockAccountsGetAll).toHaveBeenCalled();
+        });
+        await act(async () => {
+          fireEvent.click(screen.getByText('Investment'));
+        });
+        return r;
+      })();
+      fireEvent.change(screen.getByLabelText('Name'), {
+        target: { value: 'Missing qty' },
+      });
+      fireEvent.change(screen.getByLabelText('Investment Account'), {
+        target: { value: 'acc-4' },
+      });
+      // Skip security/qty/price entirely
+      const submitBtn = container.querySelector('button[type="submit"]')!;
+      await act(async () => {
+        fireEvent.click(submitBtn);
+      });
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalled();
+      });
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('submits an investment payload with isInvestment=true', async () => {
+      const onSuccess = vi.fn();
+      const { container } = render(
+        <ScheduledTransactionForm onSuccess={onSuccess} />,
+      );
+      await waitFor(() => {
+        expect(mockAccountsGetAll).toHaveBeenCalled();
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Investment'));
+      });
+      fireEvent.change(screen.getByLabelText('Name'), {
+        target: { value: 'Monthly VOO DCA' },
+      });
+      fireEvent.change(screen.getByLabelText('Investment Account'), {
+        target: { value: 'acc-4' },
+      });
+      fireEvent.change(screen.getByLabelText('Security'), {
+        target: { value: 'sec-voo' },
+      });
+      await waitFor(() => {
+        const priceInput = screen.getByLabelText('Price per share') as HTMLInputElement;
+        expect(priceInput.value).toBe('500');
+      });
+      fireEvent.change(screen.getByLabelText('Quantity (shares)'), {
+        target: { value: '1' },
+      });
+      const submitBtn = container.querySelector('button[type="submit"]')!;
+      await act(async () => {
+        fireEvent.click(submitBtn);
+      });
+      await waitFor(() => {
+        expect(mockCreate).toHaveBeenCalled();
+      });
+      const payload = mockCreate.mock.calls[0][0];
+      expect(payload.isInvestment).toBe(true);
+      expect(payload.investmentAction).toBe('BUY');
+      expect(payload.investmentSecurityId).toBe('sec-voo');
+      expect(payload.investmentQuantity).toBe(1);
+      expect(payload.investmentPrice).toBe(500);
+      expect(payload.accountId).toBe('acc-4');
+    });
+
+    it('starts in investment mode when editing an existing investment-kind row', async () => {
+      const existing = {
+        id: 'st-inv',
+        userId: 'user-1',
+        accountId: 'acc-4',
+        name: 'Existing DCA',
+        amount: -500,
+        currencyCode: 'CAD',
+        frequency: 'MONTHLY',
+        nextDueDate: '2026-06-15',
+        startDate: '2026-06-15',
+        isActive: true,
+        autoPost: false,
+        reminderDaysBefore: 3,
+        isSplit: false,
+        isTransfer: false,
+        isInvestment: true,
+        investmentAction: 'BUY',
+        investmentSecurityId: 'sec-voo',
+        investmentQuantity: 1,
+        investmentPrice: 500,
+        investmentCommission: 0,
+        tagIds: [],
+        splits: [],
+        createdAt: '',
+        updatedAt: '',
+      } as any;
+      render(<ScheduledTransactionForm scheduledTransaction={existing} />);
+      await waitFor(() => {
+        expect(mockGetSecurities).toHaveBeenCalled();
+      });
+      // Investment-only fields are present
+      expect(screen.getByLabelText('Investment Account')).toBeInTheDocument();
+      expect(screen.getByLabelText('Action')).toBeInTheDocument();
     });
   });
 });

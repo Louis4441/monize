@@ -27,10 +27,60 @@ import { PostScheduledTransactionDto } from "./dto/post-scheduled-transaction.dt
 import { Tag } from "../tags/entities/tag.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { TransactionsService } from "../transactions/transactions.service";
+import { InvestmentTransactionsService } from "../securities/investment-transactions.service";
+import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
+import { AccountSubType } from "../accounts/entities/account.entity";
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
-import { formatDateYMD, todayYMD } from "../common/date-utils";
+import { todayInTimezone, todayYMD } from "../common/date-utils";
+import {
+  calculateNextDueDate as calcNextDueDate,
+  ensureYMD,
+} from "../common/recurrence";
 import { ActionHistoryService } from "../action-history/action-history.service";
+
+const INVESTMENT_RELATIONS = [
+  "account",
+  "payee",
+  "category",
+  "transferAccount",
+  "investmentSecurity",
+  "investmentFundingAccount",
+  "splits",
+  "splits.category",
+  "splits.transferAccount",
+  "splits.tags",
+  "splits.investmentSecurity",
+];
+
+const SECURITY_REQUIRED_ACTIONS = new Set<InvestmentAction>([
+  InvestmentAction.BUY,
+  InvestmentAction.SELL,
+  InvestmentAction.DIVIDEND,
+  InvestmentAction.CAPITAL_GAIN,
+  InvestmentAction.SPLIT,
+  InvestmentAction.REINVEST,
+  InvestmentAction.ADD_SHARES,
+  InvestmentAction.REMOVE_SHARES,
+]);
+
+const QUANTITY_PRICE_ACTIONS = new Set<InvestmentAction>([
+  InvestmentAction.BUY,
+  InvestmentAction.SELL,
+  InvestmentAction.REINVEST,
+]);
+
+const QUANTITY_ONLY_ACTIONS = new Set<InvestmentAction>([
+  InvestmentAction.ADD_SHARES,
+  InvestmentAction.REMOVE_SHARES,
+  InvestmentAction.SPLIT,
+]);
+
+const AMOUNT_ONLY_ACTIONS = new Set<InvestmentAction>([
+  InvestmentAction.DIVIDEND,
+  InvestmentAction.INTEREST,
+  InvestmentAction.CAPITAL_GAIN,
+]);
 
 @Injectable()
 export class ScheduledTransactionsService {
@@ -48,6 +98,7 @@ export class ScheduledTransactionsService {
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     private transactionsService: TransactionsService,
+    private investmentTransactionsService: InvestmentTransactionsService,
     private overrideService: ScheduledTransactionOverrideService,
     private loanService: ScheduledTransactionLoanService,
     private dataSource: DataSource,
@@ -59,104 +110,102 @@ export class ScheduledTransactionsService {
     this.logger.log("Starting auto-post processing for scheduled transactions");
 
     try {
-      const today = todayYMD();
+      // Bucket users by their effective IANA timezone so "today" is computed
+      // per-user rather than against container UTC. Without this, an EST user
+      // sees transactions auto-post at 21:00 the previous local day (when
+      // 02:00 UTC ticks over to the new UTC date).
+      const userRows: { user_id: string; timezone: string | null }[] =
+        await this.dataSource.query(
+          `SELECT u.id as user_id, p.timezone
+             FROM users u
+             LEFT JOIN user_preferences p ON p.user_id = u.id`,
+        );
 
-      // Find candidates whose base nextDueDate is on/before today.
-      const candidates = await this.scheduledTransactionsRepository.find({
-        where: {
-          isActive: true,
-          autoPost: true,
-          nextDueDate: LessThanOrEqual(today) as any,
-        },
-        relations: [
-          "account",
-          "payee",
-          "category",
-          "transferAccount",
-          "splits",
-          "splits.category",
-          "splits.transferAccount",
-          "splits.tags",
-          "splits.investmentSecurity",
-        ],
-        order: { nextDueDate: "ASC" },
-      });
+      if (userRows.length === 0) return;
 
-      // Defer candidates whose next occurrence has an override pushing the
-      // effective date past today (e.g. user moved the 26th to the 27th).
-      const postponedIds = await this.findPostponedIds(
-        candidates.map((t) => t.id),
-        today,
-      );
-      const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
-
-      // Find transactions with overrides that moved the date earlier
-      const overrideDueIds = await this.overridesRepository
-        .createQueryBuilder("o")
-        .innerJoin("o.scheduledTransaction", "st")
-        .where("o.overrideDate <= :today", { today })
-        .andWhere("o.originalDate = st.nextDueDate")
-        .andWhere("st.isActive = :active", { active: true })
-        .andWhere("st.autoPost = :autoPost", { autoPost: true })
-        .select("st.id", "id")
-        .distinct(true)
-        .getRawMany();
-
-      // Merge and deduplicate
-      const dueByDateIds = new Set(dueByDate.map((t) => t.id));
-      const overrideOnlyIds = overrideDueIds
-        .map((r) => r.id as string)
-        .filter((id) => !dueByDateIds.has(id));
-
-      let overrideDueTransactions: ScheduledTransaction[] = [];
-      if (overrideOnlyIds.length > 0) {
-        overrideDueTransactions =
-          await this.scheduledTransactionsRepository.find({
-            where: overrideOnlyIds.map((id) => ({ id })),
-            relations: [
-              "account",
-              "payee",
-              "category",
-              "transferAccount",
-              "splits",
-              "splits.category",
-              "splits.transferAccount",
-            ],
-          });
+      const userIdsByTz = new Map<string, string[]>();
+      for (const { user_id, timezone } of userRows) {
+        const normalised = timezone?.trim();
+        const tz = normalised && normalised !== "browser" ? normalised : "UTC";
+        const list = userIdsByTz.get(tz) ?? [];
+        list.push(user_id);
+        userIdsByTz.set(tz, list);
       }
 
-      const dueTransactions = [...dueByDate, ...overrideDueTransactions];
+      let totalSuccess = 0;
+      let totalError = 0;
 
-      if (dueTransactions.length === 0) {
-        this.logger.log("No auto-post transactions due");
-        return;
-      }
-
-      this.logger.log(
-        `Found ${dueTransactions.length} auto-post transaction(s) to process`,
-      );
-
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (const scheduled of dueTransactions) {
-        try {
-          await this.post(scheduled.userId, scheduled.id);
-          successCount++;
-          this.logger.log(
-            `Auto-posted: "${scheduled.name}" (ID: ${scheduled.id})`,
+      for (const [tz, userIds] of userIdsByTz) {
+        const today = todayInTimezone(tz);
+        if (!today) {
+          this.logger.warn(
+            `Skipping ${userIds.length} user(s) with invalid timezone "${tz}"`,
           );
-        } catch (error) {
-          errorCount++;
-          this.logger.error(
-            `Failed to auto-post "${scheduled.name}" (ID: ${scheduled.id}): ${error.message}`,
-            error.stack,
-          );
+          continue;
+        }
+
+        const candidates = await this.scheduledTransactionsRepository.find({
+          where: {
+            userId: In(userIds),
+            isActive: true,
+            autoPost: true,
+            nextDueDate: LessThanOrEqual(today) as any,
+          },
+          relations: INVESTMENT_RELATIONS,
+          order: { nextDueDate: "ASC" },
+        });
+
+        const postponedIds = await this.findPostponedIds(
+          candidates.map((t) => t.id),
+          today,
+        );
+        const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
+
+        const overrideDueIds = await this.overridesRepository
+          .createQueryBuilder("o")
+          .innerJoin("o.scheduledTransaction", "st")
+          .where("st.userId IN (:...userIds)", { userIds })
+          .andWhere("o.overrideDate <= :today", { today })
+          .andWhere("o.originalDate = st.nextDueDate")
+          .andWhere("st.isActive = :active", { active: true })
+          .andWhere("st.autoPost = :autoPost", { autoPost: true })
+          .select("st.id", "id")
+          .distinct(true)
+          .getRawMany();
+
+        const dueByDateIds = new Set(dueByDate.map((t) => t.id));
+        const overrideOnlyIds = overrideDueIds
+          .map((r) => r.id as string)
+          .filter((id) => !dueByDateIds.has(id));
+
+        let overrideDueTransactions: ScheduledTransaction[] = [];
+        if (overrideOnlyIds.length > 0) {
+          overrideDueTransactions =
+            await this.scheduledTransactionsRepository.find({
+              where: overrideOnlyIds.map((id) => ({ id })),
+              relations: INVESTMENT_RELATIONS,
+            });
+        }
+
+        const dueTransactions = [...dueByDate, ...overrideDueTransactions];
+        if (dueTransactions.length === 0) continue;
+
+        for (const scheduled of dueTransactions) {
+          try {
+            await this.post(scheduled.userId, scheduled.id);
+            totalSuccess++;
+          } catch (error) {
+            totalError++;
+            this.logger.error(
+              `Failed to auto-post "${scheduled.name}" (ID: ${scheduled.id}): ${error.message}`,
+              error.stack,
+            );
+          }
         }
       }
 
       this.logger.log(
-        `Auto-post processing complete: ${successCount} succeeded, ${errorCount} failed`,
+        `Auto-post processing complete: ${totalSuccess} succeeded, ${totalError} failed`,
       );
     } catch (error) {
       this.logger.error("Auto-post processing failed", error.stack);
@@ -188,7 +237,16 @@ export class ScheduledTransactionsService {
     userId: string,
     createDto: CreateScheduledTransactionDto,
   ): Promise<ScheduledTransaction> {
-    await this.accountsService.findOne(userId, createDto.accountId);
+    if (createDto.isInvestment && createDto.isTransfer) {
+      throw new BadRequestException(
+        "A scheduled transaction cannot be both a transfer and an investment",
+      );
+    }
+
+    const account = await this.accountsService.findOne(
+      userId,
+      createDto.accountId,
+    );
 
     if (createDto.isTransfer && createDto.transferAccountId) {
       await this.accountsService.findOne(userId, createDto.transferAccountId);
@@ -199,9 +257,29 @@ export class ScheduledTransactionsService {
       }
     }
 
-    const { splits, isTransfer, transferAccountId, ...transactionData } =
-      createDto;
-    const hasSplits = splits && splits.length > 0;
+    if (createDto.isInvestment) {
+      if (account.accountSubType !== AccountSubType.INVESTMENT_BROKERAGE) {
+        throw new BadRequestException(
+          "Scheduled investment transactions require a brokerage account",
+        );
+      }
+      this.validateInvestmentFields(createDto);
+      if (createDto.investmentFundingAccountId) {
+        await this.accountsService.findOne(
+          userId,
+          createDto.investmentFundingAccountId,
+        );
+      }
+    }
+
+    const {
+      splits,
+      isTransfer,
+      transferAccountId,
+      isInvestment,
+      ...transactionData
+    } = createDto;
+    const hasSplits = !isInvestment && splits && splits.length > 0;
 
     if (hasSplits && !isTransfer) {
       this.validateSplits(splits, createDto.amount);
@@ -212,10 +290,43 @@ export class ScheduledTransactionsService {
       userId,
       startDate: transactionData.startDate || transactionData.nextDueDate,
       totalOccurrences: transactionData.occurrencesRemaining,
-      categoryId: hasSplits || isTransfer ? null : transactionData.categoryId,
+      categoryId:
+        hasSplits || isTransfer || isInvestment
+          ? null
+          : transactionData.categoryId,
       isSplit: hasSplits && !isTransfer,
       isTransfer: isTransfer || false,
       transferAccountId: isTransfer ? transferAccountId : null,
+      isInvestment: isInvestment || false,
+      investmentAction: isInvestment
+        ? (transactionData.investmentAction as InvestmentAction)
+        : null,
+      investmentSecurityId: isInvestment
+        ? transactionData.investmentSecurityId || null
+        : null,
+      investmentFundingAccountId: isInvestment
+        ? transactionData.investmentFundingAccountId || null
+        : null,
+      investmentQuantity:
+        isInvestment && transactionData.investmentQuantity !== undefined
+          ? transactionData.investmentQuantity
+          : null,
+      investmentPrice:
+        isInvestment && transactionData.investmentPrice !== undefined
+          ? transactionData.investmentPrice
+          : null,
+      investmentCommission:
+        isInvestment && transactionData.investmentCommission !== undefined
+          ? transactionData.investmentCommission
+          : null,
+      investmentTotalAmount:
+        isInvestment && transactionData.investmentTotalAmount !== undefined
+          ? transactionData.investmentTotalAmount
+          : null,
+      investmentExchangeRate:
+        isInvestment && transactionData.investmentExchangeRate !== undefined
+          ? transactionData.investmentExchangeRate
+          : null,
     });
 
     const saved =
@@ -236,6 +347,63 @@ export class ScheduledTransactionsService {
     });
 
     return result;
+  }
+
+  private validateInvestmentFields(dto: {
+    investmentAction?: InvestmentAction;
+    investmentSecurityId?: string | null;
+    investmentQuantity?: number | null;
+    investmentPrice?: number | null;
+    investmentTotalAmount?: number | null;
+  }): void {
+    const action = dto.investmentAction;
+    if (!action) {
+      throw new BadRequestException(
+        "Investment action is required for scheduled investment transactions",
+      );
+    }
+    if (SECURITY_REQUIRED_ACTIONS.has(action) && !dto.investmentSecurityId) {
+      throw new BadRequestException(`Action ${action} requires a security`);
+    }
+    if (QUANTITY_PRICE_ACTIONS.has(action)) {
+      if (
+        dto.investmentQuantity === undefined ||
+        dto.investmentQuantity === null ||
+        Number(dto.investmentQuantity) <= 0
+      ) {
+        throw new BadRequestException(
+          `Action ${action} requires a positive quantity`,
+        );
+      }
+      if (
+        dto.investmentPrice === undefined ||
+        dto.investmentPrice === null ||
+        Number(dto.investmentPrice) <= 0
+      ) {
+        throw new BadRequestException(
+          `Action ${action} requires a positive price`,
+        );
+      }
+    } else if (QUANTITY_ONLY_ACTIONS.has(action)) {
+      if (
+        dto.investmentQuantity === undefined ||
+        dto.investmentQuantity === null ||
+        Number(dto.investmentQuantity) <= 0
+      ) {
+        throw new BadRequestException(
+          `Action ${action} requires a positive quantity`,
+        );
+      }
+    } else if (AMOUNT_ONLY_ACTIONS.has(action)) {
+      if (
+        dto.investmentTotalAmount === undefined ||
+        dto.investmentTotalAmount === null
+      ) {
+        throw new BadRequestException(
+          `Action ${action} requires a total amount`,
+        );
+      }
+    }
   }
 
   private validateSplits(
@@ -285,9 +453,7 @@ export class ScheduledTransactionsService {
         scheduledTransactionId,
         kind: inferredKind,
         categoryId:
-          inferredKind === SplitKind.CATEGORY
-            ? split.categoryId || null
-            : null,
+          inferredKind === SplitKind.CATEGORY ? split.categoryId || null : null,
         transferAccountId:
           inferredKind === SplitKind.TRANSFER
             ? split.transferAccountId || null
@@ -349,6 +515,11 @@ export class ScheduledTransactionsService {
       .leftJoinAndSelect("st.payee", "payee")
       .leftJoinAndSelect("st.category", "category")
       .leftJoinAndSelect("st.transferAccount", "transferAccount")
+      .leftJoinAndSelect("st.investmentSecurity", "investmentSecurity")
+      .leftJoinAndSelect(
+        "st.investmentFundingAccount",
+        "investmentFundingAccount",
+      )
       .leftJoinAndSelect("st.splits", "splits")
       .leftJoinAndSelect("splits.category", "splitCategory")
       .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
@@ -364,10 +535,7 @@ export class ScheduledTransactionsService {
 
     const txDueDates = new Map<string, string>();
     const txIds = transactions.map((t) => {
-      const d =
-        t.nextDueDate instanceof Date
-          ? formatDateYMD(t.nextDueDate)
-          : String(t.nextDueDate).split("T")[0];
+      const d = ensureYMD(t.nextDueDate);
       txDueDates.set(t.id, d);
       return t.id;
     });
@@ -433,17 +601,7 @@ export class ScheduledTransactionsService {
   async findOne(userId: string, id: string): Promise<ScheduledTransaction> {
     const scheduled = await this.scheduledTransactionsRepository.findOne({
       where: { id, userId },
-      relations: [
-        "account",
-        "payee",
-        "category",
-        "transferAccount",
-        "splits",
-        "splits.category",
-        "splits.transferAccount",
-        "splits.tags",
-        "splits.investmentSecurity",
-      ],
+      relations: INVESTMENT_RELATIONS,
     });
 
     if (!scheduled) {
@@ -464,15 +622,7 @@ export class ScheduledTransactionsService {
         isActive: true,
         nextDueDate: LessThanOrEqual(today) as any,
       },
-      relations: [
-        "account",
-        "payee",
-        "category",
-        "transferAccount",
-        "splits",
-        "splits.category",
-        "splits.transferAccount",
-      ],
+      relations: INVESTMENT_RELATIONS,
       order: { nextDueDate: "ASC" },
     });
 
@@ -508,17 +658,7 @@ export class ScheduledTransactionsService {
     const overrideDueTransactions =
       await this.scheduledTransactionsRepository.find({
         where: overrideOnlyIds.map((id) => ({ id })),
-        relations: [
-          "account",
-          "payee",
-          "category",
-          "transferAccount",
-          "splits",
-          "splits.category",
-          "splits.transferAccount",
-          "splits.tags",
-          "splits.investmentSecurity",
-        ],
+        relations: INVESTMENT_RELATIONS,
       });
 
     return [...dueByDate, ...overrideDueTransactions];
@@ -537,6 +677,11 @@ export class ScheduledTransactionsService {
       .leftJoinAndSelect("st.payee", "payee")
       .leftJoinAndSelect("st.category", "category")
       .leftJoinAndSelect("st.transferAccount", "transferAccount")
+      .leftJoinAndSelect("st.investmentSecurity", "investmentSecurity")
+      .leftJoinAndSelect(
+        "st.investmentFundingAccount",
+        "investmentFundingAccount",
+      )
       .leftJoinAndSelect("st.splits", "splits")
       .leftJoinAndSelect("splits.category", "splitCategory")
       .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
@@ -557,6 +702,20 @@ export class ScheduledTransactionsService {
     const scheduled = await this.findOne(userId, id);
     const beforeData = { ...scheduled };
 
+    const effectiveIsInvestment =
+      updateDto.isInvestment !== undefined
+        ? updateDto.isInvestment
+        : scheduled.isInvestment;
+    const effectiveIsTransfer =
+      updateDto.isTransfer !== undefined
+        ? updateDto.isTransfer
+        : scheduled.isTransfer;
+    if (effectiveIsInvestment && effectiveIsTransfer) {
+      throw new BadRequestException(
+        "A scheduled transaction cannot be both a transfer and an investment",
+      );
+    }
+
     if (updateDto.accountId && updateDto.accountId !== scheduled.accountId) {
       await this.accountsService.findOne(userId, updateDto.accountId);
     }
@@ -571,7 +730,42 @@ export class ScheduledTransactionsService {
       }
     }
 
-    const { splits, isTransfer, transferAccountId, ...updateData } = updateDto;
+    if (effectiveIsInvestment) {
+      const accountId = updateDto.accountId || scheduled.accountId;
+      const account = await this.accountsService.findOne(userId, accountId);
+      if (account.accountSubType !== AccountSubType.INVESTMENT_BROKERAGE) {
+        throw new BadRequestException(
+          "Scheduled investment transactions require a brokerage account",
+        );
+      }
+      const merged = {
+        investmentAction:
+          updateDto.investmentAction ??
+          (scheduled.investmentAction as InvestmentAction | undefined),
+        investmentSecurityId:
+          updateDto.investmentSecurityId ?? scheduled.investmentSecurityId,
+        investmentQuantity:
+          updateDto.investmentQuantity ?? scheduled.investmentQuantity,
+        investmentPrice: updateDto.investmentPrice ?? scheduled.investmentPrice,
+        investmentTotalAmount:
+          updateDto.investmentTotalAmount ?? scheduled.investmentTotalAmount,
+      };
+      this.validateInvestmentFields(merged);
+      if (updateDto.investmentFundingAccountId) {
+        await this.accountsService.findOne(
+          userId,
+          updateDto.investmentFundingAccountId,
+        );
+      }
+    }
+
+    const {
+      splits,
+      isTransfer,
+      transferAccountId,
+      isInvestment,
+      ...updateData
+    } = updateDto;
 
     if (splits !== undefined) {
       if (Array.isArray(splits) && splits.length > 0) {
@@ -635,11 +829,64 @@ export class ScheduledTransactionsService {
       if (isTransfer) {
         fieldsToUpdate.isSplit = false;
         fieldsToUpdate.categoryId = null;
+        fieldsToUpdate.isInvestment = false;
+        fieldsToUpdate.investmentAction = null;
+        fieldsToUpdate.investmentSecurityId = null;
+        fieldsToUpdate.investmentFundingAccountId = null;
+        fieldsToUpdate.investmentQuantity = null;
+        fieldsToUpdate.investmentPrice = null;
+        fieldsToUpdate.investmentCommission = null;
+        fieldsToUpdate.investmentTotalAmount = null;
+        fieldsToUpdate.investmentExchangeRate = null;
         await this.splitsRepository.delete({ scheduledTransactionId: id });
       }
     }
     if (transferAccountId !== undefined) {
       fieldsToUpdate.transferAccountId = transferAccountId || null;
+    }
+
+    if (isInvestment !== undefined) {
+      fieldsToUpdate.isInvestment = isInvestment;
+      if (isInvestment) {
+        fieldsToUpdate.isSplit = false;
+        fieldsToUpdate.isTransfer = false;
+        fieldsToUpdate.categoryId = null;
+        fieldsToUpdate.transferAccountId = null;
+        await this.splitsRepository.delete({ scheduledTransactionId: id });
+      } else {
+        fieldsToUpdate.investmentAction = null;
+        fieldsToUpdate.investmentSecurityId = null;
+        fieldsToUpdate.investmentFundingAccountId = null;
+        fieldsToUpdate.investmentQuantity = null;
+        fieldsToUpdate.investmentPrice = null;
+        fieldsToUpdate.investmentCommission = null;
+        fieldsToUpdate.investmentTotalAmount = null;
+        fieldsToUpdate.investmentExchangeRate = null;
+      }
+    }
+    if (effectiveIsInvestment) {
+      if (updateData.investmentAction !== undefined)
+        fieldsToUpdate.investmentAction = updateData.investmentAction;
+      if (updateData.investmentSecurityId !== undefined)
+        fieldsToUpdate.investmentSecurityId =
+          updateData.investmentSecurityId || null;
+      if (updateData.investmentFundingAccountId !== undefined)
+        fieldsToUpdate.investmentFundingAccountId =
+          updateData.investmentFundingAccountId || null;
+      if (updateData.investmentQuantity !== undefined)
+        fieldsToUpdate.investmentQuantity =
+          updateData.investmentQuantity ?? null;
+      if (updateData.investmentPrice !== undefined)
+        fieldsToUpdate.investmentPrice = updateData.investmentPrice ?? null;
+      if (updateData.investmentCommission !== undefined)
+        fieldsToUpdate.investmentCommission =
+          updateData.investmentCommission ?? null;
+      if (updateData.investmentTotalAmount !== undefined)
+        fieldsToUpdate.investmentTotalAmount =
+          updateData.investmentTotalAmount ?? null;
+      if (updateData.investmentExchangeRate !== undefined)
+        fieldsToUpdate.investmentExchangeRate =
+          updateData.investmentExchangeRate ?? null;
     }
 
     if (Object.keys(fieldsToUpdate).length > 0) {
@@ -677,23 +924,20 @@ export class ScheduledTransactionsService {
   async skip(userId: string, id: string): Promise<ScheduledTransaction> {
     const scheduled = await this.findOne(userId, id);
 
-    const nextDueDateStr =
-      scheduled.nextDueDate instanceof Date
-        ? formatDateYMD(scheduled.nextDueDate)
-        : String(scheduled.nextDueDate).split("T")[0];
+    const nextDueDateStr = ensureYMD(scheduled.nextDueDate);
 
     await this.overridesRepository.delete({
       scheduledTransactionId: id,
       originalDate: nextDueDateStr,
     });
 
-    const nextDate = this.calculateNextDueDate(
-      new Date(scheduled.nextDueDate),
+    const newNextDueDateStr = calcNextDueDate(
+      nextDueDateStr,
       scheduled.frequency,
     );
 
     const updateFields: Record<string, any> = {
-      nextDueDate: formatDateYMD(nextDate),
+      nextDueDate: newNextDueDateStr,
     };
 
     if (
@@ -707,7 +951,7 @@ export class ScheduledTransactionsService {
       }
     }
 
-    if (scheduled.endDate && nextDate > new Date(scheduled.endDate)) {
+    if (scheduled.endDate && newNextDueDateStr > ensureYMD(scheduled.endDate)) {
       updateFields.isActive = false;
     }
 
@@ -722,10 +966,7 @@ export class ScheduledTransactionsService {
   ): Promise<ScheduledTransaction | null> {
     const scheduled = await this.findOne(userId, id);
 
-    const nextDueDateStr =
-      scheduled.nextDueDate instanceof Date
-        ? formatDateYMD(scheduled.nextDueDate)
-        : String(scheduled.nextDueDate).split("T")[0];
+    const nextDueDateStr = ensureYMD(scheduled.nextDueDate);
 
     const storedOverride = await this.overridesRepository
       .createQueryBuilder("override")
@@ -851,7 +1092,9 @@ export class ScheduledTransactionsService {
       transactionPayload.categoryId = finalCategoryId || undefined;
     }
 
-    if (scheduled.isTransfer && scheduled.transferAccountId) {
+    if (scheduled.isInvestment) {
+      await this.postInvestment(userId, scheduled, postDto, postDate);
+    } else if (scheduled.isTransfer && scheduled.transferAccountId) {
       await this.transactionsService.createTransfer(userId, {
         fromAccountId: scheduled.accountId,
         toAccountId: scheduled.transferAccountId,
@@ -893,11 +1136,10 @@ export class ScheduledTransactionsService {
 
       // Recurring frequency: advance nextDueDate, prune stale overrides,
       // decrement occurrencesRemaining, deactivate if past endDate.
-      const newNextDueDate = this.calculateNextDueDate(
-        new Date(scheduled.nextDueDate),
+      const newNextDueDateStr = calcNextDueDate(
+        ensureYMD(scheduled.nextDueDate),
         scheduled.frequency,
       );
-      const newNextDueDateStr = formatDateYMD(newNextDueDate);
 
       await queryRunner.manager
         .createQueryBuilder()
@@ -910,7 +1152,7 @@ export class ScheduledTransactionsService {
         .execute();
 
       const updateFields: Record<string, any> = {
-        lastPostedDate: new Date(),
+        lastPostedDate: todayYMD(),
         nextDueDate: newNextDueDateStr,
       };
 
@@ -925,7 +1167,10 @@ export class ScheduledTransactionsService {
         }
       }
 
-      if (scheduled.endDate && newNextDueDate > new Date(scheduled.endDate)) {
+      if (
+        scheduled.endDate &&
+        newNextDueDateStr > ensureYMD(scheduled.endDate)
+      ) {
         updateFields.isActive = false;
       }
 
@@ -951,47 +1196,107 @@ export class ScheduledTransactionsService {
     return this.findOne(userId, id);
   }
 
-  private calculateNextDueDate(
-    currentDate: Date,
-    frequency: FrequencyType,
-  ): Date {
-    const date = new Date(currentDate);
-
-    switch (frequency) {
-      case "DAILY":
-        date.setUTCDate(date.getUTCDate() + 1);
-        break;
-      case "WEEKLY":
-        date.setUTCDate(date.getUTCDate() + 7);
-        break;
-      case "BIWEEKLY":
-        date.setUTCDate(date.getUTCDate() + 14);
-        break;
-      case "EVERY4WEEKS":
-        date.setUTCDate(date.getUTCDate() + 28);
-        break;
-      case "SEMIMONTHLY":
-        if (date.getUTCDate() <= 15) {
-          date.setUTCMonth(date.getUTCMonth() + 1, 0);
-        } else {
-          date.setUTCMonth(date.getUTCMonth() + 1, 15);
-        }
-        break;
-      case "MONTHLY":
-        date.setUTCMonth(date.getUTCMonth() + 1);
-        break;
-      case "QUARTERLY":
-        date.setUTCMonth(date.getUTCMonth() + 3);
-        break;
-      case "YEARLY":
-        date.setUTCFullYear(date.getUTCFullYear() + 1);
-        break;
-      case "ONCE":
-      default:
-        break;
+  private async postInvestment(
+    userId: string,
+    scheduled: ScheduledTransaction,
+    postDto: PostScheduledTransactionDto | undefined,
+    postDate: string,
+  ): Promise<void> {
+    const action = scheduled.investmentAction as InvestmentAction | null;
+    if (!action) {
+      throw new BadRequestException(
+        "Scheduled investment transaction is missing an action",
+      );
     }
 
-    return date;
+    const quantity =
+      postDto?.investmentQuantity !== undefined &&
+      postDto?.investmentQuantity !== null
+        ? Number(postDto.investmentQuantity)
+        : scheduled.investmentQuantity !== null &&
+            scheduled.investmentQuantity !== undefined
+          ? Number(scheduled.investmentQuantity)
+          : undefined;
+
+    const price =
+      postDto?.investmentPrice !== undefined &&
+      postDto?.investmentPrice !== null
+        ? Number(postDto.investmentPrice)
+        : scheduled.investmentPrice !== null &&
+            scheduled.investmentPrice !== undefined
+          ? Number(scheduled.investmentPrice)
+          : undefined;
+
+    const totalAmount =
+      postDto?.investmentTotalAmount !== undefined &&
+      postDto?.investmentTotalAmount !== null
+        ? Number(postDto.investmentTotalAmount)
+        : scheduled.investmentTotalAmount !== null &&
+            scheduled.investmentTotalAmount !== undefined
+          ? Number(scheduled.investmentTotalAmount)
+          : undefined;
+
+    const commission =
+      scheduled.investmentCommission !== null &&
+      scheduled.investmentCommission !== undefined
+        ? Number(scheduled.investmentCommission)
+        : undefined;
+
+    const exchangeRate =
+      scheduled.investmentExchangeRate !== null &&
+      scheduled.investmentExchangeRate !== undefined
+        ? Number(scheduled.investmentExchangeRate)
+        : undefined;
+
+    const description =
+      postDto?.description !== undefined
+        ? postDto.description || undefined
+        : scheduled.description || undefined;
+
+    const dto: any = {
+      accountId: scheduled.accountId,
+      action,
+      transactionDate: postDate,
+      securityId: scheduled.investmentSecurityId || undefined,
+      fundingAccountId: scheduled.investmentFundingAccountId || undefined,
+      description,
+    };
+
+    if (QUANTITY_PRICE_ACTIONS.has(action)) {
+      dto.quantity = quantity;
+      dto.price = price;
+      if (commission !== undefined) dto.commission = commission;
+    } else if (QUANTITY_ONLY_ACTIONS.has(action)) {
+      dto.quantity = quantity;
+    } else if (AMOUNT_ONLY_ACTIONS.has(action)) {
+      // InvestmentTransactionsService computes total_amount from price * quantity
+      // for these amount-only actions; pass the desired total via price with
+      // quantity=1 if no quantity/price is set, or honour the stored values.
+      if (
+        quantity !== undefined &&
+        price !== undefined &&
+        totalAmount === undefined
+      ) {
+        dto.quantity = quantity;
+        dto.price = price;
+      } else if (totalAmount !== undefined) {
+        dto.quantity = 1;
+        dto.price = totalAmount;
+      }
+    }
+
+    if (exchangeRate !== undefined) dto.exchangeRate = exchangeRate;
+
+    await this.investmentTransactionsService.create(userId, dto);
+  }
+
+  private calculateNextDueDate(
+    currentDate: Date | string,
+    frequency: FrequencyType,
+  ): Date {
+    const ymd = ensureYMD(currentDate);
+    const next = calcNextDueDate(ymd, frequency);
+    return new Date(`${next}T00:00:00.000Z`);
   }
 
   // Delegated override methods

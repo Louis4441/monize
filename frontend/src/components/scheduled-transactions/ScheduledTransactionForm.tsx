@@ -16,12 +16,14 @@ import { Modal } from '@/components/ui/Modal';
 import { TagForm } from '@/components/tags/TagForm';
 import { SplitEditor, SplitRow, createEmptySplits, toSplitRows, toCreateSplitData } from '@/components/transactions/SplitEditor';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
+import { investmentsApi } from '@/lib/investments';
 import { getLocalDateString } from '@/lib/utils';
 import { payeesApi } from '@/lib/payees';
 import { categoriesApi } from '@/lib/categories';
 import { accountsApi } from '@/lib/accounts';
 import { tagsApi } from '@/lib/tags';
 import { ScheduledTransaction, FrequencyType, FREQUENCY_LABELS } from '@/types/scheduled-transaction';
+import { InvestmentAction, Security } from '@/types/investment';
 import { Transaction } from '@/types/transaction';
 import { Payee } from '@/types/payee';
 import { Category } from '@/types/category';
@@ -41,7 +43,34 @@ import { FormActions } from '@/components/ui/FormActions';
 
 const logger = createLogger('ScheduledTxForm');
 
-type ScheduledTransactionMode = 'transaction' | 'split' | 'transfer';
+type ScheduledTransactionMode = 'transaction' | 'split' | 'transfer' | 'investment';
+
+const INVESTMENT_ACTION_LABELS: Record<InvestmentAction, string> = {
+  BUY: 'Buy',
+  SELL: 'Sell',
+  DIVIDEND: 'Dividend',
+  INTEREST: 'Interest',
+  CAPITAL_GAIN: 'Capital Gain',
+  SPLIT: 'Stock Split',
+  TRANSFER_IN: 'Transfer In',
+  TRANSFER_OUT: 'Transfer Out',
+  REINVEST: 'Reinvest Dividend',
+  ADD_SHARES: 'Add Shares',
+  REMOVE_SHARES: 'Remove Shares',
+};
+
+// Mirrors visibility rules in InvestmentTransactionForm — keep in sync.
+const SECURITY_REQUIRED_ACTIONS: InvestmentAction[] = [
+  'BUY', 'SELL', 'DIVIDEND', 'CAPITAL_GAIN', 'SPLIT', 'REINVEST', 'ADD_SHARES', 'REMOVE_SHARES',
+];
+const QUANTITY_PRICE_ACTIONS: InvestmentAction[] = ['BUY', 'SELL', 'REINVEST'];
+const QUANTITY_ONLY_ACTIONS: InvestmentAction[] = ['ADD_SHARES', 'REMOVE_SHARES', 'SPLIT'];
+const AMOUNT_ONLY_ACTIONS: InvestmentAction[] = ['DIVIDEND', 'INTEREST', 'CAPITAL_GAIN'];
+const FUNDING_ACCOUNT_ACTIONS: InvestmentAction[] = ['BUY', 'SELL'];
+
+const SCHEDULABLE_INVESTMENT_ACTIONS: InvestmentAction[] = [
+  'BUY', 'SELL', 'DIVIDEND', 'INTEREST', 'CAPITAL_GAIN', 'REINVEST', 'ADD_SHARES', 'REMOVE_SHARES',
+];
 
 const scheduledTransactionSchema = z.object({
   accountId: z.string().uuid('Please select an account'),
@@ -106,6 +135,7 @@ export function ScheduledTransactionForm({
 
   // Determine initial mode
   const getInitialMode = (): ScheduledTransactionMode => {
+    if (scheduledTransaction?.isInvestment) return 'investment';
     if (isScheduledTransfer(scheduledTransaction)) return 'transfer';
     if (templateTransaction?.isTransfer) return 'transfer';
     if (scheduledTransaction?.isSplit && !isScheduledTransfer(scheduledTransaction)) return 'split';
@@ -114,6 +144,44 @@ export function ScheduledTransactionForm({
   };
 
   const [mode, setMode] = useState<ScheduledTransactionMode>(getInitialMode());
+
+  // Investment-mode state
+  const [securities, setSecurities] = useState<Security[]>([]);
+  const [investmentAction, setInvestmentAction] = useState<InvestmentAction>(
+    (scheduledTransaction?.investmentAction as InvestmentAction | null) ?? 'BUY',
+  );
+  const [investmentSecurityId, setInvestmentSecurityId] = useState<string>(
+    scheduledTransaction?.investmentSecurityId || '',
+  );
+  const [investmentFundingAccountId, setInvestmentFundingAccountId] = useState<string>(
+    scheduledTransaction?.investmentFundingAccountId || '',
+  );
+  const [investmentQuantity, setInvestmentQuantity] = useState<number | ''>(
+    scheduledTransaction?.investmentQuantity != null ? Number(scheduledTransaction.investmentQuantity) : '',
+  );
+  const [investmentPrice, setInvestmentPrice] = useState<number | ''>(
+    scheduledTransaction?.investmentPrice != null ? Number(scheduledTransaction.investmentPrice) : '',
+  );
+  const [investmentCommission, setInvestmentCommission] = useState<number | ''>(
+    scheduledTransaction?.investmentCommission != null ? Number(scheduledTransaction.investmentCommission) : '',
+  );
+  const [investmentTotalAmount, setInvestmentTotalAmount] = useState<number | ''>(
+    scheduledTransaction?.investmentTotalAmount != null ? Number(scheduledTransaction.investmentTotalAmount) : '',
+  );
+
+  // BUY/SELL/REINVEST helpers: latest market price (used when Price is blank)
+  // and a computed Total Value bound to (qty * price (+/-) commission).
+  const [marketPrice, setMarketPrice] = useState<number | null>(null);
+  const [investmentTotalValue, setInvestmentTotalValue] = useState<number | ''>(() => {
+    const q = scheduledTransaction?.investmentQuantity;
+    const p = scheduledTransaction?.investmentPrice;
+    const c = scheduledTransaction?.investmentCommission ?? 0;
+    if (q != null && p != null) {
+      const sign = scheduledTransaction?.investmentAction === 'SELL' ? -1 : 1;
+      return Math.round((Number(q) * Number(p) + sign * Number(c)) * 10000) / 10000;
+    }
+    return '';
+  });
   const [transferToAccountId, setTransferToAccountId] = useState<string>(
     getTransferAccountId(scheduledTransaction)
     || (templateTransaction?.isTransfer ? templateTransaction.linkedTransaction?.accountId ?? '' : '')
@@ -236,6 +304,43 @@ export function ScheduledTransactionForm({
     [accounts]
   );
 
+  // Investment-mode accounts: only brokerage (share-holding) accounts.
+  const investmentAccountOptions = useMemo(() =>
+    buildAccountDropdownOptions(
+      accounts,
+      (a) => !a.isClosed && a.accountSubType === 'INVESTMENT_BROKERAGE',
+      (a) => `${a.name} (${a.currencyCode})`,
+    ),
+    [accounts]
+  );
+
+  // Funding account options: anything that can carry cash, except the
+  // brokerage's paired cash side and asset/brokerage accounts. Mirrors the
+  // filtering in InvestmentTransactionForm.
+  const fundingAccountOptions = useMemo(() =>
+    buildAccountDropdownOptions(
+      accounts,
+      (a) =>
+        !a.isClosed &&
+        a.id !== watchedAccountId &&
+        a.accountType !== 'ASSET' &&
+        a.accountSubType !== 'INVESTMENT_BROKERAGE' &&
+        a.accountSubType !== 'INVESTMENT_CASH',
+      (a) => `${a.name} (${a.currencyCode})`,
+    ),
+    [accounts, watchedAccountId]
+  );
+
+  const securityOptions = useMemo(() =>
+    securities
+      .filter(s => s.isActive)
+      .map(s => ({
+        value: s.id,
+        label: s.symbol ? `${s.symbol} — ${s.name}` : s.name,
+      })),
+    [securities]
+  );
+
   // Memoize transfer To account options
   const transferToAccountOptions = useMemo(() =>
     buildAccountDropdownOptions(
@@ -267,6 +372,108 @@ export function ScheduledTransactionForm({
       .map(tag => ({ value: tag.id, label: tag.name })),
     [tags]
   );
+
+  // Load securities lazily — only fetch when the user actually enters investment mode.
+  useEffect(() => {
+    if (mode !== 'investment' || securities.length > 0) return;
+    investmentsApi.getSecurities()
+      .then(setSecurities)
+      .catch((err) => {
+        toast.error(getErrorMessage(err, 'Failed to load securities'));
+        logger.error(err);
+      });
+  }, [mode, securities.length]);
+
+  // When the chosen security changes, fetch its most recent close price so we
+  // can auto-fill the Price field and back-derive quantity from Total Value.
+  useEffect(() => {
+    if (mode !== 'investment' || !investmentSecurityId) {
+      setMarketPrice(null);
+      return;
+    }
+    let cancelled = false;
+    investmentsApi.getSecurityPrices(investmentSecurityId, 1)
+      .then((prices) => {
+        if (cancelled) return;
+        const latest = prices[0];
+        setMarketPrice(latest ? Number(latest.closePrice) : null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setMarketPrice(null);
+        logger.warn?.('Failed to fetch latest price', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, investmentSecurityId]);
+
+  // If the user hasn't typed a price, auto-fill from the latest market price
+  // once it arrives. Don't clobber an already-entered price. Uses the
+  // "info from previous render" pattern so we don't violate
+  // react-hooks/set-state-in-effect.
+  const [lastSeenMarketPrice, setLastSeenMarketPrice] = useState<number | null>(null);
+  if (marketPrice !== lastSeenMarketPrice) {
+    setLastSeenMarketPrice(marketPrice);
+    if (
+      marketPrice != null &&
+      (investmentPrice === '' || investmentPrice === 0)
+    ) {
+      setInvestmentPrice(Math.round(marketPrice * 1_000_000) / 1_000_000);
+    }
+  }
+
+  const effectiveInvestmentPrice =
+    investmentPrice !== '' && Number(investmentPrice) > 0
+      ? Number(investmentPrice)
+      : marketPrice ?? 0;
+  const investmentSign = investmentAction === 'SELL' ? -1 : 1;
+
+  const handleTotalValueChange = (raw: number | undefined) => {
+    if (raw === undefined) {
+      setInvestmentTotalValue('');
+      return;
+    }
+    setInvestmentTotalValue(raw);
+    if (effectiveInvestmentPrice > 0) {
+      const commission =
+        investmentCommission === '' ? 0 : Number(investmentCommission);
+      const cost = raw - investmentSign * commission;
+      const qty = Math.max(0, cost / effectiveInvestmentPrice);
+      setInvestmentQuantity(Math.round(qty * 100_000_000) / 100_000_000);
+    }
+  };
+
+  const handleQuantityChange = (raw: string) => {
+    const qty = raw === '' ? '' : Number(raw);
+    setInvestmentQuantity(qty);
+    if (qty !== '' && effectiveInvestmentPrice > 0) {
+      const commission =
+        investmentCommission === '' ? 0 : Number(investmentCommission);
+      const total = Number(qty) * effectiveInvestmentPrice + investmentSign * commission;
+      setInvestmentTotalValue(Math.round(total * 10_000) / 10_000);
+    }
+  };
+
+  const handlePriceChange = (raw: string) => {
+    const price = raw === '' ? '' : Number(raw);
+    setInvestmentPrice(price);
+    if (price !== '' && Number(price) > 0) {
+      const commission =
+        investmentCommission === '' ? 0 : Number(investmentCommission);
+      // If the user has a total in mind, keep it and re-derive quantity. Otherwise
+      // re-derive total from quantity * price.
+      if (investmentTotalValue !== '') {
+        const cost = Number(investmentTotalValue) - investmentSign * commission;
+        const qty = Math.max(0, cost / Number(price));
+        setInvestmentQuantity(Math.round(qty * 100_000_000) / 100_000_000);
+      } else if (investmentQuantity !== '') {
+        const total =
+          Number(investmentQuantity) * Number(price) + investmentSign * commission;
+        setInvestmentTotalValue(Math.round(total * 10_000) / 10_000);
+      }
+    }
+  };
 
   // Load accounts, categories, active payees on mount
   // When editing, also fetch the scheduled transaction's payee if it's inactive
@@ -322,6 +529,27 @@ export function ScheduledTransactionForm({
       setValue('categoryId', '', { shouldDirty: true });
       if (watchedAmount < 0) {
         setValue('amount', Math.abs(watchedAmount), { shouldDirty: true });
+      }
+    } else if (newMode === 'investment') {
+      setSplits([]);
+      setSelectedCategoryId('');
+      setValue('categoryId', '', { shouldDirty: true });
+      setTransferToAccountId('');
+      // The Investment tab has no Amount field, but the Zod schema still
+      // requires amount to be a number. Seed it so validation passes; it
+      // will be replaced at submit time with the computed display amount.
+      if (
+        watchedAmount === undefined ||
+        watchedAmount === null ||
+        Number.isNaN(watchedAmount)
+      ) {
+        setValue('amount', 0, { shouldDirty: false, shouldValidate: false });
+      }
+      // If the currently-selected account isn't a brokerage account, clear it
+      // so the user picks one from the brokerage-only dropdown.
+      const acc = accounts.find(a => a.id === watchedAccountId);
+      if (acc && acc.accountSubType !== 'INVESTMENT_BROKERAGE') {
+        setValue('accountId', '', { shouldDirty: true });
       }
     } else {
       // 'transaction'
@@ -471,6 +699,39 @@ export function ScheduledTransactionForm({
       }
     }
 
+    // Validate investment mode required fields per action
+    if (mode === 'investment') {
+      const acc = accounts.find(a => a.id === data.accountId);
+      if (!acc || acc.accountSubType !== 'INVESTMENT_BROKERAGE') {
+        toast.error('Scheduled investment transactions require a brokerage account');
+        return;
+      }
+      if (SECURITY_REQUIRED_ACTIONS.includes(investmentAction) && !investmentSecurityId) {
+        toast.error('This investment action requires a security');
+        return;
+      }
+      if (QUANTITY_PRICE_ACTIONS.includes(investmentAction)) {
+        if (!investmentQuantity || Number(investmentQuantity) <= 0) {
+          toast.error('Quantity must be greater than zero');
+          return;
+        }
+        if (!investmentPrice || Number(investmentPrice) <= 0) {
+          toast.error('Price must be greater than zero');
+          return;
+        }
+      } else if (QUANTITY_ONLY_ACTIONS.includes(investmentAction)) {
+        if (!investmentQuantity || Number(investmentQuantity) <= 0) {
+          toast.error('Quantity must be greater than zero');
+          return;
+        }
+      } else if (AMOUNT_ONLY_ACTIONS.includes(investmentAction)) {
+        if (investmentTotalAmount === '' || investmentTotalAmount === undefined) {
+          toast.error('Total amount is required for this action');
+          return;
+        }
+      }
+    }
+
     setIsLoading(true);
     try {
       // Strip referenceNumber (backend doesn't support it for scheduled transactions)
@@ -492,6 +753,7 @@ export function ScheduledTransactionForm({
           amount: transferAmount,
           isTransfer: true,
           transferAccountId: transferToAccountId,
+          isInvestment: false,
           categoryId: undefined,
           splits: undefined,
         };
@@ -500,14 +762,51 @@ export function ScheduledTransactionForm({
           ...payload,
           isTransfer: false,
           transferAccountId: undefined,
+          isInvestment: false,
           categoryId: undefined,
           splits: toCreateSplitData(splits),
+        };
+      } else if (mode === 'investment') {
+        // Estimate display amount from quantity*price (or totalAmount).
+        const estQty = investmentQuantity === '' ? 0 : Number(investmentQuantity);
+        const estPrice = investmentPrice === '' ? 0 : Number(investmentPrice);
+        const estTotal = investmentTotalAmount === '' ? 0 : Number(investmentTotalAmount);
+        const estCommission = investmentCommission === '' ? 0 : Number(investmentCommission);
+        let displayAmount = formData.amount;
+        if (QUANTITY_PRICE_ACTIONS.includes(investmentAction)) {
+          const sign = investmentAction === 'SELL' ? 1 : -1;
+          displayAmount = sign * (estQty * estPrice + (sign === -1 ? estCommission : -estCommission));
+        } else if (AMOUNT_ONLY_ACTIONS.includes(investmentAction)) {
+          displayAmount = estTotal;
+        } else {
+          displayAmount = 0;
+        }
+        payload = {
+          ...payload,
+          amount: roundToCents(displayAmount),
+          isTransfer: false,
+          transferAccountId: undefined,
+          isInvestment: true,
+          investmentAction,
+          investmentSecurityId: investmentSecurityId || undefined,
+          investmentFundingAccountId: FUNDING_ACCOUNT_ACTIONS.includes(investmentAction) && investmentFundingAccountId
+            ? investmentFundingAccountId
+            : undefined,
+          investmentQuantity: investmentQuantity === '' ? undefined : Number(investmentQuantity),
+          investmentPrice: investmentPrice === '' ? undefined : Number(investmentPrice),
+          investmentCommission: investmentCommission === '' ? undefined : Number(investmentCommission),
+          investmentTotalAmount: investmentTotalAmount === '' ? undefined : Number(investmentTotalAmount),
+          categoryId: undefined,
+          payeeId: undefined,
+          payeeName: undefined,
+          splits: undefined,
         };
       } else {
         payload = {
           ...payload,
           isTransfer: false,
           transferAccountId: undefined,
+          isInvestment: false,
           splits: undefined,
         };
       }
@@ -668,7 +967,7 @@ export function ScheduledTransactionForm({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       {/* Tab Bar */}
       <div className="flex space-x-2 pb-2 border-b dark:border-gray-700">
-        {(['transaction', 'split', 'transfer'] as const).map((tabMode) => (
+        {(['transaction', 'split', 'transfer', 'investment'] as const).map((tabMode) => (
           <button
             key={tabMode}
             type="button"
@@ -679,7 +978,13 @@ export function ScheduledTransactionForm({
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
-            {tabMode === 'transaction' ? 'Transaction' : tabMode === 'split' ? 'Split' : 'Transfer'}
+            {tabMode === 'transaction'
+              ? 'Transaction'
+              : tabMode === 'split'
+              ? 'Split'
+              : tabMode === 'transfer'
+              ? 'Transfer'
+              : 'Investment'}
           </button>
         ))}
       </div>
@@ -1049,6 +1354,194 @@ export function ScheduledTransactionForm({
 
           {/* Row 8: Active/Auto-post */}
           {renderOptions('Transfer')}
+        </div>
+      )}
+
+      {/* ==================== Investment Tab ==================== */}
+      {mode === 'investment' && (
+        <div className="space-y-4">
+          {/* Row 1: Name */}
+          <Input
+            label="Name"
+            type="text"
+            placeholder="e.g., Monthly VOO DCA, Quarterly DRIP..."
+            error={errors.name?.message}
+            {...register('name')}
+          />
+
+          {/* Row 2: Account, Action */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Investment Account"
+              error={errors.accountId?.message}
+              value={watchedAccountId || ''}
+              options={[
+                { value: '', label: 'Select investment account...' },
+                ...investmentAccountOptions,
+              ]}
+              {...register('accountId')}
+            />
+            <Select
+              label="Action"
+              value={investmentAction}
+              onChange={(e) => setInvestmentAction(e.target.value as InvestmentAction)}
+              options={SCHEDULABLE_INVESTMENT_ACTIONS.map(a => ({
+                value: a,
+                label: INVESTMENT_ACTION_LABELS[a],
+              }))}
+            />
+          </div>
+
+          {/* Row 3: Security (when required) */}
+          {SECURITY_REQUIRED_ACTIONS.includes(investmentAction) && (
+            <Select
+              label="Security"
+              value={investmentSecurityId}
+              onChange={(e) => setInvestmentSecurityId(e.target.value)}
+              options={[
+                { value: '', label: 'Select security...' },
+                ...securityOptions,
+              ]}
+            />
+          )}
+
+          {/* Row 4: Quantity / Price / Commission (action-conditional) */}
+          {QUANTITY_PRICE_ACTIONS.includes(investmentAction) && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input
+                  label="Quantity (shares)"
+                  type="number"
+                  step="0.00000001"
+                  min={0}
+                  value={investmentQuantity}
+                  onChange={(e) => handleQuantityChange(e.target.value)}
+                />
+                <Input
+                  label="Price per share"
+                  type="number"
+                  step="0.000001"
+                  min={0}
+                  placeholder={
+                    marketPrice != null ? `Latest: ${marketPrice}` : undefined
+                  }
+                  value={investmentPrice}
+                  onChange={(e) => handlePriceChange(e.target.value)}
+                />
+                <Input
+                  label="Commission"
+                  type="number"
+                  step="0.0001"
+                  min={0}
+                  value={investmentCommission}
+                  onChange={(e) =>
+                    setInvestmentCommission(
+                      e.target.value === '' ? '' : Number(e.target.value),
+                    )
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CurrencyInput
+                  label="Total Value"
+                  prefix={currencySymbol}
+                  value={
+                    typeof investmentTotalValue === 'number'
+                      ? investmentTotalValue
+                      : undefined
+                  }
+                  onChange={handleTotalValueChange}
+                />
+              </div>
+              {investmentSecurityId && marketPrice == null && (
+                <p className="-mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  No price history yet for this security. Enter the price manually.
+                </p>
+              )}
+            </>
+          )}
+
+          {QUANTITY_ONLY_ACTIONS.includes(investmentAction) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Quantity (shares)"
+                type="number"
+                step="0.00000001"
+                min={0}
+                value={investmentQuantity}
+                onChange={(e) => setInvestmentQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+              />
+            </div>
+          )}
+
+          {AMOUNT_ONLY_ACTIONS.includes(investmentAction) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CurrencyInput
+                label="Total Amount"
+                prefix={currencySymbol}
+                value={typeof investmentTotalAmount === 'number' ? investmentTotalAmount : undefined}
+                onChange={(value) => setInvestmentTotalAmount(value ?? '')}
+              />
+            </div>
+          )}
+
+          {/* Row 5: Funding account (BUY/SELL only) */}
+          {FUNDING_ACCOUNT_ACTIONS.includes(investmentAction) && (
+            <div>
+              <Select
+                label="Funding Account (optional)"
+                value={investmentFundingAccountId}
+                onChange={(e) => setInvestmentFundingAccountId(e.target.value)}
+                options={[
+                  { value: '', label: 'Use brokerage cash (default)' },
+                  ...fundingAccountOptions,
+                ]}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Defaults to the investment account&apos;s cash side. Pick another account to model contribution+buy.
+              </p>
+            </div>
+          )}
+
+          {/* Row 6: Frequency, Next Due Date */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Frequency"
+              error={errors.frequency?.message}
+              value={watchedFrequency || 'MONTHLY'}
+              options={frequencyOptions}
+              {...register('frequency')}
+            />
+            <DateInput
+              label="Next Due Date"
+              error={errors.nextDueDate?.message}
+              onDateChange={(date) => setValue('nextDueDate', date, { shouldDirty: true, shouldValidate: true })}
+              {...register('nextDueDate')}
+            />
+          </div>
+
+          {/* Row 7: Reminder days */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Remind Days Before"
+              type="number"
+              min={0}
+              error={errors.reminderDaysBefore?.message}
+              {...register('reminderDaysBefore', { valueAsNumber: true })}
+            />
+          </div>
+
+          {/* Tags */}
+          {renderTags()}
+
+          {/* End condition */}
+          {renderEndCondition('Inv')}
+
+          {/* Description */}
+          {renderDescription()}
+
+          {/* Active / Auto-post */}
+          {renderOptions('Inv')}
         </div>
       )}
 

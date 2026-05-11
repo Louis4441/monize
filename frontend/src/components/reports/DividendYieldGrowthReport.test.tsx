@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@/test/render';
 import { DividendYieldGrowthReport } from './DividendYieldGrowthReport';
 
@@ -90,6 +90,19 @@ const mockHoldings = [
 ];
 
 describe('DividendYieldGrowthReport', () => {
+  // The report uses subYears(new Date(), 1) as a trailing-12-months cutoff.
+  // Test fixtures (e.g. the "annual" test that puts a payment on 2025-05-10)
+  // are dated relative to a specific "today" -- so the suite needs that
+  // "today" pinned, otherwise transactions land on or past the boundary on
+  // certain wall-clock days and get filtered out.
+  beforeAll(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-05-06T12:00:00Z'));
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
