@@ -181,10 +181,10 @@ export function PostTransactionDialog({
   const projectedBalances = useMemo(() => {
     if (!transactionDate) return null;
     const sourceBefore = sourceAccount
-      ? getProjectedBalanceAtDate(sourceAccount, transactionDate, scheduledTransactions, futureTransactions, scheduledTransaction.id)
+      ? getProjectedBalanceAtDate(sourceAccount, transactionDate, scheduledTransactions, futureTransactions, scheduledTransaction.id, accounts)
       : null;
     const transferBefore = transferAccount
-      ? getProjectedBalanceAtDate(transferAccount, transactionDate, scheduledTransactions, futureTransactions, scheduledTransaction.id)
+      ? getProjectedBalanceAtDate(transferAccount, transactionDate, scheduledTransactions, futureTransactions, scheduledTransaction.id, accounts)
       : null;
     return {
       sourceBefore,

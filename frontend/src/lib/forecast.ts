@@ -225,23 +225,37 @@ function isTransfer(transaction: ScheduledTransaction): boolean {
 /**
  * Scheduled investment transactions store `accountId` as the brokerage account
  * but the cash side flows through `investmentFundingAccountId` (typically an
- * INVESTMENT_CASH account). Reshape them so the forecast treats the cash
- * account as the affected account, with the amount converted into that
- * account's currency via the recorded exchange rate.
+ * INVESTMENT_CASH account). When the funding account is left blank, the cash
+ * side falls back to the brokerage's linked cash account. Reshape the
+ * scheduled transaction so the forecast treats the cash account as the
+ * affected account, with the amount converted into that account's currency
+ * via the recorded exchange rate.
  */
-function normalizeInvestmentForForecast(transaction: ScheduledTransaction): ScheduledTransaction {
-  if (!transaction.isInvestment || !transaction.investmentFundingAccountId) {
+function normalizeInvestmentForForecast(
+  transaction: ScheduledTransaction,
+  accountsById: Map<string, Account>,
+): ScheduledTransaction {
+  if (!transaction.isInvestment) {
+    return transaction;
+  }
+  let cashAccountId = transaction.investmentFundingAccountId;
+  if (!cashAccountId) {
+    const brokerage = accountsById.get(transaction.accountId);
+    if (brokerage?.linkedAccountId) {
+      cashAccountId = brokerage.linkedAccountId;
+    }
+  }
+  if (!cashAccountId) {
     return transaction;
   }
   const rate = transaction.investmentExchangeRate != null
     ? Number(transaction.investmentExchangeRate)
     : 1;
   if (!Number.isFinite(rate) || rate === 1) {
-    // No conversion needed; just re-target the account.
-    if (transaction.accountId === transaction.investmentFundingAccountId) {
+    if (transaction.accountId === cashAccountId) {
       return transaction;
     }
-    return { ...transaction, accountId: transaction.investmentFundingAccountId };
+    return { ...transaction, accountId: cashAccountId };
   }
   const convertOverride = <T extends { amount: number | null }>(o: T): T => ({
     ...o,
@@ -249,7 +263,7 @@ function normalizeInvestmentForForecast(transaction: ScheduledTransaction): Sche
   });
   return {
     ...transaction,
-    accountId: transaction.investmentFundingAccountId,
+    accountId: cashAccountId,
     amount: Number(transaction.amount) * rate,
     futureOverrides: transaction.futureOverrides?.map(convertOverride),
     nextOverride: transaction.nextOverride
@@ -276,7 +290,8 @@ export function buildForecast(
 ): ForecastDataPoint[] {
   // Remap scheduled investment transactions onto their funding cash account so
   // BUY/SELL/etc. show up in the cash flow forecast for INVESTMENT_CASH accounts.
-  transactions = transactions.map(normalizeInvestmentForForecast);
+  const accountsById = new Map(accounts.map(a => [a.id, a]));
+  transactions = transactions.map(t => normalizeInvestmentForForecast(t, accountsById));
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -419,9 +434,17 @@ export function getProjectedBalanceAtDate(
   targetDate: string,
   scheduledTransactions: ScheduledTransaction[],
   futureTransactions: FutureTransaction[] = [],
-  excludeScheduledId?: string
+  excludeScheduledId?: string,
+  allAccounts?: Account[],
 ): number {
-  scheduledTransactions = scheduledTransactions.map(normalizeInvestmentForForecast);
+  const accountsById = new Map<string, Account>();
+  accountsById.set(account.id, account);
+  if (allAccounts) {
+    for (const a of allAccounts) accountsById.set(a.id, a);
+  }
+  scheduledTransactions = scheduledTransactions.map(t =>
+    normalizeInvestmentForForecast(t, accountsById),
+  );
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

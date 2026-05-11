@@ -771,6 +771,30 @@ describe('buildForecast', () => {
       expect(allBalances.every(b => b === 4000)).toBe(true);
     });
 
+    it('falls back to the brokerage linked cash account when fundingAccountId is null', () => {
+      const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
+      const brokerage = makeAccount({
+        id: 'brokerage-1',
+        currentBalance: 0,
+        linkedAccountId: 'cash-1',
+        accountSubType: 'INVESTMENT_BROKERAGE',
+      } as any);
+      const transactions = [makeScheduled({
+        id: 'inv-1',
+        name: 'Buy AAPL',
+        accountId: 'brokerage-1',
+        amount: -2500,
+        frequency: 'ONCE',
+        nextDueDate: '2025-01-20',
+        isInvestment: true,
+        investmentFundingAccountId: null,
+        investmentExchangeRate: 1,
+      } as any)];
+      const result = buildForecast([cashAccount, brokerage], transactions, 'month', 'cash-1');
+      const jan20 = result.find(dp => dp.date === '2025-01-20');
+      expect(jan20?.balance).toBe(7500);
+    });
+
     it('expands recurring scheduled investments on the funding account', () => {
       const cashAccount = makeAccount({ id: 'cash-1', currentBalance: 10000 });
       const transactions = [makeScheduled({
