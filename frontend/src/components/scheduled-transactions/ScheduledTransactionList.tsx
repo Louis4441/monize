@@ -9,6 +9,49 @@ import { parseLocalDate } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/errors';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { computeInvestmentCashImpact } from '@/lib/investmentCashImpact';
+import { InvestmentAction } from '@/types/investment';
+
+/**
+ * Cash impact of a scheduled transaction occurrence, taking nextOverride into
+ * account when useOverride is true. For investment-kind rows the amount column
+ * isn't simply `transaction.amount`; it's derived from qty * price + commission
+ * (or totalAmount for amount-only actions), and the override may carry a
+ * different qty / price / total than the base row.
+ */
+function scheduledOccurrenceAmount(
+  transaction: ScheduledTransaction,
+  useOverride: boolean,
+): number | null {
+  if (transaction.isInvestment) {
+    const action = transaction.investmentAction as InvestmentAction | null;
+    if (!action) return null;
+    const override = useOverride ? transaction.nextOverride : null;
+    const commission = Number(transaction.investmentCommission ?? 0);
+
+    if (action === 'BUY' || action === 'SELL' || action === 'REINVEST') {
+      const qty = Number(
+        override?.investmentQuantity ?? transaction.investmentQuantity ?? 0,
+      );
+      const price = Number(
+        override?.investmentPrice ?? transaction.investmentPrice ?? 0,
+      );
+      if (qty <= 0 || price <= 0) return null;
+      return computeInvestmentCashImpact(action, qty, price, commission);
+    }
+    if (action === 'DIVIDEND' || action === 'INTEREST' || action === 'CAPITAL_GAIN') {
+      const total =
+        override?.investmentTotalAmount ?? transaction.investmentTotalAmount;
+      return total != null ? Number(total) : null;
+    }
+    // ADD_SHARES / REMOVE_SHARES / SPLIT -- shares move, no cash impact.
+    return 0;
+  }
+  if (useOverride && transaction.nextOverride?.amount != null) {
+    return Number(transaction.nextOverride.amount);
+  }
+  return Number(transaction.amount);
+}
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Modal } from '@/components/ui/Modal';
 
@@ -149,19 +192,29 @@ const ScheduledTransactionRow = memo(function ScheduledTransactionRow({
 
       {/* Amount */}
       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-right">
-        {transaction.nextOverride?.amount != null &&
-         Number(transaction.nextOverride.amount) !== Number(transaction.amount) ? (
-          <div className="flex flex-col items-end">
-            <span className="text-xs text-gray-400 dark:text-gray-500 line-through">
-              {formatAmount(transaction.amount, transaction.currencyCode)}
-            </span>
-            <span title="Modified for next occurrence">
-              {formatAmount(transaction.nextOverride.amount, transaction.currencyCode)}
-            </span>
-          </div>
-        ) : (
-          formatAmount(transaction.amount, transaction.currencyCode)
-        )}
+        {(() => {
+          const baseAmount = scheduledOccurrenceAmount(transaction, false);
+          const overrideAmount = transaction.nextOverride
+            ? scheduledOccurrenceAmount(transaction, true)
+            : null;
+          const isModified =
+            overrideAmount != null &&
+            baseAmount != null &&
+            Number(overrideAmount) !== Number(baseAmount);
+          if (isModified) {
+            return (
+              <div className="flex flex-col items-end">
+                <span className="text-xs text-gray-400 dark:text-gray-500 line-through">
+                  {formatAmount(baseAmount, transaction.currencyCode)}
+                </span>
+                <span title="Modified for next occurrence">
+                  {formatAmount(overrideAmount, transaction.currencyCode)}
+                </span>
+              </div>
+            );
+          }
+          return formatAmount(baseAmount, transaction.currencyCode);
+        })()}
       </td>
 
       {/* Schedule (Frequency + Next Due + Remaining) */}

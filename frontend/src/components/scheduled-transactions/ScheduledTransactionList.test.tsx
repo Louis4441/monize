@@ -187,6 +187,86 @@ describe('ScheduledTransactionList', () => {
     expect(screen.getByText('-$19.99')).toBeInTheDocument();
   });
 
+  it('derives investment amount from qty * price + commission (base, no override)', () => {
+    const transactions = [createTransaction({
+      isInvestment: true,
+      investmentAction: 'BUY',
+      investmentQuantity: 10,
+      investmentPrice: 100,
+      investmentCommission: 9.99,
+      amount: 0, // base amount column ignored for investments
+    })];
+    render(<ScheduledTransactionList transactions={transactions} />);
+    // 10 * 100 + 9.99 = 1009.99, BUY -> negative
+    expect(screen.getByText('-$1009.99')).toBeInTheDocument();
+  });
+
+  it('shows base vs override amount for an investment override that changes quantity', () => {
+    const transactions = [createTransaction({
+      isInvestment: true,
+      investmentAction: 'BUY',
+      investmentQuantity: 10,
+      investmentPrice: 100,
+      investmentCommission: 0,
+      amount: 0,
+      nextOverride: {
+        amount: null,
+        overrideDate: null,
+        investmentQuantity: 5,
+        investmentPrice: 100,
+        investmentTotalAmount: null,
+      },
+    })];
+    render(<ScheduledTransactionList transactions={transactions} />);
+    // Base 10 * 100 = -1000; override 5 * 100 = -500
+    expect(screen.getByText('-$1000.00')).toBeInTheDocument();
+    expect(screen.getByText('-$500.00')).toBeInTheDocument();
+  });
+
+  it('shows base vs override amount for a DIVIDEND override that changes total', () => {
+    const transactions = [createTransaction({
+      isInvestment: true,
+      investmentAction: 'DIVIDEND',
+      investmentQuantity: null,
+      investmentPrice: null,
+      investmentTotalAmount: 50,
+      investmentCommission: 0,
+      amount: 0,
+      nextOverride: {
+        amount: null,
+        overrideDate: null,
+        investmentQuantity: null,
+        investmentPrice: null,
+        investmentTotalAmount: 125,
+      },
+    })];
+    render(<ScheduledTransactionList transactions={transactions} />);
+    expect(screen.getByText('+$50.00')).toBeInTheDocument();
+    expect(screen.getByText('+$125.00')).toBeInTheDocument();
+  });
+
+  it('does not strike through when the investment override matches the base values', () => {
+    const transactions = [createTransaction({
+      isInvestment: true,
+      investmentAction: 'BUY',
+      investmentQuantity: 10,
+      investmentPrice: 100,
+      investmentCommission: 0,
+      amount: 0,
+      nextOverride: {
+        amount: null,
+        overrideDate: null,
+        investmentQuantity: 10,
+        investmentPrice: 100,
+        investmentTotalAmount: null,
+      },
+    })];
+    render(<ScheduledTransactionList transactions={transactions} />);
+    expect(screen.getByText('-$1000.00')).toBeInTheDocument();
+    // Only one occurrence -- no strikethrough sibling
+    expect(screen.queryAllByText('-$1000.00').length).toBe(1);
+  });
+
   // --- Account name display ---
   it('displays account name', () => {
     const transactions = [createTransaction({ account: { name: 'Main Checking' } })];
