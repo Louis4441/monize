@@ -111,7 +111,8 @@ export function TransactionList({
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   const LONG_PRESS_MOVE_THRESHOLD = 10;
 
-  const handleLongPressStart = useCallback((transaction: Transaction) => {
+  const handleLongPressStart = useCallback((transaction: Transaction, e: React.MouseEvent) => {
+    if (e.button !== 0) return;
     touchStartPos.current = null;
     longPressTriggered.current = false;
     longPressTimer.current = setTimeout(() => {
@@ -151,6 +152,16 @@ export function TransactionList({
         touchStartPos.current = null;
       }
     }
+  }, []);
+
+  const handleContextMenu = useCallback((transaction: Transaction, e: React.MouseEvent) => {
+    e.preventDefault();
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    longPressTriggered.current = true;
+    setActionSheet({ isOpen: true, transaction });
   }, []);
 
   const handleRowClick = useCallback((transaction: Transaction) => {
@@ -486,6 +497,7 @@ export function TransactionList({
                     onLongPressStartTouch={handleLongPressStartTouch}
                     onLongPressEnd={handleLongPressEnd}
                     onTouchMove={handleTouchMove}
+                    onContextMenu={handleContextMenu}
                     onPayeeClick={onPayeeClick}
                     onTransferClick={onTransferClick}
                     onCategoryClick={onCategoryClick}

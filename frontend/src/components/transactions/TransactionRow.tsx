@@ -128,10 +128,11 @@ export interface TransactionRowProps {
   formatAmount: (amount: number, currencyCode?: string) => JSX.Element;
   formatBalance: (balance: number, currencyCode?: string) => JSX.Element;
   onRowClick: (transaction: Transaction) => void;
-  onLongPressStart: (transaction: Transaction) => void;
+  onLongPressStart: (transaction: Transaction, e: React.MouseEvent) => void;
   onLongPressStartTouch: (transaction: Transaction, e: React.TouchEvent) => void;
   onLongPressEnd: () => void;
   onTouchMove: (e: React.TouchEvent) => void;
+  onContextMenu: (transaction: Transaction, e: React.MouseEvent) => void;
   onPayeeClick?: (payeeId: string) => void;
   onTransferClick?: (linkedAccountId: string, linkedTransactionId: string) => void;
   onCategoryClick?: (categoryId: string) => void;
@@ -167,6 +168,7 @@ export const TransactionRow = memo(function TransactionRow({
   onLongPressStartTouch,
   onLongPressEnd,
   onTouchMove,
+  onContextMenu,
   onPayeeClick,
   onTransferClick,
   onCategoryClick,
@@ -191,7 +193,8 @@ export const TransactionRow = memo(function TransactionRow({
   return (
     <tr
       onClick={() => onRowClick(transaction)}
-      onMouseDown={() => onLongPressStart(transaction)}
+      onContextMenu={(e) => onContextMenu(transaction, e)}
+      onMouseDown={(e) => onLongPressStart(transaction, e)}
       onMouseUp={onLongPressEnd}
       onMouseLeave={onLongPressEnd}
       onTouchStart={(e) => onLongPressStartTouch(transaction, e)}

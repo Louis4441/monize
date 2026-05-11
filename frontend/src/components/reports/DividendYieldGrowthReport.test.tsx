@@ -687,13 +687,19 @@ describe('DividendYieldGrowthReport', () => {
   });
 
   it('detects annual dividend frequency', async () => {
-    // 2 payments ~365 days apart within trailing 12 months (current date is 2026-05-06)
+    // 2 payments far enough apart to count as annual, both well inside trailing 12 months
+    const now = new Date();
+    const ymd = (d: Date) => d.toISOString().slice(0, 10);
+    const recent = new Date(now);
+    recent.setDate(recent.getDate() - 14);
+    const older = new Date(recent);
+    older.setDate(older.getDate() - 250);
     mockGetTransactions.mockImplementation(async ({ action }: { action: string }) => {
       if (action === 'DIVIDEND') {
         return {
           data: [
-            { id: 'tx-1', transactionDate: '2025-05-10', action: 'DIVIDEND', totalAmount: 300, accountId: 'acc-1', securityId: 's-1' },
-            { id: 'tx-2', transactionDate: '2026-05-01', action: 'DIVIDEND', totalAmount: 300, accountId: 'acc-1', securityId: 's-1' },
+            { id: 'tx-1', transactionDate: ymd(older), action: 'DIVIDEND', totalAmount: 300, accountId: 'acc-1', securityId: 's-1' },
+            { id: 'tx-2', transactionDate: ymd(recent), action: 'DIVIDEND', totalAmount: 300, accountId: 'acc-1', securityId: 's-1' },
           ],
           pagination: { hasMore: false },
         };
