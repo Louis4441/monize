@@ -5,7 +5,7 @@
 
 set -e
 
-REGISTRY=registry.ucdialplans.com/monize
+REGISTRY=registry.laskonet.com/monize
 
 cd ~/monize
 echo "Building backend..."
