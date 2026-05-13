@@ -297,7 +297,12 @@ describe('InvestmentTransactionForm', () => {
   });
 
   it('filters out CASH, ASSET, and brokerage accounts from funding accounts', async () => {
-    render(<InvestmentTransactionForm accounts={accounts} />);
+    const investmentCash = {
+      id: 'a4', name: 'RRSP Cash', accountType: 'INVESTMENT',
+      accountSubType: 'INVESTMENT_CASH', currencyCode: 'CAD',
+    } as any;
+
+    render(<InvestmentTransactionForm accounts={[...accounts, investmentCash]} />);
     await waitFor(() => {
       const fundingSelect = screen.getByLabelText('Funds From (optional)');
       const options = fundingSelect.querySelectorAll('option');
@@ -305,6 +310,7 @@ describe('InvestmentTransactionForm', () => {
       expect(optionTexts).not.toContain('Cash Account');
       expect(optionTexts).not.toContain('RRSP Brokerage');
       expect(optionTexts).toContain('Main Chequing');
+      expect(optionTexts).toContain('RRSP Cash');
     });
   });
 
