@@ -184,6 +184,7 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           isFavourite: false,
           excludeFromNetWorth: false,
           paymentFrequency: 'MONTHLY' as PaymentFrequency,
+          createInvestmentPair: true,
         },
   });
 
