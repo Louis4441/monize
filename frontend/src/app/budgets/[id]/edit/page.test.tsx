@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@/test/render';
-import { act } from '@testing-library/react';
 import BudgetEditPage from './page';
 
 // Mock next/navigation

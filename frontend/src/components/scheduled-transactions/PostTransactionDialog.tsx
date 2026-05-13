@@ -192,7 +192,7 @@ export function PostTransactionDialog({
       transferBefore,
       transferAfter: transferBefore != null ? roundToCents(transferBefore - effectivePostAmount) : null,
     };
-  }, [sourceAccount, transferAccount, transactionDate, effectivePostAmount, scheduledTransactions, futureTransactions, scheduledTransaction.id]);
+  }, [sourceAccount, transferAccount, transactionDate, effectivePostAmount, scheduledTransactions, futureTransactions, scheduledTransaction.id, accounts]);
 
   // Initialize form with transaction values (including override if exists)
   useEffect(() => {
