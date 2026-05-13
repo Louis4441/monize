@@ -153,8 +153,21 @@ const RANGE_TO_YAHOO: Record<
   { interval: IntradayInterval; range: IntradayRange }
 > = {
   "1d": { interval: "1m", range: "1d" },
-  "1w": { interval: "5m", range: "5d" },
+  // Yahoo's "5d" range only covers 5 trading days, so a 1W request that lands
+  // on a Wednesday would only reach back to the previous Thursday. Pull a
+  // full month and let the cutoff filter trim to exactly 7 calendar days.
+  "1w": { interval: "5m", range: "1mo" },
   "1m": { interval: "15m", range: "1mo" },
+};
+
+// Calendar-day lookback used to trim the intraday series to a precise
+// "beginning of (today - N days)" boundary. Yahoo's range parameter is
+// approximate (e.g. "5d" returns 5 trading days, "1mo" excludes the
+// boundary date), so we over-fetch and filter here.
+const RANGE_LOOKBACK_DAYS: Record<IntradayRangeKey, number | null> = {
+  "1d": null,
+  "1w": 7,
+  "1m": 30,
 };
 
 // Per-range fallback chain attempted (per holding, in order) when the
@@ -178,10 +191,10 @@ const RANGE_FALLBACKS: Record<
     { interval: "90m", range: "1d" },
   ],
   "1w": [
-    { interval: "15m", range: "5d" },
-    { interval: "30m", range: "5d" },
-    { interval: "60m", range: "5d" },
-    { interval: "90m", range: "5d" },
+    { interval: "15m", range: "1mo" },
+    { interval: "30m", range: "1mo" },
+    { interval: "60m", range: "1mo" },
+    { interval: "90m", range: "1mo" },
   ],
   "1m": [
     { interval: "30m", range: "1mo" },
@@ -934,7 +947,20 @@ export class PortfolioService {
     for (const series of seriesBySecurity.values()) {
       for (const p of series) timestampSet.add(p.timestamp.getTime());
     }
-    const timestamps = [...timestampSet].sort((a, b) => a - b);
+    let timestamps = [...timestampSet].sort((a, b) => a - b);
+
+    // Trim to a precise "start of (today - N days)" boundary. Yahoo's range
+    // parameter is approximate (e.g. "1mo" excludes the calendar-month
+    // boundary date), so we over-fetched above and now drop any bars that
+    // fall before the requested calendar window.
+    const lookbackDays = RANGE_LOOKBACK_DAYS[range];
+    if (lookbackDays != null) {
+      const cutoff = new Date();
+      cutoff.setUTCHours(0, 0, 0, 0);
+      cutoff.setUTCDate(cutoff.getUTCDate() - lookbackDays);
+      const cutoffMs = cutoff.getTime();
+      timestamps = timestamps.filter((ts) => ts >= cutoffMs);
+    }
 
     // Cash held in the user's investment cash and standalone accounts is
     // part of the portfolio value just like holdings -- the daily-snapshot
@@ -1114,7 +1140,8 @@ export class PortfolioService {
         } else {
           price = src.closes[cursors[i]];
         }
-        const valueInDisplay = src.quantity * price * fxAt(src.currencyCode, ts);
+        const valueInDisplay =
+          src.quantity * price * fxAt(src.currencyCode, ts);
         totalCents += Math.round(valueInDisplay * 10000);
       }
       points.push({

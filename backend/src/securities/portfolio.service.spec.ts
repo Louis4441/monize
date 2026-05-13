@@ -3053,6 +3053,75 @@ describe("PortfolioService", () => {
       expect(calls[0][2].interval).toBe("15m");
     });
 
+    it("fetches a wider Yahoo range for 1W and trims to a 7-day cutoff", async () => {
+      // Yahoo's "5d" range only covers 5 trading days, which leaves a 1W
+      // request on a Wednesday reaching back only to the previous Thursday.
+      // We over-fetch (range="1mo") and trim here to a precise
+      // start-of-day(today - 7 days) cutoff so the chart always covers a
+      // full week.
+      jest.useFakeTimers().setSystemTime(new Date("2026-05-13T18:00:00.000Z"));
+      try {
+        accountsRepository.find.mockResolvedValue([mockBrokerageAccount]);
+        holdingsRepository.find.mockResolvedValue([mockHoldingAAPL]);
+
+        yahooFinanceService.fetchIntradaySeries.mockResolvedValue([
+          // Outside the 7-day window: must be filtered out.
+          { timestamp: new Date("2026-05-05T13:30:00.000Z"), close: 90 },
+          { timestamp: new Date("2026-05-05T23:59:59.000Z"), close: 91 },
+          // Right at the boundary: start of day(2026-05-06) is inclusive.
+          { timestamp: new Date("2026-05-06T00:00:00.000Z"), close: 95 },
+          { timestamp: new Date("2026-05-06T13:30:00.000Z"), close: 100 },
+          { timestamp: new Date("2026-05-13T15:00:00.000Z"), close: 110 },
+        ]);
+        exchangeRateService.getLatestRate.mockResolvedValue(1);
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1w",
+        });
+
+        const calls = yahooFinanceService.fetchIntradaySeries.mock.calls;
+        expect(calls[0][2]).toEqual({ interval: "5m", range: "1mo" });
+
+        const isoTimestamps = result.points.map((p) => p.timestamp);
+        expect(isoTimestamps).toEqual([
+          "2026-05-06T00:00:00.000Z",
+          "2026-05-06T13:30:00.000Z",
+          "2026-05-13T15:00:00.000Z",
+        ]);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("trims the 1M series to a 30-day cutoff", async () => {
+      jest.useFakeTimers().setSystemTime(new Date("2026-05-13T18:00:00.000Z"));
+      try {
+        accountsRepository.find.mockResolvedValue([mockBrokerageAccount]);
+        holdingsRepository.find.mockResolvedValue([mockHoldingAAPL]);
+
+        yahooFinanceService.fetchIntradaySeries.mockResolvedValue([
+          // Outside the 30-day window: must be filtered out.
+          { timestamp: new Date("2026-04-12T13:30:00.000Z"), close: 90 },
+          // Inside the 30-day window: start of day(2026-04-13) is inclusive.
+          { timestamp: new Date("2026-04-13T13:30:00.000Z"), close: 100 },
+          { timestamp: new Date("2026-05-13T15:00:00.000Z"), close: 110 },
+        ]);
+        exchangeRateService.getLatestRate.mockResolvedValue(1);
+
+        const result = await service.getIntradayValueSeries(userId, {
+          range: "1m",
+        });
+
+        const isoTimestamps = result.points.map((p) => p.timestamp);
+        expect(isoTimestamps).toEqual([
+          "2026-04-13T13:30:00.000Z",
+          "2026-05-13T15:00:00.000Z",
+        ]);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it("uses each failed holding's latest known close as a constant offset", async () => {
       // When some intraday fetches fail (Yahoo errored, was rate-limited
       // past retry, or simply has no minute-resolution data for the
