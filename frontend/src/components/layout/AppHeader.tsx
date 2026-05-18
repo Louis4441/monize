@@ -260,19 +260,23 @@ export function AppHeader() {
                     )}
 
                     {/* Divider */}
-                    <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                    {!isDelegateView && (
+                      <>
+                        <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
 
-                    {/* Settings link */}
-                    <button
-                      onClick={() => router.push('/settings')}
-                      className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
-                        pathname === '/settings'
-                          ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200'
-                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      Settings
-                    </button>
+                        {/* Settings link */}
+                        <button
+                          onClick={() => router.push('/settings')}
+                          className={`block w-full text-left px-4 py-2 text-sm transition-colors ${
+                            pathname === '/settings'
+                              ? 'bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-200'
+                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          Settings
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
@@ -463,6 +467,7 @@ export function AppHeader() {
             </div>
             <ActionHistoryPanel />
             <BudgetAlertBadge />
+            {!isDelegateView && (
             <button
               onClick={() => router.push('/settings')}
               className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -493,6 +498,7 @@ export function AppHeader() {
               </svg>
               <span className="hidden sm:inline">{user?.firstName || user?.email}</span>
             </button>
+            )}
             <Button
               variant="outline"
               size="sm"
