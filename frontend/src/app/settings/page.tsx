@@ -206,7 +206,7 @@ function SettingsContent() {
                     Shared Access
                   </h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Grant another person scoped read access to specific accounts.
+                    Grant another person granular access to specific accounts.
                   </p>
                 </Link>
               </div>

@@ -32,7 +32,7 @@ function SharedAccessContent() {
 
         <PageHeader
           title="Shared Access"
-          subtitle="Grant another person scoped read access to specific accounts"
+          subtitle="Grant another person granular access to specific accounts"
         />
 
         {isDemoMode ? (
