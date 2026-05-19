@@ -11,6 +11,7 @@ describe("DelegationController", () => {
     service = {
       listDelegates: jest.fn().mockResolvedValue(["d"]),
       createDelegate: jest.fn().mockResolvedValue({ id: "g1" }),
+      delegateEmailExists: jest.fn().mockResolvedValue(true),
       revokeDelegate: jest.fn().mockResolvedValue(undefined),
       setGrants: jest.fn().mockResolvedValue(undefined),
       setCapabilities: jest.fn().mockResolvedValue(undefined),
@@ -31,6 +32,13 @@ describe("DelegationController", () => {
   it("lists delegates for the current owner", async () => {
     await expect(controller.listDelegates(req)).resolves.toEqual(["d"]);
     expect(service.listDelegates).toHaveBeenCalledWith("owner-1");
+  });
+
+  it("looks up whether an email already exists", async () => {
+    await expect(
+      controller.lookupDelegate({ email: "a@b.c" } as never),
+    ).resolves.toEqual({ exists: true });
+    expect(service.delegateEmailExists).toHaveBeenCalledWith("a@b.c");
   });
 
   it("creates a delegate", async () => {

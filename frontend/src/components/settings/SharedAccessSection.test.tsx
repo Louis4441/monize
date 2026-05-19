@@ -6,6 +6,7 @@ import { __resetModalStateForTesting } from '@/components/ui/Modal';
 vi.mock('@/lib/delegation', () => ({
   delegationApi: {
     listDelegates: vi.fn(),
+    lookupEmail: vi.fn(),
     createDelegate: vi.fn(),
     setGrants: vi.fn(),
     setCapabilities: vi.fn(),
@@ -74,6 +75,9 @@ describe('SharedAccessSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     __resetModalStateForTesting();
+    vi.mocked(delegationApi.lookupEmail).mockResolvedValue({
+      exists: false,
+    });
     vi.mocked(delegationApi.listDelegates).mockResolvedValue([
       { ...delegate },
     ]);
@@ -184,6 +188,50 @@ describe('SharedAccessSection', () => {
           email: 'new@x.y',
           lastName: 'Doe',
           password: 'StrongPass1!xyz',
+          sendInvite: false,
+        }),
+      ),
+    );
+  });
+
+  it('links an existing user without password/invite', async () => {
+    vi.mocked(delegationApi.lookupEmail).mockResolvedValue({ exists: true });
+    vi.mocked(delegationApi.createDelegate).mockResolvedValue({
+      id: 'g3',
+      delegateUserId: 'd3',
+      email: 'exists@x.y',
+      invited: false,
+    });
+    await renderSection();
+    await screen.findByText('d@e.f');
+
+    await act(async () => {
+      openCreateModal();
+    });
+    await screen.findByPlaceholderText('Delegate email');
+
+    await act(async () => {
+      fireEvent.change(screen.getByPlaceholderText('Delegate email'), {
+        target: { value: 'exists@x.y' },
+      });
+    });
+
+    expect(
+      await screen.findByText(/already has a Monize login/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText('Set a password'),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      submitCreate();
+    });
+
+    await waitFor(() =>
+      expect(delegationApi.createDelegate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'exists@x.y',
+          password: undefined,
           sendInvite: false,
         }),
       ),

@@ -538,6 +538,20 @@ export class DelegationService {
     }
   }
 
+  /**
+   * Whether a Monize login already exists for this email (existing full
+   * account or a delegate of another owner). Used by the Add-delegate UI
+   * to skip the password / invite controls -- such a user keeps their own
+   * credentials and is only granted the additional shared access.
+   */
+  async delegateEmailExists(email: string): Promise<boolean> {
+    const normalized = email.toLowerCase().trim();
+    const user = await this.usersRepository.findOne({
+      where: { email: normalized },
+    });
+    return !!user;
+  }
+
   async createDelegate(ownerUserId: string, dto: CreateDelegateDto) {
     const email = dto.email.toLowerCase().trim();
 

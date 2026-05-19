@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Request,
   UseGuards,
   HttpCode,
@@ -20,6 +21,7 @@ import { CreateDelegateDto } from "./dto/create-delegate.dto";
 import { SetGrantsDto } from "./dto/set-grants.dto";
 import { SetCapabilitiesDto } from "./dto/set-capabilities.dto";
 import { SetSectionsDto } from "./dto/set-sections.dto";
+import { LookupDelegateDto } from "./dto/lookup-delegate.dto";
 
 /**
  * Owner-scoped delegate management ("Shared Access" settings). Every endpoint
@@ -40,6 +42,16 @@ export class DelegationController {
   @ApiOperation({ summary: "List delegates for the current account" })
   listDelegates(@Request() req) {
     return this.delegationService.listDelegates(req.user.id);
+  }
+
+  @Get("delegates/lookup")
+  @ApiOperation({
+    summary: "Whether an email already has a Monize login",
+  })
+  async lookupDelegate(@Query() dto: LookupDelegateDto) {
+    return {
+      exists: await this.delegationService.delegateEmailExists(dto.email),
+    };
   }
 
   @Post("delegates")

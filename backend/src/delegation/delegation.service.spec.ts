@@ -891,6 +891,23 @@ describe("DelegationService", () => {
     });
   });
 
+  describe("delegateEmailExists", () => {
+    it("is true when a user with the (normalized) email exists", async () => {
+      usersRepo.findOne.mockResolvedValue({ id: "u1" });
+      await expect(service.delegateEmailExists("  Foo@Bar.Com ")).resolves.toBe(
+        true,
+      );
+      expect(usersRepo.findOne).toHaveBeenCalledWith({
+        where: { email: "foo@bar.com" },
+      });
+    });
+
+    it("is false when no user has that email", async () => {
+      usersRepo.findOne.mockResolvedValue(null);
+      await expect(service.delegateEmailExists("x@y.z")).resolves.toBe(false);
+    });
+  });
+
   describe("createDelegate", () => {
     const makeManager = () => {
       const manager: any = {

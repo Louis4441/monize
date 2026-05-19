@@ -54,6 +54,8 @@ export function SharedAccessSection() {
   const [password, setPassword] = useState('');
   const [sendInvite, setSendInvite] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // null = unknown / not yet checked; true = email already has a login.
+  const [emailExists, setEmailExists] = useState<boolean | null>(null);
 
   const [revokeTarget, setRevokeTarget] = useState<DelegateSummary | null>(
     null,
@@ -101,7 +103,35 @@ export function SharedAccessSection() {
     setLastName('');
     setPassword('');
     setSendInvite(false);
+    setEmailExists(null);
   };
+
+  // Debounced check: if the email already has a Monize login (existing
+  // full account, or a delegate of another owner), the owner only links
+  // the additional access -- no password / invite is set here.
+  useEffect(() => {
+    if (!showCreate) return;
+    const value = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      setEmailExists(null);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      delegationApi
+        .lookupEmail(value)
+        .then((r) => {
+          if (!cancelled) setEmailExists(r.exists);
+        })
+        .catch(() => {
+          if (!cancelled) setEmailExists(null);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [email, showCreate]);
 
   const openCreate = () => {
     resetCreateForm();
@@ -111,7 +141,8 @@ export function SharedAccessSection() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!sendInvite) {
+    // Existing login: just link the access, never touch their credentials.
+    if (!emailExists && !sendInvite) {
       if (!password) {
         toast.error('Set a password or send an email invite.');
         return;
@@ -129,8 +160,9 @@ export function SharedAccessSection() {
         email: email.trim(),
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
-        password: sendInvite ? undefined : password || undefined,
-        sendInvite,
+        password:
+          emailExists || sendInvite ? undefined : password || undefined,
+        sendInvite: emailExists ? false : sendInvite,
       });
       if (res.temporaryPassword) {
         toast.success(
@@ -306,33 +338,43 @@ export function SharedAccessSection() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <ToggleSwitch
-                checked={sendInvite}
-                onChange={setSendInvite}
-                label="Send an email invite instead of setting a password"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Send an email invite instead of setting a password
-              </span>
-            </div>
-
-            {!sendInvite && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Password
-                </label>
-                <PasswordInput
-                  required
-                  placeholder="Set a password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={inputClass}
-                />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {PASSWORD_REQUIREMENTS_TEXT}
-                </p>
+            {emailExists ? (
+              <div className="rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/30 px-3 py-2 text-sm text-blue-800 dark:text-blue-200">
+                This person already has a Monize login. They&apos;ll keep
+                their own credentials and simply be granted the additional
+                shared access &mdash; no password or invite needed.
               </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <ToggleSwitch
+                    checked={sendInvite}
+                    onChange={setSendInvite}
+                    label="Send an email invite instead of setting a password"
+                  />
+                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                    Send an email invite instead of setting a password
+                  </span>
+                </div>
+
+                {!sendInvite && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Password
+                    </label>
+                    <PasswordInput
+                      required
+                      placeholder="Set a password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={inputClass}
+                    />
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {PASSWORD_REQUIREMENTS_TEXT}
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

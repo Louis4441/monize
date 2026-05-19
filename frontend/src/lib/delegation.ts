@@ -122,6 +122,14 @@ export const delegationApi = {
     return res.data;
   },
 
+  lookupEmail: async (email: string): Promise<{ exists: boolean }> => {
+    const res = await apiClient.get<{ exists: boolean }>(
+      '/delegation/delegates/lookup',
+      { params: { email } },
+    );
+    return res.data;
+  },
+
   createDelegate: async (
     payload: CreateDelegatePayload,
   ): Promise<CreateDelegateResponse> => {
