@@ -492,7 +492,11 @@ describe('useSwipeNavigation', () => {
 
   describe('delegate (acting-as) view', () => {
     afterEach(() => {
-      useAuthStore.getState().setDelegation(null, [], null, null);
+      // The hook is still mounted (RTL cleanup runs after this); resetting
+      // the store triggers a re-render, so wrap it in act().
+      act(() => {
+        useAuthStore.getState().setDelegation(null, [], null, null);
+      });
     });
 
     it('disables swipe when a delegate has no granted sections', () => {
