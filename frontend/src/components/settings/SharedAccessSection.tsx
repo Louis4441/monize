@@ -111,7 +111,11 @@ export function SharedAccessSection() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!sendInvite && password) {
+    if (!sendInvite) {
+      if (!password) {
+        toast.error('Set a password or send an email invite.');
+        return;
+      }
       const parsed = passwordSchema.safeParse(password);
       if (!parsed.success) {
         toast.error(PASSWORD_REQUIREMENTS_TEXT);
@@ -319,14 +323,14 @@ export function SharedAccessSection() {
                   Password
                 </label>
                 <PasswordInput
-                  placeholder="Set a password (optional)"
+                  required
+                  placeholder="Set a password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={inputClass}
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {PASSWORD_REQUIREMENTS_TEXT} Leave blank to auto-generate a
-                  temporary password.
+                  {PASSWORD_REQUIREMENTS_TEXT}
                 </p>
               </div>
             )}

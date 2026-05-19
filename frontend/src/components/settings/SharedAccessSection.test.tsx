@@ -138,7 +138,7 @@ describe('SharedAccessSection', () => {
       target: { value: 'new@x.y' },
     });
     fireEvent.change(
-      screen.getByPlaceholderText('Set a password (optional)'),
+      screen.getByPlaceholderText('Set a password'),
       { target: { value: 'weak' } },
     );
     await act(async () => {
@@ -171,7 +171,7 @@ describe('SharedAccessSection', () => {
       target: { value: 'Doe' },
     });
     fireEvent.change(
-      screen.getByPlaceholderText('Set a password (optional)'),
+      screen.getByPlaceholderText('Set a password'),
       { target: { value: 'StrongPass1!xyz' } },
     );
     await act(async () => {
