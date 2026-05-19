@@ -240,7 +240,7 @@ CREATE TABLE transaction_splits (
     transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
     kind VARCHAR(20) NOT NULL DEFAULT 'category', -- 'category', 'transfer', or 'investment'
     category_id UUID REFERENCES categories(id),
-    transfer_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL, -- target account for transfer splits
+    transfer_account_id UUID REFERENCES accounts(id) ON DELETE CASCADE, -- target account for transfer splits
     linked_transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL, -- linked transaction in target account
     amount NUMERIC(20, 4) NOT NULL,
     memo TEXT,
@@ -345,7 +345,7 @@ CREATE TABLE scheduled_transaction_splits (
     scheduled_transaction_id UUID NOT NULL REFERENCES scheduled_transactions(id) ON DELETE CASCADE,
     kind VARCHAR(20) NOT NULL DEFAULT 'category', -- 'category', 'transfer', or 'investment'
     category_id UUID REFERENCES categories(id),
-    transfer_account_id UUID REFERENCES accounts(id) ON DELETE SET NULL, -- target account for transfer splits
+    transfer_account_id UUID REFERENCES accounts(id) ON DELETE CASCADE, -- target account for transfer splits
     amount NUMERIC(20, 4) NOT NULL,
     memo TEXT,
     -- Investment-split fields (populated when kind='investment'):

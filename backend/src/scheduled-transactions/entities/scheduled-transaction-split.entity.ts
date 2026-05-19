@@ -43,7 +43,7 @@ export class ScheduledTransactionSplit {
   @Column({ type: "uuid", name: "transfer_account_id", nullable: true })
   transferAccountId: string | null;
 
-  @ManyToOne(() => Account, { nullable: true })
+  @ManyToOne(() => Account, { nullable: true, onDelete: "CASCADE" })
   @JoinColumn({ name: "transfer_account_id" })
   transferAccount: Account | null;
 
