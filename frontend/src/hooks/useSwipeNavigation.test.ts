@@ -495,7 +495,7 @@ describe('useSwipeNavigation', () => {
       useAuthStore.getState().setDelegation(null, [], null, null);
     });
 
-    it('disables swipe navigation on the dashboard for a delegate', () => {
+    it('disables swipe when a delegate has no granted sections', () => {
       mockPathname = '/dashboard';
       act(() => {
         useAuthStore.getState().setDelegation('owner-1', [], null, null);
@@ -503,14 +503,54 @@ describe('useSwipeNavigation', () => {
 
       const { result } = renderHook(() => useSwipeNavigation());
 
+      // Only the Dashboard is reachable -> nothing to swipe to.
       expect(result.current.isSwipePage).toBe(false);
+      expect(result.current.totalPages).toBe(1);
+    });
+
+    it('swipes only across the delegate-granted sections', () => {
+      mockPathname = '/dashboard';
+      act(() => {
+        useAuthStore.getState().setDelegation('owner-1', [], null, {
+          bills: true,
+          investments: false,
+          budgets: true,
+          reports: false,
+          ai: false,
+        });
+      });
+
+      const { result } = renderHook(() => useSwipeNavigation());
+
+      // Dashboard + Bills + Budgets only.
+      expect(result.current.totalPages).toBe(3);
+      expect(result.current.isSwipePage).toBe(true);
+      expect(result.current.currentIndex).toBe(0);
+    });
+
+    it('does not treat a non-granted section as a swipe page', () => {
+      mockPathname = '/investments';
+      act(() => {
+        useAuthStore.getState().setDelegation('owner-1', [], null, {
+          bills: true,
+          investments: false,
+          budgets: false,
+          reports: false,
+          ai: false,
+        });
+      });
+
+      const { result } = renderHook(() => useSwipeNavigation());
+
       expect(result.current.currentIndex).toBe(-1);
+      expect(result.current.isSwipePage).toBe(false);
     });
 
     it('keeps swipe navigation enabled for a normal (non-delegate) user', () => {
       mockPathname = '/dashboard';
       const { result } = renderHook(() => useSwipeNavigation());
       expect(result.current.isSwipePage).toBe(true);
+      expect(result.current.totalPages).toBe(7);
     });
   });
 });

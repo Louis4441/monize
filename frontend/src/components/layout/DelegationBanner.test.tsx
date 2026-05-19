@@ -64,6 +64,22 @@ describe('DelegationBanner', () => {
     expect(screen.queryByText(/Viewing:/)).not.toBeInTheDocument();
   });
 
+  it('renders nothing for a delegate with a single context', async () => {
+    state.availableContexts = [
+      { userId: 'o1', label: 'Owner', isSelf: false, ownerHas2FA: false },
+    ];
+    vi.mocked(delegationApi.getContexts).mockResolvedValue({
+      capabilities: null,
+      sections: null,
+      actingAsUserId: 'o1',
+      contexts: state.availableContexts,
+    });
+    await act(async () => {
+      render(<DelegationBanner />);
+    });
+    expect(screen.queryByText(/Viewing:/)).not.toBeInTheDocument();
+  });
+
   it('renders nothing when unauthenticated and does not call the API', async () => {
     state.isAuthenticated = false;
     await act(async () => {

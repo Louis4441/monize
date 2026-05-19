@@ -77,7 +77,9 @@ export function DelegationBanner() {
     };
   }, [isAuthenticated, setDelegation, switchTo]);
 
-  if (!isAuthenticated || availableContexts.length === 0) return null;
+  // Nothing to switch between when there is at most one context (a pure
+  // delegate with a single owner, or a normal user) -- hide the banner.
+  if (!isAuthenticated || availableContexts.length < 2) return null;
 
   const current =
     availableContexts.find((c) =>
@@ -91,8 +93,8 @@ export function DelegationBanner() {
       : 'Your account';
 
   return (
-    <div className="bg-amber-100 dark:bg-amber-900/40 border-b border-amber-300 dark:border-amber-700 px-4 sm:px-6 lg:px-12 py-2 flex flex-wrap items-center gap-3 text-sm">
-      <span className="font-medium text-amber-900 dark:text-amber-100">
+    <div className="bg-amber-100 dark:bg-amber-900/40 border-b border-amber-300 dark:border-amber-700 px-4 sm:px-6 lg:px-12 py-2 flex items-center gap-3 text-sm">
+      <span className="font-medium text-amber-900 dark:text-amber-100 truncate min-w-0">
         Viewing: {currentLabel}
       </span>
       <label className="sr-only" htmlFor="delegation-context-select">
@@ -105,7 +107,7 @@ export function DelegationBanner() {
         onChange={(e) => {
           if (e.target.value) void switchTo(e.target.value);
         }}
-        className="rounded border border-amber-400 dark:border-amber-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-2 py-1"
+        className="flex-shrink-0 rounded border border-amber-400 dark:border-amber-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-2 py-1"
       >
         {availableContexts.map((c) => (
           <option key={c.userId} value={c.userId}>
