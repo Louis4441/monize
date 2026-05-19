@@ -40,7 +40,16 @@ function BudgetsContent() {
       const data = await budgetsApi.getAll();
       setBudgets(data);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to load budgets'));
+      // A 403 here means a delegate hit /budgets without the section
+      // grant; DelegateSectionGuard already shows the single, consistent
+      // "no access" message and redirects, so don't double-toast.
+      const status =
+        typeof error === 'object' && error && 'response' in error
+          ? (error as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (status !== 403) {
+        toast.error(getErrorMessage(error, 'Failed to load budgets'));
+      }
     } finally {
       setIsLoading(false);
     }
