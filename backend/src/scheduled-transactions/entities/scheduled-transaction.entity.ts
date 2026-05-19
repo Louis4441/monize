@@ -75,7 +75,7 @@ export class ScheduledTransaction {
   @Column({ type: "uuid", name: "category_id", nullable: true })
   categoryId: string | null;
 
-  @ManyToOne(() => Category, { nullable: true })
+  @ManyToOne(() => Category, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "category_id" })
   category: Category | null;
 

@@ -205,7 +205,7 @@ CREATE TABLE transactions (
     transaction_date DATE NOT NULL,
     payee_id UUID REFERENCES payees(id),
     payee_name VARCHAR(255), -- can be different from payee.name
-    category_id UUID REFERENCES categories(id), -- category for non-split transactions
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL, -- category for non-split transactions
     amount NUMERIC(20, 4) NOT NULL, -- positive for income/deposits, negative for expenses
     currency_code VARCHAR(3) NOT NULL REFERENCES currencies(code),
     exchange_rate NUMERIC(20, 10) DEFAULT 1, -- rate at transaction time
@@ -239,7 +239,7 @@ CREATE TABLE transaction_splits (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
     kind VARCHAR(20) NOT NULL DEFAULT 'category', -- 'category', 'transfer', or 'investment'
-    category_id UUID REFERENCES categories(id),
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
     transfer_account_id UUID REFERENCES accounts(id) ON DELETE CASCADE, -- target account for transfer splits
     linked_transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL, -- linked transaction in target account
     amount NUMERIC(20, 4) NOT NULL,
@@ -299,7 +299,7 @@ CREATE TABLE scheduled_transactions (
     name VARCHAR(255) NOT NULL, -- display name for the scheduled transaction
     payee_id UUID REFERENCES payees(id),
     payee_name VARCHAR(255),
-    category_id UUID REFERENCES categories(id),
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
     amount NUMERIC(20, 4) NOT NULL,
     currency_code VARCHAR(3) NOT NULL REFERENCES currencies(code),
     description TEXT,
@@ -344,7 +344,7 @@ CREATE TABLE scheduled_transaction_splits (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     scheduled_transaction_id UUID NOT NULL REFERENCES scheduled_transactions(id) ON DELETE CASCADE,
     kind VARCHAR(20) NOT NULL DEFAULT 'category', -- 'category', 'transfer', or 'investment'
-    category_id UUID REFERENCES categories(id),
+    category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
     transfer_account_id UUID REFERENCES accounts(id) ON DELETE CASCADE, -- target account for transfer splits
     amount NUMERIC(20, 4) NOT NULL,
     memo TEXT,
