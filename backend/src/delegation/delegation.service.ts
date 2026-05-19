@@ -325,6 +325,13 @@ export class DelegationService {
     delegateUserId: string,
     accountIds: string[],
   ): Promise<void> {
+    // Defensive: reject anything that isn't a proper array. An attacker
+    // could submit {length: 1e100} and force an unbounded loop (CWE-834).
+    // The DTO layer already validates this via @IsArray, but re-check here
+    // so the bound is visible to static analysis.
+    if (!Array.isArray(accountIds)) {
+      throw new BadRequestException("accountIds must be an array");
+    }
     await this.dataSource.transaction(async (manager) => {
       for (let i = 0; i < accountIds.length; i++) {
         await manager.update(
@@ -415,6 +422,41 @@ export class DelegationService {
 
   // --- Owner-facing management ---
 
+  /**
+   * A delegate is a "full account" -- a real user in their own right --
+   * when they own data, are an owner of their own delegations, or are an
+   * admin. Owners must not be able to reset such a user's password (it is
+   * that person's own login, not an owner-provisioned credential).
+   */
+  async isFullAccount(userId: string): Promise<boolean> {
+    const [ownsAccounts, ownsDelegations, user] = await Promise.all([
+      this.accountsRepository.count({ where: { userId } }),
+      this.delegatesRepository.count({ where: { ownerUserId: userId } }),
+      this.usersRepository.findOne({
+        where: { id: userId },
+        select: ["id", "role"],
+      }),
+    ]);
+    return ownsAccounts > 0 || ownsDelegations > 0 || user?.role === "admin";
+  }
+
+  /**
+   * An owner may reset a delegate's password only when that password is an
+   * owner-provisioned credential used solely for this relationship: the
+   * delegate is not a full account in their own right AND is not also a
+   * delegate for any other owner. Otherwise the password belongs to the
+   * person, not the owner, so only they may change it.
+   */
+  async canOwnerResetDelegatePassword(
+    delegateUserId: string,
+  ): Promise<boolean> {
+    if (await this.isFullAccount(delegateUserId)) return false;
+    const delegationCount = await this.delegatesRepository.count({
+      where: { delegateUserId },
+    });
+    return delegationCount <= 1;
+  }
+
   async listDelegates(ownerUserId: string) {
     const delegations = await this.delegatesRepository.find({
       where: {
@@ -424,29 +466,36 @@ export class DelegationService {
       relations: ["delegate", "grants"],
       order: { createdAt: "DESC" },
     });
-    return delegations.map((d) => ({
-      id: d.id,
-      status: d.status,
-      createdAt: d.createdAt,
-      delegate: {
-        id: d.delegateUserId,
-        email: d.delegate?.email ?? null,
-        firstName: d.delegate?.firstName ?? null,
-        lastName: d.delegate?.lastName ?? null,
-        hasPassword: !!d.delegate?.passwordHash,
-      },
-      grants: (d.grants ?? [])
-        .filter((g) => g.canRead)
-        .map((g) => ({
-          accountId: g.accountId,
-          canRead: g.canRead,
-          canCreate: g.canCreate,
-          canEdit: g.canEdit,
-          canDelete: g.canDelete,
-        })),
-      capabilities: this.toCapabilitySet(d),
-      sections: this.toSectionSet(d),
-    }));
+    return Promise.all(
+      delegations.map(async (d) => ({
+        id: d.id,
+        status: d.status,
+        createdAt: d.createdAt,
+        delegate: {
+          id: d.delegateUserId,
+          email: d.delegate?.email ?? null,
+          firstName: d.delegate?.firstName ?? null,
+          lastName: d.delegate?.lastName ?? null,
+          hasPassword: !!d.delegate?.passwordHash,
+          // False when the password is the delegate's own (full account or
+          // a delegate elsewhere); the owner cannot reset it.
+          canResetPassword: await this.canOwnerResetDelegatePassword(
+            d.delegateUserId,
+          ),
+        },
+        grants: (d.grants ?? [])
+          .filter((g) => g.canRead)
+          .map((g) => ({
+            accountId: g.accountId,
+            canRead: g.canRead,
+            canCreate: g.canCreate,
+            canEdit: g.canEdit,
+            canDelete: g.canDelete,
+          })),
+        capabilities: this.toCapabilitySet(d),
+        sections: this.toSectionSet(d),
+      })),
+    );
   }
 
   private toSectionSet(d?: AccountDelegate | null): DelegateSectionSet {
@@ -899,6 +948,13 @@ export class DelegationService {
     if (delegate.oidcSubject) {
       throw new BadRequestException(
         "Cannot reset password for an SSO delegate account",
+      );
+    }
+    if (!(await this.canOwnerResetDelegatePassword(delegate.id))) {
+      throw new ForbiddenException(
+        "This delegate manages their own password (they have their own " +
+          "Monize account or delegated access elsewhere). Only they can " +
+          "change it.",
       );
     }
 

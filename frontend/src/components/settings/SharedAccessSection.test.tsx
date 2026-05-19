@@ -38,6 +38,7 @@ const delegate = {
     firstName: null,
     lastName: null,
     hasPassword: true,
+    canResetPassword: true,
   },
   grants: [{ accountId: 'a1', canRead: true }],
   capabilities: {
@@ -287,5 +288,18 @@ describe('SharedAccessSection', () => {
     });
     expect(writeText).toHaveBeenCalledWith('Tiger!River42');
     expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+
+  it('disables Reset password when the delegate manages their own', async () => {
+    vi.mocked(delegationApi.listDelegates).mockResolvedValue([
+      { ...delegate, delegate: { ...delegate.delegate, canResetPassword: false } },
+    ]);
+
+    await renderSection();
+    await screen.findByText('d@e.f');
+
+    expect(
+      screen.getByRole('button', { name: 'Reset password' }),
+    ).toBeDisabled();
   });
 });

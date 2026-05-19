@@ -23,7 +23,12 @@ describe("DelegationService", () => {
   let dataSource: Record<string, jest.Mock>;
 
   beforeEach(() => {
-    delegatesRepo = { findOne: jest.fn(), find: jest.fn(), save: jest.fn() };
+    delegatesRepo = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+      save: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+    };
     grantsRepo = { findOne: jest.fn(), find: jest.fn(), count: jest.fn() };
     usersRepo = { findOne: jest.fn(), save: jest.fn() };
     prefsRepo = { findOne: jest.fn() };
@@ -509,6 +514,7 @@ describe("DelegationService", () => {
           firstName: "D",
           lastName: null,
           hasPassword: true,
+          canResetPassword: true,
         },
         grants: [
           {
@@ -899,6 +905,60 @@ describe("DelegationService", () => {
         { isRevoked: true },
       );
     });
+
+    it("refuses when the delegate is a full account (owns accounts)", async () => {
+      delegatesRepo.findOne.mockResolvedValue({
+        id: "g1",
+        delegateUserId: "d1",
+      });
+      usersRepo.findOne.mockResolvedValue({ id: "d1", oidcSubject: null });
+      accountsRepo.count.mockResolvedValue(2); // owns their own accounts
+      await expect(service.resetDelegatePassword("o1", "g1")).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(usersRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("refuses when the delegate is a delegate for another owner too", async () => {
+      delegatesRepo.findOne.mockResolvedValue({
+        id: "g1",
+        delegateUserId: "d1",
+      });
+      usersRepo.findOne.mockResolvedValue({ id: "d1", oidcSubject: null });
+      accountsRepo.count.mockResolvedValue(0);
+      // isFullAccount's ownerUserId count = 0; delegateUserId count = 2.
+      delegatesRepo.count = jest
+        .fn()
+        .mockResolvedValueOnce(0) // ownsDelegations (isFullAccount)
+        .mockResolvedValueOnce(2); // delegations as delegate
+      await expect(service.resetDelegatePassword("o1", "g1")).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(usersRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("canOwnerResetDelegatePassword", () => {
+    it("is true for an owner-provisioned pure delegate", async () => {
+      accountsRepo.count.mockResolvedValue(0);
+      delegatesRepo.count = jest.fn().mockResolvedValue(0);
+      usersRepo.findOne.mockResolvedValue({ id: "d1", role: "user" });
+      await expect(service.canOwnerResetDelegatePassword("d1")).resolves.toBe(
+        true,
+      );
+    });
+
+    it("is false when the delegate is also a delegate elsewhere", async () => {
+      accountsRepo.count.mockResolvedValue(0);
+      delegatesRepo.count = jest
+        .fn()
+        .mockResolvedValueOnce(0) // ownsDelegations (isFullAccount)
+        .mockResolvedValueOnce(2); // delegations as delegate
+      usersRepo.findOne.mockResolvedValue({ id: "d1", role: "user" });
+      await expect(service.canOwnerResetDelegatePassword("d1")).resolves.toBe(
+        false,
+      );
+    });
   });
 
   describe("delegateEmailExists", () => {
@@ -1213,6 +1273,14 @@ describe("DelegationService", () => {
         accountId: "a1",
         sortOrder: 0,
       });
+    });
+
+    it("reorderDelegateFavourites rejects a non-array (CWE-834)", async () => {
+      await expect(
+        service.reorderDelegateFavourites("d1", {
+          length: 1e9,
+        } as unknown as string[]),
+      ).rejects.toThrow(/must be an array/);
     });
 
     it("reorderDelegateFavourites sets sortOrder by position", async () => {

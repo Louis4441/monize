@@ -74,6 +74,10 @@ export interface DelegateSummary {
     firstName: string | null;
     lastName: string | null;
     hasPassword: boolean;
+    // False when the delegate's password is their own (they have their own
+    // Monize account, or are a delegate for another owner too); the owner
+    // cannot reset it in that case.
+    canResetPassword: boolean;
   };
   grants: AccountGrant[];
   capabilities: DelegateCapabilityFlags;

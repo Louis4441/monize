@@ -263,6 +263,12 @@ export function SharedAccessSection() {
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={!d.delegate.canResetPassword}
+                  title={
+                    !d.delegate.canResetPassword
+                      ? 'This person manages their own password (they have their own Monize account or delegated access elsewhere).'
+                      : undefined
+                  }
                   onClick={() => handleResetPassword(d.id)}
                 >
                   Reset password
