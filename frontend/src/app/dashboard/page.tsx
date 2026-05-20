@@ -59,6 +59,11 @@ function DashboardContent() {
   const isDelegateView = !!actingAsUserId;
   const delegateSections = useAuthStore((s) => s.delegateSections);
   const delegateBills = !!delegateSections?.bills;
+  // The acting-as context is rehydrated from localStorage; running the
+  // owner-only data load before that completes would spuriously 403 a
+  // delegate on the owner endpoints (and then re-run with the right
+  // path), so wait until the store has hydrated before firing.
+  const authHydrated = useAuthStore((s) => s._hasHydrated);
   const weekStartsOn = (usePreferencesStore((s) => s.preferences?.weekStartsOn) ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -99,6 +104,7 @@ function DashboardContent() {
   });
 
   const loadDashboardData = useCallback(async () => {
+    if (!authHydrated) return;
     setIsLoading(true);
     try {
       // Phase 1: a delegate only sees the Favourite Accounts widget, and the
@@ -184,7 +190,7 @@ function DashboardContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [weekStartsOn, isDelegateView, delegateBills]);
+  }, [authHydrated, weekStartsOn, isDelegateView, delegateBills]);
 
   useEffect(() => {
     loadDashboardData();
