@@ -55,6 +55,15 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const { user } = useAuthStore();
+  const actingAsUserId = useAuthStore((s) => s.actingAsUserId);
+  const isDelegateView = !!actingAsUserId;
+  const delegateSections = useAuthStore((s) => s.delegateSections);
+  const delegateBills = !!delegateSections?.bills;
+  // The acting-as context is rehydrated from localStorage; running the
+  // owner-only data load before that completes would spuriously 403 a
+  // delegate on the owner endpoints (and then re-run with the right
+  // path), so wait until the store has hydrated before firing.
+  const authHydrated = useAuthStore((s) => s._hasHydrated);
   const weekStartsOn = (usePreferencesStore((s) => s.preferences?.weekStartsOn) ?? 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -95,8 +104,30 @@ function DashboardContent() {
   });
 
   const loadDashboardData = useCallback(async () => {
+    if (!authHydrated) return;
     setIsLoading(true);
     try {
+      // Phase 1: a delegate only sees the Favourite Accounts widget, and the
+      // other dashboard endpoints are not delegate-accessible. Load just the
+      // (server-filtered) accounts and stop.
+      if (isDelegateView) {
+        const delegateAccounts = await accountsApi.getAll();
+        setAccounts(delegateAccounts);
+        // 3C: when the owner granted the Bills & Deposits section, the
+        // scheduled endpoint is delegate-reachable (server-filtered to the
+        // delegate's readable accounts) so the widget can render.
+        if (delegateBills) {
+          try {
+            const sched = await scheduledTransactionsApi.getAll();
+            setScheduledTransactions(sched);
+          } catch (error) {
+            logger.error('Failed to load delegate scheduled data:', error);
+          }
+        }
+        setIsLoading(false);
+        return;
+      }
+
       const now = new Date();
       const currentWeekStart = startOfWeek(now, { weekStartsOn });
       const fiveWeeksAgoStart = subWeeks(currentWeekStart, 4);
@@ -159,7 +190,7 @@ function DashboardContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [weekStartsOn]);
+  }, [authHydrated, weekStartsOn, isDelegateView, delegateBills]);
 
   useEffect(() => {
     loadDashboardData();
@@ -198,37 +229,61 @@ function DashboardContent() {
             </p>
           </div>
 
-          <GettingStarted />
+          {isDelegateView ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <FavouriteAccounts
+                accounts={accounts}
+                brokerageMarketValues={brokerageMarketValues}
+                isLoading={isLoading}
+                onAccountsChanged={loadDashboardData}
+              />
+              {delegateBills && (
+                <UpcomingBills
+                  scheduledTransactions={scheduledTransactions}
+                  accounts={accounts}
+                  isLoading={isLoading}
+                  maxItems={
+                    accounts.filter((a) => a.isFavourite && !a.isClosed)
+                      .length + 2
+                  }
+                />
+              )}
+            </div>
+          ) : (
+            <>
+              <GettingStarted />
 
-          {/* Reports Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <FavouriteAccounts accounts={accounts} brokerageMarketValues={brokerageMarketValues} isLoading={isLoading} onAccountsChanged={loadDashboardData} />
-            <UpcomingBills
-              scheduledTransactions={scheduledTransactions}
-              accounts={accounts}
-              isLoading={isLoading}
-              maxItems={accounts.filter((a) => a.isFavourite && !a.isClosed).length + 2}
-            />
-          </div>
+              {/* Reports Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <FavouriteAccounts accounts={accounts} brokerageMarketValues={brokerageMarketValues} isLoading={isLoading} onAccountsChanged={loadDashboardData} />
+                <UpcomingBills
+                  scheduledTransactions={scheduledTransactions}
+                  accounts={accounts}
+                  isLoading={isLoading}
+                  maxItems={accounts.filter((a) => a.isFavourite && !a.isClosed).length + 2}
+                />
+              </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <NetWorthChart data={netWorthData} isLoading={isLoading} />
-            <TopMovers movers={topMovers} isLoading={isLoading} hasInvestmentAccounts={hasInvestments} onRefresh={triggerManualRefresh} isRefreshing={isRefreshing} />
-          </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <NetWorthChart data={netWorthData} isLoading={isLoading} />
+                <TopMovers movers={topMovers} isLoading={isLoading} hasInvestmentAccounts={hasInvestments} onRefresh={triggerManualRefresh} isRefreshing={isRefreshing} />
+              </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <ExpensesPieChart
-              transactions={transactions}
-              categories={categories}
-              isLoading={isLoading}
-            />
-            <IncomeExpensesBarChart transactions={transactions} isLoading={isLoading} />
-          </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <ExpensesPieChart
+                  transactions={transactions}
+                  categories={categories}
+                  isLoading={isLoading}
+                />
+                <IncomeExpensesBarChart transactions={transactions} isLoading={isLoading} />
+              </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <BudgetStatusWidget isLoading={isLoading} />
-            <InsightsWidget isLoading={isLoading} />
-          </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <BudgetStatusWidget isLoading={isLoading} />
+                <InsightsWidget isLoading={isLoading} />
+              </div>
+            </>
+          )}
         </div>
       </main>
     </PageLayout>

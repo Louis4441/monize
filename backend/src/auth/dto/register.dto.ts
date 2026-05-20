@@ -41,4 +41,17 @@ export class RegisterDto {
   @MaxLength(100)
   @SanitizeHtml()
   lastName?: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      "Temporary password issued by an account owner when the email " +
+      "already belongs to a delegate. Supplying it lets the registrant " +
+      "claim and upgrade the existing delegate row into a full account, " +
+      "preserving its id so all account_delegates links continue to work.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  currentPassword?: string;
 }

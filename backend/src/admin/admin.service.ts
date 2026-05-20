@@ -13,6 +13,7 @@ import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
 import { generateReadablePassword } from "./utils/password-generator";
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
+import { UsersService } from "../users/users.service";
 
 @Injectable()
 export class AdminService {
@@ -26,12 +27,25 @@ export class AdminService {
     @InjectRepository(PersonalAccessToken)
     private patRepository: Repository<PersonalAccessToken>,
     private oauthProviderService: OAuthProviderService,
+    private usersService: UsersService,
   ) {}
 
   async findAllUsers() {
-    const users = await this.usersRepository.find({
-      order: { createdAt: "ASC" },
-    });
+    // Pure delegates (users that exist only because an account owner granted
+    // them Shared Access) must not appear here -- they are managed solely from
+    // the owner's Shared Access page. A user is still listed if they own data,
+    // own a delegation, are an admin, or simply are not a delegate at all.
+    const users = await this.usersRepository
+      .createQueryBuilder("u")
+      .where(
+        `(NOT EXISTS (SELECT 1 FROM account_delegates ad WHERE ad.delegate_user_id = u.id)
+          OR EXISTS (SELECT 1 FROM accounts a WHERE a.user_id = u.id)
+          OR EXISTS (SELECT 1 FROM account_delegates o WHERE o.owner_user_id = u.id)
+          OR u.role = :adminRole)`,
+        { adminRole: "admin" },
+      )
+      .orderBy("u.created_at", "ASC")
+      .getMany();
     return users.map((user) => {
       const {
         passwordHash,
@@ -151,12 +165,29 @@ export class AdminService {
       }
     }
 
-    // Delete preferences first (FK constraint), then sweep OIDC artifacts
-    // to avoid leaving orphan oauth_payloads rows referencing the deleted
-    // subject. (The findAccount gate would reject them anyway, but the
-    // rows are cheap to delete and keep the table clean.)
-    await this.preferencesRepository.delete({ userId: targetUserId });
+    // Revoke sessions/PATs and sweep OIDC artifacts (forces re-login and
+    // avoids orphan oauth_payloads rows) -- needed whether the account is
+    // fully removed or demoted to a delegate.
+    await this.refreshTokensRepository.update(
+      { userId: targetUserId, isRevoked: false },
+      { isRevoked: true },
+    );
+    await this.patRepository.update(
+      { userId: targetUserId, isRevoked: false },
+      { isRevoked: true },
+    );
     await this.oauthProviderService.revokeAllForUser(targetUserId);
+
+    // A full account that is also a delegate of someone else is demoted to
+    // a pure delegate instead of being removed: their own data goes, but
+    // their login and the delegate access others granted them stay.
+    if (await this.usersService.isActingDelegate(targetUserId)) {
+      await this.usersService.purgeForDowngrade(targetUserId);
+      return;
+    }
+
+    // Delete preferences first (FK constraint), then the user.
+    await this.preferencesRepository.delete({ userId: targetUserId });
     await this.usersRepository.remove(targetUser);
   }
 

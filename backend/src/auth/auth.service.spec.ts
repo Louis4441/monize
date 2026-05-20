@@ -17,6 +17,7 @@ import { AuthService } from "./auth.service";
 import { TokenService } from "./token.service";
 import { TwoFactorService } from "./two-factor.service";
 import { AuthEmailService } from "./auth-email.service";
+import { DelegationService } from "../delegation/delegation.service";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { TrustedDevice } from "../users/entities/trusted-device.entity";
@@ -50,6 +51,10 @@ describe("AuthService", () => {
   let refreshTokensRepository: Record<string, jest.Mock>;
   let jwtService: Partial<JwtService>;
   let configService: { get: jest.Mock };
+  let delegationService: {
+    isDelegateUser: jest.Mock;
+    isFullAccount: jest.Mock;
+  };
   let dataSource: Record<string, jest.Mock>;
   let passwordBreachService: { isBreached: jest.Mock };
   let emailService: { sendMail: jest.Mock };
@@ -160,11 +165,19 @@ describe("AuthService", () => {
         { provide: DataSource, useValue: dataSource },
         { provide: PasswordBreachService, useValue: passwordBreachService },
         { provide: EmailService, useValue: emailService },
+        {
+          provide: DelegationService,
+          useValue: {
+            isDelegateUser: jest.fn().mockResolvedValue(false),
+            isFullAccount: jest.fn().mockResolvedValue(false),
+          },
+        },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
     configService = module.get(ConfigService);
+    delegationService = module.get(DelegationService);
 
     // Spy on logger for security event logging tests (C2+C3)
     jest.spyOn((service as any).logger, "warn").mockImplementation();
@@ -245,6 +258,120 @@ describe("AuthService", () => {
         service.register({
           email: "test@example.com",
           password: "StrongPass123!",
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it("claims an invited (passwordless) delegate instead of duplicating", async () => {
+      const invitedDelegate = {
+        id: "deleg-1",
+        email: "shared@example.com",
+        authProvider: "local",
+        passwordHash: null,
+        resetToken: "tok",
+        resetTokenExpiry: new Date(),
+      };
+      usersRepository.findOne.mockResolvedValue(invitedDelegate);
+      delegationService.isDelegateUser.mockResolvedValue(true);
+      passwordBreachService.isBreached.mockResolvedValue(false);
+      usersRepository.save.mockImplementation(async (u: any) => u);
+
+      const result = await service.register({
+        email: "shared@example.com",
+        password: "StrongPass123!",
+        firstName: "Real",
+      });
+
+      expect(delegationService.isDelegateUser).toHaveBeenCalledWith("deleg-1");
+      expect(invitedDelegate.passwordHash).toBeTruthy();
+      expect(usersRepository.save).toHaveBeenCalledWith(invitedDelegate);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+      expect(result.accessToken).toBeDefined();
+      expect(result.user).not.toHaveProperty("passwordHash");
+    });
+
+    it("claims a delegate with a temp password when the correct currentPassword is supplied", async () => {
+      const tempPwHash = await bcrypt.hash("Temp-Pw-9!aB", 4);
+      const tempDelegate = {
+        id: "deleg-3",
+        email: "shared3@example.com",
+        authProvider: "local",
+        passwordHash: tempPwHash,
+        mustChangePassword: true,
+        failedLoginAttempts: 2,
+        lockedUntil: null,
+        resetToken: null,
+        resetTokenExpiry: null,
+      };
+      usersRepository.findOne.mockResolvedValue(tempDelegate);
+      delegationService.isDelegateUser.mockResolvedValue(true);
+      delegationService.isFullAccount.mockResolvedValue(false);
+      passwordBreachService.isBreached.mockResolvedValue(false);
+      usersRepository.save.mockImplementation(async (u: any) => u);
+
+      const result = await service.register({
+        email: "shared3@example.com",
+        password: "StrongPass123!",
+        currentPassword: "Temp-Pw-9!aB",
+      });
+
+      expect(delegationService.isDelegateUser).toHaveBeenCalledWith("deleg-3");
+      expect(delegationService.isFullAccount).toHaveBeenCalledWith("deleg-3");
+      // The temp password hash is replaced by the new one.
+      expect(tempDelegate.passwordHash).not.toBe(tempPwHash);
+      // Bootstrap markers are cleared so the new owner has a clean state.
+      expect(tempDelegate.mustChangePassword).toBe(false);
+      expect(tempDelegate.failedLoginAttempts).toBe(0);
+      expect(tempDelegate.lockedUntil).toBeNull();
+      expect(result.accessToken).toBeDefined();
+      expect(result.user).not.toHaveProperty("passwordHash");
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it("rejects a delegate claim when the currentPassword is wrong or missing", async () => {
+      const tempPwHash = await bcrypt.hash("Temp-Pw-9!aB", 4);
+      usersRepository.findOne.mockResolvedValue({
+        id: "deleg-4",
+        email: "shared4@example.com",
+        authProvider: "local",
+        passwordHash: tempPwHash,
+      });
+      delegationService.isDelegateUser.mockResolvedValue(true);
+      delegationService.isFullAccount.mockResolvedValue(false);
+
+      await expect(
+        service.register({
+          email: "shared4@example.com",
+          password: "StrongPass123!",
+        }),
+      ).rejects.toThrow(/temporary password/i);
+
+      await expect(
+        service.register({
+          email: "shared4@example.com",
+          password: "StrongPass123!",
+          currentPassword: "WrongPassword!",
+        }),
+      ).rejects.toThrow(/temporary password/i);
+    });
+
+    it("never claims a row that already owns data (full account)", async () => {
+      usersRepository.findOne.mockResolvedValue({
+        id: "full-1",
+        email: "owner@example.com",
+        authProvider: "local",
+        passwordHash: "some-hash",
+      });
+      // A delegate row that has since become a full account: isDelegateUser
+      // may still be true, but isFullAccount must veto the claim path.
+      delegationService.isDelegateUser.mockResolvedValue(true);
+      delegationService.isFullAccount.mockResolvedValue(true);
+
+      await expect(
+        service.register({
+          email: "owner@example.com",
+          password: "StrongPass123!",
+          currentPassword: "anything",
         }),
       ).rejects.toThrow(ConflictException);
     });
@@ -2935,6 +3062,30 @@ describe("AuthService", () => {
   // ---------------------------------------------------------------
   // Atomic backup code consumption
   // ---------------------------------------------------------------
+
+  describe("is2FAEnabled", () => {
+    it("returns true when the user's preferences have 2FA enabled", async () => {
+      preferencesRepository.findOne.mockResolvedValue({
+        userId: "u1",
+        twoFactorEnabled: true,
+      });
+      await expect(service.is2FAEnabled("u1")).resolves.toBe(true);
+      expect(preferencesRepository.findOne).toHaveBeenCalledWith({
+        where: { userId: "u1" },
+      });
+    });
+
+    it("returns false when preferences are missing or 2FA is disabled", async () => {
+      preferencesRepository.findOne.mockResolvedValueOnce(null);
+      await expect(service.is2FAEnabled("u1")).resolves.toBe(false);
+
+      preferencesRepository.findOne.mockResolvedValueOnce({
+        userId: "u1",
+        twoFactorEnabled: false,
+      });
+      await expect(service.is2FAEnabled("u1")).resolves.toBe(false);
+    });
+  });
 
   describe("verify2FA - atomic backup code consumption", () => {
     it("uses QueryRunner transaction for backup code removal", async () => {

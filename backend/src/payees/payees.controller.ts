@@ -32,6 +32,10 @@ import { ApplyCategorySuggestionsDto } from "./dto/apply-category-suggestions.dt
 import { DeactivatePayeesDto } from "./dto/deactivate-payees.dto";
 import { Payee } from "./entities/payee.entity";
 import { PayeeAlias } from "./entities/payee-alias.entity";
+import {
+  AllowDelegate,
+  DelegateRequiresCapability,
+} from "../delegation/decorators/delegate-access.decorator";
 
 @ApiTags("Payees")
 @ApiBearerAuth()
@@ -48,6 +52,8 @@ export class PayeesController {
     type: Payee,
   })
   @ApiResponse({ status: 409, description: "Payee with name already exists" })
+  @AllowDelegate()
+  @DelegateRequiresCapability("payees", "create")
   create(
     @Request() req,
     @Body() createPayeeDto: CreatePayeeDto,
@@ -64,6 +70,7 @@ export class PayeesController {
     description: "Filter by active status (default: all)",
   })
   @ApiResponse({ status: 200, description: "List of payees", type: [Payee] })
+  @AllowDelegate()
   findAll(
     @Request() req,
     @Query("status") status?: "active" | "inactive" | "all",
@@ -72,6 +79,7 @@ export class PayeesController {
   }
 
   @Get("search")
+  @AllowDelegate()
   @ApiOperation({ summary: "Search payees by name" })
   @ApiQuery({ name: "q", required: true, description: "Search query" })
   @ApiQuery({
@@ -93,6 +101,7 @@ export class PayeesController {
   }
 
   @Get("autocomplete")
+  @AllowDelegate()
   @ApiOperation({ summary: "Autocomplete payees (for input suggestions)" })
   @ApiQuery({
     name: "q",
@@ -111,6 +120,7 @@ export class PayeesController {
   }
 
   @Get("most-used")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get most frequently used payees" })
   @ApiQuery({
     name: "limit",
@@ -128,6 +138,7 @@ export class PayeesController {
   }
 
   @Get("recently-used")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get recently used payees" })
   @ApiQuery({
     name: "limit",
@@ -149,6 +160,7 @@ export class PayeesController {
   }
 
   @Get("summary")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get payee statistics summary" })
   @ApiResponse({ status: 200, description: "Payee summary statistics" })
   getSummary(@Request() req) {
@@ -156,6 +168,7 @@ export class PayeesController {
   }
 
   @Get("aliases")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get all aliases for the user" })
   @ApiResponse({
     status: 200,
@@ -207,6 +220,7 @@ export class PayeesController {
   }
 
   @Get("category-suggestions/preview")
+  @AllowDelegate()
   @ApiOperation({
     summary:
       "Preview category auto-assignment suggestions based on transaction history",
@@ -264,6 +278,7 @@ export class PayeesController {
   }
 
   @Get("deactivation/preview")
+  @AllowDelegate()
   @ApiOperation({
     summary: "Preview which payees would be deactivated based on criteria",
   })
@@ -325,6 +340,7 @@ export class PayeesController {
   }
 
   @Get(":id/aliases")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get all aliases for a specific payee" })
   @ApiResponse({
     status: 200,
@@ -340,6 +356,7 @@ export class PayeesController {
   }
 
   @Get("inactive/match")
+  @AllowDelegate()
   @ApiOperation({
     summary: "Check if a payee name matches an inactive payee",
   })
@@ -359,6 +376,7 @@ export class PayeesController {
   }
 
   @Get(":id")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get a payee by ID" })
   @ApiResponse({ status: 200, description: "Payee details", type: Payee })
   @ApiResponse({ status: 404, description: "Payee not found" })
@@ -378,6 +396,8 @@ export class PayeesController {
   })
   @ApiResponse({ status: 404, description: "Payee not found" })
   @ApiResponse({ status: 409, description: "Payee with name already exists" })
+  @AllowDelegate()
+  @DelegateRequiresCapability("payees", "edit")
   update(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
@@ -390,6 +410,8 @@ export class PayeesController {
   @ApiOperation({ summary: "Delete a payee" })
   @ApiResponse({ status: 200, description: "Payee deleted successfully" })
   @ApiResponse({ status: 404, description: "Payee not found" })
+  @AllowDelegate()
+  @DelegateRequiresCapability("payees", "delete")
   remove(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,

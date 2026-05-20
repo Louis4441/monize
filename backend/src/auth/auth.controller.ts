@@ -38,6 +38,9 @@ import { VerifyTotpDto } from "./dto/verify-totp.dto";
 import { Setup2faDto } from "./dto/setup-2fa.dto";
 import { Setup2faInitDto } from "./dto/setup-2fa-init.dto";
 import { passwordResetTemplate } from "../notifications/email-templates";
+import { SwitchContextDto } from "./dto/switch-context.dto";
+import { DelegationService } from "../delegation/delegation.service";
+import { AllowDelegate } from "../delegation/decorators/delegate-access.decorator";
 import { SkipCsrf } from "../common/decorators/skip-csrf.decorator";
 import { SkipPasswordCheck } from "./decorators/skip-password-check.decorator";
 import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
@@ -63,6 +66,7 @@ export class AuthController {
     private emailService: EmailService,
     private demoModeService: DemoModeService,
     private tokenService: TokenService,
+    private delegationService: DelegationService,
   ) {
     // Default to true if not explicitly set to 'false'
     const localAuthSetting = this.configService.get<string>(
@@ -221,6 +225,7 @@ export class AuthController {
   }
 
   @Post("register")
+  @AllowDelegate()
   @SkipCsrf()
   @DemoRestricted()
   @Throttle({ default: { ttl: 900000, limit: 5 } }) // 5 attempts per 15 minutes
@@ -248,6 +253,7 @@ export class AuthController {
   }
 
   @Post("login")
+  @AllowDelegate()
   @SkipCsrf()
   @Throttle({ default: { ttl: 900000, limit: 5 } }) // 5 attempts per 15 minutes
   @ApiOperation({ summary: "Login with local credentials" })
@@ -289,6 +295,7 @@ export class AuthController {
   }
 
   @Get("oidc")
+  @AllowDelegate()
   @ApiOperation({ summary: "Initiate OIDC authentication" })
   @ApiResponse({ status: 302, description: "Redirects to OIDC provider" })
   @ApiResponse({ status: 400, description: "OIDC not configured" })
@@ -316,6 +323,7 @@ export class AuthController {
   }
 
   @Get("oidc/callback")
+  @AllowDelegate()
   @ApiOperation({ summary: "OIDC callback handler" })
   async oidcCallback(
     @Query() query: Record<string, string>,
@@ -414,6 +422,7 @@ export class AuthController {
   }
 
   @Get("oidc/status")
+  @AllowDelegate()
   @ApiOperation({ summary: "Check if OIDC is enabled" })
   @ApiResponse({ status: 200, description: "Returns OIDC enabled status" })
   async oidcStatus() {
@@ -421,6 +430,7 @@ export class AuthController {
   }
 
   @Get("methods")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get available authentication methods" })
   @ApiResponse({
     status: 200,
@@ -441,6 +451,7 @@ export class AuthController {
 
   @Get("csrf-refresh")
   @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
   @ApiBearerAuth()
   @ApiOperation({ summary: "Refresh CSRF token cookie" })
   async csrfRefresh(@Request() req, @Res() res: Response) {
@@ -454,13 +465,110 @@ export class AuthController {
 
   @Get("profile")
   @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
   @ApiBearerAuth()
   @ApiOperation({ summary: "Get current user profile" })
   async getProfile(@Request() req) {
     return this.authService.sanitizeUser(req.user);
   }
 
+  @Get("me-self")
+  @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      "Authenticated user's OWN profile (delegate id, never the owner). " +
+      "Used by Security settings while acting as a delegate.",
+  })
+  async getSelfProfile(@Request() req) {
+    const user = await this.authService.getUserById(req.user.realUserId);
+    if (!user) return null;
+    return this.authService.sanitizeUser(user);
+  }
+
+  @Get("contexts")
+  @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "List delegate contexts and the current acting context",
+  })
+  async getContexts(@Request() req) {
+    return {
+      actingAsUserId: req.user.isActing ? req.user.id : null,
+      contexts: await this.delegationService.getAvailableContexts(
+        req.user.realUserId,
+      ),
+      capabilities:
+        req.user.isActing && req.user.delegationId
+          ? await this.delegationService.getCapabilities(req.user.delegationId)
+          : null,
+      sections:
+        req.user.isActing && req.user.delegationId
+          ? {
+              ...(await this.delegationService.getSections(
+                req.user.delegationId,
+              )),
+              // Not a stored section: derived from per-account grants so the
+              // delegate's Transactions nav appears when they can read any
+              // non-investment account.
+              transactions: await this.delegationService.hasTransactionalAccess(
+                req.user.delegationId,
+              ),
+              // Likewise derived: the Accounts nav appears as soon as the
+              // delegate can read any one of the owner's accounts.
+              accounts: await this.delegationService.hasAnyAccountAccess(
+                req.user.delegationId,
+              ),
+            }
+          : null,
+    };
+  }
+
+  @Post("switch-context")
+  @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Switch the acting account without re-login (delegate)",
+  })
+  async switchContext(
+    @Request() req: ExpressRequest & { user: any },
+    @Body() dto: SwitchContextDto,
+    @Res() res: Response,
+  ) {
+    const realUserId = req.user.realUserId;
+    const target = await this.delegationService.resolveSwitchTarget(
+      realUserId,
+      dto.targetUserId,
+    );
+
+    const realUser = await this.authService.getUserById(realUserId);
+    if (!realUser || !realUser.isActive) {
+      throw new UnauthorizedException("User not found or inactive");
+    }
+
+    // SECURITY: revoke the current refresh family so a stale refresh token
+    // cannot silently restore the previous context.
+    const currentRefresh = req.cookies?.["refresh_token"];
+    if (currentRefresh) {
+      await this.authService.revokeRefreshToken(currentRefresh);
+    }
+
+    const context = target
+      ? { actingAsUserId: target.ownerUserId, delegationId: target.id }
+      : undefined;
+
+    const { accessToken, refreshToken } =
+      await this.tokenService.generateTokenPair(realUser, false, context);
+
+    this.setAuthCookies(res, accessToken, refreshToken, realUser.id);
+    res.json({ actingAsUserId: target ? target.ownerUserId : null });
+  }
+
   @Post("forgot-password")
+  @AllowDelegate()
   @SkipCsrf()
   @DemoRestricted()
   @Throttle({ default: { ttl: 900000, limit: 3 } })
@@ -511,6 +619,7 @@ export class AuthController {
   }
 
   @Post("reset-password")
+  @AllowDelegate()
   @SkipCsrf()
   @DemoRestricted()
   @Throttle({ default: { ttl: 900000, limit: 5 } })
@@ -521,6 +630,7 @@ export class AuthController {
   }
 
   @Post("2fa/verify")
+  @AllowDelegate()
   @SkipCsrf()
   @Throttle({ default: { ttl: 900000, limit: 5 } })
   @ApiOperation({ summary: "Verify TOTP code to complete 2FA login" })
@@ -572,48 +682,66 @@ export class AuthController {
 
   @Post("2fa/setup")
   @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
   @DemoRestricted()
   @Throttle({ default: { ttl: 900000, limit: 5 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: "Generate QR code and secret for 2FA setup" })
   async setup2FA(@Request() req, @Body() dto: Setup2faInitDto) {
-    return this.authService.setup2FA(req.user.id, dto.currentPassword);
+    return this.authService.setup2FA(req.user.realUserId, dto.currentPassword);
   }
 
   @Post("2fa/confirm-setup")
   @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
   @DemoRestricted()
   @Throttle({ default: { ttl: 900000, limit: 5 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: "Confirm 2FA setup with verification code" })
   async confirmSetup2FA(@Request() req, @Body() dto: Setup2faDto) {
-    return this.authService.confirmSetup2FA(req.user.id, dto.code);
+    return this.authService.confirmSetup2FA(req.user.realUserId, dto.code);
   }
 
   @Post("2fa/disable")
   @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
   @DemoRestricted()
   @Throttle({ default: { ttl: 900000, limit: 5 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: "Disable 2FA with verification code" })
   async disable2FA(@Request() req, @Body() dto: Setup2faDto) {
-    return this.authService.disable2FA(req.user.id, dto.code);
+    return this.authService.disable2FA(req.user.realUserId, dto.code);
+  }
+
+  @Get("2fa/status")
+  @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Whether 2FA is enabled for the authenticated user (self).",
+  })
+  async get2FAStatus(@Request() req) {
+    const enabled = await this.authService.is2FAEnabled(req.user.realUserId);
+    return { enabled };
   }
 
   @Get("2fa/trusted-devices")
   @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
   @ApiBearerAuth()
   @ApiOperation({ summary: "List trusted devices for the current user" })
   async getTrustedDevices(
     @Request() req: ExpressRequest & { user: any },
     @Res() res: Response,
   ) {
-    const devices = await this.authService.getTrustedDevices(req.user.id);
+    const devices = await this.authService.getTrustedDevices(
+      req.user.realUserId,
+    );
     const currentToken = req.cookies?.["trusted_device"];
     let currentDeviceId: string | null = null;
     if (currentToken) {
       currentDeviceId = await this.authService.findTrustedDeviceByToken(
-        req.user.id,
+        req.user.realUserId,
         currentToken,
       );
     }
@@ -631,6 +759,7 @@ export class AuthController {
 
   @Delete("2fa/trusted-devices/:id")
   @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
   @ApiBearerAuth()
   @ApiOperation({ summary: "Revoke a specific trusted device" })
   async revokeTrustedDevice(
@@ -638,12 +767,12 @@ export class AuthController {
     @Param("id", ParseUUIDPipe) deviceId: string,
     @Res() res: Response,
   ) {
-    await this.authService.revokeTrustedDevice(req.user.id, deviceId);
+    await this.authService.revokeTrustedDevice(req.user.realUserId, deviceId);
     // If revoking the current device, clear the cookie
     const currentToken = req.cookies?.["trusted_device"];
     if (currentToken) {
       const currentDeviceId = await this.authService.findTrustedDeviceByToken(
-        req.user.id,
+        req.user.realUserId,
         currentToken,
       );
       if (!currentDeviceId || currentDeviceId === deviceId) {
@@ -655,18 +784,22 @@ export class AuthController {
 
   @Delete("2fa/trusted-devices")
   @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
   @ApiBearerAuth()
   @ApiOperation({ summary: "Revoke all trusted devices" })
   async revokeAllTrustedDevices(
     @Request() req: ExpressRequest & { user: any },
     @Res() res: Response,
   ) {
-    const count = await this.authService.revokeAllTrustedDevices(req.user.id);
+    const count = await this.authService.revokeAllTrustedDevices(
+      req.user.realUserId,
+    );
     res.clearCookie("trusted_device");
     res.json({ message: `${count} device(s) revoked`, count });
   }
 
   @Post("refresh")
+  @AllowDelegate()
   @SkipCsrf()
   @Throttle({ default: { ttl: 60000, limit: 10 } }) // 10 refreshes per minute
   @ApiOperation({ summary: "Refresh access token using refresh token cookie" })
@@ -693,19 +826,21 @@ export class AuthController {
 
   @Post("2fa/backup-codes")
   @UseGuards(AuthGuard("jwt"))
+  @AllowDelegate()
   @DemoRestricted()
   @Throttle({ default: { ttl: 900000, limit: 5 } })
   @ApiBearerAuth()
   @ApiOperation({ summary: "Generate new 2FA backup codes" })
   async generateBackupCodes(@Request() req, @Body() dto: Setup2faDto) {
     const codes = await this.authService.generateBackupCodes(
-      req.user.id,
+      req.user.realUserId,
       dto.code,
     );
     return { codes };
   }
 
   @Get("oidc/confirm-link")
+  @AllowDelegate()
   @SkipCsrf()
   @ApiOperation({ summary: "Confirm OIDC account linking via email token" })
   async confirmOidcLink(@Query("token") token: string, @Res() res: Response) {
@@ -731,6 +866,7 @@ export class AuthController {
 
   @Post("logout")
   @SkipCsrf()
+  @AllowDelegate()
   @ApiOperation({ summary: "Logout current user" })
   async logout(@Request() req: ExpressRequest, @Res() res: Response) {
     // Revoke the refresh token family in the database

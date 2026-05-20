@@ -26,6 +26,9 @@ const registerSchema = z.object({
   confirmPassword: z.string(),
   firstName: z.string().max(100, 'First name must be less than 100 characters').optional(),
   lastName: z.string().max(100, 'Last name must be less than 100 characters').optional(),
+  // Optional: lets a registrant whose email already belongs to a delegate
+  // row claim and upgrade it into a full account.
+  currentPassword: z.string().max(200).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
@@ -70,7 +73,13 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
     try {
-      const { confirmPassword, ...registerData } = data;
+      const { confirmPassword, currentPassword, ...rest } = data;
+      // Only include currentPassword when the registrant actually typed one
+      // (claim path); a blank value should send nothing.
+      const trimmed = currentPassword?.trim();
+      const registerData = trimmed
+        ? { ...rest, currentPassword: trimmed }
+        : rest;
       const response = await authApi.register(registerData);
       // Token is now in httpOnly cookie, not in response body
       login(response.user!, 'httpOnly');
@@ -78,11 +87,16 @@ export default function RegisterPage() {
       // Show 2FA setup after registration
       setShowTwoFactorSetup(true);
     } catch (error) {
-      // Show specific backend message only for 400 (e.g. breached password, validation).
-      // For everything else (409 duplicate email, 429 rate limit, 5xx), use generic message
-      // to prevent account enumeration and hide internal details.
+      // Show specific backend message only for 400 (e.g. breached password, validation)
+      // and for 401 on the delegate-claim path (so the user knows to supply the
+      // temporary password their administrator gave them). For everything else
+      // (409 duplicate email, 429 rate limit, 5xx), use the generic message to
+      // prevent account enumeration and hide internal details.
       const fallback = 'Unable to create account. Please try again.';
-      if (error instanceof AxiosError && error.response?.status === 400) {
+      if (
+        error instanceof AxiosError &&
+        (error.response?.status === 400 || error.response?.status === 401)
+      ) {
         toast.error(error.response.data?.message || fallback);
       } else {
         toast.error(fallback);
@@ -198,6 +212,21 @@ export default function RegisterPage() {
               error={errors.confirmPassword?.message}
               {...register('confirmPassword')}
             />
+
+            <div>
+              <Input
+                label="Temporary password (optional)"
+                type="password"
+                autoComplete="off"
+                error={errors.currentPassword?.message}
+                {...register('currentPassword')}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Only fill this in if another Monize account holder invited
+                you as a shared user. We will use it to link this email to
+                the existing invitation instead of creating a duplicate.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-3">

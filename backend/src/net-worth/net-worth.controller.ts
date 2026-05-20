@@ -17,13 +17,47 @@ import {
 } from "@nestjs/swagger";
 import { assertStringParam } from "../common/query-param-utils";
 import { NetWorthService } from "./net-worth.service";
+import {
+  AllowDelegate,
+  DelegateRequiresSection,
+} from "../delegation/decorators/delegate-access.decorator";
+import { DelegationService } from "../delegation/delegation.service";
+
+// A UUID that cannot match any real account: forces a naturally-empty,
+// correctly-shaped result for an acting delegate with no readable accounts
+// (instead of passing undefined, which the service treats as "all").
+const NO_READABLE_ACCOUNT = "00000000-0000-0000-0000-000000000000";
 
 @ApiTags("Net Worth")
 @Controller("net-worth")
 @UseGuards(AuthGuard("jwt"))
 @ApiBearerAuth()
 export class NetWorthController {
-  constructor(private readonly netWorthService: NetWorthService) {}
+  constructor(
+    private readonly netWorthService: NetWorthService,
+    private readonly delegationService: DelegationService,
+  ) {}
+
+  /**
+   * For an acting delegate, restrict the account-id filter to the accounts
+   * they were granted READ on (intersecting any explicit request). Returns
+   * the original ids unchanged for non-delegate requests so owner behaviour
+   * (undefined = all accounts) is preserved.
+   */
+  private async scopeIds(
+    req: { user: { isActing?: boolean; delegationId?: string } },
+    ids?: string[],
+  ): Promise<string[] | undefined> {
+    if (!req.user.isActing || !req.user.delegationId) return ids;
+    const readable = new Set(
+      await this.delegationService.readableAccountIds(req.user.delegationId),
+    );
+    const eff =
+      ids && ids.length > 0
+        ? ids.filter((i) => readable.has(i))
+        : [...readable];
+    return eff.length > 0 ? eff : [NO_READABLE_ACCOUNT];
+  }
 
   @Get("monthly")
   @ApiOperation({ summary: "Get monthly net worth data" })
@@ -49,6 +83,8 @@ export class NetWorthController {
   }
 
   @Get("investments-monthly")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
   @ApiOperation({ summary: "Get monthly investment portfolio value" })
   @ApiQuery({ name: "startDate", required: false, example: "2023-01-01" })
   @ApiQuery({ name: "endDate", required: false, example: "2024-12-31" })
@@ -66,7 +102,7 @@ export class NetWorthController {
   })
   @ApiResponse({ status: 200, description: "Monthly investment value data" })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getMonthlyInvestments(
+  async getMonthlyInvestments(
     @Request() req,
     @Query("startDate") startDate?: string,
     @Query("endDate") endDate?: string,
@@ -98,12 +134,14 @@ export class NetWorthController {
       req.user.id,
       sd,
       ed,
-      ids,
+      await this.scopeIds(req, ids),
       safeCurrency,
     );
   }
 
   @Get("investments-daily")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
   @ApiOperation({ summary: "Get daily investment portfolio value" })
   @ApiQuery({ name: "startDate", required: false, example: "2025-01-01" })
   @ApiQuery({ name: "endDate", required: false, example: "2025-03-04" })
@@ -121,7 +159,7 @@ export class NetWorthController {
   })
   @ApiResponse({ status: 200, description: "Daily investment value data" })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getDailyInvestments(
+  async getDailyInvestments(
     @Request() req,
     @Query("startDate") startDate?: string,
     @Query("endDate") endDate?: string,
@@ -153,7 +191,7 @@ export class NetWorthController {
       req.user.id,
       sd,
       ed,
-      ids,
+      await this.scopeIds(req, ids),
       safeCurrency,
     );
   }

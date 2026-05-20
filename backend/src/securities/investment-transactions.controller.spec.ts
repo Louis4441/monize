@@ -2,10 +2,12 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException } from "@nestjs/common";
 import { InvestmentTransactionsController } from "./investment-transactions.controller";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
+import { DelegationService } from "../delegation/delegation.service";
 
 describe("InvestmentTransactionsController", () => {
   let controller: InvestmentTransactionsController;
   let service: Record<string, jest.Mock>;
+  let delegationMock: Record<string, jest.Mock>;
 
   const req = { user: { id: "user-1" } };
   const UUID1 = "00000000-0000-0000-0000-000000000001";
@@ -43,6 +45,12 @@ describe("InvestmentTransactionsController", () => {
       controllers: [InvestmentTransactionsController],
       providers: [
         { provide: InvestmentTransactionsService, useValue: service },
+        {
+          provide: DelegationService,
+          useValue: (delegationMock = {
+            readableAccountIds: jest.fn().mockResolvedValue([]),
+          }),
+        },
       ],
     }).compile();
 
@@ -115,26 +123,26 @@ describe("InvestmentTransactionsController", () => {
       );
     });
 
-    it("rejects invalid UUIDs in accountIds", () => {
-      expect(() => controller.findAll(req, "not-a-uuid")).toThrow(
+    it("rejects invalid UUIDs in accountIds", async () => {
+      await expect(controller.findAll(req, "not-a-uuid")).rejects.toThrow(
         BadRequestException,
       );
     });
 
-    it("rejects invalid date format for startDate", () => {
-      expect(() => controller.findAll(req, undefined, "01-01-2025")).toThrow(
-        BadRequestException,
-      );
+    it("rejects invalid date format for startDate", async () => {
+      await expect(
+        controller.findAll(req, undefined, "01-01-2025"),
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects invalid page parameter", () => {
-      expect(() =>
+    it("rejects invalid page parameter", async () => {
+      await expect(
         controller.findAll(req, undefined, undefined, undefined, "abc"),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects limit exceeding 200", () => {
-      expect(() =>
+    it("rejects limit exceeding 200", async () => {
+      await expect(
         controller.findAll(
           req,
           undefined,
@@ -143,7 +151,7 @@ describe("InvestmentTransactionsController", () => {
           undefined,
           "500",
         ),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
     it("parses page and limit as integers", async () => {
@@ -169,6 +177,48 @@ describe("InvestmentTransactionsController", () => {
         25,
         "AAPL",
         "BUY",
+      );
+    });
+
+    it("scopes an acting delegate to readable accounts", async () => {
+      const actingReq = {
+        user: { id: "owner-1", isActing: true, delegationId: "g1" },
+      };
+      service.findAll.mockResolvedValue({ data: [], total: 0 });
+      delegationMock.readableAccountIds.mockResolvedValue([UUID2]);
+
+      await controller.findAll(actingReq, `${UUID1},${UUID2}`);
+
+      expect(service.findAll).toHaveBeenCalledWith(
+        "owner-1",
+        [UUID2],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
+
+    it("returns a naturally-empty result when the delegate has no readable accounts", async () => {
+      const actingReq = {
+        user: { id: "owner-1", isActing: true, delegationId: "g1" },
+      };
+      service.findAll.mockResolvedValue({ data: [], total: 0 });
+      delegationMock.readableAccountIds.mockResolvedValue([]);
+
+      await controller.findAll(actingReq);
+
+      expect(service.findAll).toHaveBeenCalledWith(
+        "owner-1",
+        ["00000000-0000-0000-0000-000000000000"],
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
       );
     });
   });
@@ -213,16 +263,16 @@ describe("InvestmentTransactionsController", () => {
       expect(result).toEqual(rows);
     });
 
-    it("rejects invalid UUIDs", () => {
-      expect(() => controller.getRealizedGains(req, "not-a-uuid")).toThrow(
-        BadRequestException,
-      );
+    it("rejects invalid UUIDs", async () => {
+      await expect(
+        controller.getRealizedGains(req, "not-a-uuid"),
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects malformed dates", () => {
-      expect(() =>
+    it("rejects malformed dates", async () => {
+      await expect(
         controller.getRealizedGains(req, undefined, "2024/01/01"),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -281,8 +331,8 @@ describe("InvestmentTransactionsController", () => {
       expect(result).toEqual(rows);
     });
 
-    it("rejects an unknown granularity value", () => {
-      expect(() =>
+    it("rejects an unknown granularity value", async () => {
+      await expect(
         controller.getCapitalGains(
           req,
           "2024-01-01",
@@ -290,42 +340,42 @@ describe("InvestmentTransactionsController", () => {
           undefined,
           "week",
         ),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("requires startDate", () => {
-      expect(() =>
+    it("requires startDate", async () => {
+      await expect(
         controller.getCapitalGains(req, "", "2024-12-31"),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("requires endDate", () => {
-      expect(() =>
+    it("requires endDate", async () => {
+      await expect(
         controller.getCapitalGains(req, "2024-01-01", ""),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects malformed dates", () => {
-      expect(() =>
+    it("rejects malformed dates", async () => {
+      await expect(
         controller.getCapitalGains(req, "2024/01/01", "2024-12-31"),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects when startDate is after endDate", () => {
-      expect(() =>
+    it("rejects when startDate is after endDate", async () => {
+      await expect(
         controller.getCapitalGains(req, "2024-12-31", "2024-01-01"),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects invalid account UUIDs", () => {
-      expect(() =>
+    it("rejects invalid account UUIDs", async () => {
+      await expect(
         controller.getCapitalGains(
           req,
           "2024-01-01",
           "2024-12-31",
           "not-a-uuid",
         ),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

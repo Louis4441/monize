@@ -1,0 +1,128 @@
+import { Reflector } from "@nestjs/core";
+import {
+  AllowDelegate,
+  DelegatedAccountParam,
+  DelegatedTransactionParam,
+  DelegatedTransferBody,
+  DelegatedTransferParam,
+  DelegateRequires,
+  DelegateRequiresCapability,
+  DelegatedScheduledParam,
+  DelegateRequiresSection,
+  ALLOW_DELEGATE_KEY,
+  DELEGATED_ACCOUNT_PARAM_KEY,
+  DELEGATED_TRANSACTION_PARAM_KEY,
+  DELEGATED_TRANSFER_BODY_KEY,
+  DELEGATED_TRANSFER_PARAM_KEY,
+  DELEGATED_SCHEDULED_PARAM_KEY,
+  DELEGATE_OPERATION_KEY,
+  DELEGATE_CAPABILITY_KEY,
+  DELEGATE_SECTION_KEY,
+} from "./delegate-access.decorator";
+
+describe("delegate-access decorators", () => {
+  const reflector = new Reflector();
+
+  it("AllowDelegate sets the allow-delegate metadata", () => {
+    class C {
+      @AllowDelegate()
+      handler() {}
+    }
+    expect(reflector.get(ALLOW_DELEGATE_KEY, C.prototype.handler)).toBe(true);
+  });
+
+  it("DelegatedAccountParam defaults to 'id'", () => {
+    class C {
+      @DelegatedAccountParam()
+      handler() {}
+    }
+    expect(
+      reflector.get(DELEGATED_ACCOUNT_PARAM_KEY, C.prototype.handler),
+    ).toBe("id");
+  });
+
+  it("DelegatedAccountParam accepts a custom key", () => {
+    class C {
+      @DelegatedAccountParam("accountId")
+      handler() {}
+    }
+    expect(
+      reflector.get(DELEGATED_ACCOUNT_PARAM_KEY, C.prototype.handler),
+    ).toBe("accountId");
+  });
+
+  it("DelegateRequires sets the required operation", () => {
+    class C {
+      @DelegateRequires("create")
+      handler() {}
+    }
+    expect(reflector.get(DELEGATE_OPERATION_KEY, C.prototype.handler)).toBe(
+      "create",
+    );
+  });
+
+  it("DelegatedTransactionParam sets the transaction-id key", () => {
+    class C {
+      @DelegatedTransactionParam()
+      handler() {}
+    }
+    expect(
+      reflector.get(DELEGATED_TRANSACTION_PARAM_KEY, C.prototype.handler),
+    ).toBe("id");
+  });
+
+  it("DelegatedTransferBody sets [fromKey, toKey]", () => {
+    class C {
+      @DelegatedTransferBody()
+      handler() {}
+    }
+    expect(
+      reflector.get(DELEGATED_TRANSFER_BODY_KEY, C.prototype.handler),
+    ).toEqual(["fromAccountId", "toAccountId"]);
+  });
+
+  it("DelegatedTransferParam sets the transfer-id key", () => {
+    class C {
+      @DelegatedTransferParam()
+      handler() {}
+    }
+    expect(
+      reflector.get(DELEGATED_TRANSFER_PARAM_KEY, C.prototype.handler),
+    ).toBe("id");
+  });
+
+  it("DelegateRequiresCapability sets {resource, operation}", () => {
+    class C {
+      @DelegateRequiresCapability("payees", "edit")
+      handler() {}
+    }
+    expect(reflector.get(DELEGATE_CAPABILITY_KEY, C.prototype.handler)).toEqual(
+      { resource: "payees", operation: "edit" },
+    );
+  });
+
+  it("DelegatedScheduledParam defaults to 'id' and accepts a custom key", () => {
+    class C {
+      @DelegatedScheduledParam()
+      a() {}
+      @DelegatedScheduledParam("scheduledId")
+      b() {}
+    }
+    expect(reflector.get(DELEGATED_SCHEDULED_PARAM_KEY, C.prototype.a)).toBe(
+      "id",
+    );
+    expect(reflector.get(DELEGATED_SCHEDULED_PARAM_KEY, C.prototype.b)).toBe(
+      "scheduledId",
+    );
+  });
+
+  it("DelegateRequiresSection sets the section", () => {
+    class C {
+      @DelegateRequiresSection("bills")
+      handler() {}
+    }
+    expect(reflector.get(DELEGATE_SECTION_KEY, C.prototype.handler)).toBe(
+      "bills",
+    );
+  });
+});

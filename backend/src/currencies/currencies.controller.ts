@@ -24,6 +24,7 @@ import { Throttle } from "@nestjs/throttler";
 import { ParseCurrencyCodePipe } from "../common/pipes/parse-currency-code.pipe";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { AllowDelegate } from "../delegation/decorators/delegate-access.decorator";
 import {
   ExchangeRateService,
   RateRefreshSummary,
@@ -52,6 +53,7 @@ export class CurrenciesController {
   // ── Currency list ───────────────────────────────────────────────
 
   @Get()
+  @AllowDelegate()
   @ApiOperation({ summary: "Get all currencies" })
   @ApiQuery({
     name: "includeInactive",
@@ -74,6 +76,7 @@ export class CurrenciesController {
   // ── Static-segment routes (must be BEFORE :code param route) ────
 
   @Get("lookup")
+  @AllowDelegate()
   @Throttle({ default: { ttl: 60000, limit: 10 } }) // L2: 10 lookups per minute
   @ApiOperation({ summary: "Lookup currency on Yahoo Finance" })
   @ApiQuery({ name: "q", required: true, type: String })
@@ -85,6 +88,7 @@ export class CurrenciesController {
   }
 
   @Get("usage")
+  @AllowDelegate()
   @ApiOperation({
     summary: "Get usage counts for all currencies",
   })
@@ -97,6 +101,7 @@ export class CurrenciesController {
   }
 
   @Get("exchange-rates")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get latest exchange rates" })
   @ApiResponse({
     status: 200,
@@ -108,6 +113,7 @@ export class CurrenciesController {
   }
 
   @Get("exchange-rates/history")
+  @AllowDelegate()
   @Throttle({ default: { ttl: 60000, limit: 10 } }) // L2: 10 requests per minute
   @ApiOperation({ summary: "Get exchange rates for a date range" })
   @ApiQuery({ name: "startDate", required: false, type: String })
@@ -125,6 +131,7 @@ export class CurrenciesController {
   }
 
   @Get("exchange-rates/status")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get exchange rate update status" })
   @ApiResponse({ status: 200, description: "Last update time" })
   async getRateStatus(): Promise<{ lastUpdated: Date | null }> {
@@ -157,6 +164,7 @@ export class CurrenciesController {
   // ── Param routes (:code) ────────────────────────────────────────
 
   @Get(":code")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get a single currency by code" })
   @ApiResponse({ status: 200, description: "Currency details" })
   findOne(@Param("code", ParseCurrencyCodePipe) code: string) {

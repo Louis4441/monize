@@ -17,41 +17,36 @@ vi.mock('@/lib/logger', () => ({
   }),
 }));
 
-// Mock auth store
+// Mock auth store (mutable so tests can switch to a delegate context)
+const { authState } = vi.hoisted(() => {
+  const baseUser = {
+    id: 'test-user-id',
+    email: 'test@example.com',
+    firstName: 'Test',
+    lastName: 'User',
+    role: 'user',
+    hasPassword: true,
+  };
+  return {
+    authState: {
+      current: {
+        user: baseUser,
+        isAuthenticated: true,
+        isLoading: false,
+        _hasHydrated: true,
+        logout: () => {},
+        actingAsUserId: null as string | null,
+        delegateSections: null as Record<string, boolean> | null,
+      },
+    },
+  };
+});
+
 vi.mock('@/store/authStore', () => ({
   useAuthStore: Object.assign(
-    (selector?: any) => {
-      const state = {
-        user: {
-          id: 'test-user-id',
-          email: 'test@example.com',
-          firstName: 'Test',
-          lastName: 'User',
-          role: 'user',
-          hasPassword: true,
-        },
-        isAuthenticated: true,
-        isLoading: false,
-        _hasHydrated: true,
-        logout: vi.fn(),
-      };
-      return selector ? selector(state) : state;
-    },
-    {
-      getState: vi.fn(() => ({
-        user: {
-          id: 'test-user-id',
-          email: 'test@example.com',
-          firstName: 'Test',
-          lastName: 'User',
-          role: 'user',
-          hasPassword: true,
-        },
-        isAuthenticated: true,
-        isLoading: false,
-        _hasHydrated: true,
-      })),
-    },
+    (selector?: any) =>
+      selector ? selector(authState.current) : authState.current,
+    { getState: () => authState.current },
   ),
 }));
 
@@ -101,9 +96,12 @@ vi.mock('@/lib/categories', () => ({
   },
 }));
 
+const { mockGetScheduled } = vi.hoisted(() => ({
+  mockGetScheduled: vi.fn().mockResolvedValue([]),
+}));
 vi.mock('@/lib/scheduled-transactions', () => ({
   scheduledTransactionsApi: {
-    getAll: vi.fn().mockResolvedValue([]),
+    getAll: (...args: any[]) => mockGetScheduled(...args),
   },
 }));
 
@@ -177,6 +175,9 @@ describe('DashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAccounts.mockResolvedValue([]);
+    mockGetScheduled.mockResolvedValue([]);
+    authState.current.actingAsUserId = null;
+    authState.current.delegateSections = null;
   });
 
   it('renders the welcome message with user name', async () => {
@@ -298,5 +299,28 @@ describe('DashboardPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('favourite-accounts')).toHaveTextContent('loading');
     });
+  });
+
+  it('delegate without the Bills grant sees only Favourite Accounts', async () => {
+    authState.current.actingAsUserId = 'owner-1';
+    authState.current.delegateSections = { bills: false };
+    render(<DashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('favourite-accounts')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('upcoming-bills')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('getting-started')).not.toBeInTheDocument();
+    expect(mockGetScheduled).not.toHaveBeenCalled();
+  });
+
+  it('delegate with the Bills grant also sees Upcoming Bills', async () => {
+    authState.current.actingAsUserId = 'owner-1';
+    authState.current.delegateSections = { bills: true };
+    render(<DashboardPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('upcoming-bills')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('favourite-accounts')).toBeInTheDocument();
+    expect(mockGetScheduled).toHaveBeenCalled();
   });
 });

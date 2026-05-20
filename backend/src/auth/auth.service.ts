@@ -29,6 +29,7 @@ import {
 import { TokenService } from "./token.service";
 import { TwoFactorService } from "./two-factor.service";
 import { AuthEmailService } from "./auth-email.service";
+import { DelegationService } from "../delegation/delegation.service";
 
 @Injectable()
 export class AuthService {
@@ -56,6 +57,7 @@ export class AuthService {
     private tokenService: TokenService,
     private twoFactorService: TwoFactorService,
     private authEmailService: AuthEmailService,
+    private delegationService: DelegationService,
   ) {
     this.jwtSecret = this.configService.get<string>("JWT_SECRET")!;
     this.csrfKey = derivePurposeKey(this.jwtSecret, "csrf-token");
@@ -67,7 +69,8 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto) {
-    const { email, password, firstName, lastName } = registerDto;
+    const { email, password, firstName, lastName, currentPassword } =
+      registerDto;
 
     // H7: Normalize email before lookups
     const normalizedEmail = email.toLowerCase().trim();
@@ -78,7 +81,68 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException("Unable to complete registration");
+      // Delegates live in the `users` table so they reuse the auth stack.
+      // Registering with the same email must CLAIM (upgrade) the existing
+      // delegate row -- never create a duplicate, and never overwrite a
+      // row that belongs to a full account (that would be takeover).
+      //
+      // A row is claimable when it's a "pure delegate":
+      //  - authProvider === 'local' (an OIDC user can't be claimed via a
+      //    password registration),
+      //  - it appears in account_delegates.delegate_user_id, and
+      //  - it owns no data (no accounts, no delegations as owner, not admin).
+      //
+      // If the delegate row already has a password (the owner provisioned
+      // it with a temp password and shared it out-of-band), the registrant
+      // must prove they hold that temp password via `currentPassword`.
+      // Without that proof anyone who knows the email could take over the
+      // delegate row.
+      const isPureDelegate =
+        existingUser.authProvider === "local" &&
+        (await this.delegationService.isDelegateUser(existingUser.id)) &&
+        !(await this.delegationService.isFullAccount(existingUser.id));
+      if (!isPureDelegate) {
+        throw new ConflictException("Unable to complete registration");
+      }
+
+      if (existingUser.passwordHash) {
+        const supplied = (currentPassword ?? "").trim();
+        const ok =
+          supplied.length > 0 &&
+          (await bcrypt.compare(supplied, existingUser.passwordHash));
+        if (!ok) {
+          throw new UnauthorizedException(
+            "An account with this email already exists as a shared user. " +
+              "Provide the temporary password your administrator gave you " +
+              "to claim it.",
+          );
+        }
+      }
+
+      const breached = await this.passwordBreachService.isBreached(password);
+      if (breached) {
+        throw new BadRequestException(
+          "This password has been found in a data breach. Please choose a different password.",
+        );
+      }
+
+      existingUser.passwordHash = await bcrypt.hash(password, 12);
+      if (firstName) existingUser.firstName = firstName;
+      if (lastName) existingUser.lastName = lastName;
+      existingUser.mustChangePassword = false;
+      existingUser.resetToken = null;
+      existingUser.resetTokenExpiry = null;
+      existingUser.failedLoginAttempts = 0;
+      existingUser.lockedUntil = null;
+      const upgraded = await this.usersRepository.save(existingUser);
+
+      const { accessToken, refreshToken } =
+        await this.tokenService.generateTokenPair(upgraded);
+      return {
+        user: this.sanitizeUser(upgraded),
+        accessToken,
+        refreshToken,
+      };
     }
 
     // Check for breached password
@@ -439,6 +503,18 @@ export class AuthService {
 
   async getUserById(id: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { id } });
+  }
+
+  /**
+   * Returns whether the given user has 2FA enabled. Lets the Security UI
+   * (including a delegate managing their own credentials) read the
+   * authenticated user's 2FA state without exposing the secret.
+   */
+  async is2FAEnabled(userId: string): Promise<boolean> {
+    const prefs = await this.preferencesRepository.findOne({
+      where: { userId },
+    });
+    return !!prefs?.twoFactorEnabled;
   }
 
   async getUserStateById(

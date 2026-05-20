@@ -20,6 +20,10 @@ import { AuthGuard } from "@nestjs/passport";
 import { TagsService } from "./tags.service";
 import { CreateTagDto } from "./dto/create-tag.dto";
 import { UpdateTagDto } from "./dto/update-tag.dto";
+import {
+  AllowDelegate,
+  DelegateRequiresCapability,
+} from "../delegation/decorators/delegate-access.decorator";
 
 @ApiTags("Tags")
 @Controller("tags")
@@ -31,11 +35,13 @@ export class TagsController {
   @Get()
   @ApiOperation({ summary: "Get all tags for the authenticated user" })
   @ApiResponse({ status: 200, description: "Tags retrieved successfully" })
+  @AllowDelegate()
   findAll(@Request() req) {
     return this.tagsService.findAll(req.user.id);
   }
 
   @Get("transaction-counts")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get transaction counts for all tags" })
   @ApiResponse({
     status: 200,
@@ -46,6 +52,7 @@ export class TagsController {
   }
 
   @Get(":id")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get a tag by ID" })
   @ApiResponse({ status: 200, description: "Tag retrieved successfully" })
   @ApiResponse({ status: 404, description: "Tag not found" })
@@ -54,6 +61,7 @@ export class TagsController {
   }
 
   @Get(":id/transaction-count")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get number of transactions using this tag" })
   @ApiResponse({ status: 200, description: "Count retrieved successfully" })
   getTransactionCount(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
@@ -64,6 +72,8 @@ export class TagsController {
   @ApiOperation({ summary: "Create a new tag" })
   @ApiResponse({ status: 201, description: "Tag created successfully" })
   @ApiResponse({ status: 409, description: "Tag name already exists" })
+  @AllowDelegate()
+  @DelegateRequiresCapability("tags", "create")
   create(@Request() req, @Body() createTagDto: CreateTagDto) {
     return this.tagsService.create(req.user.id, createTagDto);
   }
@@ -72,6 +82,8 @@ export class TagsController {
   @ApiOperation({ summary: "Update a tag" })
   @ApiResponse({ status: 200, description: "Tag updated successfully" })
   @ApiResponse({ status: 404, description: "Tag not found" })
+  @AllowDelegate()
+  @DelegateRequiresCapability("tags", "edit")
   update(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
@@ -84,6 +96,8 @@ export class TagsController {
   @ApiOperation({ summary: "Delete a tag" })
   @ApiResponse({ status: 200, description: "Tag deleted successfully" })
   @ApiResponse({ status: 404, description: "Tag not found" })
+  @AllowDelegate()
+  @DelegateRequiresCapability("tags", "delete")
   remove(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
     return this.tagsService.remove(req.user.id, id);
   }

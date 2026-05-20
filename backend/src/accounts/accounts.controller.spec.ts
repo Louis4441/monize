@@ -5,11 +5,13 @@ import { AccountsService } from "./accounts.service";
 import { AccountExportService } from "./account-export.service";
 import { LoanPaymentDetectorService } from "./loan-payment-detector.service";
 import { LoanPaymentSetupService } from "./loan-payment-setup.service";
+import { DelegationService } from "../delegation/delegation.service";
 
 describe("AccountsController", () => {
   let controller: AccountsController;
   let mockAccountsService: Partial<Record<keyof AccountsService, jest.Mock>>;
   let mockExportService: Partial<Record<keyof AccountExportService, jest.Mock>>;
+  let mockDelegationService: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
   beforeEach(async () => {
@@ -37,6 +39,14 @@ describe("AccountsController", () => {
       exportQif: jest.fn(),
     };
 
+    mockDelegationService = {
+      readableAccountIds: jest.fn().mockResolvedValue([]),
+      hasReadAccess: jest.fn().mockResolvedValue(true),
+      getDelegateFavourites: jest.fn().mockResolvedValue(new Map()),
+      setDelegateFavourite: jest.fn().mockResolvedValue(undefined),
+      reorderDelegateFavourites: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AccountsController],
       providers: [
@@ -55,6 +65,10 @@ describe("AccountsController", () => {
         {
           provide: LoanPaymentSetupService,
           useValue: { setupLoanPayments: jest.fn() },
+        },
+        {
+          provide: DelegationService,
+          useValue: mockDelegationService,
         },
       ],
     }).compile();
@@ -75,21 +89,73 @@ describe("AccountsController", () => {
   });
 
   describe("findAll()", () => {
-    it("delegates to accountsService.findAll with userId and includeInactive", () => {
-      mockAccountsService.findAll!.mockReturnValue("accounts");
+    it("delegates to accountsService.findAll with userId and includeInactive", async () => {
+      mockAccountsService.findAll!.mockResolvedValue("accounts");
 
-      const result = controller.findAll(mockReq, true);
+      const result = await controller.findAll(mockReq, true);
 
       expect(result).toBe("accounts");
       expect(mockAccountsService.findAll).toHaveBeenCalledWith("user-1", true);
     });
 
-    it("defaults includeInactive to false when undefined", () => {
-      mockAccountsService.findAll!.mockReturnValue("accounts");
+    it("defaults includeInactive to false when undefined", async () => {
+      mockAccountsService.findAll!.mockResolvedValue("accounts");
 
-      controller.findAll(mockReq, undefined);
+      await controller.findAll(mockReq, undefined);
 
       expect(mockAccountsService.findAll).toHaveBeenCalledWith("user-1", false);
+    });
+
+    it("filters to READ-granted accounts when acting as a delegate", async () => {
+      mockAccountsService.findAll!.mockResolvedValue([
+        { id: "a1", isFavourite: false, favouriteSortOrder: 0 },
+        { id: "a2", isFavourite: false, favouriteSortOrder: 0 },
+      ]);
+      mockDelegationService.readableAccountIds.mockResolvedValue(["a1"]);
+      const actingReq = {
+        user: {
+          id: "owner-1",
+          realUserId: "deleg-1",
+          isActing: true,
+          delegationId: "g1",
+        },
+      };
+
+      const result = await controller.findAll(actingReq as never, false);
+
+      expect(result).toEqual([
+        { id: "a1", isFavourite: false, favouriteSortOrder: 0 },
+      ]);
+    });
+
+    it("overlays the delegate's own favourites, not the owner's", async () => {
+      mockAccountsService.findAll!.mockResolvedValue([
+        { id: "a1", isFavourite: true, favouriteSortOrder: 5 },
+        { id: "a2", isFavourite: false, favouriteSortOrder: 0 },
+      ]);
+      mockDelegationService.readableAccountIds.mockResolvedValue(["a1", "a2"]);
+      // Owner has a1 favourite; delegate instead favourites only a2.
+      mockDelegationService.getDelegateFavourites.mockResolvedValue(
+        new Map([["a2", 3]]),
+      );
+      const actingReq = {
+        user: {
+          id: "owner-1",
+          realUserId: "deleg-1",
+          isActing: true,
+          delegationId: "g1",
+        },
+      };
+
+      const result = await controller.findAll(actingReq as never, false);
+
+      expect(result).toEqual([
+        { id: "a1", isFavourite: false, favouriteSortOrder: 0 },
+        { id: "a2", isFavourite: true, favouriteSortOrder: 3 },
+      ]);
+      expect(mockDelegationService.getDelegateFavourites).toHaveBeenCalledWith(
+        "deleg-1",
+      );
     });
   });
 
@@ -163,16 +229,43 @@ describe("AccountsController", () => {
   });
 
   describe("findOne()", () => {
-    it("delegates to accountsService.findOne with userId and id", () => {
-      mockAccountsService.findOne!.mockReturnValue("account");
+    it("delegates to accountsService.findOne with userId and id", async () => {
+      mockAccountsService.findOne!.mockResolvedValue("account");
 
-      const result = controller.findOne(mockReq, "account-1");
+      const result = await controller.findOne(mockReq, "account-1");
 
       expect(result).toBe("account");
       expect(mockAccountsService.findOne).toHaveBeenCalledWith(
         "user-1",
         "account-1",
       );
+    });
+
+    it("overlays the delegate's own favourite when acting", async () => {
+      mockAccountsService.findOne!.mockResolvedValue({
+        id: "a1",
+        isFavourite: true,
+        favouriteSortOrder: 9,
+      });
+      mockDelegationService.getDelegateFavourites.mockResolvedValue(
+        new Map([["a1", 2]]),
+      );
+      const actingReq = {
+        user: {
+          id: "owner-1",
+          realUserId: "deleg-1",
+          isActing: true,
+          delegationId: "g1",
+        },
+      };
+
+      const result = await controller.findOne(actingReq as never, "a1");
+
+      expect(result).toEqual({
+        id: "a1",
+        isFavourite: true,
+        favouriteSortOrder: 2,
+      });
     });
   });
 
@@ -289,10 +382,10 @@ describe("AccountsController", () => {
   });
 
   describe("getDailyBalances()", () => {
-    it("delegates to accountsService.getDailyBalances with parsed accountIds", () => {
+    it("delegates to accountsService.getDailyBalances with parsed accountIds", async () => {
       mockAccountsService.getDailyBalances!.mockReturnValue("balances");
 
-      const result = controller.getDailyBalances(
+      const result = await controller.getDailyBalances(
         mockReq,
         "2025-01-01",
         "2025-12-31",
@@ -308,10 +401,10 @@ describe("AccountsController", () => {
       );
     });
 
-    it("passes undefined accountIds when not provided", () => {
+    it("passes undefined accountIds when not provided", async () => {
       mockAccountsService.getDailyBalances!.mockReturnValue("balances");
 
-      controller.getDailyBalances(
+      await controller.getDailyBalances(
         mockReq,
         "2025-01-01",
         "2025-12-31",
@@ -569,6 +662,50 @@ describe("AccountsController", () => {
         "user-1",
         ["id-1", "id-2", "id-3"],
       );
+    });
+
+    it("reorders the delegate's own overlay when acting", () => {
+      const dto = { accountIds: ["a1", "a2"] };
+      const actingReq = {
+        user: { id: "owner-1", realUserId: "deleg-1", isActing: true },
+      };
+
+      controller.reorderFavourites(actingReq as never, dto);
+
+      expect(
+        mockDelegationService.reorderDelegateFavourites,
+      ).toHaveBeenCalledWith("deleg-1", ["a1", "a2"]);
+      expect(mockAccountsService.reorderFavourites).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("setDelegateFavourite()", () => {
+    it("stores the favourite on the delegate overlay when acting", async () => {
+      const actingReq = {
+        user: { id: "owner-1", realUserId: "deleg-1", isActing: true },
+      };
+
+      const result = await controller.setDelegateFavourite(
+        actingReq as never,
+        "a1",
+        { isFavourite: true },
+      );
+
+      expect(result).toEqual({ isFavourite: true });
+      expect(mockDelegationService.setDelegateFavourite).toHaveBeenCalledWith(
+        "deleg-1",
+        "a1",
+        true,
+      );
+    });
+
+    it("rejects non-delegate callers", async () => {
+      await expect(
+        controller.setDelegateFavourite(mockReq, "a1", {
+          isFavourite: true,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockDelegationService.setDelegateFavourite).not.toHaveBeenCalled();
     });
   });
 });

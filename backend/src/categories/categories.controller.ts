@@ -25,6 +25,10 @@ import { CategoriesService } from "./categories.service";
 import { CreateCategoryDto } from "./dto/create-category.dto";
 import { UpdateCategoryDto } from "./dto/update-category.dto";
 import { ReassignTransactionsDto } from "./dto/reassign-transactions.dto";
+import {
+  AllowDelegate,
+  DelegateRequiresCapability,
+} from "../delegation/decorators/delegate-access.decorator";
 
 @ApiTags("Categories")
 @Controller("categories")
@@ -38,6 +42,8 @@ export class CategoriesController {
   @ApiResponse({ status: 201, description: "Category created successfully" })
   @ApiResponse({ status: 400, description: "Bad request" })
   @ApiResponse({ status: 401, description: "Unauthorized" })
+  @AllowDelegate()
+  @DelegateRequiresCapability("categories", "create")
   create(@Request() req, @Body() createCategoryDto: CreateCategoryDto) {
     return this.categoriesService.create(req.user.id, createCategoryDto);
   }
@@ -55,6 +61,7 @@ export class CategoriesController {
     description: "List of categories retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
+  @AllowDelegate()
   findAll(
     @Request() req,
     @Query("includeSystem", new ParseBoolPipe({ optional: true }))
@@ -64,6 +71,7 @@ export class CategoriesController {
   }
 
   @Get("tree")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get categories in tree structure (hierarchical)" })
   @ApiResponse({
     status: 200,
@@ -75,6 +83,7 @@ export class CategoriesController {
   }
 
   @Get("stats")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get category statistics" })
   @ApiResponse({
     status: 200,
@@ -101,6 +110,7 @@ export class CategoriesController {
   }
 
   @Get("income")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get all income categories" })
   @ApiResponse({
     status: 200,
@@ -112,6 +122,7 @@ export class CategoriesController {
   }
 
   @Get("expense")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get all expense categories" })
   @ApiResponse({
     status: 200,
@@ -123,6 +134,7 @@ export class CategoriesController {
   }
 
   @Get(":id")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get a specific category by ID" })
   @ApiParam({ name: "id", description: "Category UUID" })
   @ApiResponse({
@@ -153,6 +165,8 @@ export class CategoriesController {
     description: "Forbidden - category does not belong to user",
   })
   @ApiResponse({ status: 404, description: "Category not found" })
+  @AllowDelegate()
+  @DelegateRequiresCapability("categories", "edit")
   update(
     @Request() req,
     @Param("id", ParseUUIDPipe) id: string,
@@ -175,11 +189,14 @@ export class CategoriesController {
     description: "Forbidden - category does not belong to user",
   })
   @ApiResponse({ status: 404, description: "Category not found" })
+  @AllowDelegate()
+  @DelegateRequiresCapability("categories", "delete")
   remove(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
     return this.categoriesService.remove(req.user.id, id);
   }
 
   @Get(":id/transaction-count")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get the count of transactions using a category" })
   @ApiParam({ name: "id", description: "Category UUID" })
   @ApiResponse({

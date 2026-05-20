@@ -24,6 +24,7 @@ import { DeleteAccountDto } from "./dto/delete-account.dto";
 import { DeleteDataDto } from "./dto/delete-data.dto";
 import { SkipPasswordCheck } from "../auth/decorators/skip-password-check.decorator";
 import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
+import { AllowDelegate } from "../delegation/decorators/delegate-access.decorator";
 
 @ApiTags("Users")
 @Controller("users")
@@ -34,6 +35,7 @@ export class UsersController {
 
   @Get("me")
   @SkipPasswordCheck()
+  @AllowDelegate()
   @ApiOperation({ summary: "Get current user profile" })
   async getProfile(@Request() req) {
     const user = await this.usersService.findById(req.user.id);
@@ -57,6 +59,7 @@ export class UsersController {
   }
 
   @Get("preferences")
+  @AllowDelegate()
   @ApiOperation({ summary: "Get current user preferences" })
   getPreferences(@Request() req) {
     return this.usersService.getPreferences(req.user.id);
@@ -71,6 +74,7 @@ export class UsersController {
 
   @Post("change-password")
   @SkipPasswordCheck()
+  @AllowDelegate()
   @DemoRestricted()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Change current user password" })
@@ -80,7 +84,10 @@ export class UsersController {
     description: "Invalid current password or validation error",
   })
   async changePassword(@Request() req, @Body() dto: ChangePasswordDto) {
-    await this.usersService.changePassword(req.user.id, dto);
+    // Security: a delegate acting as an owner manages their OWN password,
+    // not the owner's — use realUserId so the change always targets the
+    // authenticated identity regardless of acting context.
+    await this.usersService.changePassword(req.user.realUserId, dto);
     return { message: "Password changed successfully" };
   }
 

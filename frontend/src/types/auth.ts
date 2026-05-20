@@ -39,6 +39,12 @@ export interface RegisterData {
   password: string;
   firstName?: string;
   lastName?: string;
+  /**
+   * Temporary password supplied by the registrant when their email is
+   * already a delegate row (so they can claim and upgrade it into a full
+   * account, preserving the existing delegate id).
+   */
+  currentPassword?: string;
 }
 
 export interface AuthResponse {

@@ -504,11 +504,7 @@ export class TransactionSplitService {
     await queryRunner.startTransaction();
 
     try {
-      await this.deleteSplitSideEffects(
-        transaction.id,
-        userId,
-        queryRunner,
-      );
+      await this.deleteSplitSideEffects(transaction.id, userId, queryRunner);
 
       await queryRunner.manager.delete(TransactionSplit, {
         transactionId: transaction.id,

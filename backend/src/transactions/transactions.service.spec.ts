@@ -1684,7 +1684,9 @@ describe("TransactionsService", () => {
 
       expect(mockQb.andWhere).toHaveBeenCalledWith(
         "transaction.status IN (:...statuses)",
-        { statuses: [TransactionStatus.UNRECONCILED, TransactionStatus.CLEARED] },
+        {
+          statuses: [TransactionStatus.UNRECONCILED, TransactionStatus.CLEARED],
+        },
       );
     });
 

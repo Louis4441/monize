@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Patch,
   Param,
@@ -25,12 +26,18 @@ import {
 import { Response } from "express";
 import { AuthGuard } from "@nestjs/passport";
 import { AccountsService } from "./accounts.service";
+import { DelegationService } from "../delegation/delegation.service";
+import {
+  AllowDelegate,
+  DelegatedAccountParam,
+} from "../delegation/decorators/delegate-access.decorator";
 import { AccountExportService } from "./account-export.service";
 import { LoanPaymentDetectorService } from "./loan-payment-detector.service";
 import { LoanPaymentSetupService } from "./loan-payment-setup.service";
 import { CreateAccountDto } from "./dto/create-account.dto";
 import { UpdateAccountDto } from "./dto/update-account.dto";
 import { ReorderFavouriteAccountsDto } from "./dto/reorder-favourite-accounts.dto";
+import { SetDelegateFavouriteDto } from "./dto/set-delegate-favourite.dto";
 import { LoanPreviewDto } from "./dto/loan-preview.dto";
 import {
   MortgagePreviewDto,
@@ -98,6 +105,7 @@ export class AccountsController {
     private readonly accountExportService: AccountExportService,
     private readonly loanPaymentDetectorService: LoanPaymentDetectorService,
     private readonly loanPaymentSetupService: LoanPaymentSetupService,
+    private readonly delegationService: DelegationService,
   ) {}
 
   @Post()
@@ -125,15 +133,44 @@ export class AccountsController {
     description: "List of accounts retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  findAll(
+  @AllowDelegate()
+  async findAll(
     @Request() req,
     @Query("includeInactive", new ParseBoolPipe({ optional: true }))
     includeInactive?: boolean,
   ) {
-    return this.accountsService.findAll(req.user.id, includeInactive || false);
+    const accounts = await this.accountsService.findAll(
+      req.user.id,
+      includeInactive || false,
+    );
+    if (!req.user.isActing) return accounts;
+    // Delegate: restrict to READ-granted accounts only (Phase 1).
+    const readable = new Set(
+      await this.delegationService.readableAccountIds(req.user.delegationId),
+    );
+    const visible = accounts.filter((a) => readable.has(a.id));
+    return this.applyDelegateFavourites(req.user.realUserId, visible);
+  }
+
+  /**
+   * Account favourites are owner-scoped on the accounts row. A delegate
+   * keeps their own, so when acting we replace isFavourite /
+   * favouriteSortOrder with the delegate's overlay (never the owner's).
+   */
+  private async applyDelegateFavourites<
+    T extends { id: string; isFavourite: boolean; favouriteSortOrder: number },
+  >(delegateUserId: string, accounts: T[]): Promise<T[]> {
+    const overlay =
+      await this.delegationService.getDelegateFavourites(delegateUserId);
+    return accounts.map((a) => ({
+      ...a,
+      isFavourite: overlay.has(a.id),
+      favouriteSortOrder: overlay.get(a.id) ?? 0,
+    }));
   }
 
   @Patch("reorder-favourites")
+  @AllowDelegate()
   @ApiOperation({
     summary: "Reorder favourite accounts",
     description:
@@ -145,7 +182,42 @@ export class AccountsController {
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
   reorderFavourites(@Request() req, @Body() dto: ReorderFavouriteAccountsDto) {
+    // A delegate reorders their own favourites overlay, never the owner's.
+    if (req.user.isActing) {
+      return this.delegationService.reorderDelegateFavourites(
+        req.user.realUserId,
+        dto.accountIds,
+      );
+    }
     return this.accountsService.reorderFavourites(req.user.id, dto.accountIds);
+  }
+
+  @Put(":id/favourite")
+  @AllowDelegate()
+  @DelegatedAccountParam("id")
+  @ApiOperation({
+    summary: "Set the acting delegate's own favourite flag for an account",
+  })
+  @ApiResponse({ status: 200, description: "Favourite updated" })
+  @ApiResponse({ status: 400, description: "Bad request" })
+  async setDelegateFavourite(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: SetDelegateFavouriteDto,
+  ): Promise<{ isFavourite: boolean }> {
+    // Owners manage favourites through the normal account update; this
+    // endpoint exists only for the delegate's independent overlay.
+    if (!req.user.isActing) {
+      throw new BadRequestException(
+        "Use the account update endpoint to change favourites",
+      );
+    }
+    await this.delegationService.setDelegateFavourite(
+      req.user.realUserId,
+      id,
+      dto.isFavourite,
+    );
+    return { isFavourite: dto.isFavourite };
   }
 
   @Get("daily-balances")
@@ -163,7 +235,8 @@ export class AccountsController {
     description: "Daily balance data retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getDailyBalances(
+  @AllowDelegate()
+  async getDailyBalances(
     @Request() req,
     @Query("startDate") startDate?: string,
     @Query("endDate") endDate?: string,
@@ -177,7 +250,20 @@ export class AccountsController {
       throw new BadRequestException("startDate must be YYYY-MM-DD");
     if (ed && !dateRegex.test(ed))
       throw new BadRequestException("endDate must be YYYY-MM-DD");
-    const ids = aIds ? aIds.split(",").filter(Boolean) : undefined;
+    let ids = aIds ? aIds.split(",").filter(Boolean) : undefined;
+    if (req.user.isActing) {
+      // Restrict to the delegate's READ-granted accounts (never an
+      // unfiltered owner-wide query).
+      const readable = await this.delegationService.readableAccountIds(
+        req.user.delegationId,
+      );
+      const readableSet = new Set(readable);
+      ids =
+        ids && ids.length > 0
+          ? ids.filter((id) => readableSet.has(id))
+          : readable;
+      if (ids.length === 0) return [];
+    }
     return this.accountsService.getDailyBalances(req.user.id, sd, ed, ids);
   }
 
@@ -359,8 +445,15 @@ export class AccountsController {
     description: "Forbidden - account does not belong to user",
   })
   @ApiResponse({ status: 404, description: "Account not found" })
-  findOne(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
-    return this.accountsService.findOne(req.user.id, id);
+  @AllowDelegate()
+  @DelegatedAccountParam("id")
+  async findOne(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
+    const account = await this.accountsService.findOne(req.user.id, id);
+    if (!req.user.isActing) return account;
+    const [overlaid] = await this.applyDelegateFavourites(req.user.realUserId, [
+      account,
+    ]);
+    return overlaid;
   }
 
   @Get(":id/balance")
@@ -379,6 +472,8 @@ export class AccountsController {
     description: "Forbidden - account does not belong to user",
   })
   @ApiResponse({ status: 404, description: "Account not found" })
+  @AllowDelegate()
+  @DelegatedAccountParam("id")
   getBalance(@Request() req, @Param("id", ParseUUIDPipe) id: string) {
     return this.accountsService.getBalance(req.user.id, id);
   }

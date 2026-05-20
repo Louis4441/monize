@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useAuthStore } from '@/store/authStore';
+import type { DelegateSectionGrants } from '@/lib/delegation';
 
 const SWIPE_PAGES = [
   { href: '/dashboard', label: 'Dashboard' },
@@ -12,6 +14,20 @@ const SWIPE_PAGES = [
   { href: '/budgets', label: 'Budgets' },
   { href: '/reports', label: 'Reports' },
 ] as const;
+
+// Section-gated swipe pages for a delegate. The Dashboard is always
+// reachable; the rest require the matching owner grant. Transactions is
+// reachable when the delegate can read any non-investment account
+// (delegateSections.transactions, derived server-side). Accounts stays
+// per-account scoped and out of the swipe set, mirroring the delegate nav.
+const DELEGATE_SECTION_BY_HREF: Record<string, keyof DelegateSectionGrants> = {
+  '/accounts': 'accounts',
+  '/transactions': 'transactions',
+  '/bills': 'bills',
+  '/investments': 'investments',
+  '/budgets': 'budgets',
+  '/reports': 'reports',
+};
 
 const DECISION_THRESHOLD = 10; // px movement before deciding horizontal vs vertical
 const COMMIT_THRESHOLD_RATIO = 0.25; // 25% of screen width to commit navigation
@@ -60,13 +76,31 @@ export function useSwipeNavigation(): UseSwipeNavigationReturn {
   const pathname = usePathname();
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const currentIndex = SWIPE_PAGES.findIndex((p) => pathname === p.href);
-  const isSwipePage = currentIndex !== -1;
+  // A delegate acting as an owner can only swipe across the sections the
+  // owner granted them (plus the Dashboard). Non-delegates swipe all pages.
+  const isDelegateView = useAuthStore((s) => !!s.actingAsUserId);
+  const delegateSections = useAuthStore((s) => s.delegateSections);
+
+  const pages = useMemo(() => {
+    if (!isDelegateView) return SWIPE_PAGES.slice();
+    return SWIPE_PAGES.filter((p) => {
+      if (p.href === '/dashboard') return true;
+      const section = DELEGATE_SECTION_BY_HREF[p.href];
+      return !!section && !!delegateSections?.[section];
+    });
+  }, [isDelegateView, delegateSections]);
+
+  const currentIndex = pages.findIndex((p) => pathname === p.href);
+  // A lone page (e.g. a delegate granted no sections) has nothing to swipe
+  // to, so treat it as a non-swipe page.
+  const isSwipePage = currentIndex !== -1 && pages.length > 1;
   const currentIndexRef = useRef(currentIndex);
+  const pagesRef = useRef(pages);
 
   useEffect(() => {
     currentIndexRef.current = currentIndex;
-  }, [currentIndex]);
+    pagesRef.current = pages;
+  }, [currentIndex, pages]);
 
   // Entrance animation: set initial off-screen position before browser paints
   useLayoutEffect(() => {
@@ -150,7 +184,7 @@ export function useSwipeNavigation(): UseSwipeNavigationReturn {
           const direction = deltaX < 0 ? 1 : -1;
           const nextIdx = idx + direction;
 
-          if (nextIdx < 0 || nextIdx >= SWIPE_PAGES.length) {
+          if (nextIdx < 0 || nextIdx >= pagesRef.current.length) {
             state = { ...IDLE_STATE };
             return;
           }
@@ -198,7 +232,7 @@ export function useSwipeNavigation(): UseSwipeNavigationReturn {
         const idx = currentIndexRef.current;
         const nextIdx = idx + direction;
 
-        if (nextIdx >= 0 && nextIdx < SWIPE_PAGES.length) {
+        if (nextIdx >= 0 && nextIdx < pagesRef.current.length) {
           navigated = true;
           const targetX = deltaX < 0 ? -screenW : screenW;
           content.style.transition = `transform ${ANIMATION_MS}ms ease-out, opacity ${ANIMATION_MS}ms ease-out`;
@@ -213,7 +247,7 @@ export function useSwipeNavigation(): UseSwipeNavigationReturn {
             done = true;
             content.removeEventListener('transitionend', onEnd);
             // resetStyles();
-            router.push(SWIPE_PAGES[nextIdx].href);
+            router.push(pagesRef.current[nextIdx].href);
           };
           content.addEventListener('transitionend', onEnd, { once: true });
           setTimeout(onEnd, ANIMATION_MS + 50);
@@ -251,7 +285,7 @@ export function useSwipeNavigation(): UseSwipeNavigationReturn {
   return {
     contentRef,
     currentIndex,
-    totalPages: SWIPE_PAGES.length,
+    totalPages: pages.length,
     isSwipePage,
   };
 }

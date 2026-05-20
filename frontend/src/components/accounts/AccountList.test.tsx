@@ -10,6 +10,8 @@ vi.mock('@/lib/accounts', () => ({
     close: vi.fn().mockResolvedValue(undefined),
     reopen: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
+    update: vi.fn().mockResolvedValue(undefined),
+    setDelegateFavourite: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -823,15 +825,87 @@ describe('AccountList', () => {
     expect(allButton!.className).toContain('bg-blue-600');
   });
 
-  it('shows favourite star icon for favourite accounts', () => {
+  it('shows an interactive favourite star for favourite accounts', () => {
     const account = createAccount({ isFavourite: true });
 
     render(
       <AccountList accounts={[account]} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
     );
 
-    // The favourite star icon has aria-label "Favourite"
-    expect(screen.getByLabelText('Favourite')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Remove from favourites'),
+    ).toBeInTheDocument();
+  });
+
+  it('owner toggling the star updates the account favourite', async () => {
+    const account = createAccount({ isFavourite: false });
+
+    render(
+      <AccountList accounts={[account]} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Add to favourites'));
+    });
+
+    expect(accountsApi.update).toHaveBeenCalledWith(account.id, {
+      isFavourite: true,
+    });
+    expect(accountsApi.setDelegateFavourite).not.toHaveBeenCalled();
+    // Optimistic update only -- no full list reload.
+    expect(mockOnRefresh).not.toHaveBeenCalled();
+    expect(
+      screen.getByLabelText('Remove from favourites'),
+    ).toBeInTheDocument();
+  });
+
+  it('rolls back the star when the favourite update fails', async () => {
+    (accountsApi.update as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('nope'),
+    );
+    const account = createAccount({ isFavourite: false });
+
+    render(
+      <AccountList accounts={[account]} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Add to favourites'));
+    });
+    await act(async () => {});
+
+    expect(
+      screen.getByLabelText('Add to favourites'),
+    ).toBeInTheDocument();
+    expect(mockOnRefresh).not.toHaveBeenCalled();
+  });
+
+  it('a delegate toggling the star writes the delegate overlay', async () => {
+    const { useAuthStore } = await import('@/store/authStore');
+    act(() => {
+      useAuthStore
+        .getState()
+        .setDelegation('owner-1', [], null, { accounts: true } as never);
+    });
+    const account = createAccount({ isFavourite: false });
+
+    render(
+      <AccountList accounts={[account]} onEdit={mockOnEdit} defaultCurrency="CAD" convertToDefault={exchangeMocks.convertToDefault} onRefresh={mockOnRefresh} />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Add to favourites'));
+    });
+
+    expect(accountsApi.setDelegateFavourite).toHaveBeenCalledWith(
+      account.id,
+      true,
+    );
+    expect(accountsApi.update).not.toHaveBeenCalled();
+
+    act(() => {
+      useAuthStore.getState().setDelegation(null, [], null, null);
+    });
   });
 
   it('shows linked account info for investment pairs', () => {

@@ -17,6 +17,16 @@ import { AuthGuard } from "@nestjs/passport";
 import { PortfolioService } from "./portfolio.service";
 import { SectorWeightingService } from "./sector-weighting.service";
 import { IntradayValueQueryDto } from "./dto/intraday-value.dto";
+import {
+  AllowDelegate,
+  DelegateRequiresSection,
+} from "../delegation/decorators/delegate-access.decorator";
+import { DelegationService } from "../delegation/delegation.service";
+
+// A UUID that cannot match any real account: forces a naturally-empty,
+// correctly-shaped result for an acting delegate with no readable accounts
+// (instead of passing undefined, which the service treats as "all").
+const NO_READABLE_ACCOUNT = "00000000-0000-0000-0000-000000000000";
 
 @ApiTags("Portfolio")
 @Controller("portfolio")
@@ -29,7 +39,29 @@ export class PortfolioController {
   constructor(
     private readonly portfolioService: PortfolioService,
     private readonly sectorWeightingService: SectorWeightingService,
+    private readonly delegationService: DelegationService,
   ) {}
+
+  /**
+   * For an acting delegate, restrict the account-id filter to the accounts
+   * they were granted READ on (intersecting any explicit request). Returns
+   * the original ids unchanged for non-delegate requests so owner behaviour
+   * (undefined = all accounts) is preserved.
+   */
+  private async scopeIds(
+    req: { user: { isActing?: boolean; delegationId?: string } },
+    ids?: string[],
+  ): Promise<string[] | undefined> {
+    if (!req.user.isActing || !req.user.delegationId) return ids;
+    const readable = new Set(
+      await this.delegationService.readableAccountIds(req.user.delegationId),
+    );
+    const eff =
+      ids && ids.length > 0
+        ? ids.filter((i) => readable.has(i))
+        : [...readable];
+    return eff.length > 0 ? eff : [NO_READABLE_ACCOUNT];
+  }
 
   private parseUuidList(
     csv: string | undefined,
@@ -46,6 +78,8 @@ export class PortfolioController {
   }
 
   @Get("summary")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
   @ApiOperation({
     summary: "Get portfolio summary with holdings and market values",
   })
@@ -60,12 +94,17 @@ export class PortfolioController {
     description: "Portfolio summary retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getSummary(@Request() req, @Query("accountIds") accountIds?: string) {
+  async getSummary(@Request() req, @Query("accountIds") accountIds?: string) {
     const ids = this.parseUuidList(accountIds, "account");
-    return this.portfolioService.getPortfolioSummary(req.user.id, ids);
+    return this.portfolioService.getPortfolioSummary(
+      req.user.id,
+      await this.scopeIds(req, ids),
+    );
   }
 
   @Get("allocation")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
   @ApiOperation({
     summary: "Get asset allocation breakdown",
   })
@@ -80,9 +119,15 @@ export class PortfolioController {
     description: "Asset allocation retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getAllocation(@Request() req, @Query("accountIds") accountIds?: string) {
+  async getAllocation(
+    @Request() req,
+    @Query("accountIds") accountIds?: string,
+  ) {
     const ids = this.parseUuidList(accountIds, "account");
-    return this.portfolioService.getAssetAllocation(req.user.id, ids);
+    return this.portfolioService.getAssetAllocation(
+      req.user.id,
+      await this.scopeIds(req, ids),
+    );
   }
 
   @Get("top-movers")
@@ -99,6 +144,8 @@ export class PortfolioController {
   }
 
   @Get("accounts")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
   @ApiOperation({
     summary: "Get all investment accounts for the user",
   })
@@ -107,11 +154,20 @@ export class PortfolioController {
     description: "Investment accounts retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getInvestmentAccounts(@Request() req) {
-    return this.portfolioService.getInvestmentAccounts(req.user.id);
+  async getInvestmentAccounts(@Request() req) {
+    const accounts = await this.portfolioService.getInvestmentAccounts(
+      req.user.id,
+    );
+    if (!req.user.isActing || !req.user.delegationId) return accounts;
+    const readable = new Set(
+      await this.delegationService.readableAccountIds(req.user.delegationId),
+    );
+    return accounts.filter((a) => readable.has(a.id));
   }
 
   @Get("intraday-value")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
   @ApiOperation({
     summary:
       "Get intraday portfolio value series for the 1D / 1W / 1M chart ranges",
@@ -121,16 +177,21 @@ export class PortfolioController {
     description: "Intraday portfolio value retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getIntradayValue(@Request() req, @Query() query: IntradayValueQueryDto) {
+  async getIntradayValue(
+    @Request() req,
+    @Query() query: IntradayValueQueryDto,
+  ) {
     const ids = this.parseUuidList(query.accountIds, "account");
     return this.portfolioService.getIntradayValueSeries(req.user.id, {
       range: query.range,
-      accountIds: ids,
+      accountIds: await this.scopeIds(req, ids),
       displayCurrency: query.displayCurrency,
     });
   }
 
   @Get("sector-weightings")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
   @ApiOperation({
     summary: "Get sector weightings breakdown for investment portfolio",
   })
@@ -149,7 +210,7 @@ export class PortfolioController {
     description: "Sector weightings retrieved successfully",
   })
   @ApiResponse({ status: 401, description: "Unauthorized" })
-  getSectorWeightings(
+  async getSectorWeightings(
     @Request() req,
     @Query("accountIds") accountIds?: string,
     @Query("securityIds") securityIds?: string,
@@ -158,7 +219,7 @@ export class PortfolioController {
     const sIds = this.parseUuidList(securityIds, "security");
     return this.sectorWeightingService.getSectorWeightings(
       req.user.id,
-      aIds,
+      await this.scopeIds(req, aIds),
       sIds,
     );
   }

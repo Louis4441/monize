@@ -316,6 +316,26 @@ describe('AccountForm', () => {
     });
   });
 
+  it('hides the favourite toggle for a delegate (acting view)', async () => {
+    const { useAuthStore } = await import('@/store/authStore');
+    act(() => {
+      useAuthStore
+        .getState()
+        .setDelegation('owner-1', [], null, { accounts: true } as never);
+    });
+
+    render(<AccountForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Account Name')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Add to favourites')).not.toBeInTheDocument();
+
+    act(() => {
+      useAuthStore.getState().setDelegation(null, [], null, null);
+    });
+  });
+
   it('toggles favourite when star button is clicked', async () => {
     render(
       <AccountForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />

@@ -1614,9 +1614,7 @@ describe("TransactionSplitService", () => {
         { id: "split-1", kind: "category", categoryId: "cat-1" },
         { id: "split-2", kind: "category", categoryId: "cat-2" },
       ];
-      mockQueryRunner.manager.find = jest
-        .fn()
-        .mockResolvedValue(remaining);
+      mockQueryRunner.manager.find = jest.fn().mockResolvedValue(remaining);
 
       const investmentService = (service as any).investmentTransactionsService;
 

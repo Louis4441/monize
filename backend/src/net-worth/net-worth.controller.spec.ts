@@ -1,11 +1,16 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { NetWorthController } from "./net-worth.controller";
 import { NetWorthService } from "./net-worth.service";
+import { DelegationService } from "../delegation/delegation.service";
 
 describe("NetWorthController", () => {
   let controller: NetWorthController;
   let mockNetWorthService: Partial<Record<keyof NetWorthService, jest.Mock>>;
+  let delegationService: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
+  const UUID_A = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
+  const UUID_B = "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e";
+  const NO_READABLE = "00000000-0000-0000-0000-000000000000";
 
   beforeEach(async () => {
     mockNetWorthService = {
@@ -13,6 +18,9 @@ describe("NetWorthController", () => {
       getMonthlyInvestments: jest.fn(),
       getDailyInvestments: jest.fn(),
       recalculateAllAccounts: jest.fn(),
+    };
+    delegationService = {
+      readableAccountIds: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -22,6 +30,7 @@ describe("NetWorthController", () => {
           provide: NetWorthService,
           useValue: mockNetWorthService,
         },
+        { provide: DelegationService, useValue: delegationService },
       ],
     }).compile();
 
@@ -60,14 +69,14 @@ describe("NetWorthController", () => {
   });
 
   describe("getMonthlyInvestments()", () => {
-    it("delegates to netWorthService.getMonthlyInvestments with userId, dates, and parsed accountIds", () => {
+    it("delegates to netWorthService.getMonthlyInvestments with userId, dates, and parsed accountIds", async () => {
       mockNetWorthService.getMonthlyInvestments!.mockReturnValue("investments");
 
-      const result = controller.getMonthlyInvestments(
+      const result = await controller.getMonthlyInvestments(
         mockReq,
         "2024-01-01",
         "2024-12-31",
-        "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d,b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+        `${UUID_A},${UUID_B}`,
         undefined,
       );
 
@@ -76,18 +85,15 @@ describe("NetWorthController", () => {
         "user-1",
         "2024-01-01",
         "2024-12-31",
-        [
-          "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-          "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
-        ],
+        [UUID_A, UUID_B],
         undefined,
       );
     });
 
-    it("passes undefined accountIds when not provided", () => {
+    it("passes undefined accountIds when not provided", async () => {
       mockNetWorthService.getMonthlyInvestments!.mockReturnValue("investments");
 
-      controller.getMonthlyInvestments(
+      await controller.getMonthlyInvestments(
         mockReq,
         "2024-01-01",
         "2024-12-31",
@@ -103,17 +109,60 @@ describe("NetWorthController", () => {
         undefined,
       );
     });
+
+    it("scopes accountIds to readable accounts for an acting delegate", async () => {
+      mockNetWorthService.getMonthlyInvestments!.mockReturnValue("ok");
+      delegationService.readableAccountIds.mockResolvedValue([UUID_A]);
+      const actReq = {
+        user: { id: "owner-1", isActing: true, delegationId: "d-1" },
+      };
+
+      await controller.getMonthlyInvestments(
+        actReq,
+        undefined,
+        undefined,
+        `${UUID_A},${UUID_B}`,
+        undefined,
+      );
+
+      expect(delegationService.readableAccountIds).toHaveBeenCalledWith("d-1");
+      expect(mockNetWorthService.getMonthlyInvestments).toHaveBeenCalledWith(
+        "owner-1",
+        undefined,
+        undefined,
+        [UUID_A],
+        undefined,
+      );
+    });
+
+    it("returns an empty result for a delegate with no readable accounts", async () => {
+      mockNetWorthService.getMonthlyInvestments!.mockReturnValue("ok");
+      delegationService.readableAccountIds.mockResolvedValue([]);
+      const actReq = {
+        user: { id: "owner-1", isActing: true, delegationId: "d-1" },
+      };
+
+      await controller.getMonthlyInvestments(actReq);
+
+      expect(mockNetWorthService.getMonthlyInvestments).toHaveBeenCalledWith(
+        "owner-1",
+        undefined,
+        undefined,
+        [NO_READABLE],
+        undefined,
+      );
+    });
   });
 
   describe("getDailyInvestments()", () => {
-    it("delegates to netWorthService.getDailyInvestments with userId, dates, and parsed accountIds", () => {
+    it("delegates to netWorthService.getDailyInvestments with userId, dates, and parsed accountIds", async () => {
       mockNetWorthService.getDailyInvestments!.mockReturnValue("daily");
 
-      const result = controller.getDailyInvestments(
+      const result = await controller.getDailyInvestments(
         mockReq,
         "2025-02-01",
         "2025-03-04",
-        "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        UUID_A,
         "USD",
       );
 
@@ -122,15 +171,15 @@ describe("NetWorthController", () => {
         "user-1",
         "2025-02-01",
         "2025-03-04",
-        ["a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"],
+        [UUID_A],
         "USD",
       );
     });
 
-    it("passes undefined accountIds when not provided", () => {
+    it("passes undefined accountIds when not provided", async () => {
       mockNetWorthService.getDailyInvestments!.mockReturnValue("daily");
 
-      controller.getDailyInvestments(
+      await controller.getDailyInvestments(
         mockReq,
         "2025-02-01",
         "2025-03-04",
@@ -147,8 +196,32 @@ describe("NetWorthController", () => {
       );
     });
 
-    it("throws BadRequestException for invalid startDate format", () => {
-      expect(() =>
+    it("scopes accountIds to readable accounts for an acting delegate", async () => {
+      mockNetWorthService.getDailyInvestments!.mockReturnValue("ok");
+      delegationService.readableAccountIds.mockResolvedValue([UUID_A]);
+      const actReq = {
+        user: { id: "owner-1", isActing: true, delegationId: "d-1" },
+      };
+
+      await controller.getDailyInvestments(
+        actReq,
+        undefined,
+        undefined,
+        `${UUID_A},${UUID_B}`,
+        undefined,
+      );
+
+      expect(mockNetWorthService.getDailyInvestments).toHaveBeenCalledWith(
+        "owner-1",
+        undefined,
+        undefined,
+        [UUID_A],
+        undefined,
+      );
+    });
+
+    it("throws BadRequestException for invalid startDate format", async () => {
+      await expect(
         controller.getDailyInvestments(
           mockReq,
           "invalid",
@@ -156,11 +229,11 @@ describe("NetWorthController", () => {
           undefined,
           undefined,
         ),
-      ).toThrow("startDate must be YYYY-MM-DD");
+      ).rejects.toThrow("startDate must be YYYY-MM-DD");
     });
 
-    it("throws BadRequestException for invalid accountIds", () => {
-      expect(() =>
+    it("throws BadRequestException for invalid accountIds", async () => {
+      await expect(
         controller.getDailyInvestments(
           mockReq,
           "2025-01-01",
@@ -168,7 +241,7 @@ describe("NetWorthController", () => {
           "not-a-uuid",
           undefined,
         ),
-      ).toThrow("accountIds must be comma-separated UUIDs");
+      ).rejects.toThrow("accountIds must be comma-separated UUIDs");
     });
   });
 
@@ -201,18 +274,16 @@ describe("NetWorthController", () => {
   });
 
   describe("getMonthlyInvestments edge cases", () => {
-    it("uppercases and slices currency to 3 chars", () => {
+    it("uppercases and slices currency to 3 chars", async () => {
       mockNetWorthService.getMonthlyInvestments!.mockReturnValue("ok");
-      controller.getMonthlyInvestments(
+      await controller.getMonthlyInvestments(
         mockReq,
         undefined,
         undefined,
         undefined,
         "usdextra",
       );
-      expect(
-        mockNetWorthService.getMonthlyInvestments,
-      ).toHaveBeenCalledWith(
+      expect(mockNetWorthService.getMonthlyInvestments).toHaveBeenCalledWith(
         "user-1",
         undefined,
         undefined,
@@ -221,34 +292,34 @@ describe("NetWorthController", () => {
       );
     });
 
-    it("throws on invalid endDate", () => {
-      expect(() =>
+    it("throws on invalid endDate", async () => {
+      await expect(
         controller.getMonthlyInvestments(mockReq, undefined, "bad-date"),
-      ).toThrow(/endDate/);
+      ).rejects.toThrow(/endDate/);
     });
 
-    it("throws on invalid startDate", () => {
-      expect(() =>
+    it("throws on invalid startDate", async () => {
+      await expect(
         controller.getMonthlyInvestments(mockReq, "x"),
-      ).toThrow(/startDate/);
+      ).rejects.toThrow(/startDate/);
     });
 
-    it("throws when accountIds contains a non-UUID", () => {
-      expect(() =>
+    it("throws when accountIds contains a non-UUID", async () => {
+      await expect(
         controller.getMonthlyInvestments(
           mockReq,
           undefined,
           undefined,
           "not-a-uuid",
         ),
-      ).toThrow(/UUID/);
+      ).rejects.toThrow(/UUID/);
     });
   });
 
   describe("getDailyInvestments edge cases", () => {
-    it("uppercases and slices currency to 3 chars", () => {
+    it("uppercases and slices currency to 3 chars", async () => {
       mockNetWorthService.getDailyInvestments!.mockReturnValue("ok");
-      controller.getDailyInvestments(
+      await controller.getDailyInvestments(
         mockReq,
         undefined,
         undefined,
@@ -264,10 +335,10 @@ describe("NetWorthController", () => {
       );
     });
 
-    it("throws on invalid endDate", () => {
-      expect(() =>
+    it("throws on invalid endDate", async () => {
+      await expect(
         controller.getDailyInvestments(mockReq, undefined, "bad-date"),
-      ).toThrow(/endDate/);
+      ).rejects.toThrow(/endDate/);
     });
   });
 });

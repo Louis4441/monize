@@ -189,6 +189,81 @@ describe('RegisterPage', () => {
     });
   });
 
+  it('sends currentPassword when the registrant supplies a temporary password', async () => {
+    const mockUser = { id: 'd1', email: 'shared@example.com' };
+    (authApi.register as ReturnType<typeof vi.fn>).mockResolvedValue({ user: mockUser });
+
+    render(<RegisterPage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^email/i)).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/^email/i), {
+        target: { value: 'shared@example.com' },
+      });
+      fireEvent.change(screen.getByLabelText(/^password$/i), {
+        target: { value: 'StrongPass1!' },
+      });
+      fireEvent.change(screen.getByLabelText(/confirm password/i), {
+        target: { value: 'StrongPass1!' },
+      });
+      fireEvent.change(screen.getByLabelText(/temporary password/i), {
+        target: { value: '  Temp-Pw-9!aB  ' },
+      });
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+    });
+
+    await waitFor(() =>
+      expect(authApi.register).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'shared@example.com',
+          password: 'StrongPass1!',
+          currentPassword: 'Temp-Pw-9!aB',
+        }),
+      ),
+    );
+  });
+
+  it('does not send currentPassword when the temp-password field is left blank', async () => {
+    const mockUser = { id: 'u2', email: 'new@example.com' };
+    (authApi.register as ReturnType<typeof vi.fn>).mockResolvedValue({ user: mockUser });
+
+    render(<RegisterPage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/^email/i)).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/^email/i), {
+        target: { value: 'new@example.com' },
+      });
+      fireEvent.change(screen.getByLabelText(/^password$/i), {
+        target: { value: 'StrongPass1!' },
+      });
+      fireEvent.change(screen.getByLabelText(/confirm password/i), {
+        target: { value: 'StrongPass1!' },
+      });
+      // Whitespace-only temp password must NOT be sent.
+      fireEvent.change(screen.getByLabelText(/temporary password/i), {
+        target: { value: '   ' },
+      });
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+    });
+
+    await waitFor(() => expect(authApi.register).toHaveBeenCalled());
+    const callArg = (authApi.register as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(callArg).not.toHaveProperty('currentPassword');
+  });
+
   it('shows error toast on registration failure', async () => {
     (authApi.register as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Registration failed'));
 

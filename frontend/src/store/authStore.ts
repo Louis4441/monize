@@ -3,6 +3,11 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { AxiosError } from 'axios';
 import { User } from '@/types/auth';
 import { clearAllCache } from '@/lib/apiCache';
+import type {
+  DelegateContext,
+  DelegateCapabilityFlags,
+  DelegateSectionGrants,
+} from '@/lib/delegation';
 
 interface AuthState {
   user: User | null;
@@ -11,10 +16,21 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   _hasHydrated: boolean;
+  // Delegate "acting as owner" context (Phase 1). null = acting as self.
+  actingAsUserId: string | null;
+  availableContexts: DelegateContext[];
+  delegateCapabilities: DelegateCapabilityFlags | null;
+  delegateSections: DelegateSectionGrants | null;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
+  setDelegation: (
+    actingAsUserId: string | null,
+    contexts: DelegateContext[],
+    capabilities: DelegateCapabilityFlags | null,
+    sections: DelegateSectionGrants | null,
+  ) => void;
   login: (user: User, token: string) => void;
   logout: () => void;
   clearError: () => void;
@@ -30,8 +46,25 @@ export const useAuthStore = create<AuthState>()(
       isLoading: true,
       error: null,
       _hasHydrated: false,
+      actingAsUserId: null,
+      availableContexts: [],
+      delegateCapabilities: null,
+      delegateSections: null,
 
       setUser: (user) => set({ user, isAuthenticated: !!user }),
+
+      setDelegation: (
+        actingAsUserId,
+        availableContexts,
+        delegateCapabilities,
+        delegateSections,
+      ) =>
+        set({
+          actingAsUserId,
+          availableContexts,
+          delegateCapabilities,
+          delegateSections,
+        }),
 
       // auth_token is httpOnly — backend manages the cookie, not JS
       setToken: (token) => set({ token }),
@@ -73,6 +106,10 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           error: null,
           isLoading: false,
+          actingAsUserId: null,
+          availableContexts: [],
+          delegateCapabilities: null,
+          delegateSections: null,
         });
       },
 
@@ -93,10 +130,33 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state?.isAuthenticated) {
-          // Fetch user profile from API to restore user object without persisting PII
-          import('@/lib/auth').then(({ authApi }) => {
-            authApi.getProfile().then((user: User) => {
-              state.setUser(user);
+          // Restore the user profile AND the delegation context together
+          // before flipping _hasHydrated. Anything that gates rendering on
+          // `isDelegateView` (DelegateSectionGuard, dashboard view split,
+          // nav visibility) would otherwise see actingAsUserId=null for one
+          // render and flash the wrong page before the contexts request
+          // settles.
+          Promise.all([
+            import('@/lib/auth'),
+            import('@/lib/delegation'),
+          ]).then(([{ authApi }, { delegationApi }]) => {
+            Promise.all([
+              authApi.getProfile(),
+              // Contexts is best-effort: a normal user with no delegations
+              // still gets a successful empty payload. Treat any failure
+              // here as "no delegation context" rather than blocking login
+              // restoration.
+              delegationApi.getContexts().catch(() => null),
+            ]).then(([user, contexts]) => {
+              state.setUser(user as User);
+              if (contexts) {
+                state.setDelegation(
+                  contexts.actingAsUserId,
+                  contexts.contexts,
+                  contexts.capabilities,
+                  contexts.sections,
+                );
+              }
               state.setHasHydrated(true);
             }).catch((error: unknown) => {
               const status = error instanceof AxiosError ? error.response?.status : undefined;

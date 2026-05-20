@@ -11,6 +11,7 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import { RefreshToken } from "../auth/entities/refresh-token.entity";
 import { PersonalAccessToken } from "../auth/entities/personal-access-token.entity";
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
+import { UsersService } from "../users/users.service";
 
 describe("AdminService", () => {
   let service: AdminService;
@@ -19,6 +20,7 @@ describe("AdminService", () => {
   let refreshTokensRepository: Record<string, jest.Mock>;
   let patRepository: Record<string, jest.Mock>;
   let oauthProviderService: Record<string, jest.Mock>;
+  let usersService: Record<string, jest.Mock>;
 
   const mockAdmin = {
     id: "admin-1",
@@ -59,6 +61,7 @@ describe("AdminService", () => {
       save: jest.fn().mockImplementation((data) => data),
       remove: jest.fn(),
       count: jest.fn(),
+      createQueryBuilder: jest.fn(),
     };
 
     preferencesRepository = {
@@ -75,6 +78,11 @@ describe("AdminService", () => {
 
     oauthProviderService = {
       revokeAllForUser: jest.fn().mockResolvedValue(0),
+    };
+
+    usersService = {
+      isActingDelegate: jest.fn().mockResolvedValue(false),
+      purgeForDowngrade: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -97,6 +105,10 @@ describe("AdminService", () => {
           provide: OAuthProviderService,
           useValue: oauthProviderService,
         },
+        {
+          provide: UsersService,
+          useValue: usersService,
+        },
       ],
     }).compile();
 
@@ -104,8 +116,19 @@ describe("AdminService", () => {
   });
 
   describe("findAllUsers", () => {
+    let qb: Record<string, jest.Mock>;
+
+    function mockQuery(rows: unknown[]) {
+      qb = {
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(rows),
+      };
+      usersRepository.createQueryBuilder.mockReturnValue(qb);
+    }
+
     it("returns users with sensitive fields stripped", async () => {
-      usersRepository.find.mockResolvedValue([mockAdmin, mockTargetUser]);
+      mockQuery([mockAdmin, mockTargetUser]);
 
       const result = await service.findAllUsers();
 
@@ -120,7 +143,7 @@ describe("AdminService", () => {
     });
 
     it("sets hasPassword false for OIDC users without password", async () => {
-      usersRepository.find.mockResolvedValue([
+      mockQuery([
         { ...mockTargetUser, passwordHash: null, authProvider: "oidc" },
       ]);
 
@@ -129,14 +152,15 @@ describe("AdminService", () => {
       expect(result[0].hasPassword).toBe(false);
     });
 
-    it("orders users by createdAt ASC", async () => {
-      usersRepository.find.mockResolvedValue([]);
+    it("excludes pure delegates and orders by createdAt ASC", async () => {
+      mockQuery([]);
 
       await service.findAllUsers();
 
-      expect(usersRepository.find).toHaveBeenCalledWith({
-        order: { createdAt: "ASC" },
-      });
+      const whereSql = qb.where.mock.calls[0][0] as string;
+      expect(whereSql).toContain("account_delegates");
+      expect(whereSql).toContain("delegate_user_id");
+      expect(qb.orderBy).toHaveBeenCalledWith("u.created_at", "ASC");
     });
   });
 
@@ -316,6 +340,36 @@ describe("AdminService", () => {
 
       await service.deleteUser("admin-1", "user-2");
 
+      expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
+        "user-2",
+      );
+    });
+
+    it("revokes refresh tokens and PATs on delete", async () => {
+      usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
+
+      await service.deleteUser("admin-1", "user-2");
+
+      expect(refreshTokensRepository.update).toHaveBeenCalledWith(
+        { userId: "user-2", isRevoked: false },
+        { isRevoked: true },
+      );
+      expect(patRepository.update).toHaveBeenCalledWith(
+        { userId: "user-2", isRevoked: false },
+        { isRevoked: true },
+      );
+    });
+
+    it("demotes a delegate to a pure delegate instead of deleting", async () => {
+      usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
+      usersService.isActingDelegate.mockResolvedValue(true);
+
+      await service.deleteUser("admin-1", "user-2");
+
+      expect(usersService.purgeForDowngrade).toHaveBeenCalledWith("user-2");
+      expect(preferencesRepository.delete).not.toHaveBeenCalled();
+      expect(usersRepository.remove).not.toHaveBeenCalled();
+      // Sessions are still revoked so the demotion takes effect immediately.
       expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
         "user-2",
       );

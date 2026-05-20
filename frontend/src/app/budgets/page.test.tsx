@@ -260,4 +260,13 @@ describe('BudgetsPage', () => {
     });
   });
 
+  it('does not toast on a 403 (the section guard owns that message)', async () => {
+    mockGetAll.mockRejectedValueOnce({ response: { status: 403 } });
+    render(<BudgetsPage />);
+    await waitFor(() => {
+      expect(mockGetAll).toHaveBeenCalled();
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
 });

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { Select } from '@/components/ui/Select';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 import { Account, PaymentFrequency } from '@/types/account';
 import { Category } from '@/types/category';
@@ -194,6 +195,10 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
 
   const watchedCurrency = useWatch({ control, name: 'currencyCode' });
   const watchedIsFavourite = useWatch({ control, name: 'isFavourite' });
+  // Account edits are owner-only. A delegate sets favourites from the
+  // account list (their own overlay), so the in-form toggle is hidden for
+  // them to avoid an owner-only save error.
+  const isDelegateView = useAuthStore((s) => !!s.actingAsUserId);
   const watchedAccountType = useWatch({ control, name: 'accountType' });
   const watchedOpeningBalance = useWatch({ control, name: 'openingBalance' });
   const watchedCreditLimit = useWatch({ control, name: 'creditLimit' });
@@ -651,6 +656,7 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
 
       {/* Favourite star toggle */}
       <div className="flex flex-wrap items-center justify-between gap-2">
+        {!isDelegateView && (
         <button
           type="button"
           onClick={toggleFavourite}
@@ -678,6 +684,7 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
             {watchedIsFavourite ? 'Favourite' : 'Add to favourites'}
           </span>
         </button>
+        )}
         {/* Hidden input for form registration */}
         <input type="hidden" {...register('isFavourite')} />
 

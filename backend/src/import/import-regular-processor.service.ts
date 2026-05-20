@@ -5,6 +5,7 @@ import {
   TransactionStatus,
 } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
+import { SplitKind } from "../transactions/entities/split-kind.enum";
 import { Payee } from "../payees/entities/payee.entity";
 import { PayeeAlias } from "../payees/entities/payee-alias.entity";
 import { TransactionTag } from "../tags/entities/transaction-tag.entity";
@@ -473,7 +474,10 @@ export class ImportRegularProcessorService {
         TransactionSplit,
         {
           transactionId: savedTx.id,
-          categoryId: splitCategoryId,
+          kind: splitTransferAccountId
+            ? SplitKind.TRANSFER
+            : SplitKind.CATEGORY,
+          categoryId: splitTransferAccountId ? null : splitCategoryId,
           transferAccountId: splitTransferAccountId,
           amount: split.amount,
           memo: split.memo,

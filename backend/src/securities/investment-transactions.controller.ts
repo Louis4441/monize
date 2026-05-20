@@ -27,6 +27,16 @@ import {
   InvestmentTransaction,
   InvestmentAction,
 } from "./entities/investment-transaction.entity";
+import {
+  AllowDelegate,
+  DelegateRequiresSection,
+} from "../delegation/decorators/delegate-access.decorator";
+import { DelegationService } from "../delegation/delegation.service";
+
+// A UUID that cannot match any real account: forces a naturally-empty,
+// correctly-shaped result for an acting delegate with no readable accounts
+// (instead of passing undefined, which the service treats as "all").
+const NO_READABLE_ACCOUNT = "00000000-0000-0000-0000-000000000000";
 
 @ApiTags("Investment Transactions")
 @ApiBearerAuth()
@@ -35,7 +45,29 @@ import {
 export class InvestmentTransactionsController {
   constructor(
     private readonly investmentTransactionsService: InvestmentTransactionsService,
+    private readonly delegationService: DelegationService,
   ) {}
+
+  /**
+   * For an acting delegate, restrict the account-id filter to the accounts
+   * they were granted READ on (intersecting any explicit request). Returns
+   * the original ids unchanged for non-delegate requests so owner behaviour
+   * (undefined = all accounts) is preserved.
+   */
+  private async scopeIds(
+    req: { user: { isActing?: boolean; delegationId?: string } },
+    ids?: string[],
+  ): Promise<string[] | undefined> {
+    if (!req.user.isActing || !req.user.delegationId) return ids;
+    const readable = new Set(
+      await this.delegationService.readableAccountIds(req.user.delegationId),
+    );
+    const eff =
+      ids && ids.length > 0
+        ? ids.filter((i) => readable.has(i))
+        : [...readable];
+    return eff.length > 0 ? eff : [NO_READABLE_ACCOUNT];
+  }
 
   @Post()
   @ApiOperation({
@@ -97,7 +129,9 @@ export class InvestmentTransactionsController {
     status: 200,
     description: "List of investment transactions with pagination",
   })
-  findAll(
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  async findAll(
     @Request() req,
     @Query("accountIds") accountIds?: string,
     @Query("startDate") startDate?: string,
@@ -155,7 +189,7 @@ export class InvestmentTransactionsController {
 
     return this.investmentTransactionsService.findAll(
       req.user.id,
-      ids,
+      await this.scopeIds(req, ids),
       startDate,
       endDate,
       page ? parseInt(page, 10) : undefined,
@@ -173,9 +207,14 @@ export class InvestmentTransactionsController {
     description: "Comma-separated account IDs to filter by",
   })
   @ApiResponse({ status: 200, description: "Investment transaction summary" })
-  getSummary(@Request() req, @Query("accountIds") accountIds?: string) {
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  async getSummary(@Request() req, @Query("accountIds") accountIds?: string) {
     const ids = accountIds ? accountIds.split(",").filter(Boolean) : undefined;
-    return this.investmentTransactionsService.getSummary(req.user.id, ids);
+    return this.investmentTransactionsService.getSummary(
+      req.user.id,
+      await this.scopeIds(req, ids),
+    );
   }
 
   @Get("realized-gains")
@@ -187,7 +226,9 @@ export class InvestmentTransactionsController {
   @ApiQuery({ name: "startDate", required: false })
   @ApiQuery({ name: "endDate", required: false })
   @ApiResponse({ status: 200, description: "List of SELLs with realized gain" })
-  getRealizedGains(
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  async getRealizedGains(
     @Request() req,
     @Query("accountIds") accountIds?: string,
     @Query("startDate") startDate?: string,
@@ -213,7 +254,7 @@ export class InvestmentTransactionsController {
     }
 
     return this.investmentTransactionsService.getRealizedGains(req.user.id, {
-      accountIds: ids,
+      accountIds: await this.scopeIds(req, ids),
       startDate,
       endDate,
     });
@@ -234,7 +275,9 @@ export class InvestmentTransactionsController {
     status: 200,
     description: "List of capital gain entries per period",
   })
-  getCapitalGains(
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  async getCapitalGains(
     @Request() req,
     @Query("startDate") startDate: string,
     @Query("endDate") endDate: string,
@@ -273,16 +316,18 @@ export class InvestmentTransactionsController {
       }
     }
 
+    const scoped = await this.scopeIds(req, ids);
+
     if (granularity === "day") {
       return this.investmentTransactionsService.getCapitalGainsByDay(
         req.user.id,
-        { accountIds: ids, startDate, endDate },
+        { accountIds: scoped, startDate, endDate },
       );
     }
 
     return this.investmentTransactionsService.getCapitalGainsByMonth(
       req.user.id,
-      { accountIds: ids, startDate, endDate },
+      { accountIds: scoped, startDate, endDate },
     );
   }
 

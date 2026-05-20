@@ -9,6 +9,7 @@ import { ExchangeRate } from "../currencies/entities/exchange-rate.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { NetWorthService } from "./net-worth.service";
 import { NetWorthController } from "./net-worth.controller";
+import { DelegationModule } from "../delegation/delegation.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { NetWorthController } from "./net-worth.controller";
       ExchangeRate,
       UserPreference,
     ]),
+    DelegationModule,
   ],
   providers: [NetWorthService],
   controllers: [NetWorthController],

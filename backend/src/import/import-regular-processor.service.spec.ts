@@ -3,6 +3,7 @@ import { ImportContext } from "./import-context";
 import { TransactionStatus } from "../transactions/entities/transaction.entity";
 import { AccountType } from "../accounts/entities/account.entity";
 import { Payee } from "../payees/entities/payee.entity";
+import { SplitKind } from "../transactions/entities/split-kind.enum";
 import { ImportResultDto } from "./dto/import.dto";
 
 describe("ImportRegularProcessorService", () => {
@@ -300,6 +301,57 @@ describe("ImportRegularProcessorService", () => {
       const createCalls = ctx.queryRunner.manager.create.mock.calls;
       // Main transaction + 2 splits = at least 3 create calls
       expect(createCalls.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("sets kind=category and clears transferAccountId for category splits", async () => {
+      const categoryMap = new Map<string, string | null>();
+      categoryMap.set("Food", "cat-food");
+      const ctx = makeContext({ categoryMap });
+
+      await service.processTransaction(ctx, {
+        date: "2025-01-15",
+        amount: -60,
+        splits: [{ amount: -60, category: "Food", memo: "Food" }],
+      });
+
+      const splitCreate = ctx.queryRunner.manager.create.mock.calls.find(
+        (c: unknown[]) =>
+          c[1] != null && typeof c[1] === "object" && "kind" in c[1],
+      );
+      expect(splitCreate?.[1]).toMatchObject({
+        kind: SplitKind.CATEGORY,
+        categoryId: "cat-food",
+        transferAccountId: null,
+      });
+    });
+
+    it("sets kind=transfer and clears categoryId for transfer splits", async () => {
+      const accountMap = new Map<string, string | null>();
+      accountMap.set("Checking", "acc-chk");
+      const ctx = makeContext({ accountMap });
+
+      await service.processTransaction(ctx, {
+        date: "2025-01-15",
+        amount: -50,
+        splits: [
+          {
+            amount: -50,
+            isTransfer: true,
+            transferAccount: "Checking",
+            memo: "xfer",
+          },
+        ],
+      });
+
+      const splitCreate = ctx.queryRunner.manager.create.mock.calls.find(
+        (c: unknown[]) =>
+          c[1] != null && typeof c[1] === "object" && "kind" in c[1],
+      );
+      expect(splitCreate?.[1]).toMatchObject({
+        kind: SplitKind.TRANSFER,
+        categoryId: null,
+        transferAccountId: "acc-chk",
+      });
     });
   });
 

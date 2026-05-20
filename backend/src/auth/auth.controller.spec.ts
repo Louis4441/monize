@@ -11,6 +11,7 @@ import { OidcService } from "./oidc/oidc.service";
 import { EmailService } from "../notifications/email.service";
 import { DemoModeService } from "../common/demo-mode.service";
 import { TokenService } from "./token.service";
+import { DelegationService } from "../delegation/delegation.service";
 import { encrypt, derivePurposeKey } from "./crypto.util";
 
 // Matches the JWT_SECRET used in the configService mock below; kept in one
@@ -149,6 +150,14 @@ describe("AuthController", () => {
               .mockReturnValue(7 * 24 * 60 * 60 * 1000),
           },
         },
+        {
+          provide: DelegationService,
+          useValue: {
+            getAvailableContexts: jest.fn().mockResolvedValue([]),
+            resolveSwitchTarget: jest.fn(),
+            validateActingContext: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
@@ -189,6 +198,14 @@ describe("AuthController", () => {
               getRefreshExpiryMs: jest
                 .fn()
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
             },
           },
         ],
@@ -235,6 +252,14 @@ describe("AuthController", () => {
               getRefreshExpiryMs: jest
                 .fn()
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
             },
           },
         ],
@@ -315,6 +340,14 @@ describe("AuthController", () => {
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
             },
           },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
+            },
+          },
         ],
       }).compile();
 
@@ -357,7 +390,7 @@ describe("AuthController", () => {
       const loginResult = {
         accessToken: "access-token",
         refreshToken: "refresh-token",
-        user: { id: "user-1", email: "test@example.com" },
+        user: { id: "user-1", realUserId: "user-1", email: "test@example.com" },
       };
       authService.login.mockResolvedValue(loginResult);
       const res = mockRes();
@@ -386,7 +419,7 @@ describe("AuthController", () => {
       const loginResult = {
         accessToken: "access-token",
         refreshToken: "refresh-token",
-        user: { id: "user-1", email: "test@example.com" },
+        user: { id: "user-1", realUserId: "user-1", email: "test@example.com" },
         rememberMe: true,
       };
       authService.login.mockResolvedValue(loginResult);
@@ -545,6 +578,14 @@ describe("AuthController", () => {
               getRefreshExpiryMs: jest
                 .fn()
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
             },
           },
         ],
@@ -815,7 +856,7 @@ describe("AuthController", () => {
   describe("csrfRefresh", () => {
     it("sets csrf_token cookie and returns success message", async () => {
       const res = mockRes();
-      const req = { user: { id: "user-1" } };
+      const req = { user: { id: "user-1", realUserId: "user-1" } };
 
       await controller.csrfRefresh(req as any, res as any);
 
@@ -839,7 +880,7 @@ describe("AuthController", () => {
       const verifyResult = {
         accessToken: "2fa-access",
         refreshToken: "2fa-refresh",
-        user: { id: "user-1", email: "test@example.com" },
+        user: { id: "user-1", realUserId: "user-1", email: "test@example.com" },
         trustedDeviceRef: null,
       };
       authService.verify2FA.mockResolvedValue(verifyResult);
@@ -881,7 +922,7 @@ describe("AuthController", () => {
       const verifyResult = {
         accessToken: "2fa-access",
         refreshToken: "2fa-refresh",
-        user: { id: "user-1", email: "test@example.com" },
+        user: { id: "user-1", realUserId: "user-1", email: "test@example.com" },
         trustedDeviceRef: "trusted-device-token-abc",
       };
       authService.verify2FA.mockResolvedValue(verifyResult);
@@ -929,7 +970,7 @@ describe("AuthController", () => {
       const verifyResult = {
         accessToken: "2fa-access",
         refreshToken: "2fa-refresh",
-        user: { id: "user-1", email: "test@example.com" },
+        user: { id: "user-1", realUserId: "user-1", email: "test@example.com" },
         trustedDeviceRef: null,
       };
       authService.verify2FA.mockResolvedValue(verifyResult);
@@ -958,7 +999,7 @@ describe("AuthController", () => {
       const verifyResult = {
         accessToken: "2fa-access",
         refreshToken: "2fa-refresh",
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
         trustedDeviceRef: null,
       };
       authService.verify2FA.mockResolvedValue(verifyResult);
@@ -992,7 +1033,7 @@ describe("AuthController", () => {
         qrCodeDataUrl: "data:image/png;base64,abc123",
       };
       authService.setup2FA.mockResolvedValue(setupResult);
-      const reqWithUser = { user: { id: "user-1" } };
+      const reqWithUser = { user: { id: "user-1", realUserId: "user-1" } };
 
       const result = await controller.setup2FA(reqWithUser, {
         currentPassword: "correct-password",
@@ -1010,7 +1051,7 @@ describe("AuthController", () => {
     it("delegates to authService.confirmSetup2FA with user id and code", async () => {
       const confirmResult = { message: "2FA enabled successfully" };
       authService.confirmSetup2FA.mockResolvedValue(confirmResult);
-      const reqWithUser = { user: { id: "user-1" } };
+      const reqWithUser = { user: { id: "user-1", realUserId: "user-1" } };
       const dto = { code: "123456" };
 
       const result = await controller.confirmSetup2FA(reqWithUser, dto as any);
@@ -1027,13 +1068,65 @@ describe("AuthController", () => {
     it("delegates to authService.disable2FA with user id and code", async () => {
       const disableResult = { message: "2FA disabled successfully" };
       authService.disable2FA.mockResolvedValue(disableResult);
-      const reqWithUser = { user: { id: "user-1" } };
+      const reqWithUser = { user: { id: "user-1", realUserId: "user-1" } };
       const dto = { code: "654321" };
 
       const result = await controller.disable2FA(reqWithUser, dto as any);
 
       expect(authService.disable2FA).toHaveBeenCalledWith("user-1", "654321");
       expect(result).toEqual(disableResult);
+    });
+
+    it("targets the real (delegate) user id, never the owner, when acting", async () => {
+      authService.disable2FA.mockResolvedValue({ message: "ok" });
+      const actingReq = {
+        user: { id: "owner-1", realUserId: "delegate-1", isActing: true },
+      };
+
+      await controller.disable2FA(actingReq as any, { code: "123456" } as any);
+
+      expect(authService.disable2FA).toHaveBeenCalledWith(
+        "delegate-1",
+        "123456",
+      );
+    });
+  });
+
+  describe("get2FAStatus", () => {
+    it("returns the 2FA-enabled flag for the real (delegate) user id", async () => {
+      (authService as any).is2FAEnabled = jest.fn().mockResolvedValue(true);
+      const actingReq = {
+        user: { id: "owner-1", realUserId: "delegate-1", isActing: true },
+      };
+
+      const result = await controller.get2FAStatus(actingReq as any);
+
+      expect((authService as any).is2FAEnabled).toHaveBeenCalledWith(
+        "delegate-1",
+      );
+      expect(result).toEqual({ enabled: true });
+    });
+  });
+
+  describe("getSelfProfile", () => {
+    it("loads and sanitizes the real (delegate) user, never the owner", async () => {
+      const delegateUser = { id: "delegate-1", email: "d@x.com" } as any;
+      (authService as any).getUserById = jest
+        .fn()
+        .mockResolvedValue(delegateUser);
+      (authService as any).sanitizeUser = jest
+        .fn()
+        .mockReturnValue({ id: "delegate-1", email: "d@x.com" });
+      const actingReq = {
+        user: { id: "owner-1", realUserId: "delegate-1", isActing: true },
+      };
+
+      const result = await controller.getSelfProfile(actingReq as any);
+
+      expect((authService as any).getUserById).toHaveBeenCalledWith(
+        "delegate-1",
+      );
+      expect(result).toEqual({ id: "delegate-1", email: "d@x.com" });
     });
   });
 
@@ -1062,7 +1155,7 @@ describe("AuthController", () => {
       authService.findTrustedDeviceByToken.mockResolvedValue("device-1");
       const res = mockRes();
       const expressReq = {
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
         cookies: { trusted_device: "current-device-token" },
       } as any;
 
@@ -1083,7 +1176,7 @@ describe("AuthController", () => {
       authService.getTrustedDevices.mockResolvedValue(mockDevices);
       const res = mockRes();
       const expressReq = {
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
         cookies: {},
       } as any;
 
@@ -1100,7 +1193,7 @@ describe("AuthController", () => {
       authService.getTrustedDevices.mockResolvedValue([]);
       const res = mockRes();
       const expressReq = {
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
         cookies: {},
       } as any;
 
@@ -1116,7 +1209,7 @@ describe("AuthController", () => {
       authService.findTrustedDeviceByToken.mockResolvedValue("device-1");
       const res = mockRes();
       const expressReq = {
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
         cookies: { trusted_device: "current-device-token" },
       } as any;
 
@@ -1141,7 +1234,7 @@ describe("AuthController", () => {
       authService.findTrustedDeviceByToken.mockResolvedValue("device-2");
       const res = mockRes();
       const expressReq = {
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
         cookies: { trusted_device: "current-device-token" },
       } as any;
 
@@ -1161,7 +1254,7 @@ describe("AuthController", () => {
       authService.revokeTrustedDevice.mockResolvedValue(undefined);
       const res = mockRes();
       const expressReq = {
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
         cookies: {},
       } as any;
 
@@ -1179,7 +1272,7 @@ describe("AuthController", () => {
       authService.findTrustedDeviceByToken.mockResolvedValue(null);
       const res = mockRes();
       const expressReq = {
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
         cookies: { trusted_device: "stale-token" },
       } as any;
 
@@ -1194,7 +1287,7 @@ describe("AuthController", () => {
       authService.revokeAllTrustedDevices.mockResolvedValue(3);
       const res = mockRes();
       const expressReq = {
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
       } as any;
 
       await controller.revokeAllTrustedDevices(expressReq, res as any);
@@ -1213,7 +1306,7 @@ describe("AuthController", () => {
       authService.revokeAllTrustedDevices.mockResolvedValue(0);
       const res = mockRes();
       const expressReq = {
-        user: { id: "user-1" },
+        user: { id: "user-1", realUserId: "user-1" },
       } as any;
 
       await controller.revokeAllTrustedDevices(expressReq, res as any);
@@ -1291,7 +1384,7 @@ describe("AuthController", () => {
       const loginResult = {
         accessToken: "access-token",
         refreshToken: "refresh-token",
-        user: { id: "user-1", email: "test@example.com" },
+        user: { id: "user-1", realUserId: "user-1", email: "test@example.com" },
       };
       authService.login.mockResolvedValue(loginResult);
       const res = mockRes();
@@ -1318,7 +1411,7 @@ describe("AuthController", () => {
       const loginResult = {
         accessToken: "access-token",
         refreshToken: "refresh-token",
-        user: { id: "user-1", email: "test@example.com" },
+        user: { id: "user-1", realUserId: "user-1", email: "test@example.com" },
       };
       authService.login.mockResolvedValue(loginResult);
       const res = mockRes();
@@ -1341,7 +1434,7 @@ describe("AuthController", () => {
       const loginResult = {
         accessToken: "access-token",
         refreshToken: "refresh-token",
-        user: { id: "user-1", email: "test@example.com" },
+        user: { id: "user-1", realUserId: "user-1", email: "test@example.com" },
       };
       authService.login.mockResolvedValue(loginResult);
       const res = mockRes();
@@ -1390,6 +1483,14 @@ describe("AuthController", () => {
               getRefreshExpiryMs: jest
                 .fn()
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
             },
           },
         ],
@@ -1446,6 +1547,14 @@ describe("AuthController", () => {
               getRefreshExpiryMs: jest
                 .fn()
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
             },
           },
         ],
@@ -1527,6 +1636,14 @@ describe("AuthController", () => {
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
             },
           },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
+            },
+          },
         ],
       }).compile();
       const c = force2faModule.get<AuthController>(AuthController);
@@ -1592,6 +1709,14 @@ describe("AuthController", () => {
               getRefreshExpiryMs: jest
                 .fn()
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
             },
           },
         ],
@@ -1663,6 +1788,14 @@ describe("AuthController", () => {
                   .mockReturnValue(7 * 24 * 60 * 60 * 1000),
               },
             },
+            {
+              provide: DelegationService,
+              useValue: {
+                getAvailableContexts: jest.fn().mockResolvedValue([]),
+                resolveSwitchTarget: jest.fn(),
+                validateActingContext: jest.fn(),
+              },
+            },
           ],
         }).compile();
         const c = m.get<AuthController>(AuthController);
@@ -1704,12 +1837,24 @@ describe("AuthController", () => {
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
             },
           },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
+            },
+          },
         ],
       }).compile();
       const c = m.get<AuthController>(AuthController);
       const res = mockRes();
       const req = { cookies: { oidc_state: "s", oidc_nonce: "n" } };
-      await c.oidcCallback({ error: "access_denied" }, req as never, res as never);
+      await c.oidcCallback(
+        { error: "access_denied" },
+        req as never,
+        res as never,
+      );
       expect(res.redirect).toHaveBeenCalledWith(
         "http://localhost:3000/auth/callback?error=authentication_failed",
       );
@@ -1740,6 +1885,14 @@ describe("AuthController", () => {
               getRefreshExpiryMs: jest
                 .fn()
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
             },
           },
         ],
@@ -1794,6 +1947,14 @@ describe("AuthController", () => {
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
             },
           },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
+            },
+          },
         ],
       }).compile();
       const c = m.get<AuthController>(AuthController);
@@ -1830,6 +1991,14 @@ describe("AuthController", () => {
               getRefreshExpiryMs: jest
                 .fn()
                 .mockReturnValue(7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          {
+            provide: DelegationService,
+            useValue: {
+              getAvailableContexts: jest.fn().mockResolvedValue([]),
+              resolveSwitchTarget: jest.fn(),
+              validateActingContext: jest.fn(),
             },
           },
         ],
@@ -1998,6 +2167,74 @@ describe("AuthController", () => {
       expect(res.redirect).toHaveBeenCalledWith(
         "http://localhost:3000/auth/callback?link=failed",
       );
+    });
+  });
+
+  describe("getContexts", () => {
+    async function buildController(delegation: Record<string, jest.Mock>) {
+      const module: TestingModule = await Test.createTestingModule({
+        controllers: [AuthController],
+        providers: [
+          { provide: AuthService, useValue: authService },
+          { provide: OidcService, useValue: oidcService },
+          { provide: ConfigService, useValue: configService },
+          { provide: EmailService, useValue: emailService },
+          { provide: DemoModeService, useValue: demoModeService },
+          {
+            provide: TokenService,
+            useValue: { getRefreshExpiryMs: jest.fn() },
+          },
+          { provide: DelegationService, useValue: delegation },
+        ],
+      }).compile();
+      return module.get<AuthController>(AuthController);
+    }
+
+    it("returns capabilities and sections when acting", async () => {
+      const delegation = {
+        getAvailableContexts: jest.fn().mockResolvedValue([{ userId: "o1" }]),
+        getCapabilities: jest.fn().mockResolvedValue({ payees: {} }),
+        getSections: jest.fn().mockResolvedValue({ bills: true }),
+        hasTransactionalAccess: jest.fn().mockResolvedValue(true),
+        hasAnyAccountAccess: jest.fn().mockResolvedValue(true),
+      };
+      const c = await buildController(delegation);
+      const res = await c.getContexts({
+        user: {
+          id: "o1",
+          realUserId: "d1",
+          isActing: true,
+          delegationId: "g1",
+        },
+      } as never);
+      expect(res).toEqual({
+        actingAsUserId: "o1",
+        contexts: [{ userId: "o1" }],
+        capabilities: { payees: {} },
+        sections: { bills: true, transactions: true, accounts: true },
+      });
+      expect(delegation.getSections).toHaveBeenCalledWith("g1");
+      expect(delegation.hasTransactionalAccess).toHaveBeenCalledWith("g1");
+      expect(delegation.hasAnyAccountAccess).toHaveBeenCalledWith("g1");
+    });
+
+    it("returns null capabilities and sections when not acting", async () => {
+      const delegation = {
+        getAvailableContexts: jest.fn().mockResolvedValue([]),
+        getCapabilities: jest.fn(),
+        getSections: jest.fn(),
+      };
+      const c = await buildController(delegation);
+      const res = await c.getContexts({
+        user: { id: "d1", realUserId: "d1", isActing: false },
+      } as never);
+      expect(res).toEqual({
+        actingAsUserId: null,
+        contexts: [],
+        capabilities: null,
+        sections: null,
+      });
+      expect(delegation.getSections).not.toHaveBeenCalled();
     });
   });
 

@@ -3,15 +3,18 @@ import { BadRequestException } from "@nestjs/common";
 import { PortfolioController } from "./portfolio.controller";
 import { PortfolioService } from "./portfolio.service";
 import { SectorWeightingService } from "./sector-weighting.service";
+import { DelegationService } from "../delegation/delegation.service";
 
 describe("PortfolioController", () => {
   let controller: PortfolioController;
   let portfolioService: Record<string, jest.Mock>;
   let sectorWeightingService: Record<string, jest.Mock>;
+  let delegationService: Record<string, jest.Mock>;
 
   const req = { user: { id: "user-1" } };
   const UUID1 = "00000000-0000-0000-0000-000000000001";
   const UUID2 = "00000000-0000-0000-0000-000000000002";
+  const NO_READABLE = "00000000-0000-0000-0000-000000000000";
 
   beforeEach(async () => {
     portfolioService = {
@@ -32,6 +35,10 @@ describe("PortfolioController", () => {
       }),
     };
 
+    delegationService = {
+      readableAccountIds: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PortfolioController],
       providers: [
@@ -40,6 +47,7 @@ describe("PortfolioController", () => {
           provide: SectorWeightingService,
           useValue: sectorWeightingService,
         },
+        { provide: DelegationService, useValue: delegationService },
       ],
     }).compile();
 
@@ -91,9 +99,40 @@ describe("PortfolioController", () => {
       );
     });
 
-    it("rejects invalid UUIDs in accountIds", () => {
-      expect(() => controller.getSummary(req, "not-a-uuid")).toThrow(
+    it("rejects invalid UUIDs in accountIds", async () => {
+      await expect(controller.getSummary(req, "not-a-uuid")).rejects.toThrow(
         BadRequestException,
+      );
+    });
+
+    it("scopes accountIds to readable accounts for an acting delegate", async () => {
+      portfolioService.getPortfolioSummary.mockResolvedValue({});
+      delegationService.readableAccountIds.mockResolvedValue([UUID1]);
+      const actReq = {
+        user: { id: "owner-1", isActing: true, delegationId: "d-1" },
+      };
+
+      await controller.getSummary(actReq, `${UUID1},${UUID2}`);
+
+      expect(delegationService.readableAccountIds).toHaveBeenCalledWith("d-1");
+      expect(portfolioService.getPortfolioSummary).toHaveBeenCalledWith(
+        "owner-1",
+        [UUID1],
+      );
+    });
+
+    it("returns an empty-shaped result for a delegate with no readable accounts", async () => {
+      portfolioService.getPortfolioSummary.mockResolvedValue({});
+      delegationService.readableAccountIds.mockResolvedValue([]);
+      const actReq = {
+        user: { id: "owner-1", isActing: true, delegationId: "d-1" },
+      };
+
+      await controller.getSummary(actReq);
+
+      expect(portfolioService.getPortfolioSummary).toHaveBeenCalledWith(
+        "owner-1",
+        [NO_READABLE],
       );
     });
   });
@@ -126,8 +165,8 @@ describe("PortfolioController", () => {
       );
     });
 
-    it("rejects invalid UUIDs in accountIds", () => {
-      expect(() => controller.getAllocation(req, "not-a-uuid")).toThrow(
+    it("rejects invalid UUIDs in accountIds", async () => {
+      await expect(controller.getAllocation(req, "not-a-uuid")).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -159,6 +198,22 @@ describe("PortfolioController", () => {
         "user-1",
       );
       expect(result).toEqual(accounts);
+    });
+
+    it("filters accounts to readable ones for an acting delegate", async () => {
+      const accounts = [
+        { id: UUID1, name: "Granted", type: "INVESTMENT" },
+        { id: UUID2, name: "Not granted", type: "INVESTMENT" },
+      ];
+      portfolioService.getInvestmentAccounts.mockResolvedValue(accounts);
+      delegationService.readableAccountIds.mockResolvedValue([UUID1]);
+      const actReq = {
+        user: { id: "owner-1", isActing: true, delegationId: "d-1" },
+      };
+
+      const result = await controller.getInvestmentAccounts(actReq);
+
+      expect(result).toEqual([accounts[0]]);
     });
   });
 
@@ -205,13 +260,13 @@ describe("PortfolioController", () => {
       );
     });
 
-    it("rejects invalid UUIDs in accountIds", () => {
-      expect(() =>
+    it("rejects invalid UUIDs in accountIds", async () => {
+      await expect(
         controller.getIntradayValue(req, {
           range: "1d",
           accountIds: "not-a-uuid",
         }),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -236,16 +291,16 @@ describe("PortfolioController", () => {
       );
     });
 
-    it("rejects invalid UUID in accountIds", () => {
-      expect(() => controller.getSectorWeightings(req, "not-a-uuid")).toThrow(
-        BadRequestException,
-      );
+    it("rejects invalid UUID in accountIds", async () => {
+      await expect(
+        controller.getSectorWeightings(req, "not-a-uuid"),
+      ).rejects.toThrow(BadRequestException);
     });
 
-    it("rejects invalid UUID in securityIds", () => {
-      expect(() =>
+    it("rejects invalid UUID in securityIds", async () => {
+      await expect(
         controller.getSectorWeightings(req, undefined, "not-a-uuid"),
-      ).toThrow(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });
