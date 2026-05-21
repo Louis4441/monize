@@ -90,6 +90,14 @@ vi.mock('@/components/auth/StepUpAuthModal', () => ({
     ) : null,
 }));
 
+vi.mock('@/lib/api', () => ({
+  default: { post: vi.fn() },
+}));
+import apiClient from '@/lib/api';
+const mockedApi = apiClient as unknown as {
+  post: ReturnType<typeof vi.fn>;
+};
+
 vi.mock('@/lib/emergency-access', () => ({
   emergencyAccessApi: {
     get: vi.fn(),
@@ -143,6 +151,7 @@ describe('EmergencyAccessPage', () => {
     mockUseDemoMode.mockReturnValue(false);
     mockActingAs.mockReturnValue(null);
     useStepUpTokenStore.getState().clearAll();
+    sessionStorage.clear();
   });
 
   it('blocks access for delegate sessions', async () => {
@@ -209,6 +218,74 @@ describe('EmergencyAccessPage', () => {
     expect(
       screen.getByRole('button', { name: /Add message/i }),
     ).toBeInTheDocument();
+  });
+
+  it('finalizes step-up on mount when returning from an OIDC roundtrip', async () => {
+    sessionStorage.setItem(
+      'stepUpOidcPending',
+      JSON.stringify({
+        purpose: 'emergency-access',
+        payload: { mode: 'view' },
+      }),
+    );
+    api.get.mockResolvedValue(
+      makeView({
+        messageMetadata: { hasMessage: true, charCount: 7, updatedAt: null },
+      }),
+    );
+    api.getMessage.mockResolvedValue({ message: 'returned' });
+    mockedApi.post.mockResolvedValue({
+      data: {
+        stepUpToken: 'oidc-confirmed-token',
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      },
+    });
+    await renderPage();
+    // Drain the microtask queue so the post-then-fetch chain settles.
+    await act(async () => {});
+    await act(async () => {});
+    await waitFor(() => expect(mockedApi.post).toHaveBeenCalled());
+    expect(mockedApi.post).toHaveBeenCalledWith('/auth/step-up', {
+      purpose: 'emergency-access',
+      oidcConfirmed: true,
+    });
+    expect(
+      useStepUpTokenStore.getState().getValid('emergency-access'),
+    ).toBe('oidc-confirmed-token');
+    // Sentinel was consumed.
+    expect(sessionStorage.getItem('stepUpOidcPending')).toBeNull();
+    // And the requested mode resumed.
+    await waitFor(() =>
+      expect(screen.getByText('returned')).toBeInTheDocument(),
+    );
+  });
+
+  it('skips the OIDC finalize when the sentinel targets a different purpose', async () => {
+    sessionStorage.setItem(
+      'stepUpOidcPending',
+      JSON.stringify({ purpose: 'something-else' }),
+    );
+    api.get.mockResolvedValue(makeView());
+    await renderPage();
+    await act(async () => {});
+    expect(mockedApi.post).not.toHaveBeenCalled();
+    // Sentinel remains for whoever it was intended for.
+    expect(sessionStorage.getItem('stepUpOidcPending')).not.toBeNull();
+  });
+
+  it('toasts and does not store a token when the OIDC finalize call fails', async () => {
+    sessionStorage.setItem(
+      'stepUpOidcPending',
+      JSON.stringify({ purpose: 'emergency-access' }),
+    );
+    api.get.mockResolvedValue(makeView());
+    mockedApi.post.mockRejectedValue(new Error('server boom'));
+    await renderPage();
+    await act(async () => {});
+    await waitFor(() => expect(mockedApi.post).toHaveBeenCalled());
+    expect(
+      useStepUpTokenStore.getState().getValid('emergency-access'),
+    ).toBeNull();
   });
 
   it('clicking Reveal opens the step-up modal when no token is present', async () => {

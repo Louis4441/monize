@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   StepUpRequiredError,
+  consumeOidcStepUpPending,
   rethrowStepUpError,
+  stashOidcStepUpPending,
   useStepUpTokenStore,
 } from './stepUpToken';
 
@@ -105,6 +107,86 @@ describe('StepUpRequiredError', () => {
     expect(err.reason).toBe('expired');
     expect(err.name).toBe('StepUpRequiredError');
     expect(err.message).toMatch(/expired/);
+  });
+});
+
+describe('OIDC step-up pending sentinel', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('stashes the purpose + payload and the returnTo path', () => {
+    stashOidcStepUpPending({
+      purpose: 'emergency-access',
+      returnTo: '/settings/emergency-access',
+      payload: { mode: 'view' },
+    });
+    expect(
+      JSON.parse(sessionStorage.getItem('stepUpOidcPending') ?? 'null'),
+    ).toEqual({ purpose: 'emergency-access', payload: { mode: 'view' } });
+    expect(sessionStorage.getItem('postLoginReturnTo')).toBe(
+      '/settings/emergency-access',
+    );
+  });
+
+  it('omits postLoginReturnTo when no returnTo is given', () => {
+    stashOidcStepUpPending({ purpose: 'emergency-access' });
+    expect(sessionStorage.getItem('stepUpOidcPending')).not.toBeNull();
+    expect(sessionStorage.getItem('postLoginReturnTo')).toBeNull();
+  });
+
+  it('consumes the sentinel and returns the payload', () => {
+    stashOidcStepUpPending({
+      purpose: 'emergency-access',
+      payload: { mode: 'edit' },
+    });
+    const result = consumeOidcStepUpPending('emergency-access');
+    expect(result).toEqual({
+      purpose: 'emergency-access',
+      payload: { mode: 'edit' },
+    });
+    // Removed after the first read.
+    expect(sessionStorage.getItem('stepUpOidcPending')).toBeNull();
+    expect(consumeOidcStepUpPending('emergency-access')).toBeNull();
+  });
+
+  it('ignores a sentinel for a different purpose', () => {
+    stashOidcStepUpPending({ purpose: 'emergency-access' });
+    expect(consumeOidcStepUpPending('something-else')).toBeNull();
+    // And the sentinel for the real purpose is still there.
+    expect(sessionStorage.getItem('stepUpOidcPending')).not.toBeNull();
+  });
+
+  it('returns null and clears the slot when the JSON is corrupt', () => {
+    sessionStorage.setItem('stepUpOidcPending', '{not-json');
+    expect(consumeOidcStepUpPending('emergency-access')).toBeNull();
+    expect(sessionStorage.getItem('stepUpOidcPending')).toBeNull();
+  });
+
+  it('returns null when no sentinel is stored', () => {
+    expect(consumeOidcStepUpPending('emergency-access')).toBeNull();
+  });
+
+  it('tolerates sessionStorage throwing when writing', () => {
+    const setSpy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new Error('quota');
+      });
+    expect(() =>
+      stashOidcStepUpPending({ purpose: 'emergency-access' }),
+    ).not.toThrow();
+    setSpy.mockRestore();
+  });
+
+  it('tolerates sessionStorage throwing when reading', () => {
+    const getSpy = vi
+      .spyOn(Storage.prototype, 'getItem')
+      .mockImplementation(() => {
+        throw new Error('blocked');
+      });
+    expect(consumeOidcStepUpPending('emergency-access')).toBeNull();
+    getSpy.mockRestore();
   });
 });
 

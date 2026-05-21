@@ -106,6 +106,69 @@ export class StepUpRequiredError extends Error {
 }
 
 /**
+ * OIDC users can't enroll Monize-managed 2FA and have no local password, so
+ * step-up uses the same soft-check pattern as the existing delete-account /
+ * backup-restore flows: redirect through the identity provider, then call
+ * the step-up endpoint with `oidcConfirmed=true` after the rotated session
+ * cookies come back.
+ *
+ * We persist a sentinel in sessionStorage across the redirect so the
+ * destination page can:
+ *   - Recognize that we just returned from OIDC for step-up
+ *   - Resume the action the user wanted (e.g. open the message editor)
+ *
+ * Stored as JSON in `stepUpOidcPending`. The Next.js auth callback respects
+ * `postLoginReturnTo` to bring the user back to the right page.
+ */
+const PENDING_KEY = 'stepUpOidcPending';
+
+export interface OidcStepUpPending {
+  purpose: string;
+  /** Optional opaque payload (mode, item id, ...) the caller wants back. */
+  payload?: Record<string, unknown>;
+}
+
+export function stashOidcStepUpPending(args: {
+  purpose: string;
+  returnTo?: string;
+  payload?: Record<string, unknown>;
+}): void {
+  try {
+    sessionStorage.setItem(
+      PENDING_KEY,
+      JSON.stringify({ purpose: args.purpose, payload: args.payload }),
+    );
+    if (args.returnTo) {
+      sessionStorage.setItem('postLoginReturnTo', args.returnTo);
+    }
+  } catch {
+    // sessionStorage unavailable -- the caller will simply not be resumed.
+  }
+}
+
+export function consumeOidcStepUpPending(
+  purpose: string,
+): OidcStepUpPending | null {
+  let raw: string | null = null;
+  try {
+    raw = sessionStorage.getItem(PENDING_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  let parsed: OidcStepUpPending | null = null;
+  try {
+    parsed = JSON.parse(raw) as OidcStepUpPending;
+  } catch {
+    sessionStorage.removeItem(PENDING_KEY);
+    return null;
+  }
+  if (!parsed || parsed.purpose !== purpose) return null;
+  sessionStorage.removeItem(PENDING_KEY);
+  return parsed;
+}
+
+/**
  * Inspect an axios error and, if it carries a STEP_UP_* code from the
  * backend, throw a typed `StepUpRequiredError`. Otherwise rethrow as-is.
  *

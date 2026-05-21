@@ -19,8 +19,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { StepUpAuthModal } from '@/components/auth/StepUpAuthModal';
 import {
   StepUpRequiredError,
+  consumeOidcStepUpPending,
   useStepUpTokenStore,
 } from '@/lib/stepUpToken';
+import apiClient from '@/lib/api';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuthStore } from '@/store/authStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
@@ -263,6 +265,44 @@ function EmergencyAccessSection() {
       messageForm.reset({ message: '' });
     }
   }, [hasStepUpToken, messageMode, messageForm]);
+
+  // Finalize step-up after an OIDC roundtrip. The user clicked "Continue to
+  // identity provider" in the modal, which stashed the pending purpose +
+  // mode in sessionStorage and called authApi.initiateOidc(). The auth
+  // callback brought them back here. Read the sentinel, exchange it for a
+  // real step-up token, and resume the action they wanted.
+  useEffect(() => {
+    const pending = consumeOidcStepUpPending(STEP_UP_PURPOSE);
+    if (!pending) return;
+    const resumeMode = pending.payload?.mode as 'view' | 'edit' | undefined;
+    (async () => {
+      try {
+        const res = await apiClient.post<{
+          stepUpToken: string;
+          expiresAt: string;
+        }>('/auth/step-up', {
+          purpose: STEP_UP_PURPOSE,
+          oidcConfirmed: true,
+        });
+        useStepUpTokenStore
+          .getState()
+          .set(STEP_UP_PURPOSE, res.data.stepUpToken, res.data.expiresAt);
+        if (resumeMode === 'view' || resumeMode === 'edit') {
+          setPendingMode(resumeMode);
+          // Defer to next tick so the token is in the store before fetch.
+          queueMicrotask(() => {
+            void fetchMessageInto(resumeMode);
+          });
+        }
+      } catch (err) {
+        toast.error(getErrorMessage(err, 'Failed to confirm re-authentication'));
+        logger.error(err);
+      }
+    })();
+    // Intentionally run once per mount -- the sentinel is consumed on the
+    // first call, so re-runs would no-op anyway.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchMessageInto = useCallback(
     async (nextMode: 'view' | 'edit') => {
@@ -865,6 +905,10 @@ function EmergencyAccessSection() {
           isOpen={stepUpOpen}
           purpose={STEP_UP_PURPOSE}
           reason="Re-verify your identity to view or edit your emergency-access message."
+          oidcReturnTo="/settings/emergency-access"
+          oidcResumePayload={
+            pendingMode ? { mode: pendingMode } : undefined
+          }
           onClose={() => {
             setStepUpOpen(false);
             setPendingMode(null);

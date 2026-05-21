@@ -144,7 +144,7 @@ describe("StepUpAuthService", () => {
     });
   });
 
-  describe("OIDC users without 2FA", () => {
+  describe("OIDC users", () => {
     beforeEach(() => {
       usersRepo.findOne.mockResolvedValue({
         id: userId,
@@ -155,7 +155,38 @@ describe("StepUpAuthService", () => {
       preferencesRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
     });
 
+    it("requires oidcConfirmed and otherwise rejects with OIDC_REAUTH_REQUIRED", async () => {
+      await expect(
+        service.verifyAndIssue(userId, "emergency-access", { password: "x" }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      await expect(
+        service.verifyAndIssue(userId, "emergency-access", {}),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("issues a token when oidcConfirmed=true after a fresh IdP roundtrip", async () => {
+      const result = await service.verifyAndIssue(userId, "emergency-access", {
+        oidcConfirmed: true,
+      });
+      expect(result.stepUpToken).toBe("signed.jwt.token");
+      const payload = jwt.sign.mock.calls[0][0];
+      expect(payload).toMatchObject({
+        sub: userId,
+        type: "step_up",
+        purpose: "emergency-access",
+      });
+    });
+  });
+
+  describe("local user with no password (incomplete onboarding)", () => {
     it("rejects with STEP_UP_FACTOR_UNAVAILABLE", async () => {
+      usersRepo.findOne.mockResolvedValue({
+        id: userId,
+        authProvider: "local",
+        passwordHash: null,
+        twoFactorSecret: null,
+      });
+      preferencesRepo.findOne.mockResolvedValue({ twoFactorEnabled: false });
       await expect(
         service.verifyAndIssue(userId, "emergency-access", { password: "x" }),
       ).rejects.toBeInstanceOf(BadRequestException);

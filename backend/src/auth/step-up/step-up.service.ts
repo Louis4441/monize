@@ -20,6 +20,7 @@ import type { StepUpPurpose } from "./dto/verify-step-up.dto";
 interface VerifyArgs {
   password?: string;
   totpCode?: string;
+  oidcConfirmed?: boolean;
 }
 
 export interface StepUpVerificationResult {
@@ -102,7 +103,22 @@ export class StepUpAuthService {
         userId,
         args.totpCode,
       );
-    } else if (user.authProvider === "local" && user.passwordHash) {
+    } else if (user.authProvider === "oidc") {
+      // OIDC users have no Monize-managed password and cannot enroll Monize
+      // 2FA (see two-factor.service.ts:283). Mirror the soft-check pattern
+      // used by /users/delete-account and /backup/restore: the frontend
+      // redirects the user through the identity provider via
+      // authApi.initiateOidc(), then sets oidcConfirmed=true on return.
+      // The presence of that flag combined with the freshly-rotated session
+      // cookies stands in for a re-auth challenge.
+      if (!args.oidcConfirmed) {
+        throw new BadRequestException({
+          code: "OIDC_REAUTH_REQUIRED",
+          message: "Re-authenticate with your identity provider to continue.",
+        });
+      }
+      verified = true;
+    } else if (user.passwordHash) {
       if (!args.password) {
         throw new BadRequestException({
           code: "PASSWORD_REQUIRED",
@@ -111,16 +127,16 @@ export class StepUpAuthService {
       }
       verified = await bcrypt.compare(args.password, user.passwordHash);
     } else {
-      // OIDC user without 2FA. We cannot prove they're still in possession
-      // of the account without a redirect to the identity provider, which
-      // isn't wired up yet. Direct them to enable 2FA so we can use TOTP.
+      // Local account with no password set (admin-provisioned via reset
+      // flow that hasn't completed yet) -- step-up isn't available until
+      // the user finishes onboarding.
       this.logger.warn(
-        `Step-up unavailable for user ${userId}: OIDC without 2FA`,
+        `Step-up unavailable for user ${userId}: no password and not OIDC`,
       );
       throw new BadRequestException({
         code: "STEP_UP_FACTOR_UNAVAILABLE",
         message:
-          "Enable two-factor authentication to access this protected setting.",
+          "Finish setting up your account password to access this setting.",
       });
     }
 

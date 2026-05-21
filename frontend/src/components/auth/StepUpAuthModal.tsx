@@ -10,9 +10,13 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import apiClient from '@/lib/api';
+import { authApi } from '@/lib/auth';
 import { useAuthStore } from '@/store/authStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
-import { useStepUpTokenStore } from '@/lib/stepUpToken';
+import {
+  useStepUpTokenStore,
+  stashOidcStepUpPending,
+} from '@/lib/stepUpToken';
 import { getErrorMessage } from '@/lib/errors';
 
 interface StepUpAuthModalProps {
@@ -23,6 +27,13 @@ interface StepUpAuthModalProps {
   onClose: () => void;
   /** Called after the token is stored in the in-memory step-up store. */
   onVerified?: () => void;
+  /**
+   * Path the user should return to after the OIDC roundtrip, and an
+   * opaque caller-controlled payload that survives the redirect (e.g. which
+   * mode -- 'view' or 'edit' -- to resume in).
+   */
+  oidcReturnTo?: string;
+  oidcResumePayload?: Record<string, unknown>;
 }
 
 const passwordSchema = z.object({
@@ -55,17 +66,32 @@ export function StepUpAuthModal({
   reason,
   onClose,
   onVerified,
+  oidcReturnTo,
+  oidcResumePayload,
 }: StepUpAuthModalProps) {
   const user = useAuthStore((s) => s.user);
   const preferences = usePreferencesStore((s) => s.preferences);
   const setStepUp = useStepUpTokenStore((s) => s.set);
 
   const twoFactorEnabled = !!preferences?.twoFactorEnabled;
-  const mode: 'totp' | 'password' | 'unavailable' = twoFactorEnabled
+  const mode: 'totp' | 'password' | 'oidc' | 'unavailable' = twoFactorEnabled
     ? 'totp'
-    : user?.authProvider === 'local' && user?.hasPassword
-      ? 'password'
-      : 'unavailable';
+    : user?.authProvider === 'oidc'
+      ? 'oidc'
+      : user?.authProvider === 'local' && user?.hasPassword
+        ? 'password'
+        : 'unavailable';
+
+  const handleOidcReauth = () => {
+    // Stash the resume payload + the return-to path so the page can finalize
+    // the step-up after the IdP roundtrip. Then redirect.
+    stashOidcStepUpPending({
+      purpose,
+      returnTo: oidcReturnTo,
+      payload: oidcResumePayload,
+    });
+    authApi.initiateOidc();
+  };
 
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -125,14 +151,28 @@ export function StepUpAuthModal({
         {mode === 'unavailable' ? (
           <div className="px-6 py-6 space-y-4">
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              This action requires extra verification. Your account doesn&apos;t
-              have a password or two-factor authentication enabled, so we
-              can&apos;t challenge you securely. Enable two-factor
-              authentication in the Security section to unlock this setting.
+              This action requires extra verification. Finish setting up your
+              account password (or sign in with your identity provider) before
+              accessing this setting.
             </p>
             <div className="flex justify-end">
               <Button variant="outline" onClick={onClose}>
                 Close
+              </Button>
+            </div>
+          </div>
+        ) : mode === 'oidc' ? (
+          <div className="px-6 py-6 space-y-4">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              Sign in again with your identity provider to confirm it&apos;s
+              you. You&apos;ll be brought right back here.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleOidcReauth}>
+                Continue to identity provider
               </Button>
             </div>
           </div>

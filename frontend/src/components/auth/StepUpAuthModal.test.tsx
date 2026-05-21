@@ -10,6 +10,14 @@ vi.mock('@/lib/api', () => ({
 import apiClient from '@/lib/api';
 const mockedApi = apiClient as unknown as { post: ReturnType<typeof vi.fn> };
 
+vi.mock('@/lib/auth', () => ({
+  authApi: { initiateOidc: vi.fn() },
+}));
+import { authApi } from '@/lib/auth';
+const mockedAuthApi = authApi as unknown as {
+  initiateOidc: ReturnType<typeof vi.fn>;
+};
+
 const mockAuthState: {
   user: { authProvider: 'local' | 'oidc'; hasPassword: boolean } | null;
 } = { user: { authProvider: 'local', hasPassword: true } };
@@ -166,19 +174,72 @@ describe('StepUpAuthModal — OIDC user without 2FA', () => {
   beforeEach(() => {
     mockAuthState.user = { authProvider: 'oidc', hasPassword: false };
     mockPrefsState.preferences = { twoFactorEnabled: false };
+    sessionStorage.clear();
   });
 
-  it('renders an "unavailable" notice and a Close button only', async () => {
+  it('renders the redirect notice with Continue / Cancel buttons', async () => {
     await renderModal();
     expect(
-      screen.getByText(/Enable two-factor authentication/i),
+      screen.getByText(/Sign in again with your identity provider/i),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Continue to identity provider/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Cancel$/i })).toBeInTheDocument();
+    // No factor inputs.
     expect(screen.queryByLabelText(/^Password$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Authenticator code/i)).not.toBeInTheDocument();
+  });
+
+  it('Cancel invokes onClose and does not redirect', async () => {
+    const onClose = vi.fn();
+    await renderModal({ onClose });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^Cancel$/i }));
+    });
+    expect(onClose).toHaveBeenCalled();
+    expect(mockedAuthApi.initiateOidc).not.toHaveBeenCalled();
+  });
+
+  it('Continue stashes the resume payload + returnTo and redirects to the IdP', async () => {
+    await renderModal({
+      oidcReturnTo: '/settings/emergency-access',
+      oidcResumePayload: { mode: 'edit' },
+    });
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: /Continue to identity provider/i }),
+      );
+    });
+    expect(mockedAuthApi.initiateOidc).toHaveBeenCalled();
+    const pending = JSON.parse(
+      sessionStorage.getItem('stepUpOidcPending') ?? 'null',
+    );
+    expect(pending).toEqual({
+      purpose: 'emergency-access',
+      payload: { mode: 'edit' },
+    });
+    expect(sessionStorage.getItem('postLoginReturnTo')).toBe(
+      '/settings/emergency-access',
+    );
+  });
+});
+
+describe('StepUpAuthModal — local user without password (unavailable)', () => {
+  beforeEach(() => {
+    mockAuthState.user = { authProvider: 'local', hasPassword: false };
+    mockPrefsState.preferences = { twoFactorEnabled: false };
+  });
+
+  it('renders the "finish setup" notice with a Close button', async () => {
+    await renderModal();
+    expect(
+      screen.getByText(/Finish setting up your account password/i),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Close/i })).toBeInTheDocument();
   });
 
-  it('Close button invokes onClose', async () => {
+  it('Close invokes onClose', async () => {
     const onClose = vi.fn();
     await renderModal({ onClose });
     await act(async () => {
