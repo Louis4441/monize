@@ -62,13 +62,21 @@ vi.mock('@/components/auth/StepUpAuthModal', () => ({
     isOpen,
     onClose,
     onVerified,
+    authProvider,
+    hasPassword,
   }: {
     isOpen: boolean;
     onClose: () => void;
     onVerified?: () => void;
+    authProvider: 'local' | 'oidc';
+    hasPassword: boolean;
   }) =>
     isOpen ? (
-      <div data-testid="step-up-modal">
+      <div
+        data-testid="step-up-modal"
+        data-auth-provider={authProvider}
+        data-has-password={String(hasPassword)}
+      >
         <button
           onClick={async () => {
             const { useStepUpTokenStore } = await import('@/lib/stepUpToken');
@@ -98,6 +106,22 @@ const mockedApi = apiClient as unknown as {
   post: ReturnType<typeof vi.fn>;
 };
 
+vi.mock('@/lib/auth', () => ({
+  authApi: {
+    getSelfProfile: vi.fn().mockResolvedValue({
+      id: 'self-1',
+      email: 'me@example.com',
+      authProvider: 'local',
+      hasPassword: true,
+      role: 'user',
+      isActive: true,
+      mustChangePassword: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  },
+}));
+
 vi.mock('@/lib/emergency-access', () => ({
   emergencyAccessApi: {
     get: vi.fn(),
@@ -114,11 +138,15 @@ vi.mock('@/lib/emergency-access', () => ({
 }));
 
 import { emergencyAccessApi } from '@/lib/emergency-access';
+import { authApi } from '@/lib/auth';
 import { useStepUpTokenStore, StepUpRequiredError } from '@/lib/stepUpToken';
 const api = emergencyAccessApi as unknown as Record<
   string,
   ReturnType<typeof vi.fn>
 >;
+const mockedAuthApi = authApi as unknown as {
+  getSelfProfile: ReturnType<typeof vi.fn>;
+};
 
 function makeView(
   overrides: Partial<EmergencyAccessView> = {},
@@ -286,6 +314,83 @@ describe('EmergencyAccessPage', () => {
     expect(
       useStepUpTokenStore.getState().getValid('emergency-access'),
     ).toBeNull();
+  });
+
+  it('passes authProvider=oidc to the modal for OIDC users (regression for #unavailable-fallthrough)', async () => {
+    // Regression: /auth/profile (used to hydrate the auth store) omits
+    // authProvider, so reading it from the store gave undefined and the
+    // modal fell through to its "unavailable" branch. The page must
+    // explicitly fetch /auth/me-self and pass the value down.
+    mockedAuthApi.getSelfProfile.mockResolvedValueOnce({
+      id: 'self-1',
+      email: 'oidc@example.com',
+      authProvider: 'oidc',
+      hasPassword: false,
+      role: 'user',
+      isActive: true,
+      mustChangePassword: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    api.get.mockResolvedValue(
+      makeView({
+        messageMetadata: { hasMessage: true, charCount: 4, updatedAt: null },
+      }),
+    );
+    await renderPage();
+    await waitFor(() =>
+      expect(mockedAuthApi.getSelfProfile).toHaveBeenCalled(),
+    );
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: /Reveal message/i }),
+      );
+    });
+    const modal = await screen.findByTestId('step-up-modal');
+    expect(modal.getAttribute('data-auth-provider')).toBe('oidc');
+    expect(modal.getAttribute('data-has-password')).toBe('false');
+  });
+
+  it('keeps the modal closed until the self profile has loaded', async () => {
+    let resolveProfile!: (u: unknown) => void;
+    mockedAuthApi.getSelfProfile.mockReturnValueOnce(
+      new Promise((res) => {
+        resolveProfile = res;
+      }),
+    );
+    api.get.mockResolvedValue(
+      makeView({
+        messageMetadata: { hasMessage: true, charCount: 4, updatedAt: null },
+      }),
+    );
+    await renderPage();
+    await waitFor(() =>
+      screen.getByRole('button', { name: /Reveal message/i }),
+    );
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: /Reveal message/i }),
+      );
+    });
+    // Without the self profile yet, the modal must not pop with stale data.
+    expect(screen.queryByTestId('step-up-modal')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveProfile({
+        id: 'self-1',
+        email: 'me@example.com',
+        authProvider: 'local',
+        hasPassword: true,
+        role: 'user',
+        isActive: true,
+        mustChangePassword: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('step-up-modal')).toBeInTheDocument(),
+    );
   });
 
   it('clicking Reveal opens the step-up modal when no token is present', async () => {

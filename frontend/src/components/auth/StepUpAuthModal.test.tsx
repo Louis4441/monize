@@ -36,17 +36,17 @@ vi.mock('@/store/preferencesStore', () => ({
 
 async function renderModal(props: Partial<Parameters<typeof StepUpAuthModal>[0]> = {}) {
   let result: ReturnType<typeof render> | undefined;
+  const defaultProps: Parameters<typeof StepUpAuthModal>[0] = {
+    isOpen: true,
+    purpose: 'emergency-access',
+    authProvider: mockAuthState.user?.authProvider ?? 'local',
+    hasPassword: mockAuthState.user?.hasPassword ?? true,
+    reason: 'Re-verify',
+    onClose: vi.fn(),
+    onVerified: vi.fn(),
+  };
   await act(async () => {
-    result = render(
-      <StepUpAuthModal
-        isOpen
-        purpose="emergency-access"
-        reason="Re-verify"
-        onClose={vi.fn()}
-        onVerified={vi.fn()}
-        {...props}
-      />,
-    );
+    result = render(<StepUpAuthModal {...defaultProps} {...props} />);
   });
   return result!;
 }

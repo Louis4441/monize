@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import apiClient from '@/lib/api';
 import { authApi } from '@/lib/auth';
-import { useAuthStore } from '@/store/authStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import {
   useStepUpTokenStore,
@@ -22,6 +21,18 @@ import { getErrorMessage } from '@/lib/errors';
 interface StepUpAuthModalProps {
   isOpen: boolean;
   purpose: string;
+  /**
+   * Auth provider for the caller's account. REQUIRED -- the auth store's
+   * cached user is hydrated from /auth/profile which (today) omits this
+   * field, so callers must source it from /auth/me-self (`authApi.getSelfProfile`)
+   * or another full-user endpoint before opening the modal.
+   */
+  authProvider: 'local' | 'oidc';
+  /**
+   * Whether the user has a local password set. Same caveat as
+   * `authProvider` -- pass the value from a full-user fetch.
+   */
+  hasPassword: boolean;
   /** Optional headline shown in the modal (e.g. "View your emergency message"). */
   reason?: string;
   onClose: () => void;
@@ -63,22 +74,23 @@ type TotpForm = z.infer<typeof totpSchema>;
 export function StepUpAuthModal({
   isOpen,
   purpose,
+  authProvider,
+  hasPassword,
   reason,
   onClose,
   onVerified,
   oidcReturnTo,
   oidcResumePayload,
 }: StepUpAuthModalProps) {
-  const user = useAuthStore((s) => s.user);
   const preferences = usePreferencesStore((s) => s.preferences);
   const setStepUp = useStepUpTokenStore((s) => s.set);
 
   const twoFactorEnabled = !!preferences?.twoFactorEnabled;
   const mode: 'totp' | 'password' | 'oidc' | 'unavailable' = twoFactorEnabled
     ? 'totp'
-    : user?.authProvider === 'oidc'
+    : authProvider === 'oidc'
       ? 'oidc'
-      : user?.authProvider === 'local' && user?.hasPassword
+      : authProvider === 'local' && hasPassword
         ? 'password'
         : 'unavailable';
 

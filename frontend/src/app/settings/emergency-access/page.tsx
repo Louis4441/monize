@@ -26,6 +26,8 @@ import apiClient from '@/lib/api';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuthStore } from '@/store/authStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import { authApi } from '@/lib/auth';
+import type { User } from '@/types/auth';
 import {
   resolveTimezone,
   isoToDatetimeLocal,
@@ -191,6 +193,10 @@ function EmergencyAccessSection() {
 
   const [view, setView] = useState<EmergencyAccessView | null>(null);
   const [loading, setLoading] = useState(true);
+  // The auth store's cached user comes from /auth/profile which omits
+  // authProvider + passwordHash (see getUserStateById). The step-up modal
+  // needs both, so we fetch the full self profile via /auth/me-self here.
+  const [selfUser, setSelfUser] = useState<User | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
 
   // Message reveal/edit state
@@ -255,6 +261,17 @@ function EmergencyAccessSection() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Fetch the full self profile so the step-up modal can pick the right
+  // factor (authProvider + hasPassword aren't on the auth-store user).
+  useEffect(() => {
+    authApi
+      .getSelfProfile()
+      .then((u: User) => setSelfUser(u))
+      .catch((err) => {
+        logger.error('Failed to load self profile for step-up', err);
+      });
+  }, []);
 
   // Lock the message view whenever the step-up token disappears (expiry, "Lock now",
   // logout). This prevents stale plaintext from staying on-screen after the
@@ -902,8 +919,10 @@ function EmergencyAccessSection() {
         />
 
         <StepUpAuthModal
-          isOpen={stepUpOpen}
+          isOpen={stepUpOpen && !!selfUser}
           purpose={STEP_UP_PURPOSE}
+          authProvider={selfUser?.authProvider ?? 'local'}
+          hasPassword={selfUser?.hasPassword ?? false}
           reason="Re-verify your identity to view or edit your emergency-access message."
           oidcReturnTo="/settings/emergency-access"
           oidcResumePayload={
