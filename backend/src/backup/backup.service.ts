@@ -8,14 +8,31 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import * as bcrypt from "bcryptjs";
-import { createGzip, gunzipSync } from "zlib";
+import { createGzip, gunzipSync, gzipSync } from "zlib";
 import { User } from "../users/entities/user.entity";
 import { OidcService } from "../auth/oidc/oidc.service";
+import { AiEncryptionService } from "../ai/ai-encryption.service";
+import {
+  encryptBackup,
+  decryptBackup,
+  isEncryptedBackup,
+  BackupDecryptionError,
+} from "./backup-crypto.util";
 
 export interface RestoreBackupInput {
   compressedData: Buffer;
   password?: string;
   oidcIdToken?: string;
+  // Password used to encrypt the backup file. For local users this is usually
+  // the same as `password`; if the user rotated their login password since the
+  // backup was made, the frontend re-prompts and sends the old one here.
+  backupPassword?: string;
+}
+
+export class BackupPasswordRequiredError extends BadRequestException {
+  constructor(message: string) {
+    super({ message, code: "BACKUP_PASSWORD_REQUIRED" });
+  }
 }
 
 const BACKUP_VERSION = 1;
@@ -66,15 +83,99 @@ export class BackupService {
     private readonly usersRepository: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly oidcService: OidcService,
+    private readonly aiEncryption: AiEncryptionService,
   ) {}
+
+  /**
+   * Resolves the password the auto-backup cron should use for encryption.
+   * Returns null when encryption is disabled or no password is stored.
+   */
+  resolveStoredBackupPassword(user: User): string | null {
+    if (!user.backupEncryptionEnabled || !user.backupPasswordEnc) {
+      return null;
+    }
+    try {
+      return this.aiEncryption.decrypt(user.backupPasswordEnc);
+    } catch (err) {
+      this.logger.error(
+        `Failed to decrypt stored backup password for user ${user.id}: ${err.message}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Produces the full backup file as a Buffer -- gzipped JSON, optionally
+   * encrypted. Used by the auto-backup cron which needs to write to disk.
+   */
+  async exportToBuffer(
+    userId: string,
+    encryptionPassword?: string,
+  ): Promise<Buffer> {
+    const gzipped = await this.collectGzippedExport(userId);
+    return encryptionPassword
+      ? encryptBackup(gzipped, encryptionPassword)
+      : gzipped;
+  }
 
   async streamExport(
     userId: string,
     res: import("express").Response,
+    encryptionPassword?: string,
   ): Promise<void> {
-    this.logger.log(`Starting backup export for user ${userId}`);
+    this.logger.log(
+      `Starting backup export for user ${userId}${encryptionPassword ? " (encrypted)" : ""}`,
+    );
 
-    const tableQueries: Array<{ key: string; sql: string }> = [
+    // Encrypted exports require the full payload up-front to compute the GCM
+    // auth tag, so we buffer JSON in memory before encrypting. Plain exports
+    // stream straight through gzip to avoid OOM on very large datasets.
+    if (encryptionPassword) {
+      const gzipped = await this.collectGzippedExport(userId);
+      const encrypted = encryptBackup(gzipped, encryptionPassword);
+      res.write(encrypted);
+      res.end();
+      this.logger.log(`Backup export completed for user ${userId} (encrypted)`);
+      return;
+    }
+
+    const tableQueries = this.getTableQueries();
+
+    // Stream JSON through gzip to the response, one table at a time, to
+    // avoid OOM and produce a smaller download.
+    const gzip = createGzip();
+    gzip.pipe(res);
+
+    const write = (chunk: string): Promise<void> =>
+      new Promise((resolve, _reject) => {
+        if (!gzip.write(chunk)) {
+          gzip.once("drain", resolve);
+        } else {
+          resolve();
+        }
+      });
+
+    await write(
+      `{"version":${BACKUP_VERSION},"exportedAt":"${new Date().toISOString()}"`,
+    );
+
+    for (const { key, sql } of tableQueries) {
+      const rows = await this.query(sql, [userId]);
+      await write(`,"${key}":${JSON.stringify(rows)}`);
+    }
+
+    await write("}");
+
+    await new Promise<void>((resolve, reject) => {
+      gzip.once("error", reject);
+      gzip.end(resolve);
+    });
+
+    this.logger.log(`Backup export completed for user ${userId}`);
+  }
+
+  private getTableQueries(): Array<{ key: string; sql: string }> {
+    return [
       {
         key: "currencies",
         sql: "SELECT * FROM currencies WHERE created_by_user_id = $1",
@@ -225,38 +326,24 @@ export class BackupService {
               WHERE mcs.user_id = $1`,
       },
     ];
+  }
 
-    // Stream JSON through gzip to the response, one table at a time, to
-    // avoid OOM and produce a smaller download.
-    const gzip = createGzip();
-    gzip.pipe(res);
-
-    const write = (chunk: string): Promise<void> =>
-      new Promise((resolve, _reject) => {
-        if (!gzip.write(chunk)) {
-          gzip.once("drain", resolve);
-        } else {
-          resolve();
-        }
-      });
-
-    await write(
+  /**
+   * Builds the gzipped JSON backup payload as a single Buffer in memory.
+   * Used by the encryption path (which needs the whole payload to compute
+   * the GCM auth tag) and the auto-backup writer.
+   */
+  private async collectGzippedExport(userId: string): Promise<Buffer> {
+    const tableQueries = this.getTableQueries();
+    const parts: string[] = [
       `{"version":${BACKUP_VERSION},"exportedAt":"${new Date().toISOString()}"`,
-    );
-
+    ];
     for (const { key, sql } of tableQueries) {
       const rows = await this.query(sql, [userId]);
-      await write(`,"${key}":${JSON.stringify(rows)}`);
+      parts.push(`,"${key}":${JSON.stringify(rows)}`);
     }
-
-    await write("}");
-
-    await new Promise<void>((resolve, reject) => {
-      gzip.once("error", reject);
-      gzip.end(resolve);
-    });
-
-    this.logger.log(`Backup export completed for user ${userId}`);
+    parts.push("}");
+    return gzipSync(Buffer.from(parts.join(""), "utf-8"));
   }
 
   async restoreData(
@@ -270,7 +357,8 @@ export class BackupService {
 
     await this.verifyAuthentication(user, input);
 
-    const data = this.decompressAndParse(input.compressedData);
+    const gzippedPayload = this.maybeDecrypt(input, user);
+    const data = this.decompressAndParse(gzippedPayload);
     this.validateBackupFormat(data);
 
     this.logger.log(`Starting backup restore for user ${userId}`);
@@ -503,6 +591,44 @@ export class BackupService {
     params: unknown[],
   ): Promise<Record<string, unknown>[]> {
     return this.dataSource.query(sql, params);
+  }
+
+  /**
+   * If the upload is encrypted, decrypt it using (in order of preference):
+   * 1) the explicit backupPassword the frontend sent for this restore,
+   * 2) the user's auth password (most backups encrypt with this),
+   * 3) the user's currently stored backup password.
+   *
+   * Returns the inner gzipped JSON payload, or the input unchanged if it's
+   * not encrypted. Throws BackupPasswordRequiredError when we know it's
+   * encrypted but every available password failed -- the frontend uses that
+   * to prompt the user for the password the backup was made with.
+   */
+  private maybeDecrypt(input: RestoreBackupInput, user: User): Buffer {
+    if (!isEncryptedBackup(input.compressedData)) {
+      return input.compressedData;
+    }
+
+    const candidates: string[] = [];
+    if (input.backupPassword) candidates.push(input.backupPassword);
+    if (input.password) candidates.push(input.password);
+    const stored = this.resolveStoredBackupPassword(user);
+    if (stored) candidates.push(stored);
+
+    for (const pw of candidates) {
+      try {
+        return decryptBackup(input.compressedData, pw);
+      } catch (err) {
+        if (!(err instanceof BackupDecryptionError)) throw err;
+        // try next candidate
+      }
+    }
+
+    throw new BackupPasswordRequiredError(
+      input.backupPassword
+        ? "The password you entered cannot decrypt this backup. Try the password that was set when the backup was created."
+        : "This backup is encrypted. Provide the password that was used when the backup was created.",
+    );
   }
 
   private decompressAndParse(compressedData: Buffer): BackupData {

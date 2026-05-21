@@ -7,7 +7,15 @@ vi.mock('@/lib/backupApi', () => ({
   backupApi: {
     exportBackup: vi.fn(),
     restoreBackup: vi.fn(),
+    getEncryptionStatus: vi.fn().mockResolvedValue({
+      enabled: false,
+      needsBackupPassword: false,
+    }),
+    enableLocalEncryption: vi.fn(),
+    setBackupPassword: vi.fn(),
+    disableEncryption: vi.fn(),
   },
+  BACKUP_PASSWORD_REQUIRED_CODE: 'BACKUP_PASSWORD_REQUIRED',
 }));
 
 vi.mock('@/lib/errors', () => ({

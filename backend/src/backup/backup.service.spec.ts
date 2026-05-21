@@ -11,6 +11,7 @@ import { PassThrough } from "stream";
 import { BackupService, RestoreBackupInput } from "./backup.service";
 import { User } from "../users/entities/user.entity";
 import { OidcService } from "../auth/oidc/oidc.service";
+import { AiEncryptionService } from "../ai/ai-encryption.service";
 import * as bcrypt from "bcryptjs";
 
 jest.mock("bcryptjs");
@@ -359,6 +360,16 @@ describe("BackupService", () => {
             verifyIdTokenClaims: jest.fn().mockReturnValue(true),
           },
         },
+        {
+          provide: AiEncryptionService,
+          useValue: {
+            isConfigured: jest.fn().mockReturnValue(true),
+            encrypt: jest.fn((s: string) => `enc:${s}`),
+            decrypt: jest.fn((s: string) =>
+              s.startsWith("enc:") ? s.slice(4) : s,
+            ),
+          },
+        },
       ],
     }).compile();
 
@@ -414,6 +425,43 @@ describe("BackupService", () => {
       expect(result.categories).toEqual([]);
       expect(result.transactions).toEqual([]);
       expect(result.accounts).toEqual([]);
+    });
+
+    it("writes an encrypted envelope when a password is provided", async () => {
+      mockDataSource.query.mockResolvedValue([]);
+      const mockCategories = [{ id: "cat-1", name: "Food", user_id: userId }];
+      mockDataSource.query.mockImplementation((sql: string) => {
+        if (sql.includes("categories")) return Promise.resolve(mockCategories);
+        return Promise.resolve([]);
+      });
+
+      const chunks: Buffer[] = [];
+      const mockRes = {
+        write: jest.fn((c: Buffer) => chunks.push(c)),
+        end: jest.fn(),
+      };
+      await service.streamExport(userId, mockRes as any, "secret");
+
+      const written = Buffer.concat(chunks);
+      // Magic header check -- the file starts with MZBE
+      expect(written.subarray(0, 4).toString("ascii")).toBe("MZBE");
+      expect(mockRes.end).toHaveBeenCalled();
+    });
+  });
+
+  describe("exportToBuffer", () => {
+    it("returns gzipped JSON for unencrypted exports", async () => {
+      mockDataSource.query.mockResolvedValue([]);
+      const buf = await service.exportToBuffer(userId);
+      // gzip magic 1f 8b
+      expect(buf[0]).toBe(0x1f);
+      expect(buf[1]).toBe(0x8b);
+    });
+
+    it("returns an encrypted envelope when a password is provided", async () => {
+      mockDataSource.query.mockResolvedValue([]);
+      const buf = await service.exportToBuffer(userId, "pw");
+      expect(buf.subarray(0, 4).toString("ascii")).toBe("MZBE");
     });
   });
 
@@ -977,6 +1025,68 @@ describe("BackupService", () => {
       );
 
       expect(result.message).toBe("Backup restored successfully");
+    });
+
+    describe("encrypted backups", () => {
+      const {
+        encryptBackup,
+      } = require("./backup-crypto.util") as typeof import("./backup-crypto.util");
+
+      function encryptedBlob(data: Record<string, unknown>, password: string) {
+        return encryptBackup(compressBackupData(data), password);
+      }
+
+      it("decrypts using the auth password when nothing more specific is provided", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        const result = await service.restoreData(userId, {
+          compressedData: encryptedBlob(validBackupData, "user-password"),
+          password: "user-password",
+        });
+        expect(result.message).toBe("Backup restored successfully");
+      });
+
+      it("prefers the explicit backupPassword over the auth password", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        const result = await service.restoreData(userId, {
+          compressedData: encryptedBlob(validBackupData, "old-backup-password"),
+          password: "new-login-password",
+          backupPassword: "old-backup-password",
+        });
+        expect(result.message).toBe("Backup restored successfully");
+      });
+
+      it("falls back to the stored backup password (for OIDC users without auth password)", async () => {
+        mockUserRepo.findOne.mockResolvedValue({
+          ...mockUser,
+          authProvider: "oidc",
+          passwordHash: null,
+          oidcSubject: "sub-1",
+          backupEncryptionEnabled: true,
+          backupPasswordEnc: "enc:stored-bk-pw",
+        });
+        const result = await service.restoreData(userId, {
+          compressedData: encryptedBlob(validBackupData, "stored-bk-pw"),
+          oidcIdToken: "tok",
+        });
+        expect(result.message).toBe("Backup restored successfully");
+      });
+
+      it("throws a BACKUP_PASSWORD_REQUIRED error when no candidate decrypts", async () => {
+        mockUserRepo.findOne.mockResolvedValue(mockUser);
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        await expect(
+          service.restoreData(userId, {
+            compressedData: encryptedBlob(validBackupData, "real-pw"),
+            password: "different-pw",
+          }),
+        ).rejects.toMatchObject({
+          response: expect.objectContaining({
+            code: "BACKUP_PASSWORD_REQUIRED",
+          }),
+        });
+      });
     });
   });
 });

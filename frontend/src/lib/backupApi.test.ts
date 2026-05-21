@@ -46,8 +46,19 @@ describe('backupApi', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/backup/export', {}, {
       responseType: 'blob',
       timeout: 120000,
+      headers: {},
     });
     expect(result).toBe(mockBlob);
+  });
+
+  it('exportBackup forwards encryption password as a header', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: new Blob() });
+    await backupApi.exportBackup('my-pw');
+    expect(apiClient.post).toHaveBeenCalledWith('/backup/export', {}, {
+      responseType: 'blob',
+      timeout: 120000,
+      headers: { 'X-Export-Password': 'my-pw' },
+    });
   });
 
   it('restoreBackup uploads gzipped uncompressed file', async () => {
