@@ -18,6 +18,12 @@ import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useDemoMode } from '@/hooks/useDemoMode';
 import { useAuthStore } from '@/store/authStore';
+import { usePreferencesStore } from '@/store/preferencesStore';
+import {
+  resolveTimezone,
+  isoToDatetimeLocal,
+  formatDatetimeLocal,
+} from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
 import { emergencyAccessApi } from '@/lib/emergency-access';
@@ -72,6 +78,20 @@ function daysSince(iso: string | null): number | null {
   return Math.max(0, Math.floor(diffMs / (24 * 60 * 60 * 1000)));
 }
 
+function formatTimestamp(
+  iso: string | null,
+  timezone: string,
+  dateFormat: string,
+  timeFormat: '24h' | '12h',
+): string {
+  if (!iso) return '';
+  return formatDatetimeLocal(
+    isoToDatetimeLocal(iso, timezone),
+    dateFormat,
+    timeFormat,
+  );
+}
+
 export default function EmergencyAccessPage() {
   return (
     <ProtectedRoute>
@@ -113,6 +133,11 @@ function EmergencyAccessContent() {
 }
 
 function EmergencyAccessSection() {
+  const preferences = usePreferencesStore((s) => s.preferences);
+  const userTimezone = resolveTimezone(preferences?.timezone);
+  const dateFormat = preferences?.dateFormat || 'browser';
+  const timeFormat: '24h' | '12h' = preferences?.timeFormat ?? '24h';
+
   const [view, setView] = useState<EmergencyAccessView | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -326,10 +351,16 @@ function EmergencyAccessSection() {
               Emergency access already granted
             </h2>
             <p className="text-sm text-red-700 dark:text-red-300 mb-3">
-              On {new Date(view.grantedAt).toLocaleString()}, your designated
-              contacts received magic links to take over the account. If this
-              was unintended, clear the granted state below to void outstanding
-              links.
+              On{' '}
+              {formatTimestamp(
+                view.grantedAt,
+                userTimezone,
+                dateFormat,
+                timeFormat,
+              )}
+              , your designated contacts received magic links to take over the
+              account. If this was unintended, clear the granted state below to
+              void outstanding links.
             </p>
             <Button
               variant="danger"
@@ -487,7 +518,7 @@ function EmergencyAccessSection() {
               <dt className="inline font-medium">Last sign-in: </dt>
               <dd className="inline">
                 {view.lastLogin
-                  ? `${new Date(view.lastLogin).toLocaleString()} (${inactiveDays} day${inactiveDays === 1 ? '' : 's'} ago)`
+                  ? `${formatTimestamp(view.lastLogin, userTimezone, dateFormat, timeFormat)} (${inactiveDays} day${inactiveDays === 1 ? '' : 's'} ago)`
                   : 'unknown'}
               </dd>
             </div>
@@ -495,7 +526,12 @@ function EmergencyAccessSection() {
               <dt className="inline font-medium">Last reminder sent: </dt>
               <dd className="inline">
                 {view.lastReminderSentAt
-                  ? new Date(view.lastReminderSentAt).toLocaleString()
+                  ? formatTimestamp(
+                      view.lastReminderSentAt,
+                      userTimezone,
+                      dateFormat,
+                      timeFormat,
+                    )
                   : 'never'}
               </dd>
             </div>
@@ -503,7 +539,7 @@ function EmergencyAccessSection() {
               <dt className="inline font-medium">Grant status: </dt>
               <dd className="inline">
                 {view.grantedAt
-                  ? `granted on ${new Date(view.grantedAt).toLocaleString()}`
+                  ? `granted on ${formatTimestamp(view.grantedAt, userTimezone, dateFormat, timeFormat)}`
                   : 'not yet granted'}
               </dd>
             </div>
