@@ -122,6 +122,20 @@ describe('CashFlowForecastChart', () => {
     expect(screen.getByText('All Accounts')).toBeInTheDocument();
   });
 
+  it('lists favourite accounts above non-favourites in the account selector', () => {
+    const accounts = [
+      makeAccount({ id: 'a1', name: 'Apple', isFavourite: false }),
+      makeAccount({ id: 'a2', name: 'Zebra', isFavourite: true, favouriteSortOrder: 0 }),
+    ];
+    render(
+      <CashFlowForecastChart scheduledTransactions={[]} accounts={accounts} isLoading={false} />
+    );
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    const labels = Array.from(select.options).map((o) => o.textContent);
+    expect(labels[0]).toBe('All Accounts');
+    expect(labels.indexOf('Zebra')).toBeLessThan(labels.indexOf('Apple'));
+  });
+
   it('renders chart with forecast data and summary footer', () => {
     const forecastData = [
       { label: 'Today', balance: 1000, transactions: [] },

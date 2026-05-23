@@ -14,6 +14,7 @@ import {
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { Account } from '@/types/account';
 import { Select } from '@/components/ui/Select';
+import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import {
   buildForecast,
   getForecastSummary,
@@ -131,10 +132,11 @@ export function CashFlowForecastChart({
   const accountOptions = useMemo(() => {
     return [
       { value: 'all', label: 'All Accounts' },
-      ...accounts
-        .filter(a => !a.isClosed && a.accountType !== 'ASSET' && a.accountSubType !== 'INVESTMENT_BROKERAGE')
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(a => ({ value: a.id, label: a.name })),
+      ...buildAccountDropdownOptions(
+        accounts,
+        a => !a.isClosed && a.accountType !== 'ASSET' && a.accountSubType !== 'INVESTMENT_BROKERAGE',
+        a => a.name,
+      ),
     ];
   }, [accounts]);
 
