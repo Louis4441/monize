@@ -18,12 +18,12 @@ test.describe('Import Transactions', () => {
 
     // The upload step heading should be visible
     await expect(
-      page.getByText(/upload qif files/i).first(),
+      page.getByText(/upload transaction files/i).first(),
     ).toBeVisible({ timeout: 10000 });
 
     // Should show instructions about selecting files
     await expect(
-      page.getByText(/select one or more qif files/i).first(),
+      page.getByText(/select one or more files to import/i).first(),
     ).toBeVisible();
   });
 
@@ -32,11 +32,11 @@ test.describe('Import Transactions', () => {
 
     // Wait for page to load
     await expect(
-      page.getByText(/upload qif files/i).first(),
+      page.getByText(/upload transaction files/i).first(),
     ).toBeVisible({ timeout: 10000 });
 
     // The file input should be present (even if hidden for styling)
-    const fileInput = page.locator('input[type="file"][accept=".qif"]');
+    const fileInput = page.locator('input[type="file"][accept=".qif,.ofx,.qfx,.csv"]');
     await expect(fileInput).toBeAttached();
   });
 

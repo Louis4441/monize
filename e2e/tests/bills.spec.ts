@@ -14,15 +14,15 @@ test.describe('Bills & Deposits', () => {
   });
 
   test('can create a new scheduled transaction', async ({ page }) => {
-    // First create an account to use in the scheduled transaction
+    // First create an account to use in the scheduled transaction. Account
+    // Type has no default in the form, so it must be selected explicitly --
+    // a name-only submit fails validation and persists nothing.
     await page.goto('/accounts');
-    const newAccountButton = page.getByRole('button', { name: /new account|add account/i });
-    if (await newAccountButton.isVisible()) {
-      await newAccountButton.click();
-      await page.getByLabel(/name/i).first().fill('E2E Bills Account');
-      await page.getByRole('button', { name: /save|create/i }).click();
-      await page.waitForTimeout(2000);
-    }
+    await page.getByRole('button', { name: /new account|add account/i }).click();
+    await page.getByLabel(/account name/i).fill('E2E Bills Account');
+    await page.getByLabel(/account type/i).selectOption({ label: 'Chequing' });
+    await page.getByRole('button', { name: /create account/i }).click();
+    await expect(page.locator('body')).toContainText('E2E Bills Account');
 
     // Navigate to the bills page
     await page.goto('/bills');
@@ -39,33 +39,17 @@ test.describe('Bills & Deposits', () => {
     ).toBeVisible({ timeout: 10000 });
 
     // Fill in the scheduled transaction form
-    await page.getByLabel(/name/i).first().fill('E2E Monthly Rent');
+    await page.getByLabel(/^name$/i).first().fill('E2E Monthly Rent');
 
-    // Select account
-    const accountSelect = page.getByLabel(/account/i).first();
-    if (await accountSelect.isVisible()) {
-      await accountSelect.selectOption({ label: /E2E Bills Account/i });
-    }
+    // Select the account we just created (first real option after the
+    // "Select account..." placeholder).
+    await page.getByLabel(/^account$/i).first().selectOption({ index: 1 });
 
-    // Fill amount
-    const amountField = page.getByLabel(/amount/i).first();
-    if (await amountField.isVisible()) {
-      await amountField.fill('-1500');
-    }
-
-    // Fill due date
-    const dueDateField = page.getByLabel(/due date/i).first();
-    if (await dueDateField.isVisible()) {
-      const today = new Date().toISOString().split('T')[0];
-      await dueDateField.fill(today);
-    }
+    // Fill amount (Next Due Date defaults to today, so it needs no input).
+    await page.getByLabel(/amount/i).first().fill('1500');
 
     // Submit the form
-    const saveButton = page.getByRole('button', { name: /save|create/i }).first();
-    if (await saveButton.isVisible()) {
-      await saveButton.click();
-      await page.waitForTimeout(2000);
-    }
+    await page.getByRole('button', { name: /^create$/i }).first().click();
 
     // Verify the scheduled transaction appears in the list
     await expect(page.locator('body')).toContainText('E2E Monthly Rent');
@@ -91,14 +75,15 @@ test.describe('Bills & Deposits', () => {
     // Click on the Calendar tab
     await calendarButton.click();
 
-    // Calendar should render with day-of-week headers
-    await expect(page.getByText('Sun')).toBeVisible();
-    await expect(page.getByText('Mon')).toBeVisible();
-    await expect(page.getByText('Tue')).toBeVisible();
-    await expect(page.getByText('Wed')).toBeVisible();
-    await expect(page.getByText('Thu')).toBeVisible();
-    await expect(page.getByText('Fri')).toBeVisible();
-    await expect(page.getByText('Sat')).toBeVisible();
+    // Calendar should render with day-of-week headers. Use exact matching so
+    // short labels like "Mon" don't collide with "Monize" / "Monthly Net".
+    await expect(page.getByText('Sun', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mon', { exact: true })).toBeVisible();
+    await expect(page.getByText('Tue', { exact: true })).toBeVisible();
+    await expect(page.getByText('Wed', { exact: true })).toBeVisible();
+    await expect(page.getByText('Thu', { exact: true })).toBeVisible();
+    await expect(page.getByText('Fri', { exact: true })).toBeVisible();
+    await expect(page.getByText('Sat', { exact: true })).toBeVisible();
 
     // Calendar should show a Today button
     await expect(page.getByRole('button', { name: /today/i })).toBeVisible();
@@ -116,7 +101,7 @@ test.describe('Bills & Deposits', () => {
 
     // Switch to calendar
     await calendarButton.click();
-    await expect(page.getByText('Sun')).toBeVisible();
+    await expect(page.getByText('Sun', { exact: true })).toBeVisible();
 
     // Switch back to list
     await listButton.click();

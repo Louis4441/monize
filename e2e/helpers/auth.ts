@@ -50,11 +50,11 @@ export async function loginUser(
 }
 
 export async function logout(page: Page) {
-  // Navigate to settings or click logout
+  // The Logout button lives in the app header on every authenticated page.
+  // Use an auto-waiting click rather than a non-waiting isVisible() guard:
+  // isVisible() can run before the client header hydrates, silently skip the
+  // click, and leave waitForURL with no navigation to wait for.
   await page.goto('/settings');
-  const logoutButton = page.getByRole('button', { name: /log\s?out|sign\s?out/i });
-  if (await logoutButton.isVisible()) {
-    await logoutButton.click();
-  }
+  await page.getByRole('button', { name: /log\s?out|sign\s?out/i }).first().click();
   await page.waitForURL(/\/login/, { timeout: 10000 });
 }
