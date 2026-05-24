@@ -179,6 +179,56 @@ describe("InvestmentReportDataService", () => {
     expect(rows[0].values.quantity).toBe(10);
   });
 
+  it("merges identical securities across accounts when requested", async () => {
+    accountsRepository.find.mockResolvedValue([
+      { id: "acc1", name: "RRSP" },
+      { id: "acc2", name: "TFSA" },
+    ]);
+    securitiesRepository.find.mockResolvedValue([
+      { id: "sec1", symbol: "AAA", name: "Alpha", securityType: "STOCK", currencyCode: "USD" },
+    ]);
+    holdingsRepository.find.mockResolvedValue([
+      { accountId: "acc1", securityId: "sec1", quantity: 10, averageCost: 100 },
+      { accountId: "acc2", securityId: "sec1", quantity: 5, averageCost: 120 },
+    ]);
+    txRepository.find.mockResolvedValue([
+      makeTx({ accountId: "acc1", action: InvestmentAction.BUY, transactionDate: "2024-01-10", quantity: 10, price: 100, totalAmount: 1000 }),
+      makeTx({ accountId: "acc2", action: InvestmentAction.BUY, transactionDate: "2024-01-11", quantity: 5, price: 120, totalAmount: 600 }),
+    ]);
+    txRepository.query.mockResolvedValue([priceRow({ close_price: "130" })]);
+
+    const rows = await service.computeHoldings("u1", ["acc1", "acc2"], "2024-06-10", "USD", true);
+    expect(rows).toHaveLength(1); // combined into a single position
+    expect(rows[0].values.quantity).toBe(15); // 10 + 5
+    expect(rows[0].values.costBasis).toBe(1600); // 10*100 + 5*120
+    expect(rows[0].values.marketValue).toBe(1950); // 15 * 130
+    expect(rows[0].values.account).toBe("Multiple accounts");
+  });
+
+  it("keeps securities separate across accounts by default (account name per row)", async () => {
+    accountsRepository.find.mockResolvedValue([
+      { id: "acc1", name: "RRSP" },
+      { id: "acc2", name: "TFSA" },
+    ]);
+    securitiesRepository.find.mockResolvedValue([
+      { id: "sec1", symbol: "AAA", name: "Alpha", securityType: "STOCK", currencyCode: "USD" },
+    ]);
+    holdingsRepository.find.mockResolvedValue([
+      { accountId: "acc1", securityId: "sec1", quantity: 10, averageCost: 100 },
+      { accountId: "acc2", securityId: "sec1", quantity: 5, averageCost: 120 },
+    ]);
+    txRepository.find.mockResolvedValue([
+      makeTx({ accountId: "acc1", action: InvestmentAction.BUY, transactionDate: "2024-01-10", quantity: 10, price: 100, totalAmount: 1000 }),
+      makeTx({ accountId: "acc2", action: InvestmentAction.BUY, transactionDate: "2024-01-11", quantity: 5, price: 120, totalAmount: 600 }),
+    ]);
+    txRepository.query.mockResolvedValue([priceRow({ close_price: "130" })]);
+
+    const rows = await service.computeHoldings("u1", ["acc1", "acc2"], "2024-06-10", "USD", false);
+    expect(rows).toHaveLength(2);
+    const accounts = rows.map((r) => r.values.account).sort();
+    expect(accounts).toEqual(["RRSP", "TFSA"]);
+  });
+
   it("seeds holdings without transactions (imported positions)", async () => {
     txRepository.find.mockResolvedValue([]);
     holdingsRepository.find.mockResolvedValue([

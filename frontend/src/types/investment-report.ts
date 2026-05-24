@@ -36,6 +36,7 @@ export const INVESTMENT_REPORT_COLUMNS: InvestmentColumnDef[] = [
   { key: 'name', label: 'Name', type: 'text', description: 'The name of the investment.' },
   { key: 'securityType', label: 'Type', type: 'text', description: 'Type of investment, such as stock, ETF, mutual fund, or bond.' },
   { key: 'currency', label: 'Currency', type: 'text', description: 'The currency the information displayed is based on.' },
+  { key: 'account', label: 'Account', type: 'text', description: 'The investment account that holds this security.' },
   { key: 'quantity', label: 'Quantity', type: 'shares', description: 'The number of shares you hold of a given security.' },
   { key: 'averageCost', label: 'Average Cost', type: 'currency', description: 'The average cost per share, including commissions, that you paid for this security.' },
   { key: 'costBasis', label: 'Cost Basis', type: 'currency', description: 'The total cost, including commissions and fees, of all shares of an investment.' },

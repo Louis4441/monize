@@ -9,6 +9,7 @@ import { getCached, setCache, invalidateCache } from './apiCache';
 
 export interface ExecuteInvestmentReportParams {
   asOfDate?: string;
+  mergeAccounts?: boolean;
 }
 
 export const investmentReportsApi = {

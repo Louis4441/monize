@@ -178,6 +178,7 @@ export class InvestmentReportDataService {
     accountIds: string[],
     asOfDate: string,
     baseCurrency: string,
+    mergeAccounts = false,
   ): Promise<ComputedHolding[]> {
     if (accountIds.length === 0) return [];
 
@@ -188,11 +189,16 @@ export class InvestmentReportDataService {
       where: { accountId: In(accountIds) },
     });
     const holdingsMap = new Map<string, { quantity: number; averageCost: number }>();
+    // Summed across accounts per security, for the merged (cross-account) view.
+    const summedHoldings = new Map<string, { quantity: number; costBasis: number }>();
     for (const h of holdings) {
-      holdingsMap.set(`${h.accountId}:${h.securityId}`, {
-        quantity: Number(h.quantity) || 0,
-        averageCost: Number(h.averageCost) || 0,
-      });
+      const quantity = Number(h.quantity) || 0;
+      const averageCost = Number(h.averageCost) || 0;
+      holdingsMap.set(`${h.accountId}:${h.securityId}`, { quantity, averageCost });
+      const summed = summedHoldings.get(h.securityId) ?? { quantity: 0, costBasis: 0 };
+      summed.quantity += quantity;
+      summed.costBasis += quantity * averageCost;
+      summedHoldings.set(h.securityId, summed);
     }
 
     // Replay transactions up to the as-of date, grouped by (account, security).
@@ -200,11 +206,17 @@ export class InvestmentReportDataService {
       where: { userId, accountId: In(accountIds) },
       order: { transactionDate: "ASC", createdAt: "ASC" },
     });
-    const groups = this.groupTransactions(transactions, asOfDate);
+    let groups = this.groupTransactions(transactions, asOfDate);
 
     // Holdings without any transactions (e.g. imported positions) still belong
     // in the report; seed them so they are not dropped.
     this.seedTransactionlessHoldings(holdings, groups);
+
+    // Optionally merge identical securities held across multiple accounts into a
+    // single combined position (replaying their pooled transaction history).
+    if (mergeAccounts) {
+      groups = this.mergeGroupsBySecurity(groups, asOfDate);
+    }
 
     const securityIds = [
       ...new Set([...groups.values()].map((g) => g.securityId)),
@@ -249,16 +261,22 @@ export class InvestmentReportDataService {
       // holdings table is the authoritative snapshot of this position. Defer to
       // it (matching the portfolio view): drop positions it reports as closed
       // (fully-sold/deactivated securities) and use its quantity and cost basis.
-      const holdingKey = `${group.accountId}:${group.securityId}`;
       const lastTxDate = group.txs.length
         ? group.txs[group.txs.length - 1].transactionDate
         : null;
       const reflectsPresent = !lastTxDate || lastTxDate <= asOfDate;
       if (reflectsPresent) {
-        const current = holdingsMap.get(holdingKey);
-        if (!current || Math.abs(current.quantity) < 0.0001) continue;
-        quantity = round(current.quantity, 8);
-        costBasis = round(current.quantity * current.averageCost, 4);
+        if (mergeAccounts) {
+          const current = summedHoldings.get(group.securityId);
+          if (!current || Math.abs(current.quantity) < 0.0001) continue;
+          quantity = round(current.quantity, 8);
+          costBasis = round(current.costBasis, 4);
+        } else {
+          const current = holdingsMap.get(`${group.accountId}:${group.securityId}`);
+          if (!current || Math.abs(current.quantity) < 0.0001) continue;
+          quantity = round(current.quantity, 8);
+          costBasis = round(current.quantity * current.averageCost, 4);
+        }
       } else if (Math.abs(quantity) < 0.0001) {
         continue;
       }
@@ -299,11 +317,16 @@ export class InvestmentReportDataService {
 
       const { high: high52, low: low52 } = this.fiftyTwoWeek(prices, asOfDate);
 
+      const accountName = mergeAccounts
+        ? "Multiple accounts"
+        : (accountMap.get(group.accountId) ?? "Unknown");
+
       const values: Record<string, InvestmentCellValue> = {
         symbol: security.symbol,
         name: security.name,
         securityType: formatSecurityType(security.securityType),
         currency: security.currencyCode,
+        account: accountName,
         quantity,
         averageCost,
         costBasis,
@@ -345,7 +368,7 @@ export class InvestmentReportDataService {
       computed.push({
         holding: {
           accountId: group.accountId,
-          accountName: accountMap.get(group.accountId) ?? "Unknown",
+          accountName,
           securityId: group.securityId,
           symbol: security.symbol,
           securityName: security.name,
@@ -464,6 +487,43 @@ export class InvestmentReportDataService {
       }
     }
     return groups;
+  }
+
+  /**
+   * Combine per-(account, security) groups into one group per security by
+   * pooling their transactions and replaying the merged history. Used to show
+   * a single combined position for a security held across multiple accounts.
+   */
+  private mergeGroupsBySecurity(
+    groups: Map<string, GroupRecord>,
+    asOfDate: string,
+  ): Map<string, GroupRecord> {
+    const merged = new Map<string, GroupRecord>();
+    for (const g of groups.values()) {
+      let m = merged.get(g.securityId);
+      if (!m) {
+        m = {
+          accountId: "MERGED",
+          securityId: g.securityId,
+          txs: [],
+          state: this.emptyState(),
+        };
+        merged.set(g.securityId, m);
+      }
+      m.txs.push(...g.txs);
+    }
+    for (const m of merged.values()) {
+      m.txs.sort((a, b) => {
+        if (a.transactionDate !== b.transactionDate) {
+          return a.transactionDate < b.transactionDate ? -1 : 1;
+        }
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+      for (const tx of m.txs) {
+        if (tx.transactionDate <= asOfDate) this.applyToState(m.state, tx);
+      }
+    }
+    return merged;
   }
 
   private emptyState(): ReplayState {

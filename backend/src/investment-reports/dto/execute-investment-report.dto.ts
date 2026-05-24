@@ -1,4 +1,4 @@
-import { IsOptional, Matches } from "class-validator";
+import { IsOptional, IsBoolean, Matches } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { InvestmentGroupBy } from "../entities/investment-report.entity";
 
@@ -11,6 +11,14 @@ export class ExecuteInvestmentReportDto {
     message: "asOfDate must be in YYYY-MM-DD format",
   })
   asOfDate?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Merge identical securities held across accounts into one combined row (symbol/currency grouping only)",
+  })
+  @IsOptional()
+  @IsBoolean()
+  mergeAccounts?: boolean;
 }
 
 /** A single computed value cell. Null means the value is not available. */

@@ -156,14 +156,29 @@ export class InvestmentReportsService {
     const pref = await this.prefRepository.findOne({ where: { userId } });
     const baseCurrency = pref?.defaultCurrency || "CAD";
 
+    // Merging only makes sense when securities are grouped together.
+    const groupsAcross =
+      report.groupBy === InvestmentGroupBy.SYMBOL ||
+      report.groupBy === InvestmentGroupBy.CURRENCY;
+    const mergeAccounts = groupsAcross && overrides?.mergeAccounts === true;
+
     const holdings = await this.dataService.computeHoldings(
       userId,
       accountIds,
       asOfDate,
       baseCurrency,
+      mergeAccounts,
     );
 
-    const columns = this.ensureSymbolFirst(report.config.columns);
+    let columns = this.ensureSymbolFirst(report.config.columns);
+    // When securities from multiple accounts are listed separately, lead with
+    // the account column so the user can tell the holdings apart.
+    if (groupsAcross && !mergeAccounts) {
+      columns = [
+        "account",
+        ...columns.filter((c) => c !== "account"),
+      ];
+    }
     const groups = this.buildGroups(
       holdings,
       report.groupBy,

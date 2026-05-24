@@ -67,6 +67,12 @@ export const INVESTMENT_REPORT_COLUMNS: readonly InvestmentColumnDef[] = [
     type: "text",
     description: "The currency the information displayed is based on.",
   },
+  {
+    key: "account",
+    label: "Account",
+    type: "text",
+    description: "The investment account that holds this security.",
+  },
   // -- Position & cost -----------------------------------------------------
   {
     key: "quantity",

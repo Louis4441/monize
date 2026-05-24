@@ -110,7 +110,7 @@ describe('InvestmentReportViewer', () => {
   it('re-runs the report when the as-of date is changed', async () => {
     await renderViewer();
     await screen.findByText('AAA');
-    expect(mockExecute).toHaveBeenCalledWith('r1', {});
+    expect(mockExecute).toHaveBeenCalledWith('r1', { mergeAccounts: false });
   });
 
   it('shows an empty state when there are no holdings', async () => {
@@ -151,12 +151,42 @@ describe('InvestmentReportViewer', () => {
       fireEvent.change(dateInput, { target: { value: '2024-03-15' } });
     });
     await waitFor(() =>
-      expect(mockExecute).toHaveBeenCalledWith('r1', { asOfDate: '2024-03-15' }),
+      expect(mockExecute).toHaveBeenCalledWith('r1', {
+        asOfDate: '2024-03-15',
+        mergeAccounts: false,
+      }),
     );
     await act(async () => {
       fireEvent.click(screen.getByText('Reset to latest market day'));
     });
-    await waitFor(() => expect(mockExecute).toHaveBeenLastCalledWith('r1', {}));
+    await waitFor(() =>
+      expect(mockExecute).toHaveBeenLastCalledWith('r1', { mergeAccounts: false }),
+    );
+  });
+
+  it('offers a merge toggle for symbol grouping and re-runs merged', async () => {
+    mockGetById.mockResolvedValue({ ...report, groupBy: 'SYMBOL' });
+    mockExecute.mockResolvedValue({
+      ...result,
+      groupBy: 'SYMBOL',
+      groups: [
+        { key: 's1', label: 'AAA', rows: [{ id: '1', currency: 'USD', baseExchangeRate: 1, values: { symbol: 'AAA', marketValue: 200 } }] },
+      ],
+    });
+    await renderViewer();
+    const mergeBtn = await screen.findByRole('button', { name: 'Merge' });
+    await act(async () => {
+      fireEvent.click(mergeBtn);
+    });
+    await waitFor(() =>
+      expect(mockExecute).toHaveBeenLastCalledWith('r1', { mergeAccounts: true }),
+    );
+  });
+
+  it('hides the merge toggle when grouping is none', async () => {
+    await renderViewer();
+    await screen.findByText('AAA');
+    expect(screen.queryByRole('button', { name: 'Merge' })).not.toBeInTheDocument();
   });
 
   it('formats each column type and renders a dash for missing values', async () => {

@@ -12,8 +12,8 @@ describe("investment report columns catalogue", () => {
   });
 
   it("exposes the full populatable column set", () => {
-    expect(INVESTMENT_REPORT_COLUMNS).toHaveLength(40);
-    expect(new Set(INVESTMENT_REPORT_COLUMN_KEYS).size).toBe(40);
+    expect(INVESTMENT_REPORT_COLUMNS).toHaveLength(41);
+    expect(new Set(INVESTMENT_REPORT_COLUMN_KEYS).size).toBe(41);
   });
 
   it("gives every column a label, type and description", () => {

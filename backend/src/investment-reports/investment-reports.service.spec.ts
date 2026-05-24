@@ -217,6 +217,7 @@ describe("InvestmentReportsService", () => {
         ["a1", "a2"],
         "2024-06-10",
         "USD",
+        false,
       );
       expect(result.asOfDate).toBe("2024-06-10");
       expect(result.columns).toEqual(["symbol", "marketValue"]);
@@ -242,6 +243,58 @@ describe("InvestmentReportsService", () => {
         ["a1"], // "notmine" filtered out
         "2024-01-01",
         "USD",
+        false,
+      );
+    });
+
+    it("prepends the account column when separating securities grouped by symbol", async () => {
+      reportsRepository.findOne.mockResolvedValue({
+        ...baseReport,
+        groupBy: InvestmentGroupBy.SYMBOL,
+      });
+      dataService.computeHoldings.mockResolvedValue([
+        holding({ symbol: "AAA", values: { symbol: "AAA", marketValue: 100 } }),
+      ]);
+      const result = await service.execute("u1", "r1");
+      expect(result.columns[0]).toBe("account");
+      // separated (no merge) -> computeHoldings called with mergeAccounts=false
+      expect(dataService.computeHoldings).toHaveBeenCalledWith(
+        "u1",
+        expect.any(Array),
+        "2024-06-10",
+        "USD",
+        false,
+      );
+    });
+
+    it("merges across accounts when requested and omits the forced account column", async () => {
+      reportsRepository.findOne.mockResolvedValue({
+        ...baseReport,
+        groupBy: InvestmentGroupBy.SYMBOL,
+      });
+      dataService.computeHoldings.mockResolvedValue([
+        holding({ symbol: "AAA", values: { symbol: "AAA", marketValue: 100 } }),
+      ]);
+      const result = await service.execute("u1", "r1", { mergeAccounts: true });
+      expect(dataService.computeHoldings).toHaveBeenCalledWith(
+        "u1",
+        expect.any(Array),
+        "2024-06-10",
+        "USD",
+        true,
+      );
+      expect(result.columns[0]).not.toBe("account");
+    });
+
+    it("ignores merge when grouping is none", async () => {
+      reportsRepository.findOne.mockResolvedValue(baseReport); // groupBy NONE
+      await service.execute("u1", "r1", { mergeAccounts: true });
+      expect(dataService.computeHoldings).toHaveBeenCalledWith(
+        "u1",
+        expect.any(Array),
+        "2024-06-10",
+        "USD",
+        false, // merge ignored for NONE grouping
       );
     });
 
