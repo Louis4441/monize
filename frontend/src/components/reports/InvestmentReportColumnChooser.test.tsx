@@ -32,7 +32,7 @@ describe('InvestmentReportColumnChooser', () => {
     expect(screen.queryByLabelText('Remove Symbol')).not.toBeInTheDocument();
   });
 
-  it('reorders columns with the move buttons', () => {
+  it('reorders columns by dragging one onto another', () => {
     const onChange = vi.fn();
     render(
       <InvestmentReportColumnChooser
@@ -40,29 +40,39 @@ describe('InvestmentReportColumnChooser', () => {
         onChange={onChange}
       />,
     );
-    // Move "Market Value" (index 2) up to index 1
-    fireEvent.click(screen.getByLabelText('Move Market Value up'));
+    const source = screen.getByTestId('selected-marketValue');
+    const target = screen.getByTestId('selected-gain');
+    fireEvent.dragStart(source);
+    fireEvent.dragOver(target);
+    fireEvent.drop(target);
     expect(onChange).toHaveBeenCalledWith(['symbol', 'marketValue', 'gain']);
   });
 
-  it('moves a column down with the down button', () => {
+  it('never places a dragged column before the pinned symbol', () => {
     const onChange = vi.fn();
     render(
       <InvestmentReportColumnChooser
-        value={['symbol', 'gain', 'marketValue']}
+        value={['symbol', 'gain', 'name']}
         onChange={onChange}
       />,
     );
-    // Move "Gain" (index 1) down to index 2
-    fireEvent.click(screen.getByLabelText('Move Gain down'));
-    expect(onChange).toHaveBeenCalledWith(['symbol', 'marketValue', 'gain']);
+    const source = screen.getByTestId('selected-name');
+    const target = screen.getByTestId('selected-symbol');
+    fireEvent.dragStart(source);
+    fireEvent.drop(target);
+    // Dropping onto symbol lands just after it; symbol stays first.
+    expect(onChange).toHaveBeenCalledWith(['symbol', 'name', 'gain']);
   });
 
-  it('never moves a column above the pinned symbol', () => {
+  it('does not reorder when the dragged item is the pinned symbol', () => {
     const onChange = vi.fn();
-    render(<InvestmentReportColumnChooser value={['symbol', 'gain']} onChange={onChange} />);
-    // The first non-symbol item's up button is disabled (cannot pass symbol)
-    expect(screen.getByLabelText('Move Gain up')).toBeDisabled();
+    render(
+      <InvestmentReportColumnChooser value={['symbol', 'gain']} onChange={onChange} />,
+    );
+    // Symbol is not draggable, so dragStart sets no source; dropping is a no-op.
+    fireEvent.dragStart(screen.getByTestId('selected-symbol'));
+    fireEvent.drop(screen.getByTestId('selected-gain'));
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('falls back to the raw key for an unknown selected column', () => {

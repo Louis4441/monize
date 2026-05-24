@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   INVESTMENT_REPORT_COLUMNS,
   INVESTMENT_COLUMN_MAP,
@@ -15,12 +15,16 @@ interface InvestmentReportColumnChooserProps {
 
 /**
  * Lets the user pick which MS Money-style columns appear in the report and the
- * order they appear in. The symbol column is always present and pinned first.
+ * order they appear in. Selected columns are reordered by dragging; the symbol
+ * column is always present and pinned first.
  */
 export function InvestmentReportColumnChooser({
   value,
   onChange,
 }: InvestmentReportColumnChooserProps) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
   const selected = useMemo(() => {
     const rest = value.filter((c) => c !== ALWAYS_INCLUDED_COLUMN);
     return [ALWAYS_INCLUDED_COLUMN, ...rest];
@@ -32,21 +36,25 @@ export function InvestmentReportColumnChooser({
   );
 
   const add = (key: string) => onChange([...selected, key]);
-  const remove = (key: string) =>
-    onChange(selected.filter((c) => c !== key));
+  const remove = (key: string) => onChange(selected.filter((c) => c !== key));
 
-  // Reordering never touches the pinned symbol at index 0.
-  const move = (index: number, delta: number) => {
-    const target = index + delta;
-    if (index <= 0 || target <= 0 || target >= selected.length) return;
+  // Reorder by dropping the dragged column onto another. The pinned symbol at
+  // index 0 never moves and nothing can be placed before it.
+  const handleDrop = (targetIndex: number) => {
+    setOverIndex(null);
+    const from = dragIndex;
+    setDragIndex(null);
+    if (from === null || from === 0 || from === targetIndex) return;
+    const dest = Math.max(1, targetIndex);
     const next = [...selected];
-    [next[index], next[target]] = [next[target], next[index]];
+    const [moved] = next.splice(from, 1);
+    next.splice(dest, 0, moved);
     onChange(next);
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Selected (ordered) */}
+      {/* Selected (ordered, drag to reorder) */}
       <div>
         <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Selected columns ({selected.length})
@@ -58,28 +66,35 @@ export function InvestmentReportColumnChooser({
             return (
               <li
                 key={key}
-                className="flex items-center gap-2 px-3 py-2 text-sm"
+                data-testid={`selected-${key}`}
+                draggable={!locked}
+                onDragStart={() => !locked && setDragIndex(index)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (overIndex !== index) setOverIndex(index);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleDrop(index);
+                }}
+                onDragEnd={() => {
+                  setDragIndex(null);
+                  setOverIndex(null);
+                }}
+                className={`flex items-center gap-2 px-3 py-2 text-sm ${
+                  locked ? '' : 'cursor-grab'
+                } ${dragIndex === index ? 'opacity-50' : ''} ${
+                  overIndex === index && dragIndex !== null && dragIndex !== index
+                    ? 'bg-blue-50 dark:bg-blue-900/20'
+                    : ''
+                }`}
               >
-                <div className="flex flex-col">
-                  <button
-                    type="button"
-                    aria-label={`Move ${col?.label} up`}
-                    disabled={index <= 1}
-                    onClick={() => move(index, -1)}
-                    className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed leading-none"
-                  >
-                    ▲
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Move ${col?.label} down`}
-                    disabled={locked || index >= selected.length - 1}
-                    onClick={() => move(index, 1)}
-                    className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed leading-none"
-                  >
-                    ▼
-                  </button>
-                </div>
+                <span
+                  aria-hidden="true"
+                  className={`select-none ${locked ? 'text-gray-300 dark:text-gray-600' : 'text-gray-400'}`}
+                >
+                  ⠿
+                </span>
                 <span className="flex-1 text-gray-900 dark:text-gray-100">
                   {col?.label ?? key}
                   {locked && (
@@ -89,7 +104,7 @@ export function InvestmentReportColumnChooser({
                 {!locked && (
                   <button
                     type="button"
-                    aria-label={`Remove ${col?.label}`}
+                    aria-label={`Remove ${col?.label ?? key}`}
                     onClick={() => remove(key)}
                     className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
                   >
@@ -100,6 +115,9 @@ export function InvestmentReportColumnChooser({
             );
           })}
         </ul>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Drag columns to reorder.
+        </p>
       </div>
 
       {/* Available */}
