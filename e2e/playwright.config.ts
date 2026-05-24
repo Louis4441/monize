@@ -30,10 +30,11 @@ export default defineConfig({
   webServer: process.env.CI
     ? undefined
     : {
-        command: 'docker compose up -d && sleep 10',
+        command:
+          'docker compose -f docker-compose.e2e.yml up -d --build --wait --wait-timeout 420',
         url: 'http://localhost:3001',
         reuseExistingServer: true,
-        timeout: 120000,
+        timeout: 600000,
         cwd: '..',
       },
 });
