@@ -117,6 +117,7 @@ export function createTransaction(
     transactionDate?: string;
     currencyCode?: string;
     categoryId?: string;
+    status?: string;
   },
 ): Promise<CreatedTransaction> {
   return api.post<CreatedTransaction>('/transactions', {
@@ -126,6 +127,7 @@ export function createTransaction(
     transactionDate: data.transactionDate ?? new Date().toISOString().slice(0, 10),
     currencyCode: data.currencyCode ?? 'USD',
     ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
+    ...(data.status !== undefined ? { status: data.status } : {}),
   });
 }
 
