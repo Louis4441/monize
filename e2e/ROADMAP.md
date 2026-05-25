@@ -124,7 +124,7 @@ generated with `otplib` via `helpers/totp.ts`.
 | Error states | `error-states.spec.ts` | Route-intercepted 500s surface a friendly message (tags, securities) -- target endpoints NOT pre-cached by the dashboard | Broader per-page coverage |
 | Mobile | `mobile.spec.ts` | Phone-viewport dashboard render + create-account flow | Hamburger-nav navigation; per-flow mobile coverage |
 | Settings | `settings.spec.ts` | Sections render; profile-name + default-currency persistence; password change happy + wrong-current + weak-new (incl. re-login) | — |
-| 2FA + reset | `security.spec.ts` | 2FA enable (API) reflected in UI, login-with-2FA, disable; forgot-request message; reset missing/invalid-token guards | forgot→reset happy path (infra-blocked, below) |
+| 2FA + reset | `security.spec.ts` | 2FA enable (API) reflected in UI; 2FA *enforced* at login; successful TOTP verify via the disable flow; forgot-password SMTP-redirect; reset missing/invalid-token guards | Completing 2FA-verify-to-dashboard in-test (session/cookie issue after verify in the e2e env); forgot→reset happy path (infra-blocked, below) |
 | Authorization | `authorization.spec.ts` | Unauthenticated visits to every protected route redirect to /login | Cross-user denial (needs the Phase 3 multi-user fixture) |
 | Danger zone | `zz-danger-zone.spec.ts` | Account deletion + re-login blocked; named to run **last** (sequential CI), the suite's destructive finale | — |
 

@@ -18,7 +18,9 @@ test.describe('Error handling', () => {
 
     await page.goto('/tags');
 
-    await expect(page.getByText('Failed to load tags')).toBeVisible();
+    // Next runs in dev mode in the e2e stack, so React invokes the load effect
+    // twice -> two error toasts; assert the first.
+    await expect(page.getByText('Failed to load tags').first()).toBeVisible();
   });
 
   test('shows a friendly error when securities fail to load', async ({
@@ -30,6 +32,8 @@ test.describe('Error handling', () => {
 
     await page.goto('/securities');
 
-    await expect(page.getByText('Failed to load securities')).toBeVisible();
+    await expect(
+      page.getByText('Failed to load securities').first(),
+    ).toBeVisible();
   });
 });
