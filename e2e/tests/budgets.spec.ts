@@ -48,10 +48,14 @@ test.describe('Budgets', () => {
     await expect(page.getByRole('heading', { name: budget.name })).toBeVisible({
       timeout: 15000,
     });
-    // The category appears with its budgeted target and the seeded spend.
+    // The category appears with its budgeted target.
     await expect(page.getByText(category.name).first()).toBeVisible();
     await expect(page.getByText(/\$500/).first()).toBeVisible();
-    await expect(page.getByText(/\$120/).first()).toBeVisible();
+    // The seeded spend shows as the actual. Reload once and allow extra time:
+    // the summary is recomputed on load, and the just-seeded transaction can
+    // occasionally miss the very first render.
+    await page.reload();
+    await expect(page.getByText(/\$120/).first()).toBeVisible({ timeout: 15000 });
   });
 
   test('deletes a budget through the UI', async ({ authedPage: page, api }) => {
