@@ -100,3 +100,31 @@ export function createAccount(
     openingBalance: data.openingBalance ?? 0,
   });
 }
+
+export interface CreatedTransaction {
+  id: string;
+  amount: number;
+  payeeName: string | null;
+  transactionDate: string;
+}
+
+export function createTransaction(
+  api: ApiClient,
+  data: {
+    accountId: string;
+    amount?: number;
+    payeeName?: string;
+    transactionDate?: string;
+    currencyCode?: string;
+    categoryId?: string;
+  },
+): Promise<CreatedTransaction> {
+  return api.post<CreatedTransaction>('/transactions', {
+    accountId: data.accountId,
+    amount: data.amount ?? -10,
+    payeeName: data.payeeName ?? `E2E Txn ${uniqueId()}`,
+    transactionDate: data.transactionDate ?? new Date().toISOString().slice(0, 10),
+    currencyCode: data.currencyCode ?? 'USD',
+    ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
+  });
+}
