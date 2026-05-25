@@ -15,6 +15,9 @@ import { format } from 'date-fns';
 import { MonthlyNetWorth } from '@/types/net-worth';
 import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useIsMobile } from '@/hooks/useIsMobile';
+
+type YDomain = [number | ((dataMin: number) => number), number | 'auto'];
 
 function NetWorthTooltip({
   active,
@@ -46,6 +49,7 @@ interface NetWorthChartProps {
 
 export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
   const router = useRouter();
+  const isMobile = useIsMobile();
   const { formatCurrencyCompact: formatCurrency, formatCurrencyLabel } = useNumberFormat();
 
   const chartData = useMemo(() =>
@@ -64,6 +68,25 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
     const changePercent = initial !== 0 ? (change / Math.abs(initial)) * 100 : 0;
     return { current, change, changePercent };
   }, [chartData]);
+
+  // On larger screens anchor the axis at 0. On mobile the chart is short, so a
+  // 0-anchored axis flattens every bar to nearly the same height; use a tight
+  // domain padded below the minimum so month-to-month differences are visible.
+  const yAxisDomain = useMemo<YDomain>(() => {
+    const anchoredAtZero: YDomain = [(min: number) => Math.min(0, min), 'auto'];
+    if (!isMobile || chartData.length === 0) return anchoredAtZero;
+
+    const values = chartData.map((d) => d.netWorth);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const range = maxValue - minValue;
+    if (range === 0) return anchoredAtZero;
+
+    const rawMin = minValue - range * 0.15;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(rawMin) || 1)));
+    const niceMin = Math.floor(rawMin / magnitude) * magnitude;
+    return [niceMin, 'auto'];
+  }, [chartData, isMobile]);
 
   if (isLoading) {
     return (
@@ -126,7 +149,7 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart data={chartData} margin={{ top: 52, right: 12, left: 12, bottom: 0 }}>
-            <YAxis hide domain={[(min: number) => Math.min(0, min), 'auto']} />
+            <YAxis hide domain={yAxisDomain} />
             <XAxis
               dataKey="name"
               tick={{ fill: '#6b7280', fontSize: 11 }}

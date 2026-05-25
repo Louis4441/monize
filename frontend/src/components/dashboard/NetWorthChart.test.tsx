@@ -15,9 +15,24 @@ vi.mock('recharts', () => ({
     <div data-testid="label-list">{formatter ? String(formatter(1000)) : ''}</div>
   ),
   XAxis: () => null,
-  YAxis: () => null,
+  YAxis: ({ domain }: any) => (
+    <div data-testid="y-axis" data-domain={JSON.stringify(domain)} />
+  ),
   Tooltip: () => null,
 }));
+
+function setMobile(isMobile: boolean) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: isMobile && query === '(max-width: 639px)',
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
 
 vi.mock('@/hooks/useNumberFormat', () => ({
   useNumberFormat: () => ({
@@ -33,6 +48,7 @@ vi.mock('@/lib/utils', () => ({
 describe('NetWorthChart', () => {
   beforeEach(() => {
     mockPush.mockClear();
+    setMobile(false);
   });
 
   it('renders loading state with title and pulse skeleton', () => {
@@ -143,6 +159,50 @@ describe('NetWorthChart', () => {
     render(<NetWorthChart data={data} isLoading={false} />);
     const currentEl = screen.getByText('$-3000');
     expect(currentEl.className).toContain('text-red');
+  });
+
+  it('anchors the Y-axis at 0 on non-mobile screens', () => {
+    setMobile(false);
+    const data = [
+      { month: '2024-01-01', netWorth: 500000 },
+      { month: '2024-06-01', netWorth: 520000 },
+    ] as any[];
+
+    render(<NetWorthChart data={data} isLoading={false} />);
+    // The anchored domain's lower bound is a function, which JSON.stringify
+    // drops to null, leaving [null, "auto"].
+    const domain = screen.getByTestId('y-axis').getAttribute('data-domain');
+    expect(domain).toBe('[null,"auto"]');
+  });
+
+  it('uses a tight Y-axis domain above 0 on mobile to surface differences', () => {
+    setMobile(true);
+    const data = [
+      { month: '2024-01-01', netWorth: 500000 },
+      { month: '2024-06-01', netWorth: 520000 },
+    ] as any[];
+
+    render(<NetWorthChart data={data} isLoading={false} />);
+    const domain = JSON.parse(
+      screen.getByTestId('y-axis').getAttribute('data-domain') as string,
+    );
+    // Lower bound is a concrete number padded below the minimum (not 0).
+    expect(typeof domain[0]).toBe('number');
+    expect(domain[0]).toBeGreaterThan(0);
+    expect(domain[0]).toBeLessThan(500000);
+    expect(domain[1]).toBe('auto');
+  });
+
+  it('falls back to the anchored domain on mobile when all values are equal', () => {
+    setMobile(true);
+    const data = [
+      { month: '2024-01-01', netWorth: 500000 },
+      { month: '2024-06-01', netWorth: 500000 },
+    ] as any[];
+
+    render(<NetWorthChart data={data} isLoading={false} />);
+    const domain = screen.getByTestId('y-axis').getAttribute('data-domain');
+    expect(domain).toBe('[null,"auto"]');
   });
 
   it('handles single data point correctly', () => {

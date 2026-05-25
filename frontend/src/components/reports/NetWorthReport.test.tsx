@@ -57,8 +57,8 @@ vi.mock('recharts', () => ({
   BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
   Area: () => null,
   Bar: ({ children }: any) => <div data-testid="bar">{children}</div>,
-  LabelList: ({ formatter }: any) => (
-    <div data-testid="label-list">{formatter ? String(formatter(1000)) : ''}</div>
+  LabelList: ({ formatter, angle }: any) => (
+    <div data-testid="label-list" data-angle={angle}>{formatter ? String(formatter(1000)) : ''}</div>
   ),
   XAxis: ({ tickFormatter }: any) => {
     if (tickFormatter) {
@@ -81,6 +81,19 @@ vi.mock('recharts', () => ({
   ReferenceLine: () => null,
   ReferenceDot: () => null,
 }));
+
+function setMobile(isMobile: boolean) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: isMobile && query === '(max-width: 639px)',
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
+}
 
 const mockGetMonthly = vi.fn();
 const mockRecalculate = vi.fn();
@@ -105,6 +118,7 @@ describe('NetWorthReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dateRangeMock.value = '1y';
+    setMobile(false);
   });
 
   it('shows loading state initially', () => {
@@ -237,6 +251,34 @@ describe('NetWorthReport', () => {
       expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
     });
     expect(screen.getByTestId('label-list')).toBeInTheDocument();
+  });
+
+  it('keeps 1-year bar labels horizontal on non-mobile screens', async () => {
+    dateRangeMock.value = '1y';
+    setMobile(false);
+    mockGetMonthly.mockResolvedValue([
+      { month: '2024-01-01', assets: 50000, liabilities: 10000, netWorth: 40000 },
+      { month: '2024-06-01', assets: 55000, liabilities: 9000, netWorth: 46000 },
+    ]);
+    render(<NetWorthReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('label-list')).toHaveAttribute('data-angle', '0');
+  });
+
+  it('rotates 1-year bar labels vertical on mobile', async () => {
+    dateRangeMock.value = '1y';
+    setMobile(true);
+    mockGetMonthly.mockResolvedValue([
+      { month: '2024-01-01', assets: 50000, liabilities: 10000, netWorth: 40000 },
+      { month: '2024-06-01', assets: 55000, liabilities: 9000, netWorth: 46000 },
+    ]);
+    render(<NetWorthReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('label-list')).toHaveAttribute('data-angle', '-90');
   });
 
   it('shows abbreviated value labels above bars for the 2-year range', async () => {

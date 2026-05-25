@@ -22,6 +22,7 @@ import { MonthlyNetWorth } from '@/types/net-worth';
 import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateRange } from '@/hooks/useDateRange';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
@@ -36,6 +37,7 @@ type NetWorthSortField = 'name' | 'assets' | 'liabilities' | 'netWorth';
 
 export function NetWorthReport() {
   const { formatCurrencyCompact: formatCurrency, formatCurrencyAxis, formatCurrencyLabel } = useNumberFormat();
+  const isMobile = useIsMobile();
   const [monthlyData, setMonthlyData] = useState<MonthlyNetWorth[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRecalculating, setIsRecalculating] = useState(false);
@@ -202,9 +204,10 @@ export function NetWorthReport() {
 
   // Per-bar value labels are only legible on the shorter (1y/2y) ranges; longer
   // ranges pack too many bars together. Beyond ~14 bars the labels are rotated
-  // vertical so the 2-year view doesn't overlap.
+  // vertical so the 2-year view doesn't overlap. On mobile the bars are narrow
+  // enough that even the 12-bar 1-year view needs vertical labels.
   const showBarLabels = dateRange === '1y' || dateRange === '2y';
-  const barLabelsVertical = showBarLabels && chartData.length > 14;
+  const barLabelsVertical = showBarLabels && (chartData.length > 14 || isMobile);
 
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string; payload: { name: string } }> }) => {
     if (active && payload && payload.length) {
