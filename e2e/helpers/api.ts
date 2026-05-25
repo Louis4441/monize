@@ -89,6 +89,7 @@ export async function loginViaApi(
 export interface ApiClient {
   get<T = unknown>(path: string): Promise<T>;
   post<T = unknown>(path: string, body?: unknown): Promise<T>;
+  put<T = unknown>(path: string, body?: unknown): Promise<T>;
   patch<T = unknown>(path: string, body?: unknown): Promise<T>;
   delete(path: string): Promise<void>;
 }
@@ -98,7 +99,7 @@ export interface ApiClient {
 // refresh the token once and retry.
 export function createApiClient(request: APIRequestContext): ApiClient {
   const send = async (
-    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     path: string,
     body?: unknown,
   ) => {
@@ -133,6 +134,10 @@ export function createApiClient(request: APIRequestContext): ApiClient {
     },
     post: async <T>(path: string, body?: unknown): Promise<T> => {
       const res = await send('POST', path, body);
+      return (res.status() === 204 ? undefined : await res.json()) as T;
+    },
+    put: async <T>(path: string, body?: unknown): Promise<T> => {
+      const res = await send('PUT', path, body);
       return (res.status() === 204 ? undefined : await res.json()) as T;
     },
     patch: async <T>(path: string, body?: unknown): Promise<T> => {

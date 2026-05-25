@@ -338,6 +338,35 @@ export function addBudgetCategory(
   });
 }
 
+export interface CreatedDelegate {
+  id: string;
+  delegateUserId: string;
+  email: string;
+}
+
+// The owner creates a delegate by email with an owner-set password (12+ chars,
+// upper/lower/digit/special). The delegate becomes a delegate-only user.
+export function createDelegate(
+  api: ApiClient,
+  data: { email: string; password?: string },
+): Promise<CreatedDelegate> {
+  return api.post<CreatedDelegate>('/delegation/delegates', {
+    email: data.email,
+    password: data.password ?? 'E2eTestPass123!',
+  });
+}
+
+// Grant the delegate read access to a specific account.
+export function grantDelegateAccount(
+  api: ApiClient,
+  delegateId: string,
+  accountId: string,
+): Promise<void> {
+  return api.put<void>(`/delegation/delegates/${delegateId}/grants`, {
+    grants: [{ accountId, canRead: true }],
+  });
+}
+
 export interface CreatedCustomReport {
   id: string;
   name: string;
