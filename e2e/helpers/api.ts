@@ -23,7 +23,13 @@ function withPrefix(path: string): string {
 // resource mutations must echo it back in the X-CSRF-Token header.
 async function csrfToken(request: APIRequestContext): Promise<string | undefined> {
   const { cookies } = await request.storageState();
-  return cookies.find((c) => c.name === 'csrf_token')?.value;
+  const raw = cookies.find((c) => c.name === 'csrf_token')?.value;
+  // Express encodes cookie values, so the token's ':' separator is stored as
+  // '%3A'. The backend's cookie-parser decodes the cookie before its
+  // double-submit comparison (js-cookie does the same on the frontend), so we
+  // must decode here -- otherwise the header won't byte-match the cookie and
+  // the CSRF guard rejects the request.
+  return raw ? decodeURIComponent(raw) : undefined;
 }
 
 // Register a fresh user via the API. /auth/register is CSRF-exempt and sets the
