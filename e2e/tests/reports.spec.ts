@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures';
-import { createAccount } from '../helpers/factories';
+import { createAccount, createCustomReport } from '../helpers/factories';
 import { uniqueId } from '../helpers/api';
 
 // Reports, insights, and the dashboard net-worth roll-up. The built-in report
@@ -59,5 +59,15 @@ test.describe('Reports & analytics', () => {
     await expect(
       page.getByRole('heading', { name: 'Spending Insights' }),
     ).toBeVisible();
+  });
+
+  test('opens a seeded custom report', async ({ authedPage: page, api }) => {
+    const report = await createCustomReport(api, { name: `Custom ${uniqueId()}` });
+
+    await page.goto(`/reports/custom/${report.id}`);
+
+    await expect(page.getByRole('heading', { name: report.name })).toBeVisible({
+      timeout: 15000,
+    });
   });
 });

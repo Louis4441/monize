@@ -112,23 +112,26 @@ delete/guards; validation.
 New factories in `factories.ts`: `createSecurity`, `createInvestmentAccountPair`
 (POSTs `accountType: INVESTMENT` + `createInvestmentPair` and returns the linked
 `{ cashAccount, brokerageAccount }`), `createInvestmentTransaction`,
-`createBudget`, `addBudgetCategory`.
+`createBudget`, `addBudgetCategory`, `createCustomReport`. 2FA codes are
+generated with `otplib` via `helpers/totp.ts`.
 
 | Area | Spec | Landed | Deferred (follow-up) |
 |------|------|--------|----------------------|
 | Securities | `securities.spec.ts` | Full CRUD + deactivate + validation | — |
 | Investments | `investments.spec.ts` | Page chrome; seeded BUY rolls into holdings; reload persistence | UI-driven trade entry (the combobox transaction modal); price-refresh assertion |
 | Budgets | `budgets.spec.ts` | List; detail actuals-vs-budget (seeded category + txn); delete | Wizard-based create + validation (no UI path that isn't the spending-analysis wizard) |
-| Reports/insights/net-worth | `reports.spec.ts` | Built-in catalogue; open a report; dashboard net-worth surface; insights page | Custom report builder CRUD; Monte-Carlo projection; asserting exact report figures |
-| Settings | `settings.spec.ts` | Sections render; profile-name + default-currency persistence; password change happy + wrong-current + weak-new (incl. re-login) | 2FA (TOTP) enable/login/disable; danger-zone account deletion |
+| Reports/insights/net-worth | `reports.spec.ts` | Built-in catalogue; open a report; dashboard net-worth surface; insights page; open a seeded custom report | Custom report builder *form* CRUD; Monte-Carlo projection; asserting exact report figures |
+| Settings | `settings.spec.ts` | Sections render; profile-name + default-currency persistence; password change happy + wrong-current + weak-new (incl. re-login) | — |
+| 2FA + reset | `security.spec.ts` | 2FA enable (API) reflected in UI, login-with-2FA, disable; forgot-request message; reset missing/invalid-token guards | forgot→reset happy path (infra-blocked, below) |
+| Authorization | `authorization.spec.ts` | Unauthenticated visits to every protected route redirect to /login | Cross-user denial (needs the Phase 3 multi-user fixture) |
+| Danger zone | `zz-danger-zone.spec.ts` | Account deletion + re-login blocked; named to run **last** (sequential CI), the suite's destructive finale | — |
 
-**Infra blocker for forgot/reset (2.4):** the e2e stack configures no SMTP and
-does not expose the Postgres port to the host, so the raw reset token (hashed in
-the DB, only ever emailed) cannot be retrieved by the runner. The forgot→reset
-happy path needs either a mail-capture service (e.g. Mailpit) in
-`docker-compose.e2e.yml` or an exposed DB/test endpoint before it can be tested
-honestly. The forgot-request UI and the invalid-token reset path are testable
-without it.
+**Infra blocker for the forgot/reset happy path (2.4):** the e2e stack
+configures no SMTP and does not expose the Postgres port to the host, so the raw
+reset token (hashed in the DB, only ever emailed) cannot be retrieved by the
+runner. It needs either a mail-capture service (e.g. Mailpit) in
+`docker-compose.e2e.yml` or an exposed DB/test endpoint. The forgot-request UI
+and the invalid-token reset path are covered without it.
 
 **Note on holdings:** `GroupedHoldingsList` seeds its expanded-accounts set from
 the first render (empty during load), so account rows render collapsed — expand

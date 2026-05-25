@@ -337,3 +337,20 @@ export function addBudgetCategory(
     ...(data.isIncome !== undefined ? { isIncome: data.isIncome } : {}),
   });
 }
+
+export interface CreatedCustomReport {
+  id: string;
+  name: string;
+}
+
+// Only `name` is required; every other field defaults server-side. The full
+// report-builder form is deferred (see ROADMAP Phase 2.3) -- this seeds a
+// report so the viewer/open path can be exercised.
+export function createCustomReport(
+  api: ApiClient,
+  data: { name?: string } = {},
+): Promise<CreatedCustomReport> {
+  return api.post<CreatedCustomReport>('/reports/custom', {
+    name: data.name ?? `E2E Report ${uniqueId()}`,
+  });
+}
