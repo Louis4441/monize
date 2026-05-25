@@ -1,5 +1,5 @@
 import { APIRequestContext, expect } from '@playwright/test';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomInt } from 'crypto';
 
 const API_PREFIX = '/api/v1';
 
@@ -10,12 +10,12 @@ export const uniqueId = (): string =>
 // Currencies are a GLOBAL catalog (shared across users), so a hardcoded code
 // would collide across the chromium and firefox projects. Generate a random
 // 3-letter code; the "Q" prefix avoids the seeded ISO currencies (none start
-// with Q), and retries re-draw on the rare cross-test clash. This is only a
-// test identifier (not security-sensitive), so Math.random keeps it simple and
-// avoids biasing a CSPRNG via modulo.
+// with Q), and retries re-draw on the rare cross-test clash. crypto.randomInt
+// is unbiased (unlike `bytes % 26`, which CodeQL flags) and a secure source
+// (unlike Math.random, which Bearer flags as CWE-330).
 export const randomCurrencyCode = (): string => {
   const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const pick = () => A[Math.floor(Math.random() * A.length)];
+  const pick = () => A[randomInt(A.length)];
   return `Q${pick()}${pick()}`;
 };
 
