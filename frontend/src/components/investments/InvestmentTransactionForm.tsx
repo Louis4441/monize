@@ -577,12 +577,14 @@ export function InvestmentTransactionForm({
     );
   }, [selectedTransferHolding, setValue]);
 
-  // Securities available to transfer: only those currently held (qty > 0) in
-  // the source account.
+  // Securities available to transfer: only those currently held in the source
+  // account. Use the same presence threshold the portfolio/holdings views use
+  // (|qty| >= 0.0001) so the list matches what the account actually shows --
+  // zero and tiny residual positions left by sells/splits/imports are excluded.
   const transferSecurityOptions = useMemo(
     () =>
       transferSourceHoldings
-        .filter((h) => Number(h.quantity) > 0 && h.security)
+        .filter((h) => Number(h.quantity) >= 0.0001 && h.security)
         .map((h) => ({
           value: h.securityId,
           label: `${h.security.symbol} - ${h.security.name} (${h.security.currencyCode})`,

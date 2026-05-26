@@ -496,6 +496,36 @@ describe('InvestmentTransactionForm', () => {
           currencyCode: 'USD',
         },
       },
+      // A fully-exited position lingers as a zero-quantity holding row; it must
+      // not appear as transferable.
+      {
+        id: 'h2',
+        accountId: 'a1',
+        securityId: 'sec-2',
+        quantity: 0,
+        averageCost: 0,
+        security: {
+          id: 'sec-2',
+          symbol: 'GONE',
+          name: 'Sold Out Co.',
+          currencyCode: 'USD',
+        },
+      },
+      // A tiny residual position (below the 0.0001 presence threshold the rest
+      // of the app uses) should also be hidden.
+      {
+        id: 'h3',
+        accountId: 'a1',
+        securityId: 'sec-3',
+        quantity: 0.00005,
+        averageCost: 5,
+        security: {
+          id: 'sec-3',
+          symbol: 'DUST',
+          name: 'Residual Inc.',
+          currencyCode: 'USD',
+        },
+      },
     ] as any;
 
     beforeEach(() => {
