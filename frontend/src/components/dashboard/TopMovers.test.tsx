@@ -107,6 +107,51 @@ describe('TopMovers', () => {
     expect(screen.queryByText('SYM5')).not.toBeInTheDocument();
   });
 
+  it('renders the All/Gainers/Losers filter selector', () => {
+    const movers = [
+      { securityId: '1', symbol: 'AAPL', name: 'Apple', currentPrice: 180, dailyChange: 5, dailyChangePercent: 2.8, currencyCode: 'USD' },
+    ] as any[];
+
+    render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
+    expect(screen.getByText('All')).toBeInTheDocument();
+    expect(screen.getByText('Gainers')).toBeInTheDocument();
+    expect(screen.getByText('Losers')).toBeInTheDocument();
+  });
+
+  it('filters to only gainers when Gainers is selected', () => {
+    const movers = [
+      { securityId: '1', symbol: 'AAPL', name: 'Apple', currentPrice: 180, dailyChange: 5, dailyChangePercent: 2.8, currencyCode: 'USD' },
+      { securityId: '2', symbol: 'MSFT', name: 'Microsoft', currentPrice: 400, dailyChange: -2, dailyChangePercent: -0.5, currencyCode: 'USD' },
+    ] as any[];
+
+    render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
+    fireEvent.click(screen.getByText('Gainers'));
+    expect(screen.getByText('AAPL')).toBeInTheDocument();
+    expect(screen.queryByText('MSFT')).not.toBeInTheDocument();
+  });
+
+  it('filters to only losers when Losers is selected', () => {
+    const movers = [
+      { securityId: '1', symbol: 'AAPL', name: 'Apple', currentPrice: 180, dailyChange: 5, dailyChangePercent: 2.8, currencyCode: 'USD' },
+      { securityId: '2', symbol: 'MSFT', name: 'Microsoft', currentPrice: 400, dailyChange: -2, dailyChangePercent: -0.5, currencyCode: 'USD' },
+    ] as any[];
+
+    render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
+    fireEvent.click(screen.getByText('Losers'));
+    expect(screen.getByText('MSFT')).toBeInTheDocument();
+    expect(screen.queryByText('AAPL')).not.toBeInTheDocument();
+  });
+
+  it('shows an empty message when the selected filter has no matches', () => {
+    const movers = [
+      { securityId: '1', symbol: 'AAPL', name: 'Apple', currentPrice: 180, dailyChange: 5, dailyChangePercent: 2.8, currencyCode: 'USD' },
+    ] as any[];
+
+    render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
+    fireEvent.click(screen.getByText('Losers'));
+    expect(screen.getByText('No losers today.')).toBeInTheDocument();
+  });
+
   it('shows refresh button when onRefresh is provided', () => {
     const onRefresh = vi.fn();
     const movers = [
