@@ -691,6 +691,11 @@ export function InvestmentTransactionForm({
   const isQuantityOnly = quantityOnlyActions.includes(watchedAction);
   const isAmountOnly = amountOnlyActions.includes(watchedAction);
   const isSplit = watchedAction === 'SPLIT';
+  // An individual posted transfer leg (TRANSFER_IN/TRANSFER_OUT). These only
+  // appear when editing an existing transfer; the create flow uses the
+  // combined 'TRANSFER' action instead.
+  const isTransferLeg =
+    watchedAction === 'TRANSFER_IN' || watchedAction === 'TRANSFER_OUT';
   const canHaveFundingAccount = fundingAccountActions.includes(watchedAction);
   const canHaveCashDestination = cashDestinationActions.includes(watchedAction);
 
@@ -754,6 +759,9 @@ export function InvestmentTransactionForm({
           label="Transaction Type"
           error={errors.action?.message}
           options={actionOptions}
+          // A posted transfer's direction is fixed; changing it would break
+          // the linked pair. The backend rejects it too.
+          disabled={isTransferLeg}
           {...register('action')}
         />
       </div>
@@ -1097,8 +1105,8 @@ export function InvestmentTransactionForm({
         </div>
       )}
 
-      {/* Total Amount Display */}
-      {(needsQuantityPrice || isAmountOnly) && (
+      {/* Total Amount Display - meaningless for a transfer (no cash moves) */}
+      {(needsQuantityPrice || isAmountOnly) && !isTransferLeg && (
         <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-4">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">

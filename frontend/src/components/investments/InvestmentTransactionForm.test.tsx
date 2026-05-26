@@ -656,6 +656,47 @@ describe('InvestmentTransactionForm', () => {
     });
   });
 
+  describe('Editing a posted transfer leg', () => {
+    const transferLeg = {
+      id: 'leg-out',
+      accountId: 'a1',
+      action: 'TRANSFER_OUT' as const,
+      transactionDate: '2026-02-01',
+      securityId: 'sec-1',
+      quantity: 100,
+      price: 1.67,
+      commission: 0,
+      totalAmount: 0,
+      description: '',
+    } as any;
+
+    it('locks the transaction type so the direction cannot change', async () => {
+      render(
+        <InvestmentTransactionForm
+          accounts={accounts}
+          transaction={transferLeg}
+        />,
+      );
+      await waitFor(() => {
+        expect(screen.getByText('Update Transaction')).toBeInTheDocument();
+      });
+      expect(screen.getByLabelText('Transaction Type')).toBeDisabled();
+    });
+
+    it('does not show the Total Amount for a transfer', async () => {
+      render(
+        <InvestmentTransactionForm
+          accounts={accounts}
+          transaction={transferLeg}
+        />,
+      );
+      await waitFor(() => {
+        expect(screen.getByText('Update Transaction')).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/Total Amount/)).not.toBeInTheDocument();
+    });
+  });
+
   it('clears a stale fundingAccountId when switching to an action that does not accept one', async () => {
     render(<InvestmentTransactionForm accounts={accounts} />);
     await waitFor(() => {
