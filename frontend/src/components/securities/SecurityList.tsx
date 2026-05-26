@@ -176,7 +176,7 @@ const SecurityRow = memo(function SecurityRow({
       </td>
       <td className={`${cellPadding} whitespace-nowrap text-right`}>
         <span
-          className="font-mono text-sm text-gray-900 dark:text-gray-100"
+          className="text-sm text-gray-900 dark:text-gray-100"
           title="Current shares held across all accounts"
         >
           {formatShareQuantity(shares)}

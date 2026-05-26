@@ -3,16 +3,22 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
+import { Modal } from '@/components/ui/Modal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SecurityShareAdjustmentForm } from './SecurityShareAdjustmentForm';
+import { InvestmentTransactionForm } from '@/components/investments/InvestmentTransactionForm';
 import { investmentsApi } from '@/lib/investments';
+import { accountsApi } from '@/lib/accounts';
 import { formatShareQuantity } from '@/lib/format';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import toast from 'react-hot-toast';
+import type { Account } from '@/types/account';
 import type {
   InvestmentAction,
+  InvestmentTransaction,
   Security,
   SecurityTransactionHistory as SecurityTransactionHistoryData,
 } from '@/types/investment';
@@ -51,6 +57,9 @@ export function SecurityTransactionHistory({
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [showAddForm, setShowAddForm] = useState(false);
+  // Full account objects (including closed) for the edit form's pickers.
+  const [allAccounts, setAllAccounts] = useState<Account[]>([]);
+  const [editTransaction, setEditTransaction] = useState<InvestmentTransaction | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -72,6 +81,38 @@ export function SecurityTransactionHistory({
       /* error already logged; UI shows empty state */
     });
   }, [load]);
+
+  // Load all accounts (including closed) once, so editing a transaction in a
+  // closed account still has its account available in the form.
+  useEffect(() => {
+    let cancelled = false;
+    accountsApi
+      .getAll(true)
+      .then((data) => {
+        if (!cancelled) setAllAccounts(data);
+      })
+      .catch((error) => {
+        if (!cancelled) logger.error('Failed to load accounts:', error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleEditClick = useCallback(async (id: string) => {
+    try {
+      const tx = await investmentsApi.getTransaction(id);
+      setEditTransaction(tx);
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Failed to load transaction'));
+    }
+  }, []);
+
+  const handleEditSuccess = () => {
+    setEditTransaction(null);
+    onChanged?.();
+    load().catch(() => {});
+  };
 
   const accounts = useMemo(() => history?.accounts ?? [], [history]);
   const showAccountColumn = selectedAccountId === 'all';
@@ -118,7 +159,7 @@ export function SecurityTransactionHistory({
           <div className="text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500">
             Current shares
           </div>
-          <div className="font-mono text-lg font-semibold text-gray-900 dark:text-gray-100">
+          <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {formatShareQuantity(currentShares)}
           </div>
         </div>
@@ -180,6 +221,9 @@ export function SecurityTransactionHistory({
                 <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Running Total</th>
                 <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Price</th>
                 <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Amount</th>
+                <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
@@ -201,10 +245,10 @@ export function SecurityTransactionHistory({
                     <td className="whitespace-nowrap px-3 py-2 text-sm text-gray-700 dark:text-gray-300">
                       {ACTION_LABELS[tx.action] ?? tx.action}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-sm text-gray-900 dark:text-gray-100">
+                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-900 dark:text-gray-100">
                       {tx.quantity === null ? '-' : formatShareQuantity(tx.quantity)}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-sm font-medium text-gray-900 dark:text-gray-100">
+                    <td className="whitespace-nowrap px-3 py-2 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
                       {formatShareQuantity(running)}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700 dark:text-gray-300">
@@ -212,6 +256,16 @@ export function SecurityTransactionHistory({
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-sm text-gray-700 dark:text-gray-300">
                       {formatCurrency(tx.totalAmount, security.currencyCode)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditClick(tx.id)}
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+                      >
+                        Edit
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -226,6 +280,30 @@ export function SecurityTransactionHistory({
           Close
         </Button>
       </div>
+
+      {/* Edit transaction modal (stacked on the history modal) */}
+      <Modal
+        isOpen={!!editTransaction}
+        onClose={() => setEditTransaction(null)}
+        maxWidth="lg"
+        className="p-6"
+        pushHistory
+      >
+        {editTransaction && (
+          <>
+            <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-gray-100">
+              Edit Transaction
+            </h2>
+            <InvestmentTransactionForm
+              transaction={editTransaction}
+              accounts={allAccounts}
+              allAccounts={allAccounts}
+              onSuccess={handleEditSuccess}
+              onCancel={() => setEditTransaction(null)}
+            />
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

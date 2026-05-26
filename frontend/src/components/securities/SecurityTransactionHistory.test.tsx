@@ -7,7 +7,31 @@ vi.mock('@/lib/investments', () => ({
   investmentsApi: {
     getSecurityTransactionHistory: vi.fn(),
     createTransaction: vi.fn().mockResolvedValue({}),
+    getTransaction: vi.fn().mockResolvedValue({ id: 't1', securityId: 'sec-1' }),
   },
+}));
+
+vi.mock('@/lib/accounts', () => ({
+  accountsApi: { getAll: vi.fn().mockResolvedValue([]) },
+}));
+
+// Stub the heavy shared form; we only verify the edit wiring here.
+vi.mock('@/components/investments/InvestmentTransactionForm', () => ({
+  InvestmentTransactionForm: ({
+    transaction,
+    onSuccess,
+    onCancel,
+  }: {
+    transaction?: { id: string };
+    onSuccess?: () => void;
+    onCancel?: () => void;
+  }) => (
+    <div data-testid="edit-form">
+      <span>Editing {transaction?.id}</span>
+      <button onClick={() => onSuccess?.()}>Save edit</button>
+      <button onClick={() => onCancel?.()}>Cancel edit</button>
+    </div>
+  ),
 }));
 
 vi.mock('@/hooks/useDateFormat', () => ({
@@ -130,6 +154,36 @@ describe('SecurityTransactionHistory', () => {
       expect(investmentsApi.createTransaction).toHaveBeenCalled();
     });
     // History reloaded and parent notified.
+    await waitFor(() => {
+      expect(investmentsApi.getSecurityTransactionHistory).toHaveBeenCalledTimes(2);
+    });
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it('opens the edit form for a transaction and reloads after saving', async () => {
+    vi.mocked(investmentsApi.getTransaction).mockResolvedValue({
+      id: 't1',
+      securityId: 'sec-1',
+    } as any);
+    const onChanged = vi.fn();
+    await renderHistory({ onChanged });
+    await waitFor(() => {
+      expect(screen.getByText('ACME')).toBeInTheDocument();
+    });
+    expect(investmentsApi.getSecurityTransactionHistory).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByText('Edit')[0]);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('edit-form')).toBeInTheDocument();
+    });
+    expect(investmentsApi.getTransaction).toHaveBeenCalledWith('t1');
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Save edit'));
+    });
+    // History reloads and parent is notified after a successful edit.
     await waitFor(() => {
       expect(investmentsApi.getSecurityTransactionHistory).toHaveBeenCalledTimes(2);
     });
