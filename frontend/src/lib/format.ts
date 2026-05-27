@@ -103,6 +103,27 @@ export function formatAmount(value: number | undefined | null, decimalPlaces: nu
 }
 
 /**
+ * Format a share quantity at full precision (up to 8 decimal places) with
+ * trailing zeros trimmed. Unlike the rounded quantity formatter, this keeps
+ * tiny residual positions visible (e.g. 0.0003), which is essential for
+ * tracking down errant share counts.
+ */
+export function formatShareQuantity(value: number | undefined | null): string {
+  if (value === undefined || value === null || isNaN(value)) {
+    return '0';
+  }
+  const fixed = value.toFixed(8);
+  // Trim trailing zeros and a dangling decimal point.
+  const trimmed = fixed.replace(/\.?0+$/, '');
+  // Map empty (all zeros) and negative zero (a tiny negative residue that
+  // rounds to zero, e.g. -4e-15) to a clean "0".
+  if (trimmed === '' || trimmed === '-0') {
+    return '0';
+  }
+  return trimmed;
+}
+
+/**
  * Format a number with comma thousands separators and the specified decimal places.
  * Defaults to 2 decimal places. Used for display when input is not focused.
  */

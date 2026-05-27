@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Logger,
   Inject,
   forwardRef,
@@ -14,6 +15,7 @@ import {
 } from "./entities/investment-transaction.entity";
 import { CreateInvestmentTransactionDto } from "./dto/create-investment-transaction.dto";
 import { UpdateInvestmentTransactionDto } from "./dto/update-investment-transaction.dto";
+import { TransferSecurityDto } from "./dto/transfer-security.dto";
 import { AccountsService } from "../accounts/accounts.service";
 import { TransactionsService } from "../transactions/transactions.service";
 import { HoldingsService } from "./holdings.service";
@@ -109,6 +111,45 @@ export interface LlmInvestmentTransactionsResult {
   groups: LlmInvestmentTxGroup[] | null;
   transactions: LlmInvestmentTxRow[];
   truncatedTransactionList: boolean;
+}
+
+/** One account a security has been transacted in (including closed ones). */
+export interface SecurityHistoryAccount {
+  accountId: string;
+  accountName: string;
+  isClosed: boolean;
+  /** Exact (un-snapped) current share balance in this account. */
+  currentQuantity: number;
+}
+
+/** A single transaction in a security's history, with running share balances. */
+export interface SecurityHistoryTransaction {
+  id: string;
+  transactionDate: string;
+  accountId: string;
+  accountName: string;
+  action: InvestmentAction;
+  quantity: number | null;
+  price: number | null;
+  commission: number;
+  totalAmount: number;
+  description: string | null;
+  /** Running share balance within this transaction's own account. */
+  runningQuantityAccount: number;
+  /** Running share balance across all accounts the security is held in. */
+  runningQuantityAll: number;
+}
+
+export interface SecurityTransactionHistory {
+  securityId: string;
+  symbol: string;
+  name: string;
+  currencyCode: string;
+  isActive: boolean;
+  accounts: SecurityHistoryAccount[];
+  transactions: SecurityHistoryTransaction[];
+  /** Exact (un-snapped) total current shares across all accounts. */
+  currentQuantityAll: number;
 }
 
 @Injectable()
@@ -553,6 +594,203 @@ export class InvestmentTransactionsService {
     return result;
   }
 
+  /**
+   * Reject investment accounts that don't track holdings. Securities can only
+   * live in brokerage / standalone investment accounts (null subtype); the cash
+   * sleeve (INVESTMENT_CASH) is excluded from every holdings rebuild and
+   * negative-balance guard, so transferring shares into it would leave them
+   * absent from the ledger while still drawing down the source.
+   */
+  private assertCanHoldSecurities(account: Account, label: string): void {
+    if (
+      account.accountSubType &&
+      account.accountSubType !== AccountSubType.INVESTMENT_BROKERAGE
+    ) {
+      throw new BadRequestException(`${label} cannot hold securities`);
+    }
+  }
+
+  /**
+   * Move a security between two investment accounts while preserving cost
+   * basis. Creates both legs atomically: a TRANSFER_OUT in the source account
+   * (drawn down at the source's running average cost) and a TRANSFER_IN in the
+   * destination account at the source's carried average cost. No cash
+   * transaction is created -- shares move only, no money changes hands -- so
+   * both legs use exchangeRate 1 and have a null linked cash transaction.
+   */
+  async transferSecurity(
+    userId: string,
+    dto: TransferSecurityDto,
+  ): Promise<{
+    transferOut: InvestmentTransaction;
+    transferIn: InvestmentTransaction;
+  }> {
+    if (dto.fromAccountId === dto.toAccountId) {
+      throw new BadRequestException(
+        "Source and destination accounts must be different",
+      );
+    }
+
+    const [fromAccount, toAccount] = await Promise.all([
+      this.accountsService.findOne(userId, dto.fromAccountId),
+      this.accountsService.findOne(userId, dto.toAccountId),
+    ]);
+
+    if (
+      fromAccount.accountType !== "INVESTMENT" ||
+      toAccount.accountType !== "INVESTMENT"
+    ) {
+      throw new BadRequestException("Both accounts must be of type INVESTMENT");
+    }
+
+    // Securities only live in brokerage / standalone investment accounts. The
+    // cash sleeve of an investment account is excluded from every holdings
+    // rebuild, so shares transferred into it would silently vanish.
+    this.assertCanHoldSecurities(fromAccount, "Source account");
+    this.assertCanHoldSecurities(toAccount, "Destination account");
+
+    if (toAccount.isClosed) {
+      throw new BadRequestException("Destination account is closed");
+    }
+
+    await this.securitiesService.findOne(userId, dto.securityId);
+
+    // Carry the source's actual blended average cost so basis is conserved.
+    // The client sends a prefilled costPerShare for display, but the server is
+    // authoritative here: a stale or zero client value (e.g. a UI race before
+    // holdings load, or a direct API call) must not be able to poison the
+    // destination's cost basis. When the source holds the security, its current
+    // average cost is exactly what the TRANSFER_OUT draws down, so using it for
+    // both legs conserves basis. With no existing holding the over-draw guard
+    // below rejects the transfer anyway, so the client value is a harmless
+    // fallback.
+    const sourceHolding = await this.holdingsService.findByAccountAndSecurity(
+      dto.fromAccountId,
+      dto.securityId,
+    );
+    const carriedCost =
+      sourceHolding && Number(sourceHolding.quantity) > 0
+        ? roundToDecimals(Number(sourceHolding.averageCost) || 0, 6)
+        : dto.costPerShare;
+
+    // Transfer legs carry no cash, so totalAmount is 0 -- matching how
+    // calculateTotalAmount() treats TRANSFER_IN/TRANSFER_OUT on the edit path.
+    // Cost basis flows through quantity * price (per-share cost) instead.
+    const totalAmount = 0;
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    let outId: string;
+    let inId: string;
+
+    try {
+      const transferOut = queryRunner.manager.create(InvestmentTransaction, {
+        userId,
+        accountId: dto.fromAccountId,
+        securityId: dto.securityId,
+        fundingAccountId: null,
+        action: InvestmentAction.TRANSFER_OUT,
+        transactionDate: dto.transactionDate,
+        quantity: dto.quantity,
+        price: carriedCost,
+        commission: 0,
+        totalAmount,
+        exchangeRate: 1,
+        description: dto.description,
+      });
+      const savedOut = await queryRunner.manager.save(transferOut);
+      outId = savedOut.id;
+      await this.processTransactionEffectsInTransaction(
+        queryRunner,
+        userId,
+        savedOut,
+        false,
+        false,
+      );
+
+      const transferIn = queryRunner.manager.create(InvestmentTransaction, {
+        userId,
+        accountId: dto.toAccountId,
+        securityId: dto.securityId,
+        fundingAccountId: null,
+        action: InvestmentAction.TRANSFER_IN,
+        transactionDate: dto.transactionDate,
+        quantity: dto.quantity,
+        price: carriedCost,
+        commission: 0,
+        totalAmount,
+        exchangeRate: 1,
+        description: dto.description,
+      });
+      const savedIn = await queryRunner.manager.save(transferIn);
+      inId = savedIn.id;
+      await this.processTransactionEffectsInTransaction(
+        queryRunner,
+        userId,
+        savedIn,
+        false,
+        false,
+      );
+
+      // Link the two legs to each other so a later edit or delete of one
+      // cascades to its pair.
+      await queryRunner.manager.update(InvestmentTransaction, outId, {
+        linkedTransactionId: inId,
+      });
+      await queryRunner.manager.update(InvestmentTransaction, inId, {
+        linkedTransactionId: outId,
+      });
+
+      // Guard against transferring more than the source holds. Validates the
+      // full replayed history so it catches both the immediate over-draw and
+      // any back-dated transfer that would make a past balance go negative.
+      await this.holdingsService.validateNoNegativeHoldingsHistory(
+        userId,
+        queryRunner,
+        [dto.fromAccountId, dto.toAccountId],
+        [dto.securityId],
+      );
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+
+    this.triggerRecalcWithCashAccount(dto.fromAccountId, userId);
+    this.triggerRecalcWithCashAccount(dto.toAccountId, userId);
+
+    this.securityPriceService
+      .upsertTransactionPrice(dto.securityId, dto.transactionDate)
+      .catch((err) =>
+        this.logger.warn(
+          `Failed to update transaction-derived price: ${err.message}`,
+        ),
+      );
+
+    const [transferOut, transferIn] = await Promise.all([
+      this.findOne(userId, outId),
+      this.findOne(userId, inId),
+    ]);
+
+    this.actionHistoryService.record(userId, {
+      entityType: "investment_transaction",
+      entityId: transferOut.id,
+      action: "create",
+      // Flat leg + linkedTransferLeg shape mirrors the delete beforeData so the
+      // redo path (which feeds afterData into undoInvestmentDelete) restores
+      // both legs and their mutual link.
+      afterData: { ...transferOut, linkedTransferLeg: { ...transferIn } },
+      description: "Transferred security between accounts",
+    });
+
+    return { transferOut, transferIn };
+  }
+
   private calculateTotalAmount(dto: CreateInvestmentTransactionDto): number {
     const { action, quantity, price, commission } = dto;
 
@@ -689,6 +927,10 @@ export class InvestmentTransactionsService {
         break;
 
       case InvestmentAction.REINVEST:
+        // A reinvestment buys shares at a market price; without a price the
+        // shares would be blended in at cost 0 and poison the average cost, so
+        // keep the price guard here. Only TRANSFER_IN/OUT (whose carried cost
+        // can legitimately be 0) drop it.
         if (!isFuture && securityId && quantity && price) {
           await this.holdingsService.updateHolding(
             userId,
@@ -719,7 +961,7 @@ export class InvestmentTransactionsService {
         break;
 
       case InvestmentAction.TRANSFER_IN:
-        if (!isFuture && securityId && quantity && price) {
+        if (!isFuture && securityId && quantity) {
           await this.holdingsService.updateHolding(
             userId,
             accountId,
@@ -733,7 +975,7 @@ export class InvestmentTransactionsService {
         break;
 
       case InvestmentAction.TRANSFER_OUT:
-        if (!isFuture && securityId && quantity && price) {
+        if (!isFuture && securityId && quantity) {
           await this.holdingsService.updateHolding(
             userId,
             accountId,
@@ -1067,6 +1309,118 @@ export class InvestmentTransactionsService {
   }
 
   /**
+   * Apply a transaction's effect on a running share balance. Mirrors the
+   * authoritative per-action math in HoldingsService.getHoldingAt so the
+   * running totals reconcile with stored holdings.
+   */
+  private applyQuantityToBalance(
+    balance: number,
+    action: InvestmentAction,
+    quantity: number,
+  ): number {
+    switch (action) {
+      case InvestmentAction.BUY:
+      case InvestmentAction.REINVEST:
+      case InvestmentAction.TRANSFER_IN:
+      case InvestmentAction.ADD_SHARES:
+        return balance + quantity;
+      case InvestmentAction.SELL:
+      case InvestmentAction.TRANSFER_OUT:
+      case InvestmentAction.REMOVE_SHARES:
+        return balance - quantity;
+      case InvestmentAction.SPLIT:
+        return quantity > 0 ? balance * quantity : balance;
+      default:
+        // DIVIDEND / INTEREST / CAPITAL_GAIN do not move shares.
+        return balance;
+    }
+  }
+
+  /**
+   * Full transaction history for a single security with a running share
+   * balance after each transaction -- both within the transaction's own
+   * account and across all accounts the security is held in. Also returns the
+   * list of accounts the security was ever transacted in (including closed
+   * accounts) with their exact current share balance.
+   *
+   * Quantities are intentionally NOT snapped to zero, so tiny residual
+   * positions remain visible -- this view exists to track them down.
+   */
+  async getSecurityTransactionHistory(
+    userId: string,
+    securityId: string,
+  ): Promise<SecurityTransactionHistory> {
+    // Validates ownership and existence (works for inactive securities too).
+    const security = await this.securitiesService.findOne(userId, securityId);
+
+    const transactions = await this.investmentTransactionsRepository.find({
+      where: { userId, securityId },
+      relations: ["account"],
+      order: { transactionDate: "ASC", createdAt: "ASC" },
+    });
+
+    const balances = new Map<string, number>();
+    const accountMeta = new Map<string, { name: string; isClosed: boolean }>();
+    let runningAll = 0;
+
+    const rows: SecurityHistoryTransaction[] = transactions.map((tx) => {
+      const accountId = tx.accountId;
+      if (!accountMeta.has(accountId)) {
+        accountMeta.set(accountId, {
+          name: tx.account?.name ?? "Unknown account",
+          isClosed: tx.account?.isClosed ?? false,
+        });
+      }
+
+      const prevBalance = balances.get(accountId) ?? 0;
+      const newBalance = this.applyQuantityToBalance(
+        prevBalance,
+        tx.action,
+        Number(tx.quantity) || 0,
+      );
+      balances.set(accountId, newBalance);
+      // Delta keeps the cross-account total correct even for SPLIT, which
+      // multiplies a single account's balance rather than adding to it.
+      runningAll += newBalance - prevBalance;
+
+      return {
+        id: tx.id,
+        transactionDate: tx.transactionDate,
+        accountId,
+        accountName: accountMeta.get(accountId)!.name,
+        action: tx.action,
+        quantity: tx.quantity === null ? null : Number(tx.quantity),
+        price: tx.price === null ? null : Number(tx.price),
+        commission: Number(tx.commission) || 0,
+        totalAmount: Number(tx.totalAmount) || 0,
+        description: tx.description,
+        runningQuantityAccount: newBalance,
+        runningQuantityAll: runningAll,
+      };
+    });
+
+    const accounts: SecurityHistoryAccount[] = Array.from(accountMeta.entries())
+      .map(([accountId, meta]) => ({
+        accountId,
+        accountName: meta.name,
+        isClosed: meta.isClosed,
+        currentQuantity: balances.get(accountId) ?? 0,
+      }))
+      .sort((a, b) => a.accountName.localeCompare(b.accountName));
+
+    return {
+      securityId,
+      symbol: security.symbol,
+      name: security.name,
+      currencyCode: security.currencyCode,
+      isActive: security.isActive,
+      accounts,
+      transactions: rows,
+      currentQuantityAll: runningAll,
+    };
+  }
+
+  /**
    * Return each SELL transaction annotated with cost basis and realized gain,
    * computed by replaying the user's transaction history under the
    * average-cost method. Linked brokerage/cash accounts are resolved the same
@@ -1348,12 +1702,244 @@ export class InvestmentTransactionsService {
     return transaction;
   }
 
+  /**
+   * Edit one leg of a linked security transfer and keep its pair consistent.
+   * The edited leg may change its own account; the security, quantity,
+   * per-share cost, date and description are shared and propagated to both
+   * legs so the cost basis stays balanced across the move. The transfer's
+   * direction (which leg is IN vs OUT) cannot be changed here.
+   */
+  private async updateLinkedTransfer(
+    userId: string,
+    editedLeg: InvestmentTransaction,
+    linkedLeg: InvestmentTransaction,
+    updateDto: UpdateInvestmentTransactionDto,
+  ): Promise<InvestmentTransaction> {
+    if (
+      updateDto.action !== undefined &&
+      updateDto.action !== editedLeg.action
+    ) {
+      throw new BadRequestException(
+        "Cannot change the direction of a transfer; delete it and create a new transfer instead",
+      );
+    }
+
+    const beforeData = { ...editedLeg };
+    const beforeLinked = { ...linkedLeg };
+    const editedLegId = editedLeg.id;
+
+    // Track every (account, security) the edit could touch -- old and new on
+    // both legs -- so the negative-holdings guard is scoped correctly.
+    const affectedAccountIds = new Set<string>([
+      editedLeg.accountId,
+      linkedLeg.accountId,
+    ]);
+    const affectedSecurityIds = new Set<string>();
+    if (editedLeg.securityId) affectedSecurityIds.add(editedLeg.securityId);
+
+    if (updateDto.securityId !== undefined && updateDto.securityId) {
+      await this.securitiesService.findOne(userId, updateDto.securityId);
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Reverse both legs at their original values before reapplying.
+      await this.reverseTransactionEffectsInTransaction(
+        queryRunner,
+        userId,
+        editedLeg,
+      );
+      await this.reverseTransactionEffectsInTransaction(
+        queryRunner,
+        userId,
+        linkedLeg,
+      );
+
+      // Resolve legs by role, not by which leg id was passed in: `accountId`
+      // is always the source (TRANSFER_OUT) account and `destinationAccountId`
+      // the destination (TRANSFER_IN) account. Mapping by role keeps the
+      // direction correct even when the IN leg is edited directly.
+      const outLeg =
+        editedLeg.action === InvestmentAction.TRANSFER_OUT
+          ? editedLeg
+          : linkedLeg;
+      const inLeg =
+        editedLeg.action === InvestmentAction.TRANSFER_IN
+          ? editedLeg
+          : linkedLeg;
+
+      // The source leg may move to a different account.
+      if (updateDto.accountId !== undefined) {
+        const account = await this.accountsService.findOne(
+          userId,
+          updateDto.accountId,
+        );
+        if (account.accountType !== "INVESTMENT") {
+          throw new BadRequestException("Account must be of type INVESTMENT");
+        }
+        this.assertCanHoldSecurities(account, "Account");
+        outLeg.accountId = updateDto.accountId;
+        outLeg.account = { id: updateDto.accountId } as any;
+      }
+
+      // The destination leg can be rerouted to a different account.
+      if (updateDto.destinationAccountId !== undefined) {
+        const destAccount = await this.accountsService.findOne(
+          userId,
+          updateDto.destinationAccountId,
+        );
+        if (destAccount.accountType !== "INVESTMENT") {
+          throw new BadRequestException(
+            "Destination account must be of type INVESTMENT",
+          );
+        }
+        if (destAccount.isClosed) {
+          throw new BadRequestException("Destination account is closed");
+        }
+        this.assertCanHoldSecurities(destAccount, "Destination account");
+        inLeg.accountId = updateDto.destinationAccountId;
+        inLeg.account = { id: updateDto.destinationAccountId } as any;
+      }
+
+      if (outLeg.accountId === inLeg.accountId) {
+        throw new BadRequestException(
+          "Source and destination accounts must be different",
+        );
+      }
+
+      // Shared fields applied to both legs.
+      const applyShared = (leg: InvestmentTransaction) => {
+        if (updateDto.securityId !== undefined) {
+          leg.securityId = updateDto.securityId || null;
+          leg.security = updateDto.securityId
+            ? ({ id: updateDto.securityId } as any)
+            : (null as any);
+        }
+        if (updateDto.quantity !== undefined) leg.quantity = updateDto.quantity;
+        if (updateDto.price !== undefined) leg.price = updateDto.price;
+        if (updateDto.commission !== undefined)
+          leg.commission = updateDto.commission;
+        if (updateDto.transactionDate !== undefined)
+          leg.transactionDate = updateDto.transactionDate;
+        if (updateDto.description !== undefined)
+          leg.description = updateDto.description;
+        // Transfers carry no cash.
+        leg.totalAmount = 0;
+        leg.exchangeRate = 1;
+      };
+      applyShared(editedLeg);
+      applyShared(linkedLeg);
+
+      affectedAccountIds.add(editedLeg.accountId);
+      affectedAccountIds.add(linkedLeg.accountId);
+      if (editedLeg.securityId) affectedSecurityIds.add(editedLeg.securityId);
+
+      const savedEdited = await queryRunner.manager.save(editedLeg);
+      const savedLinked = await queryRunner.manager.save(linkedLeg);
+
+      await this.processTransactionEffectsInTransaction(
+        queryRunner,
+        userId,
+        savedEdited,
+        true,
+        false,
+      );
+      await this.processTransactionEffectsInTransaction(
+        queryRunner,
+        userId,
+        savedLinked,
+        true,
+        false,
+      );
+
+      await this.holdingsService.validateNoNegativeHoldingsHistory(
+        userId,
+        queryRunner,
+        Array.from(affectedAccountIds),
+        affectedSecurityIds.size > 0
+          ? Array.from(affectedSecurityIds)
+          : undefined,
+      );
+
+      // The incremental reverse/re-apply above can misattribute average cost
+      // when a leg crosses a zero balance (a TRANSFER_OUT reversal re-establishes
+      // the source's cost basis from the leg's price instead of the source's
+      // true blended cost). Rebuild the affected accounts from the authoritative
+      // transaction history inside this transaction so both accounts' share
+      // counts and average cost are exact -- and so a rebuild failure rolls the
+      // whole edit back rather than silently committing wrong holdings.
+      await this.holdingsService.rebuildAccountsFromTransactions(
+        userId,
+        Array.from(affectedAccountIds),
+        queryRunner,
+      );
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+
+    for (const accId of affectedAccountIds) {
+      this.triggerRecalcWithCashAccount(accId, userId);
+    }
+
+    const result = await this.findOne(userId, editedLegId);
+    const linkedResult = await this.findOne(userId, linkedLeg.id);
+
+    this.actionHistoryService.record(userId, {
+      entityType: "investment_transaction",
+      entityId: editedLegId,
+      // beforeData and afterData both carry the paired leg under
+      // linkedTransferLeg so undo (beforeData) and redo (afterData) can restore
+      // both legs symmetrically.
+      action: "update",
+      beforeData: { ...beforeData, linkedTransferLeg: beforeLinked },
+      afterData: { ...result, linkedTransferLeg: { ...linkedResult } },
+      description: "Updated security transfer",
+    });
+
+    return result;
+  }
+
   async update(
     userId: string,
     id: string,
     updateDto: UpdateInvestmentTransactionDto,
   ): Promise<InvestmentTransaction> {
     const transaction = await this.findOne(userId, id);
+
+    // A security transfer is two linked legs. Editing one keeps the pair in
+    // sync (shared security/quantity/cost/date) so cost basis stays balanced.
+    if (
+      transaction.linkedTransactionId &&
+      (transaction.action === InvestmentAction.TRANSFER_IN ||
+        transaction.action === InvestmentAction.TRANSFER_OUT)
+    ) {
+      const linkedLeg = await this.investmentTransactionsRepository.findOne({
+        where: { id: transaction.linkedTransactionId, userId },
+      });
+      if (!linkedLeg) {
+        // The pair is missing (stale link / partial data). Editing this leg
+        // alone would leave the two legs unbalanced, so refuse rather than
+        // silently corrupting the transfer.
+        throw new ConflictException(
+          "This transfer's paired transaction is missing; delete and recreate the transfer instead of editing it",
+        );
+      }
+      return this.updateLinkedTransfer(
+        userId,
+        transaction,
+        linkedLeg,
+        updateDto,
+      );
+    }
+
     const beforeData = { ...transaction };
     const accountId = transaction.accountId;
     const oldSecurityId = transaction.securityId;
@@ -1820,24 +2406,60 @@ export class InvestmentTransactionsService {
       }
     }
 
+    // A security transfer is two linked legs (TRANSFER_OUT <-> TRANSFER_IN).
+    // Deleting either one removes the whole transfer so holdings can't be
+    // left half-moved.
+    const linkedLeg = transaction.linkedTransactionId
+      ? await this.investmentTransactionsRepository.findOne({
+          where: { id: transaction.linkedTransactionId, userId },
+        })
+      : null;
+    if (linkedLeg) {
+      beforeData.linkedTransferLeg = { ...linkedLeg };
+    }
+
+    const legsToRemove = linkedLeg ? [transaction, linkedLeg] : [transaction];
+    const affectedAccountIds = Array.from(
+      new Set(legsToRemove.map((leg) => leg.accountId)),
+    );
+    const affectedSecurityIds = Array.from(
+      new Set(
+        legsToRemove
+          .map((leg) => leg.securityId)
+          .filter((sid): sid is string => Boolean(sid)),
+      ),
+    );
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      await this.reverseTransactionEffectsInTransaction(
-        queryRunner,
-        userId,
-        transaction,
-      );
+      // Break the mutual link before deleting so neither row's FK points at a
+      // row that is about to disappear.
+      for (const leg of legsToRemove) {
+        if (leg.linkedTransactionId) {
+          await queryRunner.manager.update(InvestmentTransaction, leg.id, {
+            linkedTransactionId: null,
+          });
+          leg.linkedTransactionId = null;
+        }
+      }
 
-      await queryRunner.manager.remove(transaction);
+      for (const leg of legsToRemove) {
+        await this.reverseTransactionEffectsInTransaction(
+          queryRunner,
+          userId,
+          leg,
+        );
+        await queryRunner.manager.remove(leg);
+      }
 
       await this.holdingsService.validateNoNegativeHoldingsHistory(
         userId,
         queryRunner,
-        [accountId],
-        transaction.securityId ? [transaction.securityId] : undefined,
+        affectedAccountIds,
+        affectedSecurityIds.length > 0 ? affectedSecurityIds : undefined,
       );
 
       await queryRunner.commitTransaction();
@@ -1858,11 +2480,16 @@ export class InvestmentTransactionsService {
         );
     }
 
-    this.triggerRecalcWithCashAccount(
-      accountId,
-      userId,
-      transaction.fundingAccountId,
-    );
+    for (const accId of affectedAccountIds) {
+      this.triggerRecalcWithCashAccount(accId, userId);
+    }
+    if (transaction.fundingAccountId) {
+      this.triggerRecalcWithCashAccount(
+        accountId,
+        userId,
+        transaction.fundingAccountId,
+      );
+    }
 
     if (
       transaction.securityId &&

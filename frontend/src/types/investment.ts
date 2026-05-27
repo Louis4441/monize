@@ -140,6 +140,8 @@ export interface InvestmentTransaction {
   totalAmount: number;
   exchangeRate: number;
   description: string | null;
+  // Set on security-transfer legs; points at the paired TRANSFER_IN/OUT leg.
+  linkedTransactionId: string | null;
   security: Security | null;
   fundingAccount: {
     id: string;
@@ -147,6 +149,39 @@ export interface InvestmentTransaction {
   } | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SecurityHistoryAccount {
+  accountId: string;
+  accountName: string;
+  isClosed: boolean;
+  currentQuantity: number;
+}
+
+export interface SecurityHistoryTransaction {
+  id: string;
+  transactionDate: string;
+  accountId: string;
+  accountName: string;
+  action: InvestmentAction;
+  quantity: number | null;
+  price: number | null;
+  commission: number;
+  totalAmount: number;
+  description: string | null;
+  runningQuantityAccount: number;
+  runningQuantityAll: number;
+}
+
+export interface SecurityTransactionHistory {
+  securityId: string;
+  symbol: string;
+  name: string;
+  currencyCode: string;
+  isActive: boolean;
+  accounts: SecurityHistoryAccount[];
+  transactions: SecurityHistoryTransaction[];
+  currentQuantityAll: number;
 }
 
 export interface CreateInvestmentTransactionData {

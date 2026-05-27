@@ -15,6 +15,7 @@ import {
   TopMover,
   SectorWeightingResult,
   SecurityPrice,
+  SecurityTransactionHistory,
 } from '@/types/investment';
 import { getCached, setCache, invalidateCache } from './apiCache';
 
@@ -181,10 +182,37 @@ export const investmentsApi = {
     return response.data;
   },
 
+  // Transfer a security between two investment accounts, preserving cost
+  // basis. Creates both legs (TRANSFER_OUT in source, TRANSFER_IN in
+  // destination) atomically on the backend.
+  transferSecurity: async (data: {
+    fromAccountId: string;
+    toAccountId: string;
+    securityId: string;
+    transactionDate: string;
+    quantity: number;
+    costPerShare: number;
+    description?: string;
+  }): Promise<{
+    transferOut: InvestmentTransaction;
+    transferIn: InvestmentTransaction;
+  }> => {
+    const response = await apiClient.post<{
+      transferOut: InvestmentTransaction;
+      transferIn: InvestmentTransaction;
+    }>('/investment-transactions/transfer-security', data);
+    invalidateCache('investments:');
+    return response.data;
+  },
+
   // Update investment transaction
   updateTransaction: async (
     id: string,
-    data: Partial<CreateInvestmentTransactionData>,
+    // destinationAccountId is only used when editing a security-transfer leg,
+    // to reroute the paired leg's account.
+    data: Partial<CreateInvestmentTransactionData> & {
+      destinationAccountId?: string;
+    },
   ): Promise<InvestmentTransaction> => {
     const response = await apiClient.patch<InvestmentTransaction>(
       `/investment-transactions/${id}`,
@@ -198,6 +226,17 @@ export const investmentsApi = {
   getTransaction: async (id: string): Promise<InvestmentTransaction> => {
     const response = await apiClient.get<InvestmentTransaction>(
       `/investment-transactions/${id}`,
+    );
+    return response.data;
+  },
+
+  // Full transaction history for a security with running share totals and the
+  // accounts (including closed) it was used in.
+  getSecurityTransactionHistory: async (
+    securityId: string,
+  ): Promise<SecurityTransactionHistory> => {
+    const response = await apiClient.get<SecurityTransactionHistory>(
+      `/investment-transactions/security/${securityId}/history`,
     );
     return response.data;
   },

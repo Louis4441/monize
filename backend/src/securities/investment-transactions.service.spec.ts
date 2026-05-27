@@ -1,6 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
-import { NotFoundException, BadRequestException } from "@nestjs/common";
+import {
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
 import {
   InvestmentTransaction,
@@ -103,6 +107,7 @@ describe("InvestmentTransactionsService", () => {
     securityId,
     fundingAccountId: null,
     transactionId: cashTransactionId,
+    linkedTransactionId: null,
     action: InvestmentAction.BUY,
     transactionDate: "2025-01-15",
     quantity: 10,
@@ -128,6 +133,7 @@ describe("InvestmentTransactionsService", () => {
     securityId,
     fundingAccountId: null,
     transactionId: "cash-tx-2",
+    linkedTransactionId: null,
     action: InvestmentAction.SELL,
     transactionDate: "2025-02-15",
     quantity: 5,
@@ -153,6 +159,7 @@ describe("InvestmentTransactionsService", () => {
     securityId,
     fundingAccountId: null,
     transactionId: "cash-tx-3",
+    linkedTransactionId: null,
     action: InvestmentAction.DIVIDEND,
     transactionDate: "2025-03-15",
     quantity: 1,
@@ -243,6 +250,7 @@ describe("InvestmentTransactionsService", () => {
         holdingsUpdated: 0,
         holdingsDeleted: 0,
       }),
+      rebuildAccountsFromTransactions: jest.fn().mockResolvedValue(undefined),
       validateNoNegativeHoldingsHistory: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -4813,6 +4821,633 @@ describe("InvestmentTransactionsService", () => {
         true,
       );
       expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith(embedded);
+    });
+  });
+
+  describe("transferSecurity", () => {
+    const toAccountId = "account-2";
+    const mockToAccount = {
+      id: toAccountId,
+      userId,
+      accountType: "INVESTMENT",
+      accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+      linkedAccountId: null,
+      currencyCode: "USD",
+      name: "Brokerage B",
+    };
+
+    const transferDto = {
+      fromAccountId: accountId,
+      toAccountId,
+      securityId,
+      transactionDate: "2025-04-01",
+      quantity: 100,
+      costPerShare: 1.67,
+      description: "Move to Brokerage B",
+    };
+
+    beforeEach(() => {
+      accountsService.findOne.mockImplementation((uid: string, aid: string) => {
+        if (aid === accountId) return Promise.resolve(mockInvestmentAccount);
+        if (aid === toAccountId) return Promise.resolve(mockToAccount);
+        if (aid === cashAccountId) return Promise.resolve(mockCashAccount);
+        return Promise.reject(new NotFoundException("Account not found"));
+      });
+      // findOne (post-commit reload) uses the query builder.
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder({ id: transactionId, action: "TRANSFER_OUT" }),
+      );
+    });
+
+    it("creates both legs and moves holdings at the supplied cost basis", async () => {
+      const result = await service.transferSecurity(userId, transferDto);
+
+      // TRANSFER_OUT draws down the source at cost basis.
+      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+        userId,
+        accountId,
+        securityId,
+        -100,
+        1.67,
+        mockQueryRunner,
+        false,
+      );
+      // TRANSFER_IN adds to the destination at the same per-share cost.
+      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+        userId,
+        toAccountId,
+        securityId,
+        100,
+        1.67,
+        mockQueryRunner,
+        false,
+      );
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(result).toHaveProperty("transferOut");
+      expect(result).toHaveProperty("transferIn");
+    });
+
+    it("does not create any cash transaction", async () => {
+      await service.transferSecurity(userId, transferDto);
+      expect(transactionRepository.create).not.toHaveBeenCalled();
+      expect(transactionRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("validates the full history so the source cannot be over-drawn", async () => {
+      await service.transferSecurity(userId, transferDto);
+      expect(
+        holdingsService.validateNoNegativeHoldingsHistory,
+      ).toHaveBeenCalledWith(
+        userId,
+        mockQueryRunner,
+        [accountId, toAccountId],
+        [securityId],
+      );
+    });
+
+    it("rejects a transfer to the same account", async () => {
+      await expect(
+        service.transferSecurity(userId, {
+          ...transferDto,
+          toAccountId: accountId,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+    });
+
+    it("rejects when an account is not an investment account", async () => {
+      accountsService.findOne.mockImplementation((uid: string, aid: string) => {
+        if (aid === accountId) return Promise.resolve(mockInvestmentAccount);
+        if (aid === toAccountId)
+          return Promise.resolve({ ...mockToAccount, accountType: "CHEQUING" });
+        return Promise.reject(new NotFoundException("Account not found"));
+      });
+      await expect(
+        service.transferSecurity(userId, transferDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("rejects transferring into a closed destination account", async () => {
+      accountsService.findOne.mockImplementation((uid: string, aid: string) => {
+        if (aid === accountId) return Promise.resolve(mockInvestmentAccount);
+        if (aid === toAccountId)
+          return Promise.resolve({ ...mockToAccount, isClosed: true });
+        return Promise.reject(new NotFoundException("Account not found"));
+      });
+      await expect(
+        service.transferSecurity(userId, transferDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("rolls back when the over-draw guard throws", async () => {
+      holdingsService.validateNoNegativeHoldingsHistory.mockRejectedValueOnce(
+        new BadRequestException("Insufficient shares"),
+      );
+      await expect(
+        service.transferSecurity(userId, transferDto),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it("links the two legs to each other", async () => {
+      await service.transferSecurity(userId, transferDto);
+      // Each leg is updated to point at the other via linkedTransactionId.
+      const linkUpdates = mockQueryRunner.manager.update.mock.calls.filter(
+        (c: any[]) =>
+          c[0] === InvestmentTransaction &&
+          c[2] &&
+          "linkedTransactionId" in c[2],
+      );
+      expect(linkUpdates).toHaveLength(2);
+    });
+
+    it("moves holdings even when the cost basis is zero", async () => {
+      // A zero-cost-basis holding (gifted/spun-off shares) is a legitimate
+      // transfer. The holdings move must still happen -- a falsy `price` guard
+      // previously skipped it, recording both legs while moving no shares.
+      await service.transferSecurity(userId, {
+        ...transferDto,
+        costPerShare: 0,
+      });
+
+      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+        userId,
+        accountId,
+        securityId,
+        -100,
+        0,
+        mockQueryRunner,
+        false,
+      );
+      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+        userId,
+        toAccountId,
+        securityId,
+        100,
+        0,
+        mockQueryRunner,
+        false,
+      );
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it("carries the source holding's average cost, ignoring the client value", async () => {
+      // The server is authoritative: when the source holds the security, both
+      // legs use its real blended average cost (here 4.25) so basis is
+      // conserved -- a stale/zero client costPerShare cannot poison it.
+      holdingsService.findByAccountAndSecurity.mockResolvedValue({
+        quantity: 200,
+        averageCost: 4.25,
+      } as any);
+
+      await service.transferSecurity(userId, { ...transferDto, costPerShare: 0 });
+
+      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+        userId,
+        accountId,
+        securityId,
+        -100,
+        4.25,
+        mockQueryRunner,
+        false,
+      );
+      expect(holdingsService.updateHolding).toHaveBeenCalledWith(
+        userId,
+        toAccountId,
+        securityId,
+        100,
+        4.25,
+        mockQueryRunner,
+        false,
+      );
+    });
+
+    it("rejects transferring into a non-brokerage (cash sleeve) account", async () => {
+      accountsService.findOne.mockImplementation((uid: string, aid: string) => {
+        if (aid === accountId) return Promise.resolve(mockInvestmentAccount);
+        if (aid === toAccountId)
+          return Promise.resolve({
+            ...mockToAccount,
+            accountSubType: AccountSubType.INVESTMENT_CASH,
+          });
+        return Promise.reject(new NotFoundException("Account not found"));
+      });
+
+      await expect(
+        service.transferSecurity(userId, transferDto),
+      ).rejects.toThrow(BadRequestException);
+      expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("linked transfer cascade", () => {
+    const toAccountId = "account-2";
+    const mockToAccount = {
+      id: toAccountId,
+      userId,
+      accountType: "INVESTMENT",
+      accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+      linkedAccountId: null,
+      currencyCode: "USD",
+      name: "Brokerage B",
+    };
+
+    function makeLegs() {
+      const base = {
+        userId,
+        securityId,
+        fundingAccountId: null,
+        transactionId: null,
+        transactionSplitId: null,
+        transactionDate: "2025-04-01",
+        quantity: 100,
+        price: 1.67,
+        commission: 0,
+        totalAmount: 0,
+        exchangeRate: 1,
+        description: null,
+        account: null as any,
+        transaction: null as any,
+        security: mockSecurity as any,
+        fundingAccount: null,
+        transactionSplit: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const outLeg = {
+        ...base,
+        id: "leg-out",
+        accountId,
+        action: InvestmentAction.TRANSFER_OUT,
+        linkedTransactionId: "leg-in",
+      } as InvestmentTransaction;
+      const inLeg = {
+        ...base,
+        id: "leg-in",
+        accountId: toAccountId,
+        action: InvestmentAction.TRANSFER_IN,
+        linkedTransactionId: "leg-out",
+      } as InvestmentTransaction;
+      return { outLeg, inLeg };
+    }
+
+    beforeEach(() => {
+      accountsService.findOne.mockImplementation((uid: string, aid: string) => {
+        if (aid === accountId) return Promise.resolve(mockInvestmentAccount);
+        if (aid === toAccountId) return Promise.resolve(mockToAccount);
+        if (aid === cashAccountId) return Promise.resolve(mockCashAccount);
+        return Promise.reject(new NotFoundException("Account not found"));
+      });
+      transactionRepository.findOne.mockResolvedValue(null);
+    });
+
+    it("remove deletes both legs and validates both accounts", async () => {
+      const { outLeg, inLeg } = makeLegs();
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(outLeg),
+      );
+      investmentTransactionsRepository.findOne.mockResolvedValue(inLeg);
+
+      await service.remove(userId, "leg-out");
+
+      expect(mockQueryRunner.manager.remove).toHaveBeenCalledTimes(2);
+      expect(
+        holdingsService.validateNoNegativeHoldingsHistory,
+      ).toHaveBeenCalledWith(
+        userId,
+        mockQueryRunner,
+        expect.arrayContaining([accountId, toAccountId]),
+        [securityId],
+      );
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it("update propagates the edit to both legs and keeps them linked", async () => {
+      const { outLeg, inLeg } = makeLegs();
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(outLeg),
+      );
+      investmentTransactionsRepository.findOne.mockResolvedValue(inLeg);
+
+      await service.update(userId, "leg-out", { quantity: 50 });
+
+      // Both legs reversed (add/remove) and reapplied -> 4 holding updates.
+      expect(holdingsService.updateHolding).toHaveBeenCalled();
+      // Both legs saved.
+      const savedActions = mockQueryRunner.manager.save.mock.calls
+        .map((c: any[]) => c[0]?.action)
+        .filter(Boolean);
+      expect(savedActions).toContain(InvestmentAction.TRANSFER_OUT);
+      expect(savedActions).toContain(InvestmentAction.TRANSFER_IN);
+      // Edit propagated to the linked leg too.
+      expect(inLeg.quantity).toBe(50);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it("update rejects changing the transfer direction", async () => {
+      const { outLeg, inLeg } = makeLegs();
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(outLeg),
+      );
+      investmentTransactionsRepository.findOne.mockResolvedValue(inLeg);
+
+      await expect(
+        service.update(userId, "leg-out", { action: InvestmentAction.BUY }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("update reroutes the destination account onto the linked leg", async () => {
+      const { outLeg, inLeg } = makeLegs();
+      const account3 = "account-3";
+      accountsService.findOne.mockImplementation((uid: string, aid: string) => {
+        if (aid === accountId) return Promise.resolve(mockInvestmentAccount);
+        if (aid === toAccountId) return Promise.resolve(mockToAccount);
+        if (aid === account3)
+          return Promise.resolve({ ...mockToAccount, id: account3 });
+        if (aid === cashAccountId) return Promise.resolve(mockCashAccount);
+        return Promise.reject(new NotFoundException("Account not found"));
+      });
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(outLeg),
+      );
+      investmentTransactionsRepository.findOne.mockResolvedValue(inLeg);
+
+      await service.update(userId, "leg-out", {
+        destinationAccountId: account3,
+      });
+
+      // The destination (linked) leg moves to the new account.
+      expect(inLeg.accountId).toBe(account3);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it("update rejects rerouting the destination to the source account", async () => {
+      const { outLeg, inLeg } = makeLegs();
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(outLeg),
+      );
+      investmentTransactionsRepository.findOne.mockResolvedValue(inLeg);
+
+      await expect(
+        service.update(userId, "leg-out", { destinationAccountId: accountId }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("keeps the transfer direction when the IN leg is edited directly", async () => {
+      // Editing via the IN leg id must still route accountId -> source (OUT
+      // leg) and destinationAccountId -> destination (IN leg), not invert them.
+      const { outLeg, inLeg } = makeLegs();
+      const account3 = "account-3";
+      accountsService.findOne.mockImplementation((uid: string, aid: string) => {
+        if (aid === accountId) return Promise.resolve(mockInvestmentAccount);
+        if (aid === toAccountId) return Promise.resolve(mockToAccount);
+        if (aid === account3)
+          return Promise.resolve({ ...mockToAccount, id: account3 });
+        return Promise.reject(new NotFoundException("Account not found"));
+      });
+      // findOne (the entity being edited) returns the IN leg; the linked leg is
+      // the OUT leg.
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(inLeg),
+      );
+      investmentTransactionsRepository.findOne.mockResolvedValue(outLeg);
+
+      await service.update(userId, "leg-in", {
+        accountId: account3,
+        destinationAccountId: toAccountId,
+      });
+
+      // Source account applied to the OUT leg, destination to the IN leg.
+      expect(outLeg.accountId).toBe(account3);
+      expect(inLeg.accountId).toBe(toAccountId);
+      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+    });
+
+    it("rebuilds the affected accounts' holdings inside the edit transaction", async () => {
+      const { outLeg, inLeg } = makeLegs();
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(outLeg),
+      );
+      investmentTransactionsRepository.findOne.mockResolvedValue(inLeg);
+
+      await service.update(userId, "leg-out", { quantity: 50 });
+
+      // The rebuild runs on the open queryRunner (atomic with the edit) rather
+      // than a best-effort post-commit call, so a failure rolls the edit back.
+      expect(
+        holdingsService.rebuildAccountsFromTransactions,
+      ).toHaveBeenCalledWith(
+        userId,
+        expect.arrayContaining([accountId, toAccountId]),
+        mockQueryRunner,
+      );
+    });
+
+    it("rejects rerouting the destination to a closed account", async () => {
+      const { outLeg, inLeg } = makeLegs();
+      const closedId = "account-closed";
+      accountsService.findOne.mockImplementation((uid: string, aid: string) => {
+        if (aid === accountId) return Promise.resolve(mockInvestmentAccount);
+        if (aid === toAccountId) return Promise.resolve(mockToAccount);
+        if (aid === closedId)
+          return Promise.resolve({
+            ...mockToAccount,
+            id: closedId,
+            isClosed: true,
+          });
+        return Promise.reject(new NotFoundException("Account not found"));
+      });
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(outLeg),
+      );
+      investmentTransactionsRepository.findOne.mockResolvedValue(inLeg);
+
+      await expect(
+        service.update(userId, "leg-out", { destinationAccountId: closedId }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("refuses to edit a transfer leg whose pair is missing", async () => {
+      const { outLeg } = makeLegs();
+      investmentTransactionsRepository.createQueryBuilder.mockReturnValue(
+        createMockQueryBuilder(outLeg),
+      );
+      // Linked leg cannot be loaded (stale link / partial data).
+      investmentTransactionsRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.update(userId, "leg-out", { quantity: 50 }),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe("getSecurityTransactionHistory", () => {
+    const acctA = "acct-a";
+    const acctB = "acct-b";
+
+    function tx(
+      id: string,
+      accountId: string,
+      accountName: string,
+      isClosed: boolean,
+      action: InvestmentAction,
+      transactionDate: string,
+      quantity: number | null,
+      extra: Partial<InvestmentTransaction> = {},
+    ): InvestmentTransaction {
+      return {
+        id,
+        userId,
+        accountId,
+        securityId,
+        action,
+        transactionDate,
+        quantity,
+        price: 1,
+        commission: 0,
+        totalAmount: 0,
+        exchangeRate: 1,
+        description: null,
+        account: { id: accountId, name: accountName, isClosed } as any,
+        ...extra,
+      } as InvestmentTransaction;
+    }
+
+    beforeEach(() => {
+      securitiesService.findOne.mockResolvedValue({
+        ...mockSecurity,
+        isActive: false,
+      });
+    });
+
+    it("computes per-account and cross-account running totals without snapping", async () => {
+      investmentTransactionsRepository.find.mockResolvedValue([
+        tx(
+          "t1",
+          acctA,
+          "Account A",
+          false,
+          InvestmentAction.BUY,
+          "2025-01-01",
+          100,
+        ),
+        tx(
+          "t2",
+          acctB,
+          "Account B",
+          true,
+          InvestmentAction.BUY,
+          "2025-02-01",
+          50,
+        ),
+        tx(
+          "t3",
+          acctA,
+          "Account A",
+          false,
+          InvestmentAction.SELL,
+          "2025-03-01",
+          99.9999,
+        ),
+        tx(
+          "t4",
+          acctB,
+          "Account B",
+          true,
+          InvestmentAction.SPLIT,
+          "2025-04-01",
+          2,
+        ),
+      ]);
+
+      const result = await service.getSecurityTransactionHistory(
+        userId,
+        securityId,
+      );
+
+      expect(result.transactions).toHaveLength(4);
+
+      // Account A drawn down to a tiny residual, kept visible (not snapped).
+      const sell = result.transactions[2];
+      expect(sell.runningQuantityAccount).toBeCloseTo(0.0001, 8);
+      expect(sell.runningQuantityAll).toBeCloseTo(50.0001, 8);
+
+      // SPLIT multiplies only Account B's balance; cross-account total follows.
+      const split = result.transactions[3];
+      expect(split.runningQuantityAccount).toBe(100);
+      expect(split.runningQuantityAll).toBeCloseTo(100.0001, 8);
+
+      expect(result.currentQuantityAll).toBeCloseTo(100.0001, 8);
+    });
+
+    it("lists every account the security was used in, including closed ones", async () => {
+      investmentTransactionsRepository.find.mockResolvedValue([
+        tx(
+          "t1",
+          acctA,
+          "Account A",
+          false,
+          InvestmentAction.BUY,
+          "2025-01-01",
+          100,
+        ),
+        tx(
+          "t2",
+          acctB,
+          "Account B",
+          true,
+          InvestmentAction.BUY,
+          "2025-02-01",
+          50,
+        ),
+        tx(
+          "t3",
+          acctA,
+          "Account A",
+          false,
+          InvestmentAction.SELL,
+          "2025-03-01",
+          99.9999,
+        ),
+      ]);
+
+      const result = await service.getSecurityTransactionHistory(
+        userId,
+        securityId,
+      );
+
+      expect(result.accounts).toHaveLength(2);
+      const a = result.accounts.find((x) => x.accountId === acctA)!;
+      const b = result.accounts.find((x) => x.accountId === acctB)!;
+      expect(a.currentQuantity).toBeCloseTo(0.0001, 8);
+      expect(b.isClosed).toBe(true);
+      expect(b.currentQuantity).toBe(50);
+      // Works for an inactive security.
+      expect(result.isActive).toBe(false);
+    });
+
+    it("returns empty history for a security with no transactions", async () => {
+      investmentTransactionsRepository.find.mockResolvedValue([]);
+
+      const result = await service.getSecurityTransactionHistory(
+        userId,
+        securityId,
+      );
+
+      expect(result.transactions).toEqual([]);
+      expect(result.accounts).toEqual([]);
+      expect(result.currentQuantityAll).toBe(0);
+    });
+
+    it("throws when the security does not exist", async () => {
+      securitiesService.findOne.mockRejectedValue(
+        new NotFoundException("Security not found"),
+      );
+
+      await expect(
+        service.getSecurityTransactionHistory(userId, securityId),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 });

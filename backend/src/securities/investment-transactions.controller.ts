@@ -23,6 +23,7 @@ import { AuthGuard } from "@nestjs/passport";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
 import { CreateInvestmentTransactionDto } from "./dto/create-investment-transaction.dto";
 import { UpdateInvestmentTransactionDto } from "./dto/update-investment-transaction.dto";
+import { TransferSecurityDto } from "./dto/transfer-security.dto";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -84,6 +85,24 @@ export class InvestmentTransactionsController {
     @Body() createDto: CreateInvestmentTransactionDto,
   ): Promise<InvestmentTransaction> {
     return this.investmentTransactionsService.create(req.user.id, createDto);
+  }
+
+  @Post("transfer-security")
+  @ApiOperation({
+    summary:
+      "Transfer a security between two investment accounts, preserving cost basis",
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      "Both transfer legs (TRANSFER_OUT in source, TRANSFER_IN in destination) created",
+  })
+  @ApiResponse({ status: 400, description: "Invalid request data" })
+  transferSecurity(@Request() req, @Body() dto: TransferSecurityDto) {
+    return this.investmentTransactionsService.transferSecurity(
+      req.user.id,
+      dto,
+    );
   }
 
   @Get()
@@ -328,6 +347,27 @@ export class InvestmentTransactionsController {
     return this.investmentTransactionsService.getCapitalGainsByMonth(
       req.user.id,
       { accountIds: scoped, startDate, endDate },
+    );
+  }
+
+  @Get("security/:securityId/history")
+  @ApiOperation({
+    summary:
+      "Transaction history for a security with running share totals and the accounts (including closed) it was used in",
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Security transaction history with per-account and cross-account running share balances",
+  })
+  @ApiResponse({ status: 404, description: "Security not found" })
+  getSecurityTransactionHistory(
+    @Request() req,
+    @Param("securityId", ParseUUIDPipe) securityId: string,
+  ) {
+    return this.investmentTransactionsService.getSecurityTransactionHistory(
+      req.user.id,
+      securityId,
     );
   }
 
