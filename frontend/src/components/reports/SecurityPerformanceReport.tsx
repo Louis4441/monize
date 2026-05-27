@@ -364,37 +364,39 @@ export function SecurityPerformanceReport() {
                   </option>
                 ))}
             </select>
-            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
           </div>
-          {selectedSecurityId && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => setViewType('chart')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  viewType === 'chart' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                Price Chart
-              </button>
-              <button
-                onClick={() => setViewType('transactions')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  viewType === 'transactions' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                Transactions
-              </button>
-              <button
-                onClick={() => setViewType('dividends')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                  viewType === 'dividends' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                Dividends
-              </button>
-              <ExportDropdown onExportPdf={handleExportPdf} />
-            </div>
-          )}
+          <div className="flex gap-2 items-center">
+            {selectedSecurityId && (
+              <>
+                <button
+                  onClick={() => setViewType('chart')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    viewType === 'chart' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  Price Chart
+                </button>
+                <button
+                  onClick={() => setViewType('transactions')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    viewType === 'transactions' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  Transactions
+                </button>
+                <button
+                  onClick={() => setViewType('dividends')}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    viewType === 'dividends' ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  Dividends
+                </button>
+              </>
+            )}
+            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
+            {selectedSecurityId && <ExportDropdown onExportPdf={handleExportPdf} />}
+          </div>
         </div>
       </div>
 

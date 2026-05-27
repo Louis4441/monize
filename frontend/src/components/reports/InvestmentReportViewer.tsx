@@ -302,15 +302,10 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {isExecuting && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                <span>Updating...</span>
-              </div>
-            )}
             <RefreshPricesButton onRefreshComplete={executeReport} />
             <Button
               variant="outline"
+              size="sm"
               onClick={handleExportCsv}
               disabled={!result || result.rowCount === 0}
             >
@@ -352,6 +347,12 @@ export function InvestmentReportViewer({ reportId }: InvestmentReportViewerProps
               As of {formatDate(result.asOfDate)} · {result.rowCount} holding
               {result.rowCount === 1 ? '' : 's'}
             </span>
+            {isExecuting && (
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span>Updating...</span>
+              </div>
+            )}
           </div>
 
           {result.rowCount === 0 ? (

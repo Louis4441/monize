@@ -306,7 +306,6 @@ export function InvestmentPerformanceReport() {
             />
           </div>
           <div className="flex gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
             <button
               onClick={() => setViewType('performance')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -327,6 +326,7 @@ export function InvestmentPerformanceReport() {
             >
               Allocation
             </button>
+            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
             <ExportDropdown onExportPdf={handleExportPdf} />
           </div>
         </div>

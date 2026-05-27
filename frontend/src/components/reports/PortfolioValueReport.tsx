@@ -470,13 +470,13 @@ export function PortfolioValueReport() {
             />
           </div>
           <div className="flex items-center gap-3">
-            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
             <ChartViewToggle
               value={chartViewType}
               onChange={(v) => setChartViewType(v as 'area' | 'table')}
               options={['area', 'table']}
               activeColour="bg-emerald-600"
             />
+            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
             <ExportDropdown
               onExportPdf={handleExportPdf}
               onExportCsv={handleExportCsv}

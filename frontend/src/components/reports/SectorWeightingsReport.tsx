@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { useClickOutside } from '@/hooks/useClickOutside';
 import {
   BarChart,
   Bar,
@@ -17,6 +16,7 @@ import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
@@ -68,9 +68,15 @@ export function SectorWeightingsReport() {
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [selectedSecurityIds, setSelectedSecurityIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showSecurityFilter, setShowSecurityFilter] = useState(false);
-  const securityFilterRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+
+  const securityOptions = useMemo(
+    () =>
+      securities
+        .filter((s) => s.isActive)
+        .map((s) => ({ value: s.id, label: `${s.symbol} - ${s.name}` })),
+    [securities],
+  );
   const { sortField, sortDirection, handleSort } = useSortableTable<SectorSortField>(
     'reports.sector-weightings.sort',
     { field: 'total', direction: 'desc' },
@@ -102,8 +108,6 @@ export function SectorWeightingsReport() {
     });
     return items;
   }, [data, sortField, sortDirection]);
-
-  useClickOutside(securityFilterRef, () => setShowSecurityFilter(false), { enabled: showSecurityFilter });
 
   // Load accounts and securities once on mount
   useEffect(() => {
@@ -137,12 +141,6 @@ export function SectorWeightingsReport() {
   useEffect(() => {
     loadWeightings();
   }, [loadWeightings]);
-
-  const toggleSecurityId = (id: string) => {
-    setSelectedSecurityIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
-    );
-  };
 
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
@@ -213,43 +211,14 @@ export function SectorWeightingsReport() {
             />
 
             {/* Security Filter */}
-            <div className="relative" ref={securityFilterRef}>
-              <button
-                onClick={() => {
-                  setShowSecurityFilter(!showSecurityFilter);
-                }}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                Securities{selectedSecurityIds.length > 0 ? ` (${selectedSecurityIds.length})` : ''}
-              </button>
-              {showSecurityFilter && (
-                <div className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-10 max-h-60 overflow-y-auto">
-                  <div className="p-2">
-                    {securities.filter((s) => s.isActive).length === 0 ? (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 p-2">No active securities</p>
-                    ) : (
-                      securities
-                        .filter((s) => s.isActive)
-                        .map((sec) => (
-                          <label
-                            key={sec.id}
-                            className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedSecurityIds.includes(sec.id)}
-                              onChange={() => toggleSecurityId(sec.id)}
-                              className="rounded border-gray-300 dark:border-gray-600"
-                            />
-                            <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
-                              {sec.symbol} - {sec.name}
-                            </span>
-                          </label>
-                        ))
-                    )}
-                  </div>
-                </div>
-              )}
+            <div className="w-48">
+              <MultiSelect
+                ariaLabel="Filter by security"
+                placeholder="All Securities"
+                options={securityOptions}
+                value={selectedSecurityIds}
+                onChange={setSelectedSecurityIds}
+              />
             </div>
 
             {(selectedAccountIds.length > 0 || selectedSecurityIds.length > 0) && (

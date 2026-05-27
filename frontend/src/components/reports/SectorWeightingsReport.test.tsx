@@ -192,11 +192,9 @@ describe('SectorWeightingsReport', () => {
     mockGetInvestmentAccounts.mockResolvedValue([]);
     mockGetSecurities.mockResolvedValue(mockSecurities);
     render(<SectorWeightingsReport />);
-    await waitFor(() => {
-      expect(screen.getByText('Securities')).toBeInTheDocument();
-    });
+    const trigger = await screen.findByRole('button', { name: 'Filter by security' });
 
-    fireEvent.click(screen.getByText('Securities'));
+    fireEvent.click(trigger);
 
     expect(screen.getByText('AAPL - Apple Inc.')).toBeInTheDocument();
     expect(screen.getByText('VTI - Vanguard Total Stock')).toBeInTheDocument();

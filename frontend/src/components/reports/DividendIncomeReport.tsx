@@ -1033,7 +1033,6 @@ export function DividendIncomeReport() {
             onChange={setDateRange}
           />
           <div className="ml-auto shrink-0 flex gap-2 items-center">
-            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
             <button
               onClick={() => setViewType('monthly')}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
@@ -1064,6 +1063,7 @@ export function DividendIncomeReport() {
             >
               By Security
             </button>
+            <RefreshPricesButton onRefreshComplete={() => setReloadKey((k) => k + 1)} />
             <ExportDropdown
               onExportPdf={handleExportPdf}
               onExportCsv={isTableView ? handleExportCsv : undefined}
