@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@/test/render';
 import { BillsFilterPanel } from './BillsFilterPanel';
 import { Account } from '@/types/account';
 import { Category } from '@/types/category';
-import { Payee } from '@/types/payee';
+import { BillsPayeeOption } from '@/lib/bills-filters';
 
 const accounts: Account[] = [
   { id: 'acc-1', name: 'Checking' } as Account,
@@ -15,9 +15,9 @@ const categories: Category[] = [
   { id: 'cat-2', name: 'Salary', color: '#000', effectiveColor: '#000' } as Category,
 ];
 
-const payees: Payee[] = [
-  { id: 'pay-1', name: 'Acme Corp' } as Payee,
-  { id: 'pay-2', name: 'Beta LLC' } as Payee,
+const payees: BillsPayeeOption[] = [
+  { id: 'pay-1', name: 'Acme Corp' },
+  { id: 'pay-2', name: 'Beta LLC' },
 ];
 
 function makeProps(overrides: Partial<React.ComponentProps<typeof BillsFilterPanel>> = {}) {

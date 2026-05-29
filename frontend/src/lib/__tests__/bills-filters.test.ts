@@ -133,21 +133,20 @@ describe('derivePayeesFromScheduledTransactions', () => {
   it('returns distinct payees sorted by name', () => {
     const transactions = [
       makeTransaction({ id: '1', payeeId: 'p-z', payeeName: 'Zebra Co' }),
-      makeTransaction({ id: '2', payeeId: 'p-a', payee: { id: 'p-a', name: 'Acme', createdAt: '', updatedAt: '' } }),
+      makeTransaction({ id: '2', payeeId: 'p-a', payee: { id: 'p-a', name: 'Acme' } as ScheduledTransaction['payee'] }),
       makeTransaction({ id: '3', payeeId: 'p-z', payeeName: 'Zebra Co' }),
       makeTransaction({ id: '4', payeeId: null }),
     ];
     const payees = derivePayeesFromScheduledTransactions(transactions);
     expect(payees.map((p) => p.name)).toEqual(['Acme', 'Zebra Co']);
+    expect(payees.map((p) => p.id)).toEqual(['p-a', 'p-z']);
   });
 
   it('falls back to a placeholder when no name is available', () => {
     const payees = derivePayeesFromScheduledTransactions([
       makeTransaction({ id: '1', payeeId: 'p-x' }),
     ]);
-    expect(payees).toEqual([
-      { id: 'p-x', name: 'Unknown payee', createdAt: '', updatedAt: '' },
-    ]);
+    expect(payees).toEqual([{ id: 'p-x', name: 'Unknown payee' }]);
   });
 });
 

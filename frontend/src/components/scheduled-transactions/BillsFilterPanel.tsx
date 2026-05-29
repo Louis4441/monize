@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
 import { Account } from '@/types/account';
 import { Category } from '@/types/category';
-import { Payee } from '@/types/payee';
+import { BillsPayeeOption } from '@/lib/bills-filters';
 
 interface BillsFilterPanelProps {
   filtersExpanded: boolean;
@@ -19,7 +19,7 @@ interface BillsFilterPanelProps {
   setSelectedCategoryIds: (ids: string[]) => void;
   accounts: Account[];
   categories: Category[];
-  payees: Payee[];
+  payees: BillsPayeeOption[];
   activeFilterCount: number;
   onClearFilters: () => void;
 }

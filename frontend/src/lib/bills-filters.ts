@@ -15,6 +15,9 @@ export const EMPTY_BILLS_FILTER_STATE: BillsFilterState = {
   selectedCategoryIds: [],
 };
 
+/** Minimal payee shape needed to populate the filter dropdown. */
+export type BillsPayeeOption = Pick<Payee, 'id' | 'name'>;
+
 /**
  * Build the distinct list of payees referenced by a set of scheduled
  * transactions, sorted alphabetically. Used to populate the payee filter
@@ -22,12 +25,12 @@ export const EMPTY_BILLS_FILTER_STATE: BillsFilterState = {
  */
 export function derivePayeesFromScheduledTransactions(
   transactions: ScheduledTransaction[],
-): Payee[] {
-  const byId = new Map<string, Payee>();
+): BillsPayeeOption[] {
+  const byId = new Map<string, BillsPayeeOption>();
   transactions.forEach((t) => {
     if (!t.payeeId || byId.has(t.payeeId)) return;
     const name = t.payeeName || t.payee?.name || 'Unknown payee';
-    byId.set(t.payeeId, { id: t.payeeId, name, createdAt: '', updatedAt: '' });
+    byId.set(t.payeeId, { id: t.payeeId, name });
   });
   return Array.from(byId.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
