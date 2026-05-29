@@ -5,6 +5,7 @@ import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
 import { Account } from '@/types/account';
 import { Category } from '@/types/category';
 import { BillsPayeeOption } from '@/lib/bills-filters';
+import { buildCategoryFilterOptions, resolveSelectedCategories } from '@/lib/categoryUtils';
 
 interface BillsFilterPanelProps {
   filtersExpanded: boolean;
@@ -54,13 +55,13 @@ export function BillsFilterPanel(props: BillsFilterPanelProps) {
   );
 
   const categoryOptions: MultiSelectOption[] = useMemo(
-    () =>
-      categories.map((c) => ({
-        value: c.id,
-        label: c.name,
-        color: c.effectiveColor || c.color,
-      })),
+    () => buildCategoryFilterOptions(categories),
     [categories],
+  );
+
+  const selectedCategories = useMemo(
+    () => resolveSelectedCategories(selectedCategoryIds, categories),
+    [selectedCategoryIds, categories],
   );
 
   return (
@@ -74,7 +75,7 @@ export function BillsFilterPanel(props: BillsFilterPanelProps) {
           <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L14 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 018 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
           </svg>
-          <span className="font-medium text-gray-900 dark:text-gray-100">Filters</span>
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">Filters</span>
           {activeFilterCount > 0 && (
             <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs font-medium rounded-full">
               {activeFilterCount}
@@ -137,17 +138,20 @@ export function BillsFilterPanel(props: BillsFilterPanelProps) {
               </span>
             ) : null;
           })}
-          {selectedCategoryIds.map((id) => {
-            const category = categories.find((c) => c.id === id);
-            return category ? (
-              <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs rounded-full">
-                {category.name}
-                <button onClick={() => setSelectedCategoryIds(selectedCategoryIds.filter((c) => c !== id))} className="hover:text-blue-900 dark:hover:text-blue-100">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </span>
-            ) : null;
-          })}
+          {selectedCategories.map((category) => (
+            <span key={category.id} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+              {(category.effectiveColor ?? category.color) && (
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: (category.effectiveColor ?? category.color)! }}
+                />
+              )}
+              {category.name}
+              <button onClick={() => setSelectedCategoryIds(selectedCategoryIds.filter((c) => c !== category.id))} className="hover:text-blue-900 dark:hover:text-blue-100">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </span>
+          ))}
         </div>
       )}
 

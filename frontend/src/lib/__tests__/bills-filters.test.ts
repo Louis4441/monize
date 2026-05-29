@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   filterScheduledTransactions,
   derivePayeesFromScheduledTransactions,
+  deriveAccountsFromScheduledTransactions,
   countActiveBillsFilters,
   EMPTY_BILLS_FILTER_STATE,
   BillsFilterState,
 } from '../bills-filters';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
+import { Account } from '@/types/account';
 
 // Minimal scheduled transaction for filtering tests. Only the fields the
 // filter helpers read are meaningful; the rest are filled enough to satisfy
@@ -175,5 +177,62 @@ describe('countActiveBillsFilters', () => {
         }),
       ),
     ).toBe(4);
+  });
+});
+
+describe('filterScheduledTransactions - special categories', () => {
+  it('matches uncategorized records (no category, not transfer or split)', () => {
+    const uncat = makeTransaction({ id: 'u', categoryId: null });
+    const withCat = makeTransaction({ id: 'c', categoryId: 'cat-1' });
+    const transfer = makeTransaction({ id: 't', categoryId: null, isTransfer: true });
+    const split = makeTransaction({ id: 's', categoryId: null, isSplit: true });
+    const result = filterScheduledTransactions(
+      [uncat, withCat, transfer, split],
+      filters({ selectedCategoryIds: ['uncategorized'] }),
+    );
+    expect(result.map((t) => t.id)).toEqual(['u']);
+  });
+
+  it('matches transfer records', () => {
+    const transfer = makeTransaction({ id: 't', isTransfer: true });
+    const normal = makeTransaction({ id: 'n' });
+    const result = filterScheduledTransactions(
+      [transfer, normal],
+      filters({ selectedCategoryIds: ['transfer'] }),
+    );
+    expect(result.map((t) => t.id)).toEqual(['t']);
+  });
+
+  it('ORs special pseudo-categories with real category IDs', () => {
+    const transfer = makeTransaction({ id: 't', isTransfer: true });
+    const rent = makeTransaction({ id: 'r', categoryId: 'cat-housing' });
+    const other = makeTransaction({ id: 'o', categoryId: 'cat-food' });
+    const result = filterScheduledTransactions(
+      [transfer, rent, other],
+      filters({ selectedCategoryIds: ['transfer', 'cat-housing'] }),
+    );
+    expect(result.map((t) => t.id).sort()).toEqual(['r', 't']);
+  });
+});
+
+describe('deriveAccountsFromScheduledTransactions', () => {
+  const accounts = [
+    { id: 'acc-1', name: 'Zeta' } as Account,
+    { id: 'acc-2', name: 'Alpha' } as Account,
+    { id: 'acc-3', name: 'Unused' } as Account,
+  ];
+
+  it('returns only accounts referenced by the schedules, sorted by name', () => {
+    const txns = [
+      makeTransaction({ id: '1', accountId: 'acc-1' }),
+      makeTransaction({ id: '2', accountId: 'acc-2' }),
+      makeTransaction({ id: '3', accountId: 'acc-1' }),
+    ];
+    const result = deriveAccountsFromScheduledTransactions(txns, accounts);
+    expect(result.map((a) => a.id)).toEqual(['acc-2', 'acc-1']);
+  });
+
+  it('returns an empty array when there are no schedules', () => {
+    expect(deriveAccountsFromScheduledTransactions([], accounts)).toEqual([]);
   });
 });

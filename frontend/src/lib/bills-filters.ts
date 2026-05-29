@@ -1,5 +1,6 @@
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { Payee } from '@/types/payee';
+import { Account } from '@/types/account';
 
 export interface BillsFilterState {
   nameSearch: string;
@@ -36,6 +37,43 @@ export function derivePayeesFromScheduledTransactions(
 }
 
 /**
+ * Whether a scheduled transaction matches the selected category filters.
+ * Mirrors the Transactions category filter semantics (TransactionSearchUtil):
+ * real category IDs match the top-level category or any split; the special
+ * "uncategorized" pseudo-ID matches records with no category that are neither
+ * transfers nor splits; "transfer" matches transfer records. The selected
+ * conditions are OR-ed together.
+ */
+function scheduledTransactionMatchesCategories(
+  t: ScheduledTransaction,
+  selectedCategoryIds: string[],
+): boolean {
+  const realIds: string[] = [];
+  let wantUncategorized = false;
+  let wantTransfer = false;
+  for (const id of selectedCategoryIds) {
+    if (id === 'uncategorized') wantUncategorized = true;
+    else if (id === 'transfer') wantTransfer = true;
+    else realIds.push(id);
+  }
+
+  if (realIds.length > 0) {
+    const topMatch = !!t.categoryId && realIds.includes(t.categoryId);
+    const splitMatch = (t.splits || []).some(
+      (sp) => !!sp.categoryId && realIds.includes(sp.categoryId),
+    );
+    if (topMatch || splitMatch) return true;
+  }
+  if (wantUncategorized && t.categoryId == null && !t.isTransfer && !t.isSplit) {
+    return true;
+  }
+  if (wantTransfer && t.isTransfer) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Apply the Bills & Deposits filters (name, payee, account, category) to a
  * list of scheduled transactions. Filtering is client-side and immutable.
  */
@@ -63,19 +101,30 @@ export function filterScheduledTransactions(
       }
     }
 
-    if (filters.selectedCategoryIds.length > 0) {
-      const matchesTopLevel =
-        !!t.categoryId && filters.selectedCategoryIds.includes(t.categoryId);
-      const matchesSplit = (t.splits || []).some(
-        (s) => !!s.categoryId && filters.selectedCategoryIds.includes(s.categoryId),
-      );
-      if (!matchesTopLevel && !matchesSplit) {
-        return false;
-      }
+    if (
+      filters.selectedCategoryIds.length > 0 &&
+      !scheduledTransactionMatchesCategories(t, filters.selectedCategoryIds)
+    ) {
+      return false;
     }
 
     return true;
   });
+}
+
+/**
+ * The subset of accounts that are actually referenced by the given scheduled
+ * transactions, sorted alphabetically. Keeps the Accounts filter dropdown
+ * scoped to accounts used in Bills & Deposits.
+ */
+export function deriveAccountsFromScheduledTransactions(
+  transactions: ScheduledTransaction[],
+  accounts: Account[],
+): Account[] {
+  const usedIds = new Set(transactions.map((t) => t.accountId));
+  return accounts
+    .filter((a) => usedIds.has(a.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function countActiveBillsFilters(filters: BillsFilterState): number {

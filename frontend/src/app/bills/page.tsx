@@ -41,6 +41,7 @@ import { useBillsFilters } from '@/hooks/useBillsFilters';
 import {
   filterScheduledTransactions,
   derivePayeesFromScheduledTransactions,
+  deriveAccountsFromScheduledTransactions,
 } from '@/lib/bills-filters';
 import { parseLocalDate } from '@/lib/utils';
 import type { FutureTransaction } from '@/lib/forecast';
@@ -326,6 +327,12 @@ function BillsContent() {
     [scheduledTransactions]
   );
 
+  // Accounts that actually appear in Bills & Deposits, for the filter dropdown
+  const billsAccounts = useMemo(
+    () => deriveAccountsFromScheduledTransactions(scheduledTransactions, accounts),
+    [scheduledTransactions, accounts]
+  );
+
   // Filter by type and the Name/Payee/Account/Category filters, then sort by
   // effective date (considering overrides)
   const filteredTransactions = useMemo(() => {
@@ -530,6 +537,28 @@ function BillsContent() {
         </Modal>
         <UnsavedChangesDialog {...unsavedChangesDialog} />
 
+        {viewMode === 'list' && (
+          <div className="mb-6">
+            <BillsFilterPanel
+              filtersExpanded={filters.filtersExpanded}
+              setFiltersExpanded={filters.setFiltersExpanded}
+              nameSearch={filters.nameSearch}
+              setNameSearch={filters.setNameSearch}
+              selectedPayeeIds={filters.selectedPayeeIds}
+              setSelectedPayeeIds={filters.setSelectedPayeeIds}
+              selectedAccountIds={filters.selectedAccountIds}
+              setSelectedAccountIds={filters.setSelectedAccountIds}
+              selectedCategoryIds={filters.selectedCategoryIds}
+              setSelectedCategoryIds={filters.setSelectedCategoryIds}
+              accounts={billsAccounts}
+              categories={categories}
+              payees={payees}
+              activeFilterCount={filters.activeFilterCount}
+              onClearFilters={filters.clearFilters}
+            />
+          </div>
+        )}
+
         {/* View Toggle + Filter Tabs */}
         <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg mb-6">
           <div className="border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center justify-between">
@@ -605,28 +634,6 @@ function BillsContent() {
             )}
           </div>
         </div>
-
-        {viewMode === 'list' && (
-          <div className="mb-6">
-            <BillsFilterPanel
-              filtersExpanded={filters.filtersExpanded}
-              setFiltersExpanded={filters.setFiltersExpanded}
-              nameSearch={filters.nameSearch}
-              setNameSearch={filters.setNameSearch}
-              selectedPayeeIds={filters.selectedPayeeIds}
-              setSelectedPayeeIds={filters.setSelectedPayeeIds}
-              selectedAccountIds={filters.selectedAccountIds}
-              setSelectedAccountIds={filters.setSelectedAccountIds}
-              selectedCategoryIds={filters.selectedCategoryIds}
-              setSelectedCategoryIds={filters.setSelectedCategoryIds}
-              accounts={accounts}
-              categories={categories}
-              payees={payees}
-              activeFilterCount={filters.activeFilterCount}
-              onClearFilters={filters.clearFilters}
-            />
-          </div>
-        )}
 
         {viewMode === 'list' ? (
           /* Scheduled Transactions List */
