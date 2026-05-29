@@ -8,6 +8,9 @@ import {
 } from '../bills-filters';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 
+// Minimal scheduled transaction for filtering tests. Only the fields the
+// filter helpers read are meaningful; the rest are filled enough to satisfy
+// consumers and cast to the full type (as the codebase does elsewhere).
 function makeTransaction(
   overrides: Partial<ScheduledTransaction>,
 ): ScheduledTransaction {
@@ -19,15 +22,14 @@ function makeTransaction(
     categoryId: null,
     payeeId: null,
     amount: -10,
-    type: 'expense',
-    frequency: 'MONTHLY' as ScheduledTransaction['frequency'],
+    frequency: 'MONTHLY',
     startDate: '2026-01-01',
     nextDueDate: '2026-06-01',
     isActive: true,
     createdAt: '2026-01-01',
     updatedAt: '2026-01-01',
     ...overrides,
-  };
+  } as ScheduledTransaction;
 }
 
 const filters = (overrides: Partial<BillsFilterState>): BillsFilterState => ({
@@ -104,7 +106,17 @@ describe('filterScheduledTransactions', () => {
       name: 'Combined',
       categoryId: null,
       splits: [
-        { id: 's1', scheduledTransactionId: 'd', categoryId: 'cat-housing', amount: -5, sortOrder: 0 },
+        {
+          id: 's1',
+          scheduledTransactionId: 'd',
+          categoryId: 'cat-housing',
+          category: null,
+          transferAccountId: null,
+          transferAccount: null,
+          amount: -5,
+          memo: null,
+          createdAt: '2026-01-01',
+        },
       ],
     });
     const result = filterScheduledTransactions(
