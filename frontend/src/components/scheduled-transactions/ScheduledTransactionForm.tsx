@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Modal } from '@/components/ui/Modal';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { TagForm } from '@/components/tags/TagForm';
 import { SplitEditor, SplitRow, createEmptySplits, toSplitRows, toCreateSplitData } from '@/components/transactions/SplitEditor';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
@@ -834,28 +835,26 @@ export function ScheduledTransactionForm({
   }));
 
   // Shared End Condition section
-  const renderEndCondition = (idSuffix: string) => {
+  const renderEndCondition = (_idSuffix: string) => {
     if (watchedFrequency === 'ONCE') return null;
     return (
       <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">End Condition (optional)</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <div className="flex items-center mb-2">
-              <input
-                id={`useEndDate${idSuffix}`}
-                type="checkbox"
+            <label className="flex items-center gap-2 mb-2 cursor-pointer w-fit">
+              <ToggleSwitch
                 checked={useEndDate}
-                onChange={(e) => {
-                  setUseEndDate(e.target.checked);
-                  if (e.target.checked) setUseOccurrences(false);
+                onChange={(next) => {
+                  setUseEndDate(next);
+                  if (next) setUseOccurrences(false);
                 }}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+                label="End by date"
               />
-              <label htmlFor={`useEndDate${idSuffix}`} className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
+              <span className="block text-sm text-gray-900 dark:text-gray-100">
                 End by date
-              </label>
-            </div>
+              </span>
+            </label>
             {useEndDate && (
               <DateInput
                 label="End Date"
@@ -866,21 +865,19 @@ export function ScheduledTransactionForm({
             )}
           </div>
           <div>
-            <div className="flex items-center mb-2">
-              <input
-                id={`useOccurrences${idSuffix}`}
-                type="checkbox"
+            <label className="flex items-center gap-2 mb-2 cursor-pointer w-fit">
+              <ToggleSwitch
                 checked={useOccurrences}
-                onChange={(e) => {
-                  setUseOccurrences(e.target.checked);
-                  if (e.target.checked) setUseEndDate(false);
+                onChange={(next) => {
+                  setUseOccurrences(next);
+                  if (next) setUseEndDate(false);
                 }}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+                label="Number of occurrences"
               />
-              <label htmlFor={`useOccurrences${idSuffix}`} className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
+              <span className="block text-sm text-gray-900 dark:text-gray-100">
                 Number of occurrences
-              </label>
-            </div>
+              </span>
+            </label>
             {useOccurrences && (
               <Input
                 type="number"
@@ -897,30 +894,28 @@ export function ScheduledTransactionForm({
   };
 
   // Shared Active/Auto-post section
-  const renderOptions = (idSuffix: string) => (
+  const renderOptions = (_idSuffix: string) => (
     <div className="flex items-center space-x-6">
-      <div className="flex items-center">
-        <input
-          id={`isActive${idSuffix}`}
-          type="checkbox"
-          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-          {...register('isActive')}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <ToggleSwitch
+          checked={!!watch('isActive')}
+          onChange={(next) => setValue('isActive', next, { shouldDirty: true })}
+          label="Active"
         />
-        <label htmlFor={`isActive${idSuffix}`} className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
+        <span className="block text-sm text-gray-900 dark:text-gray-100">
           Active
-        </label>
-      </div>
-      <div className="flex items-center">
-        <input
-          id={`autoPost${idSuffix}`}
-          type="checkbox"
-          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-          {...register('autoPost')}
+        </span>
+      </label>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <ToggleSwitch
+          checked={!!watch('autoPost')}
+          onChange={(next) => setValue('autoPost', next, { shouldDirty: true })}
+          label="Auto-post on due date"
         />
-        <label htmlFor={`autoPost${idSuffix}`} className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
+        <span className="block text-sm text-gray-900 dark:text-gray-100">
           Auto-post on due date
-        </label>
-      </div>
+        </span>
+      </label>
     </div>
   );
 

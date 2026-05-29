@@ -223,6 +223,11 @@ const mockSecurities = [
   },
 ];
 
+// The Active / Auto-post / End-condition controls render as ToggleSwitch
+// (role="switch") rather than checkboxes, so their state lives in aria-checked.
+const expectToggle = (el: HTMLElement, on: boolean) =>
+  expect(el).toHaveAttribute('aria-checked', String(on));
+
 describe('ScheduledTransactionForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -382,15 +387,15 @@ describe('ScheduledTransactionForm', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('End by date')).toBeInTheDocument();
     });
-    const endDateCheckbox = screen.getByLabelText('End by date') as HTMLInputElement;
-    const occurrencesCheckbox = screen.getByLabelText('Number of occurrences') as HTMLInputElement;
+    const endDateCheckbox = screen.getByLabelText('End by date');
+    const occurrencesCheckbox = screen.getByLabelText('Number of occurrences');
 
     fireEvent.click(endDateCheckbox);
-    expect(endDateCheckbox.checked).toBe(true);
+    expectToggle(endDateCheckbox, true);
 
     fireEvent.click(occurrencesCheckbox);
-    expect(occurrencesCheckbox.checked).toBe(true);
-    expect(endDateCheckbox.checked).toBe(false);
+    expectToggle(occurrencesCheckbox, true);
+    expectToggle(endDateCheckbox, false);
   });
 
   it('unchecks occurrences when end date is checked (mutual exclusion)', async () => {
@@ -398,15 +403,15 @@ describe('ScheduledTransactionForm', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('End by date')).toBeInTheDocument();
     });
-    const endDateCheckbox = screen.getByLabelText('End by date') as HTMLInputElement;
-    const occurrencesCheckbox = screen.getByLabelText('Number of occurrences') as HTMLInputElement;
+    const endDateCheckbox = screen.getByLabelText('End by date');
+    const occurrencesCheckbox = screen.getByLabelText('Number of occurrences');
 
     fireEvent.click(occurrencesCheckbox);
-    expect(occurrencesCheckbox.checked).toBe(true);
+    expectToggle(occurrencesCheckbox, true);
 
     fireEvent.click(endDateCheckbox);
-    expect(endDateCheckbox.checked).toBe(true);
-    expect(occurrencesCheckbox.checked).toBe(false);
+    expectToggle(endDateCheckbox, true);
+    expectToggle(occurrencesCheckbox, false);
   });
 
   // --- Auto-post checkbox ---
@@ -415,8 +420,8 @@ describe('ScheduledTransactionForm', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Auto-post on due date')).toBeInTheDocument();
     });
-    const autoPostCheckbox = screen.getByLabelText('Auto-post on due date') as HTMLInputElement;
-    expect(autoPostCheckbox.checked).toBe(false);
+    const autoPostCheckbox = screen.getByLabelText('Auto-post on due date');
+    expectToggle(autoPostCheckbox, false);
   });
 
   it('allows toggling auto-post checkbox', async () => {
@@ -424,11 +429,11 @@ describe('ScheduledTransactionForm', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Auto-post on due date')).toBeInTheDocument();
     });
-    const autoPostCheckbox = screen.getByLabelText('Auto-post on due date') as HTMLInputElement;
+    const autoPostCheckbox = screen.getByLabelText('Auto-post on due date');
     fireEvent.click(autoPostCheckbox);
-    expect(autoPostCheckbox.checked).toBe(true);
+    expectToggle(autoPostCheckbox, true);
     fireEvent.click(autoPostCheckbox);
-    expect(autoPostCheckbox.checked).toBe(false);
+    expectToggle(autoPostCheckbox, false);
   });
 
   // --- Active checkbox ---
@@ -437,8 +442,8 @@ describe('ScheduledTransactionForm', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Active')).toBeInTheDocument();
     });
-    const activeCheckbox = screen.getByLabelText('Active') as HTMLInputElement;
-    expect(activeCheckbox.checked).toBe(true);
+    const activeCheckbox = screen.getByLabelText('Active');
+    expectToggle(activeCheckbox, true);
   });
 
   // --- Reminder days input ---
@@ -583,8 +588,8 @@ describe('ScheduledTransactionForm', () => {
     expect(frequencySelect.value).toBe('MONTHLY');
 
     // Check pre-filled auto post
-    const autoPostCheckbox = screen.getByLabelText('Auto-post on due date') as HTMLInputElement;
-    expect(autoPostCheckbox.checked).toBe(true);
+    const autoPostCheckbox = screen.getByLabelText('Auto-post on due date');
+    expectToggle(autoPostCheckbox, true);
 
     // Check pre-filled reminder days
     const reminderInput = screen.getByLabelText('Remind Days Before') as HTMLInputElement;
@@ -768,8 +773,8 @@ describe('ScheduledTransactionForm', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Active')).toBeInTheDocument();
     });
-    const activeCheckbox = screen.getByLabelText('Active') as HTMLInputElement;
-    expect(activeCheckbox.checked).toBe(false);
+    const activeCheckbox = screen.getByLabelText('Active');
+    expectToggle(activeCheckbox, false);
   });
 
   it('pre-fills end date checkbox and value from existing scheduled transaction', async () => {
@@ -786,8 +791,8 @@ describe('ScheduledTransactionForm', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('End by date')).toBeInTheDocument();
     });
-    const endDateCheckbox = screen.getByLabelText('End by date') as HTMLInputElement;
-    expect(endDateCheckbox.checked).toBe(true);
+    const endDateCheckbox = screen.getByLabelText('End by date');
+    expectToggle(endDateCheckbox, true);
   });
 
   it('pre-fills occurrences remaining from existing scheduled transaction', async () => {
@@ -804,8 +809,8 @@ describe('ScheduledTransactionForm', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Number of occurrences')).toBeInTheDocument();
     });
-    const occurrencesCheckbox = screen.getByLabelText('Number of occurrences') as HTMLInputElement;
-    expect(occurrencesCheckbox.checked).toBe(true);
+    const occurrencesCheckbox = screen.getByLabelText('Number of occurrences');
+    expectToggle(occurrencesCheckbox, true);
     const occurrencesInput = screen.getByPlaceholderText('# remaining') as HTMLInputElement;
     expect(occurrencesInput.value).toBe('12');
   });
