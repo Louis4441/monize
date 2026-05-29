@@ -1936,6 +1936,41 @@ describe("PortfolioService", () => {
         expect(result).toHaveLength(0);
       });
     });
+
+    describe("when a security has no regular price feed (skipPriceUpdates)", () => {
+      it("excludes it even when its two transaction prices are on adjacent days", async () => {
+        accountsRepository.find.mockResolvedValue([
+          mockBrokerageAccount,
+          mockCashAccount,
+        ]);
+        // A GIC whose only "prices" are buy/sell transactions. A sell on
+        // 2025-06-13 and a re-buy on 2025-06-14 land one day apart, so the
+        // date-gap check does not catch it; the skipPriceUpdates flag must.
+        const gicHolding = {
+          ...mockHoldingAAPL,
+          security: { ...mockSecurityAAPL, skipPriceUpdates: true },
+        };
+        holdingsRepository.find.mockResolvedValue([gicHolding]);
+        securityPriceRepository.query.mockResolvedValue([
+          {
+            security_id: "sec-1",
+            close_price: "50000",
+            price_date: "2025-06-14",
+            rn: "1",
+          },
+          {
+            security_id: "sec-1",
+            close_price: "80000",
+            price_date: "2025-06-13",
+            rn: "2",
+          },
+        ]);
+
+        const result = await service.getTopMovers(userId);
+
+        expect(result).toHaveLength(0);
+      });
+    });
   });
 
   describe("getMonthOverMonthMovers", () => {

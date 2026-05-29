@@ -498,7 +498,13 @@ export class PortfolioService {
     const activeHoldings = holdings.filter(
       (h) =>
         Math.abs(Number(h.quantity)) >= 0.0001 &&
-        h.security?.isActive !== false,
+        h.security?.isActive !== false &&
+        // Exclude securities with no regular price feed (e.g. GICs). Their only
+        // "prices" come from buy/sell transactions, so the latest two closes are
+        // a transaction-to-transaction delta, not a daily market move. The
+        // date-gap check below misses this when two transactions land on
+        // adjacent days, so filter on the flag that marks the security itself.
+        h.security?.skipPriceUpdates !== true,
     );
     if (activeHoldings.length === 0) return [];
 
@@ -617,7 +623,11 @@ export class PortfolioService {
     const activeHoldings = holdings.filter(
       (h) =>
         Math.abs(Number(h.quantity)) >= 0.0001 &&
-        h.security?.isActive !== false,
+        h.security?.isActive !== false &&
+        // Exclude securities with no regular price feed (e.g. GICs); their only
+        // "prices" are buy/sell transactions, not market moves. Same rationale
+        // as getTopMovers.
+        h.security?.skipPriceUpdates !== true,
     );
     if (activeHoldings.length === 0) return [];
 
