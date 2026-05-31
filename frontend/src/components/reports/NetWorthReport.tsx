@@ -246,7 +246,7 @@ export function NetWorthReport() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
           <div className="text-sm text-gray-500 dark:text-gray-400">Current Net Worth</div>
           <div className={`text-2xl font-bold ${
-            summary.current >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+            gainLossColor(summary.current)
           }`}>
             {formatCurrency(summary.current)}
           </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import {
   BarChart,
@@ -44,7 +45,7 @@ function CustomTooltip({ active, payload, fmtValue }: {
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
       <p className="font-medium text-gray-900 dark:text-gray-100">{data.payload.symbol}</p>
-      <p className={`text-sm ${value >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+      <p className={`text-sm ${gainLossColor(value)}`}>
         {value >= 0 ? '+' : ''}{fmtValue(value)}
       </p>
     </div>
@@ -311,7 +312,7 @@ export function RealizedGainsReport() {
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">Realized Gain/Loss</div>
-          <div className={`text-xl font-bold ${totals.totalGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+          <div className={`text-xl font-bold ${gainLossColor(totals.totalGain)}`}>
             {totals.totalGain >= 0 ? '+' : ''}{fmtValue(totals.totalGain)}
           </div>
         </div>
@@ -490,7 +491,7 @@ export function RealizedGainsReport() {
                     <td className="px-4 py-3 text-right text-sm text-gray-900 dark:text-gray-100">
                       {fmtValue(sg.totalCostBasis)}
                     </td>
-                    <td className={`px-4 py-3 text-right text-sm font-medium ${sg.realizedGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    <td className={`px-4 py-3 text-right text-sm font-medium ${gainLossColor(sg.realizedGain)}`}>
                       {sg.realizedGain >= 0 ? '+' : ''}{fmtValue(sg.realizedGain)}
                     </td>
                   </tr>
@@ -510,7 +511,7 @@ export function RealizedGainsReport() {
                   <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-gray-100">
                     {fmtValue(totals.totalCostBasis)}
                   </td>
-                  <td className={`px-4 py-3 text-right text-sm font-bold ${totals.totalGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  <td className={`px-4 py-3 text-right text-sm font-bold ${gainLossColor(totals.totalGain)}`}>
                     {totals.totalGain >= 0 ? '+' : ''}{fmtValue(totals.totalGain)}
                   </td>
                 </tr>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef } from 'react';
+import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from 'next/navigation';
 import {
@@ -264,11 +265,7 @@ export function IncomeExpensesBarChart({
         <div>
           <div className="text-sm text-gray-500 dark:text-gray-400">Net</div>
           <div
-            className={`font-semibold ${
-              totals.income - totals.expenses >= 0
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
-            }`}
+            className={`font-semibold ${gainLossColor(totals.income - totals.expenses)}`}
           >
             {formatCurrency(totals.income - totals.expenses)}
           </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import {
   BarChart,
@@ -326,9 +327,7 @@ export function FlexGroupAnalysisReport() {
                       <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{cat.categoryName}</td>
                       <td className="py-2 pr-4 text-right text-gray-600 dark:text-gray-400">{formatCurrency(cat.budgeted)}</td>
                       <td className="py-2 pr-4 text-right text-gray-600 dark:text-gray-400">{formatCurrency(cat.spent)}</td>
-                      <td className={`py-2 pr-4 text-right font-medium ${
-                        cat.budgeted - cat.spent >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                      }`}>
+                      <td className={`py-2 pr-4 text-right font-medium ${gainLossColor(cat.budgeted - cat.spent)}`}>
                         {formatCurrency(cat.budgeted - cat.spent)}
                       </td>
                       <td className={`py-2 text-right font-medium ${

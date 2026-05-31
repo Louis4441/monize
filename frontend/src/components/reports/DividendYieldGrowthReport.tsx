@@ -648,7 +648,7 @@ export function DividendYieldGrowthReport() {
                       <tr key={row.year} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                         <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">{row.year}</td>
                         <td className="px-4 py-3 text-sm text-right text-green-600 dark:text-green-400">{fmtValue(row.amount)}</td>
-                        <td className={`px-4 py-3 text-sm text-right ${row.growth !== null ? (row.growth >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400') : 'text-gray-400'}`}>
+                        <td className={`px-4 py-3 text-sm text-right ${row.growth !== null ? (gainLossColor(row.growth)) : 'text-gray-400'}`}>
                           {row.growth !== null ? formatSignedPercent(row.growth, 1) : '-'}
                         </td>
                       </tr>

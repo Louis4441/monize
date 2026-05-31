@@ -443,7 +443,7 @@ export function PortfolioValueReport() {
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
           <div className="text-sm text-gray-500 dark:text-gray-400">Period Change</div>
-          <div className={`text-xl font-bold ${summary.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+          <div className={`text-xl font-bold ${gainLossColor(summary.change)}`}>
             {summary.change >= 0 ? '+' : ''}{fmtVal(summary.change)}
           </div>
         </div>
@@ -782,7 +782,7 @@ export function PortfolioValueReport() {
                     <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-gray-100">
                       {fmtFull(acct.totalMarketValue + acct.cashBalance)}
                     </td>
-                    <td className={`px-4 py-3 text-right text-sm font-medium ${acct.totalGainLoss >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    <td className={`px-4 py-3 text-right text-sm font-medium ${gainLossColor(acct.totalGainLoss)}`}>
                       {acct.totalGainLoss >= 0 ? '+' : ''}{fmtFull(acct.totalGainLoss)}
                     </td>
                   </tr>

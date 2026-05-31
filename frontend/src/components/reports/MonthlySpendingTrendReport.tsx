@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
+import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from "next/navigation";
 import {
@@ -295,7 +296,7 @@ export function MonthlySpendingTrendReport() {
                         {formatCurrency(row.Expenses)}
                       </td>
                       <td
-                        className={`px-4 py-3 text-right text-sm font-medium ${row.Net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                        className={`px-4 py-3 text-right text-sm font-medium ${gainLossColor(row.Net)}`}
                       >
                         {formatCurrency(row.Net)}
                       </td>
@@ -312,7 +313,7 @@ export function MonthlySpendingTrendReport() {
                       {formatCurrency(totals.totalExpenses)}
                     </td>
                     <td
-                      className={`px-4 py-3 text-right text-sm font-bold ${totals.totalIncome - totals.totalExpenses >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                      className={`px-4 py-3 text-right text-sm font-bold ${gainLossColor(totals.totalIncome - totals.totalExpenses)}`}
                     >
                       {formatCurrency(totals.totalIncome - totals.totalExpenses)}
                     </td>

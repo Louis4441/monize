@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import {
   AreaChart,
@@ -471,7 +472,7 @@ export function SecurityPerformanceReport() {
                 </div>
               </div>
               <div className={`rounded-lg shadow p-4 ${stats.totalReturn >= 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
-                <div className={`text-sm ${stats.totalReturn >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                <div className={`text-sm ${gainLossColor(stats.totalReturn)}`}>
                   Total Return
                 </div>
                 <div className={`text-xl font-bold ${stats.totalReturn >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>

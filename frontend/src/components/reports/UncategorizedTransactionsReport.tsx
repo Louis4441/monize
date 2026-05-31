@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -318,9 +319,7 @@ export function UncategorizedTransactionsReport() {
                       {tx.accountName || 'Unknown'}
                     </td>
                     <td className={`px-4 py-3 whitespace-nowrap text-sm text-right font-medium ${
-                      tx.amount >= 0
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
+                      gainLossColor(tx.amount)
                     }`}>
                       {formatCurrency(tx.amount)}
                     </td>

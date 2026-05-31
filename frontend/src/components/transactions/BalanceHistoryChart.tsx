@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef } from 'react';
+import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import {
   LineChart,
@@ -51,9 +52,7 @@ function BalanceTooltip({
         </p>
         <p
           className={`text-lg font-semibold ${
-            data.balance >= 0
-              ? 'text-green-600 dark:text-green-400'
-              : 'text-red-600 dark:text-red-400'
+            gainLossColor(data.balance)
           }`}
         >
           {formatCurrency(data.balance)}
@@ -252,9 +251,7 @@ export function BalanceHistoryChart({
             <div className="text-sm text-gray-500 dark:text-gray-400">Current</div>
             <div
               className={`font-semibold ${
-                summary.currentBalance >= 0
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-red-600 dark:text-red-400'
+                gainLossColor(summary.currentBalance)
               }`}
             >
               {formatCurrency(summary.currentBalance)}
