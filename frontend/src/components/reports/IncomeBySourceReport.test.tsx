@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@/test/render";
+import { render, screen, waitFor, fireEvent, act } from "@/test/render";
 import { IncomeBySourceReport } from "./IncomeBySourceReport";
 
 const mockPush = vi.fn();
@@ -110,10 +110,12 @@ describe("IncomeBySourceReport", () => {
     mockIsValid = true;
   });
 
-  it("shows loading state initially", () => {
+  it("shows loading state initially", async () => {
     mockGetIncomeBySource.mockReturnValue(new Promise(() => {}));
     render(<IncomeBySourceReport />);
     expect(document.querySelector(".animate-pulse")).toBeTruthy();
+    // Flush the fetcher's resolution so its state update is wrapped in act().
+    await act(async () => {});
   });
 
   it("renders empty state when no data returned", async () => {
@@ -354,12 +356,15 @@ describe("IncomeBySourceReport", () => {
     expect(screen.getByText("$0.00 (0%)")).toBeInTheDocument();
   });
 
-  it("does not load data when isValid is false", () => {
+  it("does not load data when isValid is false", async () => {
     mockIsValid = false;
     mockGetIncomeBySource.mockResolvedValue({ data: [], totalIncome: 0 });
     render(<IncomeBySourceReport />);
     // loadData is gated on isValid, so the API should not be called
     expect(mockGetIncomeBySource).not.toHaveBeenCalled();
+    // The fetcher resolves null when isValid is false; flush so that state
+    // update is wrapped in act().
+    await act(async () => {});
   });
 
   it("sorts table when totalIncome is zero (percentage sort branch)", async () => {

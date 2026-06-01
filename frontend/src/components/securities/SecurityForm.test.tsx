@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@/test/render';
+import { render, screen, fireEvent, waitFor, act } from '@/test/render';
 import { SecurityForm } from './SecurityForm';
 import { Security } from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
@@ -319,10 +319,12 @@ describe('SecurityForm', () => {
     });
   });
 
-  it('shows an existing favourite security as already starred', () => {
+  it('shows an existing favourite security as already starred', async () => {
     const security = createSecurity({ isFavourite: true });
     render(<SecurityForm security={security} onSubmit={onSubmit} onCancel={onCancel} />);
     expect(screen.getByTitle('Remove from favourites')).toBeInTheDocument();
+    // Flush the async state update on mount so it is wrapped in act().
+    await act(async () => {});
   });
 
   it('shows validation error when symbol is empty', async () => {

@@ -280,7 +280,7 @@ describe('CurrencyExposureReport', () => {
     mockGetInvestmentAccounts.mockRejectedValue(new Error('boom'));
     render(<CurrencyExposureReport />);
     await waitFor(() => {
-      expect(screen.getByText(/No investment holdings/)).toBeInTheDocument();
+      expect(screen.getByText(/Failed to load report data/)).toBeInTheDocument();
     });
   });
 
@@ -312,4 +312,50 @@ describe('CurrencyExposureReport', () => {
     fireEvent.mouseDown(document.body);
     await waitFor(() => expect(screen.queryByText('TFSA')).not.toBeInTheDocument());
   });
+
+  it('exercises every sortable column on the currency exposure table', async () => {
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetInvestmentAccounts.mockResolvedValue(mockAccounts);
+    let container!: HTMLElement;
+    await act(async () => {
+      ({ container } = render(<CurrencyExposureReport />));
+    });
+    await waitFor(() => expect(container.querySelector('table')).toBeInTheDocument());
+    const headerCount = container.querySelectorAll('table thead th').length;
+    expect(headerCount).toBeGreaterThan(0);
+    // Two passes flip every column through ascending and descending ordering,
+    // covering each branch of the sort comparator switch.
+    for (let pass = 0; pass < 2; pass += 1) {
+      for (let i = 0; i < headerCount; i += 1) {
+        const ths = container.querySelectorAll('table thead th');
+        if (!ths[i]) break;
+        await act(async () => { fireEvent.click(ths[i]); });
+      }
+    }
+  });
+
+  it('builds the export rows through the PDF export pipeline', async () => {
+    const { exportToPdf } = await import('@/lib/pdf-export');
+    (exportToPdf as any).mockClear();
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: mockHoldings });
+    mockGetInvestmentAccounts.mockResolvedValue(mockAccounts);
+    render(<CurrencyExposureReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Total Portfolio')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /export pdf/i }));
+    });
+    await waitFor(() => expect(exportToPdf).toHaveBeenCalledTimes(1));
+    const arg = (exportToPdf as any).mock.calls[0][0];
+    expect(arg.title).toBe('Currency Exposure');
+    expect(arg.filename).toBe('currency-exposure');
+    // USD and CAD holdings both present; USD uses the mocked 1.365 rate, CAD is
+    // the home currency so it renders the fixed '1.0000' rate string.
+    const rateColumn = arg.tableData.rows.map((r: string[]) => r[2]);
+    expect(rateColumn).toContain('1.0000');
+    expect(rateColumn).toContain('1.3650');
+    expect(arg.chartLegend.length).toBeGreaterThan(0);
+  });
+
 });

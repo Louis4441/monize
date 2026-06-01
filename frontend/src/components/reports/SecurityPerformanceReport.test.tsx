@@ -125,12 +125,15 @@ describe('SecurityPerformanceReport', () => {
     ]);
   });
 
-  it('shows loading state initially', () => {
+  it('shows loading state initially', async () => {
     mockGetSecurities.mockReturnValue(new Promise(() => {}));
     mockGetPortfolioSummary.mockReturnValue(new Promise(() => {}));
     mockGetInvestmentAccounts.mockReturnValue(new Promise(() => {}));
     render(<SecurityPerformanceReport />);
     expect(document.querySelector('.animate-pulse')).toBeTruthy();
+    // Flush the secondary detail-fetch resolution so its state update is
+    // wrapped in act().
+    await act(async () => {});
   });
 
   it('renders security selector with active securities only', async () => {
@@ -258,14 +261,15 @@ describe('SecurityPerformanceReport', () => {
     });
   });
 
-  it('handles loadDetail error and load error gracefully', async () => {
+  it('shows a retryable error when the base load fails', async () => {
     mockGetSecurities.mockRejectedValue(new Error('boom'));
     mockGetPortfolioSummary.mockRejectedValue(new Error('boom'));
     mockGetInvestmentAccounts.mockRejectedValue(new Error('boom'));
     render(<SecurityPerformanceReport />);
     await waitFor(() => {
-      expect(screen.getByRole('combobox')).toBeInTheDocument();
+      expect(screen.getByText(/Failed to load report data/)).toBeInTheDocument();
     });
+    expect(screen.getByRole('button', { name: /Try again/ })).toBeInTheDocument();
   });
 
   it('exports pdf in chart view', async () => {
