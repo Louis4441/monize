@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useClickOutside } from '@/hooks/useClickOutside';
+import { useHideOnScroll } from '@/hooks/useHideOnScroll';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/lib/auth';
@@ -148,6 +149,13 @@ export function AppHeader() {
   const isToolsActive = toolsLinks.some((link) => pathname === link.href);
   const isAiActive = aiLinks.some((link) => pathname === link.href);
 
+  // Slide the header out of view when scrolling down, back in when scrolling up.
+  // Keep it pinned while any menu or the search field is open so the open
+  // surface never scrolls away with it.
+  const scrolledAway = useHideOnScroll();
+  const anyMenuOpen = mobileMenuOpen || searchOpen || toolsOpen || aiOpen;
+  const headerHidden = scrolledAway && !anyMenuOpen;
+
   const handleLogout = async () => {
     try {
       await authApi.logout();
@@ -161,7 +169,11 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50">
+    <header
+      className={`sticky top-0 z-40 bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 transition-transform duration-300 ease-in-out ${
+        headerHidden ? '-translate-y-full' : 'translate-y-0'
+      }`}
+    >
       <div className="px-4 sm:px-6 lg:px-12">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
