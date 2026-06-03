@@ -19,6 +19,7 @@ import { gainLossColor } from '@/lib/format';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { createLogger } from '@/lib/logger';
 import {
@@ -53,6 +54,7 @@ interface InvestmentValueChartProps {
 export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix }: InvestmentValueChartProps) {
   const { formatCurrency, formatCurrencyCompact, formatCurrencyAxis, formatCurrencyFlag, formatSignedPercent } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
+  const isMobile = useIsMobile();
   const [chartPoints, setChartPoints] = useState<Array<{ name: string; Value: number }>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [intradayUnavailable, setIntradayUnavailable] = useState<{
@@ -490,7 +492,17 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
           }`}
         >
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-            <AreaChart data={chartPoints} margin={{ top: 30, right: 30, left: 0, bottom: 30 }}>
+            {/* Tighter margins on mobile to reclaim wasted space. The desktop
+                margins leave generous room around the high/low flag bubbles;
+                on a narrow screen those gutters dwarf the plot, so trim them. */}
+            <AreaChart
+              data={chartPoints}
+              margin={
+                isMobile
+                  ? { top: 16, right: 8, left: 0, bottom: 8 }
+                  : { top: 30, right: 30, left: 0, bottom: 30 }
+              }
+            >
               <defs>
                 <linearGradient id="colorInvestments" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -524,6 +536,7 @@ export function InvestmentValueChart({ accountIds, displayCurrency, titleSuffix 
                 domain={yAxisDomain}
                 tickFormatter={fmtAxis}
                 tick={{ fontSize: 12 }}
+                width={isMobile ? 44 : undefined}
               />
               <Tooltip content={<CustomTooltip />} />
               <Area

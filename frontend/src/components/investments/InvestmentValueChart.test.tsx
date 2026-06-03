@@ -12,14 +12,30 @@ const dateRangeState = { dateRange: '1y', resolvedRange: { start: '2023-01-01', 
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  AreaChart: ({ children }: any) => <div data-testid="area-chart">{children}</div>,
+  AreaChart: ({ children, margin }: any) => (
+    <div data-testid="area-chart" data-margin={JSON.stringify(margin)}>{children}</div>
+  ),
   Area: () => null,
   XAxis: () => null,
-  YAxis: () => null,
+  YAxis: ({ width }: any) => <div data-testid="y-axis" data-width={width ?? ''} />,
   CartesianGrid: () => null,
   Tooltip: () => null,
   ReferenceDot: () => null,
 }));
+
+/** Toggle the useIsMobile media query for a single test. */
+function setViewport(isMobile: boolean) {
+  vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+    matches: query.includes('max-width') ? isMobile : false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }) as unknown as MediaQueryList);
+}
 
 vi.mock('@/hooks/useNumberFormat', () => ({
   useNumberFormat: () => ({
@@ -131,6 +147,30 @@ describe('InvestmentValueChart', () => {
     render(<InvestmentValueChart />);
     await screen.findByText('Portfolio Value Over Time');
     expect(screen.getByTestId('area-chart')).toBeInTheDocument();
+  });
+
+  it('uses generous chart margins on desktop', async () => {
+    setViewport(false);
+    render(<InvestmentValueChart />);
+    await screen.findByText('Portfolio Value Over Time');
+    const margin = JSON.parse(
+      screen.getByTestId('area-chart').getAttribute('data-margin') || '{}',
+    );
+    expect(margin).toEqual({ top: 30, right: 30, left: 0, bottom: 30 });
+    // Default YAxis width (no explicit override) on desktop.
+    expect(screen.getByTestId('y-axis').getAttribute('data-width')).toBe('');
+  });
+
+  it('reclaims wasted space with tighter margins on mobile', async () => {
+    setViewport(true);
+    render(<InvestmentValueChart />);
+    await screen.findByText('Portfolio Value Over Time');
+    const margin = JSON.parse(
+      screen.getByTestId('area-chart').getAttribute('data-margin') || '{}',
+    );
+    expect(margin).toEqual({ top: 16, right: 8, left: 0, bottom: 8 });
+    // Narrower YAxis gutter on mobile.
+    expect(screen.getByTestId('y-axis').getAttribute('data-width')).toBe('44');
   });
 
   it('displays computed summary values', async () => {
