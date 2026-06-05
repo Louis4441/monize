@@ -180,6 +180,7 @@ const mockAccounts = [
   { id: 'acc-2', name: 'Visa', accountType: 'CREDIT_CARD', accountSubType: null, currencyCode: 'USD', currentBalance: -500, isClosed: false },
   { id: 'acc-3', name: 'Brokerage', accountType: 'INVESTMENT', accountSubType: 'INVESTMENT_BROKERAGE', currencyCode: 'USD', currentBalance: 10000, isClosed: false },
   { id: 'acc-4', name: 'Old Savings', accountType: 'SAVINGS', accountSubType: null, currencyCode: 'USD', currentBalance: 0, isClosed: true },
+  { id: 'acc-5', name: 'Car Loan', accountType: 'LOAN', accountSubType: null, currencyCode: 'USD', currentBalance: -8000, isClosed: false },
 ];
 
 const mockTransactions = [
@@ -591,6 +592,27 @@ describe('ReconcilePage', () => {
       expect(mockRouterPush).toHaveBeenCalledWith(
         '/bills?reconcileCreate=1&reconcileTransferAccountId=acc-2&reconcileAmount=500'
       );
+    });
+
+    it('does not show the payment prompt for a loan account', async () => {
+      mockGetReconciliationData.mockResolvedValue({
+        transactions: [{
+          id: 'tx-a', transactionDate: '2026-02-01', payee: { name: 'Test' },
+          payeeName: null, category: null, amount: -8000, status: TransactionStatus.CLEARED,
+        }],
+        reconciledBalance: 0, clearedBalance: -8000, difference: 0,
+      });
+      render(<ReconcilePage />);
+      await waitFor(() => expect(screen.getByText(/Car Loan/)).toBeInTheDocument(), { timeout: 3000 });
+      fireEvent.change(screen.getByLabelText('Account'), { target: { value: 'acc-5' } });
+      fireEvent.change(screen.getByLabelText('Statement Ending Balance'), { target: { value: '8000' } });
+      fireEvent.click(screen.getAllByText('Start Reconciliation').find(el => el.tagName === 'BUTTON')!);
+      await waitFor(() => expect(screen.getByText('Finish Reconciliation')).toBeInTheDocument(), { timeout: 3000 });
+      fireEvent.click(screen.getByText('Finish Reconciliation'));
+      await waitFor(() => expect(screen.getByText('Reconciliation Complete')).toBeInTheDocument(), { timeout: 3000 });
+      expect(screen.queryByText('Update Next Payment')).not.toBeInTheDocument();
+      expect(screen.queryByText('Create Scheduled Payment')).not.toBeInTheDocument();
+      expect(mockScheduledGetAll).not.toHaveBeenCalled();
     });
 
     it('does not show the payment prompt for a non-liability account', async () => {

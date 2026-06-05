@@ -24,6 +24,11 @@ import { getErrorMessage } from '@/lib/errors';
 
 const LIABILITY_TYPES = new Set(['CREDIT_CARD', 'LOAN', 'MORTGAGE', 'LINE_OF_CREDIT']);
 
+// Revolving-credit accounts whose balance changes each statement, so the
+// payment that pays them off should track the reconciled balance. Loans and
+// mortgages have fixed payments and are intentionally excluded.
+const PAYMENT_PROMPT_TYPES = new Set(['CREDIT_CARD', 'LINE_OF_CREDIT']);
+
 type ReconcileStep = 'setup' | 'reconcile' | 'complete';
 
 export default function ReconcilePage() {
@@ -78,6 +83,11 @@ function ReconcileContent() {
   );
 
   const isLiability = selectedAccount ? LIABILITY_TYPES.has(selectedAccount.accountType) : false;
+
+  // Only revolving-credit accounts get the post-reconciliation payment prompt.
+  const offersPaymentPrompt = selectedAccount
+    ? PAYMENT_PROMPT_TYPES.has(selectedAccount.accountType)
+    : false;
 
   // For liability accounts, auto-negate positive entries. If the user explicitly
   // flips the sign (same absolute value), respect their choice -- mirrors the
@@ -186,9 +196,9 @@ function ReconcileContent() {
       );
       toast.success(`Successfully reconciled ${result.reconciled} transactions`);
 
-      // For liability accounts, look for an existing scheduled bill that pays
-      // down this account so we can offer to update its next instance.
-      if (isLiability) {
+      // For revolving-credit accounts, look for an existing scheduled bill that
+      // pays down this account so we can offer to update its next instance.
+      if (offersPaymentPrompt) {
         try {
           const scheduled = await scheduledTransactionsApi.getAll();
           const match = scheduled.find(
@@ -494,9 +504,10 @@ function ReconcileContent() {
           {format(new Date(statementDate), 'MMMM d, yyyy')}.
         </p>
 
-        {/* Liability payment prompt: offer to update or create the scheduled
-            bill that pays down this account, using the reconciled balance. */}
-        {isLiability && (
+        {/* Revolving-credit payment prompt: offer to update or create the
+            scheduled bill that pays down this account, using the reconciled
+            balance. */}
+        {offersPaymentPrompt && (
           <div className="mb-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 text-left">
             {paymentBill ? (
               <>
