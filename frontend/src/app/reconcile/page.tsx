@@ -12,15 +12,22 @@ import { DateInput } from '@/components/ui/DateInput';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { Select } from '@/components/ui/Select';
 import { transactionsApi } from '@/lib/transactions';
+import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { getLocalDateString } from '@/lib/utils';
 import { accountsApi } from '@/lib/accounts';
 import { Account } from '@/types/account';
+import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { ReconciliationData, TransactionStatus } from '@/types/transaction';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { getCurrencySymbol } from '@/lib/format';
 import { getErrorMessage } from '@/lib/errors';
 
 const LIABILITY_TYPES = new Set(['CREDIT_CARD', 'LOAN', 'MORTGAGE', 'LINE_OF_CREDIT']);
+
+// Revolving-credit accounts whose balance changes each statement, so the
+// payment that pays them off should track the reconciled balance. Loans and
+// mortgages have fixed payments and are intentionally excluded.
+const PAYMENT_PROMPT_TYPES = new Set(['CREDIT_CARD', 'LINE_OF_CREDIT']);
 
 type ReconcileStep = 'setup' | 'reconcile' | 'complete';
 
@@ -49,6 +56,9 @@ function ReconcileContent() {
   const [selectedTransactionIds, setSelectedTransactionIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [isReconciling, setIsReconciling] = useState(false);
+  // Post-reconciliation liability-payment prompt: the scheduled bill (if any)
+  // that pays down the reconciled liability account.
+  const [paymentBill, setPaymentBill] = useState<ScheduledTransaction | null>(null);
 
   // Load accounts
   useEffect(() => {
@@ -73,6 +83,11 @@ function ReconcileContent() {
   );
 
   const isLiability = selectedAccount ? LIABILITY_TYPES.has(selectedAccount.accountType) : false;
+
+  // Only revolving-credit accounts get the post-reconciliation payment prompt.
+  const offersPaymentPrompt = selectedAccount
+    ? PAYMENT_PROMPT_TYPES.has(selectedAccount.accountType)
+    : false;
 
   // For liability accounts, auto-negate positive entries. If the user explicitly
   // flips the sign (same absolute value), respect their choice -- mirrors the
@@ -180,6 +195,23 @@ function ReconcileContent() {
         statementDate
       );
       toast.success(`Successfully reconciled ${result.reconciled} transactions`);
+
+      // For revolving-credit accounts, look for an existing scheduled bill that
+      // pays down this account so we can offer to update its next instance.
+      if (offersPaymentPrompt) {
+        try {
+          const scheduled = await scheduledTransactionsApi.getAll();
+          const match = scheduled.find(
+            (st) =>
+              (st.isTransfer && st.transferAccountId === selectedAccountId) ||
+              (st.splits?.some((s) => s.transferAccountId === selectedAccountId) ?? false)
+          );
+          setPaymentBill(match ?? null);
+        } catch {
+          setPaymentBill(null);
+        }
+      }
+
       setStep('complete');
     } catch (error) {
       toast.error(getErrorMessage(error, 'Failed to reconcile transactions'));
@@ -192,6 +224,24 @@ function ReconcileContent() {
     setStep('setup');
     setReconciliationData(null);
     setSelectedTransactionIds(new Set());
+  };
+
+  // The amount to apply to the liability payment: the reconciled balance owed,
+  // as a positive figure (liability balances are stored negative).
+  const reconciledPaymentAmount = Math.round(Math.abs(statementBalance ?? 0) * 100) / 100;
+
+  const handleUpdatePayment = () => {
+    if (!paymentBill) return;
+    router.push(
+      `/bills?reconcileEditId=${paymentBill.id}&reconcileAmount=${reconciledPaymentAmount}`
+    );
+  };
+
+  const handleCreatePayment = () => {
+    router.push(
+      `/bills?reconcileCreate=1&reconcileTransferAccountId=${selectedAccountId}` +
+        `&reconcileAmount=${reconciledPaymentAmount}`
+    );
   };
 
   const formatCurrency = (amount: number | string | null | undefined) => {
@@ -453,6 +503,50 @@ function ReconcileContent() {
           Your account has been successfully reconciled as of{' '}
           {format(new Date(statementDate), 'MMMM d, yyyy')}.
         </p>
+
+        {/* Revolving-credit payment prompt: offer to update or create the
+            scheduled bill that pays down this account, using the reconciled
+            balance. */}
+        {offersPaymentPrompt && (
+          <div className="mb-6 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 text-left">
+            {paymentBill ? (
+              <>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  This account has a scheduled payment,{' '}
+                  <span className="font-medium">{paymentBill.name}</span>. Would
+                  you like to update its next instance to the reconciled balance
+                  of{' '}
+                  <span className="font-medium">
+                    {formatCurrency(reconciledPaymentAmount)}
+                  </span>
+                  ?
+                </p>
+                <div className="mt-3 flex justify-center">
+                  <Button onClick={handleUpdatePayment}>
+                    Update Next Payment
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  No scheduled payment was found for this account. Would you like
+                  to create one for the reconciled balance of{' '}
+                  <span className="font-medium">
+                    {formatCurrency(reconciledPaymentAmount)}
+                  </span>
+                  ?
+                </p>
+                <div className="mt-3 flex justify-center">
+                  <Button onClick={handleCreatePayment}>
+                    Create Scheduled Payment
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="flex justify-center space-x-4">
           <Button variant="outline" onClick={() => router.push('/accounts')}>
             Back to Accounts
@@ -463,6 +557,7 @@ function ReconcileContent() {
               setReconciliationData(null);
               setSelectedTransactionIds(new Set());
               setStatementBalance(undefined);
+              setPaymentBill(null);
             }}
           >
             Reconcile Another Account
