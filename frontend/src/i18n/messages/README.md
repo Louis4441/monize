@@ -33,15 +33,51 @@ be done in focused PRs.
   string with `[XX-...-XX]` markers, making it easy to spot strings that
   haven't been extracted yet.
 
+## The pseudo-locale is generated -- do not hand-edit it
+
+The `xx/` catalogs are generated from `en/` by a script. After editing any
+`en/*.json` file, regenerate them:
+
+    npm run i18n:pseudo
+
+`npm run i18n:check` fails if `xx/` is out of date, so wire it into CI/pre-commit
+to keep the two in sync. ICU placeholders (`{count}`, plural/select blocks) are
+preserved; only the surrounding literal text is marked.
+
+## Extracting strings in a component
+
+Client components read strings through next-intl's `useTranslations`:
+
+    'use client';
+    import { useTranslations } from 'next-intl';
+
+    export function MyComponent() {
+      const t = useTranslations('auth');           // namespace
+      return <button>{t('signIn.submit')}</button>; // -> "Sign in"
+    }
+
+For strings that embed markup (a link, a `<span>`), use `t.rich` with element
+chunks instead of concatenating:
+
+    t.rich('register.agreement', {
+      terms: (chunks) => <a href="/terms">{chunks}</a>,
+    });
+
+Component tests resolve the real English catalog automatically (`test/render.tsx`
+eagerly loads every `en/` namespace), so assertions on visible English text keep
+working without mocking next-intl.
+
 ## Namespaces
 
 The catalogue is split into small files by feature area. To add a new
 namespace, add it to the `NAMESPACES` array in `src/i18n/messages.ts` and
 create matching JSON files for every locale.
 
-| Namespace  | Contents                                          |
-|------------|---------------------------------------------------|
-| `common`   | Shared UI primitives (buttons, dialogs, toasts)   |
-| `settings` | The settings page (themes, preferences, language) |
+| Namespace    | Contents                                              |
+|--------------|-------------------------------------------------------|
+| `common`     | Shared UI primitives (buttons, dialogs, toasts)       |
+| `settings`   | The settings page (themes, preferences, language)     |
+| `auth`       | Login, register, forgot/reset/change password pages   |
+| `navigation` | App header, mobile nav drawer, search, section links  |
 
 More namespaces will be added in subsequent PRs as feature areas are extracted.

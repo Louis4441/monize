@@ -9,7 +9,7 @@ import { DEFAULT_LOCALE } from "./config";
  * Loading goes through dynamic imports so a locale's catalogs are not bundled
  * into every page until they're needed.
  */
-const NAMESPACES = ["common", "settings"] as const;
+const NAMESPACES = ["common", "settings", "auth", "navigation"] as const;
 
 type Namespace = (typeof NAMESPACES)[number];
 type Messages = Record<string, unknown>;

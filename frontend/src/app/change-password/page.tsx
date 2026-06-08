@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import '@/lib/zodConfig';
@@ -30,6 +31,7 @@ const changePasswordSchema = z
 type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
 
 export default function ChangePasswordPage() {
+  const t = useTranslations('auth.changePassword');
   const router = useRouter();
   const { user, setUser } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
@@ -54,10 +56,10 @@ export default function ChangePasswordPage() {
       const updatedUser = await authApi.getProfile();
       setUser(updatedUser);
 
-      toast.success('Password changed successfully');
+      toast.success(t('toasts.success'));
       router.push('/dashboard');
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to change password'));
+      toast.error(getErrorMessage(error, t('toasts.failed')));
     } finally {
       setIsLoading(false);
     }
@@ -80,17 +82,17 @@ export default function ChangePasswordPage() {
         <div>
           <Image src="/icons/monize-logo.svg" alt="Monize" width={96} height={96} className="mx-auto rounded-xl" priority />
           <h2 className="mt-4 text-center text-3xl font-extrabold text-gray-900 dark:text-gray-100">
-            Change Your Password
+            {t('title')}
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Your password must be changed before you can continue.
+            {t('subtitle')}
           </p>
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-4">
             <Input
-              label="Current Password"
+              label={t('currentPasswordLabel')}
               type="password"
               autoComplete="current-password"
               error={errors.currentPassword?.message}
@@ -98,7 +100,7 @@ export default function ChangePasswordPage() {
             />
 
             <Input
-              label="New Password"
+              label={t('newPasswordLabel')}
               type="password"
               autoComplete="new-password"
               error={errors.newPassword?.message}
@@ -106,7 +108,7 @@ export default function ChangePasswordPage() {
             />
 
             <Input
-              label="Confirm New Password"
+              label={t('confirmPasswordLabel')}
               type="password"
               autoComplete="new-password"
               error={errors.confirmPassword?.message}
@@ -125,7 +127,7 @@ export default function ChangePasswordPage() {
             isLoading={isLoading}
             className="w-full"
           >
-            Change Password
+            {t('submit')}
           </Button>
         </form>
       </div>
