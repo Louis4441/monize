@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
+import { I18nService } from "nestjs-i18n";
 import { EmergencyAccessMonitorService } from "./emergency-access-monitor.service";
 import { EmergencyAccessSettings } from "./entities/emergency-access-settings.entity";
 import { EmergencyAccessContact } from "./entities/emergency-access-contact.entity";
@@ -67,6 +68,13 @@ describe("EmergencyAccessMonitorService", () => {
         { provide: EmailService, useValue: emailService },
         { provide: AiEncryptionService, useValue: encryption },
         { provide: ConfigService, useValue: configService },
+        {
+          provide: I18nService,
+          useValue: {
+            translate: (key: string, opts?: { defaultValue?: string }) =>
+              opts?.defaultValue ?? key,
+          },
+        },
       ],
     }).compile();
 

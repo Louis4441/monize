@@ -30,6 +30,10 @@ import { TokenService } from "./token.service";
 import { TwoFactorService } from "./two-factor.service";
 import { AuthEmailService } from "./auth-email.service";
 import { DelegationService } from "../delegation/delegation.service";
+import { tr } from "../i18n/translate";
+import { I18nService } from "nestjs-i18n";
+import { emailTranslator } from "../i18n/email-translator";
+import { DEFAULT_LOCALE } from "../i18n/config";
 
 @Injectable()
 export class AuthService {
@@ -58,6 +62,7 @@ export class AuthService {
     private twoFactorService: TwoFactorService,
     private authEmailService: AuthEmailService,
     private delegationService: DelegationService,
+    private readonly i18n: I18nService,
   ) {
     this.jwtSecret = this.configService.get<string>("JWT_SECRET")!;
     this.csrfKey = derivePurposeKey(this.jwtSecret, "csrf-token");
@@ -102,7 +107,12 @@ export class AuthService {
         (await this.delegationService.isDelegateUser(existingUser.id)) &&
         !(await this.delegationService.isFullAccount(existingUser.id));
       if (!isPureDelegate) {
-        throw new ConflictException("Unable to complete registration");
+        throw new ConflictException(
+          tr(
+            "errors.auth.unableToCompleteRegistration",
+            "Unable to complete registration",
+          ),
+        );
       }
 
       if (existingUser.passwordHash) {
@@ -124,9 +134,12 @@ export class AuthService {
         }
         if (!claimOk) {
           throw new UnauthorizedException(
-            "An account with this email already exists as a shared user. " +
-              "Provide the temporary password your administrator gave you " +
-              "to claim it.",
+            tr(
+              "errors.auth.delegateClaimPasswordRequired",
+              "An account with this email already exists as a shared user. " +
+                "Provide the temporary password your administrator gave you " +
+                "to claim it.",
+            ),
           );
         }
       }
@@ -134,7 +147,10 @@ export class AuthService {
       const breached = await this.passwordBreachService.isBreached(password);
       if (breached) {
         throw new BadRequestException(
-          "This password has been found in a data breach. Please choose a different password.",
+          tr(
+            "errors.auth.passwordBreached",
+            "This password has been found in a data breach. Please choose a different password.",
+          ),
         );
       }
 
@@ -167,7 +183,10 @@ export class AuthService {
     const isBreached = await this.passwordBreachService.isBreached(password);
     if (isBreached) {
       throw new BadRequestException(
-        "This password has been found in a data breach. Please choose a different password.",
+        tr(
+          "errors.auth.passwordBreached",
+          "This password has been found in a data breach. Please choose a different password.",
+        ),
       );
     }
 
@@ -216,14 +235,19 @@ export class AuthService {
 
     if (!user || !user.passwordHash) {
       this.logger.warn("Login failed: no matching account");
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException(
+        tr("errors.auth.invalidCredentials", "Invalid credentials"),
+      );
     }
 
     // Check account lockout
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       this.logger.warn(`Login failed: account locked for user ${user.id}`);
       throw new ForbiddenException(
-        "Account is temporarily locked due to too many failed login attempts. Please try again later.",
+        tr(
+          "errors.auth.accountTemporarilyLocked",
+          "Account is temporarily locked due to too many failed login attempts. Please try again later.",
+        ),
       );
     }
 
@@ -248,11 +272,13 @@ export class AuthService {
         );
         // Fire-and-forget lockout email
         if (user.email) {
+          const lang = DEFAULT_LOCALE;
+          const t = emailTranslator(this.i18n, lang);
           this.emailService
             .sendMail(
               user.email,
-              "Account Temporarily Locked",
-              accountLockedTemplate(user.firstName || ""),
+              t("emails.accountLocked.subject", "Account Temporarily Locked"),
+              accountLockedTemplate(user.firstName || "", t),
             )
             .catch((err) =>
               this.logger.warn(`Failed to send lockout email: ${err.message}`),
@@ -265,12 +291,16 @@ export class AuthService {
         .set(updateFields)
         .where("id = :id", { id: user.id })
         .execute();
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException(
+        tr("errors.auth.invalidCredentials", "Invalid credentials"),
+      );
     }
 
     if (!user.isActive) {
       this.logger.warn(`Login failed: account deactivated for user ${user.id}`);
-      throw new UnauthorizedException("Account is deactivated");
+      throw new UnauthorizedException(
+        tr("errors.auth.accountDeactivated", "Account is deactivated"),
+      );
     }
 
     // Reset failed attempts on successful login
@@ -366,7 +396,10 @@ export class AuthService {
 
     if (!sub) {
       throw new UnauthorizedException(
-        "OIDC provider did not return a subject identifier",
+        tr(
+          "errors.auth.oidcNoSubject",
+          "OIDC provider did not return a subject identifier",
+        ),
       );
     }
 
@@ -403,7 +436,12 @@ export class AuthService {
 
       if (!user) {
         if (!registrationEnabled) {
-          throw new ForbiddenException("New account registration is disabled.");
+          throw new ForbiddenException(
+            tr(
+              "errors.auth.registrationDisabled",
+              "New account registration is disabled.",
+            ),
+          );
         }
         // C9: Use serializable transaction for first-user admin race prevention
         try {
@@ -572,10 +610,12 @@ export class AuthService {
         this.configService.get<string>("PUBLIC_APP_URL") ||
         "http://localhost:3000";
       const confirmUrl = `${frontendUrl}/api/v1/auth/oidc/confirm-link?token=${linkToken}`;
-      const html = oidcLinkTemplate(user.firstName || "", confirmUrl);
+      const lang = DEFAULT_LOCALE;
+      const t = emailTranslator(this.i18n, lang);
+      const html = oidcLinkTemplate(user.firstName || "", confirmUrl, t);
       await this.emailService.sendMail(
         user.email,
-        "Monize: Confirm SSO Account Link",
+        t("emails.oidcLink.subject", "Monize: Confirm SSO Account Link"),
         html,
       );
     } catch (err) {
@@ -593,7 +633,12 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException("Invalid or expired link token");
+      throw new BadRequestException(
+        tr(
+          "errors.auth.invalidOrExpiredLinkToken",
+          "Invalid or expired link token",
+        ),
+      );
     }
 
     if (user.oidcLinkExpiresAt && user.oidcLinkExpiresAt < new Date()) {
@@ -603,7 +648,9 @@ export class AuthService {
       user.oidcLinkExpiresAt = null;
       user.pendingOidcSubject = null;
       await this.usersRepository.save(user);
-      throw new BadRequestException("Link token has expired");
+      throw new BadRequestException(
+        tr("errors.auth.linkTokenExpired", "Link token has expired"),
+      );
     }
 
     // Complete the link

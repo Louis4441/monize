@@ -3,6 +3,9 @@ import { Cron } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
 import { LessThan, IsNull, Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
+import { I18nService } from "nestjs-i18n";
+import { emailTranslator } from "../i18n/email-translator";
+import { DEFAULT_LOCALE } from "../i18n/config";
 import { getMonthEndYMD } from "../common/date-utils";
 import { Budget } from "./entities/budget.entity";
 import {
@@ -86,6 +89,7 @@ export class BudgetAlertService {
     private scheduledTransactionsRepository: Repository<ScheduledTransaction>,
     private emailService: EmailService,
     private configService: ConfigService,
+    private readonly i18n: I18nService,
   ) {}
 
   @Cron("0 7 * * *")
@@ -610,16 +614,26 @@ export class BudgetAlertService {
         categoryName: (a.data?.categoryName as string) || "",
       }));
 
+      const lang = prefs?.language || DEFAULT_LOCALE;
+      const t = emailTranslator(this.i18n, lang);
+
       const html = budgetAlertImmediateTemplate(
         user.firstName || "",
         alertData,
         appUrl,
+        t,
       );
 
       const subject =
         alerts.length === 1
-          ? `Monize: Alert - ${alerts[0].title}`
-          : `Monize: ${alerts.length} alerts need attention`;
+          ? t(
+              "emails.budgetAlertImmediate.subject",
+              `Monize: Alert - ${alerts[0].title}`,
+            )
+          : t(
+              "emails.budgetAlertImmediate.subjectPlural",
+              `Monize: ${alerts.length} alerts need attention`,
+            );
 
       await this.emailService.sendMail(user.email, subject, html);
       return true;
@@ -715,14 +729,21 @@ export class BudgetAlertService {
 
     const budgetNames = budgets.map((b) => b.name);
 
+    const lang = prefs?.language || DEFAULT_LOCALE;
+    const t = emailTranslator(this.i18n, lang);
+
     const html = budgetWeeklyDigestTemplate(
       user.firstName || "",
       alertData,
       budgetNames,
       appUrl,
+      t,
     );
 
-    const subject = "Monize: Your weekly budget summary";
+    const subject = t(
+      "emails.budgetWeeklyDigest.subject",
+      "Monize: Your weekly budget summary",
+    );
     await this.emailService.sendMail(user.email, subject, html);
     return true;
   }

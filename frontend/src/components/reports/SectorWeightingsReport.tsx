@@ -298,7 +298,7 @@ export function SectorWeightingsReport() {
                 width={100}
                 tick={{ fill: 'currentColor', fontSize: 11 }}
               />
-              <Tooltip content={<CustomTooltip formatCurrencyFull={formatCurrencyFull} defaultCurrency={defaultCurrency} labelDirect={t('sectorWeightings.tooltipDirect')} labelEtf={t('sectorWeightings.tooltipEtf')} labelTotal={t('sectorWeightings.tooltipTotal')} />} />
+              <Tooltip content={<CustomTooltip formatCurrencyFull={formatCurrencyFull} defaultCurrency={defaultCurrency} labelDirect={t.raw('sectorWeightings.tooltipDirect') as string} labelEtf={t.raw('sectorWeightings.tooltipEtf') as string} labelTotal={t.raw('sectorWeightings.tooltipTotal') as string} />} />
               <Legend
                 formatter={(value: string) =>
                   value === 'direct' ? t('sectorWeightings.viewDirect') : t('sectorWeightings.viewEtf')

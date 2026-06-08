@@ -40,6 +40,9 @@ import { Setup2faDto } from "./dto/setup-2fa.dto";
 import { Setup2faInitDto } from "./dto/setup-2fa-init.dto";
 import { passwordResetTemplate } from "../notifications/email-templates";
 import { SwitchContextDto } from "./dto/switch-context.dto";
+import { I18nService } from "nestjs-i18n";
+import { emailTranslator } from "../i18n/email-translator";
+import { DEFAULT_LOCALE } from "../i18n/config";
 import { DelegationService } from "../delegation/delegation.service";
 import { AllowDelegate } from "../delegation/decorators/delegate-access.decorator";
 import { SkipCsrf } from "../common/decorators/skip-csrf.decorator";
@@ -48,6 +51,7 @@ import { DemoRestricted } from "../common/decorators/demo-restricted.decorator";
 import { DemoModeService } from "../common/demo-mode.service";
 import { generateCsrfToken, getCsrfCookieOptions } from "../common/csrf.util";
 import { encrypt, decrypt, derivePurposeKey } from "./crypto.util";
+import { tr } from "../i18n/translate";
 
 @ApiTags("Authentication")
 @Controller("auth")
@@ -68,6 +72,7 @@ export class AuthController {
     private demoModeService: DemoModeService,
     private tokenService: TokenService,
     private delegationService: DelegationService,
+    private readonly i18n: I18nService,
   ) {
     // Default to true if not explicitly set to 'false'
     const localAuthSetting = this.configService.get<string>(
@@ -236,11 +241,19 @@ export class AuthController {
   async register(@Body() registerDto: RegisterDto, @Res() res: Response) {
     if (!this.localAuthEnabled) {
       throw new ForbiddenException(
-        "Local authentication is disabled. Please use OIDC to sign in.",
+        tr(
+          "errors.auth.localAuthDisabled",
+          "Local authentication is disabled. Please use OIDC to sign in.",
+        ),
       );
     }
     if (!this.registrationEnabled) {
-      throw new ForbiddenException("New account registration is disabled.");
+      throw new ForbiddenException(
+        tr(
+          "errors.auth.registrationDisabled",
+          "New account registration is disabled.",
+        ),
+      );
     }
     const result = await this.authService.register(registerDto);
 
@@ -267,7 +280,10 @@ export class AuthController {
   ) {
     if (!this.localAuthEnabled) {
       throw new ForbiddenException(
-        "Local authentication is disabled. Please use OIDC to sign in.",
+        tr(
+          "errors.auth.localAuthDisabled",
+          "Local authentication is disabled. Please use OIDC to sign in.",
+        ),
       );
     }
     const trustedDeviceRef = this.decryptTrustedDeviceCookie(
@@ -302,7 +318,12 @@ export class AuthController {
   @ApiResponse({ status: 400, description: "OIDC not configured" })
   async oidcLogin(@Res() res: Response) {
     if (!this.oidcService.enabled) {
-      throw new BadRequestException("OIDC authentication is not configured");
+      throw new BadRequestException(
+        tr(
+          "errors.auth.oidcNotConfigured",
+          "OIDC authentication is not configured",
+        ),
+      );
     }
 
     const state = this.oidcService.generateState();
@@ -547,7 +568,9 @@ export class AuthController {
 
     const realUser = await this.authService.getUserById(realUserId);
     if (!realUser || !realUser.isActive) {
-      throw new UnauthorizedException("User not found or inactive");
+      throw new UnauthorizedException(
+        tr("errors.auth.userNotFoundOrInactive", "User not found or inactive"),
+      );
     }
 
     // SECURITY: revoke the current refresh family so a stale refresh token
@@ -576,7 +599,12 @@ export class AuthController {
   @ApiOperation({ summary: "Request password reset email" })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     if (!this.localAuthEnabled) {
-      throw new ForbiddenException("Local authentication is disabled.");
+      throw new ForbiddenException(
+        tr(
+          "errors.auth.localAuthDisabledShort",
+          "Local authentication is disabled.",
+        ),
+      );
     }
 
     // M7: Per-email rate limiting (max 3 per email per hour)
@@ -596,12 +624,18 @@ export class AuthController {
         "http://localhost:3000",
       );
       const resetUrl = `${frontendUrl}/reset-password?token=${result.token}`;
-      const html = passwordResetTemplate(result.user.firstName || "", resetUrl);
+      const lang = DEFAULT_LOCALE;
+      const t = emailTranslator(this.i18n, lang);
+      const html = passwordResetTemplate(
+        result.user.firstName || "",
+        resetUrl,
+        t,
+      );
 
       try {
         await this.emailService.sendMail(
           result.user.email!,
-          "Monize Password Reset",
+          t("emails.passwordReset.subject", "Monize Password Reset"),
           html,
         );
       } catch (error) {
@@ -807,7 +841,9 @@ export class AuthController {
   async refresh(@Request() req: ExpressRequest, @Res() res: Response) {
     const refreshToken = req.cookies?.["refresh_token"];
     if (!refreshToken) {
-      throw new UnauthorizedException("No refresh token provided");
+      throw new UnauthorizedException(
+        tr("errors.auth.noRefreshTokenProvided", "No refresh token provided"),
+      );
     }
 
     try {
@@ -852,7 +888,9 @@ export class AuthController {
 
     try {
       if (!token) {
-        throw new BadRequestException("Missing link token");
+        throw new BadRequestException(
+          tr("errors.auth.missingLinkToken", "Missing link token"),
+        );
       }
       await this.authService.confirmOidcLink(token);
       res.redirect(`${frontendUrl}/auth/callback?link=success`);

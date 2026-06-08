@@ -4,6 +4,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, IsNull } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
+import { I18nService } from "nestjs-i18n";
 import { EmergencyAccessSettings } from "./entities/emergency-access-settings.entity";
 import { EmergencyAccessContact } from "./entities/emergency-access-contact.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
@@ -13,6 +14,8 @@ import {
   emergencyAccessGrantRevokedTemplate,
   emergencyAccessReminderTemplate,
 } from "../notifications/email-templates";
+import { emailTranslator } from "../i18n/email-translator";
+import { DEFAULT_LOCALE } from "../i18n/config";
 import { hashToken } from "../auth/crypto.util";
 import { User } from "../users/entities/user.entity";
 
@@ -34,6 +37,7 @@ export class EmergencyAccessMonitorService {
     private readonly emailService: EmailService,
     private readonly encryption: AiEncryptionService,
     private readonly configService: ConfigService,
+    private readonly i18n: I18nService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
@@ -143,16 +147,25 @@ export class EmergencyAccessMonitorService {
           await this.contactsRepo.save(contact);
 
           const claimUrl = `${appUrl}/emergency-access/claim?token=${rawToken}`;
-          const html = emergencyAccessGrantTemplate({
-            contactFirstName: contact.firstName,
-            ownerFullName,
-            message: decryptedMessage,
-            claimUrl,
-            expiresAt,
-          });
+          const lang = DEFAULT_LOCALE;
+          const t = emailTranslator(this.i18n, lang);
+          const html = emergencyAccessGrantTemplate(
+            {
+              contactFirstName: contact.firstName,
+              ownerFullName,
+              message: decryptedMessage,
+              claimUrl,
+              expiresAt,
+            },
+            t,
+          );
           await this.emailService.sendMail(
             contact.email,
-            `You have been granted emergency access to ${ownerFullName}'s Monize account`,
+            t(
+              "emails.emergencyAccessGrant.subject",
+              `You have been granted emergency access to ${ownerFullName}'s Monize account`,
+              { owner: ownerFullName },
+            ),
             html,
           );
           delivered += 1;
@@ -203,19 +216,28 @@ export class EmergencyAccessMonitorService {
         0,
         settings.grantAfterDays - daysSinceLogin,
       );
-      const html = emergencyAccessReminderTemplate({
-        ownerFirstName: owner.firstName || "",
-        daysSinceLogin,
-        daysUntilGrant,
-        contacts: contacts.map((c) => ({
-          firstName: c.firstName,
-          email: c.email,
-        })),
-        appUrl,
-      });
+      const reminderLang = DEFAULT_LOCALE;
+      const reminderT = emailTranslator(this.i18n, reminderLang);
+      const html = emergencyAccessReminderTemplate(
+        {
+          ownerFirstName: owner.firstName || "",
+          daysSinceLogin,
+          daysUntilGrant,
+          contacts: contacts.map((c) => ({
+            firstName: c.firstName,
+            email: c.email,
+          })),
+          appUrl,
+        },
+        reminderT,
+      );
       await this.emailService.sendMail(
         owner.email,
-        `Monize: your account has been inactive for ${daysSinceLogin} day${daysSinceLogin === 1 ? "" : "s"}`,
+        reminderT(
+          "emails.emergencyAccessReminder.subject",
+          `Monize: your account has been inactive for ${daysSinceLogin} day${daysSinceLogin === 1 ? "" : "s"}`,
+          { daysSinceLogin },
+        ),
         html,
       );
       settings.lastReminderSentAt = new Date(now);
@@ -262,13 +284,21 @@ export class EmergencyAccessMonitorService {
 
     if (!owner.email) return;
     try {
-      const html = emergencyAccessGrantRevokedTemplate({
-        ownerFirstName: owner.firstName || "",
-        appUrl,
-      });
+      const revokedLang = DEFAULT_LOCALE;
+      const revokedT = emailTranslator(this.i18n, revokedLang);
+      const html = emergencyAccessGrantRevokedTemplate(
+        {
+          ownerFirstName: owner.firstName || "",
+          appUrl,
+        },
+        revokedT,
+      );
       await this.emailService.sendMail(
         owner.email,
-        "Monize: emergency access was granted while you were away",
+        revokedT(
+          "emails.emergencyAccessGrantRevoked.subject",
+          "Monize: emergency access was granted while you were away",
+        ),
         html,
       );
     } catch (error) {
