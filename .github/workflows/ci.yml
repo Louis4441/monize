@@ -151,7 +151,10 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
-      # Allowed: permissive (MIT, BSD, ISC, Apache-2.0, 0BSD, Unlicense, ...);
+      # Allowed: permissive (MIT, BSD, ISC, Apache-2.0, 0BSD, Unlicense,
+      # Unicode-DFS-2016/Unicode-3.0 -- the Unicode Data Files license,
+      # BSD-equivalent, accepted by ASF and FSF; e.g. make-plural via
+      # nestjs-i18n);
       # the project's own license (AGPL-3.0 family); LGPL variants (compatible
       # with AGPL since npm dependency = dynamic-linking equivalent which LGPL
       # permits; e.g. @img/sharp-libvips-*); MPL-2.0 (weak copyleft, AGPL
@@ -170,7 +173,7 @@ jobs:
           npx --yes license-checker-rseidelsohn \
             --production \
             --excludePrivatePackages \
-            --onlyAllow 'MIT;MIT-0;Apache-2.0;BSD-2-Clause;BSD-3-Clause;BSD;ISC;0BSD;CC0-1.0;CC-BY-3.0;CC-BY-4.0;Unlicense;Python-2.0;BlueOak-1.0.0;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later;LGPL-3.0;LGPL-3.0-or-later;LGPL-3.0-only;LGPL-2.1;LGPL-2.1-or-later;LGPL-2.1-only;MPL-2.0;Zlib;WTFPL;MIT*;(MIT AND BSD-3-Clause);(MIT AND Zlib);(MIT AND ISC);(MPL-2.0 OR Apache-2.0)'
+            --onlyAllow 'MIT;MIT-0;Apache-2.0;BSD-2-Clause;BSD-3-Clause;BSD;ISC;0BSD;CC0-1.0;CC-BY-3.0;CC-BY-4.0;Unlicense;Unicode-DFS-2016;Unicode-3.0;Python-2.0;BlueOak-1.0.0;AGPL-3.0;AGPL-3.0-only;AGPL-3.0-or-later;LGPL-3.0;LGPL-3.0-or-later;LGPL-3.0-only;LGPL-2.1;LGPL-2.1-or-later;LGPL-2.1-only;MPL-2.0;Zlib;WTFPL;MIT*;(MIT AND BSD-3-Clause);(MIT AND Zlib);(MIT AND ISC);(MPL-2.0 OR Apache-2.0)'
 
   schema-drift:
     name: Schema vs Migrations Drift
