@@ -7,7 +7,7 @@
 
 export const DEFAULT_LOCALE = "en";
 
-export const SUPPORTED_LOCALE_CODES: readonly string[] = ["en"];
+export const SUPPORTED_LOCALE_CODES: readonly string[] = ["en", "pl"];
 
 export function isSupportedLocale(code: string | undefined | null): boolean {
   if (!code) return false;
