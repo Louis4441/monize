@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@/test/render';
+import { render, screen, fireEvent, act } from '@/test/render';
 import { SecurityPriceHistory } from './SecurityPriceHistory';
 
 vi.mock('@/lib/investments', () => ({
