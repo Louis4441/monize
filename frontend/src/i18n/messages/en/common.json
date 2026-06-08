@@ -97,5 +97,21 @@
     "previousDay": "Previous day",
     "nextMonth": "Next month",
     "previousMonth": "Previous month"
+  },
+  "accountTypes": {
+    "CHEQUING": "Chequing",
+    "SAVINGS": "Savings",
+    "CREDIT_CARD": "Credit Card",
+    "INVESTMENT": "Investment",
+    "LOAN": "Loan",
+    "MORTGAGE": "Mortgage",
+    "CASH": "Cash",
+    "LINE_OF_CREDIT": "Line of Credit",
+    "ASSET": "Asset",
+    "OTHER": "Other"
+  },
+  "accountFilter": {
+    "allAccounts": "All Accounts",
+    "allBut": "All but {names}"
   }
 }

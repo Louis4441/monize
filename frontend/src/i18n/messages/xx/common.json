@@ -97,5 +97,21 @@
     "previousDay": "[XX-Previous day-XX]",
     "nextMonth": "[XX-Next month-XX]",
     "previousMonth": "[XX-Previous month-XX]"
+  },
+  "accountTypes": {
+    "CHEQUING": "[XX-Chequing-XX]",
+    "SAVINGS": "[XX-Savings-XX]",
+    "CREDIT_CARD": "[XX-Credit Card-XX]",
+    "INVESTMENT": "[XX-Investment-XX]",
+    "LOAN": "[XX-Loan-XX]",
+    "MORTGAGE": "[XX-Mortgage-XX]",
+    "CASH": "[XX-Cash-XX]",
+    "LINE_OF_CREDIT": "[XX-Line of Credit-XX]",
+    "ASSET": "[XX-Asset-XX]",
+    "OTHER": "[XX-Other-XX]"
+  },
+  "accountFilter": {
+    "allAccounts": "[XX-All Accounts-XX]",
+    "allBut": "[XX-All but {names}-XX]"
   }
 }

@@ -698,7 +698,7 @@ export function AccountList({ accounts, brokerageMarketValues, defaultCurrency, 
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                       <span className="font-semibold text-gray-700 dark:text-gray-200">
-                        {formatAccountType(item.type)}
+                        {formatAccountType(item.type, tc)}
                       </span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {t('list.groupCount', { count: item.count })}
@@ -737,7 +737,7 @@ export function AccountList({ accounts, brokerageMarketValues, defaultCurrency, 
                   formatCurrency={formatCurrency}
                   formatCurrencyBase={formatCurrencyBase}
                   convertToDefault={convertToDefault}
-                  formatAccountType={formatAccountType}
+                  formatAccountType={(type) => formatAccountType(type, tc)}
                   getAccountTypeColor={getAccountTypeColor}
                   onRowClick={handleRowClick}
                   onEdit={onEdit}
@@ -768,7 +768,7 @@ export function AccountList({ accounts, brokerageMarketValues, defaultCurrency, 
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {contextAccount.accountSubType === 'INVESTMENT_BROKERAGE' ? t('contextMenu.subtypeBrokerage') :
                  contextAccount.accountSubType === 'INVESTMENT_CASH' ? t('contextMenu.subtypeInvCash') :
-                 formatAccountType(contextAccount.accountType)}
+                 formatAccountType(contextAccount.accountType, tc)}
                 {contextAccount.isClosed ? t('contextMenu.closedSuffix') : ''}
               </p>
             </div>

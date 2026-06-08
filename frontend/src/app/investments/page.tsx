@@ -47,6 +47,7 @@ export default function InvestmentsPage() {
 
 function InvestmentsContent() {
   const t = useTranslations('investments');
+  const tc = useTranslations('common');
   const data = useInvestmentData();
   const { loadAllPortfolioData, selectedAccountIds, currentPage, transactionFilters } = data;
   const handleUndoRedo = useCallback(() => {
@@ -161,8 +162,9 @@ function InvestmentsContent() {
       data.selectedAccountIds,
       data.selectableAccounts,
       (a) => getAccountDisplayName(a as Account),
+      tc,
     );
-  }, [data.selectedAccountIds, data.selectableAccounts]);
+  }, [data.selectedAccountIds, data.selectableAccounts, tc]);
 
   return (
     <PageLayout>

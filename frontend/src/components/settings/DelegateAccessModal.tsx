@@ -162,6 +162,7 @@ export function DelegateAccessModal({
   submitRef,
 }: DelegateAccessModalProps) {
   const t = useTranslations('settings.delegateAccessModal');
+  const tc = useTranslations('common');
   const baseline = useMemo(
     () => buildInitialDraft(delegate),
     [delegate],
@@ -181,9 +182,9 @@ export function DelegateAccessModal({
       list.sort((a, b) => a.name.localeCompare(b.name));
     }
     return Array.from(groups.entries()).sort((x, y) =>
-      formatAccountType(x[0]).localeCompare(formatAccountType(y[0])),
+      formatAccountType(x[0], tc).localeCompare(formatAccountType(y[0], tc)),
     );
-  }, [accounts]);
+  }, [accounts, tc]);
 
   const baselineGrantArray = useMemo(
     () => grantsToArray(accounts, baseline.grants),
@@ -390,7 +391,7 @@ export function DelegateAccessModal({
               </p>
             ) : (
               groupedAccounts.map(([type, list]) => {
-                const typeLabel = formatAccountType(type);
+                const typeLabel = formatAccountType(type, tc);
                 const ids = list.map((a) => a.id);
                 return (
                   <details
