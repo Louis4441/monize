@@ -14,23 +14,21 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { emergencyAccessApi } from '@/lib/emergency-access';
-import {
-  passwordSchema,
-} from '@/lib/zod-helpers';
+import { buildPasswordSchema } from '@/lib/zod-helpers';
 import { getErrorMessage } from '@/lib/errors';
 import type { EmergencyAccessClaimPreview } from '@/types/emergency-access';
 
-const schema = z
+const buildSchema = (t: (key: string) => string, tc: (key: string) => string) => z
   .object({
-    newPassword: passwordSchema,
+    newPassword: buildPasswordSchema(tc),
     confirmPassword: z.string(),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
-    message: 'Passwords do not match',
+    message: t('passwordsNoMatch'),
     path: ['confirmPassword'],
   });
 
-type FormData = z.infer<typeof schema>;
+type FormData = z.infer<ReturnType<typeof buildSchema>>;
 
 function EmergencyClaimForm() {
   const router = useRouter();
@@ -49,7 +47,7 @@ function EmergencyClaimForm() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) });
+  } = useForm<FormData>({ resolver: zodResolver(buildSchema(t, tc)) });
 
   useEffect(() => {
     if (!token) {

@@ -114,5 +114,14 @@
     "allAccounts": "All Accounts",
     "allBut": "All but {names}"
   },
-  "passwordRequirements": "Password must be at least 12 characters and contain an uppercase letter, a lowercase letter, a number, and a special character."
+  "passwordRequirements": "Password must be at least 12 characters and contain an uppercase letter, a lowercase letter, a number, and a special character.",
+  "passwordValidation": {
+    "min": "Password must be at least 12 characters",
+    "max": "Password must be 100 characters or less",
+    "lowercase": "Must contain a lowercase letter",
+    "uppercase": "Must contain an uppercase letter",
+    "number": "Must contain a number",
+    "special": "Must contain a special character"
+  },
+  "emailInvalid": "Please enter a valid email address"
 }

@@ -15,20 +15,20 @@ import { useAuthStore } from '@/store/authStore';
 import { userSettingsApi } from '@/lib/user-settings';
 import { authApi } from '@/lib/auth';
 import { getErrorMessage } from '@/lib/errors';
-import { passwordSchema } from '@/lib/zod-helpers';
+import { buildPasswordSchema } from '@/lib/zod-helpers';
 
-const changePasswordSchema = z
+const buildChangePasswordSchema = (t: (key: string) => string, tc: (key: string) => string) => z
   .object({
-    currentPassword: z.string().min(1, 'Current password is required'),
-    newPassword: passwordSchema,
+    currentPassword: z.string().min(1, t('currentPasswordRequired')),
+    newPassword: buildPasswordSchema(tc),
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords don't match",
+    message: t('passwordsNoMatch'),
     path: ['confirmPassword'],
   });
 
-type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
+type ChangePasswordFormData = z.infer<ReturnType<typeof buildChangePasswordSchema>>;
 
 export default function ChangePasswordPage() {
   const t = useTranslations('auth.changePassword');
@@ -42,7 +42,7 @@ export default function ChangePasswordPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<ChangePasswordFormData>({
-    resolver: zodResolver(changePasswordSchema),
+    resolver: zodResolver(buildChangePasswordSchema(t, tc)),
   });
 
   const onSubmit = async (data: ChangePasswordFormData) => {

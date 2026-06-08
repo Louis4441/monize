@@ -114,5 +114,14 @@
     "allAccounts": "[XX-All Accounts-XX]",
     "allBut": "[XX-All but {names}-XX]"
   },
-  "passwordRequirements": "[XX-Password must be at least 12 characters and contain an uppercase letter, a lowercase letter, a number, and a special character.-XX]"
+  "passwordRequirements": "[XX-Password must be at least 12 characters and contain an uppercase letter, a lowercase letter, a number, and a special character.-XX]",
+  "passwordValidation": {
+    "min": "[XX-Password must be at least 12 characters-XX]",
+    "max": "[XX-Password must be 100 characters or less-XX]",
+    "lowercase": "[XX-Must contain a lowercase letter-XX]",
+    "uppercase": "[XX-Must contain an uppercase letter-XX]",
+    "number": "[XX-Must contain a number-XX]",
+    "special": "[XX-Must contain a special character-XX]"
+  },
+  "emailInvalid": "[XX-Please enter a valid email address-XX]"
 }

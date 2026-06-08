@@ -15,5 +15,6 @@
   "toasts": {
     "success": "[XX-You now have access to {name}'s account.-XX]",
     "failed": "[XX-Failed to complete emergency access claim. The link may have expired or already been used.-XX]"
-  }
+  },
+  "passwordsNoMatch": "[XX-Passwords do not match-XX]"
 }

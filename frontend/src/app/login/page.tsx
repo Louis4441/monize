@@ -18,17 +18,17 @@ import { authApi, AuthMethods } from '@/lib/auth';
 import { TwoFactorVerify } from '@/components/auth/TwoFactorVerify';
 import { User } from '@/types/auth';
 import { createLogger } from '@/lib/logger';
-import { emailSchema } from '@/lib/zod-helpers';
+import { buildEmailSchema } from '@/lib/zod-helpers';
 
 const logger = createLogger('Login');
 
-const loginSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(1, 'Password is required'),
+const buildLoginSchema = (t: (key: string) => string, tc: (key: string) => string) => z.object({
+  email: buildEmailSchema(tc),
+  password: z.string().min(1, t('signIn.passwordRequired')),
   rememberMe: z.boolean(),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+type LoginFormData = z.infer<ReturnType<typeof buildLoginSchema>>;
 
 /**
  * Validate a `returnTo` query parameter so we can safely redirect after login.
@@ -77,7 +77,7 @@ export default function LoginPage() {
     reset,
     formState: { errors },
   } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(buildLoginSchema(t, tc)),
     defaultValues: { rememberMe: false },
   });
 

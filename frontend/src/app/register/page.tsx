@@ -15,28 +15,28 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useAuthStore } from '@/store/authStore';
 import { authApi, AuthMethods } from '@/lib/auth';
-import { passwordSchema, emailSchema } from '@/lib/zod-helpers';
+import { buildPasswordSchema, buildEmailSchema } from '@/lib/zod-helpers';
 import { TwoFactorSetup } from '@/components/auth/TwoFactorSetup';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('Register');
 
-const registerSchema = z.object({
-  email: emailSchema,
-  password: passwordSchema,
+const buildRegisterSchema = (t: (key: string) => string, tc: (key: string) => string) => z.object({
+  email: buildEmailSchema(tc),
+  password: buildPasswordSchema(tc),
   confirmPassword: z.string(),
-  firstName: z.string().max(100, 'First name must be less than 100 characters').optional(),
-  lastName: z.string().max(100, 'Last name must be less than 100 characters').optional(),
+  firstName: z.string().max(100, t('errors.firstNameMax')).optional(),
+  lastName: z.string().max(100, t('errors.lastNameMax')).optional(),
   // Surfaces only after a first submit reveals the email already belongs
   // to a delegate row. Proves the registrant owns that row so the backend
   // claims (joins) it into the new account instead of failing the submit.
   delegatePassword: z.string().max(200).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
+  message: t('errors.passwordsNoMatch'),
   path: ['confirmPassword'],
 });
 
-type RegisterFormData = z.infer<typeof registerSchema>;
+type RegisterFormData = z.infer<ReturnType<typeof buildRegisterSchema>>;
 
 export default function RegisterPage() {
   const t = useTranslations('auth.register');
@@ -78,7 +78,7 @@ export default function RegisterPage() {
     formState: { errors },
     watch,
   } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
+    resolver: zodResolver(buildRegisterSchema(t, tc)),
   });
 
   // "Info from previous render" pattern (no setState in useEffect): when

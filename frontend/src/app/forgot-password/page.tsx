@@ -12,13 +12,13 @@ import Image from 'next/image';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { authApi } from '@/lib/auth';
-import { emailSchema } from '@/lib/zod-helpers';
+import { buildEmailSchema } from '@/lib/zod-helpers';
 
-const schema = z.object({
-  email: emailSchema,
+const buildSchema = (tc: (key: string) => string) => z.object({
+  email: buildEmailSchema(tc),
 });
 
-type FormData = z.infer<typeof schema>;
+type FormData = z.infer<ReturnType<typeof buildSchema>>;
 
 export default function ForgotPasswordPage() {
   const t = useTranslations('auth');
@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
     handleSubmit,
     formState: { errors },
   } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(buildSchema(tc)),
   });
 
   const onSubmit = async (data: FormData) => {

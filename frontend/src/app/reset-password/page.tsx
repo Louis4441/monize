@@ -14,19 +14,19 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { authApi } from '@/lib/auth';
 import { getErrorMessage } from '@/lib/errors';
-import { passwordSchema } from '@/lib/zod-helpers';
+import { buildPasswordSchema } from '@/lib/zod-helpers';
 
-const schema = z
+const buildSchema = (tr: (key: string) => string, tc: (key: string) => string) => z
   .object({
-    newPassword: passwordSchema,
+    newPassword: buildPasswordSchema(tc),
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
-    message: 'Passwords do not match',
+    message: tr('passwordsNoMatch'),
     path: ['confirmPassword'],
   });
 
-type FormData = z.infer<typeof schema>;
+type FormData = z.infer<ReturnType<typeof buildSchema>>;
 
 function ResetPasswordForm() {
   const t = useTranslations('auth');
@@ -42,7 +42,7 @@ function ResetPasswordForm() {
     handleSubmit,
     formState: { errors },
   } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(buildSchema(tr, tc)),
   });
 
   if (!token) {
