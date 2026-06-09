@@ -5,10 +5,10 @@ import {
   Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, DataSource } from "typeorm";
 import { tr } from "../i18n/translate";
 import { Institution } from "./entities/institution.entity";
-import { Account } from "../accounts/entities/account.entity";
+import { Account, AccountType } from "../accounts/entities/account.entity";
 import { CreateInstitutionDto } from "./dto/create-institution.dto";
 import { UpdateInstitutionDto } from "./dto/update-institution.dto";
 import {
@@ -44,6 +44,7 @@ export class InstitutionsService {
     private institutionsRepository: Repository<Institution>,
     @InjectRepository(Account)
     private accountsRepository: Repository<Account>,
+    private dataSource: DataSource,
     private logoService: InstitutionLogoService,
     private actionHistoryService: ActionHistoryService,
   ) {}
@@ -341,7 +342,74 @@ export class InstitutionsService {
   }
 
   /**
-   * Assign an account to this institution.
+   * Set an account's institution and keep a linked investment pair (cash <->
+   * brokerage) in sync, atomically. The two halves represent one real-world
+   * account, so the institution always applies to both.
+   *
+   * @param expectedInstitutionId when provided (unassign), only clears accounts
+   *        currently pointing at this institution.
+   */
+  private async setAccountInstitution(
+    userId: string,
+    accountId: string,
+    institutionId: string | null,
+    expectedInstitutionId?: string,
+  ): Promise<Account> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const account = await queryRunner.manager.findOne(Account, {
+        where: { id: accountId, userId },
+      });
+      if (!account) {
+        throw new NotFoundException(
+          tr(
+            "errors.institutions.accountNotFound",
+            `Account with ID ${accountId} not found`,
+            { id: accountId },
+          ),
+        );
+      }
+
+      // Unassign is a no-op unless the account points at this institution.
+      if (
+        expectedInstitutionId !== undefined &&
+        account.institutionId !== expectedInstitutionId
+      ) {
+        await queryRunner.commitTransaction();
+        return account;
+      }
+
+      account.institutionId = institutionId;
+      await queryRunner.manager.save(account);
+
+      // Mirror the change onto the linked investment partner.
+      if (
+        account.linkedAccountId &&
+        account.accountType === AccountType.INVESTMENT
+      ) {
+        const partner = await queryRunner.manager.findOne(Account, {
+          where: { id: account.linkedAccountId, userId },
+        });
+        if (partner && partner.institutionId !== institutionId) {
+          partner.institutionId = institutionId;
+          await queryRunner.manager.save(partner);
+        }
+      }
+
+      await queryRunner.commitTransaction();
+      return account;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Assign an account (and its linked investment partner) to this institution.
    */
   async assignAccount(
     userId: string,
@@ -349,24 +417,11 @@ export class InstitutionsService {
     accountId: string,
   ): Promise<Account> {
     await this.getOwnedEntity(userId, id);
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId, userId },
-    });
-    if (!account) {
-      throw new NotFoundException(
-        tr(
-          "errors.institutions.accountNotFound",
-          `Account with ID ${accountId} not found`,
-          { id: accountId },
-        ),
-      );
-    }
-    account.institutionId = id;
-    return this.accountsRepository.save(account);
+    return this.setAccountInstitution(userId, accountId, id);
   }
 
   /**
-   * Remove an account from this institution.
+   * Remove an account (and its linked investment partner) from this institution.
    */
   async unassignAccount(
     userId: string,
@@ -374,22 +429,6 @@ export class InstitutionsService {
     accountId: string,
   ): Promise<Account> {
     await this.getOwnedEntity(userId, id);
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId, userId },
-    });
-    if (!account) {
-      throw new NotFoundException(
-        tr(
-          "errors.institutions.accountNotFound",
-          `Account with ID ${accountId} not found`,
-          { id: accountId },
-        ),
-      );
-    }
-    if (account.institutionId === id) {
-      account.institutionId = null;
-      return this.accountsRepository.save(account);
-    }
-    return account;
+    return this.setAccountInstitution(userId, accountId, null, id);
   }
 }

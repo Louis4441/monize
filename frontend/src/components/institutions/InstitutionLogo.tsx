@@ -54,7 +54,10 @@ export function InstitutionLogo({
         loading="lazy"
         style={dimension}
         onError={() => setErrored(true)}
-        className={`shrink-0 rounded object-contain bg-white ${className}`}
+        // Circular chip with no forced backing: transparent favicons keep their
+        // transparency, opaque ones fill the circle. The ring keeps it defined
+        // against any background.
+        className={`shrink-0 rounded-full object-contain ring-1 ring-black/10 dark:ring-white/15 ${className}`}
       />
     );
   }
@@ -63,7 +66,7 @@ export function InstitutionLogo({
     <span
       style={dimension}
       aria-hidden="true"
-      className={`shrink-0 inline-flex items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-semibold ${className}`}
+      className={`shrink-0 inline-flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs font-semibold ${className}`}
     >
       {letter}
     </span>

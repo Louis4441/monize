@@ -625,9 +625,13 @@ export class AccountsService {
 
       const savedAccount = await queryRunner.manager.save(account);
 
-      // If currency changed on an investment account, update the linked account too
+      // Keep a linked investment pair (cash <-> brokerage) in sync. Both halves
+      // represent one real-world account, so shared attributes -- currency and
+      // institution -- propagate to the partner automatically.
+      const currencyChanged = updateAccountDto.currencyCode !== undefined;
+      const institutionChanged = updateAccountDto.institutionId !== undefined;
       if (
-        updateAccountDto.currencyCode !== undefined &&
+        (currencyChanged || institutionChanged) &&
         account.linkedAccountId &&
         account.accountType === AccountType.INVESTMENT
       ) {
@@ -635,7 +639,12 @@ export class AccountsService {
           where: { id: account.linkedAccountId, userId },
         });
         if (linkedAccount) {
-          linkedAccount.currencyCode = updateAccountDto.currencyCode;
+          if (updateAccountDto.currencyCode !== undefined) {
+            linkedAccount.currencyCode = updateAccountDto.currencyCode;
+          }
+          if (updateAccountDto.institutionId !== undefined) {
+            linkedAccount.institutionId = updateAccountDto.institutionId;
+          }
           await queryRunner.manager.save(linkedAccount);
         }
       }

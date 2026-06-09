@@ -5,6 +5,7 @@ describe("InstitutionsService", () => {
   let service: InstitutionsService;
   let institutionsRepo: Record<string, jest.Mock>;
   let accountsRepo: Record<string, jest.Mock>;
+  let qrManager: Record<string, jest.Mock>;
   let logoService: { fetchFavicon: jest.Mock };
   let actionHistory: { record: jest.Mock };
 
@@ -51,9 +52,24 @@ describe("InstitutionsService", () => {
     logoService = { fetchFavicon: jest.fn().mockResolvedValue(null) };
     actionHistory = { record: jest.fn() };
 
+    qrManager = {
+      findOne: jest.fn(),
+      save: jest.fn((x) => Promise.resolve(x)),
+    };
+    const queryRunner = {
+      connect: jest.fn(),
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn(),
+      rollbackTransaction: jest.fn(),
+      release: jest.fn(),
+      manager: qrManager,
+    };
+    const dataSource = { createQueryRunner: jest.fn(() => queryRunner) };
+
     service = new InstitutionsService(
       institutionsRepo as any,
       accountsRepo as any,
+      dataSource as any,
       logoService as any,
       actionHistory as any,
     );
@@ -299,18 +315,44 @@ describe("InstitutionsService", () => {
   describe("assignAccount()", () => {
     it("assigns an owned account to the institution", async () => {
       institutionsRepo.findOne.mockResolvedValue(buildInstitution());
-      accountsRepo.findOne.mockResolvedValue({
+      qrManager.findOne.mockResolvedValue({
         id: "acc-1",
         institutionId: null,
+        accountType: "CHEQUING",
+        linkedAccountId: null,
       });
       await service.assignAccount(userId, "inst-1", "acc-1");
-      const saved = accountsRepo.save.mock.calls[0][0];
+      const saved = qrManager.save.mock.calls[0][0];
       expect(saved.institutionId).toBe("inst-1");
+    });
+
+    it("syncs the linked investment partner when assigning", async () => {
+      institutionsRepo.findOne.mockResolvedValue(buildInstitution());
+      qrManager.findOne
+        .mockResolvedValueOnce({
+          id: "acc-1",
+          institutionId: null,
+          accountType: "INVESTMENT",
+          linkedAccountId: "acc-2",
+        })
+        .mockResolvedValueOnce({
+          id: "acc-2",
+          institutionId: null,
+          accountType: "INVESTMENT",
+          linkedAccountId: "acc-1",
+        });
+      await service.assignAccount(userId, "inst-1", "acc-1");
+      const saved = qrManager.save.mock.calls.map((c) => [
+        c[0].id,
+        c[0].institutionId,
+      ]);
+      expect(saved).toContainEqual(["acc-1", "inst-1"]);
+      expect(saved).toContainEqual(["acc-2", "inst-1"]);
     });
 
     it("throws NotFoundException when the account does not belong to the user", async () => {
       institutionsRepo.findOne.mockResolvedValue(buildInstitution());
-      accountsRepo.findOne.mockResolvedValue(null);
+      qrManager.findOne.mockResolvedValue(null);
       await expect(
         service.assignAccount(userId, "inst-1", "acc-1"),
       ).rejects.toThrow(NotFoundException);
@@ -320,28 +362,56 @@ describe("InstitutionsService", () => {
   describe("unassignAccount()", () => {
     it("clears the institution when the account is currently assigned to it", async () => {
       institutionsRepo.findOne.mockResolvedValue(buildInstitution());
-      accountsRepo.findOne.mockResolvedValue({
+      qrManager.findOne.mockResolvedValue({
         id: "acc-1",
         institutionId: "inst-1",
+        accountType: "CHEQUING",
+        linkedAccountId: null,
       });
       await service.unassignAccount(userId, "inst-1", "acc-1");
-      const saved = accountsRepo.save.mock.calls[0][0];
+      const saved = qrManager.save.mock.calls[0][0];
       expect(saved.institutionId).toBeNull();
+    });
+
+    it("clears the linked investment partner too", async () => {
+      institutionsRepo.findOne.mockResolvedValue(buildInstitution());
+      qrManager.findOne
+        .mockResolvedValueOnce({
+          id: "acc-1",
+          institutionId: "inst-1",
+          accountType: "INVESTMENT",
+          linkedAccountId: "acc-2",
+        })
+        .mockResolvedValueOnce({
+          id: "acc-2",
+          institutionId: "inst-1",
+          accountType: "INVESTMENT",
+          linkedAccountId: "acc-1",
+        });
+      await service.unassignAccount(userId, "inst-1", "acc-1");
+      const saved = qrManager.save.mock.calls.map((c) => [
+        c[0].id,
+        c[0].institutionId,
+      ]);
+      expect(saved).toContainEqual(["acc-1", null]);
+      expect(saved).toContainEqual(["acc-2", null]);
     });
 
     it("leaves the account untouched when assigned to a different institution", async () => {
       institutionsRepo.findOne.mockResolvedValue(buildInstitution());
-      accountsRepo.findOne.mockResolvedValue({
+      qrManager.findOne.mockResolvedValue({
         id: "acc-1",
         institutionId: "other",
+        accountType: "CHEQUING",
+        linkedAccountId: null,
       });
       await service.unassignAccount(userId, "inst-1", "acc-1");
-      expect(accountsRepo.save).not.toHaveBeenCalled();
+      expect(qrManager.save).not.toHaveBeenCalled();
     });
 
     it("throws NotFoundException when the account is missing", async () => {
       institutionsRepo.findOne.mockResolvedValue(buildInstitution());
-      accountsRepo.findOne.mockResolvedValue(null);
+      qrManager.findOne.mockResolvedValue(null);
       await expect(
         service.unassignAccount(userId, "inst-1", "acc-1"),
       ).rejects.toThrow(NotFoundException);

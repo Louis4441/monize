@@ -2472,6 +2472,26 @@ describe("AccountsService", () => {
       expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(1);
     });
 
+    it("syncs institution to the linked investment account when changed", async () => {
+      mockQueryRunner.manager.findOne
+        .mockResolvedValueOnce({
+          ...mockAccount,
+          accountType: AccountType.INVESTMENT,
+          linkedAccountId: "linked-1",
+          institutionId: null,
+        })
+        .mockResolvedValueOnce({
+          id: "linked-1",
+          userId: "user-1",
+          institutionId: null,
+        });
+      await service.update("user-1", "account-1", { institutionId: "inst-1" });
+      // 2 saves: original account + linked partner
+      expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(2);
+      const linkedSave = mockQueryRunner.manager.save.mock.calls[1][0];
+      expect(linkedSave.institutionId).toBe("inst-1");
+    });
+
     it("triggers net-worth recalc when openingBalance changes", async () => {
       mockQueryRunner.manager.findOne.mockResolvedValue({
         ...mockAccount,
