@@ -58,6 +58,25 @@ describe('InstitutionList', () => {
     expect(nameCell?.className).toContain('py-1');
   });
 
+  it('calls onSort when a sortable column header is clicked', () => {
+    const onSort = vi.fn();
+    render(
+      <InstitutionList
+        institutions={[makeInstitution()]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onManageAccounts={vi.fn()}
+        sortField="name"
+        sortDirection="asc"
+        onSort={onSort}
+      />,
+    );
+    fireEvent.click(screen.getByText('Name'));
+    expect(onSort).toHaveBeenCalledWith('name');
+    fireEvent.click(screen.getByText('Accounts'));
+    expect(onSort).toHaveBeenCalledWith('accounts');
+  });
+
   it('shows the empty state', () => {
     render(
       <InstitutionList

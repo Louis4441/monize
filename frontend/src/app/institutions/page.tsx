@@ -9,10 +9,14 @@ import { Pagination } from '@/components/ui/Pagination';
 import { Modal } from '@/components/ui/Modal';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import { InstitutionForm } from '@/components/institutions/InstitutionForm';
-import { InstitutionList } from '@/components/institutions/InstitutionList';
+import {
+  InstitutionList,
+  type InstitutionSortField,
+} from '@/components/institutions/InstitutionList';
 import { InstitutionAccountsManager } from '@/components/institutions/InstitutionAccountsManager';
 import { institutionsApi } from '@/lib/institutions';
 import { accountsApi } from '@/lib/accounts';
+import { countLogicalAccounts } from '@/lib/account-utils';
 import { Institution } from '@/types/institution';
 import { Account } from '@/types/account';
 import { PageLayout } from '@/components/layout/PageLayout';
@@ -44,6 +48,8 @@ function InstitutionsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'active' | 'closed' | ''>('');
+  const [sortField, setSortField] = useState<InstitutionSortField>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
   const [managing, setManaging] = useState<Institution | null>(null);
   const [listDensity, setListDensity] = useLocalStorage<DensityLevel>(
@@ -120,28 +126,42 @@ function InstitutionsContent() {
     }
   };
 
-  // Per-institution account status: an institution is "active" if it has any
-  // open account and "closed" if it has any closed account (mirrors the
-  // account-level filter). Institutions with no accounts have neither.
-  const statusByInstitution = useMemo(() => {
-    const map = new Map<string, { hasActive: boolean; hasClosed: boolean }>();
+  // Logical (pair-aware) account counts per institution, split by status, so
+  // the Accounts column can reflect the All/Active/Closed filter without
+  // hiding any institution rows.
+  const accountCountByStatus = useMemo(() => {
+    const groups = new Map<string, Account[]>();
     for (const account of accounts) {
       if (!account.institutionId) continue;
-      const entry = map.get(account.institutionId) ?? {
-        hasActive: false,
-        hasClosed: false,
-      };
-      if (account.isClosed) entry.hasClosed = true;
-      else entry.hasActive = true;
-      map.set(account.institutionId, entry);
+      const arr = groups.get(account.institutionId) ?? [];
+      groups.set(account.institutionId, [...arr, account]);
+    }
+    const map = new Map<string, { active: number; closed: number }>();
+    for (const [id, arr] of groups) {
+      map.set(id, {
+        active: countLogicalAccounts(arr.filter((a) => !a.isClosed)),
+        closed: countLogicalAccounts(arr.filter((a) => a.isClosed)),
+      });
     }
     return map;
   }, [accounts]);
 
+  // Apply the status filter to the displayed account count (rows are kept).
+  const decoratedInstitutions = useMemo(() => {
+    if (!filterStatus) return institutions;
+    return institutions.map((i) => {
+      const counts = accountCountByStatus.get(i.id);
+      const accountCount = counts
+        ? filterStatus === 'active'
+          ? counts.active
+          : counts.closed
+        : 0;
+      return { ...i, accountCount };
+    });
+  }, [institutions, filterStatus, accountCountByStatus]);
+
   const filteredInstitutions = useMemo(() => {
-    let result = [...institutions].sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }),
-    );
+    let result = decoratedInstitutions;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -151,15 +171,40 @@ function InstitutionsContent() {
           (i.country?.toLowerCase().includes(q) ?? false),
       );
     }
-    if (filterStatus) {
-      result = result.filter((i) => {
-        const status = statusByInstitution.get(i.id);
-        if (!status) return false;
-        return filterStatus === 'active' ? status.hasActive : status.hasClosed;
-      });
+    const sorted = [...result].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'website':
+          cmp = a.website.localeCompare(b.website, undefined, {
+            sensitivity: 'base',
+          });
+          break;
+        case 'country':
+          cmp = (a.country ?? '').localeCompare(b.country ?? '', undefined, {
+            sensitivity: 'base',
+          });
+          break;
+        case 'accounts':
+          cmp = a.accountCount - b.accountCount;
+          break;
+        default:
+          cmp = a.name.localeCompare(b.name, undefined, {
+            sensitivity: 'base',
+          });
+      }
+      return sortDirection === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [decoratedInstitutions, searchQuery, sortField, sortDirection]);
+
+  const handleSort = (field: InstitutionSortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'accounts' ? 'desc' : 'asc');
     }
-    return result;
-  }, [institutions, searchQuery, filterStatus, statusByInstitution]);
+  };
 
   const totalPages = Math.ceil(filteredInstitutions.length / PAGE_SIZE);
   const paginatedInstitutions = useMemo(() => {
@@ -283,6 +328,9 @@ function InstitutionsContent() {
               onManageAccounts={setManaging}
               density={listDensity}
               onDensityChange={setListDensity}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSort={handleSort}
             />
           )}
         </div>

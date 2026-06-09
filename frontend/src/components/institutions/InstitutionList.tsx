@@ -11,9 +11,12 @@ import { institutionsApi } from '@/lib/institutions';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { useTableDensity, nextDensity, DensityLevel } from '@/hooks/useTableDensity';
+import { SortIcon } from '@/components/ui/SortIcon';
 import { InstitutionLogo } from './InstitutionLogo';
 
 const logger = createLogger('InstitutionList');
+
+export type InstitutionSortField = 'name' | 'website' | 'country' | 'accounts';
 
 interface InstitutionListProps {
   institutions: Institution[];
@@ -22,6 +25,9 @@ interface InstitutionListProps {
   onManageAccounts: (institution: Institution) => void;
   density?: DensityLevel;
   onDensityChange?: (density: DensityLevel) => void;
+  sortField?: InstitutionSortField;
+  sortDirection?: 'asc' | 'desc';
+  onSort?: (field: InstitutionSortField) => void;
 }
 
 export function InstitutionList({
@@ -31,6 +37,9 @@ export function InstitutionList({
   onManageAccounts,
   density = 'normal',
   onDensityChange,
+  sortField = 'name',
+  sortDirection = 'asc',
+  onSort,
 }: InstitutionListProps) {
   const t = useTranslations('institutions');
   const tc = useTranslations('common');
@@ -86,17 +95,33 @@ export function InstitutionList({
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
         <thead className="bg-gray-50 dark:bg-gray-800">
           <tr>
-            <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
+            <th
+              className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${onSort ? 'cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none' : ''}`}
+              onClick={onSort ? () => onSort('name') : undefined}
+            >
               {t('list.columns.name')}
+              {onSort && <SortIcon field="name" sortField={sortField} sortDirection={sortDirection} />}
             </th>
-            <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell`}>
+            <th
+              className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell ${onSort ? 'cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none' : ''}`}
+              onClick={onSort ? () => onSort('website') : undefined}
+            >
               {t('list.columns.website')}
+              {onSort && <SortIcon field="website" sortField={sortField} sortDirection={sortDirection} />}
             </th>
-            <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell`}>
+            <th
+              className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell ${onSort ? 'cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none' : ''}`}
+              onClick={onSort ? () => onSort('country') : undefined}
+            >
               {t('list.columns.country')}
+              {onSort && <SortIcon field="country" sortField={sortField} sortDirection={sortDirection} />}
             </th>
-            <th className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
+            <th
+              className={`${headerPadding} text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider ${onSort ? 'cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 select-none' : ''}`}
+              onClick={onSort ? () => onSort('accounts') : undefined}
+            >
               {t('list.columns.accounts')}
+              {onSort && <SortIcon field="accounts" sortField={sortField} sortDirection={sortDirection} />}
             </th>
             <th className={`${headerPadding} text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider`}>
               {t('list.columns.actions')}
