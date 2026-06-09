@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@/test/render';
-import { BalanceHistoryChart } from './BalanceHistoryChart';
+import { BalanceHistoryChart, computeBalanceGradient } from './BalanceHistoryChart';
 
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
@@ -227,5 +227,50 @@ describe('BalanceHistoryChart', () => {
       ([, code]) => code === 'EUR',
     );
     expect(eurCalls.length).toBeGreaterThan(0);
+  });
+});
+
+describe('computeBalanceGradient', () => {
+  it('fades from the line down toward zero for all-positive balances', () => {
+    const g = computeBalanceGradient([1000, 1200, 900]);
+    // Line (top) is most shaded; the zero side (bottom) is clear.
+    expect(g.topOpacity).toBe(0.3);
+    expect(g.bottomOpacity).toBe(0);
+    expect(g.zeroOffset).toBe(1);
+  });
+
+  it('mirrors the fade so negative balances shade toward the bottom', () => {
+    const g = computeBalanceGradient([-1000, -200, -750]);
+    // Zero side (top) is clear; the line (bottom) is most shaded.
+    expect(g.topOpacity).toBe(0);
+    expect(g.bottomOpacity).toBe(0.3);
+    expect(g.zeroOffset).toBe(0);
+  });
+
+  it('anchors zero in the middle when balances cross zero', () => {
+    const g = computeBalanceGradient([100, -100]);
+    expect(g.topOpacity).toBe(0.3);
+    expect(g.bottomOpacity).toBe(0.3);
+    expect(g.zeroOffset).toBeCloseTo(0.5);
+  });
+
+  it('places the zero anchor proportionally for an asymmetric crossing range', () => {
+    // max=300, min=-100, span=400 -> zero sits 300/400 = 0.75 from the top.
+    const g = computeBalanceGradient([300, -100]);
+    expect(g.zeroOffset).toBeCloseTo(0.75);
+  });
+
+  it('treats a flat positive series as positive shading', () => {
+    const g = computeBalanceGradient([500, 500]);
+    expect(g.topOpacity).toBe(0.3);
+    expect(g.bottomOpacity).toBe(0);
+    expect(g.zeroOffset).toBe(1);
+  });
+
+  it('treats a flat negative series as negative shading', () => {
+    const g = computeBalanceGradient([-500, -500]);
+    expect(g.topOpacity).toBe(0);
+    expect(g.bottomOpacity).toBe(0.3);
+    expect(g.zeroOffset).toBe(0);
   });
 });

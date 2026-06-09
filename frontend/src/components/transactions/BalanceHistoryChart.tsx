@@ -63,6 +63,40 @@ function BalanceTooltip({
   return null;
 }
 
+/**
+ * Opacity stops for the balance area's vertical gradient. The fill is densest
+ * along the data line and fades to transparent at the zero axis, whether
+ * balances are positive, negative, or cross zero. `zeroOffset` is the fraction
+ * (measured from the top of the area's bounding box) at which the zero line
+ * falls, clamped to [0, 1] so all-positive data keeps the original
+ * top-to-bottom fade and all-negative data mirrors it (shading increasing
+ * toward the bottom).
+ */
+export function computeBalanceGradient(values: number[]): {
+  topOpacity: number;
+  zeroOffset: number;
+  bottomOpacity: number;
+} {
+  const SHADE = 0.3;
+  if (values.length === 0) {
+    return { topOpacity: SHADE, zeroOffset: 1, bottomOpacity: 0 };
+  }
+  let max = values[0];
+  let min = values[0];
+  for (const value of values) {
+    if (value > max) max = value;
+    if (value < min) min = value;
+  }
+  const span = max - min;
+  const zeroOffset =
+    span === 0 ? (max >= 0 ? 1 : 0) : Math.min(1, Math.max(0, max / span));
+  return {
+    topOpacity: max > 0 ? SHADE : 0,
+    zeroOffset,
+    bottomOpacity: min < 0 ? SHADE : 0,
+  };
+}
+
 export function BalanceHistoryChart({
   data,
   isLoading,
@@ -148,6 +182,11 @@ export function BalanceHistoryChart({
     return { startBalance, currentBalance, endBalance, hasFutureData, minBalance, goesNegative: minBalance < 0 };
   }, [chartData]);
 
+  const areaGradient = useMemo(
+    () => computeBalanceGradient(chartData.map((point) => point.balance)),
+    [chartData],
+  );
+
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
@@ -188,8 +227,9 @@ export function BalanceHistoryChart({
           <AreaChart data={chartData} margin={{ left: 0, right: 8, top: 5, bottom: 0 }}>
             <defs>
               <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                <stop offset={0} stopColor="#3b82f6" stopOpacity={areaGradient.topOpacity} />
+                <stop offset={areaGradient.zeroOffset} stopColor="#3b82f6" stopOpacity={0} />
+                <stop offset={1} stopColor="#3b82f6" stopOpacity={areaGradient.bottomOpacity} />
               </linearGradient>
             </defs>
             <CartesianGrid
