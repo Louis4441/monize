@@ -118,10 +118,10 @@ export function AccountInfoWidget({
               title={institutionWebsite}
               className="flex-shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <InstitutionLogo institution={institution} size={40} fallbackGlyph="$" ring={false} />
+              <InstitutionLogo institution={institution} size={40} fallbackGlyph="$" />
             </a>
           ) : (
-            <InstitutionLogo institution={institution ?? undefined} size={40} fallbackGlyph="$" ring={false} />
+            <InstitutionLogo institution={institution ?? undefined} size={40} fallbackGlyph="$" />
           )}
           <div className="min-w-0">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
