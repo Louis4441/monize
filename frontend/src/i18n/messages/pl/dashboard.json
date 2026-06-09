@@ -13,7 +13,9 @@
     "moveDown": "Przesuń w dół",
     "marketValue": "Wartość rynkowa",
     "due": "Termin: {ordinal}",
-    "settlement": "Rozliczenie: {ordinal}"
+    "dueTooltip": "Dzień każdego miesiąca, w którym przypada termin spłaty karty kredytowej",
+    "settlement": "Rozliczenie: {ordinal}",
+    "settlementTooltip": "Ostatni dzień cyklu rozliczeniowego. Transakcje zaksięgowane w tym dniu lub wcześniej pojawiają się na bieżącym wyciągu."
   },
   "upcomingBills": {
     "title": "Nadchodzące rachunki i wpłaty",

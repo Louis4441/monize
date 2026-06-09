@@ -11,8 +11,10 @@ import { join } from "path";
 
 const localesDir = join(__dirname, "locales");
 
+// Real translations only. `xx` is the generated pseudo-locale, covered by
+// pseudo-locale.spec.ts and `npm run i18n:check`.
 const TRANSLATED_LOCALES = readdirSync(localesDir, { withFileTypes: true })
-  .filter((d) => d.isDirectory() && d.name !== "en")
+  .filter((d) => d.isDirectory() && d.name !== "en" && d.name !== "xx")
   .map((d) => d.name);
 
 const enFiles = readdirSync(join(localesDir, "en")).filter((f) =>
