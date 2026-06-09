@@ -58,6 +58,7 @@ export function AccountInfoWidget({
         date: (st.nextOverride?.overrideDate ?? st.nextDueDate).split('T')[0],
         amount: st.nextOverride?.amount ?? st.amount,
         currencyCode: st.currencyCode,
+        payeeName: st.payee?.name ?? st.payeeName ?? null,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
     return candidates[0] ?? null;
@@ -99,10 +100,10 @@ export function AccountInfoWidget({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 sm:p-6 mb-6 min-h-[420px] h-full flex flex-col">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 sm:p-6 mb-6 lg:mb-0 lg:h-full flex flex-col overflow-hidden">
       <div className="flex items-start justify-between gap-2 mb-4">
-        <div className="flex items-start gap-3 min-w-0">
-          <InstitutionLogo institution={institution ?? undefined} size={32} fallbackGlyph="$" />
+        <div className="flex items-center gap-3 min-w-0">
+          <InstitutionLogo institution={institution ?? undefined} size={40} fallbackGlyph="$" />
           <div className="min-w-0">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
               {account.name}
@@ -161,9 +162,20 @@ export function AccountInfoWidget({
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {t('accountWidget.nextPayment')}
           </p>
-          <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
+          <p
+            className={`text-base font-semibold ${
+              nextPayment.amount < 0
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-green-600 dark:text-green-400'
+            }`}
+          >
             {formatCurrency(Math.abs(nextPayment.amount), nextPayment.currencyCode)}
           </p>
+          {nextPayment.payeeName && (
+            <p className="text-sm text-gray-700 dark:text-gray-300 truncate">
+              {nextPayment.payeeName}
+            </p>
+          )}
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {formatDate(nextPayment.date)}
           </p>

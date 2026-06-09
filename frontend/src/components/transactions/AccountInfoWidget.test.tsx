@@ -114,10 +114,10 @@ describe('AccountInfoWidget', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the soonest scheduled payment for the account', () => {
+  it('shows the soonest scheduled payment with payee, in red for a debit', () => {
     const scheduled = [
-      { id: 's1', accountId: 'a-1', isActive: true, nextDueDate: '2026-07-15', amount: -120.5, currencyCode: 'CAD' },
-      { id: 's2', accountId: 'a-1', isActive: true, nextDueDate: '2026-06-20', amount: -80, currencyCode: 'CAD' },
+      { id: 's1', accountId: 'a-1', isActive: true, nextDueDate: '2026-07-15', amount: -120.5, currencyCode: 'CAD', payeeName: 'Landlord' },
+      { id: 's2', accountId: 'a-1', isActive: true, nextDueDate: '2026-06-20', amount: -80, currencyCode: 'CAD', payee: { name: 'Hydro' } },
       { id: 's3', accountId: 'other', isActive: true, nextDueDate: '2026-06-01', amount: -999, currencyCode: 'CAD' },
     ] as any;
     render(
@@ -130,8 +130,30 @@ describe('AccountInfoWidget', () => {
     );
     expect(screen.getByText('Next Payment')).toBeInTheDocument();
     // The 2026-06-20 bill is sooner than 2026-07-15; the other account is ignored.
-    expect(screen.getByText('CAD 80.00')).toBeInTheDocument();
+    const amount = screen.getByText('CAD 80.00');
+    expect(amount).toBeInTheDocument();
+    expect(amount.className).toContain('text-red-600');
+    // The payee for the soonest bill is shown.
+    expect(screen.getByText('Hydro')).toBeInTheDocument();
+    expect(screen.queryByText('Landlord')).not.toBeInTheDocument();
     expect(screen.queryByText('CAD 999.00')).not.toBeInTheDocument();
+  });
+
+  it('shows an incoming scheduled deposit in green', () => {
+    const scheduled = [
+      { id: 's1', accountId: 'a-1', isActive: true, nextDueDate: '2026-06-20', amount: 2500, currencyCode: 'CAD', payeeName: 'Employer' },
+    ] as any;
+    render(
+      <AccountInfoWidget
+        account={makeAccount()}
+        scheduledTransactions={scheduled}
+        onEdit={vi.fn()}
+        onCollapse={vi.fn()}
+      />,
+    );
+    const amount = screen.getByText('CAD 2500.00');
+    expect(amount.className).toContain('text-green-600');
+    expect(screen.getByText('Employer')).toBeInTheDocument();
   });
 
   it('uses the per-occurrence override date and amount when present', () => {
