@@ -187,7 +187,7 @@ export function AccountInfoWidget({
                   {nextPayment.payeeName}
                 </p>
               )}
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-base font-semibold text-gray-700 dark:text-gray-300">
                 {formatDate(nextPayment.date)}
               </p>
             </div>
