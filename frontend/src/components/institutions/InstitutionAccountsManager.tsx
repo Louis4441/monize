@@ -38,6 +38,7 @@ export function InstitutionAccountsManager({
   const [isLoading, setIsLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'active' | 'closed' | ''>('');
 
   const load = useCallback(async () => {
     if (!institution) return;
@@ -75,6 +76,14 @@ export function InstitutionAccountsManager({
     () => assigned.filter((a) => !isInvestmentCashHalf(a)),
     [assigned],
   );
+
+  // Apply the active/closed status filter to the collapsed account list.
+  const visibleAccounts = useMemo(() => {
+    if (!filterStatus) return assignedMain;
+    return assignedMain.filter((a) =>
+      filterStatus === 'active' ? !a.isClosed : a.isClosed,
+    );
+  }, [assignedMain, filterStatus]);
 
   const availableOptions = useMemo(
     () =>
@@ -151,26 +160,71 @@ export function InstitutionAccountsManager({
           {t('accountsManager.empty')}
         </p>
       ) : (
-        <ul className="divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-md">
-          {assignedMain.map((account) => (
-            <li
-              key={account.id}
-              className="flex items-center justify-between px-3 py-2 gap-3"
+        <>
+          {/* Active/Closed status filter */}
+          <div className="mb-3 inline-flex rounded-md shadow-sm">
+            <button
+              type="button"
+              onClick={() => setFilterStatus('')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-l-md border ${
+                filterStatus === ''
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
             >
-              <span className="text-sm text-gray-900 dark:text-gray-100 truncate">
-                {getMainAccountName(account.name)}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busyId === account.id}
-                onClick={() => handleRemove(account.id)}
-              >
-                {t('accountsManager.remove')}
-              </Button>
-            </li>
-          ))}
-        </ul>
+              {t('accountsManager.filter.all')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('active')}
+              className={`px-3 py-1.5 text-sm font-medium border-t border-b ${
+                filterStatus === 'active'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              {t('accountsManager.filter.active')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterStatus('closed')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-r-md border ${
+                filterStatus === 'closed'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              {t('accountsManager.filter.closed')}
+            </button>
+          </div>
+
+          {visibleAccounts.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+              {t('accountsManager.noneMatch')}
+            </p>
+          ) : (
+            <ul className="divide-y divide-gray-200 dark:divide-gray-700 border border-gray-200 dark:border-gray-700 rounded-md">
+              {visibleAccounts.map((account) => (
+                <li
+                  key={account.id}
+                  className="flex items-center justify-between px-3 py-2 gap-3"
+                >
+                  <span className="text-sm text-gray-900 dark:text-gray-100 truncate">
+                    {getMainAccountName(account.name)}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busyId === account.id}
+                    onClick={() => handleRemove(account.id)}
+                  >
+                    {t('accountsManager.remove')}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
       <div className="mt-6 flex justify-end">

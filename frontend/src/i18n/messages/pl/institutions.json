@@ -62,6 +62,12 @@
     "noneToAdd": "Wszystkie Twoje konta są już przypisane do instytucji.",
     "loading": "Ładowanie kont...",
     "empty": "Do tej instytucji nie przypisano jeszcze żadnych kont.",
+    "noneMatch": "Żadne konto nie pasuje do wybranego filtra.",
+    "filter": {
+      "all": "Wszystkie",
+      "active": "Aktywny",
+      "closed": "Zamknięte"
+    },
     "remove": "Usuń",
     "added": "Konto dodane",
     "removed": "Konto usunięte",

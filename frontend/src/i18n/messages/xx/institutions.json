@@ -62,6 +62,12 @@
     "noneToAdd": "[XX-All your accounts are already assigned to an institution.-XX]",
     "loading": "[XX-Loading accounts...-XX]",
     "empty": "[XX-No accounts are assigned to this institution yet.-XX]",
+    "noneMatch": "[XX-No accounts match the selected filter.-XX]",
+    "filter": {
+      "all": "[XX-All-XX]",
+      "active": "[XX-Active-XX]",
+      "closed": "[XX-Closed-XX]"
+    },
     "remove": "[XX-Remove-XX]",
     "added": "[XX-Account added-XX]",
     "removed": "[XX-Account removed-XX]",

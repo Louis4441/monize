@@ -102,6 +102,17 @@ describe('InstitutionForm', () => {
     expect(website).toHaveAttribute('spellcheck', 'false');
   });
 
+  it('forces the country code to uppercase while typing', async () => {
+    render(<InstitutionForm onSubmit={vi.fn()} onCancel={() => {}} />);
+    const country = screen.getByLabelText('Country (optional)') as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.change(country, { target: { value: 'ca' } });
+    });
+
+    await waitFor(() => expect(country).toHaveValue('CA'));
+  });
+
   it('prefills the name for inline creation', () => {
     render(
       <InstitutionForm

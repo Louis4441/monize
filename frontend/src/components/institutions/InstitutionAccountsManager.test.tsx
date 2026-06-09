@@ -125,6 +125,54 @@ describe('InstitutionAccountsManager', () => {
     expect(screen.getAllByText('Remove')).toHaveLength(1);
   });
 
+  it('filters assigned accounts by active/closed status', async () => {
+    const open = { id: 'a-1', name: 'Open Chequing', institutionId: 'i-1', isClosed: false } as Account;
+    const closed = { id: 'a-2', name: 'Old Savings', institutionId: 'i-1', isClosed: true } as Account;
+    vi.mocked(institutionsApi.getAccounts).mockResolvedValue([open, closed]);
+    vi.mocked(accountsApi.getAll).mockResolvedValue([]);
+
+    await renderManager();
+
+    // "All" is the default, so both accounts are listed.
+    await waitFor(() =>
+      expect(screen.getByText('Open Chequing')).toBeInTheDocument(),
+    );
+    expect(screen.getByText('Old Savings')).toBeInTheDocument();
+
+    // "Active" hides closed accounts.
+    await act(async () => {
+      fireEvent.click(screen.getByText('Active'));
+    });
+    expect(screen.getByText('Open Chequing')).toBeInTheDocument();
+    expect(screen.queryByText('Old Savings')).not.toBeInTheDocument();
+
+    // "Closed" shows only closed accounts.
+    await act(async () => {
+      fireEvent.click(screen.getByText('Closed'));
+    });
+    expect(screen.getByText('Old Savings')).toBeInTheDocument();
+    expect(screen.queryByText('Open Chequing')).not.toBeInTheDocument();
+  });
+
+  it('shows a no-match message when the filter excludes every account', async () => {
+    const open = { id: 'a-1', name: 'Open Chequing', institutionId: 'i-1', isClosed: false } as Account;
+    vi.mocked(institutionsApi.getAccounts).mockResolvedValue([open]);
+    vi.mocked(accountsApi.getAll).mockResolvedValue([]);
+
+    await renderManager();
+    await waitFor(() =>
+      expect(screen.getByText('Open Chequing')).toBeInTheDocument(),
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Closed'));
+    });
+
+    expect(
+      screen.getByText('No accounts match the selected filter.'),
+    ).toBeInTheDocument();
+  });
+
   it('shows the empty state when no accounts are assigned', async () => {
     vi.mocked(institutionsApi.getAccounts).mockResolvedValue([]);
     vi.mocked(accountsApi.getAll).mockResolvedValue([account('a-2', 'Savings')]);
