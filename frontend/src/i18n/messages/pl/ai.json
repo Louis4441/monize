@@ -1,0 +1,53 @@
+{
+  "page": {
+    "title": "Asystent AI",
+    "subtitle": "Zadawaj pytania o swoje finanse w naturalnym języku"
+  },
+  "chat": {
+    "conversationSaved": "Rozmowa zapisana w przeglądarce",
+    "clearConversation": "Wyczyść rozmowę",
+    "inputPlaceholder": "Zapytaj o swoje finanse...",
+    "inputPlaceholderDisabled": "Dostawca AI nie jest skonfigurowany",
+    "keyboardHint": "Naciśnij Enter, aby wysłać, Shift+Enter dla nowej linii",
+    "cancelTitle": "Anuluj",
+    "sendTitle": "Wyślij"
+  },
+  "notConfigured": {
+    "heading": "AI nie jest skonfigurowane",
+    "message": "Nie skonfigurowano żadnego dostawcy AI. Aby korzystać z Asystenta AI, {link} w ustawieniach.",
+    "linkText": "skonfiguruj dostawcę AI"
+  },
+  "suggestedQueries": {
+    "heading": "Zapytaj o swoje finanse",
+    "description": "Mogę odpowiadać na pytania o Twoje wydatki, przychody, salda kont, wartość netto i wiele więcej.",
+    "monthlySpendingLabel": "Miesięczne wydatki",
+    "monthlySpendingQuery": "Ile wydałem w zeszłym miesiącu?",
+    "topCategoriesLabel": "Najwyższe kategorie",
+    "topCategoriesQuery": "Jakie jest moje 5 najwyższych kategorii wydatków w tym roku?",
+    "accountBalancesLabel": "Salda kont",
+    "accountBalancesQuery": "Jakie są moje aktualne salda kont?",
+    "compareMonthsLabel": "Porównaj miesiące",
+    "compareMonthsQuery": "Porównaj moje wydatki w tym miesiącu z poprzednim",
+    "netWorthTrendLabel": "Trend wartości netto",
+    "netWorthTrendQuery": "Pokaż trend mojej wartości netto z ostatnich 12 miesięcy",
+    "savingsRateLabel": "Stopa oszczędności",
+    "savingsRateQuery": "Ile zaoszczędziłem w tym roku w porównaniu z moimi przychodami?"
+  },
+  "toolDetails": {
+    "inputLabel": "Dane wejściowe",
+    "resultLabel": "Wynik",
+    "toolFailedAriaLabel": "Narzędzie nie powiodło się",
+    "toolSucceededAriaLabel": "Narzędzie zakończone powodzeniem"
+  },
+  "table": {
+    "downloadTitle": "Pobierz tabelę jako CSV",
+    "downloadAriaLabel": "Pobierz tabelę jako CSV",
+    "noDataError": "Brak danych tabeli do wyeksportowania"
+  },
+  "chart": {
+    "downloadTitle": "Pobierz wykres jako PNG",
+    "downloadAriaLabel": "Pobierz wykres jako PNG",
+    "captureError": "Nie udało się przechwycić obrazu wykresu",
+    "downloadError": "Nie udało się pobrać wykresu"
+  }
+}

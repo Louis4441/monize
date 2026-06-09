@@ -1,0 +1,204 @@
+{
+  "page": {
+    "title": "Odbiorcy",
+    "subtitle": "Zarządzaj odbiorcami i ich domyślnymi kategoriami",
+    "deactivateUnused": "Dezaktywuj nieużywanych",
+    "autoAssignCategories": "Automatycznie przypisz kategorie",
+    "newPayee": "+ Nowy odbiorca",
+    "searchPlaceholder": "Szukaj odbiorców...",
+    "statusAll": "Wszystkie ({count})",
+    "statusActive": "Aktywne ({count})",
+    "statusInactive": "Nieaktywne ({count})",
+    "modalTitleEdit": "Edytuj odbiorcę",
+    "modalTitleNew": "Nowy odbiorca",
+    "loading": "Wczytywanie odbiorców...",
+    "count": "{count, plural, one {# odbiorca} few {# odbiorcy} many {# odbiorców} other {# odbiorcy}}",
+    "toasts": {
+      "loadFailed": "Nie udało się wczytać danych",
+      "updated": "Zaktualizowano odbiorcę",
+      "created": "Utworzono odbiorcę",
+      "reactivated": "Odbiorca \"{name}\" został przywrócony",
+      "reactivateFailed": "Nie udało się przywrócić odbiorcy",
+      "updateFailed": "Nie udało się zaktualizować odbiorcy",
+      "createFailed": "Nie udało się utworzyć odbiorcy"
+    },
+    "summary": {
+      "totalPayees": "Wszyscy odbiorcy",
+      "active": "Aktywny",
+      "inactive": "Nieaktywny",
+      "withoutCategory": "Bez kategorii"
+    }
+  },
+  "list": {
+    "columns": {
+      "name": "Nazwa",
+      "defaultCategory": "Domyślna kategoria",
+      "count": "Liczba",
+      "aliases": "Aliasy",
+      "lastUsed": "Ostatnio użyto",
+      "created": "Utworzono",
+      "status": "Status",
+      "notes": "Notatki",
+      "actions": "Akcje"
+    },
+    "density": {
+      "normal": "Normalna",
+      "compact": "Kompaktowa",
+      "dense": "Gęsta",
+      "toggle": "Przełącz gęstość wierszy"
+    },
+    "noCategory": "Brak",
+    "statusBadge": {
+      "active": "Aktywny",
+      "inactive": "Nieaktywny"
+    },
+    "actions": {
+      "reactivate": "Przywróć",
+      "reactivateShort": "Pr",
+      "merge": "Scal",
+      "mergeShort": "S",
+      "edit": "Edytuj",
+      "editShort": "E",
+      "delete": "Usuń",
+      "deleteShort": "X"
+    },
+    "viewTransactionsTitle": "Wyświetl transakcje z tym odbiorcą",
+    "empty": {
+      "title": "Brak odbiorców",
+      "subtitle": "Zacznij od utworzenia nowego odbiorcy."
+    },
+    "deleteConfirm": {
+      "title": "Usunąć \"{name}\"?",
+      "message": "Tej operacji nie można cofnąć.",
+      "confirmLabel": "Usuń",
+      "cancelLabel": "Anuluj"
+    },
+    "toasts": {
+      "deleted": "Usunięto odbiorcę",
+      "deleteFailed": "Nie udało się usunąć odbiorcy"
+    }
+  },
+  "form": {
+    "nameLabel": "Nazwa odbiorcy",
+    "categoryLabel": "Domyślna kategoria",
+    "notesLabel": "Notatki (opcjonalnie)",
+    "submitCreate": "Utwórz odbiorcę",
+    "submitUpdate": "Zapisz odbiorcę"
+  },
+  "merge": {
+    "title": "Scal odbiorcę",
+    "mergeFromLabel": "Scal z (zostanie usunięty):",
+    "transactionCount": "{count, plural, one {# transakcja zostanie przeniesiona} few {# transakcje zostaną przeniesione} many {# transakcji zostanie przeniesionych} other {# transakcji zostanie przeniesionych}}",
+    "mergeIntoLabel": "Scal w (odbiorca docelowy)",
+    "addAsAliasLabel": "Dodaj \"{name}\" jako alias odbiorcy docelowego",
+    "willLabel": "Spowoduje to:",
+    "willMoveTransactions": "Przenieś wszystkie transakcje z \"{source}\" do \"{target}\"",
+    "willAddAlias": "Dodaj \"{source}\" jako alias, aby przyszłe importy dopasowywały się automatycznie",
+    "willDelete": "Usuń odbiorcę \"{source}\"",
+    "merging": "Scalanie...",
+    "mergeButton": "Scal odbiorcę",
+    "toasts": {
+      "merged": "Scalono z \"{target}\": {details}",
+      "transactionsMigrated": "{count, plural, one {Przeniesiono # transakcję} few {Przeniesiono # transakcje} many {Przeniesiono # transakcji} other {Przeniesiono # transakcji}}",
+      "aliasAdded": "dodano alias",
+      "sourceDeleted": "usunięto \"{name}\"",
+      "failed": "Nie udało się scalić odbiorców"
+    }
+  },
+  "categoryAutoAssign": {
+    "title": "Automatycznie przypisz domyślne kategorie",
+    "howItWorksTitle": "Jak to działa",
+    "howItWorksBody": "Ta funkcja analizuje historię Twoich transakcji, aby zaproponować domyślne kategorie dla odbiorców. Sprawdza, która kategoria jest najczęściej używana dla każdego odbiorcy, i sugeruje przypisanie jej jako kategorii domyślnej dla przyszłych transakcji. Domyślną kategorię zawsze możesz zmienić w razie potrzeby.",
+    "minTransactionsLabel": "Minimalna liczba transakcji: {count}",
+    "minTransactionsHelp": "Uwzględniaj tylko odbiorców z co najmniej taką liczbą transakcji",
+    "matchPercentageLabel": "Procent dopasowania kategorii: {percent}%",
+    "matchPercentageHelp": "Kategoria musi być używana w co najmniej takim procencie transakcji",
+    "onlyWithoutCategoryLabel": "Tylko odbiorcy bez domyślnej kategorii",
+    "previewButton": "Podgląd sugestii",
+    "loading": "Wczytywanie...",
+    "suggestionsHeader": "Sugestie (znaleziono: {count})",
+    "selectAll": "Zaznacz wszystkie",
+    "selectNone": "Odznacz wszystkie",
+    "empty": {
+      "line1": "Żaden odbiorca nie spełnia bieżących kryteriów.",
+      "line2": "Spróbuj dostosować ustawienia powyżej."
+    },
+    "columns": {
+      "payee": "Odbiorca",
+      "suggestedCategory": "Sugerowana kategoria",
+      "match": "Dopasowanie"
+    },
+    "selectedCount": "{count, plural, one {Wybrano # odbiorcę} few {Wybrano # odbiorców} many {Wybrano # odbiorców} other {Wybrano # odbiorcy}}",
+    "applyButton": "{count, plural, one {Zastosuj do # odbiorcy} few {Zastosuj do # odbiorców} many {Zastosuj do # odbiorców} other {Zastosuj do # odbiorców}}",
+    "applying": "Stosowanie...",
+    "toasts": {
+      "selectAtLeastOne": "Wybierz co najmniej jednego odbiorcę do aktualizacji",
+      "updated": "{count, plural, one {Zaktualizowano # odbiorcę} few {Zaktualizowano # odbiorców} many {Zaktualizowano # odbiorców} other {Zaktualizowano # odbiorcy}}",
+      "loadFailed": "Nie udało się wczytać sugestii",
+      "applyFailed": "Nie udało się zastosować przypisań kategorii"
+    }
+  },
+  "deactivateUnused": {
+    "title": "Dezaktywuj nieużywanych odbiorców",
+    "howItWorksTitle": "Jak to działa",
+    "howItWorksBody": "Ta funkcja znajduje rzadko używanych odbiorców i dezaktywuje ich. Dezaktywowani odbiorcy nie będą pojawiać się na listach wyboru odbiorcy podczas tworzenia transakcji, ale ich dotychczasowe transakcje zostaną zachowane. Odbiorcę możesz w dowolnej chwili przywrócić z listy odbiorców.",
+    "maxTransactionsLabel": "{count, plural, one {# lub mniej transakcji} few {# lub mniej transakcji} many {# lub mniej transakcji} other {# lub mniej transakcji}}",
+    "maxTransactionsHelp": "Uwzględniaj tylko odbiorców z taką liczbą transakcji lub mniejszą",
+    "monthsUnusedLabel": "Ostatnio użyte ponad {label} temu",
+    "monthsUnusedHelp": "Uwzględniaj tylko odbiorców nieużywanych od co najmniej tego okresu (lub nigdy nieużywanych)",
+    "previewButton": "Podgląd nieużywanych odbiorców",
+    "loading": "Wczytywanie...",
+    "candidatesHeader": "Kandydaci (znaleziono: {count})",
+    "selectAll": "Zaznacz wszystkie",
+    "selectNone": "Odznacz wszystkie",
+    "neverUsed": "Nigdy nieużywany",
+    "empty": {
+      "line1": "Żaden odbiorca nie spełnia bieżących kryteriów.",
+      "line2": "Spróbuj dostosować ustawienia powyżej."
+    },
+    "columns": {
+      "payee": "Odbiorca",
+      "transactions": "Transakcje",
+      "lastUsed": "Ostatnio użyto"
+    },
+    "selectedCount": "{count, plural, one {Wybrano # odbiorcę} few {Wybrano # odbiorców} many {Wybrano # odbiorców} other {Wybrano # odbiorcy}}",
+    "deactivateButton": "{count, plural, one {Dezaktywuj # odbiorcę} few {Dezaktywuj # odbiorców} many {Dezaktywuj # odbiorców} other {Dezaktywuj # odbiorców}}",
+    "deactivating": "Dezaktywowanie...",
+    "toasts": {
+      "selectAtLeastOne": "Wybierz co najmniej jednego odbiorcę do dezaktywacji",
+      "deactivated": "{count, plural, one {Dezaktywowano # odbiorcę} few {Dezaktywowano # odbiorców} many {Dezaktywowano # odbiorców} other {Dezaktywowano # odbiorcy}}",
+      "loadFailed": "Nie udało się wczytać podglądu",
+      "deactivateFailed": "Nie udało się dezaktywować odbiorców"
+    }
+  },
+  "reactivate": {
+    "title": "Przywrócić odbiorcę?",
+    "message": "Odbiorca \"{name}\" został wcześniej dezaktywowany. Czy chcesz go przywrócić, aby ponownie pojawiał się na listach wyboru odbiorcy?",
+    "keepInactiveButton": "Nie, pozostaw nieaktywnego",
+    "reactivateButton": "Przywróć",
+    "reactivating": "Przywracanie..."
+  },
+  "aliases": {
+    "heading": "Aliasy",
+    "description": "Aliasy mapują importowane nazwy odbiorców na tego odbiorcę. Użyj * jako symbolu wieloznacznego (np. \"STARBUCKS*\"). Bez rozróżniania wielkości liter.",
+    "loading": "Wczytywanie...",
+    "noAliases": "Brak skonfigurowanych aliasów",
+    "removeTitle": "Usuń alias",
+    "removeButton": "Usuń",
+    "addButton": "Dodaj",
+    "adding": "Dodawanie...",
+    "placeholder": "np. STARBUCKS #*",
+    "toasts": {
+      "alreadyAdded": "Alias \"{alias}\" został już dodany",
+      "added": "Dodano alias \"{alias}\"",
+      "removed": "Usunięto alias \"{alias}\"",
+      "loadFailed": "Nie udało się wczytać aliasów",
+      "addFailed": "Nie udało się dodać aliasu",
+      "removeFailed": "Nie udało się usunąć aliasu"
+    }
+  },
+  "selectCategoryPlaceholder": "Wybierz kategorię...",
+  "validation": {
+    "nameRequired": "Nazwa odbiorcy jest wymagana"
+  }
+}

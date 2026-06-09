@@ -27,6 +27,7 @@ export const DEFAULT_LOCALE = "en";
 
 const ALL_LOCALES: readonly SupportedLocale[] = [
   { code: "en", label: "English", dir: "ltr" },
+  { code: "pl", label: "Polski", dir: "ltr" },
   { code: "xx", label: "Pseudo (debug)", dir: "ltr", devOnly: true },
 ];
 
