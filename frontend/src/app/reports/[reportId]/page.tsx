@@ -24,6 +24,7 @@ const reportComponents: Record<string, React.LazyExoticComponent<React.Component
   // Debt & Loans
   'debt-payoff-timeline': lazy(() => import('@/components/reports/DebtPayoffTimelineReport').then(m => ({ default: m.DebtPayoffTimelineReport }))),
   'loan-amortization': lazy(() => import('@/components/reports/LoanAmortizationReport').then(m => ({ default: m.LoanAmortizationReport }))),
+  'credit-utilization': lazy(() => import('@/components/reports/CreditUtilizationReport').then(m => ({ default: m.CreditUtilizationReport }))),
   // Investment
   'investment-performance': lazy(() => import('@/components/reports/InvestmentPerformanceReport').then(m => ({ default: m.InvestmentPerformanceReport }))),
   'dividend-income': lazy(() => import('@/components/reports/DividendIncomeReport').then(m => ({ default: m.DividendIncomeReport }))),

@@ -158,6 +158,16 @@ const reports: Report[] = [
       </svg>
     ),
   },
+  {
+    id: 'credit-utilization',
+    category: 'debt',
+    color: 'bg-rose-500',
+    icon: (
+      <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h2m4 0h4M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z" />
+      </svg>
+    ),
+  },
   // Investment
   {
     id: 'investment-performance',
