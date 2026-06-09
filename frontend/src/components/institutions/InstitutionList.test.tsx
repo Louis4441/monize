@@ -43,6 +43,31 @@ describe('InstitutionList', () => {
     ).toHaveTextContent('2');
   });
 
+  it('renders the website as a link only for http(s) schemes', () => {
+    const { rerender } = render(
+      <InstitutionList
+        institutions={[makeInstitution()]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onManageAccounts={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole('link', { name: 'https://td.com' }),
+    ).toHaveAttribute('href', 'https://td.com');
+
+    rerender(
+      <InstitutionList
+        institutions={[makeInstitution({ website: 'javascript:alert(1)' })]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onManageAccounts={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument();
+  });
+
   it('applies dense row padding when density is dense', () => {
     render(
       <InstitutionList

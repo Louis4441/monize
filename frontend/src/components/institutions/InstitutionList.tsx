@@ -12,6 +12,7 @@ import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { useTableDensity, nextDensity, DensityLevel } from '@/hooks/useTableDensity';
 import { SortIcon } from '@/components/ui/SortIcon';
+import { safeHttpUrl } from '@/lib/safe-url';
 import { InstitutionLogo } from './InstitutionLogo';
 
 const logger = createLogger('InstitutionList');
@@ -143,15 +144,21 @@ export function InstitutionList({
                 </div>
               </td>
               <td className={`${cellPadding} hidden md:table-cell max-w-[16rem]`}>
-                <a
-                  href={institution.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate inline-block max-w-full"
-                >
-                  {institution.website}
-                </a>
+                {safeHttpUrl(institution.website) ? (
+                  <a
+                    href={safeHttpUrl(institution.website)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline truncate inline-block max-w-full"
+                  >
+                    {institution.website}
+                  </a>
+                ) : (
+                  <span className="text-sm text-gray-500 dark:text-gray-400 truncate inline-block max-w-full">
+                    {institution.website}
+                  </span>
+                )}
               </td>
               <td className={`${cellPadding} hidden sm:table-cell text-sm text-gray-500 dark:text-gray-400`}>
                 {institution.country || '—'}

@@ -12,6 +12,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { InstitutionLogo, InstitutionLogoData } from '@/components/institutions/InstitutionLogo';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { safeHttpUrl } from '@/lib/safe-url';
 
 interface AccountInfoWidgetProps {
   account: Account;
@@ -53,10 +54,7 @@ export function AccountInfoWidget({
   const institutionName = institution?.name ?? account.institution ?? null;
   // Only treat http(s) URLs as a safe link target, to avoid javascript:/data:
   // URIs ever reaching the href.
-  const institutionWebsite =
-    institution?.website && /^https?:\/\//i.test(institution.website)
-      ? institution.website
-      : undefined;
+  const institutionWebsite = safeHttpUrl(institution?.website);
 
   // The soonest active scheduled bill/deposit booked against this account.
   // Honours a per-occurrence override for both the date and the amount.
