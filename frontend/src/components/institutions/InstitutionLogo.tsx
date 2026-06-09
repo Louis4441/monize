@@ -16,6 +16,8 @@ interface InstitutionLogoProps {
   className?: string;
   /** Glyph shown when there is no institution (e.g. cashflow-only accounts). */
   fallbackGlyph?: string;
+  /** Draw the thin ring around the logo. Defaults to true. */
+  ring?: boolean;
 }
 
 /**
@@ -28,6 +30,7 @@ export function InstitutionLogo({
   size = 20,
   className = '',
   fallbackGlyph = '$',
+  ring = true,
 }: InstitutionLogoProps) {
   const [errored, setErrored] = useState(false);
 
@@ -55,9 +58,9 @@ export function InstitutionLogo({
         style={dimension}
         onError={() => setErrored(true)}
         // Circular chip with no forced backing: transparent favicons keep their
-        // transparency, opaque ones fill the circle. The ring keeps it defined
-        // against any background.
-        className={`shrink-0 rounded-full object-contain ring-1 ring-black/10 dark:ring-white/15 ${className}`}
+        // transparency, opaque ones fill the circle. The optional ring keeps it
+        // defined against any background.
+        className={`shrink-0 rounded-full object-contain ${ring ? 'ring-1 ring-black/10 dark:ring-white/15' : ''} ${className}`}
       />
     );
   }
