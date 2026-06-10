@@ -85,11 +85,11 @@
       "changed": "Statut changé en {status}",
       "updateError": "Échec de la mise à jour du statut",
       "unreconciled": "Non rapproché",
-      "cleared": "Pointé",
+      "cleared": "Encaissé",
       "reconciled": "Rapproché",
       "void": "Annulé",
       "unreconciledDense": "N",
-      "clearedDense": "P",
+      "clearedDense": "E",
       "reconciledDense": "R",
       "voidDense": "A",
       "pendingDense": "○",
@@ -193,7 +193,7 @@
     "cancelBulk": "Annuler la sélection",
     "statusLabels": {
       "unreconciled": "Non rapproché",
-      "cleared": "Pointé",
+      "cleared": "Encaissé",
       "reconciled": "Rapproché",
       "void": "Annulé"
     },
@@ -233,7 +233,7 @@
       "tagsPlaceholder": "Sélectionner des étiquettes (laisser vide pour tout effacer)...",
       "statusOptions": {
         "pending": "En attente",
-        "cleared": "Pointé",
+        "cleared": "Encaissé",
         "void": "Annulé"
       },
       "notes": {
@@ -283,7 +283,7 @@
     },
     "statusOptions": {
       "unreconciled": "Non rapproché",
-      "cleared": "Pointé",
+      "cleared": "Encaissé",
       "reconciled": "Rapproché",
       "void": "Annulé"
     },
@@ -321,21 +321,21 @@
     "historyTitle": "Remplissage rapide depuis une transaction récente"
   },
   "splitEditor": {
-    "header": "Détails de la ventilation",
+    "header": "Détails de la répartition",
     "distributeProportionally": "Répartir proportionnellement",
-    "distributeProportionallyTitle": "Répartir le montant restant proportionnellement selon le montant de chaque ventilation",
+    "distributeProportionallyTitle": "Répartir le montant restant proportionnellement selon le montant de chaque répartition",
     "distributeEvenly": "Répartir équitablement",
-    "addSplit": "Ajouter une ventilation",
-    "removeMinimum": "Minimum 2 ventilations requises",
-    "removeSplit": "Supprimer la ventilation",
+    "addSplit": "Ajouter une répartition",
+    "removeMinimum": "Minimum 2 répartitions requises",
+    "removeSplit": "Supprimer la répartition",
     "noUnassigned": "Aucun montant non affecté",
-    "addRemaining": "Ajouter le reste à cette ventilation",
+    "addRemaining": "Ajouter le reste à cette répartition",
     "total": "Total",
     "balanced": "Équilibré",
     "remaining": "Restant : {symbol}{amount}",
     "needAmount": "Besoin de {symbol}{amount} (restant : {symbol}{remaining})",
     "setTotal": "Définir le total à {symbol}{amount}",
-    "splitLabel": "Ventilation {number}",
+    "splitLabel": "Répartition {number}",
     "columns": {
       "type": "Type",
       "categoryAccount": "Catégorie / Compte",

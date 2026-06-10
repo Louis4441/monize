@@ -109,8 +109,8 @@
       "monthly-comparison": "Compara cualquier mes con el mes anterior en ingresos, gastos, patrimonio neto e inversiones.",
       "uncategorized-transactions": "Encuentra y categoriza las transacciones que no tienen categoría.",
       "duplicate-transactions": "Identifica posibles entradas duplicadas que pueden necesitar revisión o eliminación.",
-      "upcoming-bills": "Calendario visual de transacciones programadas y próximas fechas de vencimiento de facturas.",
-      "bill-payment-history": "Rastrea patrones de pago e historial de facturas recurrentes y transacciones programadas.",
+      "upcoming-bills": "Calendario visual de transacciones planificadas y próximas fechas de vencimiento de facturas.",
+      "bill-payment-history": "Rastrea patrones de pago e historial de facturas recurrentes y transacciones planificadas.",
       "budget-vs-actual": "Compara tus montos presupuestados con el gasto real a lo largo del tiempo en todas las categorías.",
       "budget-health-score": "Obtén una puntuación de salud del 0 al 100 para tu presupuesto con análisis detallado de impacto por categoría.",
       "budget-seasonal-patterns": "Descubre tendencias estacionales y meses de alto gasto en tus categorías de presupuesto.",
@@ -181,7 +181,7 @@
     "colTotalPaid": "Total pagado",
     "colLastPayment": "Último pago",
     "noPayee": "Sin beneficiario",
-    "empty": "No se encontraron pagos de facturas para este período. Registra las transacciones programadas para ver el historial de pagos.",
+    "empty": "No se encontraron pagos de facturas para este período. Registra las transacciones planificadas para ver el historial de pagos.",
     "loadError": "Error al cargar los datos del historial de pagos de facturas."
   },
   "budgetHealthScore": {
@@ -1415,7 +1415,7 @@
     "todayButton": "Hoy",
     "calendarView": "Calendario",
     "listView": "Lista",
-    "noBills": "No se encontraron facturas programadas. Agrega transacciones programadas para verlas en este calendario.",
+    "noBills": "No se encontraron facturas planificadas. Agrega transacciones planificadas para verlas en este calendario.",
     "moreItems": "+{count} más",
     "calendarAutoTitle": "{name} (Auto)",
     "calendarManualTitle": "{name} (Manual)",

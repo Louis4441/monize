@@ -51,7 +51,7 @@
       "description": "Descripción",
       "refNumber": "Ref. #",
       "tags": "Etiquetas",
-      "amount": "Importe",
+      "amount": "Cantidad",
       "balance": "Saldo",
       "status": "Estado",
       "actions": "Acciones"
@@ -161,8 +161,8 @@
       "timePeriod": "Período de tiempo",
       "startDate": "Fecha de inicio",
       "endDate": "Fecha de fin",
-      "amountFrom": "Importe desde",
-      "amountTo": "Importe hasta",
+      "amountFrom": "Cantidad desde",
+      "amountTo": "Cantidad hasta",
       "status": "Estado",
       "search": "Buscar"
     },
@@ -174,7 +174,7 @@
       "statuses": "Todos los estados",
       "amountMin": "Mín",
       "amountMax": "Máx",
-      "search": "Buscar beneficiario, categoría, importe, etiqueta, descripción, referencia #..."
+      "search": "Buscar beneficiario, categoría, cantidad, etiqueta, descripción, referencia #..."
     },
     "chips": {
       "removeAccount": "Quitar filtro {name}",
@@ -182,7 +182,7 @@
       "removeCategory": "Quitar filtro {name}",
       "removeTag": "Quitar filtro {name}",
       "removeDate": "Quitar filtro de fecha",
-      "removeAmount": "Quitar filtro de importe",
+      "removeAmount": "Quitar filtro de cantidad",
       "removeSearch": "Quitar filtro de búsqueda",
       "dateFrom": "Desde {date}",
       "dateUntil": "Hasta {date}",
@@ -254,17 +254,17 @@
       "createDate": "Fecha de creación",
       "payee": "Beneficiario",
       "category": "Categoría",
-      "amount": "Importe",
-      "totalAmount": "Importe total",
+      "amount": "Cantidad",
+      "totalAmount": "Cantidad total",
       "referenceNumber": "Número de referencia",
       "description": "Descripción",
       "status": "Estado",
       "tags": "Etiquetas",
       "fromAccount": "Cuenta origen",
       "toAccount": "Cuenta destino",
-      "transferAmount": "Importe de transferencia",
-      "transferAmountWithCurrency": "Importe de transferencia ({currency})",
-      "amountReceived": "Importe recibido ({currency})",
+      "transferAmount": "Cantidad de transferencia",
+      "transferAmountWithCurrency": "Cantidad de transferencia ({currency})",
+      "amountReceived": "Cantidad recibida ({currency})",
       "payeeOptional": "Beneficiario (opcional)"
     },
     "placeholders": {
@@ -293,8 +293,8 @@
       "transfer": "Transferencia",
       "transaction": "Transacción"
     },
-    "transferAmountNote": "El importe debe ser positivo para transferencias",
-    "amountReceivedNote": "Importe recibido después de la conversión de moneda",
+    "transferAmountNote": "La cantidad debe ser positiva para transferencias",
+    "amountReceivedNote": "Cantidad recibida después de la conversión de moneda",
     "splitTransaction": "Desglosar transacción",
     "newTagTitle": "Nueva etiqueta",
     "toasts": {
@@ -304,10 +304,10 @@
       "transactionUpdated": "Transacción actualizada",
       "saveFailed": "Error al guardar la transacción",
       "loadFailed": "Error al cargar los datos del formulario",
-      "splitsNotEqual": "El total de divisiones ({splitTotal}) debe ser igual al importe de la transacción ({txAmount})",
+      "splitsNotEqual": "El total de los desgloses ({splitTotal}) debe ser igual a la cantidad de la transacción ({txAmount})",
       "destinationRequired": "Selecciona una cuenta destino",
       "sameAccount": "Las cuentas origen y destino deben ser diferentes",
-      "negativeTransfer": "El importe de la transferencia no debe ser negativo",
+      "negativeTransfer": "La cantidad de la transferencia no debe ser negativa",
       "payeeCreated": "Beneficiario \"{name}\" creado",
       "payeeCreateFailed": "Error al crear el beneficiario",
       "payeeReactivated": "Beneficiario \"{name}\" reactivado",
@@ -321,26 +321,26 @@
     "historyTitle": "Completar rápidamente desde una transacción reciente"
   },
   "splitEditor": {
-    "header": "Detalles de la división",
+    "header": "Detalles del desglose",
     "distributeProportionally": "Distribuir proporcionalmente",
-    "distributeProportionallyTitle": "Distribuir el importe restante proporcionalmente según el importe de cada división",
+    "distributeProportionallyTitle": "Distribuir la cantidad restante proporcionalmente según la cantidad de cada desglose",
     "distributeEvenly": "Distribuir uniformemente",
-    "addSplit": "Agregar división",
-    "removeMinimum": "Se requieren mínimo 2 divisiones",
-    "removeSplit": "Quitar división",
-    "noUnassigned": "Sin importe sin asignar",
-    "addRemaining": "Agregar el restante a esta división",
+    "addSplit": "Agregar desglose",
+    "removeMinimum": "Se requieren mínimo 2 desgloses",
+    "removeSplit": "Quitar desglose",
+    "noUnassigned": "Sin cantidad sin asignar",
+    "addRemaining": "Agregar el restante a este desglose",
     "total": "Total",
     "balanced": "Equilibrado",
     "remaining": "Restante: {symbol}{amount}",
     "needAmount": "Se necesitan {symbol}{amount} (restante: {symbol}{remaining})",
     "setTotal": "Establecer total en {symbol}{amount}",
-    "splitLabel": "División {number}",
+    "splitLabel": "Desglose {number}",
     "columns": {
       "type": "Tipo",
       "categoryAccount": "Categoría / Cuenta",
       "category": "Categoría",
-      "amount": "Importe",
+      "amount": "Cantidad",
       "memo": "Nota",
       "tags": "Etiquetas"
     },
@@ -371,7 +371,7 @@
     "quantityPlaceholder": "Cantidad",
     "pricePlaceholder": "Precio",
     "commissionPlaceholder": "Comisión",
-    "amountPlaceholder": "Importe ({currency})"
+    "amountPlaceholder": "Cantidad ({currency})"
   },
   "charts": {
     "balanceHistory": {

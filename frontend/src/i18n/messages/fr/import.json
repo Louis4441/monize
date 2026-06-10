@@ -255,9 +255,9 @@
     "errorsLabel": "Erreurs :",
     "andMoreErrors": "…et {count} erreur(s) de plus",
     "loanSetupHeading": "Configurer les paiements récurrents",
-    "loanSetupDescription": "Les comptes de prêt/hypothèque suivants ont été importés sans paiements planifiés. Configurez des paiements récurrents pour continuer à suivre votre remboursement.",
+    "loanSetupDescription": "Les comptes de prêt/prêt hypothécaire suivants ont été importés sans paiements récurrents. Configurez des paiements récurrents pour continuer à suivre votre remboursement.",
     "setUpPayments": "Configurer les paiements",
-    "scheduledPaymentsConfigured": "Paiements planifiés configurés pour {count} compte{plural}.",
+    "scheduledPaymentsConfigured": "Paiements récurrents configurés pour {count} compte{plural}.",
     "viewInvestments": "Voir les investissements",
     "viewTransactions": "Voir les transactions",
     "importMoreFiles": "Importer d'autres fichiers"

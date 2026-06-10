@@ -109,8 +109,8 @@
       "monthly-comparison": "Comparez n'importe quel mois au mois précédent en termes de revenus, dépenses, valeur nette et investissements.",
       "uncategorized-transactions": "Trouvez et catégorisez les transactions auxquelles il manque une catégorie.",
       "duplicate-transactions": "Identifiez les éventuels doublons qui pourraient nécessiter une vérification ou une suppression.",
-      "upcoming-bills": "Calendrier visuel des transactions planifiées et des échéances de factures à venir.",
-      "bill-payment-history": "Suivez les tendances et l'historique des paiements pour les factures récurrentes et les transactions planifiées.",
+      "upcoming-bills": "Calendrier visuel des transactions récurrentes et des échéances de factures à venir.",
+      "bill-payment-history": "Suivez les tendances et l'historique des paiements pour les factures récurrentes et les transactions récurrentes.",
       "budget-vs-actual": "Comparez vos montants budgétés aux dépenses réelles sur toutes les catégories au fil du temps.",
       "budget-health-score": "Obtenez un score de santé de 0 à 100 pour votre budget avec une analyse d'impact détaillée par catégorie.",
       "budget-seasonal-patterns": "Découvrez les tendances saisonnières et les mois de fortes dépenses dans vos catégories budgétaires.",
@@ -159,7 +159,7 @@
       "CASH": "Espèces",
       "INVESTMENT": "Investissement",
       "LOAN": "Prêt",
-      "MORTGAGE": "Hypothèque",
+      "MORTGAGE": "Prêt hypothécaire",
       "ASSET": "Actif",
       "LIABILITY": "Passif"
     }
@@ -181,7 +181,7 @@
     "colTotalPaid": "Total payé",
     "colLastPayment": "Dernier paiement",
     "noPayee": "Aucun bénéficiaire",
-    "empty": "Aucun paiement de facture trouvé pour cette période. Validez des transactions planifiées pour consulter l'historique.",
+    "empty": "Aucun paiement de facture trouvé pour cette période. Validez des transactions récurrentes pour consulter l'historique.",
     "loadError": "Impossible de charger l'historique des paiements de factures."
   },
   "budgetHealthScore": {
@@ -378,7 +378,7 @@
     "transactionCount": "{count, plural, one {# transaction} other {# transactions}}"
   },
   "debtPayoff": {
-    "empty": "Aucun compte de dette trouvé. Ajoutez un prêt, une hypothèque ou une ligne de crédit pour voir le calendrier de remboursement.",
+    "empty": "Aucun compte de dette trouvé. Ajoutez un prêt, un prêt hypothécaire ou une ligne de crédit pour voir le calendrier de remboursement.",
     "labelSelectAccount": "Sélectionner un compte",
     "balanceOverTime": "Solde dans le temps",
     "paymentBreakdown": "Détail des paiements",
@@ -737,7 +737,7 @@
     "actionRemoveShares": "Retrait de parts"
   },
   "loanAmortization": {
-    "empty": "Aucun compte de prêt ou d'hypothèque trouvé. Ajoutez un compte de prêt pour voir l'historique des paiements.",
+    "empty": "Aucun compte de prêt ou de prêt hypothécaire trouvé. Ajoutez un compte de prêt pour voir l'historique des paiements.",
     "labelSelectLoan": "Sélectionner un prêt",
     "currentBalance": "Solde actuel",
     "originalAmount": "Montant initial",
@@ -1415,7 +1415,7 @@
     "todayButton": "Aujourd'hui",
     "calendarView": "Calendrier",
     "listView": "Liste",
-    "noBills": "Aucune facture planifiée trouvée. Ajoutez des transactions planifiées pour les voir dans ce calendrier.",
+    "noBills": "Aucune facture récurrente trouvée. Ajoutez des transactions récurrentes pour les voir dans ce calendrier.",
     "moreItems": "+{count} de plus",
     "calendarAutoTitle": "{name} (Auto)",
     "calendarManualTitle": "{name} (Manuel)",

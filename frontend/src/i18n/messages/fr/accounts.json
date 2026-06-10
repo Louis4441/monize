@@ -8,7 +8,7 @@
     "loadingAccounts": "Chargement des comptes…",
     "summary": {
       "totalActiveAccounts": "Total des comptes actifs",
-      "netWorth": "Patrimoine net",
+      "netWorth": "Valeur nette",
       "totalAssets": "Total des actifs",
       "totalLiabilities": "Total des passifs"
     }
@@ -22,8 +22,8 @@
       "active": "Actifs",
       "closed": "Clôturés",
       "netWorthAll": "Patrimoine net : Tous",
-      "inNetWorth": "Inclus dans le patrimoine net",
-      "excludedFromNetWorth": "Exclu du patrimoine net"
+      "inNetWorth": "Inclus dans le valeur nette",
+      "excludedFromNetWorth": "Exclu du valeur nette"
     },
     "accountCount": "{filtered} sur {total} comptes",
     "groupCount": "{count, plural, one {# compte} other {# comptes}}",
@@ -101,7 +101,7 @@
     "currencyLocked": "La devise est verrouillée car ce compte contient déjà des transactions. La modifier re-libeller silencieusement les soldes existants.",
     "openingBalance": "Solde d'ouverture",
     "loanAmount": "Montant du prêt",
-    "mortgageAmount": "Montant de l'hypothèque",
+    "mortgageAmount": "Montant du prêt hypothécaire",
     "accountNumber": "Numéro de compte (facultatif)",
     "institution": "Établissement (facultatif)",
     "institutionRequired": "Prêteur / Établissement (obligatoire)",
@@ -111,7 +111,7 @@
     "interestRateOptional": "Taux d'intérêt % (facultatif)",
     "interestRateRequired": "Taux d'intérêt % (obligatoire)",
     "description": "Description (facultatif)",
-    "excludeFromNetWorth": "Exclure du patrimoine net",
+    "excludeFromNetWorth": "Exclure du valeur nette",
     "favourite": "Favori",
     "addToFavourites": "Ajouter aux favoris",
     "removeFromFavourites": "Retirer des favoris",
@@ -122,7 +122,7 @@
     "createAccount": "Créer le compte",
     "updateAccount": "Mettre à jour le compte",
     "setUpRecurringPayments": "Configurer les paiements récurrents",
-    "noScheduledPayments": "Ce compte n'a pas de paiements planifiés configurés.",
+    "noScheduledPayments": "Ce compte n'a pas de paiements récurrents configurés.",
     "statementDates": "Dates de relevé (facultatif)",
     "statementDueDay": "Date d'échéance (jour du mois)",
     "statementSettlementDay": "Date de clôture (jour du mois)",
@@ -136,7 +136,7 @@
       "investment": "Investissement",
       "loan": "Prêt",
       "lineOfCredit": "Ligne de crédit",
-      "mortgage": "Hypothèque",
+      "mortgage": "Prêt hypothécaire",
       "asset": "Actif",
       "cash": "Espèces",
       "other": "Autre"
@@ -147,13 +147,13 @@
   "exportModal": {
     "title": "Exporter {name}",
     "format": "Format",
-    "splitTransactions": "Transactions ventilées",
+    "splitTransactions": "Transactions réparties",
     "dateFormat": "Format de date",
     "customFormat": "Format personnalisé",
     "customFormatHelp": "Utilisez Y pour l'année, M pour le mois, D pour le jour avec des séparateurs (- / ')",
     "exportButton": "Exporter",
     "splitOptions": {
-      "expand": "Avec le détail des ventilations",
+      "expand": "Avec le détail des répartitions",
       "collapse": "Une ligne par transaction"
     },
     "customDateFormatEmpty": "Veuillez saisir un format de date personnalisé",
@@ -186,20 +186,20 @@
   },
   "loanPaymentSetup": {
     "titleLoan": "Configurer les remboursements de prêt",
-    "titleMortgage": "Configurer les remboursements d'hypothèque",
+    "titleMortgage": "Configurer les remboursements du prêt hypothécaire",
     "analyzingHistory": "Analyse de l'historique des transactions…",
     "detectedPayments": "{count} paiements détectés du {from} au {to}.",
     "confidence": "Fiabilité :",
-    "lastSplit": "Dernière ventilation : {currency}{principal} capital / {currency}{interest} intérêts",
+    "lastSplit": "Dernière répartition : {currency}{principal} capital / {currency}{interest} intérêts",
     "extraPayments": "{count, plural, one {# remboursement anticipé} other {# remboursements anticipés}} détecté(s) (moy. {currency}{avg}/période)",
     "reviewValues": "Vérifiez et ajustez les valeurs ci-dessous avant d'enregistrer.",
     "regularPaymentAmount": "Montant du paiement régulier *",
     "includeExtraPrincipal": "Inclure un remboursement anticipé du capital",
     "extraPrincipalPerPayment": "Capital supplémentaire par paiement",
     "totalPayment": "Paiement total : {currency}{amount}",
-    "useDetectedSplit": "Utiliser la ventilation capital/intérêts des transactions importées",
+    "useDetectedSplit": "Utiliser la répartition capital/intérêts des transactions importées",
     "useDetectedSplitDesc": "Utilisera {currency}{interest} pour les intérêts, le reste au capital",
-    "calculateFromRate": "Calculera la ventilation à partir du taux d'intérêt et du solde actuel",
+    "calculateFromRate": "Calculera la répartition à partir du taux d'intérêt et du solde actuel",
     "paymentFrequency": "Fréquence de paiement *",
     "paymentFromAccount": "Paiement depuis le compte *",
     "selectAccount": "Sélectionner un compte…",
@@ -211,8 +211,8 @@
     "selectCategory": "Sélectionner une catégorie…",
     "payeeLender": "Bénéficiaire / Prêteur",
     "selectOrCreatePayee": "Sélectionner ou créer un bénéficiaire…",
-    "mortgageDetails": "Détails de l'hypothèque",
-    "canadianMortgage": "Hypothèque canadienne (composition semestrielle)",
+    "mortgageDetails": "Détails du prêt hypothécaire",
+    "canadianMortgage": "Prêt hypothécaire canadien (composition semestrielle)",
     "variableRate": "Taux variable",
     "amortizationMonths": "Amortissement (mois)",
     "termMonths": "Durée (mois)",
@@ -231,12 +231,12 @@
       "yearly": "Annuel"
     },
     "toasts": {
-      "setupComplete": "Paiements planifiés configurés pour {account}"
+      "setupComplete": "Paiements récurrents configurés pour {account}"
     }
   },
   "mortgageFields": {
-    "title": "Détails de l'hypothèque",
-    "canadianMortgage": "Hypothèque canadienne",
+    "title": "Détails du prêt hypothécaire",
+    "canadianMortgage": "Prêt hypothécaire canadien",
     "canadianMortgageDesc": "Utilise la composition semestrielle pour les taux fixes (obligatoire au Canada)",
     "variableRate": "Taux variable",
     "variableRateDesc": "Le taux peut changer durant la durée (utilise la composition mensuelle)",
@@ -277,7 +277,7 @@
     "valueChangeCategory": "Catégorie de variation de valeur",
     "selectOrCreateCategory": "Sélectionner ou créer une catégorie…",
     "dateAcquired": "Date d'acquisition",
-    "dateAcquiredNote": "L'actif sera exclu des calculs du patrimoine net avant cette date."
+    "dateAcquiredNote": "L'actif sera exclu des calculs du valeur nette avant cette date."
   },
   "toasts": {
     "categoryCreatedNested": "Catégorie « {parent} : {name} » créée",

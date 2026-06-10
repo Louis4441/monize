@@ -39,10 +39,10 @@
   "complete": {
     "title": "Rapprochement terminé",
     "message": "Votre compte a été rapproché avec succès au {date}.",
-    "existingPayment": "Ce compte possède un paiement planifié, <b>{name}</b>. Souhaitez-vous mettre à jour sa prochaine occurrence au solde rapproché de <b>{amount}</b> ?",
+    "existingPayment": "Ce compte possède un paiement récurrent, <b>{name}</b>. Souhaitez-vous mettre à jour sa prochaine occurrence au solde rapproché de <b>{amount}</b> ?",
     "updatePayment": "Mettre à jour le prochain paiement",
-    "noPayment": "Aucun paiement planifié n'a été trouvé pour ce compte. Souhaitez-vous en créer un pour le solde rapproché de <b>{amount}</b> ?",
-    "createPayment": "Créer un paiement planifié",
+    "noPayment": "Aucun paiement récurrent n'a été trouvé pour ce compte. Souhaitez-vous en créer un pour le solde rapproché de <b>{amount}</b> ?",
+    "createPayment": "Créer un paiement récurrent",
     "backToAccounts": "Retour aux comptes",
     "reconcileAnother": "Rapprocher un autre compte"
   },

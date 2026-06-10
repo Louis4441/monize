@@ -26,7 +26,7 @@
     "colDate": "Fecha",
     "colPayee": "Beneficiario",
     "colCategory": "Categoría",
-    "colAmount": "Importe",
+    "colAmount": "Cantidad",
     "colStatus": "Estado",
     "finish": "Finalizar conciliación"
   },
