@@ -240,7 +240,10 @@ export function CreditUtilizationReport() {
     );
   }
 
-  const chartHeight = Math.max(200, sortedRows.length * 52);
+  // Scales with the account count; the chart container also stretches to fill
+  // the row, so with few accounts the bars use the full height of the donut
+  // column instead of leaving empty space below.
+  const chartMinHeight = Math.max(200, sortedRows.length * 52);
 
   // The donut shows drawn credit (coloured by the same thresholds as the bars)
   // against remaining available credit (muted). Available is clamped at zero
@@ -315,54 +318,58 @@ export function CreditUtilizationReport() {
       {/* Utilization Charts */}
       <div ref={chartRef} className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="min-w-0 lg:col-span-2">
+          <div className="min-w-0 lg:col-span-2 flex flex-col">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
               {t('creditUtilization.utilizationByAccount')}
             </h3>
-            <div style={{ width: '100%', height: chartHeight }}>
-              <ResponsiveContainer minWidth={0}>
-                <BarChart data={sortedRows} layout="vertical" margin={{ left: 8, right: 24 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
-                  <XAxis
-                    type="number"
-                    domain={[0, 100]}
-                    tickFormatter={(value: number) => `${value}%`}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={120}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const row = payload[0].payload as CreditAccountRow;
-                      return (
-                        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-                          <p className="font-medium text-gray-900 dark:text-gray-100">{row.name}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {t('creditUtilization.tooltipUtilization')}: {row.utilizationPercent.toFixed(1)}%
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {t('creditUtilization.tooltipUsed')}: {formatCurrency(row.used, displayCurrency)}
-                          </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {t('creditUtilization.tooltipAvailable')}: {formatCurrency(row.available, displayCurrency)}
-                          </p>
-                        </div>
-                      );
-                    }}
-                  />
-                  <ReferenceLine x={100} stroke={chartColors.axis} strokeDasharray="4 4" />
-                  <Bar dataKey="utilizationPercent" radius={[0, 4, 4, 0]}>
-                    {sortedRows.map((row) => (
-                      <Cell key={row.id} fill={utilizationColour(row.utilizationPercent)} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            {/* The absolutely positioned inner div lets ResponsiveContainer
+                track the stretched flex height without a feedback loop. */}
+            <div className="relative flex-1" style={{ minHeight: chartMinHeight }}>
+              <div className="absolute inset-0">
+                <ResponsiveContainer minWidth={0}>
+                  <BarChart data={sortedRows} layout="vertical" margin={{ left: 8, right: 24 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      domain={[0, 100]}
+                      tickFormatter={(value: number) => `${value}%`}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={120}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const row = payload[0].payload as CreditAccountRow;
+                        return (
+                          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+                            <p className="font-medium text-gray-900 dark:text-gray-100">{row.name}</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {t('creditUtilization.tooltipUtilization')}: {row.utilizationPercent.toFixed(1)}%
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {t('creditUtilization.tooltipUsed')}: {formatCurrency(row.used, displayCurrency)}
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {t('creditUtilization.tooltipAvailable')}: {formatCurrency(row.available, displayCurrency)}
+                            </p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <ReferenceLine x={100} stroke={chartColors.axis} strokeDasharray="4 4" />
+                    <Bar dataKey="utilizationPercent" radius={[0, 4, 4, 0]} maxBarSize={32}>
+                      {sortedRows.map((row) => (
+                        <Cell key={row.id} fill={utilizationColour(row.utilizationPercent)} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
           <div className="min-w-0">
