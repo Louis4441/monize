@@ -53,7 +53,7 @@ vi.mock('recharts', () => ({
     const C = content;
     if (!C) return null;
     const samples = [
-      { active: true, payload: [{ dataKey: 'budgeted', name: 'Budgeted', color: '#3b82f6', value: 1000 }, { dataKey: 'actual', name: 'Actual', color: '#10b981', value: 1100 }], label: 'tip-1' },
+      { active: true, payload: [{ dataKey: 'budgeted', name: 'Budgeted', color: 'var(--chart-primary)', value: 1000 }, { dataKey: 'actual', name: 'Actual', color: 'var(--chart-income)', value: 1100 }], label: 'tip-1' },
       { active: true, payload: [{ value: 100 }], label: 'tip-2' },
       { active: true, payload: [{ value: -50 }], label: 'tip-3' },
       { active: false, payload: [], label: '' },

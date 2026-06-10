@@ -23,6 +23,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
+import { chartColors } from '@/lib/chart-colors';
 import { useTranslations } from 'next-intl';
 
 interface PayoffScheduleItem {
@@ -591,7 +592,7 @@ export function DebtPayoffTimelineReport() {
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <AreaChart data={payoffSchedule}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis
                       dataKey="label"
                       tick={{ fontSize: 11 }}
@@ -605,8 +606,9 @@ export function DebtPayoffTimelineReport() {
                     <Area
                       type="monotone"
                       dataKey="historicalBalance"
-                      stroke="#ef4444"
-                      fill="#fecaca"
+                      stroke={chartColors.expense}
+                      fill={chartColors.expense}
+                      fillOpacity={0.3}
                       name={t('debtPayoff.seriesRemainingBalance')}
                       strokeWidth={2}
                       connectNulls={false}
@@ -615,25 +617,25 @@ export function DebtPayoffTimelineReport() {
                       <Area
                         type="monotone"
                         dataKey="projectedBalance"
-                        stroke="#3b82f6"
-                        fill="#dbeafe"
+                        stroke={chartColors.primary}
+                        fill={chartColors.primary}
                         name={t('debtPayoff.seriesProjectedBalance')}
                         strokeWidth={2}
                         strokeDasharray="6 3"
-                        fillOpacity={0.4}
+                        fillOpacity={0.15}
                         connectNulls={false}
                       />
                     )}
                     {projectionStartLabel && (
                       <ReferenceLine
                         x={projectionStartLabel}
-                        stroke="#6b7280"
+                        stroke={chartColors.axis}
                         strokeDasharray="4 4"
                         strokeWidth={2}
                         label={{
                           value: t('debtPayoff.today'),
                           position: 'top',
-                          fill: '#6b7280',
+                          fill: chartColors.axis,
                           fontSize: 12,
                           fontWeight: 600,
                         }}
@@ -647,7 +649,7 @@ export function DebtPayoffTimelineReport() {
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={payoffSchedule}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis
                       dataKey="label"
                       tick={{ fontSize: 11 }}
@@ -662,25 +664,25 @@ export function DebtPayoffTimelineReport() {
                     <Bar
                       dataKey="cumulativePrincipal"
                       stackId="a"
-                      fill="#22c55e"
+                      fill={chartColors.income}
                       name={t('debtPayoff.seriesPrincipalPaid')}
                     />
                     <Bar
                       dataKey="cumulativeInterest"
                       stackId="a"
-                      fill="#f97316"
+                      fill={chartColors.warning}
                       name={t('debtPayoff.seriesInterestPaid')}
                     />
                     {projectionStartLabel && (
                       <ReferenceLine
                         x={projectionStartLabel}
-                        stroke="#6b7280"
+                        stroke={chartColors.axis}
                         strokeDasharray="4 4"
                         strokeWidth={2}
                         label={{
                           value: t('debtPayoff.today'),
                           position: 'top',
-                          fill: '#6b7280',
+                          fill: chartColors.axis,
                           fontSize: 12,
                           fontWeight: 600,
                         }}
@@ -694,7 +696,7 @@ export function DebtPayoffTimelineReport() {
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={distributionData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis
                       dataKey="label"
                       tick={{ fontSize: 11 }}
@@ -733,25 +735,25 @@ export function DebtPayoffTimelineReport() {
                     <Bar
                       dataKey="principalPercent"
                       stackId="a"
-                      fill="#22c55e"
+                      fill={chartColors.income}
                       name={t('debtPayoff.seriesPrincipal')}
                     />
                     <Bar
                       dataKey="interestPercent"
                       stackId="a"
-                      fill="#f97316"
+                      fill={chartColors.warning}
                       name={t('debtPayoff.seriesInterest')}
                     />
                     {projectionStartLabel && (
                       <ReferenceLine
                         x={projectionStartLabel}
-                        stroke="#6b7280"
+                        stroke={chartColors.axis}
                         strokeDasharray="4 4"
                         strokeWidth={2}
                         label={{
                           value: t('debtPayoff.today'),
                           position: 'top',
-                          fill: '#6b7280',
+                          fill: chartColors.axis,
                           fontSize: 12,
                           fontWeight: 600,
                         }}

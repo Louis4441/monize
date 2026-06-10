@@ -290,7 +290,9 @@ describe("Cross-user data isolation (integration)", () => {
         undefined,
         undefined,
       );
-      expect(result.data.find((t) => t.id === userATransaction.id)).toBeUndefined();
+      expect(
+        result.data.find((t) => t.id === userATransaction.id),
+      ).toBeUndefined();
       expect(result.data.every((t) => t.userId === userBId)).toBe(true);
     });
 
@@ -304,7 +306,9 @@ describe("Cross-user data isolation (integration)", () => {
       } as any);
 
       const result = await transactionsService.findAll(userBId);
-      expect(result.data.find((t) => t.id === userATransaction.id)).toBeUndefined();
+      expect(
+        result.data.find((t) => t.id === userATransaction.id),
+      ).toBeUndefined();
       expect(result.data.every((t) => t.userId === userBId)).toBe(true);
     });
   });
@@ -372,9 +376,7 @@ describe("Cross-user data isolation (integration)", () => {
       await createTestCategory(dataSource, userBId, { name: "userB dining" });
 
       const result = await categoriesService.findAll(userBId);
-      expect(
-        result.find((c) => c.id === userACategory.id),
-      ).toBeUndefined();
+      expect(result.find((c) => c.id === userACategory.id)).toBeUndefined();
       expect(result.every((c) => c.userId === userBId)).toBe(true);
     });
   });
@@ -422,7 +424,9 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("findAll(userB) does not include any of userA's payees", async () => {
-      await createTestPayee(dataSource, userBId, { name: "userB hardware store" });
+      await createTestPayee(dataSource, userBId, {
+        name: "userB hardware store",
+      });
 
       const result = await payeesService.findAll(userBId);
       expect(result.find((p) => p.id === userAPayee.id)).toBeUndefined();
@@ -443,9 +447,9 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("findOne(userB, userA.tag.id) throws NotFoundException", async () => {
-      await expect(
-        tagsService.findOne(userBId, userATag.id),
-      ).rejects.toThrow(NotFoundException);
+      await expect(tagsService.findOne(userBId, userATag.id)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it("update(userB, userA.tag.id) throws NotFoundException and leaves the row untouched", async () => {
@@ -461,9 +465,9 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("remove(userB, userA.tag.id) throws NotFoundException and the row still exists", async () => {
-      await expect(
-        tagsService.remove(userBId, userATag.id),
-      ).rejects.toThrow(NotFoundException);
+      await expect(tagsService.remove(userBId, userATag.id)).rejects.toThrow(
+        NotFoundException,
+      );
 
       const stillThere = await dataSource.manager.findOne(Tag, {
         where: { id: userATag.id },
@@ -651,9 +655,12 @@ describe("Cross-user data isolation (integration)", () => {
         investmentTransactionsService.remove(userBId, userATx.id),
       ).rejects.toThrow(NotFoundException);
 
-      const stillThere = await dataSource.manager.findOne(InvestmentTransaction, {
-        where: { id: userATx.id },
-      });
+      const stillThere = await dataSource.manager.findOne(
+        InvestmentTransaction,
+        {
+          where: { id: userATx.id },
+        },
+      );
       expect(stillThere).not.toBeNull();
     });
 
@@ -761,9 +768,12 @@ describe("Cross-user data isolation (integration)", () => {
         } as any),
       ).rejects.toThrow(NotFoundException);
 
-      const reloaded = await dataSource.manager.findOneOrFail(InvestmentReport, {
-        where: { id: userAReport.id },
-      });
+      const reloaded = await dataSource.manager.findOneOrFail(
+        InvestmentReport,
+        {
+          where: { id: userAReport.id },
+        },
+      );
       expect(reloaded.name).toBe("userA holdings");
       expect(reloaded.userId).toBe(userAId);
     });

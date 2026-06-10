@@ -31,6 +31,7 @@ import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { exportToCsv } from '@/lib/csv-export';
+import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
 import { useTranslations } from 'next-intl';
 
 type SeriesKey = 'dividends' | 'interest' | 'capitalGains';
@@ -70,9 +71,9 @@ interface DailyIncome {
 }
 
 const SERIES_COLORS: Record<SeriesKey, { positive: string; negative: string }> = {
-  dividends: { positive: '#22c55e', negative: '#22c55e' },
-  interest: { positive: '#3b82f6', negative: '#3b82f6' },
-  capitalGains: { positive: '#8b5cf6', negative: '#ef4444' },
+  dividends: { positive: chartColors.income, negative: chartColors.income },
+  interest: { positive: chartColors.primary, negative: chartColors.primary },
+  capitalGains: { positive: CHART_SERIES[4], negative: chartColors.expense },
 };
 
 export function DividendIncomeReport() {
@@ -1210,12 +1211,12 @@ export function DividendIncomeReport() {
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={formatCurrencyAxis} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <ReferenceLine y={0} stroke="#9ca3af" />
+                <ReferenceLine y={0} stroke={chartColors.axis} />
                 {visibleSeries.dividends && (
                   <Bar
                     dataKey="dividends"
@@ -1412,12 +1413,12 @@ export function DividendIncomeReport() {
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <BarChart data={displayedDailyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tickFormatter={formatCurrencyAxis} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <ReferenceLine y={0} stroke="#9ca3af" />
+                  <ReferenceLine y={0} stroke={chartColors.axis} />
                   {visibleSeries.dividends && (
                     <Bar
                       dataKey="dividends"

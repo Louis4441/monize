@@ -28,6 +28,7 @@ import { SortableHeader } from '@/components/ui/SortableHeader';
 import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { ReportError } from '@/components/reports/ReportError';
 import { CHART_COLOURS_INCOME } from '@/lib/chart-colours';
+import { chartColors } from '@/lib/chart-colors';
 import { exportToCsv } from '@/lib/csv-export';
 import type { ChartDatum } from '@/types/chart';
 import { useTranslations } from 'next-intl';
@@ -310,7 +311,7 @@ export function IncomeBySourceReport() {
               <div className="h-96">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={chartData} layout="vertical" margin={{ left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={80} />
                     <Tooltip content={<CustomTooltip />} />

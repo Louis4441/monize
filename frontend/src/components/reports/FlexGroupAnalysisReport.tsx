@@ -23,6 +23,7 @@ import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
+import { chartColors } from '@/lib/chart-colors';
 import { useTranslations } from 'next-intl';
 
 const logger = createLogger('FlexGroupAnalysisReport');
@@ -247,15 +248,15 @@ export function FlexGroupAnalysisReport() {
                   <Bar
                     dataKey="spent"
                     name={t('flexGroupAnalysis.seriesSpent')}
-                    fill="#3b82f6"
+                    fill={chartColors.primary}
                     radius={[0, 4, 4, 0]}
                   />
                   <ReferenceLine
                     x={group.totalBudgeted}
-                    stroke="#ef4444"
+                    stroke={chartColors.expense}
                     strokeWidth={2}
                     strokeDasharray="5 5"
-                    label={{ value: t('flexGroupAnalysis.limitLabel', { amount: formatCurrency(group.totalBudgeted) }), position: 'top', fill: '#ef4444', fontSize: 11 }}
+                    label={{ value: t('flexGroupAnalysis.limitLabel', { amount: formatCurrency(group.totalBudgeted) }), position: 'top', fill: chartColors.expense, fontSize: 11 }}
                   />
                 </BarChart>
               </ResponsiveContainer>

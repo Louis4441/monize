@@ -27,6 +27,7 @@ import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
+import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
 import { useTranslations } from 'next-intl';
 
 const logger = createLogger('DividendYieldGrowthReport');
@@ -588,7 +589,7 @@ export function DividendYieldGrowthReport() {
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={annualData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis dataKey="year" tick={{ fontSize: 11 }} />
                     <YAxis tickFormatter={formatCurrencyAxis} />
                     <Tooltip
@@ -610,7 +611,7 @@ export function DividendYieldGrowthReport() {
                         );
                       }}
                     />
-                    <Bar dataKey="amount" fill="#22c55e" name={t('dividendYieldGrowth.barDividends')} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="amount" fill={chartColors.income} name={t('dividendYieldGrowth.barDividends')} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -679,7 +680,7 @@ export function DividendYieldGrowthReport() {
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                   <BarChart data={frequencyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis dataKey="frequency" tick={{ fontSize: 11 }} />
                     <YAxis tickFormatter={formatCurrencyAxis} />
                     <Tooltip
@@ -695,7 +696,7 @@ export function DividendYieldGrowthReport() {
                         );
                       }}
                     />
-                    <Bar dataKey="totalDividends" fill="#8b5cf6" name={t('dividendYieldGrowth.barTotalDividends')} radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="totalDividends" fill={CHART_SERIES[4]} name={t('dividendYieldGrowth.barTotalDividends')} radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>

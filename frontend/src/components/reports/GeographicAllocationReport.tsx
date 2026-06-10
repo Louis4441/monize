@@ -26,8 +26,10 @@ import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
+import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
+import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 
 const logger = createLogger('GeographicAllocationReport');
 
@@ -71,16 +73,14 @@ const EXCHANGE_TO_REGION: Record<string, { country: string; region: string }> = 
 };
 
 const REGION_COLOURS: Record<string, string> = {
-  'North America': '#3b82f6',
-  'Europe': '#22c55e',
-  'Asia-Pacific': '#f97316',
-  'Other': '#8b5cf6',
+  'North America': CHART_SERIES[0],
+  'Europe': CHART_SERIES[1],
+  'Asia-Pacific': CHART_SERIES[2],
+  'Other': CHART_SERIES[3],
 };
 
-const COUNTRY_COLOURS = [
-  '#3b82f6', '#22c55e', '#f97316', '#8b5cf6', '#ec4899',
-  '#14b8a6', '#eab308', '#ef4444', '#06b6d4', '#a855f7',
-];
+const COUNTRY_COLOURS = CHART_SERIES;
+
 
 interface ExchangeAllocation {
   exchange: string;
@@ -218,7 +218,7 @@ export function GeographicAllocationReport() {
         marketValue: data.value,
         percentage: total > 0 ? (data.value / total) * 100 : 0,
         count: data.count,
-        color: REGION_COLOURS[region] || '#6b7280',
+        color: REGION_COLOURS[region] || chartColors.axis,
       }))
       .sort((a, b) => b.marketValue - a.marketValue);
 
@@ -296,11 +296,11 @@ export function GeographicAllocationReport() {
 
     const legendItems = viewType === 'region'
       ? regionData.map((item) => ({
-          color: item.color,
+          color: resolvePdfColor(item.color),
           label: `${item.region} - ${formatCurrencyFull(item.marketValue, defaultCurrency)} (${item.percentage.toFixed(1)}%)`,
         }))
       : exchangeData.map((item, idx) => ({
-          color: COUNTRY_COLOURS[idx % COUNTRY_COLOURS.length],
+          color: resolvePdfColor(COUNTRY_COLOURS[idx % COUNTRY_COLOURS.length]),
           label: `${item.exchange} - ${formatCurrencyFull(item.marketValue, defaultCurrency)} (${item.percentage.toFixed(1)}%)`,
         }));
 
@@ -468,7 +468,7 @@ export function GeographicAllocationReport() {
                   tick={{ fill: 'currentColor', fontSize: 11 }}
                 />
                 <Tooltip content={<CustomTooltip formatCurrencyFull={(v) => formatCurrencyFull(v, defaultCurrency)} holdingLabel={(count) => t('geographicAllocation.holdingCount', { count })} />} />
-                <Bar dataKey="marketValue" fill="#3b82f6" radius={[0, 4, 4, 0]}>
+                <Bar dataKey="marketValue" fill={chartColors.primary} radius={[0, 4, 4, 0]}>
                   {exchangeData.map((entry, index) => (
                     <Cell key={entry.exchange} fill={COUNTRY_COLOURS[index % COUNTRY_COLOURS.length]} />
                   ))}

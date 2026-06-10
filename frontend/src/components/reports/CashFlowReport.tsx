@@ -28,6 +28,7 @@ import { DateRangeSelector } from "@/components/ui/DateRangeSelector";
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ChartTooltip } from "@/components/reports/ChartTooltip";
 import { ReportError } from "@/components/reports/ReportError";
+import { chartColors } from "@/lib/chart-colors";
 import { useTranslations } from 'next-intl';
 
 interface ChartDataItem {
@@ -299,7 +300,7 @@ export function CashFlowReport() {
               onClick={handleChartClick}
               style={{ cursor: "pointer" }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
               <XAxis
                 dataKey="name"
                 tick={{ fontSize: 12 }}
@@ -313,16 +314,16 @@ export function CashFlowReport() {
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend />
-              <ReferenceLine y={0} stroke="#9ca3af" />
+              <ReferenceLine y={0} stroke={chartColors.axis} />
               <Bar
                 dataKey="Income"
-                fill="#22c55e"
+                fill={chartColors.income}
                 name={t('cashFlow.seriesInflows')}
                 radius={[4, 4, 0, 0]}
               />
               <Bar
                 dataKey="Expenses"
-                fill="#ef4444"
+                fill={chartColors.expense}
                 name={t('cashFlow.seriesOutflows')}
                 radius={[4, 4, 0, 0]}
               />

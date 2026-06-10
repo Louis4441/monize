@@ -29,8 +29,11 @@ import { SortableHeader } from '@/components/ui/SortableHeader';
 import { ChartTooltip } from "@/components/reports/ChartTooltip";
 import { ReportError } from "@/components/reports/ReportError";
 import { exportToCsv } from "@/lib/csv-export";
+import { chartColors } from "@/lib/chart-colors";
+import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 
 type MonthlySpendingSortField = 'name' | 'income' | 'expenses' | 'net';
+
 
 interface ChartDataItem {
   name: string;
@@ -142,8 +145,8 @@ export function MonthlySpendingTrendReport() {
       ],
       chartContainer: chartRef.current,
       chartLegend: [
-        { color: '#ef4444', label: t('monthlySpendingTrend.seriesExpenses') },
-        { color: '#22c55e', label: t('monthlySpendingTrend.seriesIncome') },
+        { color: resolvePdfColor(chartColors.expense), label: t('monthlySpendingTrend.seriesExpenses') },
+        { color: resolvePdfColor(chartColors.income), label: t('monthlySpendingTrend.seriesIncome') },
       ],
       filename: "monthly-spending-trend",
     });
@@ -334,7 +337,7 @@ export function MonthlySpendingTrendReport() {
                   onClick={handleChartClick}
                   style={{ cursor: "pointer" }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
@@ -351,17 +354,17 @@ export function MonthlySpendingTrendReport() {
                   <Line
                     type="monotone"
                     dataKey="Expenses"
-                    stroke="#ef4444"
+                    stroke={chartColors.expense}
                     strokeWidth={2}
-                    dot={{ fill: "#ef4444", strokeWidth: 2, r: 4 }}
+                    dot={{ fill: chartColors.expense, strokeWidth: 2, r: 4 }}
                     activeDot={{ r: 6 }}
                   />
                   <Line
                     type="monotone"
                     dataKey="Income"
-                    stroke="#22c55e"
+                    stroke={chartColors.income}
                     strokeWidth={2}
-                    dot={{ fill: "#22c55e", strokeWidth: 2, r: 4 }}
+                    dot={{ fill: chartColors.income, strokeWidth: 2, r: 4 }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>

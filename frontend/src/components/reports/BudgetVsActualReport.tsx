@@ -24,6 +24,7 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
+import { chartColors } from '@/lib/chart-colors';
 
 type BudgetTrendSortField = 'month' | 'budgeted' | 'actual' | 'variance' | 'percentUsed';
 
@@ -240,8 +241,8 @@ export function BudgetVsActualReport() {
                       }}
                     />
                     <Legend />
-                    <Bar dataKey="budgeted" name={t('budgetVsActual.seriesBudgeted')} fill="#3b82f6" radius={[2, 2, 0, 0]} />
-                    <Bar dataKey="actual" name={t('budgetVsActual.seriesActual')} fill="#10b981" radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="budgeted" name={t('budgetVsActual.seriesBudgeted')} fill={chartColors.primary} radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="actual" name={t('budgetVsActual.seriesActual')} fill={chartColors.income} radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -272,7 +273,7 @@ export function BudgetVsActualReport() {
                       <Line
                         type="monotone"
                         dataKey="variance"
-                        stroke="#f59e0b"
+                        stroke={chartColors.warning}
                         strokeWidth={2}
                         dot={{ r: 4 }}
                         name={t('budgetVsActual.seriesVariance')}
