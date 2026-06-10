@@ -30,6 +30,7 @@ async function openMenu() {
 describe('AuthLanguageSwitcher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionStorage.clear();
   });
 
   it('renders a globe button and no menu initially', () => {
@@ -68,6 +69,9 @@ describe('AuthLanguageSwitcher', () => {
       'pl',
       expect.objectContaining({ sameSite: 'lax' }),
     );
+    // Flags the choice as deliberate so the post-login preference sync
+    // persists it to the user's stored preferences.
+    expect(sessionStorage.getItem('preLoginLocale')).toBe('pl');
     expect(mockRefresh).toHaveBeenCalled();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });

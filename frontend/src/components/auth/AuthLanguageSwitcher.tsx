@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import { LOCALE_COOKIE, SUPPORTED_LOCALES } from '@/i18n/config';
+import { rememberPreLoginLocale } from '@/lib/pre-login-locale';
 
 /**
  * Discreet language picker for unauthenticated screens (login/register): a
@@ -47,6 +48,9 @@ export function AuthLanguageSwitcher() {
     setIsOpen(false);
     if (next === locale) return;
     Cookies.set(LOCALE_COOKIE, next, { sameSite: 'lax', expires: 365 });
+    // Marks the choice as deliberate so the post-login preference sync
+    // saves it to the user's preferences instead of reverting to them.
+    rememberPreLoginLocale(next);
     router.refresh();
   };
 
