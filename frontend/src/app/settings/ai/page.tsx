@@ -43,11 +43,11 @@ function AiSettingsContent() {
       setUsage(usageData);
       setStatus(statusData);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to load AI settings'));
+      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
     } finally {
       setIsLoading(false);
     }
-  }, [usageDays]);
+  }, [usageDays, t]);
 
   useEffect(() => {
     loadData();
@@ -59,7 +59,7 @@ function AiSettingsContent() {
       const usageData = await aiApi.getUsage(days);
       setUsage(usageData);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to load usage data'));
+      toast.error(getErrorMessage(error, t('toasts.usageLoadFailed')));
     }
   };
 

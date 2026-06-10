@@ -247,6 +247,10 @@
       "REINVEST": "Réinvestissement",
       "ADD_SHARES": "Ajouter des actions",
       "REMOVE_SHARES": "Retirer des actions"
+    },
+    "toasts": {
+      "loadHistoryFailed": "Échec du chargement de l'historique",
+      "loadTransactionFailed": "Échec du chargement de la transaction"
     }
   },
   "shareAdjustment": {

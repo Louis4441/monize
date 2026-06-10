@@ -37,7 +37,7 @@ export function ColorThemeSelector({ value, onChange }: ColorThemeSelectorProps)
         updatePreferencesStore(updated);
         toast.success(t('toasts.saved'));
       } catch (error) {
-        toast.error(getErrorMessage(error, 'Failed to save colour theme'));
+        toast.error(getErrorMessage(error, t('toasts.colorThemeSaveFailed')));
       }
     });
   };

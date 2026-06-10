@@ -58,11 +58,11 @@ export function SecurityTransactionHistory({
       logger.error('Failed to load security transaction history:', error);
       // getErrorMessage keeps the message consistent with the rest of the app.
       setHistory(null);
-      throw new Error(getErrorMessage(error, 'Failed to load history'));
+      throw new Error(getErrorMessage(error, t('transactionHistory.toasts.loadHistoryFailed')));
     } finally {
       setIsLoading(false);
     }
-  }, [security.id]);
+  }, [security.id, t]);
 
   useEffect(() => {
     load().catch(() => {
@@ -92,9 +92,9 @@ export function SecurityTransactionHistory({
       const tx = await investmentsApi.getTransaction(id);
       setEditTransaction(tx);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to load transaction'));
+      toast.error(getErrorMessage(error, t('transactionHistory.toasts.loadTransactionFailed')));
     }
-  }, []);
+  }, [t]);
 
   const handleEditSuccess = () => {
     setEditTransaction(null);

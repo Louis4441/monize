@@ -50,12 +50,12 @@ function CategoriesContent() {
       const data = await categoriesApi.getAll();
       setCategories(data);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to load categories'));
+      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
       logger.error(error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadCategories();
@@ -68,10 +68,10 @@ function CategoriesContent() {
       const data = await categoriesApi.getAll();
       setCategories(data);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to load categories'));
+      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
       logger.error(error);
     }
-  }, []);
+  }, [t]);
 
   const handleFormSubmit = async (data: any) => {
     try {
@@ -95,7 +95,7 @@ function CategoriesContent() {
         refreshCategories();
       }
     } catch (error) {
-      toast.error(getErrorMessage(error, `Failed to ${editingItem ? 'update' : 'create'} category`));
+      toast.error(getErrorMessage(error, editingItem ? t('toasts.updateFailed') : t('toasts.createFailed')));
       throw error;
     }
   };
@@ -107,7 +107,7 @@ function CategoriesContent() {
       toast.success(t('toasts.importSuccess', { count: result.categoriesCreated }));
       loadCategories();
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to import default categories'));
+      toast.error(getErrorMessage(error, t('toasts.importFailed')));
     } finally {
       setIsImporting(false);
     }

@@ -29,7 +29,12 @@
     "updated": "Categorie succesvol bijgewerkt",
     "deleted": "Categorie succesvol verwijderd",
     "cannotDeleteSystem": "Systeemcategorieën kunnen niet worden verwijderd",
-    "importSuccess": "Succesvol {count} categorieën geïmporteerd"
+    "importSuccess": "Succesvol {count} categorieën geïmporteerd",
+    "loadFailed": "Categorieën laden mislukt",
+    "deleteFailed": "Categorie verwijderen mislukt",
+    "createFailed": "Categorie aanmaken mislukt",
+    "updateFailed": "Categorie bijwerken mislukt",
+    "importFailed": "Standaardcategorieën importeren mislukt"
   },
   "form": {
     "nameLabel": "Categorienaam",

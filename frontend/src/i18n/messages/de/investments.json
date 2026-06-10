@@ -29,7 +29,8 @@
     "today": "Heute",
     "transactionCount": "{count} Buchung{plural}",
     "allPayees": "Alle Zahlungsempfänger",
-    "allCategories": "Alle Kategorien"
+    "allCategories": "Alle Kategorien",
+    "toastDeleteFailed": "Buchung konnte nicht gelöscht werden"
   },
   "portfolioSummary": {
     "title": "Portfolio-Übersicht",
@@ -219,6 +220,7 @@
     "submitUpdate": "Buchung aktualisieren",
     "submitCreate": "Buchung erstellen",
     "toastSecurityCreated": "Wertpapier erstellt",
+    "toastSecurityCreateFailed": "Wertpapier konnte nicht erstellt werden",
     "toastTransferred": "Wertpapiere übertragen",
     "toastTransferUpdated": "Überweisung aktualisiert",
     "toastUpdated": "Buchung aktualisiert",

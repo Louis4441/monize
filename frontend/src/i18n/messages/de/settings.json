@@ -2,7 +2,8 @@
   "language": {
     "label": "Sprache",
     "helpText": "Wählen Sie die Sprache der Monize-Oberfläche. Zahlen- und Datumsformatierung werden separat unten eingestellt.",
-    "saved": "Sprache aktualisiert"
+    "saved": "Sprache aktualisiert",
+    "saveFailed": "Sprache konnte nicht gespeichert werden"
   },
   "profile": {
     "heading": "Profil",
@@ -20,7 +21,8 @@
     "saveButton": "Profil speichern",
     "savingButton": "Wird gespeichert...",
     "toasts": {
-      "success": "Profil erfolgreich aktualisiert"
+      "success": "Profil erfolgreich aktualisiert",
+      "updateFailed": "Profil konnte nicht aktualisiert werden"
     },
     "validation": {
       "firstNameMax": "Der Vorname darf höchstens 100 Zeichen lang sein",
@@ -43,7 +45,8 @@
     "changePasswordButton": "Passwort ändern",
     "changingPasswordButton": "Wird geändert...",
     "toasts": {
-      "passwordChanged": "Passwort erfolgreich geändert"
+      "passwordChanged": "Passwort erfolgreich geändert",
+      "passwordChangeFailed": "Passwort konnte nicht geändert werden"
     },
     "twoFactor": {
       "heading": "Zwei-Faktor-Authentifizierung",
@@ -60,7 +63,8 @@
         "verificationCodeLabel": "Verifizierungscode",
         "disablingButton": "Wird deaktiviert...",
         "toasts": {
-          "disabled": "Zwei-Faktor-Authentifizierung deaktiviert"
+          "disabled": "Zwei-Faktor-Authentifizierung deaktiviert",
+          "disableFailed": "Zwei-Faktor-Authentifizierung konnte nicht deaktiviert werden"
         }
       }
     },
@@ -74,6 +78,9 @@
         "verificationCodeLabel": "Verifizierungscode",
         "regeneratingButton": "Wird neu generiert...",
         "regenerateButton": "Neu generieren"
+      },
+      "toasts": {
+        "generateFailed": "Backup-Codes konnten nicht generiert werden"
       }
     },
     "trustedDevices": {
@@ -88,7 +95,9 @@
       },
       "toasts": {
         "revoked": "Gerät widerrufen",
-        "revokedAll": "{count} Gerät(e) widerrufen"
+        "revokedAll": "{count} Gerät(e) widerrufen",
+        "revokeFailed": "Gerät konnte nicht widerrufen werden",
+        "revokeAllFailed": "Geräte konnten nicht widerrufen werden"
       }
     },
     "validation": {
@@ -122,7 +131,10 @@
     "saveButton": "Einstellungen speichern",
     "savingButton": "Wird gespeichert...",
     "toasts": {
-      "saved": "Einstellungen gespeichert"
+      "saved": "Einstellungen gespeichert",
+      "saveFailed": "Einstellungen konnten nicht gespeichert werden",
+      "themeSaveFailed": "Design konnte nicht gespeichert werden",
+      "colorThemeSaveFailed": "Farbdesign konnte nicht gespeichert werden"
     },
     "browserLocale": "Browser-Gebietsschema verwenden (automatisch erkennen)",
     "browserTimezonePrefix": "Browser-Zeitzone verwenden (automatisch erkannt: {tz})",
@@ -190,7 +202,11 @@
       "digestEnabled": "Budget-Zusammenfassung aktiviert",
       "digestDisabled": "Budget-Zusammenfassung deaktiviert",
       "digestDaySet": "Budget-Zusammenfassungstag auf {day} gesetzt",
-      "testEmailSent": "Test-E-Mail gesendet! Bitte prüfen Sie Ihren Posteingang."
+      "testEmailSent": "Test-E-Mail gesendet! Bitte prüfen Sie Ihren Posteingang.",
+      "emailUpdateFailed": "Benachrichtigungseinstellung konnte nicht aktualisiert werden",
+      "digestUpdateFailed": "Einstellung für Budget-Zusammenfassung konnte nicht aktualisiert werden",
+      "digestDayFailed": "Budget-Zusammenfassungstag konnte nicht aktualisiert werden",
+      "testEmailFailed": "Test-E-Mail konnte nicht gesendet werden"
     }
   },
   "help": {
@@ -233,7 +249,8 @@
       "deletingButton": "Wird gelöscht...",
       "confirmButton": "Datenlöschung bestätigen",
       "toasts": {
-        "success": "{count} Datensätze erfolgreich gelöscht"
+        "success": "{count} Datensätze erfolgreich gelöscht",
+        "failed": "Daten konnten nicht gelöscht werden"
       }
     },
     "deleteAccount": {
@@ -252,7 +269,8 @@
       "confirmButton": "Löschen bestätigen",
       "toasts": {
         "downgraded": "Ihre eigenen Daten wurden entfernt. Ihre Anmeldung und der gemeinsame Zugriff bleiben erhalten, damit die Delegierung bestehen bleibt.",
-        "deleted": "Konto gelöscht"
+        "deleted": "Konto gelöscht",
+        "failed": "Konto konnte nicht gelöscht werden"
       },
       "errors": {
         "typeDelete": "Bitte geben Sie DELETE zur Bestätigung ein",
@@ -323,7 +341,10 @@
       "revoked": "Token widerrufen",
       "selectScope": "Wählen Sie mindestens eine Berechtigung aus",
       "copyTokenFailed": "Token konnte nicht kopiert werden",
-      "copyUrlFailed": "URL konnte nicht kopiert werden"
+      "copyUrlFailed": "URL konnte nicht kopiert werden",
+      "loadFailed": "API-Token konnten nicht geladen werden",
+      "createFailed": "Token konnte nicht erstellt werden",
+      "revokeFailed": "Token konnte nicht widerrufen werden"
     },
     "relative": {
       "never": "Nie",
@@ -417,7 +438,9 @@
       },
       "toasts": {
         "enabled": "Verschlüsselte Backups aktiviert",
-        "disabled": "Verschlüsselte Backups deaktiviert"
+        "disabled": "Verschlüsselte Backups deaktiviert",
+        "enableFailed": "Verschlüsselung konnte nicht aktiviert werden",
+        "disableFailed": "Verschlüsselung konnte nicht deaktiviert werden"
       }
     },
     "export": {
@@ -434,7 +457,8 @@
         "downloadButton": "Herunterladen"
       },
       "toasts": {
-        "success": "Backup erfolgreich heruntergeladen"
+        "success": "Backup erfolgreich heruntergeladen",
+        "failed": "Backup konnte nicht erstellt werden"
       }
     },
     "restore": {
@@ -453,7 +477,9 @@
       "confirmRestoreButton": "Wiederherstellung bestätigen",
       "toasts": {
         "pleaseSelectFile": "Bitte wählen Sie eine Backup-Datei aus",
-        "pleaseEnterPassword": "Bitte geben Sie Ihr Passwort zur Bestätigung ein"
+        "pleaseEnterPassword": "Bitte geben Sie Ihr Passwort zur Bestätigung ein",
+        "encryptedNeedsPassword": "Dieses Backup ist verschlüsselt. Geben Sie das Passwort, mit dem es erstellt wurde, im Feld \"Backup-Passwort\" ein und versuchen Sie es erneut.",
+        "failed": "Backup konnte nicht wiederhergestellt werden"
       }
     },
     "restoreResult": {
@@ -538,7 +564,8 @@
     },
     "saveButton": "Speichern",
     "toasts": {
-      "saved": "Zugriff aktualisiert"
+      "saved": "Zugriff aktualisiert",
+      "saveFailed": "Zugriff konnte nicht aktualisiert werden"
     }
   },
   "nav": {
@@ -574,7 +601,11 @@
       "title": "KI-Einstellungen",
       "description": "KI-Anbieter konfigurieren, API-Schlüssel verwalten und Nutzungsstatistiken einsehen."
     },
-    "delegateSecurityError": "Ihre Sicherheitseinstellungen konnten nicht geladen werden."
+    "delegateSecurityError": "Ihre Sicherheitseinstellungen konnten nicht geladen werden.",
+    "toasts": {
+      "securityLoadFailed": "Sicherheitseinstellungen konnten nicht geladen werden",
+      "loadFailed": "Einstellungen konnten nicht geladen werden"
+    }
   },
   "aiSettings": {
     "backLink": "Zurück zu den Einstellungen",
@@ -583,6 +614,10 @@
     "demoRestricted": {
       "heading": "Im Demo-Modus eingeschränkt",
       "body": "Die KI-Anbieterkonfiguration ist im Demo-Modus deaktiviert."
+    },
+    "toasts": {
+      "loadFailed": "KI-Einstellungen konnten nicht geladen werden",
+      "usageLoadFailed": "Nutzungsdaten konnten nicht geladen werden"
     }
   },
   "sharedAccessPage": {
@@ -617,7 +652,8 @@
       "reminderAfterDaysLabel": "Inaktivitätstage bis zu Erinnerungs-E-Mails",
       "saveButton": "Einstellungen speichern",
       "toasts": {
-        "saved": "Einstellungen für den Notfallzugang gespeichert"
+        "saved": "Einstellungen für den Notfallzugang gespeichert",
+        "saveFailed": "Einstellungen konnten nicht gespeichert werden"
       }
     },
     "message": {
@@ -640,7 +676,9 @@
       "saveButton": "Nachricht speichern",
       "toasts": {
         "saved": "Nachricht gespeichert",
-        "verifyAgain": "Verifizierung abgelaufen -- bitte erneut verifizieren, um zu speichern"
+        "verifyAgain": "Verifizierung abgelaufen -- bitte erneut verifizieren, um zu speichern",
+        "loadFailed": "Nachricht konnte nicht geladen werden",
+        "saveFailed": "Nachricht konnte nicht gespeichert werden"
       }
     },
     "contacts": {
@@ -667,7 +705,9 @@
       "toasts": {
         "added": "Kontakt hinzugefügt",
         "updated": "Kontakt aktualisiert",
-        "removed": "Kontakt entfernt"
+        "removed": "Kontakt entfernt",
+        "saveFailed": "Kontakt konnte nicht gespeichert werden",
+        "removeFailed": "Kontakt konnte nicht entfernt werden"
       }
     },
     "status": {
@@ -688,11 +728,16 @@
       "clearingButton": "Wird gelöscht...",
       "clearButton": "Löschen",
       "toasts": {
-        "cleared": "Gewährter Status gelöscht"
+        "cleared": "Gewährter Status gelöscht",
+        "resetFailed": "Gewährter Status konnte nicht zurückgesetzt werden"
       }
     },
     "stepUp": {
       "reason": "Verifizieren Sie Ihre Identität erneut, um Ihre Notfallzugang-Nachricht anzuzeigen oder zu bearbeiten."
+    },
+    "toasts": {
+      "loadFailed": "Notfallzugang konnte nicht geladen werden",
+      "reauthFailed": "Erneute Authentifizierung konnte nicht bestätigt werden"
     }
   },
   "aiProviders": {

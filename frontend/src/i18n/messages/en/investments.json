@@ -29,7 +29,8 @@
     "today": "Today",
     "transactionCount": "{count} transaction{plural}",
     "allPayees": "All payees",
-    "allCategories": "All categories"
+    "allCategories": "All categories",
+    "toastDeleteFailed": "Failed to delete transaction"
   },
   "portfolioSummary": {
     "title": "Portfolio Summary",
@@ -219,6 +220,7 @@
     "submitUpdate": "Update Transaction",
     "submitCreate": "Create Transaction",
     "toastSecurityCreated": "Security created",
+    "toastSecurityCreateFailed": "Failed to create security",
     "toastTransferred": "Securities transferred",
     "toastTransferUpdated": "Transfer updated",
     "toastUpdated": "Transaction updated",

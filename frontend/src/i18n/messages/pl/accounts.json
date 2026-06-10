@@ -88,8 +88,12 @@
   },
   "toast": {
     "deleteSuccess": "Konto usunięte",
+    "deleteFailed": "Nie udało się usunąć konta",
     "closeSuccess": "Konto zamknięte",
+    "closeFailed": "Nie udało się zamknąć konta",
     "reopenSuccess": "Konto otwarte ponownie",
+    "reopenFailed": "Nie udało się ponownie otworzyć konta",
+    "loadFailed": "Nie udało się wczytać kont",
     "favouriteError": "Nie udało się zaktualizować ulubionych",
     "createSuccess": "Konto utworzone",
     "updateSuccess": "Konto zaktualizowane"
@@ -157,7 +161,8 @@
       "collapse": "Jeden wiersz na transakcję"
     },
     "customDateFormatEmpty": "Podaj własny format daty",
-    "exportedAs": "Wyeksportowano jako {format}"
+    "exportedAs": "Wyeksportowano jako {format}",
+    "exportFailed": "Nie udało się wyeksportować konta"
   },
   "loanFields": {
     "title": "Szczegóły spłaty pożyczki",
@@ -282,6 +287,7 @@
   "toasts": {
     "categoryCreatedNested": "Utworzono kategorię \"{parent}: {name}\"",
     "categoryCreated": "Utworzono kategorię \"{name}\"",
+    "categoryCreateFailed": "Nie udało się utworzyć kategorii",
     "payeeCreated": "Utworzono odbiorcę \"{name}\"",
     "payeeCreateFailed": "Nie udało się utworzyć odbiorcy",
     "institutionCreated": "Instytucja „{name}” utworzona",

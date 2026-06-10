@@ -259,12 +259,12 @@ function EmergencyAccessSection() {
         reminderAfterDays: data.reminderAfterDays,
       });
     } catch (err) {
-      toast.error(getErrorMessage(err, 'Failed to load emergency access'));
+      toast.error(getErrorMessage(err, t('toasts.loadFailed')));
       logger.error(err);
     } finally {
       setLoading(false);
     }
-  }, [settingsForm]);
+  }, [settingsForm, t]);
 
   useEffect(() => {
     void load();
@@ -320,7 +320,7 @@ function EmergencyAccessSection() {
           });
         }
       } catch (err) {
-        toast.error(getErrorMessage(err, 'Failed to confirm re-authentication'));
+        toast.error(getErrorMessage(err, t('toasts.reauthFailed')));
         logger.error(err);
       }
     })();
@@ -343,13 +343,13 @@ function EmergencyAccessSection() {
           setStepUpOpen(true);
           return;
         }
-        toast.error(getErrorMessage(err, 'Failed to load message'));
+        toast.error(getErrorMessage(err, tMsg('toasts.loadFailed')));
         logger.error(err);
       } finally {
         setMessageLoading(false);
       }
     },
-    [messageForm, clearStepUp],
+    [messageForm, clearStepUp, tMsg],
   );
 
   const handleReveal = () => {
@@ -396,7 +396,7 @@ function EmergencyAccessSection() {
         toast.error(tMsg('toasts.verifyAgain'));
         return;
       }
-      toast.error(getErrorMessage(err, 'Failed to save message'));
+      toast.error(getErrorMessage(err, tMsg('toasts.saveFailed')));
       logger.error(err);
     } finally {
       setSavingMessage(false);
@@ -410,7 +410,7 @@ function EmergencyAccessSection() {
       setView(next);
       toast.success(t('settings.toasts.saved'));
     } catch (err) {
-      toast.error(getErrorMessage(err, 'Failed to save settings'));
+      toast.error(getErrorMessage(err, t('settings.toasts.saveFailed')));
       logger.error(err);
     } finally {
       setSavingSettings(false);
@@ -448,7 +448,7 @@ function EmergencyAccessSection() {
       toast.success(editingContact ? tContacts('toasts.updated') : tContacts('toasts.added'));
       setShowContactForm(false);
     } catch (err) {
-      toast.error(getErrorMessage(err, 'Failed to save contact'));
+      toast.error(getErrorMessage(err, tContacts('toasts.saveFailed')));
       logger.error(err);
     } finally {
       setSubmittingContact(false);
@@ -471,7 +471,7 @@ function EmergencyAccessSection() {
       toast.success(tContacts('toasts.removed'));
       setRemoveTarget(null);
     } catch (err) {
-      toast.error(getErrorMessage(err, 'Failed to remove contact'));
+      toast.error(getErrorMessage(err, tContacts('toasts.removeFailed')));
       logger.error(err);
     } finally {
       setRemoving(false);
@@ -486,7 +486,7 @@ function EmergencyAccessSection() {
       toast.success(t('resetConfirm.toasts.cleared'));
       setShowResetConfirm(false);
     } catch (err) {
-      toast.error(getErrorMessage(err, 'Failed to reset granted state'));
+      toast.error(getErrorMessage(err, t('resetConfirm.toasts.resetFailed')));
       logger.error(err);
     } finally {
       setResetting(false);

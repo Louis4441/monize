@@ -18,6 +18,7 @@ import { authApi, AuthMethods } from '@/lib/auth';
 import { buildPasswordSchema, buildEmailSchema } from '@/lib/zod-helpers';
 import { TwoFactorSetup } from '@/components/auth/TwoFactorSetup';
 import { OnboardingPreferences } from '@/components/auth/OnboardingPreferences';
+import { AuthLanguageSwitcher } from '@/components/auth/AuthLanguageSwitcher';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('Register');
@@ -386,6 +387,8 @@ export default function RegisterPage() {
             })}
           </p>
         </form>
+
+        <AuthLanguageSwitcher />
       </div>
     </div>
   );

@@ -2,7 +2,8 @@
   "language": {
     "label": "Idioma",
     "helpText": "Elige el idioma usado en toda la interfaz de Monize. El formato de números y fechas se controla por separado a continuación.",
-    "saved": "Idioma actualizado"
+    "saved": "Idioma actualizado",
+    "saveFailed": "Error al guardar el idioma"
   },
   "profile": {
     "heading": "Perfil",
@@ -20,7 +21,8 @@
     "saveButton": "Guardar perfil",
     "savingButton": "Guardando...",
     "toasts": {
-      "success": "Perfil actualizado correctamente"
+      "success": "Perfil actualizado correctamente",
+      "updateFailed": "Error al actualizar el perfil"
     },
     "validation": {
       "firstNameMax": "El nombre debe tener 100 caracteres o menos",
@@ -43,7 +45,8 @@
     "changePasswordButton": "Cambiar contraseña",
     "changingPasswordButton": "Cambiando...",
     "toasts": {
-      "passwordChanged": "Contraseña cambiada correctamente"
+      "passwordChanged": "Contraseña cambiada correctamente",
+      "passwordChangeFailed": "Error al cambiar la contraseña"
     },
     "twoFactor": {
       "heading": "Autenticación de dos factores",
@@ -60,7 +63,8 @@
         "verificationCodeLabel": "Código de verificación",
         "disablingButton": "Deshabilitando...",
         "toasts": {
-          "disabled": "Autenticación de dos factores deshabilitada"
+          "disabled": "Autenticación de dos factores deshabilitada",
+          "disableFailed": "Error al deshabilitar la autenticación de dos factores"
         }
       }
     },
@@ -74,6 +78,9 @@
         "verificationCodeLabel": "Código de verificación",
         "regeneratingButton": "Regenerando...",
         "regenerateButton": "Regenerar"
+      },
+      "toasts": {
+        "generateFailed": "Error al generar los códigos de respaldo"
       }
     },
     "trustedDevices": {
@@ -88,7 +95,9 @@
       },
       "toasts": {
         "revoked": "Dispositivo revocado",
-        "revokedAll": "{count} dispositivo(s) revocado(s)"
+        "revokedAll": "{count} dispositivo(s) revocado(s)",
+        "revokeFailed": "Error al revocar el dispositivo",
+        "revokeAllFailed": "Error al revocar los dispositivos"
       }
     },
     "validation": {
@@ -122,7 +131,10 @@
     "saveButton": "Guardar preferencias",
     "savingButton": "Guardando...",
     "toasts": {
-      "saved": "Preferencias guardadas"
+      "saved": "Preferencias guardadas",
+      "saveFailed": "Error al guardar las preferencias",
+      "themeSaveFailed": "Error al guardar el tema",
+      "colorThemeSaveFailed": "Error al guardar el tema de color"
     },
     "browserLocale": "Usar configuración regional del navegador (detección automática)",
     "browserTimezonePrefix": "Usar zona horaria del navegador (detectada automáticamente como {tz})",
@@ -190,7 +202,11 @@
       "digestEnabled": "Resumen de presupuesto habilitado",
       "digestDisabled": "Resumen de presupuesto deshabilitado",
       "digestDaySet": "Día del resumen de presupuesto establecido en {day}",
-      "testEmailSent": "¡Correo de prueba enviado! Revisa tu bandeja de entrada."
+      "testEmailSent": "¡Correo de prueba enviado! Revisa tu bandeja de entrada.",
+      "emailUpdateFailed": "Error al actualizar la preferencia de notificaciones",
+      "digestUpdateFailed": "Error al actualizar la preferencia del resumen de presupuesto",
+      "digestDayFailed": "Error al actualizar el día del resumen",
+      "testEmailFailed": "Error al enviar el correo de prueba"
     }
   },
   "help": {
@@ -233,7 +249,8 @@
       "deletingButton": "Eliminando...",
       "confirmButton": "Confirmar eliminación de datos",
       "toasts": {
-        "success": "Se eliminaron {count} registros correctamente"
+        "success": "Se eliminaron {count} registros correctamente",
+        "failed": "Error al eliminar los datos"
       }
     },
     "deleteAccount": {
@@ -252,7 +269,8 @@
       "confirmButton": "Confirmar eliminación",
       "toasts": {
         "downgraded": "Tus propios datos fueron eliminados. Tu inicio de sesión y el acceso compartido se conservan para que la delegación siga en su lugar.",
-        "deleted": "Cuenta eliminada"
+        "deleted": "Cuenta eliminada",
+        "failed": "Error al eliminar la cuenta"
       },
       "errors": {
         "typeDelete": "Por favor escribe DELETE para confirmar",
@@ -323,7 +341,10 @@
       "revoked": "Token revocado",
       "selectScope": "Selecciona al menos un permiso",
       "copyTokenFailed": "Error al copiar el token",
-      "copyUrlFailed": "Error al copiar la URL"
+      "copyUrlFailed": "Error al copiar la URL",
+      "loadFailed": "Error al cargar los tokens de API",
+      "createFailed": "Error al crear el token",
+      "revokeFailed": "Error al revocar el token"
     },
     "relative": {
       "never": "Nunca",
@@ -417,7 +438,9 @@
       },
       "toasts": {
         "enabled": "Copias de seguridad cifradas habilitadas",
-        "disabled": "Copias de seguridad cifradas deshabilitadas"
+        "disabled": "Copias de seguridad cifradas deshabilitadas",
+        "enableFailed": "Error al habilitar el cifrado",
+        "disableFailed": "Error al deshabilitar el cifrado"
       }
     },
     "export": {
@@ -434,7 +457,8 @@
         "downloadButton": "Descargar"
       },
       "toasts": {
-        "success": "Copia de seguridad descargada correctamente"
+        "success": "Copia de seguridad descargada correctamente",
+        "failed": "Error al crear la copia de seguridad"
       }
     },
     "restore": {
@@ -453,7 +477,9 @@
       "confirmRestoreButton": "Confirmar restauración",
       "toasts": {
         "pleaseSelectFile": "Por favor selecciona un archivo de copia de seguridad",
-        "pleaseEnterPassword": "Ingresa tu contraseña para confirmar"
+        "pleaseEnterPassword": "Ingresa tu contraseña para confirmar",
+        "encryptedNeedsPassword": "Esta copia de seguridad está cifrada. Ingresa la contraseña con la que fue creada en el campo \"Contraseña de copia de seguridad\" y vuelve a intentarlo.",
+        "failed": "Error al restaurar la copia de seguridad"
       }
     },
     "restoreResult": {
@@ -538,7 +564,8 @@
     },
     "saveButton": "Guardar",
     "toasts": {
-      "saved": "Acceso actualizado"
+      "saved": "Acceso actualizado",
+      "saveFailed": "Error al actualizar el acceso"
     }
   },
   "nav": {
@@ -574,7 +601,11 @@
       "title": "Configuración de IA",
       "description": "Configura proveedores de IA, gestiona claves de API y consulta estadísticas de uso."
     },
-    "delegateSecurityError": "No se pueden cargar tu configuración de seguridad."
+    "delegateSecurityError": "No se pueden cargar tu configuración de seguridad.",
+    "toasts": {
+      "securityLoadFailed": "Error al cargar la configuración de seguridad",
+      "loadFailed": "Error al cargar la configuración"
+    }
   },
   "aiSettings": {
     "backLink": "Volver a Configuración",
@@ -583,6 +614,10 @@
     "demoRestricted": {
       "heading": "Restringido en modo demo",
       "body": "La configuración de proveedores de IA está deshabilitada en el modo demo."
+    },
+    "toasts": {
+      "loadFailed": "Error al cargar la configuración de IA",
+      "usageLoadFailed": "Error al cargar los datos de uso"
     }
   },
   "sharedAccessPage": {
@@ -617,7 +652,8 @@
       "reminderAfterDaysLabel": "Días de inactividad antes de los correos de recordatorio",
       "saveButton": "Guardar configuración",
       "toasts": {
-        "saved": "Configuración de acceso de emergencia guardada"
+        "saved": "Configuración de acceso de emergencia guardada",
+        "saveFailed": "Error al guardar la configuración"
       }
     },
     "message": {
@@ -640,7 +676,9 @@
       "saveButton": "Guardar mensaje",
       "toasts": {
         "saved": "Mensaje guardado",
-        "verifyAgain": "Verificación expirada -- por favor verifica de nuevo para guardar"
+        "verifyAgain": "Verificación expirada -- por favor verifica de nuevo para guardar",
+        "loadFailed": "Error al cargar el mensaje",
+        "saveFailed": "Error al guardar el mensaje"
       }
     },
     "contacts": {
@@ -667,7 +705,9 @@
       "toasts": {
         "added": "Contacto agregado",
         "updated": "Contacto actualizado",
-        "removed": "Contacto eliminado"
+        "removed": "Contacto eliminado",
+        "saveFailed": "Error al guardar el contacto",
+        "removeFailed": "Error al eliminar el contacto"
       }
     },
     "status": {
@@ -688,11 +728,16 @@
       "clearingButton": "Borrando...",
       "clearButton": "Borrar",
       "toasts": {
-        "cleared": "Estado otorgado borrado"
+        "cleared": "Estado otorgado borrado",
+        "resetFailed": "Error al restablecer el estado otorgado"
       }
     },
     "stepUp": {
       "reason": "Verifica de nuevo tu identidad para ver o editar tu mensaje de acceso de emergencia."
+    },
+    "toasts": {
+      "loadFailed": "Error al cargar el acceso de emergencia",
+      "reauthFailed": "Error al confirmar la reautenticación"
     }
   },
   "aiProviders": {

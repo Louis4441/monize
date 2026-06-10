@@ -2,7 +2,8 @@
   "language": {
     "label": "Język",
     "helpText": "Wybierz język używany w całym interfejsie Monize. Formatowanie liczb i dat jest sterowane osobno poniżej.",
-    "saved": "Zmieniono język"
+    "saved": "Zmieniono język",
+    "saveFailed": "Nie udało się zapisać języka"
   },
   "profile": {
     "heading": "Profil",
@@ -20,7 +21,8 @@
     "saveButton": "Zapisz profil",
     "savingButton": "Zapisywanie...",
     "toasts": {
-      "success": "Zaktualizowano profil"
+      "success": "Zaktualizowano profil",
+      "updateFailed": "Nie udało się zaktualizować profilu"
     },
     "validation": {
       "firstNameMax": "Imię może mieć maksymalnie 100 znaków",
@@ -43,7 +45,8 @@
     "changePasswordButton": "Zmień hasło",
     "changingPasswordButton": "Zmienianie...",
     "toasts": {
-      "passwordChanged": "Zmieniono hasło"
+      "passwordChanged": "Zmieniono hasło",
+      "passwordChangeFailed": "Nie udało się zmienić hasła"
     },
     "twoFactor": {
       "heading": "Uwierzytelnianie dwuskładnikowe",
@@ -60,7 +63,8 @@
         "verificationCodeLabel": "Kod weryfikacyjny",
         "disablingButton": "Wyłączanie...",
         "toasts": {
-          "disabled": "Wyłączono uwierzytelnianie dwuskładnikowe"
+          "disabled": "Wyłączono uwierzytelnianie dwuskładnikowe",
+          "disableFailed": "Nie udało się wyłączyć uwierzytelniania dwuskładnikowego"
         }
       }
     },
@@ -74,6 +78,9 @@
         "verificationCodeLabel": "Kod weryfikacyjny",
         "regeneratingButton": "Generowanie ponownie...",
         "regenerateButton": "Wygeneruj ponownie"
+      },
+      "toasts": {
+        "generateFailed": "Nie udało się wygenerować kodów zapasowych"
       }
     },
     "trustedDevices": {
@@ -88,7 +95,9 @@
       },
       "toasts": {
         "revoked": "Odwołano urządzenie",
-        "revokedAll": "Odwołano urządzenia: {count}"
+        "revokedAll": "Odwołano urządzenia: {count}",
+        "revokeFailed": "Nie udało się odwołać urządzenia",
+        "revokeAllFailed": "Nie udało się odwołać urządzeń"
       }
     },
     "validation": {
@@ -122,7 +131,10 @@
     "saveButton": "Zapisz preferencje",
     "savingButton": "Zapisywanie...",
     "toasts": {
-      "saved": "Zapisano preferencje"
+      "saved": "Zapisano preferencje",
+      "saveFailed": "Nie udało się zapisać preferencji",
+      "themeSaveFailed": "Nie udało się zapisać motywu",
+      "colorThemeSaveFailed": "Nie udało się zapisać motywu kolorystycznego"
     },
     "browserLocale": "Użyj ustawień regionalnych przeglądarki (automatycznie)",
     "browserTimezonePrefix": "Użyj strefy czasowej przeglądarki (wykryto {tz})",
@@ -190,7 +202,11 @@
       "digestEnabled": "Włączono podsumowanie budżetu",
       "digestDisabled": "Wyłączono podsumowanie budżetu",
       "digestDaySet": "Ustawiono dzień podsumowania budżetu na {day}",
-      "testEmailSent": "Wysłano testowy e-mail! Sprawdź swoją skrzynkę."
+      "testEmailSent": "Wysłano testowy e-mail! Sprawdź swoją skrzynkę.",
+      "emailUpdateFailed": "Nie udało się zaktualizować preferencji powiadomień",
+      "digestUpdateFailed": "Nie udało się zaktualizować preferencji podsumowania budżetu",
+      "digestDayFailed": "Nie udało się zaktualizować dnia podsumowania",
+      "testEmailFailed": "Nie udało się wysłać testowego e-maila"
     }
   },
   "help": {
@@ -233,7 +249,8 @@
       "deletingButton": "Usuwanie...",
       "confirmButton": "Potwierdź usunięcie danych",
       "toasts": {
-        "success": "Usunięto {count} rekordów"
+        "success": "Usunięto {count} rekordów",
+        "failed": "Nie udało się usunąć danych"
       }
     },
     "deleteAccount": {
@@ -252,7 +269,8 @@
       "confirmButton": "Potwierdź usunięcie",
       "toasts": {
         "downgraded": "Twoje własne dane zostały usunięte. Twoje logowanie i dostęp współdzielony pozostają, aby pełnomocnictwo nadal obowiązywało.",
-        "deleted": "Usunięto konto"
+        "deleted": "Usunięto konto",
+        "failed": "Nie udało się usunąć konta"
       },
       "errors": {
         "typeDelete": "Wpisz DELETE, aby potwierdzić",
@@ -323,7 +341,10 @@
       "revoked": "Odwołano token",
       "selectScope": "Wybierz co najmniej jeden zakres",
       "copyTokenFailed": "Nie udało się skopiować tokenu",
-      "copyUrlFailed": "Nie udało się skopiować adresu URL"
+      "copyUrlFailed": "Nie udało się skopiować adresu URL",
+      "loadFailed": "Nie udało się wczytać tokenów API",
+      "createFailed": "Nie udało się utworzyć tokenu",
+      "revokeFailed": "Nie udało się odwołać tokenu"
     },
     "relative": {
       "never": "Nigdy",
@@ -417,7 +438,9 @@
       },
       "toasts": {
         "enabled": "Włączono szyfrowane kopie zapasowe",
-        "disabled": "Wyłączono szyfrowane kopie zapasowe"
+        "disabled": "Wyłączono szyfrowane kopie zapasowe",
+        "enableFailed": "Nie udało się włączyć szyfrowania",
+        "disableFailed": "Nie udało się wyłączyć szyfrowania"
       }
     },
     "export": {
@@ -434,7 +457,8 @@
         "downloadButton": "Pobierz"
       },
       "toasts": {
-        "success": "Pobrano kopię zapasową"
+        "success": "Pobrano kopię zapasową",
+        "failed": "Nie udało się utworzyć kopii zapasowej"
       }
     },
     "restore": {
@@ -453,7 +477,9 @@
       "confirmRestoreButton": "Potwierdź przywracanie",
       "toasts": {
         "pleaseSelectFile": "Wybierz plik kopii zapasowej",
-        "pleaseEnterPassword": "Wpisz hasło, aby potwierdzić"
+        "pleaseEnterPassword": "Wpisz hasło, aby potwierdzić",
+        "encryptedNeedsPassword": "Ta kopia zapasowa jest zaszyfrowana. Wpisz hasło, którym ją utworzono, w polu \"Hasło kopii zapasowej\" i spróbuj ponownie.",
+        "failed": "Nie udało się przywrócić kopii zapasowej"
       }
     },
     "restoreResult": {
@@ -538,7 +564,8 @@
     },
     "saveButton": "Zapisz",
     "toasts": {
-      "saved": "Zaktualizowano dostęp"
+      "saved": "Zaktualizowano dostęp",
+      "saveFailed": "Nie udało się zaktualizować dostępu"
     }
   },
   "nav": {
@@ -574,7 +601,11 @@
       "title": "Ustawienia AI",
       "description": "Skonfiguruj dostawców AI, zarządzaj kluczami API i przeglądaj statystyki użycia."
     },
-    "delegateSecurityError": "Nie można wczytać Twoich ustawień bezpieczeństwa."
+    "delegateSecurityError": "Nie można wczytać Twoich ustawień bezpieczeństwa.",
+    "toasts": {
+      "securityLoadFailed": "Nie udało się wczytać ustawień zabezpieczeń",
+      "loadFailed": "Nie udało się wczytać ustawień"
+    }
   },
   "aiSettings": {
     "backLink": "Powrót do Ustawień",
@@ -583,6 +614,10 @@
     "demoRestricted": {
       "heading": "Ograniczone w trybie demo",
       "body": "Konfiguracja dostawcy AI jest wyłączona w trybie demo."
+    },
+    "toasts": {
+      "loadFailed": "Nie udało się wczytać ustawień AI",
+      "usageLoadFailed": "Nie udało się wczytać danych o użyciu"
     }
   },
   "sharedAccessPage": {
@@ -617,7 +652,8 @@
       "reminderAfterDaysLabel": "Dni nieaktywności przed e-mailami z przypomnieniem",
       "saveButton": "Zapisz ustawienia",
       "toasts": {
-        "saved": "Zapisano ustawienia dostępu awaryjnego"
+        "saved": "Zapisano ustawienia dostępu awaryjnego",
+        "saveFailed": "Nie udało się zapisać ustawień"
       }
     },
     "message": {
@@ -640,7 +676,9 @@
       "saveButton": "Zapisz wiadomość",
       "toasts": {
         "saved": "Zapisano wiadomość",
-        "verifyAgain": "Weryfikacja wygasła -- zweryfikuj ponownie, aby zapisać"
+        "verifyAgain": "Weryfikacja wygasła -- zweryfikuj ponownie, aby zapisać",
+        "loadFailed": "Nie udało się wczytać wiadomości",
+        "saveFailed": "Nie udało się zapisać wiadomości"
       }
     },
     "contacts": {
@@ -667,7 +705,9 @@
       "toasts": {
         "added": "Dodano kontakt",
         "updated": "Zaktualizowano kontakt",
-        "removed": "Usunięto kontakt"
+        "removed": "Usunięto kontakt",
+        "saveFailed": "Nie udało się zapisać kontaktu",
+        "removeFailed": "Nie udało się usunąć kontaktu"
       }
     },
     "status": {
@@ -688,11 +728,16 @@
       "clearingButton": "Czyszczenie...",
       "clearButton": "Wyczyść",
       "toasts": {
-        "cleared": "Wyczyszczono stan przyznania"
+        "cleared": "Wyczyszczono stan przyznania",
+        "resetFailed": "Nie udało się wyczyścić stanu przyznania"
       }
     },
     "stepUp": {
       "reason": "Zweryfikuj ponownie swoją tożsamość, aby wyświetlić lub edytować wiadomość dostępu awaryjnego."
+    },
+    "toasts": {
+      "loadFailed": "Nie udało się wczytać dostępu awaryjnego",
+      "reauthFailed": "Nie udało się potwierdzić ponownego uwierzytelnienia"
     }
   },
   "aiProviders": {

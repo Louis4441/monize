@@ -247,6 +247,10 @@
       "REINVEST": "Herinvesteren",
       "ADD_SHARES": "Aandelen toevoegen",
       "REMOVE_SHARES": "Aandelen verwijderen"
+    },
+    "toasts": {
+      "loadHistoryFailed": "Historie laden mislukt",
+      "loadTransactionFailed": "Transactie laden mislukt"
     }
   },
   "shareAdjustment": {

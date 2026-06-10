@@ -247,6 +247,10 @@
       "REINVEST": "Reinvest",
       "ADD_SHARES": "Add Shares",
       "REMOVE_SHARES": "Remove Shares"
+    },
+    "toasts": {
+      "loadHistoryFailed": "Failed to load history",
+      "loadTransactionFailed": "Failed to load transaction"
     }
   },
   "shareAdjustment": {

@@ -88,8 +88,12 @@
   },
   "toast": {
     "deleteSuccess": "Cuenta eliminada correctamente",
+    "deleteFailed": "Error al eliminar la cuenta",
     "closeSuccess": "Cuenta cerrada correctamente",
+    "closeFailed": "Error al cerrar la cuenta",
     "reopenSuccess": "Cuenta reabierta correctamente",
+    "reopenFailed": "Error al reabrir la cuenta",
+    "loadFailed": "Error al cargar las cuentas",
     "favouriteError": "Error al actualizar favorita",
     "createSuccess": "Cuenta creada correctamente",
     "updateSuccess": "Cuenta actualizada correctamente"
@@ -157,7 +161,8 @@
       "collapse": "Una línea por transacción"
     },
     "customDateFormatEmpty": "Por favor ingresa un formato de fecha personalizado",
-    "exportedAs": "Exportado como {format}"
+    "exportedAs": "Exportado como {format}",
+    "exportFailed": "Error al exportar la cuenta"
   },
   "loanFields": {
     "title": "Detalles del Pago del Préstamo",
@@ -282,6 +287,7 @@
   "toasts": {
     "categoryCreatedNested": "Categoría \"{parent}: {name}\" creada",
     "categoryCreated": "Categoría \"{name}\" creada",
+    "categoryCreateFailed": "Error al crear la categoría",
     "payeeCreated": "Beneficiario \"{name}\" creado",
     "payeeCreateFailed": "Error al crear el beneficiario",
     "institutionCreated": "Institución \"{name}\" creada",

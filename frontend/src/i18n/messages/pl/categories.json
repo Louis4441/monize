@@ -29,7 +29,12 @@
     "updated": "Kategoria zaktualizowana pomyslnie",
     "deleted": "Kategoria usunieta pomyslnie",
     "cannotDeleteSystem": "Kategorii systemowych nie mozna usuwac",
-    "importSuccess": "Zaimportowano kategorie: {count}"
+    "importSuccess": "Zaimportowano kategorie: {count}",
+    "loadFailed": "Nie udało się wczytać kategorii",
+    "deleteFailed": "Nie udało się usunąć kategorii",
+    "createFailed": "Nie udało się utworzyć kategorii",
+    "updateFailed": "Nie udało się zaktualizować kategorii",
+    "importFailed": "Nie udało się zaimportować domyślnych kategorii"
   },
   "form": {
     "nameLabel": "Nazwa kategorii",

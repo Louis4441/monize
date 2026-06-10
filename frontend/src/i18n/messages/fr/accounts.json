@@ -88,8 +88,12 @@
   },
   "toast": {
     "deleteSuccess": "Compte supprimé avec succès",
+    "deleteFailed": "Échec de la suppression du compte",
     "closeSuccess": "Compte clôturé avec succès",
+    "closeFailed": "Échec de la clôture du compte",
     "reopenSuccess": "Compte rouvert avec succès",
+    "reopenFailed": "Échec de la réouverture du compte",
+    "loadFailed": "Échec du chargement des comptes",
     "favouriteError": "Échec de la mise à jour des favoris",
     "createSuccess": "Compte créé avec succès",
     "updateSuccess": "Compte mis à jour avec succès"
@@ -157,7 +161,8 @@
       "collapse": "Une ligne par transaction"
     },
     "customDateFormatEmpty": "Veuillez saisir un format de date personnalisé",
-    "exportedAs": "Exporté au format {format}"
+    "exportedAs": "Exporté au format {format}",
+    "exportFailed": "Échec de l'exportation du compte"
   },
   "loanFields": {
     "title": "Détails du remboursement de prêt",
@@ -282,6 +287,7 @@
   "toasts": {
     "categoryCreatedNested": "Catégorie « {parent} : {name} » créée",
     "categoryCreated": "Catégorie « {name} » créée",
+    "categoryCreateFailed": "Échec de la création de la catégorie",
     "payeeCreated": "Bénéficiaire « {name} » créé",
     "payeeCreateFailed": "Échec de la création du bénéficiaire",
     "institutionCreated": "Établissement « {name} » créé",

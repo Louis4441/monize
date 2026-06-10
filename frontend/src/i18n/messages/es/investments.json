@@ -29,7 +29,8 @@
     "today": "Hoy",
     "transactionCount": "{count} transacción{plural}",
     "allPayees": "Todos los beneficiarios",
-    "allCategories": "Todas las categorías"
+    "allCategories": "Todas las categorías",
+    "toastDeleteFailed": "Error al eliminar la transacción"
   },
   "portfolioSummary": {
     "title": "Resumen de Cartera",
@@ -219,6 +220,7 @@
     "submitUpdate": "Actualizar Transacción",
     "submitCreate": "Crear Transacción",
     "toastSecurityCreated": "Valor creado",
+    "toastSecurityCreateFailed": "Error al crear el valor",
     "toastTransferred": "Valores transferidos",
     "toastTransferUpdated": "Transferencia actualizada",
     "toastUpdated": "Transacción actualizada",

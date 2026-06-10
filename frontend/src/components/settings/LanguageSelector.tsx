@@ -1,7 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
-import { useTranslations } from 'next-intl';
+import { createTranslator, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
@@ -10,6 +10,26 @@ import { userSettingsApi } from '@/lib/user-settings';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { getErrorMessage } from '@/lib/errors';
 import { LOCALE_COOKIE, SUPPORTED_LOCALES } from '@/i18n/config';
+import { loadNamespaceMessages } from '@/i18n/messages';
+
+/**
+ * The confirmation toast must be readable by the user who just switched, so
+ * it is rendered in the *target* locale -- the surrounding UI still shows the
+ * old language until router.refresh() delivers the new catalogs.
+ */
+async function savedMessageIn(locale: string, fallback: string): Promise<string> {
+  try {
+    const settings = await loadNamespaceMessages(locale, 'settings');
+    const tNext = createTranslator({
+      locale,
+      messages: { settings } as Parameters<typeof createTranslator>[0]['messages'],
+      namespace: 'settings.language',
+    });
+    return tNext('saved');
+  } catch {
+    return fallback;
+  }
+}
 
 interface LanguageSelectorProps {
   value: string;
@@ -35,10 +55,10 @@ export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
       try {
         const updated = await userSettingsApi.updatePreferences({ language: next });
         updatePreferencesStore(updated);
-        toast.success(t('saved'));
+        toast.success(await savedMessageIn(next, t('saved')));
         router.refresh();
       } catch (error) {
-        toast.error(getErrorMessage(error, 'Failed to save language'));
+        toast.error(getErrorMessage(error, t('saveFailed')));
       }
     });
   };

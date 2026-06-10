@@ -58,12 +58,12 @@ function AccountsContent() {
       setPortfolioSummary(portfolio);
       setInstitutions(insts);
     } catch (error) {
-      showErrorToast(error, 'Failed to load accounts');
+      showErrorToast(error, t('toast.loadFailed'));
       logger.error(error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadAccounts();

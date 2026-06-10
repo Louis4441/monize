@@ -2,7 +2,8 @@
   "language": {
     "label": "Idioma",
     "helpText": "Escolha o idioma utilizado em toda a interface do Monize. A formatação de números e datas é controlada separadamente abaixo.",
-    "saved": "Idioma atualizado"
+    "saved": "Idioma atualizado",
+    "saveFailed": "Falha ao guardar o idioma"
   },
   "profile": {
     "heading": "Perfil",
@@ -20,7 +21,8 @@
     "saveButton": "Guardar Perfil",
     "savingButton": "A guardar...",
     "toasts": {
-      "success": "Perfil atualizado com sucesso"
+      "success": "Perfil atualizado com sucesso",
+      "updateFailed": "Falha ao atualizar o perfil"
     },
     "validation": {
       "firstNameMax": "O nome não pode ter mais de 100 caracteres",
@@ -43,7 +45,8 @@
     "changePasswordButton": "Alterar Palavra-passe",
     "changingPasswordButton": "A alterar...",
     "toasts": {
-      "passwordChanged": "Palavra-passe alterada com sucesso"
+      "passwordChanged": "Palavra-passe alterada com sucesso",
+      "passwordChangeFailed": "Falha ao alterar a palavra-passe"
     },
     "twoFactor": {
       "heading": "Autenticação de Dois Fatores",
@@ -60,7 +63,8 @@
         "verificationCodeLabel": "Código de Verificação",
         "disablingButton": "A desativar...",
         "toasts": {
-          "disabled": "Autenticação de dois fatores desativada"
+          "disabled": "Autenticação de dois fatores desativada",
+          "disableFailed": "Falha ao desativar a autenticação de dois fatores"
         }
       }
     },
@@ -74,6 +78,9 @@
         "verificationCodeLabel": "Código de Verificação",
         "regeneratingButton": "A regenerar...",
         "regenerateButton": "Regenerar"
+      },
+      "toasts": {
+        "generateFailed": "Falha ao gerar os códigos de recuperação"
       }
     },
     "trustedDevices": {
@@ -88,7 +95,9 @@
       },
       "toasts": {
         "revoked": "Dispositivo revogado",
-        "revokedAll": "{count} dispositivo(s) revogado(s)"
+        "revokedAll": "{count} dispositivo(s) revogado(s)",
+        "revokeFailed": "Falha ao revogar o dispositivo",
+        "revokeAllFailed": "Falha ao revogar os dispositivos"
       }
     },
     "validation": {
@@ -122,7 +131,10 @@
     "saveButton": "Guardar Preferências",
     "savingButton": "A guardar...",
     "toasts": {
-      "saved": "Preferências guardadas"
+      "saved": "Preferências guardadas",
+      "saveFailed": "Falha ao guardar as preferências",
+      "themeSaveFailed": "Falha ao guardar o tema",
+      "colorThemeSaveFailed": "Falha ao guardar o tema de cor"
     },
     "browserLocale": "Utilizar locale do browser (deteção automática)",
     "browserTimezonePrefix": "Utilizar fuso horário do browser (detetado automaticamente como {tz})",
@@ -190,7 +202,11 @@
       "digestEnabled": "Resumo de orçamento ativado",
       "digestDisabled": "Resumo de orçamento desativado",
       "digestDaySet": "Dia do resumo de orçamento definido para {day}",
-      "testEmailSent": "E-mail de teste enviado! Verifique a sua caixa de entrada."
+      "testEmailSent": "E-mail de teste enviado! Verifique a sua caixa de entrada.",
+      "emailUpdateFailed": "Falha ao atualizar a preferência de notificações",
+      "digestUpdateFailed": "Falha ao atualizar a preferência do resumo de orçamento",
+      "digestDayFailed": "Falha ao atualizar o dia do resumo",
+      "testEmailFailed": "Falha ao enviar o e-mail de teste"
     }
   },
   "help": {
@@ -233,7 +249,8 @@
       "deletingButton": "A eliminar...",
       "confirmButton": "Confirmar Eliminação de Dados",
       "toasts": {
-        "success": "{count} registos eliminados com sucesso"
+        "success": "{count} registos eliminados com sucesso",
+        "failed": "Falha ao eliminar os dados"
       }
     },
     "deleteAccount": {
@@ -252,7 +269,8 @@
       "confirmButton": "Confirmar Eliminação",
       "toasts": {
         "downgraded": "Os seus próprios dados foram removidos. O seu início de sessão e acesso partilhado são mantidos para que a delegação continue em vigor.",
-        "deleted": "Conta eliminada"
+        "deleted": "Conta eliminada",
+        "failed": "Falha ao eliminar a conta"
       },
       "errors": {
         "typeDelete": "Por favor escreva DELETE para confirmar",
@@ -323,7 +341,10 @@
       "revoked": "Token revogado",
       "selectScope": "Selecione pelo menos um âmbito",
       "copyTokenFailed": "Falha ao copiar token",
-      "copyUrlFailed": "Falha ao copiar URL"
+      "copyUrlFailed": "Falha ao copiar URL",
+      "loadFailed": "Falha ao carregar os tokens de API",
+      "createFailed": "Falha ao criar o token",
+      "revokeFailed": "Falha ao revogar o token"
     },
     "relative": {
       "never": "Nunca",
@@ -417,7 +438,9 @@
       },
       "toasts": {
         "enabled": "Cópias de segurança encriptadas ativadas",
-        "disabled": "Cópias de segurança encriptadas desativadas"
+        "disabled": "Cópias de segurança encriptadas desativadas",
+        "enableFailed": "Falha ao ativar a encriptação",
+        "disableFailed": "Falha ao desativar a encriptação"
       }
     },
     "export": {
@@ -434,7 +457,8 @@
         "downloadButton": "Transferir"
       },
       "toasts": {
-        "success": "Cópia de segurança transferida com sucesso"
+        "success": "Cópia de segurança transferida com sucesso",
+        "failed": "Falha ao criar a cópia de segurança"
       }
     },
     "restore": {
@@ -453,7 +477,9 @@
       "confirmRestoreButton": "Confirmar Restauro",
       "toasts": {
         "pleaseSelectFile": "Por favor selecione um ficheiro de cópia de segurança",
-        "pleaseEnterPassword": "Por favor introduza a sua palavra-passe para confirmar"
+        "pleaseEnterPassword": "Por favor introduza a sua palavra-passe para confirmar",
+        "encryptedNeedsPassword": "Esta cópia de segurança está encriptada. Introduza a palavra-passe com que foi criada no campo \"Palavra-passe da cópia de segurança\" e tente novamente.",
+        "failed": "Falha ao restaurar a cópia de segurança"
       }
     },
     "restoreResult": {
@@ -538,7 +564,8 @@
     },
     "saveButton": "Guardar",
     "toasts": {
-      "saved": "Acesso atualizado"
+      "saved": "Acesso atualizado",
+      "saveFailed": "Falha ao atualizar o acesso"
     }
   },
   "nav": {
@@ -574,7 +601,11 @@
       "title": "Definições de IA",
       "description": "Configure fornecedores de IA, gira chaves de API e veja estatísticas de utilização."
     },
-    "delegateSecurityError": "Não foi possível carregar as suas definições de segurança."
+    "delegateSecurityError": "Não foi possível carregar as suas definições de segurança.",
+    "toasts": {
+      "securityLoadFailed": "Falha ao carregar as definições de segurança",
+      "loadFailed": "Falha ao carregar as definições"
+    }
   },
   "aiSettings": {
     "backLink": "Voltar às Definições",
@@ -583,6 +614,10 @@
     "demoRestricted": {
       "heading": "Restrito no Modo de Demonstração",
       "body": "A configuração de fornecedores de IA está desativada no modo de demonstração."
+    },
+    "toasts": {
+      "loadFailed": "Falha ao carregar as definições de IA",
+      "usageLoadFailed": "Falha ao carregar os dados de utilização"
     }
   },
   "sharedAccessPage": {
@@ -617,7 +652,8 @@
       "reminderAfterDaysLabel": "Dias de inatividade antes dos e-mails de lembrete",
       "saveButton": "Guardar definições",
       "toasts": {
-        "saved": "Definições de acesso de emergência guardadas"
+        "saved": "Definições de acesso de emergência guardadas",
+        "saveFailed": "Falha ao guardar as definições"
       }
     },
     "message": {
@@ -640,7 +676,9 @@
       "saveButton": "Guardar mensagem",
       "toasts": {
         "saved": "Mensagem guardada",
-        "verifyAgain": "Verificação expirada -- por favor verifique novamente para guardar"
+        "verifyAgain": "Verificação expirada -- por favor verifique novamente para guardar",
+        "loadFailed": "Falha ao carregar a mensagem",
+        "saveFailed": "Falha ao guardar a mensagem"
       }
     },
     "contacts": {
@@ -667,7 +705,9 @@
       "toasts": {
         "added": "Contacto adicionado",
         "updated": "Contacto atualizado",
-        "removed": "Contacto removido"
+        "removed": "Contacto removido",
+        "saveFailed": "Falha ao guardar o contacto",
+        "removeFailed": "Falha ao remover o contacto"
       }
     },
     "status": {
@@ -688,11 +728,16 @@
       "clearingButton": "A limpar...",
       "clearButton": "Limpar",
       "toasts": {
-        "cleared": "Estado de concessão limpo"
+        "cleared": "Estado de concessão limpo",
+        "resetFailed": "Falha ao limpar o estado de concessão"
       }
     },
     "stepUp": {
       "reason": "Verifique novamente a sua identidade para ver ou editar a sua mensagem de acesso de emergência."
+    },
+    "toasts": {
+      "loadFailed": "Falha ao carregar o acesso de emergência",
+      "reauthFailed": "Falha ao confirmar a reautenticação"
     }
   },
   "aiProviders": {

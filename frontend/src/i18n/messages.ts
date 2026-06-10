@@ -64,3 +64,16 @@ export async function loadMessages(locale: string): Promise<Messages> {
   );
   return Object.fromEntries(entries);
 }
+
+/**
+ * Load a single namespace catalog for an arbitrary locale. For the rare spots
+ * that must render a string in a locale other than the active one -- e.g.
+ * confirming a language change in the *target* language, while the UI is
+ * still rendered in the old one.
+ */
+export async function loadNamespaceMessages(
+  locale: string,
+  namespace: Namespace,
+): Promise<Messages> {
+  return loadNamespace(locale, namespace);
+}

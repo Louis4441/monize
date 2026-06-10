@@ -88,8 +88,12 @@
   },
   "toast": {
     "deleteSuccess": "Rekening succesvol verwijderd",
+    "deleteFailed": "Verwijderen van rekening mislukt",
     "closeSuccess": "Rekening succesvol gesloten",
+    "closeFailed": "Sluiten van rekening mislukt",
     "reopenSuccess": "Rekening succesvol heropend",
+    "reopenFailed": "Heropenen van rekening mislukt",
+    "loadFailed": "Laden van rekeningen mislukt",
     "favouriteError": "Bijwerken van favoriet mislukt",
     "createSuccess": "Rekening succesvol aangemaakt",
     "updateSuccess": "Rekening succesvol bijgewerkt"
@@ -157,7 +161,8 @@
       "collapse": "Één regel per transactie"
     },
     "customDateFormatEmpty": "Voer een aangepaste datumnotatie in",
-    "exportedAs": "Geëxporteerd als {format}"
+    "exportedAs": "Geëxporteerd als {format}",
+    "exportFailed": "Exporteren van rekening mislukt"
   },
   "loanFields": {
     "title": "Details leningbetaling",
@@ -282,6 +287,7 @@
   "toasts": {
     "categoryCreatedNested": "Categorie \"{parent}: {name}\" aangemaakt",
     "categoryCreated": "Categorie \"{name}\" aangemaakt",
+    "categoryCreateFailed": "Aanmaken van categorie mislukt",
     "payeeCreated": "Begunstigde \"{name}\" aangemaakt",
     "payeeCreateFailed": "Aanmaken van begunstigde mislukt",
     "institutionCreated": "Instelling \"{name}\" aangemaakt",

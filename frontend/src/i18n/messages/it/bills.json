@@ -59,6 +59,8 @@
   },
   "toasts": {
     "overridesDeleted": "Sostituzioni eliminate",
-    "notFound": "Pagamento pianificato non trovato"
+    "notFound": "Pagamento pianificato non trovato",
+    "loadFailed": "Caricamento delle transazioni pianificate non riuscito",
+    "overridesDeleteFailed": "Eliminazione delle sostituzioni non riuscita"
   }
 }

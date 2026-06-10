@@ -88,8 +88,12 @@
   },
   "toast": {
     "deleteSuccess": "Konto erfolgreich gelöscht",
+    "deleteFailed": "Konto konnte nicht gelöscht werden",
     "closeSuccess": "Konto erfolgreich geschlossen",
+    "closeFailed": "Konto konnte nicht geschlossen werden",
     "reopenSuccess": "Konto erfolgreich wiedereröffnet",
+    "reopenFailed": "Konto konnte nicht wiedereröffnet werden",
+    "loadFailed": "Konten konnten nicht geladen werden",
     "favouriteError": "Favorit konnte nicht aktualisiert werden",
     "createSuccess": "Konto erfolgreich erstellt",
     "updateSuccess": "Konto erfolgreich aktualisiert"
@@ -157,7 +161,8 @@
       "collapse": "Eine Zeile pro Buchung"
     },
     "customDateFormatEmpty": "Bitte geben Sie ein benutzerdefiniertes Datumsformat ein",
-    "exportedAs": "Exportiert als {format}"
+    "exportedAs": "Exportiert als {format}",
+    "exportFailed": "Konto konnte nicht exportiert werden"
   },
   "loanFields": {
     "title": "Darlehenszahlungsdetails",
@@ -282,6 +287,7 @@
   "toasts": {
     "categoryCreatedNested": "Kategorie „{parent}: {name}” erstellt",
     "categoryCreated": "Kategorie „{name}” erstellt",
+    "categoryCreateFailed": "Kategorie konnte nicht erstellt werden",
     "payeeCreated": "Zahlungsempfänger „{name}” erstellt",
     "payeeCreateFailed": "Zahlungsempfänger konnte nicht erstellt werden",
     "institutionCreated": "Institut „{name}” erstellt",

@@ -62,6 +62,13 @@
     "system": "Système",
     "title": "Thème : {label}. Cliquez pour modifier."
   },
+  "errorPage": {
+    "title": "Un problème est survenu",
+    "description": "Une erreur inattendue s'est produite. Veuillez réessayer ou contacter l'assistance si le problème persiste.",
+    "errorId": "ID de l'erreur : {digest}",
+    "tryAgain": "Réessayer",
+    "goToDashboard": "Aller au tableau de bord"
+  },
   "errorBoundary": {
     "defaultMessage": "Une erreur s'est produite lors du rendu de ce composant."
   },

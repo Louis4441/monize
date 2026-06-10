@@ -59,6 +59,8 @@
   },
   "toasts": {
     "overridesDeleted": "Substituições eliminadas",
-    "notFound": "Pagamento agendado não encontrado"
+    "notFound": "Pagamento agendado não encontrado",
+    "loadFailed": "Falha ao carregar transações agendadas",
+    "overridesDeleteFailed": "Falha ao eliminar substituições"
   }
 }

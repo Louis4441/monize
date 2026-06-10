@@ -88,8 +88,12 @@
   },
   "toast": {
     "deleteSuccess": "Account deleted successfully",
+    "deleteFailed": "Failed to delete account",
     "closeSuccess": "Account closed successfully",
+    "closeFailed": "Failed to close account",
     "reopenSuccess": "Account reopened successfully",
+    "reopenFailed": "Failed to reopen account",
+    "loadFailed": "Failed to load accounts",
     "favouriteError": "Failed to update favourite",
     "createSuccess": "Account created successfully",
     "updateSuccess": "Account updated successfully"
@@ -157,7 +161,8 @@
       "collapse": "One line per transaction"
     },
     "customDateFormatEmpty": "Please enter a custom date format",
-    "exportedAs": "Exported as {format}"
+    "exportedAs": "Exported as {format}",
+    "exportFailed": "Failed to export account"
   },
   "loanFields": {
     "title": "Loan Payment Details",
@@ -282,6 +287,7 @@
   "toasts": {
     "categoryCreatedNested": "Category \"{parent}: {name}\" created",
     "categoryCreated": "Category \"{name}\" created",
+    "categoryCreateFailed": "Failed to create category",
     "payeeCreated": "Payee \"{name}\" created",
     "payeeCreateFailed": "Failed to create payee",
     "institutionCreated": "Institution \"{name}\" created",

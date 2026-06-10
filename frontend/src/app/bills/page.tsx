@@ -155,12 +155,12 @@ function BillsContent() {
           }))
       );
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to load scheduled transactions'));
+      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
       logger.error(error);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadData();
@@ -212,7 +212,7 @@ function BillsContent() {
         toast.success(t('toasts.overridesDeleted'));
         openEdit(overrideConfirm.transaction);
       } catch (error) {
-        toast.error(getErrorMessage(error, 'Failed to delete overrides'));
+        toast.error(getErrorMessage(error, t('toasts.overridesDeleteFailed')));
         logger.error(error);
       }
     }

@@ -59,6 +59,8 @@
   },
   "toasts": {
     "overridesDeleted": "Remplacements supprimés",
-    "notFound": "Paiement récurrent introuvable"
+    "notFound": "Paiement récurrent introuvable",
+    "loadFailed": "Échec du chargement des transactions récurrentes",
+    "overridesDeleteFailed": "Échec de la suppression des remplacements"
   }
 }

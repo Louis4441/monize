@@ -2,7 +2,8 @@
   "language": {
     "label": "Taal",
     "helpText": "Kies de taal die door de hele Monize-interface wordt gebruikt. Getal- en datumopmaak worden hieronder apart ingesteld.",
-    "saved": "Taal bijgewerkt"
+    "saved": "Taal bijgewerkt",
+    "saveFailed": "Opslaan van taal mislukt"
   },
   "profile": {
     "heading": "Profiel",
@@ -20,7 +21,8 @@
     "saveButton": "Profiel opslaan",
     "savingButton": "Opslaan...",
     "toasts": {
-      "success": "Profiel succesvol bijgewerkt"
+      "success": "Profiel succesvol bijgewerkt",
+      "updateFailed": "Bijwerken van profiel mislukt"
     },
     "validation": {
       "firstNameMax": "Voornaam mag maximaal 100 tekens bevatten",
@@ -43,7 +45,8 @@
     "changePasswordButton": "Wachtwoord wijzigen",
     "changingPasswordButton": "Wijzigen...",
     "toasts": {
-      "passwordChanged": "Wachtwoord succesvol gewijzigd"
+      "passwordChanged": "Wachtwoord succesvol gewijzigd",
+      "passwordChangeFailed": "Wijzigen van wachtwoord mislukt"
     },
     "twoFactor": {
       "heading": "Tweefactorauthenticatie",
@@ -60,7 +63,8 @@
         "verificationCodeLabel": "Verificatiecode",
         "disablingButton": "Uitschakelen...",
         "toasts": {
-          "disabled": "Tweefactorauthenticatie uitgeschakeld"
+          "disabled": "Tweefactorauthenticatie uitgeschakeld",
+          "disableFailed": "Uitschakelen van tweefactorauthenticatie mislukt"
         }
       }
     },
@@ -74,6 +78,9 @@
         "verificationCodeLabel": "Verificatiecode",
         "regeneratingButton": "Genereren...",
         "regenerateButton": "Opnieuw genereren"
+      },
+      "toasts": {
+        "generateFailed": "Genereren van reservecodes mislukt"
       }
     },
     "trustedDevices": {
@@ -88,7 +95,9 @@
       },
       "toasts": {
         "revoked": "Apparaat ingetrokken",
-        "revokedAll": "{count} apparaat/apparaten ingetrokken"
+        "revokedAll": "{count} apparaat/apparaten ingetrokken",
+        "revokeFailed": "Intrekken van apparaat mislukt",
+        "revokeAllFailed": "Intrekken van apparaten mislukt"
       }
     },
     "validation": {
@@ -122,7 +131,10 @@
     "saveButton": "Voorkeuren opslaan",
     "savingButton": "Opslaan...",
     "toasts": {
-      "saved": "Voorkeuren opgeslagen"
+      "saved": "Voorkeuren opgeslagen",
+      "saveFailed": "Opslaan van voorkeuren mislukt",
+      "themeSaveFailed": "Opslaan van thema mislukt",
+      "colorThemeSaveFailed": "Opslaan van kleurthema mislukt"
     },
     "browserLocale": "Browserinstelling gebruiken (automatisch detecteren)",
     "browserTimezonePrefix": "Browsertijdzone gebruiken (automatisch gedetecteerd als {tz})",
@@ -190,7 +202,11 @@
       "digestEnabled": "Budgetoverzicht ingeschakeld",
       "digestDisabled": "Budgetoverzicht uitgeschakeld",
       "digestDaySet": "Dag van budgetoverzicht ingesteld op {day}",
-      "testEmailSent": "Teste-mail verzonden! Controleer jouw inbox."
+      "testEmailSent": "Teste-mail verzonden! Controleer jouw inbox.",
+      "emailUpdateFailed": "Bijwerken van meldingsvoorkeur mislukt",
+      "digestUpdateFailed": "Bijwerken van voorkeur voor budgetoverzicht mislukt",
+      "digestDayFailed": "Bijwerken van dag van budgetoverzicht mislukt",
+      "testEmailFailed": "Verzenden van teste-mail mislukt"
     }
   },
   "help": {
@@ -233,7 +249,8 @@
       "deletingButton": "Verwijderen...",
       "confirmButton": "Verwijdering van gegevens bevestigen",
       "toasts": {
-        "success": "{count} records succesvol verwijderd"
+        "success": "{count} records succesvol verwijderd",
+        "failed": "Verwijderen van gegevens mislukt"
       }
     },
     "deleteAccount": {
@@ -252,7 +269,8 @@
       "confirmButton": "Verwijdering bevestigen",
       "toasts": {
         "downgraded": "Jouw eigen gegevens zijn verwijderd. Jouw aanmelding en gedeelde toegang blijven behouden zodat de delegatie in stand blijft.",
-        "deleted": "Account verwijderd"
+        "deleted": "Account verwijderd",
+        "failed": "Verwijderen van account mislukt"
       },
       "errors": {
         "typeDelete": "Typ DELETE om te bevestigen",
@@ -323,7 +341,10 @@
       "revoked": "Token ingetrokken",
       "selectScope": "Selecteer ten minste één bereik",
       "copyTokenFailed": "Kopiëren van token mislukt",
-      "copyUrlFailed": "Kopiëren van URL mislukt"
+      "copyUrlFailed": "Kopiëren van URL mislukt",
+      "loadFailed": "Laden van API-tokens mislukt",
+      "createFailed": "Aanmaken van token mislukt",
+      "revokeFailed": "Intrekken van token mislukt"
     },
     "relative": {
       "never": "Nooit",
@@ -417,7 +438,9 @@
       },
       "toasts": {
         "enabled": "Versleutelde back-ups ingeschakeld",
-        "disabled": "Versleutelde back-ups uitgeschakeld"
+        "disabled": "Versleutelde back-ups uitgeschakeld",
+        "enableFailed": "Inschakelen van versleuteling mislukt",
+        "disableFailed": "Uitschakelen van versleuteling mislukt"
       }
     },
     "export": {
@@ -434,7 +457,8 @@
         "downloadButton": "Downloaden"
       },
       "toasts": {
-        "success": "Back-up succesvol gedownload"
+        "success": "Back-up succesvol gedownload",
+        "failed": "Aanmaken van back-up mislukt"
       }
     },
     "restore": {
@@ -453,7 +477,9 @@
       "confirmRestoreButton": "Herstel bevestigen",
       "toasts": {
         "pleaseSelectFile": "Selecteer een back-upbestand",
-        "pleaseEnterPassword": "Voer jouw wachtwoord in om te bevestigen"
+        "pleaseEnterPassword": "Voer jouw wachtwoord in om te bevestigen",
+        "encryptedNeedsPassword": "Deze back-up is versleuteld. Voer het wachtwoord waarmee deze is aangemaakt in het veld \"Back-upwachtwoord\" in en probeer het opnieuw.",
+        "failed": "Terugzetten van back-up mislukt"
       }
     },
     "restoreResult": {
@@ -538,7 +564,8 @@
     },
     "saveButton": "Opslaan",
     "toasts": {
-      "saved": "Toegang bijgewerkt"
+      "saved": "Toegang bijgewerkt",
+      "saveFailed": "Bijwerken van toegang mislukt"
     }
   },
   "nav": {
@@ -574,7 +601,11 @@
       "title": "AI-instellingen",
       "description": "Configureer AI-providers, beheer API-sleutels en bekijk gebruiksstatistieken."
     },
-    "delegateSecurityError": "Kan jouw beveiligingsinstellingen niet laden."
+    "delegateSecurityError": "Kan jouw beveiligingsinstellingen niet laden.",
+    "toasts": {
+      "securityLoadFailed": "Laden van beveiligingsinstellingen mislukt",
+      "loadFailed": "Laden van instellingen mislukt"
+    }
   },
   "aiSettings": {
     "backLink": "Terug naar instellingen",
@@ -583,6 +614,10 @@
     "demoRestricted": {
       "heading": "Beperkt in demomodus",
       "body": "AI-providerconfiguratie is uitgeschakeld in demomodus."
+    },
+    "toasts": {
+      "loadFailed": "Laden van AI-instellingen mislukt",
+      "usageLoadFailed": "Laden van gebruiksgegevens mislukt"
     }
   },
   "sharedAccessPage": {
@@ -617,7 +652,8 @@
       "reminderAfterDaysLabel": "Dagen van inactiviteit voordat herinneringe-mails worden verstuurd",
       "saveButton": "Instellingen opslaan",
       "toasts": {
-        "saved": "Instellingen voor noodtoegang opgeslagen"
+        "saved": "Instellingen voor noodtoegang opgeslagen",
+        "saveFailed": "Opslaan van instellingen mislukt"
       }
     },
     "message": {
@@ -640,7 +676,9 @@
       "saveButton": "Bericht opslaan",
       "toasts": {
         "saved": "Bericht opgeslagen",
-        "verifyAgain": "Verificatie verlopen -- verifieer opnieuw om op te slaan"
+        "verifyAgain": "Verificatie verlopen -- verifieer opnieuw om op te slaan",
+        "loadFailed": "Laden van bericht mislukt",
+        "saveFailed": "Opslaan van bericht mislukt"
       }
     },
     "contacts": {
@@ -667,7 +705,9 @@
       "toasts": {
         "added": "Contactpersoon toegevoegd",
         "updated": "Contactpersoon bijgewerkt",
-        "removed": "Contactpersoon verwijderd"
+        "removed": "Contactpersoon verwijderd",
+        "saveFailed": "Opslaan van contactpersoon mislukt",
+        "removeFailed": "Verwijderen van contactpersoon mislukt"
       }
     },
     "status": {
@@ -688,11 +728,16 @@
       "clearingButton": "Wissen...",
       "clearButton": "Wissen",
       "toasts": {
-        "cleared": "Verleende status gewist"
+        "cleared": "Verleende status gewist",
+        "resetFailed": "Wissen van verleende status mislukt"
       }
     },
     "stepUp": {
       "reason": "Verifieer jouw identiteit opnieuw om jouw noodtoegang-bericht te bekijken of te bewerken."
+    },
+    "toasts": {
+      "loadFailed": "Laden van noodtoegang mislukt",
+      "reauthFailed": "Bevestigen van herauthenticatie mislukt"
     }
   },
   "aiProviders": {

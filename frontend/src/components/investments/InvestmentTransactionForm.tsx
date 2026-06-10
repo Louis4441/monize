@@ -623,7 +623,7 @@ export function InvestmentTransactionForm({
       setShowSecurityModal(false);
       toast.success(t('transactionForm.toastSecurityCreated'));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to create security'));
+      toast.error(getErrorMessage(error, t('transactionForm.toastSecurityCreateFailed')));
       throw error;
     }
   };

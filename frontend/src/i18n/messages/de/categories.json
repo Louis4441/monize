@@ -29,7 +29,12 @@
     "updated": "Kategorie erfolgreich aktualisiert",
     "deleted": "Kategorie erfolgreich gelöscht",
     "cannotDeleteSystem": "Systemkategorien können nicht gelöscht werden",
-    "importSuccess": "{count} Kategorien erfolgreich importiert"
+    "importSuccess": "{count} Kategorien erfolgreich importiert",
+    "loadFailed": "Kategorien konnten nicht geladen werden",
+    "deleteFailed": "Kategorie konnte nicht gelöscht werden",
+    "createFailed": "Kategorie konnte nicht erstellt werden",
+    "updateFailed": "Kategorie konnte nicht aktualisiert werden",
+    "importFailed": "Standardkategorien konnten nicht importiert werden"
   },
   "form": {
     "nameLabel": "Kategoriename",

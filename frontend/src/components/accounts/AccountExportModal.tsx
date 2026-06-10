@@ -103,7 +103,7 @@ export function AccountExportModal({
       onClose();
     } catch (error) {
       logger.error('Export failed', error);
-      toast.error(getErrorMessage(error, 'Failed to export account'));
+      toast.error(getErrorMessage(error, t('exportModal.exportFailed')));
     } finally {
       setIsExporting(false);
     }

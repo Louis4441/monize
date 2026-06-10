@@ -59,6 +59,8 @@
   },
   "toasts": {
     "overridesDeleted": "Überschreibungen gelöscht",
-    "notFound": "Terminierte Zahlung nicht gefunden"
+    "notFound": "Terminierte Zahlung nicht gefunden",
+    "loadFailed": "Terminierte Buchungen konnten nicht geladen werden",
+    "overridesDeleteFailed": "Überschreibungen konnten nicht gelöscht werden"
   }
 }

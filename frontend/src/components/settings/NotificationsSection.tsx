@@ -43,7 +43,7 @@ export function NotificationsSection({
       toast.success(newValue ? t('toasts.emailEnabled') : t('toasts.emailDisabled'));
     } catch (error) {
       setNotificationEmail(!newValue);
-      toast.error(getErrorMessage(error, 'Failed to update notification preference'));
+      toast.error(getErrorMessage(error, t('toasts.emailUpdateFailed')));
     }
   };
 
@@ -57,7 +57,7 @@ export function NotificationsSection({
       toast.success(newValue ? t('toasts.digestEnabled') : t('toasts.digestDisabled'));
     } catch (error) {
       setBudgetDigestEnabled(!newValue);
-      toast.error(getErrorMessage(error, 'Failed to update budget digest preference'));
+      toast.error(getErrorMessage(error, t('toasts.digestUpdateFailed')));
     }
   };
 
@@ -71,7 +71,7 @@ export function NotificationsSection({
       toast.success(t('toasts.digestDaySet', { day: day.charAt(0) + day.slice(1).toLowerCase() }));
     } catch (error) {
       setBudgetDigestDay(previousDay);
-      toast.error(getErrorMessage(error, 'Failed to update digest day'));
+      toast.error(getErrorMessage(error, t('toasts.digestDayFailed')));
     }
   };
 
@@ -81,7 +81,7 @@ export function NotificationsSection({
       await userSettingsApi.sendTestEmail();
       toast.success(t('toasts.testEmailSent'));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to send test email'));
+      toast.error(getErrorMessage(error, t('toasts.testEmailFailed')));
     } finally {
       setIsSendingTestEmail(false);
     }

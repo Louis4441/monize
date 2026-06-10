@@ -84,7 +84,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
       toast.success(t('toasts.passwordChanged'));
       reset();
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to change password'));
+      toast.error(getErrorMessage(error, t('toasts.passwordChangeFailed')));
     }
   };
 
@@ -102,7 +102,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
       updatePreferencesStore(updated);
       toast.success(t('twoFactor.disableModal.toasts.disabled'));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to disable 2FA'));
+      toast.error(getErrorMessage(error, t('twoFactor.disableModal.toasts.disableFailed')));
     } finally {
       setIsDisabling2FA(false);
     }
@@ -118,7 +118,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
       setBackupCodeVerifyCode('');
       setShowBackupCodes(true);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to generate backup codes'));
+      toast.error(getErrorMessage(error, t('backupCodes.toasts.generateFailed')));
     } finally {
       setIsGeneratingCodes(false);
     }
@@ -148,7 +148,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
       setTrustedDevices((prev) => prev.filter((d) => d.id !== id));
       toast.success(t('trustedDevices.toasts.revoked'));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to revoke device'));
+      toast.error(getErrorMessage(error, t('trustedDevices.toasts.revokeFailed')));
     }
   };
 
@@ -159,7 +159,7 @@ export function SecuritySection({ user, preferences, force2fa, onPreferencesUpda
       setShowRevokeAllConfirm(false);
       toast.success(t('trustedDevices.toasts.revokedAll', { count: result.count }));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to revoke devices'));
+      toast.error(getErrorMessage(error, t('trustedDevices.toasts.revokeAllFailed')));
     }
   };
 

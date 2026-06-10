@@ -62,6 +62,13 @@
     "system": "System",
     "title": "Design: {label}. Klicken zum Ändern."
   },
+  "errorPage": {
+    "title": "Etwas ist schiefgelaufen",
+    "description": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support, wenn das Problem weiterhin besteht.",
+    "errorId": "Fehler-ID: {digest}",
+    "tryAgain": "Erneut versuchen",
+    "goToDashboard": "Zum Dashboard"
+  },
   "errorBoundary": {
     "defaultMessage": "Beim Rendern dieser Komponente ist ein Fehler aufgetreten."
   },

@@ -59,6 +59,8 @@
   },
   "toasts": {
     "overridesDeleted": "Modificaciones eliminadas",
-    "notFound": "Transacción planificada no encontrada"
+    "notFound": "Transacción planificada no encontrada",
+    "loadFailed": "Error al cargar las transacciones planificadas",
+    "overridesDeleteFailed": "Error al eliminar las modificaciones"
   }
 }

@@ -83,7 +83,7 @@ function DelegateSecurityView() {
         setForce2fa(!!methods.force2fa);
       })
       .catch((error) => {
-        toast.error(getErrorMessage(error, 'Failed to load security settings'));
+        toast.error(getErrorMessage(error, t('toasts.securityLoadFailed')));
         logger.error(error);
       })
       .finally(() => {
@@ -92,7 +92,7 @@ function DelegateSecurityView() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   if (isLoading) {
     return (
@@ -188,11 +188,7 @@ function OwnerSettingsView() {
 
   const [activeSection, setActiveSection] = useScrollSpy(sectionIds, { enabled: !isLoading });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [userData, prefsData, smtpStatus, authMethods] = await Promise.all([
@@ -207,12 +203,16 @@ function OwnerSettingsView() {
       setForce2fa(authMethods.force2fa);
       useDemoStore.getState().setDemoMode(authMethods.demo ?? false);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to load settings'));
+      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
       logger.error(error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleSectionClick = useCallback((id: string) => {
     const el = document.getElementById(id);

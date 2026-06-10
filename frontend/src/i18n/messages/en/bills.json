@@ -59,6 +59,8 @@
   },
   "toasts": {
     "overridesDeleted": "Overrides deleted",
-    "notFound": "Scheduled payment not found"
+    "notFound": "Scheduled payment not found",
+    "loadFailed": "Failed to load scheduled transactions",
+    "overridesDeleteFailed": "Failed to delete overrides"
   }
 }
