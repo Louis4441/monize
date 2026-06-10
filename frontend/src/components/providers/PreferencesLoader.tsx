@@ -8,6 +8,11 @@ import { usePreferencesStore } from '@/store/preferencesStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LOCALE_COOKIE, isSupportedLocale } from '@/i18n/config';
 import { isColorTheme } from '@/lib/color-themes';
+import { userSettingsApi } from '@/lib/user-settings';
+import { consumePreLoginLocale } from '@/lib/pre-login-locale';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('PreferencesLoader');
 
 /**
  * Component that loads user preferences when authenticated.
@@ -18,6 +23,7 @@ export function PreferencesLoader({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const authHydrated = useAuthStore((state) => state._hasHydrated);
   const loadPreferences = usePreferencesStore((state) => state.loadPreferences);
+  const updatePreferencesStore = usePreferencesStore((state) => state.updatePreferences);
   const clearPreferences = usePreferencesStore((state) => state.clearPreferences);
   const preferences = usePreferencesStore((state) => state.preferences);
   const isLoaded = usePreferencesStore((state) => state.isLoaded);
@@ -52,9 +58,25 @@ export function PreferencesLoader({ children }: { children: React.ReactNode }) {
   // Sync language cookie from DB preference. The proxy reads NEXT_LOCALE and
   // sets the x-locale header on the next request; we refresh the router so
   // the new language takes effect immediately if it differs from the cookie.
+  // Exception: a language deliberately chosen on the login screen wins over
+  // the stored preference -- persist it instead of reverting the cookie.
   useEffect(() => {
     if (!prefsHydrated || !preferences?.language) return;
     if (!isSupportedLocale(preferences.language)) return;
+
+    const preLogin = consumePreLoginLocale();
+    if (preLogin && isSupportedLocale(preLogin)) {
+      if (preLogin !== preferences.language) {
+        userSettingsApi
+          .updatePreferences({ language: preLogin })
+          .then((updated) => updatePreferencesStore(updated))
+          .catch((error) =>
+            logger.error('Failed to persist pre-login language choice:', error),
+          );
+      }
+      return;
+    }
+
     const current = Cookies.get(LOCALE_COOKIE);
     if (current === preferences.language) return;
     Cookies.set(LOCALE_COOKIE, preferences.language, {
@@ -62,7 +84,7 @@ export function PreferencesLoader({ children }: { children: React.ReactNode }) {
       expires: 365,
     });
     router.refresh();
-  }, [prefsHydrated, preferences?.language, router]);
+  }, [prefsHydrated, preferences?.language, router, updatePreferencesStore]);
 
   return <>{children}</>;
 }

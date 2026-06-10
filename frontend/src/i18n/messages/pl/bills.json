@@ -59,6 +59,8 @@
   },
   "toasts": {
     "overridesDeleted": "Usunięto wyjątki",
-    "notFound": "Nie znaleziono zaplanowanej płatności"
+    "notFound": "Nie znaleziono zaplanowanej płatności",
+    "loadFailed": "Nie udało się wczytać zaplanowanych transakcji",
+    "overridesDeleteFailed": "Nie udało się usunąć wyjątków"
   }
 }

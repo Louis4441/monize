@@ -94,7 +94,7 @@ export function ProfileSection({ user, onUserUpdated }: ProfileSectionProps) {
       setValue('currentPassword', '');
       toast.success(t('toasts.success'));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to update profile'));
+      toast.error(getErrorMessage(error, t('toasts.updateFailed')));
     } finally {
       setIsUpdatingProfile(false);
     }

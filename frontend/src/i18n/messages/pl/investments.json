@@ -29,7 +29,8 @@
     "today": "Dzisiaj",
     "transactionCount": "{count, plural, one {# transakcja} few {# transakcje} many {# transakcji} other {# transakcji}}",
     "allPayees": "Wszyscy odbiorcy",
-    "allCategories": "Wszystkie kategorie"
+    "allCategories": "Wszystkie kategorie",
+    "toastDeleteFailed": "Nie udało się usunąć transakcji"
   },
   "portfolioSummary": {
     "title": "Podsumowanie portfela",
@@ -219,6 +220,7 @@
     "submitUpdate": "Zaktualizuj transakcję",
     "submitCreate": "Utwórz transakcję",
     "toastSecurityCreated": "Utworzono papier wartościowy",
+    "toastSecurityCreateFailed": "Nie udało się utworzyć papieru wartościowego",
     "toastTransferred": "Przeniesiono papiery wartościowe",
     "toastTransferUpdated": "Zaktualizowano przelew",
     "toastUpdated": "Zaktualizowano transakcję",

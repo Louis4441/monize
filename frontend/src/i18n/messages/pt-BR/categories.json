@@ -29,7 +29,12 @@
     "updated": "Categoria atualizada com sucesso",
     "deleted": "Categoria excluída com sucesso",
     "cannotDeleteSystem": "As categorias do sistema não podem ser excluídas",
-    "importSuccess": "{count} categorias importadas com sucesso"
+    "importSuccess": "{count} categorias importadas com sucesso",
+    "loadFailed": "Falha ao carregar categorias",
+    "deleteFailed": "Falha ao excluir categoria",
+    "createFailed": "Falha ao criar categoria",
+    "updateFailed": "Falha ao atualizar categoria",
+    "importFailed": "Falha ao importar categorias padrão"
   },
   "form": {
     "nameLabel": "Nome da categoria",

@@ -152,7 +152,7 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
       updatePreferencesStore(updated);
       toast.success(t('toasts.saved'));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to save preferences'));
+      toast.error(getErrorMessage(error, t('toasts.saveFailed')));
     } finally {
       setIsUpdatingPreferences(false);
     }

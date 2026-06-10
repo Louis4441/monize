@@ -101,11 +101,11 @@ export function ApiAccessSection() {
       const data = await authApi.getTokens();
       setTokens(data);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to load API tokens'));
+      toast.error(getErrorMessage(error, t('toasts.loadFailed')));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadTokens();
@@ -136,7 +136,7 @@ export function ApiAccessSection() {
       setTokens((prev) => [result, ...prev]);
       setCopied(false);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to create token'));
+      toast.error(getErrorMessage(error, t('toasts.createFailed')));
     } finally {
       setIsCreating(false);
     }
@@ -168,7 +168,7 @@ export function ApiAccessSection() {
       setTokens((prev) => prev.filter((tok) => tok.id !== revokeTokenId));
       toast.success(t('toasts.revoked'));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to revoke token'));
+      toast.error(getErrorMessage(error, t('toasts.revokeFailed')));
     } finally {
       setRevokeTokenId(null);
     }

@@ -29,7 +29,8 @@
     "today": "Vandaag",
     "transactionCount": "{count} transactie{plural}",
     "allPayees": "Alle begunstigden",
-    "allCategories": "Alle categorieën"
+    "allCategories": "Alle categorieën",
+    "toastDeleteFailed": "Verwijderen van transactie mislukt"
   },
   "portfolioSummary": {
     "title": "Portefeuillesamenvatting",
@@ -219,6 +220,7 @@
     "submitUpdate": "Transactie bijwerken",
     "submitCreate": "Transactie aanmaken",
     "toastSecurityCreated": "Waardepapier aangemaakt",
+    "toastSecurityCreateFailed": "Aanmaken van waardepapier mislukt",
     "toastTransferred": "Waardepapieren overgeboekt",
     "toastTransferUpdated": "Overboeking bijgewerkt",
     "toastUpdated": "Transactie bijgewerkt",

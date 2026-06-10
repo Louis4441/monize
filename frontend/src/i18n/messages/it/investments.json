@@ -29,7 +29,8 @@
     "today": "Oggi",
     "transactionCount": "{count} transazion{plural}",
     "allPayees": "Tutti i beneficiari",
-    "allCategories": "Tutte le categorie"
+    "allCategories": "Tutte le categorie",
+    "toastDeleteFailed": "Eliminazione transazione non riuscita"
   },
   "portfolioSummary": {
     "title": "Riepilogo portafoglio",
@@ -219,6 +220,7 @@
     "submitUpdate": "Aggiorna transazione",
     "submitCreate": "Crea transazione",
     "toastSecurityCreated": "Titolo creato",
+    "toastSecurityCreateFailed": "Creazione titolo non riuscita",
     "toastTransferred": "Titoli trasferiti",
     "toastTransferUpdated": "Trasferimento aggiornato",
     "toastUpdated": "Transazione aggiornata",

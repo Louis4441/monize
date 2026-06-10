@@ -128,7 +128,7 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
       setExportPasswordPrompt(false);
       setExportPassword('');
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to create backup'));
+      toast.error(getErrorMessage(error, t('export.toasts.failed')));
     } finally {
       setIsExporting(false);
     }
@@ -196,11 +196,9 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
       closeRestoreForm();
     } catch (error) {
       if (isBackupPasswordRequired(error)) {
-        toast.error(
-          'This backup is encrypted. Enter the password it was created with in the "Backup password" field, then try again.',
-        );
+        toast.error(t('restore.toasts.encryptedNeedsPassword'));
       } else {
-        toast.error(getErrorMessage(error, 'Failed to restore backup'));
+        toast.error(getErrorMessage(error, t('restore.toasts.failed')));
       }
     } finally {
       setIsRestoring(false);
@@ -221,7 +219,7 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
       setSetupPassword('');
       toast.success(t('encryption.toasts.enabled'));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to enable encryption'));
+      toast.error(getErrorMessage(error, t('encryption.toasts.enableFailed')));
     } finally {
       setSetupSaving(false);
     }
@@ -234,7 +232,7 @@ export function BackupRestoreSection({ user }: BackupRestoreSectionProps) {
       setEncryption(status);
       toast.success(t('encryption.toasts.disabled'));
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to disable encryption'));
+      toast.error(getErrorMessage(error, t('encryption.toasts.disableFailed')));
     }
   };
 

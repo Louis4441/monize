@@ -89,7 +89,7 @@ export function DangerZoneSection({ user }: DangerZoneSectionProps) {
       logout();
       router.push('/login');
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to delete account'));
+      toast.error(getErrorMessage(error, t('deleteAccount.toasts.failed')));
       setIsDeleting(false);
     }
   };
@@ -128,7 +128,7 @@ export function DangerZoneSection({ user }: DangerZoneSectionProps) {
       setDeletePayees(false);
       setDeleteExchangeRates(false);
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to delete data'));
+      toast.error(getErrorMessage(error, t('deleteData.toasts.failed')));
     } finally {
       setIsDeletingData(false);
     }

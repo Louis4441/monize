@@ -2,7 +2,8 @@
   "language": {
     "label": "Langue",
     "helpText": "Choisissez la langue utilisée dans toute l'interface Monize. Le formatage des nombres et des dates est contrôlé séparément ci-dessous.",
-    "saved": "Langue mise à jour"
+    "saved": "Langue mise à jour",
+    "saveFailed": "Échec de l'enregistrement de la langue"
   },
   "profile": {
     "heading": "Profil",
@@ -20,7 +21,8 @@
     "saveButton": "Enregistrer le profil",
     "savingButton": "Enregistrement...",
     "toasts": {
-      "success": "Profil mis à jour avec succès"
+      "success": "Profil mis à jour avec succès",
+      "updateFailed": "Échec de la mise à jour du profil"
     },
     "validation": {
       "firstNameMax": "Le prénom doit contenir 100 caractères ou moins",
@@ -43,7 +45,8 @@
     "changePasswordButton": "Changer le mot de passe",
     "changingPasswordButton": "Modification...",
     "toasts": {
-      "passwordChanged": "Mot de passe modifié avec succès"
+      "passwordChanged": "Mot de passe modifié avec succès",
+      "passwordChangeFailed": "Échec de la modification du mot de passe"
     },
     "twoFactor": {
       "heading": "Authentification à deux facteurs",
@@ -60,7 +63,8 @@
         "verificationCodeLabel": "Code de vérification",
         "disablingButton": "Désactivation...",
         "toasts": {
-          "disabled": "Authentification à deux facteurs désactivée"
+          "disabled": "Authentification à deux facteurs désactivée",
+          "disableFailed": "Échec de la désactivation de l'authentification à deux facteurs"
         }
       }
     },
@@ -74,6 +78,9 @@
         "verificationCodeLabel": "Code de vérification",
         "regeneratingButton": "Régénération...",
         "regenerateButton": "Régénérer"
+      },
+      "toasts": {
+        "generateFailed": "Échec de la génération des codes de secours"
       }
     },
     "trustedDevices": {
@@ -88,7 +95,9 @@
       },
       "toasts": {
         "revoked": "Appareil révoqué",
-        "revokedAll": "{count} appareil(s) révoqué(s)"
+        "revokedAll": "{count} appareil(s) révoqué(s)",
+        "revokeFailed": "Échec de la révocation de l'appareil",
+        "revokeAllFailed": "Échec de la révocation des appareils"
       }
     },
     "validation": {
@@ -122,7 +131,10 @@
     "saveButton": "Enregistrer les préférences",
     "savingButton": "Enregistrement...",
     "toasts": {
-      "saved": "Préférences enregistrées"
+      "saved": "Préférences enregistrées",
+      "saveFailed": "Échec de l'enregistrement des préférences",
+      "themeSaveFailed": "Échec de l'enregistrement du thème",
+      "colorThemeSaveFailed": "Échec de l'enregistrement du thème de couleur"
     },
     "browserLocale": "Utiliser les paramètres régionaux du navigateur (détection automatique)",
     "browserTimezonePrefix": "Utiliser le fuseau horaire du navigateur (détecté automatiquement : {tz})",
@@ -190,7 +202,11 @@
       "digestEnabled": "Récapitulatif de budget activé",
       "digestDisabled": "Récapitulatif de budget désactivé",
       "digestDaySet": "Jour du récapitulatif de budget défini sur {day}",
-      "testEmailSent": "E-mail de test envoyé ! Vérifiez votre boîte de réception."
+      "testEmailSent": "E-mail de test envoyé ! Vérifiez votre boîte de réception.",
+      "emailUpdateFailed": "Échec de la mise à jour de la préférence de notification",
+      "digestUpdateFailed": "Échec de la mise à jour de la préférence de récapitulatif de budget",
+      "digestDayFailed": "Échec de la mise à jour du jour du récapitulatif",
+      "testEmailFailed": "Échec de l'envoi de l'e-mail de test"
     }
   },
   "help": {
@@ -233,7 +249,8 @@
       "deletingButton": "Suppression...",
       "confirmButton": "Confirmer la suppression des données",
       "toasts": {
-        "success": "{count} enregistrement(s) supprimé(s) avec succès"
+        "success": "{count} enregistrement(s) supprimé(s) avec succès",
+        "failed": "Échec de la suppression des données"
       }
     },
     "deleteAccount": {
@@ -252,7 +269,8 @@
       "confirmButton": "Confirmer la suppression",
       "toasts": {
         "downgraded": "Vos données ont été supprimées. Votre identifiant de connexion et l'accès partagé sont conservés pour maintenir la délégation.",
-        "deleted": "Compte supprimé"
+        "deleted": "Compte supprimé",
+        "failed": "Échec de la suppression du compte"
       },
       "errors": {
         "typeDelete": "Veuillez saisir DELETE pour confirmer",
@@ -323,7 +341,10 @@
       "revoked": "Jeton révoqué",
       "selectScope": "Sélectionnez au moins un périmètre",
       "copyTokenFailed": "Échec de la copie du jeton",
-      "copyUrlFailed": "Échec de la copie de l'URL"
+      "copyUrlFailed": "Échec de la copie de l'URL",
+      "loadFailed": "Échec du chargement des jetons d'API",
+      "createFailed": "Échec de la création du jeton",
+      "revokeFailed": "Échec de la révocation du jeton"
     },
     "relative": {
       "never": "Jamais",
@@ -417,7 +438,9 @@
       },
       "toasts": {
         "enabled": "Sauvegardes chiffrées activées",
-        "disabled": "Sauvegardes chiffrées désactivées"
+        "disabled": "Sauvegardes chiffrées désactivées",
+        "enableFailed": "Échec de l'activation du chiffrement",
+        "disableFailed": "Échec de la désactivation du chiffrement"
       }
     },
     "export": {
@@ -434,7 +457,8 @@
         "downloadButton": "Télécharger"
       },
       "toasts": {
-        "success": "Sauvegarde téléchargée avec succès"
+        "success": "Sauvegarde téléchargée avec succès",
+        "failed": "Échec de la création de la sauvegarde"
       }
     },
     "restore": {
@@ -453,7 +477,9 @@
       "confirmRestoreButton": "Confirmer la restauration",
       "toasts": {
         "pleaseSelectFile": "Veuillez sélectionner un fichier de sauvegarde",
-        "pleaseEnterPassword": "Veuillez saisir votre mot de passe pour confirmer"
+        "pleaseEnterPassword": "Veuillez saisir votre mot de passe pour confirmer",
+        "encryptedNeedsPassword": "Cette sauvegarde est chiffrée. Saisissez le mot de passe utilisé lors de sa création dans le champ \"Mot de passe de sauvegarde\", puis réessayez.",
+        "failed": "Échec de la restauration de la sauvegarde"
       }
     },
     "restoreResult": {
@@ -538,7 +564,8 @@
     },
     "saveButton": "Enregistrer",
     "toasts": {
-      "saved": "Accès mis à jour"
+      "saved": "Accès mis à jour",
+      "saveFailed": "Échec de la mise à jour de l'accès"
     }
   },
   "nav": {
@@ -574,7 +601,11 @@
       "title": "Paramètres IA",
       "description": "Configurez les fournisseurs d'IA, gérez les clés API et consultez les statistiques d'utilisation."
     },
-    "delegateSecurityError": "Impossible de charger vos paramètres de sécurité."
+    "delegateSecurityError": "Impossible de charger vos paramètres de sécurité.",
+    "toasts": {
+      "securityLoadFailed": "Échec du chargement des paramètres de sécurité",
+      "loadFailed": "Échec du chargement des paramètres"
+    }
   },
   "aiSettings": {
     "backLink": "Retour aux paramètres",
@@ -583,6 +614,10 @@
     "demoRestricted": {
       "heading": "Restreint en mode démo",
       "body": "La configuration des fournisseurs d'IA est désactivée en mode démo."
+    },
+    "toasts": {
+      "loadFailed": "Échec du chargement des paramètres IA",
+      "usageLoadFailed": "Échec du chargement des données d'utilisation"
     }
   },
   "sharedAccessPage": {
@@ -617,7 +652,8 @@
       "reminderAfterDaysLabel": "Jours d'inactivité avant les e-mails de rappel",
       "saveButton": "Enregistrer les paramètres",
       "toasts": {
-        "saved": "Paramètres d'accès d'urgence enregistrés"
+        "saved": "Paramètres d'accès d'urgence enregistrés",
+        "saveFailed": "Échec de l'enregistrement des paramètres"
       }
     },
     "message": {
@@ -640,7 +676,9 @@
       "saveButton": "Enregistrer le message",
       "toasts": {
         "saved": "Message enregistré",
-        "verifyAgain": "Vérification expirée — veuillez vérifier à nouveau pour enregistrer"
+        "verifyAgain": "Vérification expirée — veuillez vérifier à nouveau pour enregistrer",
+        "loadFailed": "Échec du chargement du message",
+        "saveFailed": "Échec de l'enregistrement du message"
       }
     },
     "contacts": {
@@ -667,7 +705,9 @@
       "toasts": {
         "added": "Contact ajouté",
         "updated": "Contact mis à jour",
-        "removed": "Contact supprimé"
+        "removed": "Contact supprimé",
+        "saveFailed": "Échec de l'enregistrement du contact",
+        "removeFailed": "Échec de la suppression du contact"
       }
     },
     "status": {
@@ -688,11 +728,16 @@
       "clearingButton": "Effacement...",
       "clearButton": "Effacer",
       "toasts": {
-        "cleared": "État accordé effacé"
+        "cleared": "État accordé effacé",
+        "resetFailed": "Échec de la réinitialisation de l'état accordé"
       }
     },
     "stepUp": {
       "reason": "Vérifiez à nouveau votre identité pour consulter ou modifier votre message d'accès d'urgence."
+    },
+    "toasts": {
+      "loadFailed": "Échec du chargement de l'accès d'urgence",
+      "reauthFailed": "Échec de la confirmation de la ré-authentification"
     }
   },
   "aiProviders": {

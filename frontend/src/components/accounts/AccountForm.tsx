@@ -493,7 +493,7 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
       }
     } catch (error) {
       logger.error('Failed to create category:', error);
-      toast.error(getErrorMessage(error, 'Failed to create category'));
+      toast.error(getErrorMessage(error, t('toasts.categoryCreateFailed')));
     }
   };
 

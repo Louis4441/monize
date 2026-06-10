@@ -247,6 +247,10 @@
       "REINVEST": "Reinvestition",
       "ADD_SHARES": "Anteile hinzufügen",
       "REMOVE_SHARES": "Anteile entfernen"
+    },
+    "toasts": {
+      "loadHistoryFailed": "Verlauf konnte nicht geladen werden",
+      "loadTransactionFailed": "Buchung konnte nicht geladen werden"
     }
   },
   "shareAdjustment": {

@@ -29,7 +29,8 @@
     "today": "Hoje",
     "transactionCount": "{count} transação{plural}",
     "allPayees": "Todos os beneficiários",
-    "allCategories": "Todas as categorias"
+    "allCategories": "Todas as categorias",
+    "toastDeleteFailed": "Falha ao eliminar a transação"
   },
   "portfolioSummary": {
     "title": "Resumo do Portefólio",
@@ -219,6 +220,7 @@
     "submitUpdate": "Atualizar Transação",
     "submitCreate": "Criar Transação",
     "toastSecurityCreated": "Título criado",
+    "toastSecurityCreateFailed": "Falha ao criar título",
     "toastTransferred": "Títulos transferidos",
     "toastTransferUpdated": "Transferência atualizada",
     "toastUpdated": "Transação atualizada",

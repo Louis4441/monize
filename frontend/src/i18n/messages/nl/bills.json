@@ -59,6 +59,8 @@
   },
   "toasts": {
     "overridesDeleted": "Overschrijvingen verwijderd",
-    "notFound": "Geplande betaling niet gevonden"
+    "notFound": "Geplande betaling niet gevonden",
+    "loadFailed": "Geplande transacties laden mislukt",
+    "overridesDeleteFailed": "Overschrijvingen verwijderen mislukt"
   }
 }

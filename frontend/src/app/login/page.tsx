@@ -16,6 +16,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useDemoStore } from '@/store/demoStore';
 import { authApi, AuthMethods } from '@/lib/auth';
 import { TwoFactorVerify } from '@/components/auth/TwoFactorVerify';
+import { AuthLanguageSwitcher } from '@/components/auth/AuthLanguageSwitcher';
 import { User } from '@/types/auth';
 import { createLogger } from '@/lib/logger';
 import { buildEmailSchema } from '@/lib/zod-helpers';
@@ -201,6 +202,8 @@ export default function LoginPage() {
             {t('signIn.ssoButton')}
           </Button>
 
+          <AuthLanguageSwitcher />
+
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-6">
             v{process.env.NEXT_PUBLIC_APP_VERSION}
           </p>
@@ -212,6 +215,7 @@ export default function LoginPage() {
   if (twoFactorState) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+        <AuthLanguageSwitcher />
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <Image src="/icons/monize-logo.svg" alt="Monize" width={96} height={96} className="mx-auto rounded-xl" priority />
@@ -358,6 +362,8 @@ export default function LoginPage() {
             {t('signIn.noMethods')}
           </div>
         )}
+
+        <AuthLanguageSwitcher />
 
         <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-6">
           v{process.env.NEXT_PUBLIC_APP_VERSION}

@@ -470,7 +470,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
       setAccountToDelete(null);
       onRefresh();
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to delete account'));
+      toast.error(getErrorMessage(error, t('toast.deleteFailed')));
     } finally {
       setIsDeleting(false);
     }
@@ -492,7 +492,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
       setAccountToClose(null);
       onRefresh();
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to close account'));
+      toast.error(getErrorMessage(error, t('toast.closeFailed')));
     } finally {
       setIsClosing(false);
     }
@@ -509,7 +509,7 @@ export function AccountList({ accounts, institutions, brokerageMarketValues, def
       toast.success(t('toast.reopenSuccess'));
       onRefresh();
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to reopen account'));
+      toast.error(getErrorMessage(error, t('toast.reopenFailed')));
     }
   }, [onRefresh, t]);
 

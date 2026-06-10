@@ -44,7 +44,7 @@ export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
         updatePreferencesStore(updated);
         toast.success(t('toasts.saved'));
       } catch (error) {
-        toast.error(getErrorMessage(error, 'Failed to save theme'));
+        toast.error(getErrorMessage(error, t('toasts.themeSaveFailed')));
       }
     });
   };

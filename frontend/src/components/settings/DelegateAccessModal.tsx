@@ -304,7 +304,7 @@ export function DelegateAccessModal({
       setFormDirty(false);
       onSaved();
     } catch (err) {
-      toast.error(getErrorMessage(err, 'Failed to update access'));
+      toast.error(getErrorMessage(err, t('toasts.saveFailed')));
       logger.error(err);
     } finally {
       setSaving(false);

@@ -219,7 +219,7 @@ export function CategoryList({
         onRefresh();
       }
     } catch (error) {
-      toast.error(getErrorMessage(error, 'Failed to delete category'));
+      toast.error(getErrorMessage(error, t('toasts.deleteFailed')));
       logger.error(error);
     } finally {
       setDeleteCategory(null);

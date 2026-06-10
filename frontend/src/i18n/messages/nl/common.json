@@ -62,6 +62,13 @@
     "system": "Systeem",
     "title": "Thema: {label}. Klik om te wijzigen."
   },
+  "errorPage": {
+    "title": "Er is iets misgegaan",
+    "description": "Er is een onverwachte fout opgetreden. Probeer het opnieuw of neem contact op met de ondersteuning als het probleem aanhoudt.",
+    "errorId": "Fout-ID: {digest}",
+    "tryAgain": "Opnieuw proberen",
+    "goToDashboard": "Naar het dashboard"
+  },
   "errorBoundary": {
     "defaultMessage": "Er is iets misgegaan bij het weergeven van dit onderdeel."
   },

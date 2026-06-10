@@ -2,7 +2,8 @@
   "language": {
     "label": "Language",
     "helpText": "Choose the language used throughout the Monize interface. Number and date formatting are controlled separately below.",
-    "saved": "Language updated"
+    "saved": "Language updated",
+    "saveFailed": "Failed to save language"
   },
   "profile": {
     "heading": "Profile",
@@ -20,7 +21,8 @@
     "saveButton": "Save Profile",
     "savingButton": "Saving...",
     "toasts": {
-      "success": "Profile updated successfully"
+      "success": "Profile updated successfully",
+      "updateFailed": "Failed to update profile"
     },
     "validation": {
       "firstNameMax": "First name must be 100 characters or less",
@@ -43,7 +45,8 @@
     "changePasswordButton": "Change Password",
     "changingPasswordButton": "Changing...",
     "toasts": {
-      "passwordChanged": "Password changed successfully"
+      "passwordChanged": "Password changed successfully",
+      "passwordChangeFailed": "Failed to change password"
     },
     "twoFactor": {
       "heading": "Two-Factor Authentication",
@@ -60,7 +63,8 @@
         "verificationCodeLabel": "Verification Code",
         "disablingButton": "Disabling...",
         "toasts": {
-          "disabled": "Two-factor authentication disabled"
+          "disabled": "Two-factor authentication disabled",
+          "disableFailed": "Failed to disable 2FA"
         }
       }
     },
@@ -74,6 +78,9 @@
         "verificationCodeLabel": "Verification Code",
         "regeneratingButton": "Regenerating...",
         "regenerateButton": "Regenerate"
+      },
+      "toasts": {
+        "generateFailed": "Failed to generate backup codes"
       }
     },
     "trustedDevices": {
@@ -88,7 +95,9 @@
       },
       "toasts": {
         "revoked": "Device revoked",
-        "revokedAll": "{count} device(s) revoked"
+        "revokedAll": "{count} device(s) revoked",
+        "revokeFailed": "Failed to revoke device",
+        "revokeAllFailed": "Failed to revoke devices"
       }
     },
     "validation": {
@@ -122,7 +131,10 @@
     "saveButton": "Save Preferences",
     "savingButton": "Saving...",
     "toasts": {
-      "saved": "Preferences saved"
+      "saved": "Preferences saved",
+      "saveFailed": "Failed to save preferences",
+      "themeSaveFailed": "Failed to save theme",
+      "colorThemeSaveFailed": "Failed to save colour theme"
     },
     "browserLocale": "Use browser locale (auto-detect)",
     "browserTimezonePrefix": "Use browser timezone (auto-detected as {tz})",
@@ -190,7 +202,11 @@
       "digestEnabled": "Budget digest enabled",
       "digestDisabled": "Budget digest disabled",
       "digestDaySet": "Budget digest day set to {day}",
-      "testEmailSent": "Test email sent! Check your inbox."
+      "testEmailSent": "Test email sent! Check your inbox.",
+      "emailUpdateFailed": "Failed to update notification preference",
+      "digestUpdateFailed": "Failed to update budget digest preference",
+      "digestDayFailed": "Failed to update digest day",
+      "testEmailFailed": "Failed to send test email"
     }
   },
   "help": {
@@ -233,7 +249,8 @@
       "deletingButton": "Deleting...",
       "confirmButton": "Confirm Delete Data",
       "toasts": {
-        "success": "Deleted {count} records successfully"
+        "success": "Deleted {count} records successfully",
+        "failed": "Failed to delete data"
       }
     },
     "deleteAccount": {
@@ -252,7 +269,8 @@
       "confirmButton": "Confirm Delete",
       "toasts": {
         "downgraded": "Your own data was removed. Your login and shared access are kept so the delegation stays in place.",
-        "deleted": "Account deleted"
+        "deleted": "Account deleted",
+        "failed": "Failed to delete account"
       },
       "errors": {
         "typeDelete": "Please type DELETE to confirm",
@@ -323,7 +341,10 @@
       "revoked": "Token revoked",
       "selectScope": "Select at least one scope",
       "copyTokenFailed": "Failed to copy token",
-      "copyUrlFailed": "Failed to copy URL"
+      "copyUrlFailed": "Failed to copy URL",
+      "loadFailed": "Failed to load API tokens",
+      "createFailed": "Failed to create token",
+      "revokeFailed": "Failed to revoke token"
     },
     "relative": {
       "never": "Never",
@@ -417,7 +438,9 @@
       },
       "toasts": {
         "enabled": "Encrypted backups enabled",
-        "disabled": "Encrypted backups disabled"
+        "disabled": "Encrypted backups disabled",
+        "enableFailed": "Failed to enable encryption",
+        "disableFailed": "Failed to disable encryption"
       }
     },
     "export": {
@@ -434,7 +457,8 @@
         "downloadButton": "Download"
       },
       "toasts": {
-        "success": "Backup downloaded successfully"
+        "success": "Backup downloaded successfully",
+        "failed": "Failed to create backup"
       }
     },
     "restore": {
@@ -453,7 +477,9 @@
       "confirmRestoreButton": "Confirm Restore",
       "toasts": {
         "pleaseSelectFile": "Please select a backup file",
-        "pleaseEnterPassword": "Please enter your password to confirm"
+        "pleaseEnterPassword": "Please enter your password to confirm",
+        "encryptedNeedsPassword": "This backup is encrypted. Enter the password it was created with in the \"Backup password\" field, then try again.",
+        "failed": "Failed to restore backup"
       }
     },
     "restoreResult": {
@@ -538,7 +564,8 @@
     },
     "saveButton": "Save",
     "toasts": {
-      "saved": "Access updated"
+      "saved": "Access updated",
+      "saveFailed": "Failed to update access"
     }
   },
   "nav": {
@@ -574,7 +601,11 @@
       "title": "AI Settings",
       "description": "Configure AI providers, manage API keys, and view usage statistics."
     },
-    "delegateSecurityError": "Unable to load your security settings."
+    "delegateSecurityError": "Unable to load your security settings.",
+    "toasts": {
+      "securityLoadFailed": "Failed to load security settings",
+      "loadFailed": "Failed to load settings"
+    }
   },
   "aiSettings": {
     "backLink": "Back to Settings",
@@ -583,6 +614,10 @@
     "demoRestricted": {
       "heading": "Restricted in Demo Mode",
       "body": "AI provider configuration is disabled in demo mode."
+    },
+    "toasts": {
+      "loadFailed": "Failed to load AI settings",
+      "usageLoadFailed": "Failed to load usage data"
     }
   },
   "sharedAccessPage": {
@@ -617,7 +652,8 @@
       "reminderAfterDaysLabel": "Days of inactivity before reminder emails",
       "saveButton": "Save settings",
       "toasts": {
-        "saved": "Emergency access settings saved"
+        "saved": "Emergency access settings saved",
+        "saveFailed": "Failed to save settings"
       }
     },
     "message": {
@@ -640,7 +676,9 @@
       "saveButton": "Save message",
       "toasts": {
         "saved": "Message saved",
-        "verifyAgain": "Verification expired -- please verify again to save"
+        "verifyAgain": "Verification expired -- please verify again to save",
+        "loadFailed": "Failed to load message",
+        "saveFailed": "Failed to save message"
       }
     },
     "contacts": {
@@ -667,7 +705,9 @@
       "toasts": {
         "added": "Contact added",
         "updated": "Contact updated",
-        "removed": "Contact removed"
+        "removed": "Contact removed",
+        "saveFailed": "Failed to save contact",
+        "removeFailed": "Failed to remove contact"
       }
     },
     "status": {
@@ -688,11 +728,16 @@
       "clearingButton": "Clearing...",
       "clearButton": "Clear",
       "toasts": {
-        "cleared": "Granted state cleared"
+        "cleared": "Granted state cleared",
+        "resetFailed": "Failed to reset granted state"
       }
     },
     "stepUp": {
       "reason": "Re-verify your identity to view or edit your emergency-access message."
+    },
+    "toasts": {
+      "loadFailed": "Failed to load emergency access",
+      "reauthFailed": "Failed to confirm re-authentication"
     }
   },
   "aiProviders": {

@@ -62,6 +62,13 @@
     "system": "Sistema",
     "title": "Tema: {label}. Clicca per cambiare."
   },
+  "errorPage": {
+    "title": "Qualcosa è andato storto",
+    "description": "Si è verificato un errore imprevisto. Riprova o contatta l'assistenza se il problema persiste.",
+    "errorId": "ID errore: {digest}",
+    "tryAgain": "Riprova",
+    "goToDashboard": "Vai al pannello di controllo"
+  },
   "errorBoundary": {
     "defaultMessage": "Si è verificato un errore durante il rendering di questo componente."
   },

@@ -88,8 +88,12 @@
   },
   "toast": {
     "deleteSuccess": "Conto eliminato con successo",
+    "deleteFailed": "Eliminazione del conto non riuscita",
     "closeSuccess": "Conto chiuso con successo",
+    "closeFailed": "Chiusura del conto non riuscita",
     "reopenSuccess": "Conto riaperto con successo",
+    "reopenFailed": "Riapertura del conto non riuscita",
+    "loadFailed": "Caricamento dei conti non riuscito",
     "favouriteError": "Aggiornamento preferito non riuscito",
     "createSuccess": "Conto creato con successo",
     "updateSuccess": "Conto aggiornato con successo"
@@ -157,7 +161,8 @@
       "collapse": "Una riga per transazione"
     },
     "customDateFormatEmpty": "Inserisci un formato data personalizzato",
-    "exportedAs": "Esportato come {format}"
+    "exportedAs": "Esportato come {format}",
+    "exportFailed": "Esportazione del conto non riuscita"
   },
   "loanFields": {
     "title": "Dettagli pagamento prestito",
@@ -282,6 +287,7 @@
   "toasts": {
     "categoryCreatedNested": "Categoria \"{parent}: {name}\" creata",
     "categoryCreated": "Categoria \"{name}\" creata",
+    "categoryCreateFailed": "Creazione categoria non riuscita",
     "payeeCreated": "Beneficiario \"{name}\" creato",
     "payeeCreateFailed": "Creazione beneficiario non riuscita",
     "institutionCreated": "Istituzione \"{name}\" creata",
