@@ -518,7 +518,7 @@
     "edit": {
       "subtitlePrefix": "Editar: ",
       "subtitle": "Actualiza la configuración del presupuesto y las asignaciones por categoría",
-      "backToDashboard": "Volver al panel",
+      "backToDashboard": "Volver al panel de control",
       "budgetSettings": "Configuración del presupuesto",
       "categoryAllocations": "Asignaciones por categoría",
       "income": "Ingresos",

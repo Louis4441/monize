@@ -31,7 +31,7 @@
     "finish": "Terminer le rapprochement"
   },
   "status": {
-    "cleared": "Compensé",
+    "cleared": "Encaissé",
     "unreconciled": "Non rapproché",
     "void": "Annulé",
     "reconciled": "Rapproché"

@@ -39,10 +39,10 @@
   "complete": {
     "title": "Conciliación completada",
     "message": "Tu cuenta ha sido conciliada correctamente a {date}.",
-    "existingPayment": "Esta cuenta tiene un pago programado, <b>{name}</b>. ¿Deseas actualizar la próxima instancia al saldo conciliado de <b>{amount}</b>?",
+    "existingPayment": "Esta cuenta tiene un pago planificado, <b>{name}</b>. ¿Deseas actualizar la próxima instancia al saldo conciliado de <b>{amount}</b>?",
     "updatePayment": "Actualizar próximo pago",
-    "noPayment": "No se encontró ningún pago programado para esta cuenta. ¿Deseas crear uno por el saldo conciliado de <b>{amount}</b>?",
-    "createPayment": "Crear pago programado",
+    "noPayment": "No se encontró ningún pago planificado para esta cuenta. ¿Deseas crear uno por el saldo conciliado de <b>{amount}</b>?",
+    "createPayment": "Crear pago planificado",
     "backToAccounts": "Volver a cuentas",
     "reconcileAnother": "Conciliar otra cuenta"
   },

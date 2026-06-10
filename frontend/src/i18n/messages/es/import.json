@@ -255,7 +255,7 @@
     "errorsLabel": "Errores:",
     "andMoreErrors": "...y {count} errores más",
     "loanSetupHeading": "Configurar Pagos Recurrentes",
-    "loanSetupDescription": "Las siguientes cuentas de préstamo/hipoteca se importaron sin pagos programados. Configura los pagos recurrentes para continuar el seguimiento de tu préstamo.",
+    "loanSetupDescription": "Las siguientes cuentas de préstamo/hipoteca se importaron sin pagos planificados. Configura los pagos recurrentes para continuar el seguimiento de tu préstamo.",
     "setUpPayments": "Configurar Pagos",
     "scheduledPaymentsConfigured": "Pagos planificados configurados para {count} cuenta{plural}.",
     "viewInvestments": "Ver Inversiones",
