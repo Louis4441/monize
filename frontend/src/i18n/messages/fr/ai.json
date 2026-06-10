@@ -1,0 +1,53 @@
+{
+  "page": {
+    "title": "Assistant IA",
+    "subtitle": "Posez des questions sur vos finances en langage naturel"
+  },
+  "chat": {
+    "conversationSaved": "Conversation enregistrée dans votre navigateur",
+    "clearConversation": "Effacer la conversation",
+    "inputPlaceholder": "Posez une question sur vos finances...",
+    "inputPlaceholderDisabled": "Fournisseur IA non configuré",
+    "keyboardHint": "Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne",
+    "cancelTitle": "Annuler",
+    "sendTitle": "Envoyer"
+  },
+  "notConfigured": {
+    "heading": "IA non configurée",
+    "message": "Aucun fournisseur IA n'est configuré. Pour utiliser l'Assistant IA, veuillez {link} dans vos paramètres.",
+    "linkText": "configurer un fournisseur IA"
+  },
+  "suggestedQueries": {
+    "heading": "Posez des questions sur vos finances",
+    "description": "Je peux répondre à des questions sur vos dépenses, revenus, soldes de compte, valeur nette, et bien plus encore.",
+    "monthlySpendingLabel": "Dépenses mensuelles",
+    "monthlySpendingQuery": "Combien ai-je dépensé le mois dernier ?",
+    "topCategoriesLabel": "Principales catégories",
+    "topCategoriesQuery": "Quelles sont mes 5 principales catégories de dépenses cette année ?",
+    "accountBalancesLabel": "Soldes des comptes",
+    "accountBalancesQuery": "Quels sont mes soldes de compte actuels ?",
+    "compareMonthsLabel": "Comparer les mois",
+    "compareMonthsQuery": "Comparez mes dépenses ce mois-ci par rapport au mois dernier",
+    "netWorthTrendLabel": "Tendance de la valeur nette",
+    "netWorthTrendQuery": "Montrez la tendance de ma valeur nette sur les 12 derniers mois",
+    "savingsRateLabel": "Taux d'épargne",
+    "savingsRateQuery": "Combien ai-je épargné cette année par rapport à mes revenus ?"
+  },
+  "toolDetails": {
+    "inputLabel": "Entrée",
+    "resultLabel": "Résultat",
+    "toolFailedAriaLabel": "Outil échoué",
+    "toolSucceededAriaLabel": "Outil réussi"
+  },
+  "table": {
+    "downloadTitle": "Télécharger le tableau en CSV",
+    "downloadAriaLabel": "Télécharger le tableau en CSV",
+    "noDataError": "Aucune donnée à exporter"
+  },
+  "chart": {
+    "downloadTitle": "Télécharger le graphique en PNG",
+    "downloadAriaLabel": "Télécharger le graphique en PNG",
+    "captureError": "Impossible de capturer l'image du graphique",
+    "downloadError": "Échec du téléchargement du graphique"
+  }
+}
