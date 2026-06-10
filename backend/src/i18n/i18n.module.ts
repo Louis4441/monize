@@ -8,6 +8,7 @@ import {
   QueryResolver,
 } from "nestjs-i18n";
 import { DEFAULT_LOCALE } from "./config";
+import { i18nFormatter } from "./i18n-formatter";
 
 /**
  * Centralised translation catalogues for backend strings (exception messages,
@@ -28,6 +29,9 @@ import { DEFAULT_LOCALE } from "./config";
   imports: [
     NestjsI18nModule.forRoot({
       fallbackLanguage: DEFAULT_LOCALE,
+      // The stock `string-format` formatter treats our `{{ key }}` placeholder
+      // convention as escaped literal braces; this one interpolates them.
+      formatter: i18nFormatter,
       loaderOptions: {
         path: path.join(__dirname, "locales"),
         watch: process.env.NODE_ENV !== "production",
