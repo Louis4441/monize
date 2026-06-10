@@ -1,6 +1,7 @@
 'use client';
 
 import { CashFlowType } from '@/lib/monte-carlo';
+import { chartColors } from '@/lib/chart-colors';
 import { useTranslations } from 'next-intl';
 
 export interface CashFlowEvent {
@@ -21,12 +22,12 @@ export function CashFlowLegendSwatch({
   role: 'start' | 'end';
   income: boolean;
 }) {
-  const fill = income ? '#16a34a' : '#dc2626';
+  const fill = income ? chartColors.income : chartColors.expense;
   const points =
     role === 'start' ? '7,1 1,11 13,11' : '7,11 1,1 13,1';
   return (
     <svg width={14} height={12} viewBox="0 0 14 12" className="shrink-0">
-      <polygon points={points} fill={fill} stroke="#ffffff" strokeWidth={1} />
+      <polygon points={points} fill={fill} stroke="var(--color-white)" strokeWidth={1} />
     </svg>
   );
 }
@@ -42,8 +43,8 @@ export function CashFlowMarker({
   role: 'start' | 'end';
   income: boolean;
 }) {
-  const fill = income ? '#16a34a' : '#dc2626';
-  const stroke = '#ffffff';
+  const fill = income ? chartColors.income : chartColors.expense;
+  const stroke = 'var(--color-white)';
   // Triangle pointing up = start, pointing down = end. Income green, expense red.
   const size = 7;
   const points =

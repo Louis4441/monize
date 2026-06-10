@@ -163,7 +163,9 @@ describe("InstitutionsService", () => {
     });
 
     it("excludes the cash half of a linked investment pair from the counts", async () => {
-      institutionsRepo.find.mockResolvedValue([buildInstitution({ id: "inst-1" })]);
+      institutionsRepo.find.mockResolvedValue([
+        buildInstitution({ id: "inst-1" }),
+      ]);
       const qb = chainableQb(
         [{ institution_id: "inst-1", count: "1" }],
         "getRawMany",

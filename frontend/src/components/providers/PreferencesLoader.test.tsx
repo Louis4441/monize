@@ -5,6 +5,7 @@ import { PreferencesLoader } from './PreferencesLoader';
 const mockLoadPreferences = vi.fn();
 const mockClearPreferences = vi.fn();
 const mockSetTheme = vi.fn();
+const mockSetColorTheme = vi.fn();
 
 // Mock useTheme
 vi.mock('@/contexts/ThemeContext', () => ({
@@ -13,6 +14,8 @@ vi.mock('@/contexts/ThemeContext', () => ({
     theme: 'system',
     resolvedTheme: 'light',
     setTheme: mockSetTheme,
+    colorTheme: 'default',
+    setColorTheme: mockSetColorTheme,
   }),
 }));
 
@@ -31,7 +34,7 @@ vi.mock('@/store/authStore', () => ({
 vi.mock('@/store/preferencesStore', () => ({
   usePreferencesStore: (selector: any) => {
     const state = {
-      preferences: { theme: 'dark' },
+      preferences: { theme: 'dark', colorTheme: 'latte' },
       isLoaded: false,
       _hasHydrated: true,
       loadPreferences: mockLoadPreferences,
@@ -71,5 +74,14 @@ describe('PreferencesLoader', () => {
       </PreferencesLoader>,
     );
     expect(mockSetTheme).toHaveBeenCalledWith('dark');
+  });
+
+  it('syncs colour theme when preferences have a valid colorTheme value', () => {
+    render(
+      <PreferencesLoader>
+        <div>Child</div>
+      </PreferencesLoader>,
+    );
+    expect(mockSetColorTheme).toHaveBeenCalledWith('latte');
   });
 });

@@ -20,6 +20,7 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
+import { chartColors } from '@/lib/chart-colors';
 
 type SeasonalPatternsSortField = 'category' | 'typical' | 'highMonths';
 
@@ -238,7 +239,7 @@ export function BudgetSeasonalPatternsReport() {
                     {chartData.map((entry, index) => (
                       <Cell
                         key={index}
-                        fill={entry.isHigh ? '#ef4444' : '#3b82f6'}
+                        fill={entry.isHigh ? chartColors.expense : chartColors.primary}
                       />
                     ))}
                   </Bar>

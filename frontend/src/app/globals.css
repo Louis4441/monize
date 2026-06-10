@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./themes.css";
 
 /* Custom theme extensions */
 @theme {
@@ -78,15 +79,44 @@ body {
 
 /* Category badge colour variables for light/dark mode */
 :root {
-  --category-bg-base: #e5e7eb;
-  --category-text-base: #6b7280;
+  --category-bg-base: var(--color-gray-200);
+  --category-text-base: var(--color-gray-500);
   --category-text-mix: #000;
 }
 
 .dark {
-  --category-bg-base: #374151;
-  --category-text-base: #9ca3af;
+  --category-bg-base: var(--color-gray-700);
+  --category-text-base: var(--color-gray-400);
   --category-text-mix: #fff;
+}
+
+/* Chart colour tokens. Recharts components reference these as
+   `var(--chart-*)` strings (see src/lib/chart-colors.ts) so charts follow
+   both the colour theme and light/dark mode without any JS recomputation.
+   Grid, axis, and primary derive from the gray/blue ramps and therefore
+   re-theme automatically; the rest have per-theme overrides in themes.css. */
+:root {
+  --chart-primary: var(--color-blue-500);
+  --chart-grid: var(--color-gray-200);
+  --chart-axis: var(--color-gray-500);
+  --chart-income: #10b981;
+  --chart-expense: #ef4444;
+  --chart-warning: #f59e0b;
+  --chart-1: #3b82f6;
+  --chart-2: #10b981;
+  --chart-3: #f59e0b;
+  --chart-4: #ef4444;
+  --chart-5: #8b5cf6;
+  --chart-6: #ec4899;
+  --chart-7: #06b6d4;
+  --chart-8: #84cc16;
+  --chart-9: #f97316;
+  --chart-10: #6366f1;
+}
+
+.dark {
+  --chart-grid: var(--color-gray-700);
+  --chart-axis: var(--color-gray-400);
 }
 
 /* Form element styling (replaces @tailwindcss/forms) */
@@ -102,7 +132,7 @@ textarea,
 select {
   @apply w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 text-base font-sans;
   appearance: none;
-  background-color: #fff;
+  background-color: var(--color-white);
   font-family: 'Inter', system-ui, sans-serif;
 }
 
@@ -117,17 +147,17 @@ select {
 [type='time'],
 [type='week'] {
   @apply w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 text-base font-sans;
-  background-color: #fff;
+  background-color: var(--color-white);
   font-family: 'Inter', system-ui, sans-serif;
 }
 
 /* Placeholder colors */
 ::placeholder {
-  color: rgb(156 163 175); /* gray-400 */
+  color: var(--color-gray-400);
 }
 
 .dark ::placeholder {
-  color: rgb(156 163 175); /* gray-400 */
+  color: var(--color-gray-400);
 }
 
 [type='text']:focus,
@@ -164,7 +194,7 @@ select:focus {
 .dark textarea,
 .dark select {
   @apply border-gray-600 text-gray-100;
-  background-color: rgb(31 41 55); /* gray-800 to match MultiSelect */
+  background-color: var(--color-gray-800); /* matches MultiSelect */
 }
 
 /* Select dropdown arrow for dark mode */
@@ -200,12 +230,12 @@ select {
 .dark [type='checkbox'],
 .dark [type='radio'] {
   @apply border-gray-600;
-  background-color: rgb(31 41 55); /* gray-800 */
+  background-color: var(--color-gray-800);
 }
 
 /* Date input styling - empty date inputs should match placeholder color */
 .date-empty {
-  color: rgb(156 163 175) !important; /* gray-400 - matches placeholder */
+  color: var(--color-gray-400) !important; /* matches placeholder */
 }
 
 /* Select placeholder color - applied when no option is selected. The selectors
@@ -213,7 +243,7 @@ select {
    `.dark select { text-gray-100 }` rule above. */
 select.select-placeholder,
 .dark select.select-placeholder {
-  color: rgb(156 163 175); /* gray-400 - matches MultiSelect placeholder */
+  color: var(--color-gray-400); /* matches MultiSelect placeholder */
 }
 
 /* Calendar picker indicator for dark mode */

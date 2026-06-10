@@ -26,6 +26,9 @@ export class UserPreference {
   @Column({ default: "light" })
   theme: string;
 
+  @Column({ name: "color_theme", length: 20, default: "default" })
+  colorTheme: string;
+
   @Column({ default: "browser" })
   timezone: string;
 

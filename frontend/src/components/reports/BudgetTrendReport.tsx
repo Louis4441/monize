@@ -18,6 +18,9 @@ import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
+import { chartColors } from '@/lib/chart-colors';
+import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
+
 
 export function BudgetTrendReport() {
   const t = useTranslations('reports');
@@ -77,8 +80,8 @@ export function BudgetTrendReport() {
       title: t('budgetTrend.pdfTitle'),
       chartContainer: chartRef.current,
       chartLegend: [
-        { color: '#3b82f6', label: t('budgetTrend.seriesBudgeted') },
-        { color: '#10b981', label: t('budgetTrend.seriesActual') },
+        { color: resolvePdfColor(chartColors.primary), label: t('budgetTrend.seriesBudgeted') },
+        { color: resolvePdfColor(chartColors.income), label: t('budgetTrend.seriesActual') },
       ],
       tableData: { headers, rows },
       filename: 'budget-trend',
@@ -172,7 +175,7 @@ export function BudgetTrendReport() {
                   <Line
                     type="monotone"
                     dataKey="budgeted"
-                    stroke="#3b82f6"
+                    stroke={chartColors.primary}
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={{ r: 4 }}
@@ -181,7 +184,7 @@ export function BudgetTrendReport() {
                   <Line
                     type="monotone"
                     dataKey="actual"
-                    stroke="#10b981"
+                    stroke={chartColors.income}
                     strokeWidth={2}
                     dot={{ r: 4 }}
                     name={t('budgetTrend.seriesActual')}

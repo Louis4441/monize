@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { LOCALE_COOKIE, isSupportedLocale } from '@/i18n/config';
+import { isColorTheme } from '@/lib/color-themes';
 
 /**
  * Component that loads user preferences when authenticated.
@@ -21,7 +22,7 @@ export function PreferencesLoader({ children }: { children: React.ReactNode }) {
   const preferences = usePreferencesStore((state) => state.preferences);
   const isLoaded = usePreferencesStore((state) => state.isLoaded);
   const prefsHydrated = usePreferencesStore((state) => state._hasHydrated);
-  const { setTheme } = useTheme();
+  const { setTheme, setColorTheme } = useTheme();
 
   useEffect(() => {
     // Wait for both stores to hydrate
@@ -40,6 +41,13 @@ export function PreferencesLoader({ children }: { children: React.ReactNode }) {
       setTheme(preferences.theme as 'light' | 'dark' | 'system');
     }
   }, [prefsHydrated, preferences?.theme, setTheme]);
+
+  // Sync colour theme when preferences change
+  useEffect(() => {
+    if (prefsHydrated && isColorTheme(preferences?.colorTheme)) {
+      setColorTheme(preferences.colorTheme);
+    }
+  }, [prefsHydrated, preferences?.colorTheme, setColorTheme]);
 
   // Sync language cookie from DB preference. The proxy reads NEXT_LOCALE and
   // sets the x-locale header on the next request; we refresh the router so

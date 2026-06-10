@@ -19,15 +19,16 @@ import { ReportError } from '@/components/reports/ReportError';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useReportData } from '@/hooks/useReportData';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
+import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
 import { useTranslations } from 'next-intl';
 
 type HealthHistorySortField = 'month' | 'score' | 'grade' | 'change';
 
 function getScoreColor(score: number): string {
-  if (score >= 80) return '#10b981';
-  if (score >= 60) return '#f59e0b';
-  if (score >= 40) return '#f97316';
-  return '#ef4444';
+  if (score >= 80) return chartColors.income;
+  if (score >= 60) return chartColors.warning;
+  if (score >= 40) return CHART_SERIES[8];
+  return chartColors.expense;
 }
 
 export function HealthScoreHistoryReport() {
@@ -271,12 +272,12 @@ export function HealthScoreHistoryReport() {
                     );
                   }}
                 />
-                <ReferenceLine y={80} stroke="#10b981" strokeDasharray="3 3" label={{ value: t('healthScoreHistory.refLineGood'), position: 'right', fill: '#10b981', fontSize: 11 }} />
-                <ReferenceLine y={60} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: t('healthScoreHistory.refLineFair'), position: 'right', fill: '#f59e0b', fontSize: 11 }} />
+                <ReferenceLine y={80} stroke={chartColors.income} strokeDasharray="3 3" label={{ value: t('healthScoreHistory.refLineGood'), position: 'right', fill: chartColors.income, fontSize: 11 }} />
+                <ReferenceLine y={60} stroke={chartColors.warning} strokeDasharray="3 3" label={{ value: t('healthScoreHistory.refLineFair'), position: 'right', fill: chartColors.warning, fontSize: 11 }} />
                 <Line
                   type="monotone"
                   dataKey="score"
-                  stroke="#6366f1"
+                  stroke={chartColors.primary}
                   strokeWidth={3}
                   dot={(props: { cx?: number; cy?: number; payload?: HealthScoreHistoryPoint }) => {
                     const { cx, cy, payload } = props;

@@ -48,6 +48,49 @@ export class UpdatePreferencesDto {
   theme?: string;
 
   @ApiPropertyOptional({
+    description:
+      "Colour theme (palette), separate from the light/dark mode preference",
+    example: "default",
+    enum: [
+      "default",
+      "latte",
+      "msmoney",
+      "newspaper",
+      "burgundy",
+      "nord",
+      "forest",
+      "solarized",
+      "gruvbox",
+      "dracula",
+      "tokyonight",
+      "rosepine",
+      "midnight",
+      "highcontrast",
+      "colorblind",
+    ],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn([
+    "default",
+    "latte",
+    "msmoney",
+    "newspaper",
+    "burgundy",
+    "nord",
+    "forest",
+    "solarized",
+    "gruvbox",
+    "dracula",
+    "tokyonight",
+    "rosepine",
+    "midnight",
+    "highcontrast",
+    "colorblind",
+  ])
+  colorTheme?: string;
+
+  @ApiPropertyOptional({
     description: "Timezone (browser = use browser timezone)",
     example: "browser",
   })

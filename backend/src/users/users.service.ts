@@ -181,6 +181,9 @@ export class UsersService {
     if (dto.theme !== undefined) {
       preferences.theme = dto.theme;
     }
+    if (dto.colorTheme !== undefined) {
+      preferences.colorTheme = dto.colorTheme;
+    }
     if (dto.timezone !== undefined) {
       preferences.timezone = dto.timezone;
     }

@@ -465,6 +465,7 @@ describe("UsersService", () => {
       ["defaultQuoteProvider", "yahoo"],
       ["recentTransactionsLimit", 25],
       ["language", "fr"],
+      ["colorTheme", "latte"],
     ])(
       "updates the %s field when provided",
       async (field: string, value: any) => {
@@ -476,6 +477,18 @@ describe("UsersService", () => {
         expect(savedData[field]).toEqual(value);
       },
     );
+
+    it("leaves colorTheme untouched when not provided", async () => {
+      preferencesRepository.findOne.mockResolvedValue({
+        ...mockPreferences,
+        colorTheme: "nord",
+      });
+
+      await service.updatePreferences("user-1", { theme: "dark" });
+
+      const savedData = preferencesRepository.save.mock.calls[0][0];
+      expect(savedData.colorTheme).toBe("nord");
+    });
 
     it("seeds language='en' when creating default preferences", async () => {
       preferencesRepository.findOne.mockResolvedValue(null);

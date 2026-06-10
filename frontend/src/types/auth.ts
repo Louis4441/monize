@@ -1,3 +1,5 @@
+import type { ColorTheme } from '@/lib/color-themes';
+
 export interface User {
   id: string;
   email: string;
@@ -87,6 +89,7 @@ export interface UserPreferences {
   dateFormat: string; // 'browser' = use browser locale
   numberFormat: string; // 'browser' = use browser locale
   theme: 'light' | 'dark' | 'system';
+  colorTheme: ColorTheme;
   timezone: string; // 'browser' = use browser timezone
   notificationEmail: boolean;
   notificationBrowser: boolean;
@@ -147,6 +150,7 @@ export interface UpdatePreferencesData {
   dateFormat?: string;
   numberFormat?: string;
   theme?: 'light' | 'dark' | 'system';
+  colorTheme?: ColorTheme;
   timezone?: string;
   notificationEmail?: boolean;
   notificationBrowser?: boolean;

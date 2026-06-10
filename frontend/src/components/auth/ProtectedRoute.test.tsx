@@ -145,6 +145,7 @@ describe('ProtectedRoute', () => {
         dateFormat: 'browser',
         numberFormat: 'browser',
         theme: 'system',
+        colorTheme: 'default',
         timezone: 'browser',
         notificationEmail: false,
         notificationBrowser: false,

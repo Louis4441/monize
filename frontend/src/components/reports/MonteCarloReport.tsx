@@ -49,6 +49,7 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import { createLogger } from '@/lib/logger';
+import { chartColors } from '@/lib/chart-colors';
 import { useMonteCarloScenarios, MAX_COMPARE_SCENARIOS } from './useMonteCarloScenarios';
 import { useTranslations } from 'next-intl';
 
@@ -1207,7 +1208,8 @@ export function MonteCarloReport() {
                       dataKey="band10to25"
                       stackId="band"
                       stroke="none"
-                      fill="#bfdbfe"
+                      fill={chartColors.primary}
+                      fillOpacity={0.3}
                       name={t('monteCarlo.chartBand10to25')}
                     />
                     <Area
@@ -1215,7 +1217,8 @@ export function MonteCarloReport() {
                       dataKey="band25to75"
                       stackId="band"
                       stroke="none"
-                      fill="#60a5fa"
+                      fill={chartColors.primary}
+                      fillOpacity={0.6}
                       name={t('monteCarlo.chartBand25to75')}
                     />
                     <Area
@@ -1223,13 +1226,14 @@ export function MonteCarloReport() {
                       dataKey="band75to90"
                       stackId="band"
                       stroke="none"
-                      fill="#bfdbfe"
+                      fill={chartColors.primary}
+                      fillOpacity={0.3}
                       name={t('monteCarlo.chartBand75to90')}
                     />
                     <Line
                       type="monotone"
                       dataKey="p50"
-                      stroke="#1d4ed8"
+                      stroke={chartColors.primary}
                       strokeWidth={2}
                       dot={false}
                       name={t('monteCarlo.chartMedian')}
@@ -1245,7 +1249,7 @@ export function MonteCarloReport() {
                         undefined && (
                         <ReferenceLine
                           x={result.yearLabels[form.yearsToRetirement - 1]}
-                          stroke="#d97706"
+                          stroke={chartColors.warning}
                           strokeDasharray="8 4"
                           strokeWidth={2.5}
                           label={{
@@ -1274,7 +1278,7 @@ export function MonteCarloReport() {
                               0.5
                                 ? 'insideTopRight'
                                 : 'insideTopLeft',
-                            fill: '#d97706',
+                            fill: chartColors.warning,
                             fontSize: 12,
                             fontWeight: 600,
                           }}

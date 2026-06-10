@@ -17,6 +17,8 @@ import { Combobox } from '@/components/ui/Combobox';
 import { getDateFormatOptions, EXCHANGE_OPTIONS } from '@/lib/constants';
 import { LanguageSelector } from '@/components/settings/LanguageSelector';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
+import { ColorThemeSelector } from '@/components/settings/ColorThemeSelector';
+import { ColorTheme } from '@/lib/color-themes';
 
 const NUMBER_FORMAT_OPTIONS = [
   { value: 'browser', labelKey: 'numberFormatOptions.browser' },
@@ -88,6 +90,7 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
   const [numberFormat, setNumberFormat] = useState(preferences.numberFormat);
   const [timezone, setTimezone] = useState(preferences.timezone);
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(preferences.theme);
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(preferences.colorTheme ?? 'default');
   const [defaultCurrency, setDefaultCurrency] = useState(preferences.defaultCurrency);
   const [weekStartsOn, setWeekStartsOn] = useState(preferences.weekStartsOn ?? 1);
   const [showCreatedAt, setShowCreatedAt] = useState(preferences.showCreatedAt ?? false);
@@ -128,8 +131,9 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
   const handleUpdatePreferences = async () => {
     setIsUpdatingPreferences(true);
     try {
-      // Theme is applied and persisted immediately by ThemeSelector (like
-      // language), so it is intentionally omitted from this bulk save.
+      // Theme and colour theme are applied and persisted immediately by
+      // ThemeSelector / ColorThemeSelector (like language), so they are
+      // intentionally omitted from this bulk save.
       const data: UpdatePreferencesData = {
         dateFormat,
         numberFormat,
@@ -162,6 +166,8 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
         <LanguageSelector value={language} onChange={setLanguage} />
 
         <ThemeSelector value={theme} onChange={setTheme} />
+
+        <ColorThemeSelector value={colorTheme} onChange={setColorTheme} />
 
         <Select
           label={t('defaultCurrencyLabel')}

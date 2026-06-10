@@ -575,6 +575,7 @@ CREATE TABLE user_preferences (
     date_format VARCHAR(20) DEFAULT 'YYYY-MM-DD',
     number_format VARCHAR(20) DEFAULT 'en-US',
     theme VARCHAR(20) DEFAULT 'light',
+    color_theme VARCHAR(20) NOT NULL DEFAULT 'default',
     timezone VARCHAR(50) DEFAULT 'browser',
     notification_email BOOLEAN DEFAULT true,
     notification_browser BOOLEAN DEFAULT true,

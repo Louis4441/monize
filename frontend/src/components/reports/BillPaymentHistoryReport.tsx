@@ -26,6 +26,7 @@ import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useTranslations } from 'next-intl';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
+import { chartColors } from '@/lib/chart-colors';
 
 type BillSortField = 'bill' | 'count' | 'average' | 'total' | 'lastPayment';
 
@@ -241,11 +242,11 @@ export function BillPaymentHistoryReport() {
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={billData.monthlyTotals}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tickFormatter={formatCurrencyAxis} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="total" fill="#3b82f6" name={t('billPaymentHistory.totalPaid')} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="total" fill={chartColors.primary} name={t('billPaymentHistory.totalPaid')} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

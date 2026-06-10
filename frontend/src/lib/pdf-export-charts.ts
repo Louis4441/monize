@@ -41,6 +41,33 @@ function resolveChartDimensions(
 }
 
 /**
+ * Chart colours are CSS variable references (var(--chart-*), see
+ * src/lib/chart-colors.ts) that resolve against the document's active colour
+ * theme. The serialized standalone SVG has no stylesheet context, so they
+ * would render as black. Bake the computed colours into the clone before
+ * serialization by reading them from the live elements.
+ */
+function inlineCssVariableColors(original: SVGSVGElement, clone: SVGSVGElement): void {
+  const COLOR_ATTRS = ['fill', 'stroke', 'stop-color'] as const;
+  const originalElements = [original, ...Array.from(original.querySelectorAll<SVGElement>('*'))];
+  const cloneElements = [clone, ...Array.from(clone.querySelectorAll<SVGElement>('*'))];
+  if (originalElements.length !== cloneElements.length) return;
+
+  originalElements.forEach((origEl, i) => {
+    const cloneEl = cloneElements[i];
+    for (const attr of COLOR_ATTRS) {
+      const value = origEl.getAttribute(attr);
+      if (value && value.includes('var(')) {
+        const computed = getComputedStyle(origEl).getPropertyValue(attr);
+        if (computed) {
+          cloneEl.setAttribute(attr, computed);
+        }
+      }
+    }
+  });
+}
+
+/**
  * Captures a single SVG element and converts it to a PNG data URL.
  * Forces a white background regardless of dark mode for print-friendly output.
  *
@@ -71,6 +98,10 @@ function captureSingleSvg(
   svgClone.querySelectorAll(':scope > g[style], :scope > svg[style]').forEach((el) => {
     (el as SVGElement).removeAttribute('style');
   });
+
+  // Resolve theme CSS variables to concrete colours while both trees still
+  // mirror each other (before the background rect is inserted below).
+  inlineCssVariableColors(svg, svgClone);
 
   // Set the clone to render at scaled resolution natively.
   // viewBox preserves the original coordinate system while width/height

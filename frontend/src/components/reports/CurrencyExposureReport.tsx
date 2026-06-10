@@ -22,8 +22,10 @@ import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
+import { CHART_SERIES } from '@/lib/chart-colors';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
+import { resolvePdfColor } from '@/components/reports/resolve-pdf-color';
 
 const logger = createLogger('CurrencyExposureReport');
 
@@ -34,17 +36,18 @@ const excludeCashAccounts = (a: Account) => a.accountSubType !== 'INVESTMENT_CAS
 type CurrencyExposureSortField = 'currency' | 'nativeValue' | 'rate' | 'convertedValue' | 'percentage' | 'count';
 
 const CURRENCY_COLOURS: Record<string, string> = {
-  CAD: '#ef4444',
-  USD: '#3b82f6',
-  EUR: '#22c55e',
-  GBP: '#8b5cf6',
-  JPY: '#f97316',
-  CHF: '#ec4899',
-  AUD: '#14b8a6',
-  HKD: '#eab308',
+  CAD: CHART_SERIES[0],
+  USD: CHART_SERIES[1],
+  EUR: CHART_SERIES[2],
+  GBP: CHART_SERIES[3],
+  JPY: CHART_SERIES[4],
+  CHF: CHART_SERIES[5],
+  AUD: CHART_SERIES[6],
+  HKD: CHART_SERIES[7],
 };
 
-const FALLBACK_COLOURS = ['#06b6d4', '#a855f7', '#f43f5e', '#84cc16', '#6b7280'];
+const FALLBACK_COLOURS = [CHART_SERIES[8], CHART_SERIES[9]];
+
 
 interface CurrencyAllocation {
   currency: string;
@@ -203,7 +206,7 @@ export function CurrencyExposureReport() {
       ? accounts.filter((a) => selectedAccountIds.includes(a.id)).map((a) => a.name).join(', ')
       : 'All Accounts';
     const legendItems = allocationData.map((item) => ({
-      color: item.color,
+      color: resolvePdfColor(item.color),
       label: `${item.currency} - ${formatCurrencyFull(item.convertedValue, defaultCurrency)} (${item.percentage.toFixed(1)}%)`,
     }));
     await exportToPdf({

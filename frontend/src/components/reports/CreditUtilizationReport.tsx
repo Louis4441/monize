@@ -24,6 +24,7 @@ import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { ReportError } from '@/components/reports/ReportError';
 import { useTranslations } from 'next-intl';
+import { chartColors } from '@/lib/chart-colors';
 
 // Only credit cards and lines of credit with a credit limit can have a
 // meaningful utilization figure (used / available credit).
@@ -43,9 +44,9 @@ type CreditUtilizationSortField =
 // Utilization thresholds drive the bar colour: low (green), moderate (amber),
 // high (red). 30% / 75% mirror the common "keep utilization under 30%" guidance.
 function utilizationColour(percent: number): string {
-  if (percent >= 75) return '#ef4444';
-  if (percent >= 30) return '#f59e0b';
-  return '#22c55e';
+  if (percent >= 75) return chartColors.expense;
+  if (percent >= 30) return chartColors.warning;
+  return chartColors.income;
 }
 
 interface CreditAccountRow {
@@ -285,7 +286,7 @@ export function CreditUtilizationReport() {
         <div style={{ width: '100%', height: chartHeight }}>
           <ResponsiveContainer minWidth={0}>
             <BarChart data={sortedRows} layout="vertical" margin={{ left: 8, right: 24 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
               <XAxis
                 type="number"
                 domain={[0, 100]}
@@ -318,7 +319,7 @@ export function CreditUtilizationReport() {
                   );
                 }}
               />
-              <ReferenceLine x={100} stroke="#9ca3af" strokeDasharray="4 4" />
+              <ReferenceLine x={100} stroke={chartColors.axis} strokeDasharray="4 4" />
               <Bar dataKey="utilizationPercent" radius={[0, 4, 4, 0]}>
                 {sortedRows.map((row) => (
                   <Cell key={row.id} fill={utilizationColour(row.utilizationPercent)} />

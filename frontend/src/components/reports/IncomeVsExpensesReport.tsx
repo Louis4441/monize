@@ -28,6 +28,7 @@ import { SortableHeader } from '@/components/ui/SortableHeader';
 import { ChartTooltip } from "@/components/reports/ChartTooltip";
 import { ReportError } from "@/components/reports/ReportError";
 import { exportToCsv } from "@/lib/csv-export";
+import { chartColors } from "@/lib/chart-colors";
 import { useTranslations } from 'next-intl';
 
 type IncomeVsExpensesSortField = 'name' | 'income' | 'expenses' | 'savings' | 'savingsRate';
@@ -389,7 +390,7 @@ export function IncomeVsExpensesReport() {
                   onClick={handleChartClick}
                   style={{ cursor: "pointer" }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                   <XAxis
                     dataKey="name"
                     tick={{ fontSize: 12 }}
@@ -403,11 +404,11 @@ export function IncomeVsExpensesReport() {
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <ReferenceLine y={0} stroke="#9ca3af" />
+                  <ReferenceLine y={0} stroke={chartColors.axis} />
                   <Bar
                     dataKey="Income"
                     name={t('incomeVsExpenses.seriesIncome')}
-                    fill="#22c55e"
+                    fill={chartColors.income}
                     radius={[4, 4, 0, 0]}
                     cursor="pointer"
                     onClick={handleBarClick('income')}
@@ -415,7 +416,7 @@ export function IncomeVsExpensesReport() {
                   <Bar
                     dataKey="Expenses"
                     name={t('incomeVsExpenses.seriesExpenses')}
-                    fill="#ef4444"
+                    fill={chartColors.expense}
                     radius={[4, 4, 0, 0]}
                     cursor="pointer"
                     onClick={handleBarClick('expense')}
@@ -423,7 +424,7 @@ export function IncomeVsExpensesReport() {
                   <Bar
                     dataKey="Savings"
                     name={t('incomeVsExpenses.seriesSavings')}
-                    fill="#3b82f6"
+                    fill={chartColors.primary}
                     radius={[4, 4, 0, 0]}
                     cursor="pointer"
                   />

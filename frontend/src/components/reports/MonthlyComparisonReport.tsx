@@ -23,6 +23,7 @@ import {
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { gainLossColor } from '@/lib/format';
 import { CHART_COLOURS } from '@/lib/chart-colours';
+import { chartColors } from '@/lib/chart-colors';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
@@ -533,14 +534,14 @@ export function MonthlyComparisonReport() {
                   name: format(parseMonth(p.month), 'MMM yy'),
                   netWorth: Math.round(p.netWorth),
                 }))} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                   <YAxis tickFormatter={formatCurrencyAxis} tick={{ fontSize: 12 }} />
                   <Tooltip
                     formatter={(value) => [formatCurrencyCompact(Number(value), currency), t('monthlyComparison.tooltipNetWorth')]}
-                    contentStyle={{ backgroundColor: 'var(--tooltip-bg, #fff)', borderColor: 'var(--tooltip-border, #e5e7eb)' }}
+                    contentStyle={{ backgroundColor: 'var(--tooltip-bg, var(--color-white))', borderColor: 'var(--tooltip-border, var(--color-gray-200))' }}
                   />
-                  <Bar dataKey="netWorth" fill="#14b8a6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="netWorth" fill={chartColors.primary} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -579,7 +580,7 @@ export function MonthlyComparisonReport() {
                     margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
                     layout="vertical"
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis type="number" tickFormatter={(v: number) => `${v}%`} tick={{ fontSize: 12 }} />
                     <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={90} />
                     <Tooltip formatter={(value) => [`${Number(value).toFixed(2)}%`, t('monthlyComparison.pdfAnnualizedReturn')]} />
@@ -590,7 +591,7 @@ export function MonthlyComparisonReport() {
                       {investments.accountPerformance.map((_, i) => (
                         <Cell
                           key={i}
-                          fill={investments.accountPerformance[i].annualizedReturn >= 0 ? '#22c55e' : '#ef4444'}
+                          fill={investments.accountPerformance[i].annualizedReturn >= 0 ? chartColors.income : chartColors.expense}
                         />
                       ))}
                     </Bar>

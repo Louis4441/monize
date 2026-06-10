@@ -50,6 +50,7 @@ const mockPreferences: UserPreferences = {
   numberFormat: 'en-US',
   timezone: 'UTC',
   theme: 'system',
+  colorTheme: 'default',
   defaultCurrency: 'CAD',
   notificationEmail: false,
   notificationBrowser: false,
@@ -280,6 +281,35 @@ describe('PreferencesSection', () => {
     });
     expect(userSettingsApi.updatePreferences).toHaveBeenCalledWith(
       expect.not.objectContaining({ theme: expect.anything() }),
+    );
+  });
+
+  it('persists the colour theme immediately on change, without waiting for save', async () => {
+    (userSettingsApi.updatePreferences as ReturnType<typeof vi.fn>).mockResolvedValue(mockPreferences);
+
+    render(<PreferencesSection preferences={mockPreferences} onPreferencesUpdated={mockOnPreferencesUpdated} />);
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Colour theme'), { target: { value: 'latte' } });
+    });
+
+    await waitFor(() => {
+      expect(userSettingsApi.updatePreferences).toHaveBeenCalledWith({ colorTheme: 'latte' });
+    });
+  });
+
+  it('does not include colorTheme in the bulk Save Preferences payload', async () => {
+    (userSettingsApi.updatePreferences as ReturnType<typeof vi.fn>).mockResolvedValue(mockPreferences);
+
+    render(<PreferencesSection preferences={mockPreferences} onPreferencesUpdated={mockOnPreferencesUpdated} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Preferences' }));
+
+    await waitFor(() => {
+      expect(userSettingsApi.updatePreferences).toHaveBeenCalled();
+    });
+    expect(userSettingsApi.updatePreferences).toHaveBeenCalledWith(
+      expect.not.objectContaining({ colorTheme: expect.anything() }),
     );
   });
 
