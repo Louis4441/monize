@@ -195,6 +195,49 @@ describe('MonthlyCategoryBreakdownReport', () => {
     expect(url).toContain('endDate=2025-01-31');
   });
 
+  it('drills down using the full report range when a category name is clicked', async () => {
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue(sampleResponse);
+    render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Groceries')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Groceries'));
+    });
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const url = mockPush.mock.calls[0][0] as string;
+    expect(url).toContain('/transactions?');
+    expect(url).toContain('categoryIds=cat-groceries');
+    // Full resolved report range, not a single month.
+    expect(url).toContain('startDate=2025-01-01');
+    expect(url).toContain('endDate=2025-06-30');
+  });
+
+  it('drills down into every child category when a section header is clicked', async () => {
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue(sampleResponse);
+    render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Groceries')).toBeInTheDocument();
+    });
+
+    // The first "Food & Dining" occurrence is the clickable section header.
+    const header = screen.getAllByText('Food & Dining')[0];
+    await act(async () => {
+      fireEvent.click(header);
+    });
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const url = mockPush.mock.calls[0][0] as string;
+    expect(url).toContain('/transactions?');
+    expect(url).toContain('categoryIds=cat-groceries');
+    expect(url).toContain('startDate=2025-01-01');
+    expect(url).toContain('endDate=2025-06-30');
+  });
+
   it('switches to percentage view when the toggle is checked', async () => {
     mockGetMonthlyCategoryBreakdown.mockResolvedValue(sampleResponse);
     render(<MonthlyCategoryBreakdownReport />);
