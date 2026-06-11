@@ -7,6 +7,7 @@ import { PayeesService } from "./payees.service";
 import { Payee } from "./entities/payee.entity";
 import { PayeeAlias } from "./entities/payee-alias.entity";
 import { Category } from "../categories/entities/category.entity";
+import { Transaction } from "../transactions/entities/transaction.entity";
 
 const userId = "user-1";
 
@@ -30,12 +31,30 @@ describe("PayeeAutoMergeService", () => {
   let service: PayeeAutoMergeService;
   let mockPayeesService: Record<string, jest.Mock>;
   let mockCategoriesRepository: Record<string, jest.Mock>;
+  let mockTransactionsRepository: Record<string, jest.Mock>;
+  // Rows returned by the dominant-category query; set per test.
+  let dominantRows: Array<{ payeeId: string; categoryId: string; cnt: string }>;
   let mockQueryRunner: any;
   let mockDataSource: { createQueryRunner: jest.Mock };
 
   beforeEach(async () => {
     mockPayeesService = { findAll: jest.fn() };
     mockCategoriesRepository = { find: jest.fn().mockResolvedValue([]) };
+    dominantRows = [];
+    const txQueryBuilder: any = {
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      addGroupBy: jest.fn().mockReturnThis(),
+      getRawMany: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(dominantRows)),
+    };
+    mockTransactionsRepository = {
+      createQueryBuilder: jest.fn().mockReturnValue(txQueryBuilder),
+    };
 
     mockQueryRunner = {
       connect: jest.fn(),
@@ -66,6 +85,10 @@ describe("PayeeAutoMergeService", () => {
         {
           provide: getRepositoryToken(Category),
           useValue: mockCategoriesRepository,
+        },
+        {
+          provide: getRepositoryToken(Transaction),
+          useValue: mockTransactionsRepository,
         },
       ],
     }).compile();
@@ -316,6 +339,59 @@ describe("PayeeAutoMergeService", () => {
         });
 
         expect(mockCategoriesRepository.find).not.toHaveBeenCalled();
+      });
+
+      it("does not group payees whose category is unknown (no default, no transactions)", async () => {
+        mockPayeesService.findAll.mockResolvedValue([
+          makePayee("p1", "Amazon", 10, null),
+          makePayee("p2", "Amazon Prime", 5, null),
+        ]);
+        dominantRows = []; // neither payee has categorized transactions
+
+        const { groups } = await service.previewAutoMerge(userId, {
+          ...opts,
+          categoryMatch: "subcategory",
+        });
+
+        // null category must not match another null category.
+        expect(groups).toHaveLength(0);
+      });
+
+      it("falls back to the dominant transaction category when no default is set", async () => {
+        mockPayeesService.findAll.mockResolvedValue([
+          makePayee("p1", "Amazon", 10, null),
+          makePayee("p2", "Amazon Prime", 5, null),
+        ]);
+        dominantRows = [
+          { payeeId: "p1", categoryId: "cat-shopping", cnt: "8" },
+          { payeeId: "p2", categoryId: "cat-shopping", cnt: "4" },
+        ];
+
+        const { groups } = await service.previewAutoMerge(userId, {
+          ...opts,
+          categoryMatch: "subcategory",
+        });
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].members).toHaveLength(2);
+      });
+
+      it("keeps payees apart when their dominant transaction categories differ", async () => {
+        mockPayeesService.findAll.mockResolvedValue([
+          makePayee("p1", "Amazon", 10, null),
+          makePayee("p2", "Amazon Prime", 5, null),
+        ]);
+        dominantRows = [
+          { payeeId: "p1", categoryId: "cat-shopping", cnt: "8" },
+          { payeeId: "p2", categoryId: "cat-digital", cnt: "4" },
+        ];
+
+        const { groups } = await service.previewAutoMerge(userId, {
+          ...opts,
+          categoryMatch: "subcategory",
+        });
+
+        expect(groups).toHaveLength(0);
       });
     });
 

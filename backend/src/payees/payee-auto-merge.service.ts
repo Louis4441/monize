@@ -95,6 +95,8 @@ export class PayeeAutoMergeService {
     private readonly payeesService: PayeesService,
     @InjectRepository(Category)
     private readonly categoriesRepository: Repository<Category>,
+    @InjectRepository(Transaction)
+    private readonly transactionsRepository: Repository<Transaction>,
   ) {}
 
   /**
@@ -115,14 +117,22 @@ export class PayeeAutoMergeService {
       opts.includeInactive ? "all" : "active",
     );
 
-    // When matching by top-level category, build a categoryId -> rootId map.
+    // Resolve each payee's effective category when the filter is on: prefer the
+    // explicit default category, else fall back to the payee's dominant
+    // transaction category. A null key means "category unknown" - such payees
+    // are excluded from grouping rather than matched against each other.
+    const categoryFilterOn = opts.categoryMatch !== "off";
     const rootByCategory =
       opts.categoryMatch === "category"
         ? await this.buildRootCategoryMap(userId)
         : null;
+    const dominantByPayee = categoryFilterOn
+      ? await this.buildDominantCategoryMap(userId)
+      : null;
     const categoryKeyOf = (payee: PayeeWithStats): string | null => {
-      const catId = payee.defaultCategoryId;
-      if (opts.categoryMatch === "off" || !catId) return null;
+      if (!categoryFilterOn) return null;
+      const catId = payee.defaultCategoryId ?? dominantByPayee?.get(payee.id);
+      if (!catId) return null;
       if (opts.categoryMatch === "subcategory") return catId;
       return rootByCategory?.get(catId) ?? catId;
     };
@@ -215,11 +225,14 @@ export class PayeeAutoMergeService {
   ): PayeeWithStats[][] {
     const n = annotated.length;
     const canLink = (i: number, j: number): boolean => {
-      if (
-        enforceCategory &&
-        annotated[i].categoryKey !== annotated[j].categoryKey
-      ) {
-        return false;
+      if (enforceCategory) {
+        const keyA = annotated[i].categoryKey;
+        const keyB = annotated[j].categoryKey;
+        // An unknown category (null) never matches - not even another unknown -
+        // so payees with no determinable category are not grouped together.
+        if (keyA === null || keyB === null || keyA !== keyB) {
+          return false;
+        }
       }
       return this.isFuzzyPrefix(
         annotated[i].tokens,
@@ -322,6 +335,38 @@ export class PayeeAutoMergeService {
       rootOf.set(category.id, current);
     }
     return rootOf;
+  }
+
+  /**
+   * Build a map from payee id to its dominant (most-used) transaction category,
+   * used as the payee's category when no explicit default category is set.
+   * Transfers and uncategorized transactions are ignored.
+   */
+  private async buildDominantCategoryMap(
+    userId: string,
+  ): Promise<Map<string, string>> {
+    const rows = await this.transactionsRepository
+      .createQueryBuilder("t")
+      .select("t.payee_id", "payeeId")
+      .addSelect("t.category_id", "categoryId")
+      .addSelect("COUNT(*)", "cnt")
+      .where("t.user_id = :userId", { userId })
+      .andWhere("t.payee_id IS NOT NULL")
+      .andWhere("t.category_id IS NOT NULL")
+      .andWhere("t.is_transfer = false")
+      .groupBy("t.payee_id")
+      .addGroupBy("t.category_id")
+      .getRawMany<{ payeeId: string; categoryId: string; cnt: string }>();
+
+    const best = new Map<string, { categoryId: string; count: number }>();
+    for (const row of rows) {
+      const count = parseInt(row.cnt, 10);
+      const current = best.get(row.payeeId);
+      if (!current || count > current.count) {
+        best.set(row.payeeId, { categoryId: row.categoryId, count });
+      }
+    }
+    return new Map([...best].map(([payeeId, v]) => [payeeId, v.categoryId]));
   }
 
   /**
