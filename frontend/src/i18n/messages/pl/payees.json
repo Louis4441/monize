@@ -174,6 +174,15 @@
       "aliasesSkipped": "{count, plural, one {Pominięto # alias z powodu konfliktu} few {Pominięto # aliasy z powodu konfliktów} many {Pominięto # aliasów z powodu konfliktów} other {Pominięto # aliasów z powodu konfliktów}}",
       "loadFailed": "Nie udało się załadować grup scalania",
       "applyFailed": "Nie udało się scalić odbiorców"
+    },
+    "categoryMatchLabel": "Scalaj tylko odbiorców z tej samej kategorii",
+    "categoryMatchHelp": "Rozdziela odbiorców o różnych kategoriach, ograniczając błędne dopasowania.",
+    "granularityLabel": "Poziom dopasowania kategorii",
+    "selectAll": "Zaznacz wszystko",
+    "deselectAll": "Odznacz wszystko",
+    "granularity": {
+      "category": "Kategoria",
+      "subcategory": "Podkategoria"
     }
   },
   "deactivateUnused": {

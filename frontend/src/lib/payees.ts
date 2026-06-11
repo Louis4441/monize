@@ -223,6 +223,7 @@ export const payeesApi = {
         similarityThreshold: params.similarityThreshold,
         minTokenLength: params.minTokenLength,
         includeInactive: params.includeInactive,
+        categoryMatch: params.categoryMatch,
       },
     });
     return response.data.groups;

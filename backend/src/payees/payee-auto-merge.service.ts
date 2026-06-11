@@ -4,10 +4,12 @@ import {
   ConflictException,
   Logger,
 } from "@nestjs/common";
-import { DataSource, QueryRunner } from "typeorm";
+import { InjectRepository } from "@nestjs/typeorm";
+import { DataSource, QueryRunner, Repository } from "typeorm";
 import { tr } from "../i18n/translate";
 import { Payee } from "./entities/payee.entity";
 import { PayeeAlias } from "./entities/payee-alias.entity";
+import { Category } from "../categories/entities/category.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { PayeesService } from "./payees.service";
@@ -18,11 +20,16 @@ import {
   similarity,
 } from "./payee-normalize.util";
 
+export type CategoryMatchMode = "off" | "category" | "subcategory";
+
 export interface AutoMergeOptions {
   minGroupSize: number;
   similarityThreshold: number; // 0-1
   minTokenLength: number;
   includeInactive: boolean;
+  // When not "off", only payees sharing the same category ("category" = the
+  // top-level parent, "subcategory" = the exact default category) may merge.
+  categoryMatch: CategoryMatchMode;
 }
 
 export interface AutoMergeMember {
@@ -66,6 +73,9 @@ type PayeeWithStats = Awaited<ReturnType<PayeesService["findAll"]>>[number];
 interface AnnotatedPayee {
   payee: PayeeWithStats;
   tokens: string[];
+  // Category identity used to gate merges when categoryMatch is enabled; null
+  // when the payee has no default category (or matching is off).
+  categoryKey: string | null;
 }
 
 @Injectable()
@@ -75,6 +85,8 @@ export class PayeeAutoMergeService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly payeesService: PayeesService,
+    @InjectRepository(Category)
+    private readonly categoriesRepository: Repository<Category>,
   ) {}
 
   /**
@@ -95,6 +107,18 @@ export class PayeeAutoMergeService {
       opts.includeInactive ? "all" : "active",
     );
 
+    // When matching by top-level category, build a categoryId -> rootId map.
+    const rootByCategory =
+      opts.categoryMatch === "category"
+        ? await this.buildRootCategoryMap(userId)
+        : null;
+    const categoryKeyOf = (payee: PayeeWithStats): string | null => {
+      const catId = payee.defaultCategoryId;
+      if (opts.categoryMatch === "off" || !catId) return null;
+      if (opts.categoryMatch === "subcategory") return catId;
+      return rootByCategory?.get(catId) ?? catId;
+    };
+
     // Tokenize each payee's normalized name; skip names with no usable token.
     const annotated: AnnotatedPayee[] = payees
       .map((payee) => ({
@@ -103,10 +127,15 @@ export class PayeeAutoMergeService {
           normalizePayeeName(payee.name),
           opts.minTokenLength,
         ),
+        categoryKey: categoryKeyOf(payee),
       }))
       .filter((entry) => entry.tokens.length > 0);
 
-    const clusters = this.clusterPayees(annotated, opts.similarityThreshold);
+    const clusters = this.clusterPayees(
+      annotated,
+      opts.similarityThreshold,
+      opts.categoryMatch !== "off",
+    );
 
     const groups: AutoMergeGroupPreview[] = clusters
       .filter((members) => members.length >= opts.minGroupSize)
@@ -129,12 +158,29 @@ export class PayeeAutoMergeService {
    * containment requires the first tokens to match, so payees are first bucketed
    * by exact first token; spelling variants of the first token (LIDL/LIDI) are
    * reconciled in a bounded cross-bucket pass.
+   *
+   * When `enforceCategory` is set, two payees may only link when their category
+   * keys are equal (equality is transitive, so clusters stay category-pure).
    */
   private clusterPayees(
     annotated: AnnotatedPayee[],
     threshold: number,
+    enforceCategory: boolean,
   ): PayeeWithStats[][] {
     const n = annotated.length;
+    const canLink = (i: number, j: number): boolean => {
+      if (
+        enforceCategory &&
+        annotated[i].categoryKey !== annotated[j].categoryKey
+      ) {
+        return false;
+      }
+      return this.isFuzzyPrefix(
+        annotated[i].tokens,
+        annotated[j].tokens,
+        threshold,
+      );
+    };
     const parent = Array.from({ length: n }, (_, i) => i);
     const find = (i: number): number => {
       let root = i;
@@ -165,13 +211,7 @@ export class PayeeAutoMergeService {
     for (const indices of byFirstToken.values()) {
       for (let a = 0; a < indices.length; a++) {
         for (let b = a + 1; b < indices.length; b++) {
-          if (
-            this.isFuzzyPrefix(
-              annotated[indices[a]].tokens,
-              annotated[indices[b]].tokens,
-              threshold,
-            )
-          ) {
+          if (canLink(indices[a], indices[b])) {
             union(indices[a], indices[b]);
           }
         }
@@ -189,13 +229,7 @@ export class PayeeAutoMergeService {
           const ib = byFirstToken.get(firstTokens[b])!;
           for (const x of ia) {
             for (const y of ib) {
-              if (
-                this.isFuzzyPrefix(
-                  annotated[x].tokens,
-                  annotated[y].tokens,
-                  threshold,
-                )
-              ) {
+              if (canLink(x, y)) {
                 union(x, y);
               }
             }
@@ -212,6 +246,36 @@ export class PayeeAutoMergeService {
       else clusters.set(root, [annotated[i].payee]);
     }
     return [...clusters.values()];
+  }
+
+  /**
+   * Build a map from every category id to its top-level (root) category id, so
+   * subcategories can be compared at the parent-category level.
+   */
+  private async buildRootCategoryMap(
+    userId: string,
+  ): Promise<Map<string, string>> {
+    const categories = await this.categoriesRepository.find({
+      where: { userId },
+      select: ["id", "parentId"],
+    });
+    const parentOf = new Map<string, string | null>(
+      categories.map((c) => [c.id, c.parentId]),
+    );
+    const rootOf = new Map<string, string>();
+    for (const category of categories) {
+      let current = category.id;
+      const seen = new Set<string>();
+      // Walk up the parent chain, guarding against cycles and missing parents.
+      while (true) {
+        const parent = parentOf.get(current);
+        if (!parent || !parentOf.has(parent) || seen.has(parent)) break;
+        seen.add(parent);
+        current = parent;
+      }
+      rootOf.set(category.id, current);
+    }
+    return rootOf;
   }
 
   /**

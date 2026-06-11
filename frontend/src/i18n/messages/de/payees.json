@@ -174,6 +174,15 @@
       "aliasesSkipped": "{count, plural, one {# Alias wurde wegen eines Konflikts übersprungen} other {# Aliase wurden wegen Konflikten übersprungen}}",
       "loadFailed": "Zusammenführungsgruppen konnten nicht geladen werden",
       "applyFailed": "Zahlungsempfänger konnten nicht zusammengeführt werden"
+    },
+    "categoryMatchLabel": "Nur Zahlungsempfänger derselben Kategorie zusammenführen",
+    "categoryMatchHelp": "Hält Zahlungsempfänger getrennt, wenn sich ihre Kategorien unterscheiden, und reduziert so Fehltreffer.",
+    "granularityLabel": "Kategorie-Übereinstimmungsebene",
+    "selectAll": "Alle auswählen",
+    "deselectAll": "Alle abwählen",
+    "granularity": {
+      "category": "Kategorie",
+      "subcategory": "Unterkategorie"
     }
   },
   "deactivateUnused": {

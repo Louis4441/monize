@@ -25,7 +25,10 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { assertStringParam } from "../common/query-param-utils";
 import { PayeesService } from "./payees.service";
-import { PayeeAutoMergeService } from "./payee-auto-merge.service";
+import {
+  PayeeAutoMergeService,
+  CategoryMatchMode,
+} from "./payee-auto-merge.service";
 import { CreatePayeeDto } from "./dto/create-payee.dto";
 import { UpdatePayeeDto } from "./dto/update-payee.dto";
 import { CreatePayeeAliasDto } from "./dto/create-payee-alias.dto";
@@ -254,6 +257,13 @@ export class PayeesController {
     type: Boolean,
     description: "Include inactive payees (default: false)",
   })
+  @ApiQuery({
+    name: "categoryMatch",
+    required: false,
+    enum: ["off", "category", "subcategory"],
+    description:
+      "Only merge payees sharing a category/subcategory (default: off)",
+  })
   @ApiResponse({ status: 200, description: "Suggested merge groups" })
   previewAutoMerge(
     @Request() req,
@@ -265,12 +275,19 @@ export class PayeesController {
     minTokenLength: number,
     @Query("includeInactive", new DefaultValuePipe(false), ParseBoolPipe)
     includeInactive: boolean,
+    @Query("categoryMatch", new DefaultValuePipe("off"))
+    categoryMatch: string,
   ) {
+    const categoryMatchMode: CategoryMatchMode =
+      categoryMatch === "category" || categoryMatch === "subcategory"
+        ? categoryMatch
+        : "off";
     return this.payeeAutoMergeService.previewAutoMerge(req.user.id, {
       minGroupSize: Math.min(Math.max(minGroupSize, 2), 50),
       similarityThreshold: Math.min(Math.max(similarityThreshold, 0.5), 1),
       minTokenLength: Math.min(Math.max(minTokenLength, 2), 10),
       includeInactive,
+      categoryMatch: categoryMatchMode,
     });
   }
 

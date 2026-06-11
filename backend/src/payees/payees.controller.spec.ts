@@ -562,7 +562,7 @@ describe("PayeesController", () => {
     it("delegates with clamped options", async () => {
       mockAutoMergeService.previewAutoMerge.mockResolvedValue({ groups: [] });
 
-      await controller.previewAutoMerge(mockReq, 2, 0.85, 3, false);
+      await controller.previewAutoMerge(mockReq, 2, 0.85, 3, false, "off");
 
       expect(mockAutoMergeService.previewAutoMerge).toHaveBeenCalledWith(
         "user-1",
@@ -571,6 +571,7 @@ describe("PayeesController", () => {
           similarityThreshold: 0.85,
           minTokenLength: 3,
           includeInactive: false,
+          categoryMatch: "off",
         },
       );
     });
@@ -578,7 +579,14 @@ describe("PayeesController", () => {
     it("clamps out-of-range knobs into safe bounds", async () => {
       mockAutoMergeService.previewAutoMerge.mockResolvedValue({ groups: [] });
 
-      await controller.previewAutoMerge(mockReq, 1, 0.1, 99, true);
+      await controller.previewAutoMerge(
+        mockReq,
+        1,
+        0.1,
+        99,
+        true,
+        "subcategory",
+      );
 
       expect(mockAutoMergeService.previewAutoMerge).toHaveBeenCalledWith(
         "user-1",
@@ -587,7 +595,19 @@ describe("PayeesController", () => {
           similarityThreshold: 0.5,
           minTokenLength: 10,
           includeInactive: true,
+          categoryMatch: "subcategory",
         },
+      );
+    });
+
+    it("falls back to 'off' for an unknown categoryMatch value", async () => {
+      mockAutoMergeService.previewAutoMerge.mockResolvedValue({ groups: [] });
+
+      await controller.previewAutoMerge(mockReq, 2, 0.85, 3, false, "bogus");
+
+      expect(mockAutoMergeService.previewAutoMerge).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({ categoryMatch: "off" }),
       );
     });
   });

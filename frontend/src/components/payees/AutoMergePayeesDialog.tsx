@@ -4,11 +4,14 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { payeesApi } from '@/lib/payees';
 import { AutoMergeGroup } from '@/types/payee';
 import toast from 'react-hot-toast';
 import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
+
+type CategoryGranularity = 'category' | 'subcategory';
 
 const logger = createLogger('AutoMergePayees');
 
@@ -57,6 +60,9 @@ export function AutoMergePayeesDialog({
   const [similarityPercent, setSimilarityPercent] = useState(85);
   const [minTokenLength, setMinTokenLength] = useState(3);
   const [includeInactive, setIncludeInactive] = useState(false);
+  const [categoryMatchEnabled, setCategoryMatchEnabled] = useState(false);
+  const [categoryGranularity, setCategoryGranularity] =
+    useState<CategoryGranularity>('category');
 
   const [groups, setGroups] = useState<EditableGroup[]>([]);
   const [hasPreviewLoaded, setHasPreviewLoaded] = useState(false);
@@ -82,6 +88,7 @@ export function AutoMergePayeesDialog({
         similarityThreshold: similarityPercent / 100,
         minTokenLength,
         includeInactive,
+        categoryMatch: categoryMatchEnabled ? categoryGranularity : 'off',
       });
       setGroups(toEditableGroups(results));
       setHasPreviewLoaded(true);
@@ -120,6 +127,10 @@ export function AutoMergePayeesDialog({
       canonicalName: member ? member.name : group.canonicalName,
       selectedMemberIds: next,
     });
+  };
+
+  const setAllIncluded = (included: boolean) => {
+    setGroups((prev) => prev.map((g) => ({ ...g, included })));
   };
 
   // A group is applicable when included and has at least two selected members
@@ -246,20 +257,57 @@ export function AutoMergePayeesDialog({
           </div>
 
           {/* Include inactive */}
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="autoMergeIncludeInactive"
+          <label className="flex items-center gap-3 cursor-pointer">
+            <ToggleSwitch
               checked={includeInactive}
-              onChange={(e) => setIncludeInactive(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+              onChange={setIncludeInactive}
+              label={t('autoMerge.includeInactiveLabel')}
             />
-            <label
-              htmlFor="autoMergeIncludeInactive"
-              className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-            >
+            <span className="text-sm text-gray-700 dark:text-gray-300">
               {t('autoMerge.includeInactiveLabel')}
+            </span>
+          </label>
+
+          {/* Require matching category */}
+          <div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <ToggleSwitch
+                checked={categoryMatchEnabled}
+                onChange={setCategoryMatchEnabled}
+                label={t('autoMerge.categoryMatchLabel')}
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                {t('autoMerge.categoryMatchLabel')}
+              </span>
             </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              {t('autoMerge.categoryMatchHelp')}
+            </p>
+            {categoryMatchEnabled && (
+              <div
+                className="flex gap-1 mt-2"
+                role="group"
+                aria-label={t('autoMerge.granularityLabel')}
+              >
+                {(['category', 'subcategory'] as CategoryGranularity[]).map(
+                  (mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setCategoryGranularity(mode)}
+                      aria-pressed={categoryGranularity === mode}
+                      className={
+                        categoryGranularity === mode
+                          ? 'px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white transition-colors'
+                          : 'px-3 py-1.5 text-sm font-medium rounded-md bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors'
+                      }
+                    >
+                      {t(`autoMerge.granularity.${mode}`)}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -278,9 +326,30 @@ export function AutoMergePayeesDialog({
         {/* Results */}
         {hasPreviewLoaded && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-              {t('autoMerge.groupsHeader', { count: groups.length })}
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                {t('autoMerge.groupsHeader', { count: groups.length })}
+              </h3>
+              {groups.length > 0 && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAllIncluded(true)}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {t('autoMerge.selectAll')}
+                  </button>
+                  <span className="text-gray-300 dark:text-gray-600">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setAllIncluded(false)}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {t('autoMerge.deselectAll')}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {groups.length === 0 ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -300,15 +369,15 @@ export function AutoMergePayeesDialog({
                   >
                     {/* Group header: include toggle + editable canonical name + alias */}
                     <div className="flex items-start gap-3 mb-3">
-                      <input
-                        type="checkbox"
-                        checked={group.included}
-                        onChange={(e) =>
-                          updateGroup(group.id, { included: e.target.checked })
-                        }
-                        className="mt-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-                        aria-label={t('autoMerge.includeGroupLabel')}
-                      />
+                      <div className="mt-1">
+                        <ToggleSwitch
+                          checked={group.included}
+                          onChange={(next) =>
+                            updateGroup(group.id, { included: next })
+                          }
+                          label={t('autoMerge.includeGroupLabel')}
+                        />
+                      </div>
                       <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
@@ -360,13 +429,12 @@ export function AutoMergePayeesDialog({
                               className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
                               aria-label={t('autoMerge.keepLabel')}
                             />
-                            <input
-                              type="checkbox"
+                            <ToggleSwitch
+                              size="sm"
                               checked={group.selectedMemberIds.has(member.payeeId)}
                               onChange={() => toggleMember(group, member.payeeId)}
                               disabled={isCanonical || !group.included}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-                              aria-label={t('autoMerge.includeMemberLabel')}
+                              label={t('autoMerge.includeMemberLabel')}
                             />
                             <span className="flex-1 text-gray-900 dark:text-gray-100">
                               {member.name}

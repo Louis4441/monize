@@ -174,6 +174,15 @@
       "aliasesSkipped": "{count, plural, one {# alias was skipped due to a conflict} other {# aliases were skipped due to conflicts}}",
       "loadFailed": "Failed to load merge groups",
       "applyFailed": "Failed to merge payees"
+    },
+    "categoryMatchLabel": "Only merge payees in the same category",
+    "categoryMatchHelp": "Keep payees apart when their categories differ, reducing false matches.",
+    "granularityLabel": "Category match level",
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all",
+    "granularity": {
+      "category": "Category",
+      "subcategory": "Subcategory"
     }
   },
   "deactivateUnused": {

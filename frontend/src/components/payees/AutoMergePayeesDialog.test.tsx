@@ -83,7 +83,67 @@ describe('AutoMergePayeesDialog', () => {
       similarityThreshold: 0.85,
       minTokenLength: 3,
       includeInactive: false,
+      categoryMatch: 'off',
     });
+  });
+
+  it('requests category matching when enabled, defaulting to category granularity', async () => {
+    mockPreview.mockResolvedValue([]);
+    render(<AutoMergePayeesDialog isOpen onClose={onClose} onSuccess={onSuccess} />);
+
+    // Enable the "same category" toggle, then preview.
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Only merge payees in the same category' }),
+      );
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Preview Groups'));
+    });
+
+    expect(mockPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ categoryMatch: 'category' }),
+    );
+  });
+
+  it('requests subcategory matching when that granularity is chosen', async () => {
+    mockPreview.mockResolvedValue([]);
+    render(<AutoMergePayeesDialog isOpen onClose={onClose} onSuccess={onSuccess} />);
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Only merge payees in the same category' }),
+      );
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Subcategory' }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Preview Groups'));
+    });
+
+    expect(mockPreview).toHaveBeenCalledWith(
+      expect.objectContaining({ categoryMatch: 'subcategory' }),
+    );
+  });
+
+  it('deselects every group with Deselect all', async () => {
+    mockPreview.mockResolvedValue([lidlGroup]);
+    render(<AutoMergePayeesDialog isOpen onClose={onClose} onSuccess={onSuccess} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Preview Groups'));
+    });
+    await waitFor(() => expect(screen.getByDisplayValue('Lidl')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Deselect all'));
+    });
+
+    // With no groups selected, the apply button is disabled.
+    expect(
+      screen.getByRole('button', { name: /Merge 0 Groups/ }),
+    ).toBeDisabled();
   });
 
   it('applies the merge with the canonical and sources derived from selection', async () => {

@@ -1,10 +1,12 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
+import { getRepositoryToken } from "@nestjs/typeorm";
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import { PayeeAutoMergeService } from "./payee-auto-merge.service";
 import { PayeesService } from "./payees.service";
 import { Payee } from "./entities/payee.entity";
 import { PayeeAlias } from "./entities/payee-alias.entity";
+import { Category } from "../categories/entities/category.entity";
 
 const userId = "user-1";
 
@@ -12,19 +14,28 @@ function makePayee(
   id: string,
   name: string,
   transactionCount: number,
+  defaultCategoryId: string | null = null,
   isActive = true,
 ): Partial<Payee> {
-  return { id, name, transactionCount, isActive } as Partial<Payee>;
+  return {
+    id,
+    name,
+    transactionCount,
+    defaultCategoryId,
+    isActive,
+  } as Partial<Payee>;
 }
 
 describe("PayeeAutoMergeService", () => {
   let service: PayeeAutoMergeService;
   let mockPayeesService: Record<string, jest.Mock>;
+  let mockCategoriesRepository: Record<string, jest.Mock>;
   let mockQueryRunner: any;
   let mockDataSource: { createQueryRunner: jest.Mock };
 
   beforeEach(async () => {
     mockPayeesService = { findAll: jest.fn() };
+    mockCategoriesRepository = { find: jest.fn().mockResolvedValue([]) };
 
     mockQueryRunner = {
       connect: jest.fn(),
@@ -52,6 +63,10 @@ describe("PayeeAutoMergeService", () => {
         PayeeAutoMergeService,
         { provide: DataSource, useValue: mockDataSource },
         { provide: PayeesService, useValue: mockPayeesService },
+        {
+          provide: getRepositoryToken(Category),
+          useValue: mockCategoriesRepository,
+        },
       ],
     }).compile();
 
@@ -64,6 +79,7 @@ describe("PayeeAutoMergeService", () => {
       similarityThreshold: 0.85,
       minTokenLength: 3,
       includeInactive: false,
+      categoryMatch: "off" as const,
     };
 
     it("clusters Lidl variants and picks the most-used canonical", async () => {
@@ -232,6 +248,73 @@ describe("PayeeAutoMergeService", () => {
       expect(groups[0].members).toHaveLength(2);
       expect(groups[0].suggestedAlias).toBe("*ROYAL CITY NURSERY*");
       expect(groups[0].suggestedCanonicalPayeeId).toBe("p1");
+    });
+
+    describe("category matching", () => {
+      it("keeps prefix variants apart when their subcategories differ", async () => {
+        mockPayeesService.findAll.mockResolvedValue([
+          makePayee("p1", "Amazon", 10, "cat-shopping"),
+          makePayee("p2", "Amazon Prime", 5, "cat-digital"),
+        ]);
+
+        const { groups } = await service.previewAutoMerge(userId, {
+          ...opts,
+          categoryMatch: "subcategory",
+        });
+
+        expect(groups).toHaveLength(0);
+      });
+
+      it("still groups prefix variants that share a subcategory", async () => {
+        mockPayeesService.findAll.mockResolvedValue([
+          makePayee("p1", "Amazon", 10, "cat-shopping"),
+          makePayee("p2", "Amazon Prime", 5, "cat-shopping"),
+        ]);
+
+        const { groups } = await service.previewAutoMerge(userId, {
+          ...opts,
+          categoryMatch: "subcategory",
+        });
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].members).toHaveLength(2);
+      });
+
+      it("groups by top-level category, resolving subcategories to their root", async () => {
+        // cat-books and cat-electronics are both children of cat-shopping.
+        mockCategoriesRepository.find.mockResolvedValue([
+          { id: "cat-shopping", parentId: null },
+          { id: "cat-books", parentId: "cat-shopping" },
+          { id: "cat-electronics", parentId: "cat-shopping" },
+        ]);
+        mockPayeesService.findAll.mockResolvedValue([
+          makePayee("p1", "Amazon", 10, "cat-books"),
+          makePayee("p2", "Amazon Prime", 5, "cat-electronics"),
+        ]);
+
+        const { groups } = await service.previewAutoMerge(userId, {
+          ...opts,
+          categoryMatch: "category",
+        });
+
+        expect(groups).toHaveLength(1);
+        expect(groups[0].members).toHaveLength(2);
+        expect(mockCategoriesRepository.find).toHaveBeenCalled();
+      });
+
+      it("does not load categories when matching by subcategory", async () => {
+        mockPayeesService.findAll.mockResolvedValue([
+          makePayee("p1", "Amazon", 10, "cat-shopping"),
+          makePayee("p2", "Amazon Prime", 5, "cat-shopping"),
+        ]);
+
+        await service.previewAutoMerge(userId, {
+          ...opts,
+          categoryMatch: "subcategory",
+        });
+
+        expect(mockCategoriesRepository.find).not.toHaveBeenCalled();
+      });
     });
   });
 

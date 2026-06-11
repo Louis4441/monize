@@ -50,11 +50,14 @@ export interface MergePayeeResult {
   sourcePayeeDeleted: boolean;
 }
 
+export type CategoryMatchMode = 'off' | 'category' | 'subcategory';
+
 export interface AutoMergePreviewParams {
   minGroupSize: number;
   similarityThreshold: number;
   minTokenLength: number;
   includeInactive: boolean;
+  categoryMatch: CategoryMatchMode;
 }
 
 export interface AutoMergeMember {
