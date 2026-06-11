@@ -14,7 +14,7 @@ import { PayeesService } from "./payees.service";
 import { matchesAliasPattern } from "./alias-match.util";
 import {
   normalizePayeeName,
-  leadingSignificantToken,
+  significantTokens,
   similarity,
 } from "./payee-normalize.util";
 
@@ -56,16 +56,16 @@ export interface ApplyAutoMergeResult {
   skippedAliases: number;
 }
 
-// Cap the fuzzy O(G^2) representative comparison to keep preview cheap even
-// for very large payee lists. Token bucketing still applies above this.
-const MAX_FUZZY_GROUPS = 1500;
+// Cap the cross-bucket fuzzy pass (O(B^2) over distinct first tokens) to keep
+// preview cheap on very large payee lists.
+const MAX_FUZZY_FIRST_TOKENS = 1500;
 
 // findAll() enriches each payee with computed stats (transactionCount, etc.).
 type PayeeWithStats = Awaited<ReturnType<PayeesService["findAll"]>>[number];
 
-interface Cluster {
-  token: string;
-  payees: PayeeWithStats[];
+interface AnnotatedPayee {
+  payee: PayeeWithStats;
+  tokens: string[];
 }
 
 @Injectable()
@@ -78,9 +78,13 @@ export class PayeeAutoMergeService {
   ) {}
 
   /**
-   * Analyze all payees and propose merge groups of near-duplicates. Each group
-   * suggests a canonical payee (the most-used member) and a wildcard alias
-   * (`*TOKEN*`) so future imports are auto-captured. Read-only.
+   * Analyze all payees and propose merge groups of near-duplicates. Payees are
+   * grouped only when one name is a (fuzzy) token-prefix elaboration of another
+   * - e.g. "Lidl" -> "Lidl Warszawa" -> "Lidl sp. z o.o." - so a merely shared
+   * common word does NOT collapse unrelated payees ("Royal Electric" vs "Royal
+   * City Nursery" diverge at the second token and stay apart). Each group
+   * suggests a canonical payee (the most-used member) and a wildcard alias built
+   * from the shared prefix so future imports are auto-captured. Read-only.
    */
   async previewAutoMerge(
     userId: string,
@@ -91,56 +95,22 @@ export class PayeeAutoMergeService {
       opts.includeInactive ? "all" : "active",
     );
 
-    // Precompute normalized form + leading token for each payee.
-    const annotated = payees
+    // Tokenize each payee's normalized name; skip names with no usable token.
+    const annotated: AnnotatedPayee[] = payees
       .map((payee) => ({
         payee,
-        normalized: normalizePayeeName(payee.name),
+        tokens: significantTokens(
+          normalizePayeeName(payee.name),
+          opts.minTokenLength,
+        ),
       }))
-      .map((entry) => ({
-        ...entry,
-        token: leadingSignificantToken(entry.normalized, opts.minTokenLength),
-      }))
-      .filter(
-        (
-          entry,
-        ): entry is {
-          payee: PayeeWithStats;
-          normalized: string;
-          token: string;
-        } => entry.token !== null,
-      );
+      .filter((entry) => entry.tokens.length > 0);
 
-    // Stage 1: bucket by leading significant token.
-    const buckets = new Map<string, Cluster>();
-    for (const entry of annotated) {
-      const existing = buckets.get(entry.token);
-      if (!existing) {
-        buckets.set(entry.token, {
-          token: entry.token,
-          payees: [entry.payee],
-        });
-      } else {
-        buckets.set(entry.token, {
-          ...existing,
-          payees: [...existing.payees, entry.payee],
-        });
-      }
-    }
+    const clusters = this.clusterPayees(annotated, opts.similarityThreshold);
 
-    // Stage 2: fuzzy-merge buckets whose leading tokens are close enough so
-    // spelling variants that fell into different token buckets still group
-    // (e.g. LIDL/LIDI, WALMART/WALMRT). Exact-token buckets are already merged
-    // in Stage 1; this is where the similarity threshold takes effect.
-    const clusters = this.fuzzyMergeClusters(
-      [...buckets.values()],
-      opts.similarityThreshold,
-    );
-
-    // Build previews for clusters that meet the minimum group size.
     const groups: AutoMergeGroupPreview[] = clusters
-      .filter((cluster) => cluster.payees.length >= opts.minGroupSize)
-      .map((cluster) => this.toGroupPreview(cluster, opts.minTokenLength))
+      .filter((members) => members.length >= opts.minGroupSize)
+      .map((members) => this.toGroupPreview(members, opts.minTokenLength))
       .sort((a, b) => {
         if (b.totalTransactions !== a.totalTransactions) {
           return b.totalTransactions - a.totalTransactions;
@@ -151,15 +121,21 @@ export class PayeeAutoMergeService {
     return { groups };
   }
 
-  private fuzzyMergeClusters(
-    clusters: Cluster[],
+  /**
+   * Cluster payees by fuzzy token-prefix containment: two payees join the same
+   * cluster when the shorter token list is a prefix of the longer one, with
+   * each aligned token matching within the similarity threshold (a token
+   * matches itself at 1.0, so a threshold of 1 requires exact tokens). Prefix
+   * containment requires the first tokens to match, so payees are first bucketed
+   * by exact first token; spelling variants of the first token (LIDL/LIDI) are
+   * reconciled in a bounded cross-bucket pass.
+   */
+  private clusterPayees(
+    annotated: AnnotatedPayee[],
     threshold: number,
-  ): Cluster[] {
-    // Skip the quadratic pass on pathologically large inputs.
-    if (clusters.length > MAX_FUZZY_GROUPS) return clusters;
-
-    // Union-find over cluster indices.
-    const parent = clusters.map((_, i) => i);
+  ): PayeeWithStats[][] {
+    const n = annotated.length;
+    const parent = Array.from({ length: n }, (_, i) => i);
     const find = (i: number): number => {
       let root = i;
       while (parent[root] !== root) root = parent[root];
@@ -177,46 +153,85 @@ export class PayeeAutoMergeService {
       if (ra !== rb) parent[ra] = rb;
     };
 
-    // Compare leading tokens (not full names): a token matches itself at 1.0,
-    // so a threshold of 1 means "exact tokens only" while lower values pull in
-    // near-token spelling variants.
-    for (let i = 0; i < clusters.length; i++) {
-      for (let j = i + 1; j < clusters.length; j++) {
-        if (find(i) === find(j)) continue;
-        if (similarity(clusters[i].token, clusters[j].token) >= threshold) {
-          union(i, j);
+    const byFirstToken = new Map<string, number[]>();
+    for (let i = 0; i < n; i++) {
+      const first = annotated[i].tokens[0];
+      const list = byFirstToken.get(first);
+      if (list) list.push(i);
+      else byFirstToken.set(first, [i]);
+    }
+
+    // Within a first-token bucket: link prefix elaborations.
+    for (const indices of byFirstToken.values()) {
+      for (let a = 0; a < indices.length; a++) {
+        for (let b = a + 1; b < indices.length; b++) {
+          if (
+            this.isFuzzyPrefix(
+              annotated[indices[a]].tokens,
+              annotated[indices[b]].tokens,
+              threshold,
+            )
+          ) {
+            union(indices[a], indices[b]);
+          }
         }
       }
     }
 
-    const merged = new Map<number, Cluster>();
-    for (let i = 0; i < clusters.length; i++) {
-      const root = find(i);
-      const current = clusters[i];
-      const existing = merged.get(root);
-      if (!existing) {
-        merged.set(root, current);
-      } else {
-        // Keep the token of the larger contributing bucket so the generated
-        // alias is anchored on the dominant spelling.
-        const dominant =
-          current.payees.length > existing.payees.length ? current : existing;
-        merged.set(root, {
-          token: dominant.token,
-          payees: [...existing.payees, ...current.payees],
-        });
+    // Across buckets: only when the first tokens are themselves close enough
+    // (spelling variants like LIDL/LIDI). Skipped on pathologically large input.
+    const firstTokens = [...byFirstToken.keys()];
+    if (firstTokens.length <= MAX_FUZZY_FIRST_TOKENS) {
+      for (let a = 0; a < firstTokens.length; a++) {
+        for (let b = a + 1; b < firstTokens.length; b++) {
+          if (similarity(firstTokens[a], firstTokens[b]) < threshold) continue;
+          const ia = byFirstToken.get(firstTokens[a])!;
+          const ib = byFirstToken.get(firstTokens[b])!;
+          for (const x of ia) {
+            for (const y of ib) {
+              if (
+                this.isFuzzyPrefix(
+                  annotated[x].tokens,
+                  annotated[y].tokens,
+                  threshold,
+                )
+              ) {
+                union(x, y);
+              }
+            }
+          }
+        }
       }
     }
 
-    return [...merged.values()];
+    const clusters = new Map<number, PayeeWithStats[]>();
+    for (let i = 0; i < n; i++) {
+      const root = find(i);
+      const list = clusters.get(root);
+      if (list) list.push(annotated[i].payee);
+      else clusters.set(root, [annotated[i].payee]);
+    }
+    return [...clusters.values()];
+  }
+
+  /**
+   * True when the shorter token list is a prefix of the longer one, with each
+   * aligned token pair matching within the similarity threshold.
+   */
+  private isFuzzyPrefix(a: string[], b: string[], threshold: number): boolean {
+    const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+    for (let k = 0; k < shorter.length; k++) {
+      if (similarity(shorter[k], longer[k]) < threshold) return false;
+    }
+    return true;
   }
 
   private toGroupPreview(
-    cluster: Cluster,
+    payeeList: PayeeWithStats[],
     minTokenLength: number,
   ): AutoMergeGroupPreview {
     // Canonical = most transactions, tie-break on shortest then alphabetical.
-    const canonical = [...cluster.payees].sort((a, b) => {
+    const canonical = [...payeeList].sort((a, b) => {
       const ca = a.transactionCount ?? 0;
       const cb = b.transactionCount ?? 0;
       if (cb !== ca) return cb - ca;
@@ -224,15 +239,23 @@ export class PayeeAutoMergeService {
       return a.name.localeCompare(b.name);
     })[0];
 
-    // Anchor the alias on the canonical's own leading token when available so
-    // it reflects the kept spelling; fall back to the cluster token.
-    const aliasToken =
-      leadingSignificantToken(
-        normalizePayeeName(canonical.name),
-        minTokenLength,
-      ) ?? cluster.token;
+    // Anchor the alias on the token-prefix shared by every member so it is as
+    // specific as the merge ("*LIDL*", "*ROYAL CITY NURSERY*"), falling back to
+    // the canonical's first token for fuzzy/typo clusters with no exact prefix.
+    const memberTokens = payeeList.map((p) =>
+      significantTokens(normalizePayeeName(p.name), minTokenLength),
+    );
+    const commonPrefix = longestCommonTokenPrefix(memberTokens);
+    const canonicalTokens = significantTokens(
+      normalizePayeeName(canonical.name),
+      minTokenLength,
+    );
+    const aliasBase =
+      commonPrefix.length > 0
+        ? commonPrefix.join(" ")
+        : (canonicalTokens[0] ?? "");
 
-    const members: AutoMergeMember[] = cluster.payees
+    const members: AutoMergeMember[] = payeeList
       .map((payee) => ({
         payeeId: payee.id,
         name: payee.name,
@@ -247,10 +270,10 @@ export class PayeeAutoMergeService {
     );
 
     return {
-      groupKey: cluster.token,
+      groupKey: aliasBase,
       suggestedCanonicalPayeeId: canonical.id,
       suggestedName: canonical.name,
-      suggestedAlias: `*${aliasToken}*`,
+      suggestedAlias: aliasBase ? `*${aliasBase}*` : "",
       members,
       totalTransactions,
     };
@@ -511,4 +534,23 @@ export class PayeeAutoMergeService {
     await queryRunner.manager.save(newAlias);
     return "created";
   }
+}
+
+/**
+ * The longest run of leading tokens shared (exactly) by every token list.
+ * Used to build a merge group's wildcard alias from the common base name.
+ */
+function longestCommonTokenPrefix(tokenLists: string[][]): string[] {
+  if (tokenLists.length === 0) return [];
+  const minLen = Math.min(...tokenLists.map((tokens) => tokens.length));
+  const prefix: string[] = [];
+  for (let k = 0; k < minLen; k++) {
+    const token = tokenLists[0][k];
+    if (tokenLists.every((tokens) => tokens[k] === token)) {
+      prefix.push(token);
+    } else {
+      break;
+    }
+  }
+  return prefix;
 }

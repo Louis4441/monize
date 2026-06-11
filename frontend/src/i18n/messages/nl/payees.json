@@ -142,7 +142,7 @@
   "autoMerge": {
     "title": "Begunstigden automatisch samenvoegen",
     "howItWorksTitle": "Hoe het werkt",
-    "howItWorksBody": "Deze functie scant uw begunstigden en groepeert bijna-duplicaten die een trefwoord delen (bijvoorbeeld \"Lidl\", \"LIDL sp. z o.o.\" en \"LIDL WARSZAWA 0421\"). Elke groep wordt samengevoegd tot één canonieke begunstigde en er wordt een jokertekenalias (zoals \"*LIDL*\") aangemaakt zodat toekomstige imports automatisch worden gekoppeld. Controleer en pas elke groep aan voordat u toepast.",
+    "howItWorksBody": "Deze functie scant uw begunstigden en groepeert varianten waarbij de ene naam een uitbreiding van de andere is - zo bouwen \"Lidl\", \"LIDL sp. z o.o.\" en \"LIDL WARSZAWA 0421\" allemaal voort op \"Lidl\". Elke groep wordt samengevoegd tot één canonieke begunstigde en er wordt een jokertekenalias (zoals \"*LIDL*\") aangemaakt zodat toekomstige imports automatisch worden gekoppeld. Begunstigden die alleen een gemeenschappelijk woord delen (zoals \"Royal Electric\" en \"Royal City Nursery\") blijven gescheiden. Controleer en pas elke groep aan voordat u toepast.",
     "minGroupSizeLabel": "Minimale groepsgrootte: {count}",
     "minGroupSizeHelp": "Alleen groepen met ten minste zoveel begunstigden voorstellen",
     "similarityLabel": "Gelijkenisdrempel: {percent}%",

@@ -142,7 +142,7 @@
   "autoMerge": {
     "title": "Mesclar beneficiários automaticamente",
     "howItWorksTitle": "Como funciona",
-    "howItWorksBody": "Este recurso examina seus beneficiários e agrupa os quase duplicados que compartilham uma palavra-chave (por exemplo, \"Lidl\", \"LIDL sp. z o.o.\" e \"LIDL WARSZAWA 0421\"). Cada grupo é mesclado em um único beneficiário canônico e um alias com curinga (como \"*LIDL*\") é criado para que as importações futuras sejam correspondidas automaticamente. Revise e ajuste cada grupo antes de aplicar.",
+    "howItWorksBody": "Este recurso examina seus beneficiários e agrupa variantes em que um nome estende outro - por exemplo, \"Lidl\", \"LIDL sp. z o.o.\" e \"LIDL WARSZAWA 0421\" se baseiam em \"Lidl\". Cada grupo é mesclado em um único beneficiário canônico e um alias com curinga (como \"*LIDL*\") é criado para que as importações futuras sejam correspondidas automaticamente. Beneficiários que apenas compartilham uma palavra comum (como \"Royal Electric\" e \"Royal City Nursery\") permanecem separados. Revise e ajuste cada grupo antes de aplicar.",
     "minGroupSizeLabel": "Tamanho mínimo do grupo: {count}",
     "minGroupSizeHelp": "Sugerir apenas grupos com pelo menos este número de beneficiários",
     "similarityLabel": "Limite de similaridade: {percent}%",

@@ -194,6 +194,45 @@ describe("PayeeAutoMergeService", () => {
       const { groups } = await service.previewAutoMerge(userId, opts);
       expect(groups).toHaveLength(0);
     });
+
+    it("does not merge unrelated payees that only share a common word", async () => {
+      mockPayeesService.findAll.mockResolvedValue([
+        makePayee("p1", "Royal Electric", 23),
+        makePayee("p2", "Royal & Sun Alliance Insurance", 15),
+        makePayee("p3", "Royal City Nursery", 9),
+        makePayee("p4", "Royal Cat Records", 5),
+        makePayee("p5", "Royal Ontario Museum", 4),
+        makePayee("p6", "Royal Sonesta Hotel", 3),
+        makePayee("p7", "Royal City Pharmacy", 2),
+        makePayee("p8", "Royal City Soccer Club", 2),
+        makePayee("p9", "Royal Pavilion Hotel", 2),
+        makePayee("p10", "Royal City Basketball Club", 1),
+        makePayee("p11", "Royal City Brewing", 1),
+        makePayee("p12", "Royal Distributing", 1),
+        makePayee("p13", "Royal Leather Fashion", 1),
+        makePayee("p14", "Royal York Hotel", 1),
+      ]);
+
+      const { groups } = await service.previewAutoMerge(userId, opts);
+
+      // "Royal" is just a shared adjective; every payee diverges at the second
+      // token, so none should be grouped together.
+      expect(groups).toHaveLength(0);
+    });
+
+    it("merges true prefix elaborations even without a bare base payee", async () => {
+      mockPayeesService.findAll.mockResolvedValue([
+        makePayee("p1", "Royal City Nursery", 9),
+        makePayee("p2", "Royal City Nursery Downtown", 3),
+      ]);
+
+      const { groups } = await service.previewAutoMerge(userId, opts);
+
+      expect(groups).toHaveLength(1);
+      expect(groups[0].members).toHaveLength(2);
+      expect(groups[0].suggestedAlias).toBe("*ROYAL CITY NURSERY*");
+      expect(groups[0].suggestedCanonicalPayeeId).toBe("p1");
+    });
   });
 
   describe("applyAutoMerge", () => {
