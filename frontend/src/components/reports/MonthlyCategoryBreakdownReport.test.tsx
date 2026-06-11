@@ -112,6 +112,7 @@ describe('MonthlyCategoryBreakdownReport', () => {
     vi.clearAllMocks();
     mockPush.mockClear();
     mockIsValid = true;
+    window.localStorage.clear();
   });
 
   it('shows loading state initially', async () => {
@@ -195,6 +196,49 @@ describe('MonthlyCategoryBreakdownReport', () => {
     expect(url).toContain('endDate=2025-01-31');
   });
 
+  it('drills down using the full report range when a category name is clicked', async () => {
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue(sampleResponse);
+    render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Groceries')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Groceries'));
+    });
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const url = mockPush.mock.calls[0][0] as string;
+    expect(url).toContain('/transactions?');
+    expect(url).toContain('categoryIds=cat-groceries');
+    // Full resolved report range, not a single month.
+    expect(url).toContain('startDate=2025-01-01');
+    expect(url).toContain('endDate=2025-06-30');
+  });
+
+  it('drills down into every child category when a section header is clicked', async () => {
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue(sampleResponse);
+    render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Groceries')).toBeInTheDocument();
+    });
+
+    // The first "Food & Dining" occurrence is the clickable section header.
+    const header = screen.getAllByText('Food & Dining')[0];
+    await act(async () => {
+      fireEvent.click(header);
+    });
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    const url = mockPush.mock.calls[0][0] as string;
+    expect(url).toContain('/transactions?');
+    expect(url).toContain('categoryIds=cat-groceries');
+    expect(url).toContain('startDate=2025-01-01');
+    expect(url).toContain('endDate=2025-06-30');
+  });
+
   it('switches to percentage view when the toggle is checked', async () => {
     mockGetMonthlyCategoryBreakdown.mockResolvedValue(sampleResponse);
     render(<MonthlyCategoryBreakdownReport />);
@@ -209,6 +253,30 @@ describe('MonthlyCategoryBreakdownReport', () => {
     });
 
     // Groceries is the only expense, so its monthly value is 100% of expenses.
+    await waitFor(() => {
+      expect(screen.getAllByText('-100.0%').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('persists the percentage toggle to localStorage and restores it', async () => {
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue(sampleResponse);
+    const first = render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Groceries')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Show percentages'));
+    });
+    await waitFor(() => {
+      expect(screen.getAllByText('-100.0%').length).toBeGreaterThan(0);
+    });
+
+    // Re-mounting the report reads the persisted toggle and stays in
+    // percentage mode without any further interaction.
+    first.unmount();
+    render(<MonthlyCategoryBreakdownReport />);
     await waitFor(() => {
       expect(screen.getAllByText('-100.0%').length).toBeGreaterThan(0);
     });

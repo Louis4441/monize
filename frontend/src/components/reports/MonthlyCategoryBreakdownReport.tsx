@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
@@ -9,11 +9,16 @@ import { MonthlyBreakdownCategoryRow } from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useDateRange } from '@/hooks/useDateRange';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useReportData } from '@/hooks/useReportData';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
+
+const RANGE_STORAGE_KEY = 'monize-reports-monthly-category-breakdown-range';
+const PERCENTAGES_STORAGE_KEY =
+  'monize-reports-monthly-category-breakdown-percentages';
 
 // Deviation thresholds (fraction of the non-zero average) mirroring yaffa.
 const DEVIATION_LEVEL_1 = 0.05;
@@ -154,7 +159,10 @@ export function MonthlyCategoryBreakdownReport() {
   const { formatCurrency } = useNumberFormat();
   const { formatMonth } = useDateFormat();
   const otherExpensesLabel = t('monthlyCategoryBreakdown.otherExpenses');
-  const [showPercentages, setShowPercentages] = useState(false);
+  const [showPercentages, setShowPercentages] = useLocalStorage<boolean>(
+    PERCENTAGES_STORAGE_KEY,
+    false,
+  );
   const {
     dateRange,
     setDateRange,
@@ -164,7 +172,7 @@ export function MonthlyCategoryBreakdownReport() {
     setEndDate,
     resolvedRange,
     isValid,
-  } = useDateRange({ defaultRange: '6m' });
+  } = useDateRange({ defaultRange: '6m', storageKey: RANGE_STORAGE_KEY });
 
   const { start: rangeStart, end: rangeEnd } = resolvedRange;
 
@@ -279,17 +287,28 @@ export function MonthlyCategoryBreakdownReport() {
     return `${year}-${String(mon).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   };
 
-  const drillDown = (month: string, categoryIds: string[]) => {
+  const navigateToTransactions = (
+    categoryIds: string[],
+    start: string | undefined,
+    end: string | undefined,
+  ) => {
     const ids = Array.from(new Set(categoryIds));
     if (ids.length === 0) return;
-    const start = `${month}-01`;
-    const end = lastDayOfMonth(month);
-    const params = new URLSearchParams({
-      categoryIds: ids.join(','),
-      startDate: start,
-      endDate: end,
-    });
+    const params = new URLSearchParams({ categoryIds: ids.join(',') });
+    if (start) params.set('startDate', start);
+    if (end) params.set('endDate', end);
     router.push(`/transactions?${params.toString()}`);
+  };
+
+  // Drill into a single month for the given categories.
+  const drillDown = (month: string, categoryIds: string[]) => {
+    navigateToTransactions(categoryIds, `${month}-01`, lastDayOfMonth(month));
+  };
+
+  // Drill into the full report date range for the given categories (used when
+  // clicking a category/subcategory name rather than a single month cell).
+  const drillDownRange = (categoryIds: string[]) => {
+    navigateToTransactions(categoryIds, rangeStart || undefined, rangeEnd || undefined);
   };
 
   // Export the breakdown as a CSV matrix: one row per category (with its parent
@@ -452,10 +471,24 @@ export function MonthlyCategoryBreakdownReport() {
                   const sectionAvg = section.isIncome ? model!.totalIncomeAvg : model!.totalExpensesAvg;
                   return (
                     <tbody key={`section-${si}`} className="contents">
-                      {/* Section header */}
+                      {/* Section header. The colored bar spans the full table
+                          width while the label is pinned to the left so it stays
+                          visible when the table is scrolled horizontally. */}
                       <tr>
-                        <td colSpan={colSpan} className={`px-2 py-1.5 font-semibold ${section.paletteClass}`}>
-                          {section.title}
+                        <td colSpan={colSpan} className={`p-0 font-semibold ${section.paletteClass}`}>
+                          <div className="sticky left-0 z-10 px-2 py-1.5 inline-block max-w-full">
+                            {section.allCategoryIds.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => drillDownRange(section.allCategoryIds)}
+                                className="text-left hover:underline"
+                              >
+                                {section.title}
+                              </button>
+                            ) : (
+                              section.title
+                            )}
+                          </div>
                         </td>
                       </tr>
                       {/* Category rows */}
@@ -465,7 +498,17 @@ export function MonthlyCategoryBreakdownReport() {
                             className="sticky left-0 z-10 bg-white dark:bg-gray-800 pl-5 pr-2 py-1 text-gray-900 dark:text-gray-100 truncate max-w-[220px]"
                             title={row.displayName}
                           >
-                            {row.displayName}
+                            {row.categoryId ? (
+                              <button
+                                type="button"
+                                onClick={() => drillDownRange([row.categoryId!])}
+                                className="block w-full text-left truncate hover:underline"
+                              >
+                                {row.displayName}
+                              </button>
+                            ) : (
+                              row.displayName
+                            )}
                           </td>
                           {months.map((m) => {
                             const value = row.values[m] || 0;
@@ -497,8 +540,8 @@ export function MonthlyCategoryBreakdownReport() {
                         </tr>
                       ))}
                       {/* Section subtotal */}
-                      <tr className="font-bold bg-gray-50 dark:bg-gray-900/40 border-t-2 border-gray-300 dark:border-gray-600">
-                        <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900/40 px-2 py-1 truncate" title={`${t('monthlyCategoryBreakdown.subtotal')}: ${section.title}`}>
+                      <tr className="font-bold bg-gray-50 dark:bg-gray-900 border-t-2 border-gray-300 dark:border-gray-600">
+                        <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-2 py-1 truncate" title={`${t('monthlyCategoryBreakdown.subtotal')}: ${section.title}`}>
                           {t('monthlyCategoryBreakdown.subtotal')}: {section.title}
                         </td>
                         {months.map((m) => {
@@ -536,8 +579,8 @@ export function MonthlyCategoryBreakdownReport() {
                     {t('monthlyCategoryBreakdown.summary')}
                   </td>
                 </tr>
-                <tr className="font-bold bg-gray-100 dark:bg-gray-900/50 border-t-2 border-gray-400 dark:border-gray-500">
-                  <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900/50 px-2 py-1">
+                <tr className="font-bold bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-400 dark:border-gray-500">
+                  <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1">
                     {t('monthlyCategoryBreakdown.totalExpenses')}
                   </td>
                   {months.map((m) => (
@@ -552,8 +595,8 @@ export function MonthlyCategoryBreakdownReport() {
                     {formatGrand(model!.totalExpensesAvg, false, formatCurrency, currency)}
                   </td>
                 </tr>
-                <tr className="font-bold bg-gray-100 dark:bg-gray-900/50">
-                  <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900/50 px-2 py-1">
+                <tr className="font-bold bg-gray-100 dark:bg-gray-900">
+                  <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1">
                     {t('monthlyCategoryBreakdown.totalIncome')}
                   </td>
                   {months.map((m) => (
@@ -568,8 +611,8 @@ export function MonthlyCategoryBreakdownReport() {
                     {formatGrand(model!.totalIncomeAvg, true, formatCurrency, currency)}
                   </td>
                 </tr>
-                <tr className="font-bold bg-gray-100 dark:bg-gray-900/50">
-                  <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900/50 px-2 py-1">
+                <tr className="font-bold bg-gray-100 dark:bg-gray-900">
+                  <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1">
                     {t('monthlyCategoryBreakdown.balance')}
                   </td>
                   {months.map((m) => {
@@ -600,8 +643,8 @@ export function MonthlyCategoryBreakdownReport() {
                   const sectionSum = section.isIncome ? model!.totalIncomeSum : model!.totalExpensesSum;
                   const sectionAvg = section.isIncome ? model!.totalIncomeAvg : model!.totalExpensesAvg;
                   return (
-                    <tr key={`recap-${si}`} className="font-bold bg-gray-50 dark:bg-gray-900/40">
-                      <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900/40 px-2 py-1 truncate" title={section.title}>
+                    <tr key={`recap-${si}`} className="font-bold bg-gray-50 dark:bg-gray-900">
+                      <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-2 py-1 truncate" title={section.title}>
                         {section.title}
                       </td>
                       {months.map((m) => {
