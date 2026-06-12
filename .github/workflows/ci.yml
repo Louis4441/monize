@@ -351,8 +351,12 @@ jobs:
           # 30770548d4592a14c9099ac0103a2564_0 - Observable timing discrepancy [CWE-208] comparing payee-name tokens in longestCommonTokenPrefix (no secret involved) - review-by: 2026-09-11
           exclude-fingerprint: "b65bd7b1a0585cd1d0a326cdb09ce40d_0,da119900eefffd8b84e7693e0388568a_0,95857358158e4664c01c05441df9f2a9_0,842822dd22cd4403ab5800ac89480c0a_0,aa2e6330aede1004652f740df19e1d86_0,b04cb91b90deb5e16504baa7ab95f678_0,b04cb91b90deb5e16504baa7ab95f678_1,b04cb91b90deb5e16504baa7ab95f678_2,30770548d4592a14c9099ac0103a2564_0"
 
-  build-and-push:
-    name: Build & Push Containers
+  # Resolve the release version and shared build metadata ONCE, so the parallel
+  # backend/frontend build jobs below stamp identical version/date/sha values.
+  # No commit happens here: the release job owns the version-bump commit so the
+  # bump is only published after both images build and pass their CVE scan.
+  prepare-release:
+    name: Prepare Release
     runs-on: ubuntu-latest
     # Manual-only: this is the release step (version bump, tag, signed images,
     # SBOM/provenance attestations, Trivy scan). Triggered from the Actions tab
@@ -375,35 +379,29 @@ jobs:
         e2e-tests,
       ]
     permissions:
-      contents: write # to push the version-bump commit and create the GitHub release
-      packages: write # to push the signed multi-arch images to GHCR
-      id-token: write # for cosign keyless signing via GitHub's OIDC token
-      attestations: write # for SBOM and provenance attestations on the published images
-      security-events: write # for Trivy to upload SARIF results to the Security tab
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_date: ${{ steps.meta.outputs.build_date }}
+      git_sha: ${{ steps.meta.outputs.git_sha }}
     steps:
-      # persist-credentials is intentionally left at its default (true) here:
-      # later steps run `git push` to publish the version bump and need the
-      # token wired into the checkout.
       - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: true
+          persist-credentials: false
 
       - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 24
-          # Disable the package-manager cache in this publish job. zizmor's
-          # cache-poisoning audit flags caches that are restored in a job which
-          # publishes runtime artifacts (the signed GHCR images below): a
-          # poisoned cache could taint a release. This job only runs `npm
-          # version`, so it never needs the cache anyway.
+          # Disable the package-manager cache: zizmor's cache-poisoning audit
+          # flags caches restored in a job that feeds a release. This job only
+          # runs `npm version`, so it never needs the cache anyway.
           package-manager-cache: false
 
       # Decide the new version from the workflow inputs. An explicit `version`
       # wins; otherwise bump major/minor/patch off backend/package.json. Inputs
       # are read via env (never interpolated into the script) to avoid template
-      # injection. Both package.json files are kept in lockstep.
-      - name: Bump version
+      # injection.
+      - name: Resolve version
         id: version
         env:
           RELEASE_TYPE: ${{ inputs.release_type }}
@@ -425,9 +423,72 @@ jobs:
             esac
           fi
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Bumping version: $CURRENT -> $NEW_VERSION (type=${RELEASE_TYPE:-patch}, explicit=${EXPLICIT_VERSION:-none})"
-          cd backend  && npm version "$NEW_VERSION" --no-git-tag-version --allow-same-version && cd ..
-          cd frontend && npm version "$NEW_VERSION" --no-git-tag-version --allow-same-version && cd ..
+          echo "Resolved version: $CURRENT -> $NEW_VERSION (type=${RELEASE_TYPE:-patch}, explicit=${EXPLICIT_VERSION:-none})"
+
+      - name: Set build metadata
+        id: meta
+        env:
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          echo "git_sha=$GIT_SHA" >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+  # Build, push, sign, attest and scan the two images IN PARALLEL (one matrix
+  # leg per image) instead of sequentially. Each leg publishes its own image so
+  # they share nothing at runtime; the buildx gha cache is scoped per image to
+  # keep the parallel legs from clobbering each other's layers.
+  build-and-push:
+    name: Build & Push (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    needs: prepare-release
+    permissions:
+      packages: write # to push the signed multi-arch images to GHCR
+      id-token: write # for cosign keyless signing via GitHub's OIDC token
+      attestations: write # for SBOM and provenance attestations on the published images
+      security-events: write # for Trivy to upload SARIF results to the Security tab
+    strategy:
+      # Don't cancel the frontend build if the backend fails (or vice versa) -
+      # we want both results.
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            image: ghcr.io/kenlasko/monize-backend
+            context: .
+            file: backend/Dockerfile
+            workdir: backend
+            title: Monize Backend
+            description: Backend for Monize, a self-hosted personal finance app
+          - name: frontend
+            image: ghcr.io/kenlasko/monize-frontend
+            context: frontend
+            file: frontend/Dockerfile
+            workdir: frontend
+            title: Monize Frontend
+            description: Frontend for Monize, a self-hosted personal finance app
+    steps:
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 24
+          # Disable the package-manager cache in this publish job. zizmor's
+          # cache-poisoning audit flags caches that are restored in a job which
+          # publishes runtime artifacts (the signed GHCR images below): a
+          # poisoned cache could taint a release. This job only runs `npm
+          # version`, so it never needs the cache anyway.
+          package-manager-cache: false
+
+      # Stamp the resolved version into this image's package.json so the built
+      # artifact reports the right version. The bump is intentionally NOT
+      # committed here - the release job below owns the version-bump commit.
+      - name: Stamp version
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          WORKDIR: ${{ matrix.workdir }}
+        run: cd "$WORKDIR" && npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
@@ -442,75 +503,36 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
-      - name: Set build metadata
-        id: meta
-        env:
-          GIT_SHA: ${{ github.sha }}
-        run: |
-          echo "git_sha=$GIT_SHA" >> "$GITHUB_OUTPUT"
-          echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push backend
-        id: build-backend
+      - name: Build and push image
+        id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
-          context: .
-          file: backend/Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           target: production
           push: true
           platforms: linux/amd64,linux/arm64
           provenance: true
           sbom: true
           tags: |
-            ghcr.io/kenlasko/monize-backend:latest
-            ghcr.io/kenlasko/monize-backend:${{ steps.version.outputs.version }}
+            ${{ matrix.image }}:latest
+            ${{ matrix.image }}:${{ needs.prepare-release.outputs.version }}
           build-args: |
-            GIT_SHA=${{ steps.meta.outputs.git_sha }}
-            BUILD_DATE=${{ steps.meta.outputs.build_date }}
-            VERSION=${{ steps.version.outputs.version }}
+            GIT_SHA=${{ needs.prepare-release.outputs.git_sha }}
+            BUILD_DATE=${{ needs.prepare-release.outputs.build_date }}
+            VERSION=${{ needs.prepare-release.outputs.version }}
           annotations: |
-            index:org.opencontainers.image.title=Monize Backend
-            index:org.opencontainers.image.description=Backend for Monize, a self-hosted personal finance app
+            index:org.opencontainers.image.title=${{ matrix.title }}
+            index:org.opencontainers.image.description=${{ matrix.description }}
             index:org.opencontainers.image.source=https://github.com/kenlasko/monize
             index:org.opencontainers.image.url=https://github.com/kenlasko/monize
             index:org.opencontainers.image.authors=ken.lasko@gmail.com
             index:org.opencontainers.image.vendor=Ken Lasko
-            index:org.opencontainers.image.revision=${{ steps.meta.outputs.git_sha }}
-            index:org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
-            index:org.opencontainers.image.version=${{ steps.version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push frontend
-        id: build-frontend
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
-        with:
-          context: frontend
-          file: frontend/Dockerfile
-          target: production
-          push: true
-          platforms: linux/amd64,linux/arm64
-          provenance: true
-          sbom: true
-          tags: |
-            ghcr.io/kenlasko/monize-frontend:latest
-            ghcr.io/kenlasko/monize-frontend:${{ steps.version.outputs.version }}
-          build-args: |
-            GIT_SHA=${{ steps.meta.outputs.git_sha }}
-            BUILD_DATE=${{ steps.meta.outputs.build_date }}
-            VERSION=${{ steps.version.outputs.version }}
-          annotations: |
-            index:org.opencontainers.image.title=Monize Frontend
-            index:org.opencontainers.image.description=Frontend for Monize, a self-hosted personal finance app
-            index:org.opencontainers.image.source=https://github.com/kenlasko/monize
-            index:org.opencontainers.image.url=https://github.com/kenlasko/monize
-            index:org.opencontainers.image.authors=ken.lasko@gmail.com
-            index:org.opencontainers.image.vendor=Ken Lasko
-            index:org.opencontainers.image.revision=${{ steps.meta.outputs.git_sha }}
-            index:org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
-            index:org.opencontainers.image.version=${{ steps.version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            index:org.opencontainers.image.revision=${{ needs.prepare-release.outputs.git_sha }}
+            index:org.opencontainers.image.created=${{ needs.prepare-release.outputs.build_date }}
+            index:org.opencontainers.image.version=${{ needs.prepare-release.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
       - name: Install cosign
         uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
@@ -518,119 +540,102 @@ jobs:
       # Keyless signing via GitHub OIDC. No long-lived keys to manage; the
       # signature is bound to this workflow's identity and verifiable with
       # `cosign verify --certificate-identity-regexp ...`.
-      - name: Sign backend image
+      - name: Sign image
         env:
-          DIGEST: ${{ steps.build-backend.outputs.digest }}
-          VERSION: ${{ steps.version.outputs.version }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE: ${{ matrix.image }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           cosign sign --yes \
-            "ghcr.io/kenlasko/monize-backend@${DIGEST}" \
-            "ghcr.io/kenlasko/monize-backend:${VERSION}" \
-            ghcr.io/kenlasko/monize-backend:latest
+            "${IMAGE}@${DIGEST}" \
+            "${IMAGE}:${VERSION}" \
+            "${IMAGE}:latest"
 
-      - name: Sign frontend image
-        env:
-          DIGEST: ${{ steps.build-frontend.outputs.digest }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          cosign sign --yes \
-            "ghcr.io/kenlasko/monize-frontend@${DIGEST}" \
-            "ghcr.io/kenlasko/monize-frontend:${VERSION}" \
-            ghcr.io/kenlasko/monize-frontend:latest
-
-      # Generate and attest an SPDX SBOM for each image. The provenance and
-      # SBOM produced by docker/build-push-action above are embedded in the
-      # OCI manifest; these attestations make them discoverable via
+      # Generate and attest an SPDX SBOM for the image. The provenance and SBOM
+      # produced by docker/build-push-action above are embedded in the OCI
+      # manifest; this attestation makes them discoverable via
       # `gh attestation verify` for downstream consumers.
-      - name: Generate backend SBOM
+      - name: Generate SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
-          image: ghcr.io/kenlasko/monize-backend@${{ steps.build-backend.outputs.digest }}
+          image: ${{ matrix.image }}@${{ steps.build.outputs.digest }}
           format: spdx-json
-          output-file: backend-sbom.spdx.json
+          output-file: ${{ matrix.name }}-sbom.spdx.json
 
-      - name: Attest backend SBOM
+      - name: Attest SBOM
         uses: actions/attest-sbom@cbfd0027ae731a5892db25ecd226930d7ffd19eb # v2.1.0
         with:
-          subject-name: ghcr.io/kenlasko/monize-backend
-          subject-digest: ${{ steps.build-backend.outputs.digest }}
-          sbom-path: backend-sbom.spdx.json
+          subject-name: ${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: ${{ matrix.name }}-sbom.spdx.json
           push-to-registry: true
 
-      - name: Generate frontend SBOM
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
-        with:
-          image: ghcr.io/kenlasko/monize-frontend@${{ steps.build-frontend.outputs.digest }}
-          format: spdx-json
-          output-file: frontend-sbom.spdx.json
-
-      - name: Attest frontend SBOM
-        uses: actions/attest-sbom@cbfd0027ae731a5892db25ecd226930d7ffd19eb # v2.1.0
-        with:
-          subject-name: ghcr.io/kenlasko/monize-frontend
-          subject-digest: ${{ steps.build-frontend.outputs.digest }}
-          sbom-path: frontend-sbom.spdx.json
-          push-to-registry: true
-
-      # Scan the pushed images for OS + library CVEs. SARIF goes to the
-      # Security tab so findings are tracked over time. We fail on CRITICAL
-      # only - HIGH issues surface in the Security tab but do not block
-      # releases, matching the npm-audit policy.
-      - name: Scan backend image (Trivy)
+      # Scan the pushed image for OS + library CVEs. SARIF goes to the Security
+      # tab so findings are tracked over time. We fail on CRITICAL only - HIGH
+      # issues surface in the Security tab but do not block releases, matching
+      # the npm-audit policy.
+      - name: Scan image (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/kenlasko/monize-backend@${{ steps.build-backend.outputs.digest }}
+          image-ref: ${{ matrix.image }}@${{ steps.build.outputs.digest }}
           format: sarif
-          output: trivy-backend.sarif
+          output: trivy-${{ matrix.name }}.sarif
           severity: CRITICAL,HIGH
           exit-code: '0'
           ignore-unfixed: true
 
-      - name: Upload backend Trivy SARIF
+      - name: Upload Trivy SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@fb0994ef1c058010acf1efccff928b0a83b1ed54 # v4.32.6
         with:
-          sarif_file: trivy-backend.sarif
-          category: trivy-backend
+          sarif_file: trivy-${{ matrix.name }}.sarif
+          category: trivy-${{ matrix.name }}
 
-      - name: Scan frontend image (Trivy)
+      - name: Fail on critical CVEs
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/kenlasko/monize-frontend@${{ steps.build-frontend.outputs.digest }}
-          format: sarif
-          output: trivy-frontend.sarif
-          severity: CRITICAL,HIGH
-          exit-code: '0'
-          ignore-unfixed: true
-
-      - name: Upload frontend Trivy SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@fb0994ef1c058010acf1efccff928b0a83b1ed54 # v4.32.6
-        with:
-          sarif_file: trivy-frontend.sarif
-          category: trivy-frontend
-
-      - name: Fail on critical CVEs (backend)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: ghcr.io/kenlasko/monize-backend@${{ steps.build-backend.outputs.digest }}
+          image-ref: ${{ matrix.image }}@${{ steps.build.outputs.digest }}
           format: table
           severity: CRITICAL
           exit-code: '1'
           ignore-unfixed: true
 
-      - name: Fail on critical CVEs (frontend)
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+  # Both images are built, signed, attested and scanned at this point. Now -
+  # and only now - commit/push the version bump and cut the GitHub release, so
+  # a failed or vulnerable build never leaves a dangling version commit.
+  release:
+    name: Commit Version & Release
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-and-push]
+    permissions:
+      contents: write # to push the version-bump commit and create the GitHub release
+    steps:
+      # persist-credentials is intentionally left at its default (true) here:
+      # the "Commit version bump" step runs `git push` to publish the version
+      # bump and needs the token wired into the checkout.
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
-          image-ref: ghcr.io/kenlasko/monize-frontend@${{ steps.build-frontend.outputs.digest }}
-          format: table
-          severity: CRITICAL
-          exit-code: '1'
-          ignore-unfixed: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      # Re-apply the resolved version to both package.json files (kept in
+      # lockstep) and commit it. Deterministic: the version was decided in
+      # prepare-release.
+      - name: Bump version
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+        run: |
+          cd backend  && npm version "$VERSION" --no-git-tag-version --allow-same-version && cd ..
+          cd frontend && npm version "$VERSION" --no-git-tag-version --allow-same-version && cd ..
 
       - name: Commit version bump
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -645,7 +650,7 @@ jobs:
       - name: Resolve release notes
         id: notes
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
           RELEASE_NOTES_INPUT: ${{ inputs.release_notes }}
         run: |
           NOTES_FILE="docs/release-notes/${VERSION}.md"
@@ -665,7 +670,7 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
           NOTES_PATH: ${{ steps.notes.outputs.path }}
         run: |
           if [ -n "$NOTES_PATH" ]; then
