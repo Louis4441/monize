@@ -3,10 +3,22 @@ import { render, screen } from '@/test/render';
 import { BalanceHistoryChart } from './BalanceHistoryChart';
 import { computeBalanceGradient } from '@/lib/balance-history';
 
+// The Area mock invokes the `dot` render-prop so the high/low value bubbles
+// are exercised by the data-driven tests below; their output is exposed via
+// the "line-dots" test id. Existing assertions are unaffected.
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
   AreaChart: ({ children }: any) => <div data-testid="area-chart">{children}</div>,
-  Area: () => <div data-testid="area" />,
+  Area: ({ dot }: any) => (
+    <div data-testid="area">
+      {typeof dot === 'function' && (
+        <svg data-testid="line-dots">
+          {dot({ cx: 50, cy: 60, index: 0 })}
+          {dot({ cx: 70, cy: 80, index: 1 })}
+        </svg>
+      )}
+    </div>
+  ),
   XAxis: () => <div data-testid="x-axis" />,
   YAxis: () => <div data-testid="y-axis" />,
   CartesianGrid: () => <div data-testid="cartesian-grid" />,
@@ -16,11 +28,13 @@ vi.mock('recharts', () => ({
 
 const mockFormatCurrency = vi.fn((n: number, _code?: string) => `$${n.toFixed(2)}`);
 const mockFormatCurrencyAxis = vi.fn((n: number, _code?: string) => `$${n}`);
+const mockFormatCurrencyFlag = vi.fn((n: number, _code?: string) => `$${n}`);
 
 vi.mock('@/hooks/useNumberFormat', () => ({
   useNumberFormat: () => ({
     formatCurrency: mockFormatCurrency,
     formatCurrencyAxis: mockFormatCurrencyAxis,
+    formatCurrencyFlag: mockFormatCurrencyFlag,
   }),
 }));
 
@@ -228,6 +242,28 @@ describe('BalanceHistoryChart', () => {
       ([, code]) => code === 'EUR',
     );
     expect(eurCalls.length).toBeGreaterThan(0);
+  });
+
+  it('marks the highest and lowest points with value bubbles', () => {
+    mockFormatCurrencyFlag.mockClear();
+    render(
+      <BalanceHistoryChart
+        data={[
+          { date: '2025-01-01', balance: 500 },
+          { date: '2025-01-02', balance: 600 },
+        ]}
+        isLoading={false}
+        currencyCode="EUR"
+      />
+    );
+    // The lowest (500) and highest (600) points each render a labelled bubble,
+    // formatted through the compact "flag" formatter with the chart currency.
+    const dots = screen.getByTestId('line-dots');
+    const labels = Array.from(dots.querySelectorAll('text')).map((node) => node.textContent);
+    expect(labels).toContain('$500');
+    expect(labels).toContain('$600');
+    const eurFlagCalls = mockFormatCurrencyFlag.mock.calls.filter(([, code]) => code === 'EUR');
+    expect(eurFlagCalls.length).toBeGreaterThan(0);
   });
 });
 

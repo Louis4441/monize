@@ -20,6 +20,11 @@ import { parseLocalDate } from '@/lib/utils';
 import { computeBalanceGradient, computeBalanceSummary } from '@/lib/balance-history';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ChartDownloadButton } from '@/components/ui/ChartDownloadButton';
+import {
+  ChartFlagShadowFilter,
+  computeMinMaxFlagIndices,
+  renderMinMaxFlagDots,
+} from '@/components/investments/portfolio-chart-utils';
 
 
 interface BalanceHistoryChartProps {
@@ -73,7 +78,8 @@ export function BalanceHistoryChart({
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const chartTitle = t('charts.balanceHistory.title');
-  const { formatCurrency: formatCurrencyFull, formatCurrencyAxis } = useNumberFormat();
+  const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatCurrencyFlag } =
+    useNumberFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   const downloadFilename = accountName ? `${chartTitle} - ${accountName}` : chartTitle;
 
@@ -85,6 +91,11 @@ export function BalanceHistoryChart({
   const formatAxis = useCallback(
     (value: number) => formatCurrencyAxis(value, currencyCode),
     [formatCurrencyAxis, currencyCode],
+  );
+
+  const formatFlag = useCallback(
+    (value: number) => formatCurrencyFlag(value, currencyCode),
+    [formatCurrencyFlag, currencyCode],
   );
 
   const { chartData, monthTicks } = useMemo(() => {
@@ -115,6 +126,14 @@ export function BalanceHistoryChart({
     [chartData],
   );
 
+  // Highest/lowest points get green/red value bubbles, positioned to the
+  // inside of whichever chart half they fall on so they never overlap the
+  // plot edges.
+  const flags = useMemo(
+    () => computeMinMaxFlagIndices(chartData.map((point) => point.balance)),
+    [chartData],
+  );
+
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
@@ -141,6 +160,9 @@ export function BalanceHistoryChart({
     );
   }
 
+  const highLabel = flags.show ? formatFlag(chartData[flags.maxIndex].balance) : '';
+  const lowLabel = flags.show ? formatFlag(chartData[flags.minIndex].balance) : '';
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
       <div className="flex items-center justify-between mb-4">
@@ -155,7 +177,8 @@ export function BalanceHistoryChart({
           re-measures, so clip it to the card instead of painting outside. */}
       <div ref={chartRef} className="h-72 overflow-hidden" style={{ minHeight: 288 }}>
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-          <AreaChart data={chartData} margin={{ left: 0, right: 8, top: 5, bottom: 0 }}>
+          {/* top margin leaves headroom for the high-value bubble callout */}
+          <AreaChart data={chartData} margin={{ left: 0, right: 8, top: 20, bottom: 0 }}>
             <defs>
               <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
                 <stop offset={0} stopColor={chartColors.primary} stopOpacity={areaGradient.topOpacity} />
@@ -163,6 +186,7 @@ export function BalanceHistoryChart({
                 <stop offset={1} stopColor={chartColors.primary} stopOpacity={areaGradient.bottomOpacity} />
               </linearGradient>
             </defs>
+            <ChartFlagShadowFilter />
             <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
             <XAxis
               dataKey="date"
@@ -202,7 +226,19 @@ export function BalanceHistoryChart({
               strokeWidth={2}
               fillOpacity={1}
               fill="url(#colorBalance)"
-              dot={false}
+              dot={(props: { cx?: number; cy?: number; index?: number }) =>
+                renderMinMaxFlagDots({
+                  cx: props.cx,
+                  cy: props.cy,
+                  index: props.index,
+                  flags,
+                  pointCount: chartData.length,
+                  highColor: chartColors.income,
+                  lowColor: chartColors.expense,
+                  highLabel,
+                  lowLabel,
+                })
+              }
               activeDot={{ r: 6, fill: chartColors.primary }}
             />
           </AreaChart>
