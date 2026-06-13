@@ -150,6 +150,7 @@
     "title": "Automatycznie scal odbiorców",
     "howItWorksTitle": "Jak to działa",
     "howItWorksBody": "Ta funkcja przeszukuje odbiorców i grupuje warianty, w których jedna nazwa rozszerza drugą - na przykład \"Lidl\", \"LIDL sp. z o.o.\" i \"LIDL WARSZAWA 0421\" opierają się na \"Lidl\". Każda grupa jest scalana w jednego głównego odbiorcę, a alias z symbolem wieloznacznym (np. \"*LIDL*\") jest tworzony, aby przyszłe importy były dopasowywane automatycznie. Odbiorcy, których łączy tylko wspólne słowo (jak \"Royal Electric\" i \"Royal City Nursery\"), pozostają osobno. Sprawdź i dostosuj każdą grupę przed zastosowaniem.",
+    "backupRecommendation": "Zalecane: utwórz <link>kopię zapasową</link> przed wprowadzeniem zmian.",
     "minGroupSizeLabel": "Minimalny rozmiar grupy: {count}",
     "minGroupSizeHelp": "Proponuj tylko grupy z co najmniej taką liczbą odbiorców",
     "similarityLabel": "Próg podobieństwa: {percent}%",

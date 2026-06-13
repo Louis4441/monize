@@ -150,6 +150,7 @@
     "title": "Zahlungsempfänger automatisch zusammenführen",
     "howItWorksTitle": "So funktioniert es",
     "howItWorksBody": "Diese Funktion durchsucht Ihre Zahlungsempfänger und gruppiert Varianten, bei denen ein Name einen anderen erweitert - zum Beispiel bauen \"Lidl\", \"LIDL sp. z o.o.\" und \"LIDL WARSZAWA 0421\" alle auf \"Lidl\" auf. Jede Gruppe wird zu einem einzigen Haupt-Zahlungsempfänger zusammengeführt, und ein Platzhalter-Alias (etwa \"*LIDL*\") wird erstellt, damit künftige Importe automatisch zugeordnet werden. Zahlungsempfänger, die nur ein gemeinsames Wort teilen (wie \"Royal Electric\" und \"Royal City Nursery\"), bleiben getrennt. Prüfen und passen Sie jede Gruppe vor dem Anwenden an.",
+    "backupRecommendation": "Empfohlen: Erstellen Sie ein <link>Backup</link>, bevor Sie Änderungen vornehmen.",
     "minGroupSizeLabel": "Mindestgruppengröße: {count}",
     "minGroupSizeHelp": "Nur Gruppen mit mindestens so vielen Zahlungsempfängern vorschlagen",
     "similarityLabel": "Ähnlichkeitsschwelle: {percent}%",

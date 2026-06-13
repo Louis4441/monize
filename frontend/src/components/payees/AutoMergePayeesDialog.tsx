@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
@@ -260,6 +261,18 @@ export function AutoMergePayeesDialog({
           </h3>
           <p className="text-sm text-blue-700 dark:text-blue-300">
             {t('autoMerge.howItWorksBody')}
+          </p>
+          <p className="mt-2 text-sm font-bold text-blue-800 dark:text-blue-200">
+            {t.rich('autoMerge.backupRecommendation', {
+              link: (chunks) => (
+                <Link
+                  href="/settings#backup-restore"
+                  className="underline hover:no-underline"
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
           </p>
         </div>
 

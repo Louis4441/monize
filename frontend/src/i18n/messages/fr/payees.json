@@ -150,6 +150,7 @@
     "title": "Fusionner automatiquement les bénéficiaires",
     "howItWorksTitle": "Comment ça marche",
     "howItWorksBody": "Cette fonction analyse vos bénéficiaires et regroupe les variantes dont un nom prolonge un autre - par exemple \"Lidl\", \"LIDL sp. z o.o.\" et \"LIDL WARSZAWA 0421\" reposent tous sur \"Lidl\". Chaque groupe est fusionné en un seul bénéficiaire canonique, et un alias générique (tel que \"*LIDL*\") est créé afin que les futurs imports soient associés automatiquement. Les bénéficiaires qui ne partagent qu'un mot commun (comme \"Royal Electric\" et \"Royal City Nursery\") restent séparés. Vérifiez et ajustez chaque groupe avant de l'appliquer.",
+    "backupRecommendation": "Recommandé : créez une <link>sauvegarde</link> avant d'effectuer des modifications.",
     "minGroupSizeLabel": "Taille minimale du groupe : {count}",
     "minGroupSizeHelp": "Ne suggérer que les groupes comptant au moins ce nombre de bénéficiaires",
     "similarityLabel": "Seuil de similarité : {percent}%",

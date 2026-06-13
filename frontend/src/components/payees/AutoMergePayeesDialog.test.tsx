@@ -19,6 +19,12 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+vi.mock('next/link', () => ({
+  default: ({ children, href, ...props }: any) => (
+    <a href={href} {...props}>{children}</a>
+  ),
+}));
+
 vi.mock('@/lib/payees', () => ({
   payeesApi: {
     getAutoMergePreview: vi.fn().mockResolvedValue([]),
@@ -102,6 +108,14 @@ describe('AutoMergePayeesDialog', () => {
     expect(screen.getByText(/Minimum Group Size/)).toBeInTheDocument();
     expect(screen.getByText(/Similarity Threshold/)).toBeInTheDocument();
     expect(screen.getByText('Preview Groups')).toBeInTheDocument();
+  });
+
+  it('recommends a backup with a link to the backup settings section', () => {
+    render(<AutoMergePayeesDialog isOpen onClose={onClose} onSuccess={onSuccess} />);
+    const link = screen.getByRole('link', { name: 'backup' });
+    expect(link).toHaveAttribute('href', '/settings#backup-restore');
+    // The recommendation copy is rendered in bold for emphasis.
+    expect(screen.getByText(/Recommended:/)).toBeInTheDocument();
   });
 
   it('does not render when closed', () => {
