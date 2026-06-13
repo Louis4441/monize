@@ -102,6 +102,7 @@ export class PayeesService {
       transactionCount: number;
       lastUsedDate: string | null;
       aliasCount: number;
+      uncategorizedCount: number;
     })[]
   > {
     // Build where clause based on status filter
@@ -162,12 +163,21 @@ export class PayeesService {
       countField: "alias_count",
     });
 
+    // Per-payee count of transactions with no category (excluding transfers and
+    // split parents) -- the same scope the default-category backfill targets --
+    // so the list can flag payees that still have uncategorized transactions.
+    const uncategorizedCountMap = await countUncategorizedTransactionsByPayee(
+      this.payeesRepository.manager,
+      userId,
+    );
+
     // Merge stats with payees
     return payees.map((payee) => ({
       ...payee,
       transactionCount: countMap.get(payee.id) || 0,
       lastUsedDate: lastUsedMap.get(payee.id) || null,
       aliasCount: aliasCountMap.get(payee.id) || 0,
+      uncategorizedCount: uncategorizedCountMap.get(payee.id) || 0,
     }));
   }
 

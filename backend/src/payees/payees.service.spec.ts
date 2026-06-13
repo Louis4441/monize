@@ -264,6 +264,30 @@ describe("PayeesService", () => {
       const result = await service.findAll(userId);
 
       expect(result[0].transactionCount).toBe(0);
+      expect(result[0].uncategorizedCount).toBe(0);
+    });
+
+    it("should include each payee's uncategorized transaction count", async () => {
+      payeesRepository.find.mockResolvedValue([mockPayee, mockPayeeNoCategory]);
+      payeesRepository.createQueryBuilder.mockReturnValue({
+        ...queryBuilderMock,
+        getRawMany: jest.fn().mockResolvedValue([]),
+      });
+      // The backfill-scope count query runs through the entity manager.
+      (payeesRepository.manager as any).createQueryBuilder.mockReturnValue({
+        ...queryBuilderMock,
+        getRawMany: jest
+          .fn()
+          .mockResolvedValue([{ payeeId: "payee-2", cnt: "4" }]),
+      });
+
+      const result = await service.findAll(userId);
+
+      expect(result[0].uncategorizedCount).toBe(0);
+      expect(result[1]).toMatchObject({
+        id: "payee-2",
+        uncategorizedCount: 4,
+      });
     });
   });
 

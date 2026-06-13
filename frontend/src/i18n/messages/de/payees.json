@@ -64,6 +64,8 @@
       "deleteShort": "X"
     },
     "viewTransactionsTitle": "Buchungen mit diesem Zahlungsempfänger anzeigen",
+    "uncategorizedBadge": "{count, plural, one {# ohne Kategorie} other {# ohne Kategorie}}",
+    "uncategorizedTitle": "{count, plural, one {# Transaktion dieses Zahlungsempfängers hat keine Kategorie} other {# Transaktionen dieses Zahlungsempfängers haben keine Kategorie}}",
     "empty": {
       "title": "Keine Zahlungsempfänger",
       "subtitle": "Erstellen Sie einen neuen Zahlungsempfänger, um zu beginnen."

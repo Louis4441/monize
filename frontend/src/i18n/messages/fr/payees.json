@@ -64,6 +64,8 @@
       "deleteShort": "X"
     },
     "viewTransactionsTitle": "Voir les transactions avec ce bénéficiaire",
+    "uncategorizedBadge": "{count, plural, one {# sans catégorie} other {# sans catégorie}}",
+    "uncategorizedTitle": "{count, plural, one {# transaction de ce bénéficiaire n'a pas de catégorie} other {# transactions de ce bénéficiaire n'ont pas de catégorie}}",
     "empty": {
       "title": "Aucun bénéficiaire",
       "subtitle": "Commencez par créer un nouveau bénéficiaire."

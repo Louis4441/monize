@@ -12,6 +12,7 @@ export interface Payee {
   transactionCount?: number;
   lastUsedDate?: string | null;
   aliasCount?: number;
+  uncategorizedCount?: number;
 }
 
 export interface PayeeAlias {

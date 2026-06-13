@@ -64,6 +64,8 @@
       "deleteShort": "X"
     },
     "viewTransactionsTitle": "Wyświetl transakcje z tym odbiorcą",
+    "uncategorizedBadge": "{count, plural, one {# bez kategorii} few {# bez kategorii} many {# bez kategorii} other {# bez kategorii}}",
+    "uncategorizedTitle": "{count, plural, one {# transakcja tego odbiorcy nie ma kategorii} few {# transakcje tego odbiorcy nie mają kategorii} many {# transakcji tego odbiorcy nie ma kategorii} other {# transakcji tego odbiorcy nie ma kategorii}}",
     "empty": {
       "title": "Brak odbiorców",
       "subtitle": "Zacznij od utworzenia nowego odbiorcy."

@@ -64,6 +64,8 @@
       "deleteShort": "[XX-X-XX]"
     },
     "viewTransactionsTitle": "[XX-View transactions with this payee-XX]",
+    "uncategorizedBadge": "[XX-{count, plural, one {# uncategorized} other {# uncategorized}}-XX]",
+    "uncategorizedTitle": "[XX-{count, plural, one {# transaction for this payee has no category} other {# transactions for this payee have no category}}-XX]",
     "empty": {
       "title": "[XX-No payees-XX]",
       "subtitle": "[XX-Get started by creating a new payee.-XX]"

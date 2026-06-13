@@ -64,6 +64,8 @@
       "deleteShort": "X"
     },
     "viewTransactionsTitle": "Transacties met deze begunstigde bekijken",
+    "uncategorizedBadge": "{count, plural, one {# zonder categorie} other {# zonder categorie}}",
+    "uncategorizedTitle": "{count, plural, one {# transactie van deze begunstigde heeft geen categorie} other {# transacties van deze begunstigde hebben geen categorie}}",
     "empty": {
       "title": "Geen begunstigden",
       "subtitle": "Begin met het aanmaken van een nieuwe begunstigde."
