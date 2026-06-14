@@ -16,6 +16,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useReportData } from '@/hooks/useReportData';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { SortableHeader } from '@/components/ui/SortableHeader';
 import { ReportError } from '@/components/reports/ReportError';
 import { exportToCsv } from '@/lib/csv-export';
 
@@ -367,14 +368,11 @@ export function MonthlyCategoryBreakdownReport() {
 
   const model = useMemo(() => {
     if (!data) return null;
-    // Drop the in-progress (current) month unless the user opts in. Only the
-    // latest column can be the current month, and never strip the only column.
-    const allMonths = data.months;
-    const lastMonth = allMonths[allMonths.length - 1];
-    const months =
-      !includeCurrentMonth && allMonths.length > 1 && lastMonth === currentMonth
-        ? allMonths.slice(0, -1)
-        : allMonths;
+    // Drop the in-progress (current) month unless the user opts in. The current
+    // month is removed wherever it appears so the toggle always takes effect.
+    const months = includeCurrentMonth
+      ? data.months
+      : data.months.filter((m) => m !== currentMonth);
     const monthCount = months.length || 1;
     const rows = data.data;
 
@@ -1087,20 +1085,6 @@ export function MonthlyCategoryBreakdownReport() {
     </tr>
   );
 
-  // Sort affordances for the column headers.
-  const ariaSort = (column: string): 'ascending' | 'descending' | 'none' =>
-    sortColumn === column
-      ? sortDir === 'asc'
-        ? 'ascending'
-        : 'descending'
-      : 'none';
-  const sortIndicator = (column: string) =>
-    sortColumn === column ? (
-      <span aria-hidden="true" className="ml-0.5">
-        {sortDir === 'asc' ? '▲' : '▼'}
-      </span>
-    ) : null;
-
   return (
     <div className="space-y-6">
       {/* Controls */}
@@ -1161,61 +1145,49 @@ export function MonthlyCategoryBreakdownReport() {
             <table className="min-w-full text-xs border-collapse">
               <thead>
                 <tr className="text-gray-500 dark:text-gray-400">
-                  <th
-                    className="sticky left-0 z-10 bg-white dark:bg-gray-800 px-2 py-2 text-left font-medium min-w-[180px]"
-                    aria-sort={ariaSort(CATEGORY_COLUMN)}
+                  <SortableHeader
+                    field={CATEGORY_COLUMN}
+                    sortField={sortColumn}
+                    sortDirection={sortDir}
+                    onSort={handleSort}
+                    align="left"
+                    className="sticky left-0 z-10 bg-white dark:bg-gray-800 px-2 py-2 font-medium min-w-[180px]"
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleSort(CATEGORY_COLUMN)}
-                      className="inline-flex items-center gap-1 hover:underline"
-                    >
-                      {t('monthlyCategoryBreakdown.category')}
-                      {sortIndicator(CATEGORY_COLUMN)}
-                    </button>
-                  </th>
+                    {t('monthlyCategoryBreakdown.category')}
+                  </SortableHeader>
                   {months.map((m) => (
-                    <th
+                    <SortableHeader
                       key={m}
-                      className="px-2 py-2 text-right font-medium whitespace-nowrap"
-                      aria-sort={ariaSort(m)}
+                      field={m}
+                      sortField={sortColumn}
+                      sortDirection={sortDir}
+                      onSort={handleSort}
+                      align="right"
+                      className="px-2 py-2 font-medium whitespace-nowrap"
                     >
-                      <button
-                        type="button"
-                        onClick={() => handleSort(m)}
-                        className="inline-flex items-center gap-1 hover:underline"
-                      >
-                        {formatMonth(m)}
-                        {sortIndicator(m)}
-                      </button>
-                    </th>
+                      {formatMonth(m)}
+                    </SortableHeader>
                   ))}
-                  <th
-                    className="px-2 py-2 text-right font-medium"
-                    aria-sort={ariaSort(TOTAL_COLUMN)}
+                  <SortableHeader
+                    field={TOTAL_COLUMN}
+                    sortField={sortColumn}
+                    sortDirection={sortDir}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-2 py-2 font-medium"
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleSort(TOTAL_COLUMN)}
-                      className="inline-flex items-center gap-1 hover:underline"
-                    >
-                      {t('monthlyCategoryBreakdown.total')}
-                      {sortIndicator(TOTAL_COLUMN)}
-                    </button>
-                  </th>
-                  <th
-                    className="px-2 py-2 text-right font-medium"
-                    aria-sort={ariaSort(AVG_COLUMN)}
+                    {t('monthlyCategoryBreakdown.total')}
+                  </SortableHeader>
+                  <SortableHeader
+                    field={AVG_COLUMN}
+                    sortField={sortColumn}
+                    sortDirection={sortDir}
+                    onSort={handleSort}
+                    align="right"
+                    className="px-2 py-2 font-medium"
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleSort(AVG_COLUMN)}
-                      className="inline-flex items-center gap-1 hover:underline"
-                    >
-                      {t('monthlyCategoryBreakdown.avgPerMonth')}
-                      {sortIndicator(AVG_COLUMN)}
-                    </button>
-                  </th>
+                    {t('monthlyCategoryBreakdown.avgPerMonth')}
+                  </SortableHeader>
                 </tr>
               </thead>
               <tbody>
