@@ -89,6 +89,7 @@ const sampleResponse = {
       categoryName: 'Groceries',
       parentId: 'cat-food',
       parentName: 'Food & Dining',
+      parentIsIncome: false,
       isIncome: false,
       valuesByMonth: { '2025-01': 100, '2025-02': 200, '2025-03': 300 },
       depositTotal: 0,
@@ -99,6 +100,7 @@ const sampleResponse = {
       categoryName: 'Salary',
       parentId: null,
       parentName: null,
+      parentIsIncome: null,
       isIncome: true,
       valuesByMonth: { '2025-01': 1000, '2025-02': 1000, '2025-03': 1000 },
       depositTotal: 3000,
@@ -151,16 +153,20 @@ describe('MonthlyCategoryBreakdownReport', () => {
       expect(screen.getByText('Groceries')).toBeInTheDocument();
     });
 
-    // Parent section header (also appears in the subtotal recap).
+    // Parent section header for the expense group.
     expect(screen.getAllByText('Food & Dining').length).toBeGreaterThan(0);
-    // Parentless income category gets the "Other" section.
+    // Parentless income category collects into the "Other income" section.
     expect(screen.getByText('Salary')).toBeInTheDocument();
-    expect(screen.getAllByText('Other expenses').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Other income').length).toBeGreaterThan(0);
+
+    // Top-level group headers separate income from expenses.
+    expect(screen.getByText('Income')).toBeInTheDocument();
+    expect(screen.getByText('Expenses')).toBeInTheDocument();
 
     // Subtotal rows reference each section title.
     expect(screen.getByText('Subtotal: Food & Dining')).toBeInTheDocument();
 
-    // Grand summary rows.
+    // Per-group totals plus the balance summary.
     expect(screen.getByText('Summary')).toBeInTheDocument();
     expect(screen.getByText('Total expenses')).toBeInTheDocument();
     expect(screen.getByText('Total income')).toBeInTheDocument();
@@ -328,5 +334,67 @@ describe('MonthlyCategoryBreakdownReport', () => {
     const redCells = container.querySelectorAll('[class*="bg-red-"]');
     expect(greenCells.length).toBeGreaterThan(0);
     expect(redCells.length).toBeGreaterThan(0);
+  });
+
+  // Two expense subcategories under one parent: a normal spend and a
+  // refund-heavy one whose net is positive (negative expense magnitude). The
+  // subcategories must sort alphabetically and the subtotal must net them out.
+  const mixedSignResponse = {
+    currency: 'USD',
+    months: ['2025-01'],
+    data: [
+      {
+        categoryId: 'sub-zebra',
+        categoryName: 'Zebra',
+        parentId: 'cat-auto',
+        parentName: 'Auto',
+        parentIsIncome: false,
+        isIncome: false,
+        valuesByMonth: { '2025-01': 100 },
+        depositTotal: 0,
+        withdrawalTotal: 100,
+      },
+      {
+        categoryId: 'sub-apple',
+        categoryName: 'Apple',
+        parentId: 'cat-auto',
+        parentName: 'Auto',
+        parentIsIncome: false,
+        isIncome: false,
+        valuesByMonth: { '2025-01': -30 },
+        depositTotal: 30,
+        withdrawalTotal: 0,
+      },
+    ],
+  };
+
+  it('sorts subcategories alphabetically within a section', async () => {
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue(mixedSignResponse);
+    render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Apple')).toBeInTheDocument();
+    });
+
+    // Apple (A) must render before Zebra (Z), not in amount order.
+    const apple = screen.getByText('Apple');
+    const zebra = screen.getByText('Zebra');
+    expect(
+      apple.compareDocumentPosition(zebra) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('nets a positive-total expense subcategory into the section subtotal', async () => {
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue(mixedSignResponse);
+    render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Subtotal: Auto')).toBeInTheDocument();
+    });
+
+    // Subtotal = 100 + (-30) = 70, NOT 100 + 30 = 130.
+    expect(screen.getAllByText('- $70.00').length).toBeGreaterThan(0);
+    expect(screen.queryByText('- $130.00')).not.toBeInTheDocument();
   });
 });

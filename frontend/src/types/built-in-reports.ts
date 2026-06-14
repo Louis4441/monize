@@ -79,6 +79,7 @@ export interface MonthlyBreakdownCategoryRow {
   categoryName: string;
   parentId: string | null;
   parentName: string | null;
+  parentIsIncome: boolean | null;
   isIncome: boolean;
   valuesByMonth: Record<string, number>;
   depositTotal: number;

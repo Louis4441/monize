@@ -156,6 +156,7 @@ describe("MonthlyCategoryBreakdownService", () => {
     expect(row.categoryName).toBe("Groceries");
     expect(row.parentId).toBe("cat-parent");
     expect(row.parentName).toBe("Food & Dining");
+    expect(row.parentIsIncome).toBe(false);
     expect(row.isIncome).toBe(false);
     // Expense net = withdrawals - deposits, positive magnitude.
     expect(row.valuesByMonth["2025-01"]).toBe(100);
@@ -186,8 +187,39 @@ describe("MonthlyCategoryBreakdownService", () => {
     expect(row.isIncome).toBe(true);
     expect(row.parentId).toBeNull();
     expect(row.parentName).toBeNull();
+    expect(row.parentIsIncome).toBeNull();
     // Income net = deposits - withdrawals.
     expect(row.valuesByMonth["2025-01"]).toBe(5000);
+  });
+
+  it("keeps an expense category as expense even when deposits dominate", async () => {
+    // A refund-heavy month leaves a designated expense category with more
+    // deposits than withdrawals. The category's own isIncome flag must still
+    // win so the row lands in the expense group with a (negative) net.
+    transactionsRepository.query.mockResolvedValue([
+      {
+        month: "2025-01",
+        category_id: "cat-child",
+        currency_code: "USD",
+        deposits: "300.00",
+        withdrawals: "100.00",
+      },
+    ]);
+    categoriesRepository.find.mockResolvedValue([
+      mockParentCategory,
+      mockChildCategory,
+    ]);
+
+    const result = await service.getMonthlyCategoryBreakdown(
+      mockUserId,
+      "2025-01-01",
+      "2025-12-31",
+    );
+
+    const row = result.data[0];
+    expect(row.isIncome).toBe(false);
+    // Expense net = withdrawals - deposits, here negative (a net refund).
+    expect(row.valuesByMonth["2025-01"]).toBe(-200);
   });
 
   it("treats unknown or missing category as Uncategorized and merges rows", async () => {

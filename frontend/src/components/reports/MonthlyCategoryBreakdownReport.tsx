@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
@@ -46,6 +46,18 @@ const SECTION_PALETTE = [
 ];
 const OTHER_PALETTE =
   'bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-200';
+
+// Top-level group header bars. Income is rendered first (green), expenses
+// second (red) so the two halves of the report are visually unmistakable.
+const INCOME_GROUP_CLASS =
+  'bg-green-100 text-green-900 dark:bg-green-900/40 dark:text-green-100';
+const EXPENSE_GROUP_CLASS =
+  'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100';
+
+const OTHER_INCOME_KEY = '__other_income__';
+const OTHER_EXPENSE_KEY = '__other_expense__';
+const isOtherKey = (key: string): boolean =>
+  key === OTHER_INCOME_KEY || key === OTHER_EXPENSE_KEY;
 
 // Deviation cell background classes. "high" = above average, "low" = below.
 const DEVIATION_CLASS: Record<string, string> = {
@@ -95,27 +107,38 @@ function processGroup(
   rows: MonthlyBreakdownCategoryRow[],
   months: string[],
   monthCount: number,
+  sectionIsIncome: boolean,
 ): Omit<Section, 'title' | 'paletteClass' | 'isIncome'> {
   const processed: ProcessedRow[] = rows
     .map((row) => {
-      const total = sumMoney(months.map((m) => row.valuesByMonth[m] || 0));
-      const nonZeroCount = months.filter(
-        (m) => (row.valuesByMonth[m] || 0) !== 0,
-      ).length;
+      // Re-express every month value in the section's sign convention so the
+      // subtotal is correct even when a subcategory's net runs against the
+      // section (e.g. a refund-heavy expense subcategory whose net is
+      // positive must still subtract from the expense subtotal). The raw net
+      // (deposits - withdrawals) is recovered from the row's own convention,
+      // then re-signed for the section.
+      const values: Record<string, number> = {};
+      for (const m of months) {
+        const own = row.valuesByMonth[m] || 0;
+        const rawNet = row.isIncome ? own : -own;
+        values[m] = roundMoney(sectionIsIncome ? rawNet : -rawNet);
+      }
+      const total = sumMoney(months.map((m) => values[m] || 0));
+      const nonZeroCount = months.filter((m) => (values[m] || 0) !== 0).length;
       const avg = nonZeroCount > 0 ? total / monthCount : 0;
       const nonZeroAvg = nonZeroCount > 0 ? total / nonZeroCount : 0;
       return {
         categoryId: row.categoryId,
         displayName: row.categoryName,
-        isIncome: row.isIncome,
-        values: row.valuesByMonth,
+        isIncome: sectionIsIncome,
+        values,
         total: roundMoney(total),
         avg: roundMoney(avg),
         nonZeroAvg,
         nonZeroCount,
       };
     })
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   const subtotals: Record<string, number> = {};
   for (const m of months) {
@@ -159,6 +182,7 @@ export function MonthlyCategoryBreakdownReport() {
   const { formatCurrency } = useNumberFormat();
   const { formatMonth } = useDateFormat();
   const otherExpensesLabel = t('monthlyCategoryBreakdown.otherExpenses');
+  const otherIncomeLabel = t('monthlyCategoryBreakdown.otherIncome');
   const [showPercentages, setShowPercentages] = useLocalStorage<boolean>(
     PERCENTAGES_STORAGE_KEY,
     false,
@@ -195,66 +219,86 @@ export function MonthlyCategoryBreakdownReport() {
     const monthCount = months.length || 1;
     const rows = data.data;
 
-    // Group categories by parent name; parentless categories go to "Other".
-    const groups = new Map<string, MonthlyBreakdownCategoryRow[]>();
-    const noParent: MonthlyBreakdownCategoryRow[] = [];
+    // Group categories by parent. A category with a parent forms (or joins) a
+    // section keyed by that parent; parentless categories collect into the
+    // "Other income" / "Other expenses" buckets according to their own type.
+    // The whole section is classified income or expense from the parent's flag
+    // (falling back to the row's own flag when the parent is unknown).
+    interface RawGroup {
+      key: string;
+      title: string;
+      isIncome: boolean;
+      list: MonthlyBreakdownCategoryRow[];
+    }
+    const groups = new Map<string, RawGroup>();
+    const addRow = (
+      key: string,
+      title: string,
+      isIncome: boolean,
+      row: MonthlyBreakdownCategoryRow,
+    ) => {
+      const existing = groups.get(key);
+      groups.set(
+        key,
+        existing
+          ? { ...existing, list: [...existing.list, row] }
+          : { key, title, isIncome, list: [row] },
+      );
+    };
     for (const row of rows) {
-      if (row.parentName) {
-        const list = groups.get(row.parentName) || [];
-        groups.set(row.parentName, [...list, row]);
+      if (row.parentId && row.parentName) {
+        addRow(
+          row.parentId,
+          row.parentName,
+          row.parentIsIncome ?? row.isIncome,
+          row,
+        );
+      } else if (row.isIncome) {
+        addRow(OTHER_INCOME_KEY, otherIncomeLabel, true, row);
       } else {
-        noParent.push(row);
+        addRow(OTHER_EXPENSE_KEY, otherExpensesLabel, false, row);
       }
     }
 
-    // Pre-compute parent totals to sort sections by magnitude descending.
-    const parentTotals = new Map<string, number>();
-    for (const [parentName, list] of groups) {
-      parentTotals.set(
-        parentName,
-        sumMoney(
-          list.flatMap((r) => months.map((m) => r.valuesByMonth[m] || 0)),
-        ),
-      );
-    }
-    const sortedParents = Array.from(groups.keys()).sort(
-      (a, b) => (parentTotals.get(b) || 0) - (parentTotals.get(a) || 0),
-    );
+    // Order each half alphabetically by category name, with the catch-all
+    // "Other" bucket pinned to the end.
+    const orderGroups = (income: boolean): RawGroup[] =>
+      Array.from(groups.values())
+        .filter((g) => g.isIncome === income)
+        .sort((a, b) => {
+          const aOther = isOtherKey(a.key);
+          const bOther = isOtherKey(b.key);
+          if (aOther !== bOther) return aOther ? 1 : -1;
+          return a.title.localeCompare(b.title);
+        });
+    const orderedGroups = [...orderGroups(true), ...orderGroups(false)];
 
-    const sections: Section[] = [];
-    sortedParents.forEach((parentName, idx) => {
-      const list = groups.get(parentName)!;
-      const group = processGroup(list, months, monthCount);
-      sections.push({
-        title: parentName,
-        paletteClass: SECTION_PALETTE[idx % SECTION_PALETTE.length],
-        isIncome: list.every((r) => r.isIncome),
-        ...group,
-      });
+    let paletteCount = 0;
+    const sections: Section[] = orderedGroups.map((g) => {
+      const other = isOtherKey(g.key);
+      const paletteClass = other
+        ? OTHER_PALETTE
+        : SECTION_PALETTE[paletteCount % SECTION_PALETTE.length];
+      if (!other) paletteCount += 1;
+      const group = processGroup(g.list, months, monthCount, g.isIncome);
+      return { title: g.title, paletteClass, isIncome: g.isIncome, ...group };
     });
-    if (noParent.length > 0) {
-      const group = processGroup(noParent, months, monthCount);
-      sections.push({
-        title: otherExpensesLabel,
-        paletteClass: OTHER_PALETTE,
-        isIncome: noParent.every((r) => r.isIncome),
-        ...group,
-      });
-    }
 
-    // Monthly grand totals, split by income vs expense classification.
+    const incomeSections = sections.filter((s) => s.isIncome);
+    const expenseSections = sections.filter((s) => !s.isIncome);
+
+    // Group totals are the sum of section subtotals (already positive
+    // magnitudes in each section's own convention).
     const monthlyExpenses: Record<string, number> = {};
     const monthlyIncome: Record<string, number> = {};
     for (const m of months) {
+      monthlyIncome[m] = sumMoney(incomeSections.map((s) => s.subtotals[m] || 0));
       monthlyExpenses[m] = sumMoney(
-        rows.filter((r) => !r.isIncome).map((r) => r.valuesByMonth[m] || 0),
-      );
-      monthlyIncome[m] = sumMoney(
-        rows.filter((r) => r.isIncome).map((r) => r.valuesByMonth[m] || 0),
+        expenseSections.map((s) => s.subtotals[m] || 0),
       );
     }
-    const totalExpensesSum = sumMoney(Object.values(monthlyExpenses));
-    const totalIncomeSum = sumMoney(Object.values(monthlyIncome));
+    const totalIncomeSum = sumMoney(incomeSections.map((s) => s.subtotalSum));
+    const totalExpensesSum = sumMoney(expenseSections.map((s) => s.subtotalSum));
     const totalExpensesAvg = roundMoney(totalExpensesSum / monthCount);
     const totalIncomeAvg = roundMoney(totalIncomeSum / monthCount);
     const monthlyBalance: Record<string, number> = {};
@@ -269,6 +313,8 @@ export function MonthlyCategoryBreakdownReport() {
     return {
       months,
       sections,
+      incomeSections,
+      expenseSections,
       monthlyExpenses,
       monthlyIncome,
       totalExpensesSum,
@@ -279,7 +325,7 @@ export function MonthlyCategoryBreakdownReport() {
       balanceSum,
       balanceAvg,
     };
-  }, [data, otherExpensesLabel]);
+  }, [data, otherExpensesLabel, otherIncomeLabel]);
 
   const lastDayOfMonth = (month: string): string => {
     const [year, mon] = month.split('-').map(Number);
@@ -396,6 +442,169 @@ export function MonthlyCategoryBreakdownReport() {
   const hasData = model != null && model.sections.length > 0 && months.length > 0;
   const colSpan = months.length + 3;
 
+  // Render one parent section: its colored header, the alphabetically sorted
+  // subcategory rows, and the section subtotal.
+  const renderSection = (section: Section, si: number) => {
+    const sectionMonthTotal = (m: string) =>
+      section.isIncome ? model!.monthlyIncome[m] : model!.monthlyExpenses[m];
+    const sectionSum = section.isIncome
+      ? model!.totalIncomeSum
+      : model!.totalExpensesSum;
+    const sectionAvg = section.isIncome
+      ? model!.totalIncomeAvg
+      : model!.totalExpensesAvg;
+    return (
+      <Fragment key={`section-${si}`}>
+        {/* Section header. The colored bar spans the full table width while
+            the label is pinned to the left so it stays visible when the table
+            is scrolled horizontally. */}
+        <tr>
+          <td colSpan={colSpan} className={`p-0 font-semibold ${section.paletteClass}`}>
+            <div className="sticky left-0 z-10 px-2 py-1.5 inline-block max-w-full">
+              {section.allCategoryIds.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => drillDownRange(section.allCategoryIds)}
+                  className="text-left hover:underline"
+                >
+                  {section.title}
+                </button>
+              ) : (
+                section.title
+              )}
+            </div>
+          </td>
+        </tr>
+        {/* Subcategory rows (sorted alphabetically) */}
+        {section.rows.map((row) => (
+          <tr key={row.categoryId || row.displayName} className="hover:bg-gray-50 dark:hover:bg-gray-700/40">
+            <td
+              className="sticky left-0 z-10 bg-white dark:bg-gray-800 pl-5 pr-2 py-1 text-gray-900 dark:text-gray-100 truncate max-w-[220px]"
+              title={row.displayName}
+            >
+              {row.categoryId ? (
+                <button
+                  type="button"
+                  onClick={() => drillDownRange([row.categoryId!])}
+                  className="block w-full text-left truncate hover:underline"
+                >
+                  {row.displayName}
+                </button>
+              ) : (
+                row.displayName
+              )}
+            </td>
+            {months.map((m) => {
+              const value = row.values[m] || 0;
+              const cls = deviationClass(value, row.nonZeroAvg, row.nonZeroCount, row.isIncome);
+              return (
+                <td key={m} className={`px-2 py-1 text-right ${cls}`}>
+                  {value !== 0 && row.categoryId ? (
+                    <button
+                      type="button"
+                      onClick={() => drillDown(m, [row.categoryId!])}
+                      className="hover:underline"
+                    >
+                      {formatCell(value, sectionMonthTotal(m), row.isIncome)}
+                    </button>
+                  ) : value !== 0 ? (
+                    formatCell(value, sectionMonthTotal(m), row.isIncome)
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600">—</span>
+                  )}
+                </td>
+              );
+            })}
+            <td className="px-2 py-1 text-right font-semibold text-gray-900 dark:text-gray-100">
+              {formatCell(row.total, sectionSum, row.isIncome)}
+            </td>
+            <td className="px-2 py-1 text-right text-gray-700 dark:text-gray-300">
+              {formatCell(row.avg, sectionAvg, row.isIncome)}
+            </td>
+          </tr>
+        ))}
+        {/* Section subtotal */}
+        <tr className="font-bold bg-gray-50 dark:bg-gray-900 border-t-2 border-gray-300 dark:border-gray-600">
+          <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-2 py-1 truncate" title={`${t('monthlyCategoryBreakdown.subtotal')}: ${section.title}`}>
+            {t('monthlyCategoryBreakdown.subtotal')}: {section.title}
+          </td>
+          {months.map((m) => {
+            const value = section.subtotals[m] || 0;
+            return (
+              <td key={m} className="px-2 py-1 text-right">
+                {value !== 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => drillDown(m, section.allCategoryIds)}
+                    className="hover:underline"
+                  >
+                    {formatCell(value, sectionMonthTotal(m), section.isIncome)}
+                  </button>
+                ) : (
+                  <span className="text-gray-300 dark:text-gray-600">—</span>
+                )}
+              </td>
+            );
+          })}
+          <td className="px-2 py-1 text-right">
+            {formatCell(section.subtotalSum, sectionSum, section.isIncome)}
+          </td>
+          <td className="px-2 py-1 text-right">
+            {formatCell(section.subtotalAvg, sectionAvg, section.isIncome)}
+          </td>
+        </tr>
+      </Fragment>
+    );
+  };
+
+  // The bold per-month total for a whole income or expense group, shown at the
+  // bottom of that group.
+  const renderGroupTotal = (isIncome: boolean) => {
+    const label = isIncome
+      ? t('monthlyCategoryBreakdown.totalIncome')
+      : t('monthlyCategoryBreakdown.totalExpenses');
+    const monthly = isIncome ? model!.monthlyIncome : model!.monthlyExpenses;
+    const sum = isIncome ? model!.totalIncomeSum : model!.totalExpensesSum;
+    const avg = isIncome ? model!.totalIncomeAvg : model!.totalExpensesAvg;
+    const accent = isIncome
+      ? 'text-green-700 dark:text-green-300'
+      : 'text-red-700 dark:text-red-300';
+    return (
+      <tr className="font-bold bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-400 dark:border-gray-500">
+        <td className={`sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1 ${accent}`}>
+          {label}
+        </td>
+        {months.map((m) => (
+          <td key={m} className={`px-2 py-1 text-right ${accent}`}>
+            {formatGrand(monthly[m] || 0, isIncome, formatCurrency, currency)}
+          </td>
+        ))}
+        <td className={`px-2 py-1 text-right ${accent}`}>
+          {formatGrand(sum, isIncome, formatCurrency, currency)}
+        </td>
+        <td className={`px-2 py-1 text-right ${accent}`}>
+          {formatGrand(avg, isIncome, formatCurrency, currency)}
+        </td>
+      </tr>
+    );
+  };
+
+  // Full-width group header bar ("Income" / "Expenses").
+  const renderGroupHeader = (isIncome: boolean) => (
+    <tr>
+      <td
+        colSpan={colSpan}
+        className={`px-2 py-1.5 font-bold text-sm ${isIncome ? INCOME_GROUP_CLASS : EXPENSE_GROUP_CLASS}`}
+      >
+        <div className="sticky left-0 z-10 inline-block">
+          {isIncome
+            ? t('monthlyCategoryBreakdown.income')
+            : t('monthlyCategoryBreakdown.expenses')}
+        </div>
+      </td>
+    </tr>
+  );
+
   return (
     <div className="space-y-6">
       {/* Controls */}
@@ -464,154 +673,35 @@ export function MonthlyCategoryBreakdownReport() {
                 </tr>
               </thead>
               <tbody>
-                {model!.sections.map((section, si) => {
-                  const sectionMonthTotal = (m: string) =>
-                    section.isIncome ? model!.monthlyIncome[m] : model!.monthlyExpenses[m];
-                  const sectionSum = section.isIncome ? model!.totalIncomeSum : model!.totalExpensesSum;
-                  const sectionAvg = section.isIncome ? model!.totalIncomeAvg : model!.totalExpensesAvg;
-                  return (
-                    <tbody key={`section-${si}`} className="contents">
-                      {/* Section header. The colored bar spans the full table
-                          width while the label is pinned to the left so it stays
-                          visible when the table is scrolled horizontally. */}
-                      <tr>
-                        <td colSpan={colSpan} className={`p-0 font-semibold ${section.paletteClass}`}>
-                          <div className="sticky left-0 z-10 px-2 py-1.5 inline-block max-w-full">
-                            {section.allCategoryIds.length > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => drillDownRange(section.allCategoryIds)}
-                                className="text-left hover:underline"
-                              >
-                                {section.title}
-                              </button>
-                            ) : (
-                              section.title
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      {/* Category rows */}
-                      {section.rows.map((row) => (
-                        <tr key={row.categoryId || row.displayName} className="hover:bg-gray-50 dark:hover:bg-gray-700/40">
-                          <td
-                            className="sticky left-0 z-10 bg-white dark:bg-gray-800 pl-5 pr-2 py-1 text-gray-900 dark:text-gray-100 truncate max-w-[220px]"
-                            title={row.displayName}
-                          >
-                            {row.categoryId ? (
-                              <button
-                                type="button"
-                                onClick={() => drillDownRange([row.categoryId!])}
-                                className="block w-full text-left truncate hover:underline"
-                              >
-                                {row.displayName}
-                              </button>
-                            ) : (
-                              row.displayName
-                            )}
-                          </td>
-                          {months.map((m) => {
-                            const value = row.values[m] || 0;
-                            const cls = deviationClass(value, row.nonZeroAvg, row.nonZeroCount, row.isIncome);
-                            return (
-                              <td key={m} className={`px-2 py-1 text-right ${cls}`}>
-                                {value !== 0 && row.categoryId ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => drillDown(m, [row.categoryId!])}
-                                    className="hover:underline"
-                                  >
-                                    {formatCell(value, sectionMonthTotal(m), row.isIncome)}
-                                  </button>
-                                ) : value !== 0 ? (
-                                  formatCell(value, sectionMonthTotal(m), row.isIncome)
-                                ) : (
-                                  <span className="text-gray-300 dark:text-gray-600">—</span>
-                                )}
-                              </td>
-                            );
-                          })}
-                          <td className="px-2 py-1 text-right font-semibold text-gray-900 dark:text-gray-100">
-                            {formatCell(row.total, sectionSum, row.isIncome)}
-                          </td>
-                          <td className="px-2 py-1 text-right text-gray-700 dark:text-gray-300">
-                            {formatCell(row.avg, sectionAvg, row.isIncome)}
-                          </td>
-                        </tr>
-                      ))}
-                      {/* Section subtotal */}
-                      <tr className="font-bold bg-gray-50 dark:bg-gray-900 border-t-2 border-gray-300 dark:border-gray-600">
-                        <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-2 py-1 truncate" title={`${t('monthlyCategoryBreakdown.subtotal')}: ${section.title}`}>
-                          {t('monthlyCategoryBreakdown.subtotal')}: {section.title}
-                        </td>
-                        {months.map((m) => {
-                          const value = section.subtotals[m] || 0;
-                          return (
-                            <td key={m} className="px-2 py-1 text-right">
-                              {value !== 0 ? (
-                                <button
-                                  type="button"
-                                  onClick={() => drillDown(m, section.allCategoryIds)}
-                                  className="hover:underline"
-                                >
-                                  {formatCell(value, sectionMonthTotal(m), section.isIncome)}
-                                </button>
-                              ) : (
-                                <span className="text-gray-300 dark:text-gray-600">—</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                        <td className="px-2 py-1 text-right">
-                          {formatCell(section.subtotalSum, sectionSum, section.isIncome)}
-                        </td>
-                        <td className="px-2 py-1 text-right">
-                          {formatCell(section.subtotalAvg, sectionAvg, section.isIncome)}
-                        </td>
-                      </tr>
-                    </tbody>
-                  );
-                })}
+                {/* Income group: sections (alphabetical) then the income total */}
+                {model!.incomeSections.length > 0 && (
+                  <Fragment>
+                    {renderGroupHeader(true)}
+                    {model!.incomeSections.map((section, si) =>
+                      renderSection(section, si),
+                    )}
+                    {renderGroupTotal(true)}
+                  </Fragment>
+                )}
 
-                {/* Grand summary */}
+                {/* Expense group: sections (alphabetical) then the expense total */}
+                {model!.expenseSections.length > 0 && (
+                  <Fragment>
+                    {renderGroupHeader(false)}
+                    {model!.expenseSections.map((section, si) =>
+                      renderSection(section, model!.incomeSections.length + si),
+                    )}
+                    {renderGroupTotal(false)}
+                  </Fragment>
+                )}
+
+                {/* Summary: the net balance (income minus expenses) */}
                 <tr>
                   <td colSpan={colSpan} className="px-2 py-1.5 font-semibold bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100">
                     {t('monthlyCategoryBreakdown.summary')}
                   </td>
                 </tr>
                 <tr className="font-bold bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-400 dark:border-gray-500">
-                  <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1">
-                    {t('monthlyCategoryBreakdown.totalExpenses')}
-                  </td>
-                  {months.map((m) => (
-                    <td key={m} className="px-2 py-1 text-right">
-                      {formatGrand(model!.monthlyExpenses[m] || 0, false, formatCurrency, currency)}
-                    </td>
-                  ))}
-                  <td className="px-2 py-1 text-right">
-                    {formatGrand(model!.totalExpensesSum, false, formatCurrency, currency)}
-                  </td>
-                  <td className="px-2 py-1 text-right">
-                    {formatGrand(model!.totalExpensesAvg, false, formatCurrency, currency)}
-                  </td>
-                </tr>
-                <tr className="font-bold bg-gray-100 dark:bg-gray-900">
-                  <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1">
-                    {t('monthlyCategoryBreakdown.totalIncome')}
-                  </td>
-                  {months.map((m) => (
-                    <td key={m} className="px-2 py-1 text-right text-green-600 dark:text-green-400">
-                      {formatGrand(model!.monthlyIncome[m] || 0, true, formatCurrency, currency)}
-                    </td>
-                  ))}
-                  <td className="px-2 py-1 text-right text-green-600 dark:text-green-400">
-                    {formatGrand(model!.totalIncomeSum, true, formatCurrency, currency)}
-                  </td>
-                  <td className="px-2 py-1 text-right text-green-600 dark:text-green-400">
-                    {formatGrand(model!.totalIncomeAvg, true, formatCurrency, currency)}
-                  </td>
-                </tr>
-                <tr className="font-bold bg-gray-100 dark:bg-gray-900">
                   <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1">
                     {t('monthlyCategoryBreakdown.balance')}
                   </td>
@@ -630,44 +720,6 @@ export function MonthlyCategoryBreakdownReport() {
                     {formatGrand(model!.balanceAvg, null, formatCurrency, currency)}
                   </td>
                 </tr>
-
-                {/* Spacer */}
-                <tr>
-                  <td colSpan={colSpan} className="h-2" />
-                </tr>
-
-                {/* Section subtotals recap */}
-                {model!.sections.map((section, si) => {
-                  const sectionMonthTotal = (m: string) =>
-                    section.isIncome ? model!.monthlyIncome[m] : model!.monthlyExpenses[m];
-                  const sectionSum = section.isIncome ? model!.totalIncomeSum : model!.totalExpensesSum;
-                  const sectionAvg = section.isIncome ? model!.totalIncomeAvg : model!.totalExpensesAvg;
-                  return (
-                    <tr key={`recap-${si}`} className="font-bold bg-gray-50 dark:bg-gray-900">
-                      <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-2 py-1 truncate" title={section.title}>
-                        {section.title}
-                      </td>
-                      {months.map((m) => {
-                        const value = section.subtotals[m] || 0;
-                        return (
-                          <td key={m} className="px-2 py-1 text-right">
-                            {value !== 0 ? (
-                              formatCell(value, sectionMonthTotal(m), section.isIncome)
-                            ) : (
-                              <span className="text-gray-300 dark:text-gray-600">—</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td className="px-2 py-1 text-right">
-                        {formatCell(section.subtotalSum, sectionSum, section.isIncome)}
-                      </td>
-                      <td className="px-2 py-1 text-right">
-                        {formatCell(section.subtotalAvg, sectionAvg, section.isIncome)}
-                      </td>
-                    </tr>
-                  );
-                })}
               </tbody>
             </table>
           </div>

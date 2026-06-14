@@ -170,8 +170,9 @@ export class MonthlyCategoryBreakdownService {
 
   /**
    * Convert one accumulator into a response row. A category is income when its
-   * deposits exceed its withdrawals; the per-month value is the signed net in
-   * the category's dominant direction (positive magnitude either way) so the
+   * own isIncome flag says so (falling back to deposits-dominate only for
+   * uncategorized rows that have no category record); the per-month value is
+   * the signed net in that direction (positive magnitude either way) so the
    * frontend can render and sum it without re-deciding the sign.
    */
   private buildRow(
@@ -185,7 +186,9 @@ export class MonthlyCategoryBreakdownService {
       ? (categoryMap.get(category.parentId) ?? null)
       : null;
 
-    const isIncome = acc.depositTotal > acc.withdrawalTotal;
+    const isIncome = category
+      ? category.isIncome
+      : acc.depositTotal > acc.withdrawalTotal;
 
     const valuesByMonth: Record<string, number> = {};
     const allMonths = new Set<string>([
@@ -204,6 +207,7 @@ export class MonthlyCategoryBreakdownService {
       categoryName: category?.name ?? "Uncategorized",
       parentId: parent?.id ?? null,
       parentName: parent?.name ?? null,
+      parentIsIncome: parent?.isIncome ?? null,
       isIncome,
       valuesByMonth,
       depositTotal: roundMoney(acc.depositTotal),

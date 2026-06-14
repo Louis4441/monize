@@ -21,8 +21,20 @@ export class MonthlyBreakdownCategoryRow {
 
   @ApiProperty({
     example: false,
+    nullable: true,
     description:
-      "True when the category is an income category (deposits dominate).",
+      "Income flag of the parent category (null when the category has no " +
+      "parent). Lets the frontend classify a whole section as income or " +
+      "expense from its parent rather than guessing from the children.",
+  })
+  parentIsIncome: boolean | null;
+
+  @ApiProperty({
+    example: false,
+    description:
+      "True when the category is designated as income. Uses the category's " +
+      "own isIncome flag, falling back to deposits-dominate for uncategorized " +
+      "rows.",
   })
   isIncome: boolean;
 
