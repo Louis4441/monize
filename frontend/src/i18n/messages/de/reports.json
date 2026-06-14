@@ -1009,6 +1009,12 @@
     "totalExpenses": "Ausgaben gesamt",
     "totalIncome": "Einnahmen gesamt",
     "balance": "Saldo",
+    "transfers": "Überweisungen",
+    "totalTransfers": "Überweisungen gesamt",
+    "transferFrom": "Von",
+    "transferTo": "Nach",
+    "overallTotal": "Gesamtsumme",
+    "includeCurrentMonth": "Laufenden Monat einbeziehen",
     "exportCsv": "CSV exportieren",
     "csvParentColumn": "Übergeordnete Kategorie"
   },

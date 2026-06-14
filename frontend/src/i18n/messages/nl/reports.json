@@ -1009,6 +1009,12 @@
     "totalExpenses": "Totale uitgaven",
     "totalIncome": "Totale inkomsten",
     "balance": "Saldo",
+    "transfers": "Overboekingen",
+    "totalTransfers": "Totaal overboekingen",
+    "transferFrom": "Van",
+    "transferTo": "Naar",
+    "overallTotal": "Totaal-generaal",
+    "includeCurrentMonth": "Huidige maand opnemen",
     "exportCsv": "CSV exporteren",
     "csvParentColumn": "Hoofdcategorie"
   },

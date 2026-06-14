@@ -86,9 +86,17 @@ export interface MonthlyBreakdownCategoryRow {
   withdrawalTotal: number;
 }
 
+export interface MonthlyBreakdownTransferRow {
+  accountId: string;
+  accountName: string;
+  direction: 'from' | 'to';
+  valuesByMonth: Record<string, number>;
+}
+
 export interface MonthlyCategoryBreakdownResponse {
   months: string[];
   data: MonthlyBreakdownCategoryRow[];
+  transfers: MonthlyBreakdownTransferRow[];
   currency: string;
 }
 

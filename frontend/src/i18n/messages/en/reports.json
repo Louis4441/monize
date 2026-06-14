@@ -1009,6 +1009,12 @@
     "totalExpenses": "Total expenses",
     "totalIncome": "Total income",
     "balance": "Balance",
+    "transfers": "Transfers",
+    "totalTransfers": "Total transfers",
+    "transferFrom": "From",
+    "transferTo": "To",
+    "overallTotal": "Overall total",
+    "includeCurrentMonth": "Include current month",
     "exportCsv": "Export CSV",
     "csvParentColumn": "Parent category"
   },

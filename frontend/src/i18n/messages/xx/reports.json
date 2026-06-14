@@ -1009,6 +1009,12 @@
     "totalExpenses": "[XX-Total expenses-XX]",
     "totalIncome": "[XX-Total income-XX]",
     "balance": "[XX-Balance-XX]",
+    "transfers": "[XX-Transfers-XX]",
+    "totalTransfers": "[XX-Total transfers-XX]",
+    "transferFrom": "[XX-From-XX]",
+    "transferTo": "[XX-To-XX]",
+    "overallTotal": "[XX-Overall total-XX]",
+    "includeCurrentMonth": "[XX-Include current month-XX]",
     "exportCsv": "[XX-Export CSV-XX]",
     "csvParentColumn": "[XX-Parent category-XX]"
   },

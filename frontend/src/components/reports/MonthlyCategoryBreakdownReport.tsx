@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { builtInReportsApi } from '@/lib/built-in-reports';
-import { MonthlyBreakdownCategoryRow } from '@/types/built-in-reports';
+import {
+  MonthlyBreakdownCategoryRow,
+  MonthlyBreakdownTransferRow,
+} from '@/types/built-in-reports';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useDateRange } from '@/hooks/useDateRange';
@@ -19,6 +22,12 @@ import { exportToCsv } from '@/lib/csv-export';
 const RANGE_STORAGE_KEY = 'monize-reports-monthly-category-breakdown-range';
 const PERCENTAGES_STORAGE_KEY =
   'monize-reports-monthly-category-breakdown-percentages';
+const SORT_COLUMN_STORAGE_KEY =
+  'monize-reports-monthly-category-breakdown-sort-column';
+const SORT_DIR_STORAGE_KEY =
+  'monize-reports-monthly-category-breakdown-sort-dir';
+const INCLUDE_CURRENT_MONTH_STORAGE_KEY =
+  'monize-reports-monthly-category-breakdown-include-current-month';
 
 // Deviation thresholds (fraction of the non-zero average) mirroring yaffa.
 const DEVIATION_LEVEL_1 = 0.05;
@@ -48,11 +57,14 @@ const OTHER_PALETTE =
   'bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-200';
 
 // Top-level group header bars. Income is rendered first (green), expenses
-// second (red) so the two halves of the report are visually unmistakable.
+// second (red), transfers last (blue) so the parts of the report are visually
+// unmistakable.
 const INCOME_GROUP_CLASS =
   'bg-green-100 text-green-900 dark:bg-green-900/40 dark:text-green-100';
 const EXPENSE_GROUP_CLASS =
   'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100';
+const TRANSFER_GROUP_CLASS =
+  'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100';
 
 const OTHER_INCOME_KEY = '__other_income__';
 const OTHER_EXPENSE_KEY = '__other_expense__';
@@ -89,6 +101,49 @@ interface Section {
   subtotalAvg: number;
   allCategoryIds: string[];
   isIncome: boolean;
+  isOther: boolean;
+}
+
+interface TransferRow {
+  accountId: string;
+  direction: 'from' | 'to';
+  displayName: string;
+  values: Record<string, number>;
+  total: number;
+  avg: number;
+}
+
+// Sort state. A column is the category name, a YYYY-MM month, the total or the
+// average; rows and sections are ordered by the same key.
+type SortDir = 'asc' | 'desc';
+const CATEGORY_COLUMN = 'category';
+const TOTAL_COLUMN = 'total';
+const AVG_COLUMN = 'avg';
+
+function rowSortKey(row: ProcessedRow, column: string): number | string {
+  if (column === CATEGORY_COLUMN) return row.displayName;
+  if (column === TOTAL_COLUMN) return row.total;
+  if (column === AVG_COLUMN) return row.avg;
+  return row.values[column] || 0;
+}
+
+function sectionSortKey(section: Section, column: string): number | string {
+  if (column === CATEGORY_COLUMN) return section.title;
+  if (column === TOTAL_COLUMN) return section.subtotalSum;
+  if (column === AVG_COLUMN) return section.subtotalAvg;
+  return section.subtotals[column] || 0;
+}
+
+function compareKeys(
+  a: number | string,
+  b: number | string,
+  dir: SortDir,
+): number {
+  const cmp =
+    typeof a === 'string' && typeof b === 'string'
+      ? a.localeCompare(b)
+      : (a as number) - (b as number);
+  return dir === 'asc' ? cmp : -cmp;
 }
 
 const SCALE = 10000;
@@ -108,7 +163,9 @@ function processGroup(
   months: string[],
   monthCount: number,
   sectionIsIncome: boolean,
-): Omit<Section, 'title' | 'paletteClass' | 'isIncome'> {
+  sortColumn: string,
+  sortDir: SortDir,
+): Omit<Section, 'title' | 'paletteClass' | 'isIncome' | 'isOther'> {
   const processed: ProcessedRow[] = rows
     .map((row) => {
       // Re-express every month value in the section's sign convention so the
@@ -138,7 +195,15 @@ function processGroup(
         nonZeroCount,
       };
     })
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
+    .sort((a, b) => {
+      const primary = compareKeys(
+        rowSortKey(a, sortColumn),
+        rowSortKey(b, sortColumn),
+        sortDir,
+      );
+      // Tie-break alphabetically so equal values keep a stable order.
+      return primary !== 0 ? primary : a.displayName.localeCompare(b.displayName);
+    });
 
   const subtotals: Record<string, number> = {};
   for (const m of months) {
@@ -151,6 +216,65 @@ function processGroup(
     .filter((id): id is string => id != null);
 
   return { rows: processed, subtotals, subtotalSum, subtotalAvg, allCategoryIds };
+}
+
+function transferSortKey(row: TransferRow, column: string): number | string {
+  if (column === CATEGORY_COLUMN) return row.displayName;
+  if (column === TOTAL_COLUMN) return row.total;
+  if (column === AVG_COLUMN) return row.avg;
+  return row.values[column] || 0;
+}
+
+// Process the signed transfer rows: re-key by month, compute totals/averages
+// and order by the active sort. Values keep their backend sign ("from" rows
+// positive, "to" rows negative) so they sum into a meaningful net.
+function processTransfers(
+  transfers: MonthlyBreakdownTransferRow[],
+  months: string[],
+  monthCount: number,
+  fromLabel: (name: string) => string,
+  toLabel: (name: string) => string,
+  sortColumn: string,
+  sortDir: SortDir,
+): {
+  rows: TransferRow[];
+  monthly: Record<string, number>;
+  totalSum: number;
+  totalAvg: number;
+} {
+  const rows: TransferRow[] = transfers
+    .map((tr) => {
+      const values: Record<string, number> = {};
+      for (const m of months) values[m] = roundMoney(tr.valuesByMonth[m] || 0);
+      const total = sumMoney(months.map((m) => values[m] || 0));
+      const nonZeroCount = months.filter((m) => (values[m] || 0) !== 0).length;
+      const avg = nonZeroCount > 0 ? total / monthCount : 0;
+      return {
+        accountId: tr.accountId,
+        direction: tr.direction,
+        displayName:
+          tr.direction === 'from'
+            ? fromLabel(tr.accountName)
+            : toLabel(tr.accountName),
+        values,
+        total: roundMoney(total),
+        avg: roundMoney(avg),
+      };
+    })
+    .sort((a, b) => {
+      const primary = compareKeys(
+        transferSortKey(a, sortColumn),
+        transferSortKey(b, sortColumn),
+        sortDir,
+      );
+      return primary !== 0 ? primary : a.displayName.localeCompare(b.displayName);
+    });
+
+  const monthly: Record<string, number> = {};
+  for (const m of months) monthly[m] = sumMoney(rows.map((r) => r.values[m] || 0));
+  const totalSum = sumMoney(rows.map((r) => r.total));
+  const totalAvg = roundMoney(totalSum / monthCount);
+  return { rows, monthly, totalSum, totalAvg };
 }
 
 function deviationClass(
@@ -187,6 +311,34 @@ export function MonthlyCategoryBreakdownReport() {
     PERCENTAGES_STORAGE_KEY,
     false,
   );
+  const [sortColumn, setSortColumn] = useLocalStorage<string>(
+    SORT_COLUMN_STORAGE_KEY,
+    CATEGORY_COLUMN,
+  );
+  const [sortDir, setSortDir] = useLocalStorage<SortDir>(
+    SORT_DIR_STORAGE_KEY,
+    'asc',
+  );
+  const [includeCurrentMonth, setIncludeCurrentMonth] =
+    useLocalStorage<boolean>(INCLUDE_CURRENT_MONTH_STORAGE_KEY, false);
+
+  // The current calendar month (YYYY-MM); the latest column is in progress and
+  // excluded by default unless the user opts to include it.
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(
+    now.getMonth() + 1,
+  ).padStart(2, '0')}`;
+
+  // Toggle the sort column/direction. Selecting a new column defaults to
+  // ascending for the category name and descending for value columns.
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDir(column === CATEGORY_COLUMN ? 'asc' : 'desc');
+    }
+  };
   const {
     dateRange,
     setDateRange,
@@ -215,7 +367,14 @@ export function MonthlyCategoryBreakdownReport() {
 
   const model = useMemo(() => {
     if (!data) return null;
-    const months = data.months;
+    // Drop the in-progress (current) month unless the user opts in. Only the
+    // latest column can be the current month, and never strip the only column.
+    const allMonths = data.months;
+    const lastMonth = allMonths[allMonths.length - 1];
+    const months =
+      !includeCurrentMonth && allMonths.length > 1 && lastMonth === currentMonth
+        ? allMonths.slice(0, -1)
+        : allMonths;
     const monthCount = months.length || 1;
     const rows = data.data;
 
@@ -260,32 +419,71 @@ export function MonthlyCategoryBreakdownReport() {
       }
     }
 
-    // Order each half alphabetically by category name, with the catch-all
-    // "Other" bucket pinned to the end.
-    const orderGroups = (income: boolean): RawGroup[] =>
-      Array.from(groups.values())
-        .filter((g) => g.isIncome === income)
-        .sort((a, b) => {
-          const aOther = isOtherKey(a.key);
-          const bOther = isOtherKey(b.key);
-          if (aOther !== bOther) return aOther ? 1 : -1;
-          return a.title.localeCompare(b.title);
-        });
-    const orderedGroups = [...orderGroups(true), ...orderGroups(false)];
+    // Build a Section from a raw group; palette is assigned later in display
+    // order. Rows are sorted inside processGroup by the active column.
+    const buildSection = (g: RawGroup): Section => {
+      const group = processGroup(
+        g.list,
+        months,
+        monthCount,
+        g.isIncome,
+        sortColumn,
+        sortDir,
+      );
+      return {
+        title: g.title,
+        paletteClass: '',
+        isIncome: g.isIncome,
+        isOther: isOtherKey(g.key),
+        ...group,
+      };
+    };
 
+    // Sort sections within a group by the active column, "Other" pinned last.
+    const sortSections = (secs: Section[]): Section[] =>
+      [...secs].sort((a, b) => {
+        if (a.isOther !== b.isOther) return a.isOther ? 1 : -1;
+        const primary = compareKeys(
+          sectionSortKey(a, sortColumn),
+          sectionSortKey(b, sortColumn),
+          sortDir,
+        );
+        return primary !== 0 ? primary : a.title.localeCompare(b.title);
+      });
+
+    const rawGroups = Array.from(groups.values());
+    const incomeSectionsRaw = sortSections(
+      rawGroups.filter((g) => g.isIncome).map(buildSection),
+    );
+    const expenseSectionsRaw = sortSections(
+      rawGroups.filter((g) => !g.isIncome).map(buildSection),
+    );
+
+    // Assign the rotating palette across the combined display order (income
+    // first, then expenses); "Other" buckets keep the neutral palette.
     let paletteCount = 0;
-    const sections: Section[] = orderedGroups.map((g) => {
-      const other = isOtherKey(g.key);
-      const paletteClass = other
+    const assignPalette = (s: Section): Section => {
+      const paletteClass = s.isOther
         ? OTHER_PALETTE
         : SECTION_PALETTE[paletteCount % SECTION_PALETTE.length];
-      if (!other) paletteCount += 1;
-      const group = processGroup(g.list, months, monthCount, g.isIncome);
-      return { title: g.title, paletteClass, isIncome: g.isIncome, ...group };
-    });
+      if (!s.isOther) paletteCount += 1;
+      return { ...s, paletteClass };
+    };
+    const incomeSections = incomeSectionsRaw.map(assignPalette);
+    const expenseSections = expenseSectionsRaw.map(assignPalette);
+    const sections = [...incomeSections, ...expenseSections];
 
-    const incomeSections = sections.filter((s) => s.isIncome);
-    const expenseSections = sections.filter((s) => !s.isIncome);
+    // Transfers form their own group (signed: "from" positive, "to" negative).
+    const transfers = processTransfers(
+      data.transfers || [],
+      months,
+      monthCount,
+      (name) => `${t('monthlyCategoryBreakdown.transferFrom')} ${name}`,
+      (name) => `${t('monthlyCategoryBreakdown.transferTo')} ${name}`,
+      sortColumn,
+      sortDir,
+    );
+    const hasTransfers = transfers.rows.length > 0;
 
     // Group totals are the sum of section subtotals (already positive
     // magnitudes in each section's own convention).
@@ -301,20 +499,28 @@ export function MonthlyCategoryBreakdownReport() {
     const totalExpensesSum = sumMoney(expenseSections.map((s) => s.subtotalSum));
     const totalExpensesAvg = roundMoney(totalExpensesSum / monthCount);
     const totalIncomeAvg = roundMoney(totalIncomeSum / monthCount);
+
+    // Balance is income minus expenses; the overall total folds transfers in
+    // too (matching a Microsoft Money banking summary's bottom line).
     const monthlyBalance: Record<string, number> = {};
+    const monthlyOverall: Record<string, number> = {};
     for (const m of months) {
-      monthlyBalance[m] = roundMoney(
-        (monthlyIncome[m] || 0) - (monthlyExpenses[m] || 0),
-      );
+      const bal = roundMoney((monthlyIncome[m] || 0) - (monthlyExpenses[m] || 0));
+      monthlyBalance[m] = bal;
+      monthlyOverall[m] = roundMoney(bal + (transfers.monthly[m] || 0));
     }
     const balanceSum = roundMoney(totalIncomeSum - totalExpensesSum);
     const balanceAvg = roundMoney(balanceSum / monthCount);
+    const overallSum = roundMoney(balanceSum + transfers.totalSum);
+    const overallAvg = roundMoney(overallSum / monthCount);
 
     return {
       months,
       sections,
       incomeSections,
       expenseSections,
+      transfers,
+      hasTransfers,
       monthlyExpenses,
       monthlyIncome,
       totalExpensesSum,
@@ -324,8 +530,20 @@ export function MonthlyCategoryBreakdownReport() {
       monthlyBalance,
       balanceSum,
       balanceAvg,
+      monthlyOverall,
+      overallSum,
+      overallAvg,
     };
-  }, [data, otherExpensesLabel, otherIncomeLabel]);
+  }, [
+    data,
+    otherExpensesLabel,
+    otherIncomeLabel,
+    sortColumn,
+    sortDir,
+    includeCurrentMonth,
+    currentMonth,
+    t,
+  ]);
 
   const lastDayOfMonth = (month: string): string => {
     const [year, mon] = month.split('-').map(Number);
@@ -397,6 +615,17 @@ export function MonthlyCategoryBreakdownReport() {
       roundMoney(model.totalIncomeSum),
       roundMoney(model.totalIncomeAvg),
     ]);
+    // Transfer rows carry their own sign already ("from" positive, "to"
+    // negative), so they are exported as-is.
+    for (const transfer of model.transfers.rows) {
+      rows.push([
+        t('monthlyCategoryBreakdown.transfers'),
+        transfer.displayName,
+        ...model.months.map((m) => transfer.values[m] || 0),
+        transfer.total,
+        transfer.avg,
+      ]);
+    }
     rows.push([
       '',
       t('monthlyCategoryBreakdown.balance'),
@@ -404,6 +633,22 @@ export function MonthlyCategoryBreakdownReport() {
       model.balanceSum,
       model.balanceAvg,
     ]);
+    if (model.hasTransfers) {
+      rows.push([
+        '',
+        t('monthlyCategoryBreakdown.totalTransfers'),
+        ...model.months.map((m) => model.transfers.monthly[m] || 0),
+        model.transfers.totalSum,
+        model.transfers.totalAvg,
+      ]);
+      rows.push([
+        '',
+        t('monthlyCategoryBreakdown.overallTotal'),
+        ...model.months.map((m) => model.monthlyOverall[m] || 0),
+        model.overallSum,
+        model.overallAvg,
+      ]);
+    }
     exportToCsv('monthly-category-breakdown', headers, rows);
   };
 
@@ -439,7 +684,10 @@ export function MonthlyCategoryBreakdownReport() {
   }
 
   const months = model?.months ?? [];
-  const hasData = model != null && model.sections.length > 0 && months.length > 0;
+  const hasData =
+    model != null &&
+    months.length > 0 &&
+    (model.sections.length > 0 || model.hasTransfers);
   const colSpan = months.length + 3;
 
   // Render one parent section: its colored header, the alphabetically sorted
@@ -605,6 +853,99 @@ export function MonthlyCategoryBreakdownReport() {
     </tr>
   );
 
+  // The transfers group: a header bar, one signed row per account/direction
+  // ("from" positive, "to" negative), and the net total transfers row.
+  const renderTransfers = () => {
+    const tr = model!.transfers;
+    const accent = 'text-blue-700 dark:text-blue-300';
+    return (
+      <Fragment>
+        <tr>
+          <td colSpan={colSpan} className={`px-2 py-1.5 font-bold text-sm ${TRANSFER_GROUP_CLASS}`}>
+            <div className="sticky left-0 z-10 inline-block">
+              {t('monthlyCategoryBreakdown.transfers')}
+            </div>
+          </td>
+        </tr>
+        {tr.rows.map((row) => (
+          <tr key={`${row.direction}-${row.accountId}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/40">
+            <td className="sticky left-0 z-10 bg-white dark:bg-gray-800 pl-5 pr-2 py-1 text-gray-900 dark:text-gray-100 truncate max-w-[220px]" title={row.displayName}>
+              {row.displayName}
+            </td>
+            {months.map((m) => (
+              <td key={m} className="px-2 py-1 text-right">
+                {formatGrand(row.values[m] || 0, null, formatCurrency, currency)}
+              </td>
+            ))}
+            <td className="px-2 py-1 text-right font-semibold text-gray-900 dark:text-gray-100">
+              {formatGrand(row.total, null, formatCurrency, currency)}
+            </td>
+            <td className="px-2 py-1 text-right text-gray-700 dark:text-gray-300">
+              {formatGrand(row.avg, null, formatCurrency, currency)}
+            </td>
+          </tr>
+        ))}
+        <tr className="font-bold bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-400 dark:border-gray-500">
+          <td className={`sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1 ${accent}`}>
+            {t('monthlyCategoryBreakdown.totalTransfers')}
+          </td>
+          {months.map((m) => (
+            <td key={m} className={`px-2 py-1 text-right ${accent}`}>
+              {formatGrand(tr.monthly[m] || 0, null, formatCurrency, currency)}
+            </td>
+          ))}
+          <td className={`px-2 py-1 text-right ${accent}`}>
+            {formatGrand(tr.totalSum, null, formatCurrency, currency)}
+          </td>
+          <td className={`px-2 py-1 text-right ${accent}`}>
+            {formatGrand(tr.totalAvg, null, formatCurrency, currency)}
+          </td>
+        </tr>
+      </Fragment>
+    );
+  };
+
+  // A bold summary row spanning all months plus the total/average columns.
+  const renderSummaryRow = (
+    label: string,
+    monthly: Record<string, number>,
+    sum: number,
+    avg: number,
+    signMode: boolean | null,
+    accent: string,
+  ) => (
+    <tr className="font-bold bg-gray-100 dark:bg-gray-900">
+      <td className={`sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1 ${accent}`}>
+        {label}
+      </td>
+      {months.map((m) => (
+        <td key={m} className={`px-2 py-1 text-right ${accent}`}>
+          {formatGrand(monthly[m] || 0, signMode, formatCurrency, currency)}
+        </td>
+      ))}
+      <td className={`px-2 py-1 text-right ${accent}`}>
+        {formatGrand(sum, signMode, formatCurrency, currency)}
+      </td>
+      <td className={`px-2 py-1 text-right ${accent}`}>
+        {formatGrand(avg, signMode, formatCurrency, currency)}
+      </td>
+    </tr>
+  );
+
+  // Sort affordances for the column headers.
+  const ariaSort = (column: string): 'ascending' | 'descending' | 'none' =>
+    sortColumn === column
+      ? sortDir === 'asc'
+        ? 'ascending'
+        : 'descending'
+      : 'none';
+  const sortIndicator = (column: string) =>
+    sortColumn === column ? (
+      <span aria-hidden="true" className="ml-0.5">
+        {sortDir === 'asc' ? '▲' : '▼'}
+      </span>
+    ) : null;
+
   return (
     <div className="space-y-6">
       {/* Controls */}
@@ -621,6 +962,15 @@ export function MonthlyCategoryBreakdownReport() {
             onCustomEndDateChange={setEndDate}
           />
           <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <ToggleSwitch
+                checked={includeCurrentMonth}
+                onChange={setIncludeCurrentMonth}
+                label={t('monthlyCategoryBreakdown.includeCurrentMonth')}
+                size="sm"
+              />
+              <span>{t('monthlyCategoryBreakdown.includeCurrentMonth')}</span>
+            </div>
             <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
               <ToggleSwitch
                 checked={showPercentages}
@@ -656,19 +1006,60 @@ export function MonthlyCategoryBreakdownReport() {
             <table className="min-w-full text-xs border-collapse">
               <thead>
                 <tr className="text-gray-500 dark:text-gray-400">
-                  <th className="sticky left-0 z-10 bg-white dark:bg-gray-800 px-2 py-2 text-left font-medium min-w-[180px]">
-                    {t('monthlyCategoryBreakdown.category')}
+                  <th
+                    className="sticky left-0 z-10 bg-white dark:bg-gray-800 px-2 py-2 text-left font-medium min-w-[180px]"
+                    aria-sort={ariaSort(CATEGORY_COLUMN)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSort(CATEGORY_COLUMN)}
+                      className="inline-flex items-center gap-1 hover:underline"
+                    >
+                      {t('monthlyCategoryBreakdown.category')}
+                      {sortIndicator(CATEGORY_COLUMN)}
+                    </button>
                   </th>
                   {months.map((m) => (
-                    <th key={m} className="px-2 py-2 text-right font-medium whitespace-nowrap">
-                      {formatMonth(m)}
+                    <th
+                      key={m}
+                      className="px-2 py-2 text-right font-medium whitespace-nowrap"
+                      aria-sort={ariaSort(m)}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSort(m)}
+                        className="inline-flex items-center gap-1 hover:underline"
+                      >
+                        {formatMonth(m)}
+                        {sortIndicator(m)}
+                      </button>
                     </th>
                   ))}
-                  <th className="px-2 py-2 text-right font-medium">
-                    {t('monthlyCategoryBreakdown.total')}
+                  <th
+                    className="px-2 py-2 text-right font-medium"
+                    aria-sort={ariaSort(TOTAL_COLUMN)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSort(TOTAL_COLUMN)}
+                      className="inline-flex items-center gap-1 hover:underline"
+                    >
+                      {t('monthlyCategoryBreakdown.total')}
+                      {sortIndicator(TOTAL_COLUMN)}
+                    </button>
                   </th>
-                  <th className="px-2 py-2 text-right font-medium">
-                    {t('monthlyCategoryBreakdown.avgPerMonth')}
+                  <th
+                    className="px-2 py-2 text-right font-medium"
+                    aria-sort={ariaSort(AVG_COLUMN)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSort(AVG_COLUMN)}
+                      className="inline-flex items-center gap-1 hover:underline"
+                    >
+                      {t('monthlyCategoryBreakdown.avgPerMonth')}
+                      {sortIndicator(AVG_COLUMN)}
+                    </button>
                   </th>
                 </tr>
               </thead>
@@ -695,12 +1086,32 @@ export function MonthlyCategoryBreakdownReport() {
                   </Fragment>
                 )}
 
-                {/* Summary: the net balance (income minus expenses) */}
+                {/* Transfers group: FROM (positive) / TO (negative) per account */}
+                {model!.hasTransfers && renderTransfers()}
+
+                {/* Summary: totals, balance, optional transfers/overall, and a
+                    recap of every category section. */}
                 <tr>
                   <td colSpan={colSpan} className="px-2 py-1.5 font-semibold bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-gray-100">
                     {t('monthlyCategoryBreakdown.summary')}
                   </td>
                 </tr>
+                {renderSummaryRow(
+                  t('monthlyCategoryBreakdown.totalIncome'),
+                  model!.monthlyIncome,
+                  model!.totalIncomeSum,
+                  model!.totalIncomeAvg,
+                  true,
+                  'text-green-600 dark:text-green-400',
+                )}
+                {renderSummaryRow(
+                  t('monthlyCategoryBreakdown.totalExpenses'),
+                  model!.monthlyExpenses,
+                  model!.totalExpensesSum,
+                  model!.totalExpensesAvg,
+                  false,
+                  '',
+                )}
                 <tr className="font-bold bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-400 dark:border-gray-500">
                   <td className="sticky left-0 z-10 bg-gray-100 dark:bg-gray-900 px-2 py-1">
                     {t('monthlyCategoryBreakdown.balance')}
@@ -720,6 +1131,89 @@ export function MonthlyCategoryBreakdownReport() {
                     {formatGrand(model!.balanceAvg, null, formatCurrency, currency)}
                   </td>
                 </tr>
+                {model!.hasTransfers &&
+                  renderSummaryRow(
+                    t('monthlyCategoryBreakdown.totalTransfers'),
+                    model!.transfers.monthly,
+                    model!.transfers.totalSum,
+                    model!.transfers.totalAvg,
+                    null,
+                    'text-blue-700 dark:text-blue-300',
+                  )}
+                {model!.hasTransfers && (
+                  <tr className="font-bold bg-gray-200 dark:bg-gray-800 border-t-2 border-gray-400 dark:border-gray-500">
+                    <td className="sticky left-0 z-10 bg-gray-200 dark:bg-gray-800 px-2 py-1">
+                      {t('monthlyCategoryBreakdown.overallTotal')}
+                    </td>
+                    {months.map((m) => {
+                      const ov = model!.monthlyOverall[m] || 0;
+                      return (
+                        <td key={m} className={`px-2 py-1 text-right ${ov >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {formatGrand(ov, null, formatCurrency, currency)}
+                        </td>
+                      );
+                    })}
+                    <td className={`px-2 py-1 text-right ${model!.overallSum >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {formatGrand(model!.overallSum, null, formatCurrency, currency)}
+                    </td>
+                    <td className={`px-2 py-1 text-right ${model!.overallAvg >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {formatGrand(model!.overallAvg, null, formatCurrency, currency)}
+                    </td>
+                  </tr>
+                )}
+
+                {/* Spacer */}
+                <tr>
+                  <td colSpan={colSpan} className="h-2" />
+                </tr>
+
+                {/* Recap of every category section's subtotal */}
+                {model!.sections.map((section, si) => {
+                  const sectionMonthTotal = (m: string) =>
+                    section.isIncome
+                      ? model!.monthlyIncome[m]
+                      : model!.monthlyExpenses[m];
+                  const sectionSum = section.isIncome
+                    ? model!.totalIncomeSum
+                    : model!.totalExpensesSum;
+                  const sectionAvg = section.isIncome
+                    ? model!.totalIncomeAvg
+                    : model!.totalExpensesAvg;
+                  return (
+                    <tr key={`recap-${si}`} className="font-bold bg-gray-50 dark:bg-gray-900">
+                      <td className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-2 py-1 truncate" title={section.title}>
+                        {section.title}
+                      </td>
+                      {months.map((m) => {
+                        const value = section.subtotals[m] || 0;
+                        return (
+                          <td key={m} className="px-2 py-1 text-right">
+                            {value !== 0 ? (
+                              formatCell(value, sectionMonthTotal(m), section.isIncome)
+                            ) : (
+                              <span className="text-gray-300 dark:text-gray-600">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-2 py-1 text-right">
+                        {formatCell(section.subtotalSum, sectionSum, section.isIncome)}
+                      </td>
+                      <td className="px-2 py-1 text-right">
+                        {formatCell(section.subtotalAvg, sectionAvg, section.isIncome)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {model!.hasTransfers &&
+                  renderSummaryRow(
+                    t('monthlyCategoryBreakdown.transfers'),
+                    model!.transfers.monthly,
+                    model!.transfers.totalSum,
+                    model!.transfers.totalAvg,
+                    null,
+                    'text-blue-700 dark:text-blue-300',
+                  )}
               </tbody>
             </table>
           </div>

@@ -1009,6 +1009,12 @@
     "totalExpenses": "Wydatki łącznie",
     "totalIncome": "Przychody łącznie",
     "balance": "Saldo",
+    "transfers": "Transfery",
+    "totalTransfers": "Suma transferów",
+    "transferFrom": "Z",
+    "transferTo": "Do",
+    "overallTotal": "Suma całkowita",
+    "includeCurrentMonth": "Uwzględnij bieżący miesiąc",
     "exportCsv": "Eksportuj CSV",
     "csvParentColumn": "Kategoria nadrzędna"
   },

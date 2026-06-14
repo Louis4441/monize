@@ -107,6 +107,7 @@ const sampleResponse = {
       withdrawalTotal: 0,
     },
   ],
+  transfers: [],
 };
 
 describe('MonthlyCategoryBreakdownReport', () => {
@@ -166,10 +167,10 @@ describe('MonthlyCategoryBreakdownReport', () => {
     // Subtotal rows reference each section title.
     expect(screen.getByText('Subtotal: Food & Dining')).toBeInTheDocument();
 
-    // Per-group totals plus the balance summary.
+    // Per-group totals (also echoed in the summary) plus the balance row.
     expect(screen.getByText('Summary')).toBeInTheDocument();
-    expect(screen.getByText('Total expenses')).toBeInTheDocument();
-    expect(screen.getByText('Total income')).toBeInTheDocument();
+    expect(screen.getAllByText('Total expenses').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Total income').length).toBeGreaterThan(0);
     expect(screen.getByText('Balance')).toBeInTheDocument();
 
     // Month headers follow the user's date format (mocked here as MM/YYYY).
@@ -366,6 +367,7 @@ describe('MonthlyCategoryBreakdownReport', () => {
         withdrawalTotal: 0,
       },
     ],
+    transfers: [],
   };
 
   it('sorts subcategories alphabetically within a section', async () => {
@@ -396,5 +398,127 @@ describe('MonthlyCategoryBreakdownReport', () => {
     // Subtotal = 100 + (-30) = 70, NOT 100 + 30 = 130.
     expect(screen.getAllByText('- $70.00').length).toBeGreaterThan(0);
     expect(screen.queryByText('- $130.00')).not.toBeInTheDocument();
+  });
+
+  it('re-sorts rows by amount when a value column header is clicked', async () => {
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue(mixedSignResponse);
+    render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Apple')).toBeInTheDocument();
+    });
+
+    // Default (alphabetical): Apple before Zebra. Sorting by the Total column
+    // descending puts Zebra (100) before Apple (-30).
+    await act(async () => {
+      fireEvent.click(screen.getByText('Total'));
+    });
+
+    await waitFor(() => {
+      const apple = screen.getByText('Apple');
+      const zebra = screen.getByText('Zebra');
+      expect(
+        zebra.compareDocumentPosition(apple) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+  });
+
+  const transfersResponse = {
+    currency: 'USD',
+    months: ['2025-01'],
+    data: [
+      {
+        categoryId: 'cat-salary',
+        categoryName: 'Salary',
+        parentId: null,
+        parentName: null,
+        parentIsIncome: null,
+        isIncome: true,
+        valuesByMonth: { '2025-01': 1000 },
+        depositTotal: 1000,
+        withdrawalTotal: 0,
+      },
+    ],
+    transfers: [
+      {
+        accountId: 'acc-chequing',
+        accountName: 'Chequing',
+        direction: 'from',
+        valuesByMonth: { '2025-01': 500 },
+      },
+      {
+        accountId: 'acc-savings',
+        accountName: 'Savings',
+        direction: 'to',
+        valuesByMonth: { '2025-01': -200 },
+      },
+    ],
+  };
+
+  it('renders a transfers section with from/to rows and an overall total', async () => {
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue(transfersResponse);
+    render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('From Chequing')).toBeInTheDocument();
+    });
+
+    // Transfers group header and a "to" row (shown negative).
+    expect(screen.getAllByText('Transfers').length).toBeGreaterThan(0);
+    expect(screen.getByText('To Savings')).toBeInTheDocument();
+
+    // Net transfers = 500 + (-200) = 300.
+    expect(screen.getAllByText('+ $300.00').length).toBeGreaterThan(0);
+    // Overall total = income (1000) - expenses (0) + transfers (300) = 1300.
+    expect(screen.getByText('Overall total')).toBeInTheDocument();
+    expect(screen.getAllByText('+ $1300.00').length).toBeGreaterThan(0);
+  });
+
+  it('excludes the in-progress current month unless opted in', async () => {
+    const now = new Date();
+    const currentMonth = `${now.getFullYear()}-${String(
+      now.getMonth() + 1,
+    ).padStart(2, '0')}`;
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonth = `${prev.getFullYear()}-${String(
+      prev.getMonth() + 1,
+    ).padStart(2, '0')}`;
+
+    mockGetMonthlyCategoryBreakdown.mockResolvedValue({
+      currency: 'USD',
+      months: [prevMonth, currentMonth],
+      data: [
+        {
+          categoryId: 'cat-salary',
+          categoryName: 'Salary',
+          parentId: null,
+          parentName: null,
+          parentIsIncome: null,
+          isIncome: true,
+          valuesByMonth: { [prevMonth]: 1000, [currentMonth]: 500 },
+          depositTotal: 1500,
+          withdrawalTotal: 0,
+        },
+      ],
+      transfers: [],
+    });
+    render(<MonthlyCategoryBreakdownReport />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Salary')).toBeInTheDocument();
+    });
+
+    // By default the current (in-progress) month column is hidden, so its
+    // value (500) does not appear anywhere.
+    expect(screen.queryAllByText('+ $500.00').length).toBe(0);
+
+    // Opting in brings the current month back.
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Include current month'));
+    });
+    await waitFor(() => {
+      expect(screen.getAllByText('+ $500.00').length).toBeGreaterThan(0);
+    });
   });
 });

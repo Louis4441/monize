@@ -117,11 +117,58 @@ describe("MonthlyCategoryBreakdownService", () => {
 
     expect(result.months).toEqual([]);
     expect(result.data).toEqual([]);
+    expect(result.transfers).toEqual([]);
     expect(result.currency).toBe("USD");
   });
 
+  it("splits transfers into signed from/to rows per account", async () => {
+    // First query (categories) returns nothing; second query (transfers)
+    // returns per-account, per-month aggregates of the two transfer legs.
+    transactionsRepository.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          month: "2025-01",
+          account_id: "acc-chequing",
+          account_name: "Chequing",
+          currency_code: "USD",
+          outflow: "500.00",
+          inflow: "0.00",
+        },
+        {
+          month: "2025-01",
+          account_id: "acc-savings",
+          account_name: "Savings",
+          currency_code: "USD",
+          outflow: "0.00",
+          inflow: "500.00",
+        },
+      ]);
+
+    const result = await service.getMonthlyCategoryBreakdown(
+      mockUserId,
+      "2025-01-01",
+      "2025-12-31",
+    );
+
+    expect(result.months).toContain("2025-01");
+    const fromRow = result.transfers.find((r) => r.direction === "from");
+    const toRow = result.transfers.find((r) => r.direction === "to");
+    // Outflow becomes a positive "from" row (a source of funds).
+    expect(fromRow?.accountName).toBe("Chequing");
+    expect(fromRow?.valuesByMonth["2025-01"]).toBe(500);
+    // Inflow becomes a negative "to" row (a use of funds).
+    expect(toRow?.accountName).toBe("Savings");
+    expect(toRow?.valuesByMonth["2025-01"]).toBe(-500);
+
+    // The transfer query selects only transfer legs, once each.
+    const transferSql = transactionsRepository.query.mock.calls[1][0];
+    expect(transferSql).toContain("t.is_transfer = true");
+    expect(transferSql).toContain("parent_transaction_id IS NULL");
+  });
+
   it("builds an expense row with parent metadata and signed monthly values", async () => {
-    transactionsRepository.query.mockResolvedValue([
+    transactionsRepository.query.mockResolvedValueOnce([
       {
         month: "2025-02",
         category_id: "cat-child",
@@ -166,7 +213,7 @@ describe("MonthlyCategoryBreakdownService", () => {
   });
 
   it("classifies a category as income when deposits dominate", async () => {
-    transactionsRepository.query.mockResolvedValue([
+    transactionsRepository.query.mockResolvedValueOnce([
       {
         month: "2025-01",
         category_id: "cat-income",
@@ -196,7 +243,7 @@ describe("MonthlyCategoryBreakdownService", () => {
     // A refund-heavy month leaves a designated expense category with more
     // deposits than withdrawals. The category's own isIncome flag must still
     // win so the row lands in the expense group with a (negative) net.
-    transactionsRepository.query.mockResolvedValue([
+    transactionsRepository.query.mockResolvedValueOnce([
       {
         month: "2025-01",
         category_id: "cat-child",
@@ -223,7 +270,7 @@ describe("MonthlyCategoryBreakdownService", () => {
   });
 
   it("treats unknown or missing category as Uncategorized and merges rows", async () => {
-    transactionsRepository.query.mockResolvedValue([
+    transactionsRepository.query.mockResolvedValueOnce([
       {
         month: "2025-01",
         category_id: null,
@@ -254,7 +301,7 @@ describe("MonthlyCategoryBreakdownService", () => {
   });
 
   it("converts foreign currency amounts to the base currency", async () => {
-    transactionsRepository.query.mockResolvedValue([
+    transactionsRepository.query.mockResolvedValueOnce([
       {
         month: "2025-01",
         category_id: "cat-child",

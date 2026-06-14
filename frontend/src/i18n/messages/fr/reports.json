@@ -1009,6 +1009,12 @@
     "totalExpenses": "Total des dépenses",
     "totalIncome": "Total des revenus",
     "balance": "Solde",
+    "transfers": "Virements",
+    "totalTransfers": "Total des virements",
+    "transferFrom": "De",
+    "transferTo": "Vers",
+    "overallTotal": "Total général",
+    "includeCurrentMonth": "Inclure le mois en cours",
     "exportCsv": "Exporter en CSV",
     "csvParentColumn": "Catégorie parente"
   },

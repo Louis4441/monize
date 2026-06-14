@@ -1009,6 +1009,12 @@
     "totalExpenses": "Despesas totais",
     "totalIncome": "Receitas totais",
     "balance": "Saldo",
+    "transfers": "Transferências",
+    "totalTransfers": "Total de transferências",
+    "transferFrom": "De",
+    "transferTo": "Para",
+    "overallTotal": "Total geral",
+    "includeCurrentMonth": "Incluir mês atual",
     "exportCsv": "Exportar CSV",
     "csvParentColumn": "Categoria principal"
   },
