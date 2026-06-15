@@ -1,0 +1,61 @@
+name: PR Checklist
+
+# Enforces the propose-first workflow from CONTRIBUTING.md: every PR must keep
+# the template checklist, tick all of its boxes, and link an approved
+# discussion or issue. Make this a required status check in the `main` branch
+# protection rule so PRs can't merge until it passes.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checklist:
+    name: Verify PR checklist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check body for unticked boxes and an approval link
+        # The PR body is passed via env (never interpolated into the script) to
+        # avoid template injection. See CWE-94.
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PR_BODY:-}" ]; then
+            echo "::error::PR description is empty. Use the pull request template and fill it in."
+            exit 1
+          fi
+
+          fail=0
+
+          # 1. Every checklist item must be ticked: no remaining "- [ ]".
+          unchecked=$(printf '%s' "$PR_BODY" | grep -cE '^[[:space:]]*-[[:space:]]*\[[[:space:]]\]' || true)
+          if [ "$unchecked" -gt 0 ]; then
+            echo "::error::$unchecked checklist item(s) are still unchecked. Tick every box in the PR template."
+            fail=1
+          fi
+
+          # 2. An approved discussion or issue must be linked: either a "#123"
+          #    reference or a github.com discussions/issues URL.
+          if printf '%s' "$PR_BODY" | grep -qE '(#[0-9]+|github\.com/[^ )]+/(discussions|issues)/[0-9]+)'; then
+            :
+          else
+            echo "::error::No linked discussion or issue found. Link the approved discussion (Approved in: ...) or 'Closes #123'."
+            fail=1
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "See CONTRIBUTING.md for the propose-first workflow."
+            exit 1
+          fi
+
+          echo "PR checklist looks good."
