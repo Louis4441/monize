@@ -54,6 +54,7 @@
   "chartViewToggle": {
     "pieChart": "Graphique circulaire",
     "barChart": "Graphique à barres",
+    "stackedChart": "Graphique à barres empilées 100 %",
     "lineChart": "Graphique en courbes",
     "areaChart": "Graphique en aires",
     "table": "Tableau"

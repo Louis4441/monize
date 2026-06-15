@@ -54,6 +54,7 @@
   "chartViewToggle": {
     "pieChart": "Grafico a torta",
     "barChart": "Grafico a barre",
+    "stackedChart": "Grafico a barre impilate 100%",
     "lineChart": "Grafico a linee",
     "areaChart": "Grafico ad area",
     "table": "Tabella"

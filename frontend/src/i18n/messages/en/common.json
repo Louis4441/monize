@@ -54,6 +54,7 @@
   "chartViewToggle": {
     "pieChart": "Pie Chart",
     "barChart": "Bar Chart",
+    "stackedChart": "100% Stacked Bar",
     "lineChart": "Line Chart",
     "areaChart": "Area Chart",
     "table": "Table"

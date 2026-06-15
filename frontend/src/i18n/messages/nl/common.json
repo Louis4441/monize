@@ -54,6 +54,7 @@
   "chartViewToggle": {
     "pieChart": "Cirkeldiagram",
     "barChart": "Staafdiagram",
+    "stackedChart": "100% gestapeld staafdiagram",
     "lineChart": "Lijndiagram",
     "areaChart": "Vlakdiagram",
     "table": "Tabel"

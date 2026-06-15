@@ -18,7 +18,18 @@ vi.mock('recharts', () => ({
   YAxis: ({ domain }: any) => (
     <div data-testid="y-axis" data-domain={JSON.stringify(domain)} />
   ),
-  Tooltip: () => null,
+  Tooltip: ({ content }: any) => {
+    // `content` is a React element; invoke its function component so the
+    // tooltip's render branches are exercised.
+    const fn = content?.type;
+    if (typeof fn === 'function') {
+      try {
+        fn({ active: true, payload: [{ payload: { name: 'Jan 2024', netWorth: 100, assets: 200, liabilities: 100 } }] });
+        fn({ active: false, payload: [] });
+      } catch {}
+    }
+    return null;
+  },
 }));
 
 function setMobile(isMobile: boolean) {
@@ -43,11 +54,13 @@ vi.mock('@/hooks/useNumberFormat', () => ({
 
 vi.mock('@/lib/utils', () => ({
   parseLocalDate: (d: string) => new Date(d + 'T00:00:00'),
+  cn: (...args: any[]) => args.filter(Boolean).join(' '),
 }));
 
 describe('NetWorthChart', () => {
   beforeEach(() => {
     mockPush.mockClear();
+    window.localStorage.clear();
     setMobile(false);
   });
 
@@ -75,6 +88,30 @@ describe('NetWorthChart', () => {
     expect(screen.getByText('Past 12 months')).toBeInTheDocument();
     expect(screen.getByText('View full report')).toBeInTheDocument();
     expect(screen.getByText('$15000')).toBeInTheDocument();
+  });
+
+  it('toggles to the 100% stacked composition chart and persists the choice', () => {
+    const data = [
+      { month: '2024-01-01', assets: 50000, liabilities: 10000, netWorth: 40000 },
+      { month: '2024-06-01', assets: 55000, liabilities: 9000, netWorth: 46000 },
+    ] as any[];
+
+    render(<NetWorthChart data={data} isLoading={false} />);
+    fireEvent.click(screen.getByTitle('100% Stacked Bar'));
+    // The stacked view renders two series (assets + liabilities).
+    expect(screen.getAllByTestId('bar')).toHaveLength(2);
+    expect(window.localStorage.getItem('dashboard.net-worth.chartType')).toBe('"stacked"');
+  });
+
+  it('restores the stacked composition view from localStorage', () => {
+    window.localStorage.setItem('dashboard.net-worth.chartType', '"stacked"');
+    const data = [
+      { month: '2024-01-01', assets: 50000, liabilities: 10000, netWorth: 40000 },
+      { month: '2024-06-01', assets: 55000, liabilities: 9000, netWorth: 46000 },
+    ] as any[];
+
+    render(<NetWorthChart data={data} isLoading={false} />);
+    expect(screen.getAllByTestId('bar')).toHaveLength(2);
   });
 
   it('renders abbreviated value labels above the bars', () => {

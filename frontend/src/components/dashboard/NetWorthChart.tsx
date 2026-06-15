@@ -17,6 +17,8 @@ import { chartColors } from '@/lib/chart-colors';
 import { MonthlyNetWorth } from '@/types/net-worth';
 import { parseLocalDate } from '@/lib/utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 
 type YDomain = [number | ((dataMin: number) => number), number | 'auto'];
 
@@ -43,6 +45,39 @@ function NetWorthTooltip({
   return null;
 }
 
+function NetWorthCompositionTooltip({
+  active,
+  payload,
+  formatCurrency,
+  labels,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: { name: string; assets: number; liabilities: number } }>;
+  formatCurrency: (v: number) => string;
+  labels: { assets: string; liabilities: string; netWorth: string };
+}) {
+  if (active && payload && payload.length) {
+    const d = payload[0].payload;
+    const total = d.assets + d.liabilities;
+    const pct = (v: number) => (total > 0 ? `${((v / total) * 100).toFixed(1)}%` : '0%');
+    return (
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
+        <p className="font-medium text-gray-900 dark:text-gray-100">{d.name}</p>
+        <p className="text-sm" style={{ color: chartColors.income }}>
+          {labels.assets}: {formatCurrency(d.assets)} ({pct(d.assets)})
+        </p>
+        <p className="text-sm" style={{ color: chartColors.expense }}>
+          {labels.liabilities}: {formatCurrency(d.liabilities)} ({pct(d.liabilities)})
+        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 pt-1 border-t border-gray-100 dark:border-gray-700">
+          {labels.netWorth}: {formatCurrency(d.assets - d.liabilities)}
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
 interface NetWorthChartProps {
   data: MonthlyNetWorth[];
   isLoading: boolean;
@@ -52,12 +87,23 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
   const t = useTranslations('dashboard');
   const router = useRouter();
   const { formatCurrencyCompact: formatCurrency, formatCurrencyLabel } = useNumberFormat();
+  const [chartType, setChartType] = useLocalStorage<'bar' | 'stacked'>(
+    'dashboard.net-worth.chartType',
+    'bar',
+  );
+  const compositionLabels = {
+    assets: t('assetsVsLiabilities.assets'),
+    liabilities: t('assetsVsLiabilities.liabilities'),
+    netWorth: t('assetsVsLiabilities.netWorthLabel'),
+  };
 
   const chartData = useMemo(() =>
     data.map((d) => ({
       name: format(parseLocalDate(d.month), 'MMM yyyy'),
       shortName: format(parseLocalDate(d.month), 'MMM'),
       netWorth: Math.round(d.netWorth),
+      assets: Math.round(d.assets),
+      liabilities: Math.round(d.liabilities),
     })),
   [data]);
 
@@ -132,7 +178,14 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
         >
           {t('netWorth.title')}
         </button>
-        <span className="text-sm text-gray-500 dark:text-gray-400">{t('netWorth.past12Months')}</span>
+        <div className="flex items-center gap-2">
+          <span className="hidden sm:inline text-sm text-gray-500 dark:text-gray-400">{t('netWorth.past12Months')}</span>
+          <ChartViewToggle
+            value={chartType}
+            onChange={(v) => setChartType(v as 'bar' | 'stacked')}
+            options={['bar', 'stacked']}
+          />
+        </div>
       </div>
       <div className="mb-3">
         <div className={`text-2xl font-bold ${
@@ -148,32 +201,52 @@ export function NetWorthChart({ data, isLoading }: NetWorthChartProps) {
       </div>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-          <BarChart data={chartData} margin={{ top: 52, right: 12, left: 12, bottom: 0 }}>
-            <YAxis hide domain={yAxisDomain} />
-            <XAxis
-              dataKey="name"
-              tick={{ fill: chartColors.axis, fontSize: 11 }}
-              tickLine={false}
-              axisLine={false}
-              interval="preserveStartEnd"
-              tickFormatter={(value: string) => value.split(' ')[0]}
-            />
-            <Tooltip
-              content={<NetWorthTooltip formatCurrency={formatCurrency} />}
-              cursor={{ fill: chartColors.grid, fillOpacity: 0.35 }}
-            />
-            <Bar dataKey="netWorth" fill={chartColors.primary} radius={[4, 4, 0, 0]}>
-              <LabelList
-                dataKey="netWorth"
-                position="top"
-                angle={-90}
-                offset={6}
-                textAnchor="start"
-                formatter={(value: unknown) => formatCurrencyLabel(Number(value))}
-                style={{ fill: chartColors.axis, fontSize: 11, fontWeight: 600, dominantBaseline: 'central' }}
+          {chartType === 'stacked' ? (
+            <BarChart data={chartData} stackOffset="expand" margin={{ top: 12, right: 12, left: 12, bottom: 0 }}>
+              <YAxis hide domain={[0, 1]} />
+              <XAxis
+                dataKey="name"
+                tick={{ fill: chartColors.axis, fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+                tickFormatter={(value: string) => value.split(' ')[0]}
               />
-            </Bar>
-          </BarChart>
+              <Tooltip
+                content={<NetWorthCompositionTooltip formatCurrency={formatCurrency} labels={compositionLabels} />}
+                cursor={{ fill: chartColors.grid, fillOpacity: 0.35 }}
+              />
+              <Bar dataKey="assets" stackId="nw" fill={chartColors.income} />
+              <Bar dataKey="liabilities" stackId="nw" fill={chartColors.expense} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          ) : (
+            <BarChart data={chartData} margin={{ top: 52, right: 12, left: 12, bottom: 0 }}>
+              <YAxis hide domain={yAxisDomain} />
+              <XAxis
+                dataKey="name"
+                tick={{ fill: chartColors.axis, fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                interval="preserveStartEnd"
+                tickFormatter={(value: string) => value.split(' ')[0]}
+              />
+              <Tooltip
+                content={<NetWorthTooltip formatCurrency={formatCurrency} />}
+                cursor={{ fill: chartColors.grid, fillOpacity: 0.35 }}
+              />
+              <Bar dataKey="netWorth" fill={chartColors.primary} radius={[4, 4, 0, 0]}>
+                <LabelList
+                  dataKey="netWorth"
+                  position="top"
+                  angle={-90}
+                  offset={6}
+                  textAnchor="start"
+                  formatter={(value: unknown) => formatCurrencyLabel(Number(value))}
+                  style={{ fill: chartColors.axis, fontSize: 11, fontWeight: 600, dominantBaseline: 'central' }}
+                />
+              </Bar>
+            </BarChart>
+          )}
         </ResponsiveContainer>
       </div>
       <button

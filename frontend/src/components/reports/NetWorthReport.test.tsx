@@ -11,6 +11,7 @@ vi.mock('@/components/ui/ChartViewToggle', () => ({
     <div data-testid="chart-view-toggle">
       <button onClick={() => onChange('line')}>line</button>
       <button onClick={() => onChange('bar')}>bar</button>
+      <button onClick={() => onChange('stacked')}>stacked</button>
       <button onClick={() => onChange('table')}>table</button>
       <span>val:{value}</span>
     </div>
@@ -70,8 +71,11 @@ vi.mock('recharts', () => ({
   YAxis: ({ tickFormatter }: any) => <div>{tickFormatter ? tickFormatter(1000) : ''}</div>,
   CartesianGrid: () => null,
   Tooltip: ({ content, formatter }: any) => {
-    if (typeof content === 'function') {
-      try { content({ active: true, payload: [{ value: 100, name: 'NetWorth', color: '#000', payload: { name: 'Jan', NetWorth: 100, Assets: 200, Liabilities: 100 } }] }); content({ active: false, payload: [] }); } catch {}
+    // `content` is a React element (e.g. <CustomTooltip />); invoke its function
+    // component so the tooltip's render branches are exercised in tests.
+    const fn = typeof content === 'function' ? content : content?.type;
+    if (typeof fn === 'function') {
+      try { fn({ active: true, payload: [{ value: 100, name: 'NetWorth', color: '#000', payload: { name: 'Jan', NetWorth: 100, Assets: 200, Liabilities: 100 } }] }); fn({ active: false, payload: [] }); } catch {}
     }
     if (formatter) {
       try { formatter(100, 'NetWorth'); } catch {}
@@ -118,6 +122,7 @@ vi.mock('@/lib/logger', () => ({
 describe('NetWorthReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     dateRangeMock.value = '1y';
     setMobile(false);
   });
@@ -238,6 +243,38 @@ describe('NetWorthReport', () => {
       expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
     });
     expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    expect(screen.queryByTestId('area-chart')).not.toBeInTheDocument();
+  });
+
+  it('switches to the 100% stacked composition view and persists the choice', async () => {
+    mockGetMonthly.mockResolvedValue([
+      { month: '2024-01-01', assets: 50000, liabilities: 10000, netWorth: 40000 },
+      { month: '2024-06-01', assets: 55000, liabilities: 9000, netWorth: 46000 },
+    ]);
+    render(<NetWorthReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('stacked'));
+    });
+    // The stacked view renders two series (Assets + Liabilities) rather than one.
+    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    expect(screen.getAllByTestId('bar')).toHaveLength(2);
+    expect(window.localStorage.getItem('reports.net-worth.chartType')).toBe('"stacked"');
+  });
+
+  it('restores the stacked composition view from localStorage', async () => {
+    window.localStorage.setItem('reports.net-worth.chartType', '"stacked"');
+    mockGetMonthly.mockResolvedValue([
+      { month: '2024-01-01', assets: 50000, liabilities: 10000, netWorth: 40000 },
+      { month: '2024-06-01', assets: 55000, liabilities: 9000, netWorth: 46000 },
+    ]);
+    render(<NetWorthReport />);
+    await waitFor(() => {
+      expect(screen.getByText('Current Net Worth')).toBeInTheDocument();
+    });
+    expect(screen.getAllByTestId('bar')).toHaveLength(2);
     expect(screen.queryByTestId('area-chart')).not.toBeInTheDocument();
   });
 

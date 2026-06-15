@@ -54,6 +54,7 @@
   "chartViewToggle": {
     "pieChart": "Wykres kołowy",
     "barChart": "Wykres słupkowy",
+    "stackedChart": "Skumulowany wykres słupkowy 100%",
     "lineChart": "Wykres liniowy",
     "areaChart": "Wykres warstwowy",
     "table": "Tabela"

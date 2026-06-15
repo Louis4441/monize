@@ -54,6 +54,7 @@
   "chartViewToggle": {
     "pieChart": "Kreisdiagramm",
     "barChart": "Balkendiagramm",
+    "stackedChart": "100 % gestapeltes Balkendiagramm",
     "lineChart": "Liniendiagramm",
     "areaChart": "Flächendiagramm",
     "table": "Tabelle"
