@@ -84,7 +84,6 @@ interface PreferencesSectionProps {
 export function PreferencesSection({ preferences, onPreferencesUpdated }: PreferencesSectionProps) {
   const t = useTranslations('settings.preferences');
   const tc = useTranslations('common');
-  const dateFormatOptions = getDateFormatOptions(tc);
   const updatePreferencesStore = usePreferencesStore((state) => state.updatePreferences);
 
   const [dateFormat, setDateFormat] = useState(preferences.dateFormat);
@@ -159,9 +158,9 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
     }
   };
 
-  const numberFormatSample = new Intl.NumberFormat(
-    getEffectiveLocale('browser', language),
-  ).format(1234.56);
+  const browserLocale = getEffectiveLocale('browser', language);
+  const numberFormatSample = new Intl.NumberFormat(browserLocale).format(1234.56);
+  const dateFormatOptions = getDateFormatOptions(tc, browserLocale);
 
   return (
     <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg p-6 mb-6">
