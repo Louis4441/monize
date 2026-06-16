@@ -5565,10 +5565,12 @@ describe("TransactionsService", () => {
       expect(transactionsRepository.save).not.toHaveBeenCalled();
     });
 
-    it("links an existing payee and adopts its default category", async () => {
-      // No explicit category; the matched payee supplies one.
+    it("links an existing payee, adopts its category, and uses its canonical name", async () => {
+      // No explicit category; the matched payee supplies one. The caller's
+      // abbreviation ("Whole Foods") resolves to the payee's canonical name.
       payeesService.resolveByName.mockResolvedValueOnce({
         id: "payee-9",
+        name: "Whole Foods Market",
         defaultCategoryId: "cat-default",
         defaultCategory: { id: "cat-default", name: "Groceries" },
       });
@@ -5586,6 +5588,7 @@ describe("TransactionsService", () => {
       );
       expect(preview.payeeId).toBe("payee-9");
       expect(preview.payeeMatched).toBe(true);
+      expect(preview.payeeName).toBe("Whole Foods Market");
       expect(preview.categoryId).toBe("cat-default");
       expect(preview.categoryName).toBe("Groceries");
     });
@@ -5598,6 +5601,7 @@ describe("TransactionsService", () => {
       });
       payeesService.resolveByName.mockResolvedValueOnce({
         id: "payee-9",
+        name: "Whole Foods Market",
         defaultCategoryId: "cat-default",
         defaultCategory: { id: "cat-default", name: "Groceries" },
       });

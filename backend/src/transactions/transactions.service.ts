@@ -311,14 +311,22 @@ export class TransactionsService {
     // links to the payee record instead of recording a detached free-text name.
     // When nothing matches, payeeId stays null and the caller can offer to
     // create the payee.
-    const payeeName = stripHtml(input.payeeName) || null;
+    const inputPayeeName = stripHtml(input.payeeName) || null;
     let payeeId: string | null = null;
+    let payeeName: string | null = inputPayeeName;
     let payeeMatched = false;
-    if (payeeName) {
-      const payee = await this.payeesService.resolveByName(userId, payeeName);
+    if (inputPayeeName) {
+      const payee = await this.payeesService.resolveByName(
+        userId,
+        inputPayeeName,
+      );
       if (payee) {
         payeeId = payee.id;
         payeeMatched = true;
+        // Use the matched payee's canonical name so the transaction links
+        // cleanly and the preview shows which payee the name resolved to
+        // (e.g. "Buon Gusto" -> "Buon Gusto Restaurant").
+        payeeName = payee.name;
         // Mirror create(): when the caller gave no category, adopt the matched
         // payee's default so the preview equals what create() will persist.
         if (!categoryId && payee.defaultCategoryId) {

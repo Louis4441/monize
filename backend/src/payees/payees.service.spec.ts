@@ -1493,12 +1493,58 @@ describe("PayeesService", () => {
 
     it("returns null when neither name nor alias matches", async () => {
       queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
+      queryBuilderMock.getMany = jest.fn().mockResolvedValue([]);
       payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
       aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
 
       const result = await service.resolveByName(userId, "Unknown Vendor");
 
       expect(result).toBeNull();
+    });
+
+    it("matches a single active payee by partial name (abbreviation)", async () => {
+      const fullPayee = { ...mockPayee, name: "Buon Gusto Restaurant" };
+      queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
+      queryBuilderMock.getMany = jest.fn().mockResolvedValue([fullPayee]);
+      payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
+      aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
+
+      const result = await service.resolveByName(userId, "Buon Gusto");
+
+      expect(result).toEqual(fullPayee);
+      expect(queryBuilderMock.andWhere).toHaveBeenCalledWith(
+        "LOWER(payee.name) LIKE LOWER(:pattern)",
+        { pattern: "%Buon Gusto%" },
+      );
+    });
+
+    it("does not guess when multiple payees match a partial name", async () => {
+      queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
+      queryBuilderMock.getMany = jest.fn().mockResolvedValue([
+        { ...mockPayee, name: "Buon Gusto Restaurant" },
+        { ...mockPayee, id: "payee-x", name: "Buon Gusto Pizzeria" },
+      ]);
+      payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
+      aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
+
+      const result = await service.resolveByName(userId, "Buon Gusto");
+
+      expect(result).toBeNull();
+    });
+
+    it("does not partial-match input shorter than 3 characters", async () => {
+      queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
+      // Even if a payee would match, a 2-char term must not auto-link.
+      queryBuilderMock.getMany = jest
+        .fn()
+        .mockResolvedValue([{ ...mockPayee, name: "AB Store" }]);
+      payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
+      aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
+
+      const result = await service.resolveByName(userId, "AB");
+
+      expect(result).toBeNull();
+      expect(queryBuilderMock.getMany).not.toHaveBeenCalled();
     });
 
     it("returns null for a blank name without querying", async () => {

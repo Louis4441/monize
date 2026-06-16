@@ -309,8 +309,13 @@ export class PayeesService {
    * Resolve a free-text payee name (as typed by a user or proposed by the AI
    * Assistant / MCP server) to an existing payee so a new transaction can link
    * to the payee record -- and inherit its default category -- instead of
-   * storing a detached name. Matches an exact name first (case-insensitive),
-   * then falls back to alias patterns (the same matching the importer uses).
+   * storing a detached name. Resolution is tiered, most-specific first:
+   *   1. exact name match (case-insensitive),
+   *   2. alias pattern match (the same matching the importer uses),
+   *   3. a single active payee whose name contains the text -- handles the
+   *      common case where the caller abbreviates ("Buon Gusto" ->
+   *      "Buon Gusto Restaurant"). Requires 3+ characters and exactly one
+   *      candidate so we never guess between payees.
    * Returns null when nothing matches so the caller can offer to create one.
    */
   async resolveByName(userId: string, name: string): Promise<Payee | null> {
@@ -329,7 +334,27 @@ export class PayeesService {
       return byName;
     }
 
-    return this.findPayeeByAlias(userId, trimmed);
+    const byAlias = await this.findPayeeByAlias(userId, trimmed);
+    if (byAlias) {
+      return byAlias;
+    }
+
+    // Partial match: only auto-link when a single active payee matches, so an
+    // abbreviation resolves but an ambiguous term does not silently pick one.
+    if (trimmed.length < 3) {
+      return null;
+    }
+    const partialMatches = await this.payeesRepository
+      .createQueryBuilder("payee")
+      .leftJoinAndSelect("payee.defaultCategory", "defaultCategory")
+      .where("payee.user_id = :userId", { userId })
+      .andWhere("payee.is_active = true")
+      .andWhere("LOWER(payee.name) LIKE LOWER(:pattern)", {
+        pattern: `%${escapeLikeWildcards(trimmed)}%`,
+      })
+      .take(2)
+      .getMany();
+    return partialMatches.length === 1 ? partialMatches[0] : null;
   }
 
   async findOrCreate(

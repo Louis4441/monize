@@ -267,7 +267,9 @@ export const getPayeesOutput = {
       id: str,
       name: str,
       defaultCategoryId: strNull.optional(),
-      notes: str.optional(),
+      // notes is a nullable column -- a payee without notes serializes as null,
+      // which must pass output validation (was rejected by a non-null string).
+      notes: strNull.optional(),
       isActive: bool.optional(),
       transactionCount: num.optional(),
       lastUsedDate: strNull.optional(),
