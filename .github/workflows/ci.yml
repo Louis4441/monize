@@ -615,7 +615,6 @@ jobs:
     needs: [prepare-release, build-and-push]
     permissions:
       contents: write # to push the version-bump commit and create the GitHub release
-      checks: write   # to create the PR checklist check run before pushing version bump
     steps:
       # persist-credentials is intentionally left at its default (true) here:
       # the "Commit version bump" step runs `git push` to publish the version
@@ -640,11 +639,14 @@ jobs:
           cd backend  && npm version "$VERSION" --no-git-tag-version --allow-same-version && cd ..
           cd frontend && npm version "$VERSION" --no-git-tag-version --allow-same-version && cd ..
 
+      # Pushes to protected main directly. This works because github-actions[bot]
+      # (the identity of the default GITHUB_TOKEN) is on the branch-protection
+      # bypass list -- see the "Restrict who can push" / bypass settings on the
+      # main branch rule. No PR/check is forged: the bot is explicitly trusted to
+      # push the [skip ci] version-bump commit.
       - name: Commit version bump
         env:
           VERSION: ${{ needs.prepare-release.outputs.version }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -652,20 +654,6 @@ jobs:
           git commit -m "chore: bump version to ${VERSION} [skip ci]"
           git pull --rebase
           git push
-          SHA=$(git rev-parse HEAD)
-          TEMP_BRANCH="ci-release-${SHA:0:8}"
-          # Push to an unprotected temp branch first so GitHub knows the SHA.
-          # Branch protection only applies to main, so this always succeeds.
-          git push origin "HEAD:refs/heads/${TEMP_BRANCH}"
-          # Pre-satisfy the required status check now that the commit is visible.
-          gh api repos/$REPO/check-runs \
-            --method POST \
-            -f name="Verify PR checklist" \
-            -f head_sha="$SHA" \
-            -f status=completed \
-            -f conclusion=success \
-            -f "output[title]=PR checklist" \
-            -f "output[summary]=Auto-pass: CI release commit (no PR body to inspect)"
 
       # Resolve the release notes body. Precedence: the `release_notes` input,
       # then a committed docs/release-notes/<version>.md, then GitHub's
