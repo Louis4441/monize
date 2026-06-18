@@ -114,16 +114,18 @@ jobs:
           sha_short=$(git rev-parse --short HEAD)
           build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 
-          # Always tag branch-slug + short-sha. Move :latest only when building
+          # Tag a moving :<branch-slug> (the latest build of that branch) plus an
+          # immutable :<branch-slug>-<short-sha> so each commit's image is both
+          # identifiable by branch at a glance and pinnable. Move :latest only on
           # the default branch, so feature/fork pushes never clobber :latest.
-          tags="$(printf '%s:%s\n%s:sha-%s\n' "$image" "$slug" "$image" "$sha_short")"
+          tags="$(printf '%s:%s\n%s:%s-%s\n' "$image" "$slug" "$image" "$slug" "$sha_short")"
           if [ "$REF_NAME" = "$DEFAULT_BRANCH" ]; then
             tags="$(printf '%s%s:latest\n' "$tags" "$image")"
           fi
 
           {
             echo "tags<<EOF"
-            printf '%s' "$tags"
+            printf '%s\n' "$tags"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
           echo "git_sha=$sha_full" >> "$GITHUB_OUTPUT"
@@ -172,3 +174,20 @@ jobs:
             index:org.opencontainers.image.revision=${{ steps.meta.outputs.git_sha }}
             index:org.opencontainers.image.created=${{ steps.meta.outputs.build_date }}
             index:org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+
+      # List the pushed image tags in the run Summary so they're copy-pasteable
+      # without digging through the build log. Tags arrive via env (never
+      # interpolated into the script) to avoid template injection.
+      - name: Summary
+        if: success()
+        env:
+          NAME: ${{ matrix.name }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          {
+            echo "### ${NAME} image pushed"
+            echo ""
+            echo '```'
+            printf '%s\n' "$TAGS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
