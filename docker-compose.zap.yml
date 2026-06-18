@@ -27,3 +27,13 @@ services:
       NODE_ENV: production
       INTERNAL_API_URL: http://backend:3000
       PUBLIC_APP_URL: http://localhost:3001
+    # The standalone production server binds IPv4-only (HOSTNAME=0.0.0.0 in the
+    # frontend Dockerfile), but inside the container `localhost` resolves to ::1
+    # first, so the base e2e healthcheck's wget to http://localhost:3000 is
+    # refused and the container never becomes healthy (`up --wait` then times
+    # out). The dev server binds dual-stack, so this only bites the production
+    # image. Probe 127.0.0.1 explicitly. (Only `test` is overridden; interval,
+    # timeout, retries and start_period are inherited from docker-compose.e2e.yml.)
+    healthcheck:
+      test:
+        ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/login || exit 1"]
