@@ -550,6 +550,7 @@ export class McpTransactionsTools {
           const confirmation = await confirmWrite(
             server,
             confirmLines.join("\n"),
+            extra.requestId,
           );
           if (confirmation === "declined") {
             return toolError(
@@ -640,6 +641,7 @@ export class McpTransactionsTools {
           const confirmation = await confirmWrite(
             server,
             confirmLines.join("\n"),
+            extra.requestId,
           );
           if (confirmation === "declined") {
             return toolError(

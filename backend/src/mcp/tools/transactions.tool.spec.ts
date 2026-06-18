@@ -529,10 +529,16 @@ describe("McpTransactionsTools", () => {
           payeeName: "Store",
           dryRun: false,
         },
-        { sessionId: "s1" },
+        { sessionId: "s1", requestId: "call-1" },
       );
 
-      expect(elicitInput).toHaveBeenCalled();
+      // The elicitation must be related to the tool call's request id so the
+      // Streamable HTTP transport delivers it on that call's POST SSE stream
+      // rather than the (typically absent) standalone GET stream.
+      expect(elicitInput).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ relatedRequestId: "call-1" }),
+      );
       expect(transactionsService.create).toHaveBeenCalled();
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.id).toBe("t1");

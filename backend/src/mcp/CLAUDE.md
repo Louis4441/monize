@@ -93,8 +93,10 @@ Checklist for a new tool:
 5. If it mutates data, derive scope `"write"` and enforce the daily write limit
    via `McpWriteLimiter` (see `transactions.tool.ts`). `whitelist`-style
    sanitize user strings with `stripHtml(...)` before persisting. Gate the write
-   behind a user confirmation with `confirmWrite(server, message)` (the
-   MCP-elicitation equivalent of the AI Assistant's approve/reject card) and
+   behind a user confirmation with `confirmWrite(server, message, extra.requestId)`
+   (the MCP-elicitation equivalent of the AI Assistant's approve/reject card --
+   pass `extra.requestId` so the elicitation is delivered on the tool call's own
+   Streamable HTTP SSE stream rather than the standalone GET stream) and
    only persist on `"accepted"`/`"unsupported"`; on `"declined"` return a
    `toolError` without writing. `"unsupported"` means the client can't show a
    dialog -- it still gates every tool call with its own approval prompt, so

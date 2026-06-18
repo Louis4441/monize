@@ -96,6 +96,7 @@ export class McpPayeesTools {
           const confirmation = await confirmWrite(
             server,
             confirmLines.join("\n"),
+            extra.requestId,
           );
           if (confirmation === "declined") {
             return toolError(
