@@ -120,7 +120,10 @@ jobs:
           # the default branch, so feature/fork pushes never clobber :latest.
           tags="$(printf '%s:%s\n%s:%s-%s\n' "$image" "$slug" "$image" "$slug" "$sha_short")"
           if [ "$REF_NAME" = "$DEFAULT_BRANCH" ]; then
-            tags="$(printf '%s%s:latest\n' "$tags" "$image")"
+            # $tags has no trailing newline ($() stripped it), so add one before
+            # appending :latest -- otherwise it concatenates onto the last tag
+            # ("...:main-abc123ghcr.io/...:latest" -> invalid reference format).
+            tags="$(printf '%s\n%s:latest\n' "$tags" "$image")"
           fi
 
           {
