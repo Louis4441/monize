@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useReportData } from '@/hooks/useReportData';
@@ -79,6 +80,7 @@ interface PriceChartPoint {
 export function SecurityPerformanceReport() {
   const t = useTranslations('reports');
   const tc = useTranslations('common');
+  const mainAccountName = useMainAccountName();
   const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatSignedPercent } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -124,9 +126,9 @@ export function SecurityPerformanceReport() {
 
   const accountNameById = useMemo(() => {
     const map = new Map<string, string>();
-    accounts.forEach((a) => map.set(a.id, a.name.replace(/ - (Brokerage|Cash)$/, '')));
+    accounts.forEach((a) => map.set(a.id, mainAccountName(a.name)));
     return map;
-  }, [accounts]);
+  }, [accounts, mainAccountName]);
 
   // Load per-security detail (price history + transactions) when a security is
   // selected. `reloadDetail` re-runs after a manual price refresh. The detail

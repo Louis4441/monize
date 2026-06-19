@@ -27,6 +27,7 @@ import { TransactionList } from '@/components/transactions/TransactionList';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { useInvestmentData } from '@/hooks/useInvestmentData';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { Account } from '@/types/account';
 import { buildAccountFilterLabel } from '@/lib/account-utils';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -48,6 +49,7 @@ export default function InvestmentsPage() {
 function InvestmentsContent() {
   const t = useTranslations('investments');
   const tc = useTranslations('common');
+  const mainAccountName = useMainAccountName();
   const data = useInvestmentData();
   const { loadAllPortfolioData, selectedAccountIds, currentPage, transactionFilters } = data;
   const handleUndoRedo = useCallback(() => {
@@ -148,13 +150,14 @@ function InvestmentsContent() {
     void deleteTransaction(id);
   }, [deleteTransaction]);
 
-  // Display name for account selector (strip " - Brokerage" suffix)
-  const getAccountDisplayName = (account: Account) => {
-    if (account.accountSubType === 'INVESTMENT_BROKERAGE') {
-      return account.name.replace(' - Brokerage', '');
-    }
-    return account.name;
-  };
+  // Display name for account selector (strip the localized " - Brokerage" suffix)
+  const getAccountDisplayName = useCallback(
+    (account: Account) =>
+      account.accountSubType === 'INVESTMENT_BROKERAGE'
+        ? mainAccountName(account.name)
+        : account.name,
+    [mainAccountName],
+  );
 
   // Summary/allocation/chart titles show which accounts the filter covers.
   const accountFilterLabel = useMemo(() => {
@@ -164,7 +167,7 @@ function InvestmentsContent() {
       (a) => getAccountDisplayName(a as Account),
       tc,
     );
-  }, [data.selectedAccountIds, data.selectableAccounts, tc]);
+  }, [data.selectedAccountIds, data.selectableAccounts, tc, getAccountDisplayName]);
 
   return (
     <PageLayout>

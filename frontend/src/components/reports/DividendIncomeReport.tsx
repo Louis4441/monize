@@ -33,6 +33,7 @@ import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { exportToCsv } from '@/lib/csv-export';
 import { chartColors, CHART_SERIES } from '@/lib/chart-colors';
 import { useTranslations } from 'next-intl';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 
 type SeriesKey = 'dividends' | 'interest' | 'capitalGains';
 type MonthlyIncomeSortField = 'month' | 'startValue' | 'endValue' | 'dividends' | 'interest' | 'capitalGains' | 'total';
@@ -78,6 +79,7 @@ const SERIES_COLORS: Record<SeriesKey, { positive: string; negative: string }> =
 
 export function DividendIncomeReport() {
   const t = useTranslations('reports');
+  const mainAccountName = useMainAccountName();
   const { formatCurrency: formatCurrencyFull, formatCurrencyAxis } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -521,9 +523,9 @@ export function DividendIncomeReport() {
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((account) => ({
           value: account.id,
-          label: account.name.replace(/ - (Brokerage|Cash)$/, ''),
+          label: mainAccountName(account.name),
         })),
-    [accounts],
+    [accounts, mainAccountName],
   );
 
   const securityData = useMemo((): SecurityIncome[] => {
@@ -708,7 +710,7 @@ export function DividendIncomeReport() {
 
   const handleExportCsv = () => {
     const accountLabel = selectedAccount
-      ? selectedAccount.name.replace(/ - (Brokerage|Cash)$/, '')
+      ? mainAccountName(selectedAccount.name)
       : 'all-accounts';
     const filenameBase = 'gains-dividends-interest';
     const scope = accountLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -801,7 +803,7 @@ export function DividendIncomeReport() {
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
     const accountLabel = selectedAccount
-      ? selectedAccount.name.replace(/ - (Brokerage|Cash)$/, '')
+      ? mainAccountName(selectedAccount.name)
       : 'All Accounts';
 
     // Build a PDF table that mirrors what's on screen when the user is in a

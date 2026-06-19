@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "現金",
+    "brokerage": "證券"
+  },
   "page": {
     "title": "科目",
     "subtitle": "管理您的銀行科目、信用卡及投資",

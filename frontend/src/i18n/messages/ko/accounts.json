@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "현금",
+    "brokerage": "증권"
+  },
   "page": {
     "title": "계정",
     "subtitle": "은행 계정, 신용카드 및 투자를 관리하세요",

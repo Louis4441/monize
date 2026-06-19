@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Account } from '@/types/account';
 
@@ -40,13 +41,14 @@ export function ReportAccountMultiSelect({
   className = 'w-48',
 }: ReportAccountMultiSelectProps) {
   const t = useTranslations('reports');
+  const mainAccountName = useMainAccountName();
   const options = accounts
     .filter(filter)
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((account) => ({
       value: account.id,
-      label: account.name.replace(/ - (Brokerage|Cash)$/, ''),
+      label: mainAccountName(account.name),
     }));
 
   // Local draft so checkbox toggles render instantly and the dropdown stays

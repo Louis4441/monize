@@ -18,6 +18,7 @@ import { roundMoney } from "../common/round.util";
 import { formatDateYMD, formatDateYMDLocal } from "../common/date-utils";
 import { mapWithConcurrency } from "../common/concurrency.util";
 import { convertWithRateLookup } from "../common/currency-conversion.util";
+import { stripBrokerageSuffix } from "../accounts/account-name.util";
 
 // "As of now" portfolio valuations fetch a live spot rate per foreign
 // currency. Cap concurrent quote-provider fetches so a portfolio spanning
@@ -1241,8 +1242,8 @@ export class PortfolioCalculationService {
       const accountGainLossPercent =
         accountCostBasis > 0 ? (accountGainLoss / accountCostBasis) * 100 : 0;
 
-      // Get display name (remove " - Brokerage" suffix if present)
-      const accountName = brokerageAccount.name.replace(" - Brokerage", "");
+      // Get display name (remove the localized " - Brokerage" suffix if present)
+      const accountName = stripBrokerageSuffix(brokerageAccount.name);
 
       const cashBalance = linkedCashAccount
         ? (effectiveBalances.get(linkedCashAccount.id) ??

@@ -1,3 +1,7 @@
 {
-  "ok": "[XX-OK-XX]"
+  "ok": "[XX-OK-XX]",
+  "accountSuffix": {
+    "cash": "[XX-Cash-XX]",
+    "brokerage": "[XX-Brokerage-XX]"
+  }
 }

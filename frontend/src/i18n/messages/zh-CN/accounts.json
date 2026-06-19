@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "现金",
+    "brokerage": "证券"
+  },
   "page": {
     "title": "账户",
     "subtitle": "管理您的银行账户、信用卡和投资",

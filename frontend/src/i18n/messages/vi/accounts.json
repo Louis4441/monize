@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Tiền mặt",
+    "brokerage": "Môi giới"
+  },
   "page": {
     "title": "Tài khoản",
     "subtitle": "Quản lý tài khoản ngân hàng, thẻ tín dụng và đầu tư của bạn",

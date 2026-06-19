@@ -31,6 +31,7 @@ import {
 import { Cron } from "@nestjs/schedule";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
+import { brokerageSuffix, cashSuffix } from "./account-name.util";
 import { formatDateYMD, todayInTimezone, todayYMD } from "../common/date-utils";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { ActionHistoryService } from "../action-history/action-history.service";
@@ -173,10 +174,16 @@ export class AccountsService {
     try {
       const repo = queryRunner.manager.getRepository(Account);
 
+      // Suffixes are localized to the requester's language so the generated
+      // pair names read naturally (e.g. "TFSA - Bargeld") instead of always
+      // appending the English words.
+      const cashSuffixWord = cashSuffix();
+      const brokerageSuffixWord = brokerageSuffix();
+
       // Create the cash account first
       const cashAccount = repo.create({
         ...accountData,
-        name: `${name} - Cash`,
+        name: `${name} - ${cashSuffixWord}`,
         userId,
         openingBalance,
         currentBalance: openingBalance,
@@ -188,7 +195,7 @@ export class AccountsService {
       // Create the brokerage account linked to the cash account
       const brokerageAccount = repo.create({
         ...accountData,
-        name: `${name} - Brokerage`,
+        name: `${name} - ${brokerageSuffixWord}`,
         userId,
         openingBalance: 0,
         currentBalance: 0,

@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Bargeld",
+    "brokerage": "Depot"
+  },
   "page": {
     "title": "Konten",
     "subtitle": "Verwalten Sie Ihre Bankkonten, Kreditkarten und Investitionen",

@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Contanti",
+    "brokerage": "Intermediazione"
+  },
   "page": {
     "title": "Conti",
     "subtitle": "Gestisci i tuoi conti bancari, carte di credito e investimenti",

@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Contant",
+    "brokerage": "Effecten"
+  },
   "page": {
     "title": "Rekeningen",
     "subtitle": "Beheer jouw bankrekeningen, creditcards en beleggingen",

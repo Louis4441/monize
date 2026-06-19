@@ -117,9 +117,22 @@ export const isInvestmentCashHalf = (account: Account): boolean => {
   );
 };
 
-/** The main account name, with any " - Brokerage"/" - Cash" suffix stripped. */
-export const getMainAccountName = (name: string): string => {
-  return name.replace(/ - (Brokerage|Cash)$/, '');
+/**
+ * The main account name, with any " - Brokerage"/" - Cash" suffix stripped.
+ *
+ * Investment pair names are generated server-side with a localized suffix, so
+ * callers should pass the user's translated "Brokerage"/"Cash" words via
+ * `localizedSuffixes` to strip them too. The English words are always stripped
+ * as well so accounts created before localization (or in English) still match.
+ */
+export const getMainAccountName = (
+  name: string,
+  localizedSuffixes: string[] = [],
+): string => {
+  const suffixes = [...new Set(['Brokerage', 'Cash', ...localizedSuffixes])]
+    .filter(Boolean)
+    .map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return name.replace(new RegExp(` - (${suffixes.join('|')})$`), '');
 };
 
 /**

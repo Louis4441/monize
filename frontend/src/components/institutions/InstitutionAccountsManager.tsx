@@ -14,7 +14,8 @@ import { institutionsApi } from '@/lib/institutions';
 import { accountsApi } from '@/lib/accounts';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
-import { isInvestmentCashHalf, getMainAccountName } from '@/lib/account-utils';
+import { isInvestmentCashHalf } from '@/lib/account-utils';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { InstitutionLogo } from './InstitutionLogo';
 
 const logger = createLogger('InstitutionAccountsManager');
@@ -34,6 +35,7 @@ export function InstitutionAccountsManager({
   onChanged,
 }: InstitutionAccountsManagerProps) {
   const t = useTranslations('institutions');
+  const mainAccountName = useMainAccountName();
   const router = useRouter();
   const [assigned, setAssigned] = useState<Account[]>([]);
   const [allAccounts, setAllAccounts] = useState<Account[]>([]);
@@ -91,8 +93,11 @@ export function InstitutionAccountsManager({
     () =>
       allAccounts
         .filter((a) => !assignedIds.has(a.id) && !isInvestmentCashHalf(a))
-        .map((a) => ({ value: a.id, label: getMainAccountName(a.name) })),
-    [allAccounts, assignedIds],
+        .map((a) => ({
+          value: a.id,
+          label: mainAccountName(a.name),
+        })),
+    [allAccounts, assignedIds, mainAccountName],
   );
 
   // Close the modal and jump to the Transactions page filtered to the account.
@@ -209,7 +214,7 @@ export function InstitutionAccountsManager({
                     title={t('accountsManager.viewTransactions')}
                     className="text-sm text-left text-blue-600 dark:text-blue-400 hover:underline truncate"
                   >
-                    {getMainAccountName(account.name)}
+                    {mainAccountName(account.name)}
                   </button>
                   <Button
                     variant="outline"

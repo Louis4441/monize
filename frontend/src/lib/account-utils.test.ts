@@ -324,6 +324,22 @@ describe('getMainAccountName', () => {
   it('only strips the suffix at the end of the name', () => {
     expect(getMainAccountName('Cash - Reserve')).toBe('Cash - Reserve');
   });
+
+  it('strips a localized suffix when supplied', () => {
+    expect(getMainAccountName('TFSA - Bargeld', ['Maklerkonto', 'Bargeld'])).toBe(
+      'TFSA',
+    );
+  });
+
+  it('still strips the English suffix even when localized words are supplied', () => {
+    expect(getMainAccountName('TFSA - Cash', ['Maklerkonto', 'Bargeld'])).toBe(
+      'TFSA',
+    );
+  });
+
+  it('escapes regex metacharacters in localized suffixes', () => {
+    expect(getMainAccountName('TFSA - (Cash)', ['(Cash)'])).toBe('TFSA');
+  });
 });
 
 describe('maskAccountNumber', () => {

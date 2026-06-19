@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Gotówka",
+    "brokerage": "Maklerskie"
+  },
   "page": {
     "title": "Konta",
     "subtitle": "Zarządzaj swoimi rachunkami bankowymi, kartami kredytowymi i inwestycjami",

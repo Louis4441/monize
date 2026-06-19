@@ -1,3 +1,7 @@
 {
-  "ok": "ठीक है"
+  "ok": "ठीक है",
+  "accountSuffix": {
+    "cash": "नकद",
+    "brokerage": "ब्रोकरेज"
+  }
 }

@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Nakit",
+    "brokerage": "Aracılık"
+  },
   "page": {
     "title": "Hesaplar",
     "subtitle": "Banka hesaplarınızı, kredi kartlarınızı ve yatırımlarınızı yönetin",

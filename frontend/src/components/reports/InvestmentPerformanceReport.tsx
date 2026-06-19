@@ -26,11 +26,13 @@ import { useReportData } from '@/hooks/useReportData';
 import { ReportError } from '@/components/reports/ReportError';
 import { aggregateHoldingsBySecurity, AggregatedHolding } from '@/lib/aggregate-holdings';
 import { useTranslations } from 'next-intl';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 
 type HoldingsSortField = 'symbol' | 'quantity' | 'averageCost' | 'currentPrice' | 'marketValue' | 'gainLoss' | 'gainLossPercent';
 
 export function InvestmentPerformanceReport() {
   const t = useTranslations('reports');
+  const mainAccountName = useMainAccountName();
   const { formatCurrency: formatCurrencyFull, formatSignedPercent } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -115,9 +117,9 @@ export function InvestmentPerformanceReport() {
 
   const accountNameById = useMemo(() => {
     const map = new Map<string, string>();
-    accounts.forEach((a) => map.set(a.id, a.name.replace(/ - (Brokerage|Cash)$/, '')));
+    accounts.forEach((a) => map.set(a.id, mainAccountName(a.name)));
     return map;
-  }, [accounts]);
+  }, [accounts, mainAccountName]);
 
   const aggregatedHoldings = useMemo((): AggregatedHolding[] => {
     if (!portfolio) return [];

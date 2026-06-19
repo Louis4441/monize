@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "[XX-Cash-XX]",
+    "brokerage": "[XX-Brokerage-XX]"
+  },
   "page": {
     "title": "[XX-Accounts-XX]",
     "subtitle": "[XX-Manage your bank accounts, credit cards, and investments-XX]",
