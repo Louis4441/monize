@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Espèces",
+    "brokerage": "Courtage"
+  },
   "page": {
     "title": "Comptes",
     "subtitle": "Gérez vos comptes bancaires, cartes de crédit et investissements",

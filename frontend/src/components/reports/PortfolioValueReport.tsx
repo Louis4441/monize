@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import {
   AreaChart,
@@ -72,6 +73,7 @@ function CustomTooltip({ active, payload, fmtFull, portfolioLabel }: {
 export function PortfolioValueReport() {
   const t = useTranslations('reports');
   const tc = useTranslations('common');
+  const mainAccountName = useMainAccountName();
   const { formatCurrencyCompact, formatCurrencyAxis, formatCurrencyFlag, formatCurrency: formatCurrencyFull, formatSignedPercent } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
@@ -386,7 +388,7 @@ export function PortfolioValueReport() {
   const handleExportPdf = async () => {
     const { exportToPdf } = await import('@/lib/pdf-export');
     const accountLabel = selectedAccount
-      ? selectedAccount.name.replace(/ - (Brokerage|Cash)$/, '')
+      ? mainAccountName(selectedAccount.name)
       : t('portfolioValue.allAccounts');
     const breakdownHeaders = [t('portfolioValue.pdfColAccount'), t('portfolioValue.pdfColHoldings'), t('portfolioValue.pdfColCash'), t('portfolioValue.pdfColTotal'), t('portfolioValue.pdfColGainLoss')];
     const breakdownRows = portfolio?.holdingsByAccount.map((acct) => [

@@ -1,3 +1,7 @@
 {
-  "ok": "OK"
+  "ok": "OK",
+  "accountSuffix": {
+    "cash": "現金",
+    "brokerage": "証券"
+  }
 }

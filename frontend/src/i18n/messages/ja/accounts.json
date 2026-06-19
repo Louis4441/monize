@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "現金",
+    "brokerage": "証券"
+  },
   "page": {
     "title": "勘定科目",
     "subtitle": "銀行口座、クレジットカード、投資を管理する",

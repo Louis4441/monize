@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Cash",
+    "brokerage": "Brokerage"
+  },
   "page": {
     "title": "Accounts",
     "subtitle": "Manage your bank accounts, credit cards, and investments",

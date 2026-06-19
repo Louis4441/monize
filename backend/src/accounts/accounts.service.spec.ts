@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { I18nContext } from "nestjs-i18n";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { AccountsService } from "./accounts.service";
@@ -1080,6 +1081,32 @@ describe("AccountsService", () => {
       const cashCreate = mockQrRepo.create.mock.calls[0][0];
       expect(cashCreate.openingBalance).toBe(0);
       expect(cashCreate.currentBalance).toBe(0);
+    });
+
+    it("localizes the cash and brokerage suffixes to the request locale", async () => {
+      const localized: Record<string, string> = {
+        "common.accountSuffix.cash": "Bargeld",
+        "common.accountSuffix.brokerage": "Depot",
+      };
+      jest.spyOn(I18nContext, "current").mockReturnValue({
+        t: (key: string) => localized[key] ?? key,
+      } as never);
+
+      mockQrRepo.save.mockImplementation((data) => ({
+        ...data,
+        id: data.id || "gen-id",
+      }));
+
+      await service.createInvestmentAccountPair("user-1", {
+        name: "Depotkonto",
+        accountType: AccountType.INVESTMENT,
+        currencyCode: "EUR",
+      } as any);
+
+      const cashCreate = mockQrRepo.create.mock.calls[0][0];
+      const brokerageCreate = mockQrRepo.create.mock.calls[1][0];
+      expect(cashCreate.name).toBe("Depotkonto - Bargeld");
+      expect(brokerageCreate.name).toBe("Depotkonto - Depot");
     });
   });
 

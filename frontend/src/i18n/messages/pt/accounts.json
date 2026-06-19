@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Dinheiro",
+    "brokerage": "Corretagem"
+  },
   "page": {
     "title": "Contas",
     "subtitle": "Gerir as suas contas bancárias, cartões de crédito e investimentos",

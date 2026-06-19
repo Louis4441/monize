@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Efectivo",
+    "brokerage": "Corretaje"
+  },
   "page": {
     "title": "Cuentas",
     "subtitle": "Administra tus cuentas bancarias, tarjetas de crédito e inversiones",

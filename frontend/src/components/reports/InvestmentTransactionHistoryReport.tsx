@@ -22,6 +22,7 @@ import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
+import { useMainAccountName } from '@/hooks/useMainAccountName';
 
 const logger = createLogger('InvestmentTransactionHistoryReport');
 
@@ -51,6 +52,7 @@ interface ActionSummary {
 
 export function InvestmentTransactionHistoryReport() {
   const t = useTranslations('reports');
+  const mainAccountName = useMainAccountName();
   const { formatCurrency: formatCurrencyFull } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -244,7 +246,7 @@ export function InvestmentTransactionHistoryReport() {
     const { exportToPdf } = await import('@/lib/pdf-export');
     const { headers, rows } = getExportData(true);
     const accountLabel = selectedAccount
-      ? selectedAccount.name.replace(/ - (Brokerage|Cash)$/, '')
+      ? mainAccountName(selectedAccount.name)
       : t('investmentTransactions.allAccounts');
     const uniqueSecurities = new Set(filteredTransactions.filter((tx) => tx.security).map((tx) => tx.security!.symbol)).size;
     await exportToPdf({
@@ -259,7 +261,7 @@ export function InvestmentTransactionHistoryReport() {
       tableData: { headers, rows },
       filename: 'investment-transactions',
     });
-  }, [getExportData, selectedAccount, filteredTransactions, fmtValue, totalAmount, actionSummaries, t]);
+  }, [getExportData, selectedAccount, filteredTransactions, fmtValue, totalAmount, actionSummaries, t, mainAccountName]);
 
   if (error) {
     return <ReportError onRetry={reload} />;

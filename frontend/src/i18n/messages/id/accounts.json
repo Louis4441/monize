@@ -1,4 +1,8 @@
 {
+  "nameSuffix": {
+    "cash": "Tunai",
+    "brokerage": "Pialang"
+  },
   "page": {
     "title": "Akun",
     "subtitle": "Kelola rekening bank, kartu kredit, dan investasi Anda",
