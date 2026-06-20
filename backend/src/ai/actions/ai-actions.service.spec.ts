@@ -50,6 +50,7 @@ describe("AiActionsService", () => {
       create: jest.fn().mockResolvedValue({ id: "tx-new" }),
       update: jest.fn().mockResolvedValue({ id: TX }),
       remove: jest.fn().mockResolvedValue(undefined),
+      removeAny: jest.fn().mockResolvedValue(undefined),
       createBulk: jest.fn(),
       createTransfer: jest.fn().mockResolvedValue({
         fromTransaction: { id: "tf-1" },
@@ -311,7 +312,7 @@ describe("AiActionsService", () => {
       transactionId: TX,
     };
     const result = await service.confirm(USER, dtoFor(descriptor));
-    expect(transactions.remove).toHaveBeenCalledWith(USER, TX);
+    expect(transactions.removeAny).toHaveBeenCalledWith(USER, TX);
     expect(result).toEqual({ type: "delete_transaction", id: TX });
   });
 
@@ -645,7 +646,7 @@ describe("AiActionsService", () => {
     });
 
     it("executes batch_actions(delete) best-effort, collecting skips", async () => {
-      transactions.remove
+      transactions.removeAny
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error("nope"));
       const descriptor: import("./ai-action.types").BatchActionsDescriptor = {

@@ -1365,6 +1365,46 @@ describe("TransactionsService", () => {
     });
   });
 
+  describe("removeAny", () => {
+    it("routes a transfer leg to removeTransfer (cascades both legs)", async () => {
+      transactionsRepository.findOne.mockResolvedValue({
+        id: "tx-from",
+        userId: "user-1",
+        isTransfer: true,
+        linkedTransactionId: "tx-to",
+        splits: [],
+      });
+      const removeTransferSpy = jest
+        .spyOn(service, "removeTransfer")
+        .mockResolvedValue(undefined);
+      const removeSpy = jest.spyOn(service, "remove").mockResolvedValue();
+
+      await service.removeAny("user-1", "tx-from");
+
+      expect(removeTransferSpy).toHaveBeenCalledWith("user-1", "tx-from");
+      expect(removeSpy).not.toHaveBeenCalled();
+    });
+
+    it("routes a plain transaction to remove", async () => {
+      transactionsRepository.findOne.mockResolvedValue({
+        id: "tx-1",
+        userId: "user-1",
+        isTransfer: false,
+        linkedTransactionId: null,
+        splits: [],
+      });
+      const removeTransferSpy = jest
+        .spyOn(service, "removeTransfer")
+        .mockResolvedValue(undefined);
+      const removeSpy = jest.spyOn(service, "remove").mockResolvedValue();
+
+      await service.removeAny("user-1", "tx-1");
+
+      expect(removeSpy).toHaveBeenCalledWith("user-1", "tx-1");
+      expect(removeTransferSpy).not.toHaveBeenCalled();
+    });
+  });
+
   // ========================================================================
   // Additional coverage tests
   // ========================================================================

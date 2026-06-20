@@ -315,7 +315,7 @@ export class AiActionsService {
       }
       case "delete": {
         const r = row as BatchDeleteTransactionRow;
-        await this.transactionsService.remove(userId, r.transactionId);
+        await this.transactionsService.removeAny(userId, r.transactionId);
         return r.transactionId;
       }
       case "create_transfer": {
@@ -384,7 +384,7 @@ export class AiActionsService {
     userId: string,
     descriptor: DeleteTransactionDescriptor,
   ): Promise<ConfirmActionResult> {
-    await this.transactionsService.remove(userId, descriptor.transactionId);
+    await this.transactionsService.removeAny(userId, descriptor.transactionId);
     return { type: "delete_transaction", id: descriptor.transactionId };
   }
 

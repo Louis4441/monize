@@ -35,6 +35,7 @@ describe("McpTransactionsTools", () => {
       createBulk: jest.fn(),
       update: jest.fn(),
       remove: jest.fn().mockResolvedValue(undefined),
+      removeAny: jest.fn().mockResolvedValue(undefined),
       previewUpdate: jest.fn(),
       previewDelete: jest.fn(),
       createTransfer: jest.fn(),
@@ -800,7 +801,7 @@ describe("McpTransactionsTools", () => {
         { sessionId: "s1" },
       );
 
-      expect(transactionsService.remove).toHaveBeenCalledWith("u1", "t1");
+      expect(transactionsService.removeAny).toHaveBeenCalledWith("u1", "t1");
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.deleted).toBe(true);
     });

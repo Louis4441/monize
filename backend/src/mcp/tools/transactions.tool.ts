@@ -1115,7 +1115,7 @@ export class McpTransactionsTools {
         return toolError(
           "Cancelled: the confirmation was declined, so the transaction was not deleted.",
         );
-      await this.transactionsService.remove(userId, preview.transactionId);
+      await this.transactionsService.removeAny(userId, preview.transactionId);
       this.writeLimiter.record(userId, "delete_transaction");
       return toolResult({ id: preview.transactionId, deleted: true, count: 1 });
     }
@@ -1171,7 +1171,7 @@ export class McpTransactionsTools {
       );
     const ids: string[] = [];
     for (const row of bulk.okRows) {
-      await this.transactionsService.remove(userId, row.transactionId);
+      await this.transactionsService.removeAny(userId, row.transactionId);
       ids.push(row.transactionId);
       this.writeLimiter.record(userId, "delete_transaction");
     }
@@ -1299,7 +1299,7 @@ export class McpTransactionsTools {
         return r.fromTransaction.id;
       }
       case "delete_transaction": {
-        await this.transactionsService.remove(userId, d.transactionId);
+        await this.transactionsService.removeAny(userId, d.transactionId);
         this.writeLimiter.record(userId, "delete_transaction");
         return d.transactionId;
       }
