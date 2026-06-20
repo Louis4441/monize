@@ -62,6 +62,19 @@
       "budget": "Budget",
       "custom_report": "Rapport"
     },
+    "actionLabels": {
+      "BUY": "Kopen",
+      "SELL": "Verkopen",
+      "DIVIDEND": "Dividend",
+      "INTEREST": "Rente",
+      "CAPITAL_GAIN": "Kapitaalwinst",
+      "SPLIT": "Splitsing",
+      "TRANSFER_IN": "Inkomend",
+      "TRANSFER_OUT": "Uitgaand",
+      "REINVEST": "Herinvesteren",
+      "ADD_SHARES": "Aandelen toevoegen",
+      "REMOVE_SHARES": "Aandelen verwijderen"
+    },
     "descriptions": {
       "createdAccount": "Rekening \"{name}\" aangemaakt",
       "updatedAccount": "Rekening \"{name}\" bijgewerkt",

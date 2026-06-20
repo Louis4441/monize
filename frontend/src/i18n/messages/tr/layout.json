@@ -62,6 +62,19 @@
       "budget": "Bütçe",
       "custom_report": "Rapor"
     },
+    "actionLabels": {
+      "BUY": "Al",
+      "SELL": "Sat",
+      "DIVIDEND": "Temettü",
+      "INTEREST": "Faiz",
+      "CAPITAL_GAIN": "Sermaye Kazancı",
+      "SPLIT": "Bölünme",
+      "TRANSFER_IN": "Transfer Girişi",
+      "TRANSFER_OUT": "Transfer Çıkışı",
+      "REINVEST": "Yeniden Yatır",
+      "ADD_SHARES": "Hisse Ekle",
+      "REMOVE_SHARES": "Hisse Çıkar"
+    },
     "descriptions": {
       "createdAccount": "\"{name}\" hesabı oluşturuldu",
       "updatedAccount": "\"{name}\" hesabı güncellendi",

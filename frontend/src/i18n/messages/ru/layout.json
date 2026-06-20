@@ -62,6 +62,19 @@
       "budget": "Бюджет",
       "custom_report": "Отчёт"
     },
+    "actionLabels": {
+      "BUY": "Покупка",
+      "SELL": "Продажа",
+      "DIVIDEND": "Дивиденд",
+      "INTEREST": "Процент",
+      "CAPITAL_GAIN": "Доход от прироста капитала",
+      "SPLIT": "Дробление",
+      "TRANSFER_IN": "Перевод входящий",
+      "TRANSFER_OUT": "Перевод исходящий",
+      "REINVEST": "Реинвестирование",
+      "ADD_SHARES": "Добавить акции",
+      "REMOVE_SHARES": "Удалить акции"
+    },
     "descriptions": {
       "createdAccount": "Создан счёт \"{name}\"",
       "updatedAccount": "Обновлён счёт \"{name}\"",

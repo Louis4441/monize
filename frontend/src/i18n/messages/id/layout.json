@@ -62,6 +62,19 @@
       "budget": "Anggaran",
       "custom_report": "Laporan"
     },
+    "actionLabels": {
+      "BUY": "Beli",
+      "SELL": "Jual",
+      "DIVIDEND": "Dividen",
+      "INTEREST": "Bunga",
+      "CAPITAL_GAIN": "Keuntungan Modal",
+      "SPLIT": "Pemecahan Saham",
+      "TRANSFER_IN": "Transfer Masuk",
+      "TRANSFER_OUT": "Transfer Keluar",
+      "REINVEST": "Reinvestasi",
+      "ADD_SHARES": "Tambah Lembar",
+      "REMOVE_SHARES": "Hapus Lembar"
+    },
     "descriptions": {
       "createdAccount": "Akun \"{name}\" dibuat",
       "updatedAccount": "Akun \"{name}\" diperbarui",

@@ -62,6 +62,19 @@
       "budget": "Ngân sách",
       "custom_report": "Báo cáo"
     },
+    "actionLabels": {
+      "BUY": "Mua",
+      "SELL": "Bán",
+      "DIVIDEND": "Cổ tức",
+      "INTEREST": "Lãi",
+      "CAPITAL_GAIN": "Khoản lãi vốn",
+      "SPLIT": "Chia",
+      "TRANSFER_IN": "Chuyển vào",
+      "TRANSFER_OUT": "Chuyển ra",
+      "REINVEST": "Tái đầu tư",
+      "ADD_SHARES": "Thêm cổ phiếu",
+      "REMOVE_SHARES": "Xóa cổ phiếu"
+    },
     "descriptions": {
       "createdAccount": "Đã tạo tài khoản \"{name}\"",
       "updatedAccount": "Đã cập nhật tài khoản \"{name}\"",

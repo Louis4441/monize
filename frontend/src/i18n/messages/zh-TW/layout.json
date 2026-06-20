@@ -62,6 +62,19 @@
       "budget": "預算",
       "custom_report": "報表"
     },
+    "actionLabels": {
+      "BUY": "買入",
+      "SELL": "賣出",
+      "DIVIDEND": "股利",
+      "INTEREST": "利息",
+      "CAPITAL_GAIN": "資本利得",
+      "SPLIT": "股票分割",
+      "TRANSFER_IN": "轉入",
+      "TRANSFER_OUT": "轉出",
+      "REINVEST": "再投資",
+      "ADD_SHARES": "增加股數",
+      "REMOVE_SHARES": "減少股數"
+    },
     "descriptions": {
       "createdAccount": "已建立科目「{name}」",
       "updatedAccount": "已更新科目「{name}」",

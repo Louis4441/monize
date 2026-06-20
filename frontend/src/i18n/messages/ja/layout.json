@@ -62,6 +62,19 @@
       "budget": "予算",
       "custom_report": "レポート"
     },
+    "actionLabels": {
+      "BUY": "買い",
+      "SELL": "売り",
+      "DIVIDEND": "配当",
+      "INTEREST": "利息",
+      "CAPITAL_GAIN": "キャピタルゲイン",
+      "SPLIT": "株式分割",
+      "TRANSFER_IN": "振替入庫",
+      "TRANSFER_OUT": "振替出庫",
+      "REINVEST": "再投資",
+      "ADD_SHARES": "株数追加",
+      "REMOVE_SHARES": "株数削除"
+    },
     "descriptions": {
       "createdAccount": "勘定科目「{name}」を作成しました",
       "updatedAccount": "勘定科目「{name}」を更新しました",

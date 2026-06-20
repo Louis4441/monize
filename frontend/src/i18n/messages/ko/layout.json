@@ -62,6 +62,19 @@
       "budget": "예산",
       "custom_report": "보고서"
     },
+    "actionLabels": {
+      "BUY": "매수",
+      "SELL": "매도",
+      "DIVIDEND": "배당금",
+      "INTEREST": "이자",
+      "CAPITAL_GAIN": "자본이득",
+      "SPLIT": "분할",
+      "TRANSFER_IN": "입고",
+      "TRANSFER_OUT": "출고",
+      "REINVEST": "재투자",
+      "ADD_SHARES": "주식수 추가",
+      "REMOVE_SHARES": "주식수 제거"
+    },
     "descriptions": {
       "createdAccount": "계정 \"{name}\" 생성됨",
       "updatedAccount": "계정 \"{name}\" 업데이트됨",

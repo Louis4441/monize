@@ -62,6 +62,19 @@
       "budget": "Бюджет",
       "custom_report": "Звіт"
     },
+    "actionLabels": {
+      "BUY": "Купити",
+      "SELL": "Продати",
+      "DIVIDEND": "Дивіденд",
+      "INTEREST": "Відсотки",
+      "CAPITAL_GAIN": "Приріст капіталу",
+      "SPLIT": "Дроблення",
+      "TRANSFER_IN": "Переказ вхідний",
+      "TRANSFER_OUT": "Переказ вихідний",
+      "REINVEST": "Реінвестування",
+      "ADD_SHARES": "Додати акції",
+      "REMOVE_SHARES": "Видалити акції"
+    },
     "descriptions": {
       "createdAccount": "Створено рахунок \"{name}\"",
       "updatedAccount": "Оновлено рахунок \"{name}\"",
