@@ -320,6 +320,7 @@
     "dateMustBeYMD": "Дата має бути у форматі YYYY-MM-DD"
   },
   "securities": {
+    "exchangeRateUnavailable": "Не вдалося визначити обмінний курс для {{ from }} -> {{ to }} на дату транзакції. Вкажіть явний exchangeRate, щоб проведення за грошовим рахунком було коректним.",
     "accountMustBeInvestment": "Рахунок має бути типу INVESTMENT",
     "securityIdRequired": "Ідентифікатор цінного паперу обов'язковий для операцій {{ action }}",
     "splitRatioRequired": "Коефіцієнт дроблення (кількість) має бути більше нуля",

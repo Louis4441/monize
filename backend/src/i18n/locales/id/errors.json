@@ -320,6 +320,7 @@
     "dateMustBeYMD": "tanggal harus dalam format YYYY-MM-DD"
   },
   "securities": {
+    "exchangeRateUnavailable": "Tidak dapat menentukan nilai tukar untuk {{ from }} -> {{ to }} pada tanggal transaksi. Berikan exchangeRate eksplisit agar pencatatan ke akun kas benar.",
     "accountMustBeInvestment": "Akun harus bertipe INVESTMENT",
     "securityIdRequired": "ID sekuritas diperlukan untuk transaksi {{ action }}",
     "splitRatioRequired": "Rasio pemecahan (kuantitas) harus lebih dari nol",

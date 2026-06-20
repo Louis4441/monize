@@ -320,6 +320,7 @@
     "dateMustBeYMD": "date는 YYYY-MM-DD 형식이어야 합니다"
   },
   "securities": {
+    "exchangeRateUnavailable": "거래일의 {{ from }} -> {{ to }} 환율을 확인할 수 없습니다. 현금 계좌 기록이 정확하도록 명시적인 exchangeRate를 입력하세요.",
     "accountMustBeInvestment": "계정은 INVESTMENT 유형이어야 합니다",
     "securityIdRequired": "{{ action }} 거래에는 증권 ID가 필요합니다",
     "splitRatioRequired": "분할 비율(수량)은 0보다 커야 합니다",

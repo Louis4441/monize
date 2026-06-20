@@ -1330,6 +1330,7 @@ export class ToolExecutorService {
       price: item.price as number | undefined,
       commission: item.commission as number | undefined,
       fundingAccountName: item.fundingAccountName as string | undefined,
+      exchangeRate: item.exchangeRate as number | undefined,
       description: item.description as string | undefined,
     };
   }
@@ -1345,6 +1346,7 @@ export class ToolExecutorService {
       quantity: item.quantity as number | undefined,
       price: item.price as number | undefined,
       commission: item.commission as number | undefined,
+      exchangeRate: item.exchangeRate as number | undefined,
       description: item.description as string | undefined,
     };
   }

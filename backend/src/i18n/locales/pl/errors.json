@@ -320,6 +320,7 @@
     "dateMustBeYMD": "date musi być w formacie YYYY-MM-DD"
   },
   "securities": {
+    "exchangeRateUnavailable": "Nie można ustalić kursu wymiany dla {{ from }} -> {{ to }} na dzień transakcji. Podaj jawny exchangeRate, aby księgowanie na koncie gotówkowym było poprawne.",
     "accountMustBeInvestment": "Konto musi być typu INVESTMENT",
     "securityIdRequired": "Identyfikator papieru wartościowego jest wymagany dla transakcji {{ action }}",
     "splitRatioRequired": "Współczynnik splitu (ilość) musi być większy od zera",

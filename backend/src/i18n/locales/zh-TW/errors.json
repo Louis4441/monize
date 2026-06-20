@@ -320,6 +320,7 @@
     "dateMustBeYMD": "date 必須為 YYYY-MM-DD 格式"
   },
   "securities": {
+    "exchangeRateUnavailable": "無法確定交易日 {{ from }} -> {{ to }} 的匯率。請提供明確的 exchangeRate，以便現金帳戶的記帳正確。",
     "accountMustBeInvestment": "科目類型必須為 INVESTMENT",
     "securityIdRequired": "{{ action }} 交易需要證券 ID",
     "splitRatioRequired": "分割比例（數量）必須大於零",

@@ -320,6 +320,7 @@
     "dateMustBeYMD": "date deve estar no formato YYYY-MM-DD"
   },
   "securities": {
+    "exchangeRateUnavailable": "Não foi possível determinar uma taxa de câmbio para {{ from }} -> {{ to }} na data da transação. Informe um exchangeRate explícito para que o lançamento na conta de caixa fique correto.",
     "accountMustBeInvestment": "A conta deve ser do tipo INVESTMENT",
     "securityIdRequired": "O ID do título é obrigatório para transações de {{ action }}",
     "splitRatioRequired": "O índice de desdobramento (quantidade) deve ser maior que zero",

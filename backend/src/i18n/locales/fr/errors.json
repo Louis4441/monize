@@ -320,6 +320,7 @@
     "dateMustBeYMD": "La date doit être au format YYYY-MM-DD"
   },
   "securities": {
+    "exchangeRateUnavailable": "Impossible de déterminer un taux de change pour {{ from }} -> {{ to }} à la date de la transaction. Fournissez un exchangeRate explicite afin que l'écriture sur le compte d'espèces soit correcte.",
     "accountMustBeInvestment": "Le compte doit être de type INVESTMENT",
     "securityIdRequired": "L'ID de titre est requis pour les transactions {{ action }}",
     "splitRatioRequired": "Le ratio de fractionnement (quantité) doit être supérieur à zéro",

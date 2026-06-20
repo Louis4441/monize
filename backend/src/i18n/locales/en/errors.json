@@ -322,6 +322,7 @@
   "securities": {
     "accountMustBeInvestment": "Account must be of type INVESTMENT",
     "securityIdRequired": "Security ID is required for {{ action }} transactions",
+    "exchangeRateUnavailable": "Could not determine an exchange rate for {{ from }} -> {{ to }} on the transaction date. Supply an explicit exchangeRate so the cash posting is correct.",
     "splitRatioRequired": "Split ratio (quantity) must be greater than zero",
     "ambiguousSecurity": "\"{{ query }}\" matches multiple securities: {{ list }}. Use the exact ticker symbol.",
     "securityNotFoundByQuery": "No security matches \"{{ query }}\". Add the security first or check the ticker symbol.",

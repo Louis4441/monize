@@ -320,6 +320,7 @@
     "dateMustBeYMD": "date は YYYY-MM-DD 形式でなければなりません"
   },
   "securities": {
+    "exchangeRateUnavailable": "取引日における {{ from }} -> {{ to }} の為替レートを特定できませんでした。現金口座への計上が正しくなるよう、明示的な exchangeRate を指定してください。",
     "accountMustBeInvestment": "口座は INVESTMENT タイプでなければなりません",
     "securityIdRequired": "{{ action }} 取引には有価証券IDが必要です",
     "splitRatioRequired": "株式分割比率（数量）はゼロより大きくなければなりません",

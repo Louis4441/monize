@@ -320,6 +320,7 @@
     "dateMustBeYMD": "tarih YYYY-AA-GG biçiminde olmalıdır"
   },
   "securities": {
+    "exchangeRateUnavailable": "İşlem tarihinde {{ from }} -> {{ to }} için bir döviz kuru belirlenemedi. Nakit hesabına kaydın doğru olması için açık bir exchangeRate girin.",
     "accountMustBeInvestment": "Hesap YATIRİM türünde olmalıdır",
     "securityIdRequired": "{{ action }} işlemleri için menkul kıymet kimliği gereklidir",
     "splitRatioRequired": "Bölünme oranı (miktar) sıfırdan büyük olmalıdır",

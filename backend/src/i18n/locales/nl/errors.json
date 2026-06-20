@@ -320,6 +320,7 @@
     "dateMustBeYMD": "datum moet in JJJJ-MM-DD-formaat zijn"
   },
   "securities": {
+    "exchangeRateUnavailable": "Kon geen wisselkoers bepalen voor {{ from }} -> {{ to }} op de transactiedatum. Geef een expliciete exchangeRate op zodat de boeking op de geldrekening correct is.",
     "accountMustBeInvestment": "Rekening moet van het type INVESTMENT zijn",
     "securityIdRequired": "Waardepapier-ID is vereist voor {{ action }}-transacties",
     "splitRatioRequired": "Splitsingsverhouding (hoeveelheid) moet groter zijn dan nul",

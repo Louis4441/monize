@@ -320,6 +320,7 @@
     "dateMustBeYMD": "date phải có định dạng YYYY-MM-DD"
   },
   "securities": {
+    "exchangeRateUnavailable": "Không thể xác định tỷ giá hối đoái cho {{ from }} -> {{ to }} vào ngày giao dịch. Hãy cung cấp exchangeRate rõ ràng để bút toán vào tài khoản tiền mặt được chính xác.",
     "accountMustBeInvestment": "Tài khoản phải là loại ĐẦU TƯ",
     "securityIdRequired": "ID chứng khoán là bắt buộc cho giao tác {{ action }}",
     "splitRatioRequired": "Tỷ lệ chia (số lượng) phải lớn hơn không",

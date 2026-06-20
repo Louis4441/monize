@@ -320,6 +320,7 @@
     "dateMustBeYMD": "la data deve essere nel formato YYYY-MM-DD"
   },
   "securities": {
+    "exchangeRateUnavailable": "Impossibile determinare un tasso di cambio per {{ from }} -> {{ to }} alla data della transazione. Fornisci un exchangeRate esplicito affinché la registrazione sul conto di liquidità sia corretta.",
     "accountMustBeInvestment": "Il conto deve essere di tipo INVESTMENT",
     "securityIdRequired": "L'ID titolo è obbligatorio per le transazioni {{ action }}",
     "splitRatioRequired": "Il rapporto di suddivisione (quantità) deve essere maggiore di zero",

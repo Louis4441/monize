@@ -320,6 +320,7 @@
     "dateMustBeYMD": "date 必须为 YYYY-MM-DD 格式"
   },
   "securities": {
+    "exchangeRateUnavailable": "无法确定交易日 {{ from }} -> {{ to }} 的汇率。请提供明确的 exchangeRate，以便现金账户的记账正确。",
     "accountMustBeInvestment": "账户类型必须为 INVESTMENT",
     "securityIdRequired": "{{ action }} 交易需要证券 ID",
     "splitRatioRequired": "拆股比例（数量）必须大于零",

@@ -320,6 +320,7 @@
     "dateMustBeYMD": "дата должна быть в формате ГГГГ-ММ-ДД"
   },
   "securities": {
+    "exchangeRateUnavailable": "Не удалось определить обменный курс для {{ from }} -> {{ to }} на дату транзакции. Укажите явный exchangeRate, чтобы проводка по денежному счёту была корректной.",
     "accountMustBeInvestment": "Счёт должен быть типа INVESTMENT",
     "securityIdRequired": "ID ценной бумаги обязателен для проводок {{ action }}",
     "splitRatioRequired": "Коэффициент дробления (количество) должен быть больше нуля",

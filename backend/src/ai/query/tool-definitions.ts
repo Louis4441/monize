@@ -796,6 +796,11 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
                 description:
                   "Commission or fee (up to 4 decimals). Defaults to 0.",
               },
+              exchangeRate: {
+                type: "number",
+                description:
+                  "create/update: FX rate converting the security's currency into the funding cash account's currency (e.g. for a EUR security funded from a PLN account, the EUR->PLN rate such as 4.2514). Supply this when the broker's settlement data gives the rate or the converted cash total, so the cash posting is exact. Omit for same-currency transactions, or to use the rate for the transaction date.",
+              },
               fundingAccountName: {
                 type: "string",
                 description:
