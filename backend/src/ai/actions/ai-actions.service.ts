@@ -516,7 +516,10 @@ export class AiActionsService {
       currencyCode: descriptor.currencyCode,
       payeeId: descriptor.payeeId ?? undefined,
       payeeName: descriptor.payeeName ?? undefined,
-      categoryId: descriptor.categoryId ?? undefined,
+      // When replacing the split set the parent keeps no single category.
+      categoryId: descriptor.splits
+        ? undefined
+        : (descriptor.categoryId ?? undefined),
       description: descriptor.description ?? undefined,
     });
     const transaction = await this.transactionsService.update(
@@ -525,6 +528,19 @@ export class AiActionsService {
       dto,
       { createPayeeIfMissing: descriptor.createPayee === true },
     );
+    // Replace the split set after the scalar fields are applied (each call is
+    // internally transactional). updateSplits re-validates the sum/sign rules.
+    if (descriptor.splits) {
+      await this.transactionsService.updateSplits(
+        userId,
+        descriptor.transactionId,
+        descriptor.splits.map((s) => ({
+          categoryId: s.categoryId,
+          amount: s.amount,
+          memo: s.memo ?? undefined,
+        })),
+      );
+    }
     return { type: "update_transaction", id: transaction.id };
   }
 
@@ -586,8 +602,19 @@ export class AiActionsService {
       currencyCode: descriptor.currencyCode,
       payeeId: descriptor.payeeId ?? undefined,
       payeeName: descriptor.payeeName ?? undefined,
-      categoryId: descriptor.categoryId ?? undefined,
+      // A split transaction carries its categories in `splits`; the parent has
+      // no single category.
+      categoryId: descriptor.splits
+        ? undefined
+        : (descriptor.categoryId ?? undefined),
       description: descriptor.description ?? undefined,
+      splits: descriptor.splits
+        ? descriptor.splits.map((s) => ({
+            categoryId: s.categoryId,
+            amount: s.amount,
+            memo: s.memo ?? undefined,
+          }))
+        : undefined,
     });
     const transaction = await this.transactionsService.create(userId, dto, {
       createPayeeIfMissing: descriptor.createPayee === true,

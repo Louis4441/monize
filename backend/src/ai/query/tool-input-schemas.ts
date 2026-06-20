@@ -395,6 +395,21 @@ export const deleteTransactionSchema = z.object({
  * rows need only the target id. `items` is 1..MAX_BULK_ACTION_ROWS so a pasted
  * table cannot blow past the provider's tool-call output-token budget.
  */
+/**
+ * One category split line on a create/update row. Category splits only: each
+ * line names a category and the slice of the transaction amount it carries. The
+ * slices must sum to the transaction amount (enforced downstream by
+ * `validateSplits`); transfer/investment splits are not exposed through the tool.
+ */
+const manageTransactionSplitSchema = z.object({
+  categoryName: z.string().min(1).max(100),
+  amount: amountSchema,
+  memo: z.string().max(500).optional(),
+});
+
+/** Largest split set a single transaction row may carry through the tool. */
+const MAX_SPLIT_LINES = 50;
+
 const manageTransactionItemSchema = z
   .object({
     // create (standard)
@@ -413,6 +428,11 @@ const manageTransactionItemSchema = z
     createPayeeIfMissing: z.boolean().optional(),
     exchangeRate: z.number().finite().min(0).max(1_000_000).optional(),
     toAmount: amountSchema.optional(),
+    // split transactions (category splits only)
+    splits: z
+      .array(manageTransactionSplitSchema)
+      .max(MAX_SPLIT_LINES)
+      .optional(),
   })
   .passthrough();
 
@@ -428,6 +448,43 @@ export const manageTransactionsSchema = z
   .superRefine((value, ctx) => {
     value.items.forEach((item, index) => {
       const path = (field: string) => ["items", index, field];
+      // A split row carries a `splits` array instead of a single category and
+      // cannot also be a transfer or name a top-level category.
+      const hasSplits = item.splits !== undefined;
+      if (hasSplits) {
+        if (item.splits!.length < 2) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: path("splits"),
+            message: "A split transaction needs at least 2 split lines.",
+          });
+        }
+        if (item.categoryName !== undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: path("categoryName"),
+            message:
+              "Do not set categoryName on a split row; put categories in the splits array.",
+          });
+        }
+        if (
+          item.toAccountName !== undefined ||
+          item.fromAccountName !== undefined
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: path("splits"),
+            message: "splits cannot be combined with a transfer.",
+          });
+        }
+        if (value.operation === "delete") {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: path("splits"),
+            message: "splits are not used for delete.",
+          });
+        }
+      }
       if (value.operation === "create") {
         const isTransfer = item.toAccountName !== undefined;
         if (isTransfer) {
@@ -489,13 +546,14 @@ export const manageTransactionsSchema = z
           item.date !== undefined ||
           item.payeeName !== undefined ||
           item.categoryName !== undefined ||
-          item.description !== undefined;
+          item.description !== undefined ||
+          hasSplits;
         if (!hasChange) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: path("transactionId"),
             message:
-              "Provide at least one field to change (amount, date, payeeName, categoryName, or description).",
+              "Provide at least one field to change (amount, date, payeeName, categoryName, description, or splits).",
           });
         }
       } else {

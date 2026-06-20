@@ -200,6 +200,13 @@ export type PendingActionStatus =
   | 'error'
   | 'expired';
 
+/** One category-split line shown on a split transaction confirmation card. */
+export interface PendingActionSplit {
+  categoryName?: string | null;
+  amount: number;
+  memo?: string | null;
+}
+
 export interface PendingActionPreview {
   accountName?: string;
   amount?: number;
@@ -219,6 +226,11 @@ export interface PendingActionPreview {
   currentCategoryName?: string | null;
   description?: string | null;
   name?: string | null;
+  /**
+   * Category-split lines for a split create_transaction / update_transaction.
+   * When present the card shows the breakdown in place of the single category.
+   */
+  splits?: PendingActionSplit[];
   // create_investment_transaction display fields.
   investmentAction?: InvestmentAction;
   symbol?: string | null;

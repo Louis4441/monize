@@ -92,10 +92,26 @@ export function TransactionConfirmationCard({
           : preview.payeeName
         : none,
     });
-    rows.push({
-      label: t('confirmAction.category'),
-      value: preview.categoryName || none,
-    });
+    // A split transaction shows its per-category breakdown in place of the
+    // single category row.
+    if (preview.splits && preview.splits.length > 0) {
+      preview.splits.forEach((split, i) => {
+        const label =
+          i === 0 ? t('confirmAction.splits') : '';
+        const category = split.categoryName || none;
+        rows.push({
+          label,
+          value: split.memo
+            ? `${category}: ${formatCurrency(split.amount, preview.currencyCode)} (${split.memo})`
+            : `${category}: ${formatCurrency(split.amount, preview.currencyCode)}`,
+        });
+      });
+    } else {
+      rows.push({
+        label: t('confirmAction.category'),
+        value: preview.categoryName || none,
+      });
+    }
     if (preview.description)
       rows.push({
         label: t('confirmAction.description'),

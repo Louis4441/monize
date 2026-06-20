@@ -55,6 +55,8 @@ interface ManageItem {
   createPayeeIfMissing?: boolean;
   exchangeRate?: number;
   toAmount?: number;
+  // split transactions (category splits only)
+  splits?: { categoryName: string; amount: number; memo?: string }[];
 }
 
 @Injectable()
@@ -329,6 +331,7 @@ export class McpTransactionsTools {
           "create (standard): { accountName, amount, date, payeeName?, categoryName?, description?, createPayeeIfMissing? } (amount positive=income, negative=expense). " +
           "create (transfer): { fromAccountName, toAccountName, amount, date, description?, payeeName?, createPayeeIfMissing?, exchangeRate?, toAmount? } -- an item is a transfer when toAccountName is present; payeeName is an optional custom label matched to an existing payee (or created if missing, like a normal transaction) and applied to both legs (omit to auto-generate 'Transfer to/from <account>'). " +
           "update: { transactionId, amount?, date?, payeeName?, categoryName?, description?, createPayeeIfMissing? } (>=1 field; a category-only change is transactionId + categoryName; transfers auto-detected; payeeName sets the transfer's custom label, matched to an existing payee or created if missing). " +
+          "split transactions (create or update): add a 'splits' array of { categoryName, amount, memo? } (>= 2 lines, category splits only) instead of a single categoryName; split amounts must sum to the transaction amount. Send split transactions one item at a time, not mixed into a multi-row batch. " +
           "delete: { transactionId } (removes linked transfer legs / split children too). " +
           "approvalMode = 'bulk' (default; one confirmation for the whole batch) or 'individual' (one confirmation per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
         inputSchema: {
@@ -413,6 +416,33 @@ export class McpTransactionsTools {
                   .optional()
                   .describe(
                     "create (transfer): explicit destination amount (overrides exchangeRate).",
+                  ),
+                splits: z
+                  .array(
+                    z.object({
+                      categoryName: z
+                        .string()
+                        .min(1)
+                        .max(100)
+                        .describe(
+                          'Category for this split line ("Parent: Child" for a subcategory).',
+                        ),
+                      amount: z
+                        .number()
+                        .min(-999999999999)
+                        .max(999999999999)
+                        .describe("Signed amount for this split line."),
+                      memo: z
+                        .string()
+                        .max(500)
+                        .optional()
+                        .describe("Optional memo for this split line."),
+                    }),
+                  )
+                  .max(50)
+                  .optional()
+                  .describe(
+                    "Category splits (create/update). >= 2 lines instead of a single categoryName; amounts must sum to the transaction amount. Send split transactions one item at a time.",
                   ),
               }),
             )
@@ -578,6 +608,7 @@ export class McpTransactionsTools {
       categoryName: item.categoryName,
       description: item.description,
       createPayeeIfMissing: item.createPayeeIfMissing,
+      splits: item.splits,
     };
   }
 
@@ -631,6 +662,7 @@ export class McpTransactionsTools {
       categoryName: item.categoryName,
       description: item.description,
       createPayeeIfMissing: item.createPayeeIfMissing,
+      splits: item.splits,
     };
   }
 
@@ -648,12 +680,90 @@ export class McpTransactionsTools {
     return undefined;
   }
 
+  /** Dry-run preview for a single category-split create/update item. */
+  private async manageDryRunSplit(
+    userId: string,
+    operation: "create" | "update",
+    item: ManageItem,
+  ) {
+    const message =
+      "This is a preview. Call again with dryRun=false to apply the changes.";
+    if (operation === "create") {
+      const { preview, splits } = await this.prepService.prepareCreateSingle(
+        userId,
+        this.toCreateRow(item),
+      );
+      return toolResult({
+        dryRun: true,
+        operation,
+        previews: [
+          {
+            status: "ok",
+            accountName: preview.accountName,
+            amount: preview.amount,
+            currencyCode: preview.currencyCode,
+            transactionDate: preview.transactionDate,
+            payeeName: preview.payeeName,
+            splits: (splits ?? []).map((s) => ({
+              categoryName: s.categoryName,
+              amount: s.amount,
+              memo: s.memo,
+            })),
+          },
+        ],
+        skipped: [],
+        message,
+      });
+    }
+    const result = await this.prepService.prepareUpdate(
+      userId,
+      this.toUpdateRow(item),
+    );
+    // A split update always resolves to the standard branch (prepareUpdate
+    // rejects splits on a transfer), but narrow defensively.
+    if (result.kind !== "standard") {
+      return toolError(
+        "A transfer cannot be converted into a split transaction.",
+      );
+    }
+    const { preview, splits } = result;
+    return toolResult({
+      dryRun: true,
+      operation,
+      previews: [
+        {
+          status: "ok",
+          accountName: preview.accountName,
+          amount: preview.amount,
+          currencyCode: preview.currencyCode,
+          transactionDate: preview.transactionDate,
+          splits: (splits ?? []).map((s) => ({
+            categoryName: s.categoryName,
+            amount: s.amount,
+            memo: s.memo,
+          })),
+        },
+      ],
+      skipped: [],
+      message,
+    });
+  }
+
   /** Dry-run preview for every item without writing. */
   private async manageDryRun(
     userId: string,
     operation: ManageOperation,
     items: ManageItem[],
   ) {
+    // A single split create/update is its own rich unit; the bulk preview
+    // helpers do not carry splits.
+    if (
+      items.length === 1 &&
+      items[0].splits &&
+      (operation === "create" || operation === "update")
+    ) {
+      return this.manageDryRunSplit(userId, operation, items[0]);
+    }
     if (operation === "create") {
       const std = await this.prepService.prepareCreate(
         userId,
@@ -726,6 +836,59 @@ export class McpTransactionsTools {
     return confirmation === "declined" ? "declined" : "accepted";
   }
 
+  /** Create one category-split transaction (single rich item). */
+  private async manageCreateSplit(
+    server: McpServer,
+    userId: string,
+    item: ManageItem,
+    requestId: unknown,
+  ) {
+    const budget = this.checkWriteBudget(userId, 1);
+    if (budget) return budget;
+    const { preview, createPayee, splits } =
+      await this.prepService.prepareCreateSingle(
+        userId,
+        this.toCreateRow(item),
+      );
+    const action = this.actionBuilder.buildCreateTransaction(
+      userId,
+      preview,
+      splits,
+    );
+    const outcome = await this.emitOrConfirm(
+      server,
+      userId,
+      action,
+      `Create this split transaction?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}\nSplits: ${(splits ?? []).map((s) => `${s.categoryName} ${s.amount}`).join(", ")}`,
+      requestId,
+    );
+    if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
+    if (outcome === "declined")
+      return toolError(
+        "Cancelled: the confirmation was declined, so no transaction was created.",
+      );
+    const tx = await this.transactionsService.create(
+      userId,
+      {
+        accountId: preview.accountId,
+        amount: preview.amount,
+        transactionDate: preview.transactionDate,
+        payeeId: preview.payeeId ?? undefined,
+        payeeName: preview.payeeName ?? undefined,
+        description: preview.description ?? undefined,
+        currencyCode: preview.currencyCode,
+        splits: (splits ?? []).map((s) => ({
+          categoryId: s.categoryId,
+          amount: s.amount,
+          memo: s.memo ?? undefined,
+        })),
+      },
+      { createPayeeIfMissing: createPayee },
+    );
+    this.writeLimiter.record(userId, "create_transaction");
+    return toolResult({ id: tx.id, date: tx.transactionDate, count: 1 });
+  }
+
   private async manageCreate(
     server: McpServer,
     userId: string,
@@ -734,6 +897,13 @@ export class McpTransactionsTools {
     requestId: unknown,
   ) {
     const single = items.length === 1;
+
+    // A single split transaction is its own rich unit; handle it on a dedicated
+    // path (the bulk prepare/preview helpers do not carry splits).
+    if (single && items[0].splits) {
+      return this.manageCreateSplit(server, userId, items[0], requestId);
+    }
+
     const standardItems = items.filter((i) => !this.isTransferItem(i));
     const transferItems = items.filter((i) => this.isTransferItem(i));
 
@@ -969,12 +1139,20 @@ export class McpTransactionsTools {
         return toolResult({ id: r.fromTransaction.id, count: 1 });
       }
       const preview = result.preview;
-      const action = this.actionBuilder.buildUpdateTransaction(userId, preview);
+      const splits = result.splits;
+      const action = this.actionBuilder.buildUpdateTransaction(
+        userId,
+        preview,
+        splits,
+      );
+      const confirmMessage = splits
+        ? `Apply this transaction edit?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}\nSplits: ${splits.map((s) => `${s.categoryName} ${s.amount}`).join(", ")}`
+        : `Apply this transaction edit?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}`;
       const outcome = await this.emitOrConfirm(
         server,
         userId,
         action,
-        `Apply this transaction edit?\nAccount: ${preview.accountName}\nAmount: ${preview.amount} ${preview.currencyCode}\nDate: ${preview.transactionDate}`,
+        confirmMessage,
         requestId,
       );
       if (outcome === "relay") return toolResult(RELAY_PREVIEW_SHOWN);
@@ -990,12 +1168,24 @@ export class McpTransactionsTools {
           transactionDate: preview.transactionDate,
           payeeId: preview.payeeId ?? undefined,
           payeeName: preview.payeeName ?? undefined,
-          categoryId: preview.categoryId ?? undefined,
+          // Replacing the split set clears any single category on the parent.
+          categoryId: splits ? undefined : (preview.categoryId ?? undefined),
           description: preview.description ?? undefined,
           currencyCode: preview.currencyCode,
         },
         { createPayeeIfMissing: result.createPayee },
       );
+      if (splits) {
+        await this.transactionsService.updateSplits(
+          userId,
+          preview.transactionId,
+          splits.map((s) => ({
+            categoryId: s.categoryId,
+            amount: s.amount,
+            memo: s.memo ?? undefined,
+          })),
+        );
+      }
       this.writeLimiter.record(userId, "update_transaction");
       return toolResult({ id: tx.id, count: 1 });
     }

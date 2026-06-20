@@ -36,6 +36,7 @@ describe("McpTransactionsTools", () => {
       create: jest.fn(),
       createBulk: jest.fn(),
       update: jest.fn(),
+      updateSplits: jest.fn().mockResolvedValue([]),
       remove: jest.fn().mockResolvedValue(undefined),
       removeAny: jest.fn().mockResolvedValue(undefined),
       previewUpdate: jest.fn(),
@@ -1558,6 +1559,165 @@ describe("McpTransactionsTools", () => {
       );
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.skipped).toHaveLength(1);
+    });
+
+    const splitPreview = { ...stdPreview };
+    const resolvedSplits = [
+      { categoryId: "c1", categoryName: "Groceries", amount: -30, memo: null },
+      {
+        categoryId: "c2",
+        categoryName: "Household",
+        amount: -20,
+        memo: "soap",
+      },
+    ];
+
+    it("creates a split transaction with splits on accept", async () => {
+      acceptingClient();
+      prepService.prepareCreateSingle.mockResolvedValue({
+        preview: splitPreview,
+        createPayee: true,
+        splits: resolvedSplits,
+      });
+      transactionsService.create.mockResolvedValue({
+        id: "t-split",
+        transactionDate: "2025-01-15",
+      });
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "create",
+          items: [
+            {
+              accountName: "Checking",
+              amount: -50,
+              date: "2025-01-15",
+              splits: [
+                { categoryName: "Groceries", amount: -30 },
+                { categoryName: "Household", amount: -20, memo: "soap" },
+              ],
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+      expect(transactionsService.create).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({
+          splits: [
+            { categoryId: "c1", amount: -30, memo: undefined },
+            { categoryId: "c2", amount: -20, memo: "soap" },
+          ],
+        }),
+        { createPayeeIfMissing: true },
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.id).toBe("t-split");
+      expect(parsed.count).toBe(1);
+    });
+
+    it("declines a split create and writes nothing", async () => {
+      decliningClient();
+      prepService.prepareCreateSingle.mockResolvedValue({
+        preview: splitPreview,
+        createPayee: true,
+        splits: resolvedSplits,
+      });
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "create",
+          items: [
+            {
+              accountName: "Checking",
+              amount: -50,
+              date: "2025-01-15",
+              splits: [
+                { categoryName: "Groceries", amount: -30 },
+                { categoryName: "Household", amount: -20 },
+              ],
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+      expect(result.isError).toBe(true);
+      expect(transactionsService.create).not.toHaveBeenCalled();
+    });
+
+    it("replaces splits on a split update", async () => {
+      acceptingClient();
+      prepService.prepareUpdate.mockResolvedValue({
+        kind: "standard",
+        preview: {
+          transactionId: "t1",
+          accountName: "Checking",
+          amount: -50,
+          transactionDate: "2025-01-15",
+          payeeId: null,
+          payeeName: null,
+          categoryId: null,
+          description: null,
+          currencyCode: "USD",
+        },
+        createPayee: true,
+        splits: resolvedSplits,
+      });
+      transactionsService.update.mockResolvedValue({ id: "t1" });
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "update",
+          items: [
+            {
+              transactionId: "11111111-1111-4111-8111-111111111111",
+              splits: [
+                { categoryName: "Groceries", amount: -30 },
+                { categoryName: "Household", amount: -20, memo: "soap" },
+              ],
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+      expect(transactionsService.update).toHaveBeenCalled();
+      expect(transactionsService.updateSplits).toHaveBeenCalledWith(
+        "u1",
+        "t1",
+        [
+          { categoryId: "c1", amount: -30, memo: undefined },
+          { categoryId: "c2", amount: -20, memo: "soap" },
+        ],
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.id).toBe("t1");
+    });
+
+    it("dry-run create returns split previews without writing", async () => {
+      prepService.prepareCreateSingle.mockResolvedValue({
+        preview: splitPreview,
+        createPayee: true,
+        splits: resolvedSplits,
+      });
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "create",
+          dryRun: true,
+          items: [
+            {
+              accountName: "Checking",
+              amount: -50,
+              date: "2025-01-15",
+              splits: [
+                { categoryName: "Groceries", amount: -30 },
+                { categoryName: "Household", amount: -20 },
+              ],
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.dryRun).toBe(true);
+      expect(parsed.previews[0].splits).toHaveLength(2);
+      expect(transactionsService.create).not.toHaveBeenCalled();
     });
   });
 });

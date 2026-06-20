@@ -50,6 +50,7 @@ describe("AiActionsService", () => {
     transactions = {
       create: jest.fn().mockResolvedValue({ id: "tx-new" }),
       update: jest.fn().mockResolvedValue({ id: TX }),
+      updateSplits: jest.fn().mockResolvedValue([]),
       remove: jest.fn().mockResolvedValue(undefined),
       removeAny: jest.fn().mockResolvedValue(undefined),
       createBulk: jest.fn(),
@@ -181,6 +182,62 @@ describe("AiActionsService", () => {
       expect.objectContaining({ payeeName: "Brand New Store" }),
       { createPayeeIfMissing: true },
     );
+  });
+
+  it("creates a split transaction, passing splits and clearing the parent category", async () => {
+    const descriptor = createTxDescriptor({
+      categoryId: CAT,
+      splits: [
+        { categoryId: CAT, amount: -8, memo: null },
+        { categoryId: PAYEE, amount: -4.5, memo: "extra" },
+      ],
+    });
+    const result = await service.confirm(USER, dtoFor(descriptor));
+
+    expect(transactions.create).toHaveBeenCalledWith(
+      USER,
+      expect.objectContaining({
+        // The parent category is dropped for a split transaction.
+        categoryId: undefined,
+        splits: [
+          { categoryId: CAT, amount: -8, memo: undefined },
+          { categoryId: PAYEE, amount: -4.5, memo: "extra" },
+        ],
+      }),
+      { createPayeeIfMissing: false },
+    );
+    expect(result).toEqual({ type: "create_transaction", id: "tx-new" });
+  });
+
+  it("replaces the split set on an update_transaction with splits", async () => {
+    const descriptor: AiActionDescriptor = {
+      type: "update_transaction",
+      userId: USER,
+      actionId: "act-update-splits",
+      expiresAt: Date.now() + 60_000,
+      transactionId: TX,
+      accountId: ACC,
+      amount: -12.5,
+      transactionDate: "2026-01-15",
+      payeeId: null,
+      payeeName: null,
+      createPayee: false,
+      categoryId: null,
+      description: null,
+      currencyCode: "USD",
+      splits: [
+        { categoryId: CAT, amount: -8, memo: null },
+        { categoryId: PAYEE, amount: -4.5, memo: null },
+      ],
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+
+    expect(transactions.update).toHaveBeenCalled();
+    expect(transactions.updateSplits).toHaveBeenCalledWith(USER, TX, [
+      { categoryId: CAT, amount: -8, memo: undefined },
+      { categoryId: PAYEE, amount: -4.5, memo: undefined },
+    ]);
+    expect(result).toEqual({ type: "update_transaction", id: TX });
   });
 
   it("categorizes a transaction on a valid confirmation", async () => {

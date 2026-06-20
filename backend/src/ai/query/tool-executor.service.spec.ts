@@ -18,6 +18,7 @@ import { TransactionToolPrepService } from "../../transactions/transaction-tool-
 import { PayeeToolPrepService } from "../../payees/payee-tool-prep.service";
 import { SecurityToolPrepService } from "../../securities/security-tool-prep.service";
 import { TransactionTransferService } from "../../transactions/transaction-transfer.service";
+import { TransactionSplitService } from "../../transactions/transaction-split.service";
 
 describe("ToolExecutorService", () => {
   let service: ToolExecutorService;
@@ -34,6 +35,7 @@ describe("ToolExecutorService", () => {
   let securities: Record<string, jest.Mock>;
   let signing: Record<string, jest.Mock>;
   let transfer: Record<string, jest.Mock>;
+  let splitService: Record<string, jest.Mock>;
 
   const userId = "user-1";
 
@@ -480,6 +482,12 @@ describe("ToolExecutorService", () => {
       sign: jest.fn().mockReturnValue("signature-abc"),
     };
 
+    // Category-split validation is a no-op by default; tests that exercise an
+    // invalid sum override it to throw.
+    splitService = {
+      validateSplits: jest.fn(),
+    };
+
     transfer = {
       isTransfer: jest.fn(
         (tx: { isTransfer?: boolean }) => tx.isTransfer === true,
@@ -534,6 +542,7 @@ describe("ToolExecutorService", () => {
         { provide: TransactionsService, useValue: transactions },
         { provide: PayeesService, useValue: payees },
         { provide: TransactionTransferService, useValue: transfer },
+        { provide: TransactionSplitService, useValue: splitService },
         { provide: AiActionSigningService, useValue: signing },
         // Real prep + builder wrapping the mocked services, so the executor's
         // name resolution, preview building, and pending-action construction
@@ -1125,6 +1134,110 @@ describe("ToolExecutorService", () => {
       });
       expect(transfer.previewCreateTransfer).toHaveBeenCalled();
       expect(result.pendingAction?.type).toBe("create_transfer");
+    });
+
+    it("single create with splits builds a create_transaction card carrying resolved splits", async () => {
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "create",
+        items: [
+          {
+            accountName: "Checking",
+            amount: -100,
+            date: "2026-01-15",
+            splits: [
+              { categoryName: "Groceries", amount: -60 },
+              { categoryName: "Household", amount: -40, memo: "soap" },
+            ],
+          },
+        ],
+      });
+
+      expect(splitService.validateSplits).toHaveBeenCalledWith(
+        expect.any(Array),
+        -100,
+      );
+      expect(transactions.create).toBeUndefined();
+      expect(result.pendingAction?.type).toBe("create_transaction");
+      const descriptor = result.pendingAction?.descriptor as {
+        categoryId: string | null;
+        splits?: Array<{
+          categoryId: string;
+          amount: number;
+          memo: string | null;
+        }>;
+      };
+      expect(descriptor.categoryId).toBeNull();
+      expect(descriptor.splits).toEqual([
+        { categoryId: "cat-1", amount: -60, memo: null },
+        { categoryId: "cat-1", amount: -40, memo: "soap" },
+      ]);
+      expect(result.pendingAction?.preview.splits).toHaveLength(2);
+      expect(result.summary).toContain("split transaction");
+    });
+
+    it("single update with splits builds an update_transaction card with splits", async () => {
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "update",
+        items: [
+          {
+            transactionId: "11111111-1111-4111-8111-111111111111",
+            splits: [
+              { categoryName: "Groceries", amount: -20 },
+              { categoryName: "Household", amount: -10 },
+            ],
+          },
+        ],
+      });
+
+      expect(splitService.validateSplits).toHaveBeenCalled();
+      expect(result.pendingAction?.type).toBe("update_transaction");
+      const descriptor = result.pendingAction?.descriptor as {
+        categoryId: string | null;
+        splits?: Array<{ categoryId: string; amount: number }>;
+      };
+      expect(descriptor.categoryId).toBeNull();
+      expect(descriptor.splits).toHaveLength(2);
+    });
+
+    it("rejects an invalid split sum surfaced by validateSplits", async () => {
+      splitService.validateSplits.mockImplementationOnce(() => {
+        throw new Error("Split amounts must sum to the transaction amount");
+      });
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "create",
+        items: [
+          {
+            accountName: "Checking",
+            amount: -100,
+            date: "2026-01-15",
+            splits: [
+              { categoryName: "Groceries", amount: -60 },
+              { categoryName: "Household", amount: -10 },
+            ],
+          },
+        ],
+      });
+      expect(result.isError).toBe(true);
+      expect(result.pendingAction).toBeUndefined();
+    });
+
+    it("rejects splits mixed into a multi-row batch", async () => {
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "create",
+        items: [
+          {
+            accountName: "Checking",
+            amount: -100,
+            date: "2026-01-15",
+            splits: [
+              { categoryName: "Groceries", amount: -60 },
+              { categoryName: "Household", amount: -40 },
+            ],
+          },
+          { accountName: "Checking", amount: -20, date: "2026-01-16" },
+        ],
+      });
+      expect(result.isError).toBe(true);
     });
 
     it("bulk create (bulk mode) builds one create_transactions card", async () => {

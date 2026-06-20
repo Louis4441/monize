@@ -469,6 +469,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
       "create (standard): { accountName, amount, date, payeeName?, categoryName?, description?, createPayeeIfMissing? } -- amount is positive for income, negative for expenses. " +
       "create (transfer): { fromAccountName, toAccountName, amount, date, description?, payeeName?, createPayeeIfMissing?, exchangeRate?, toAmount? } -- an item is a transfer when toAccountName is present; amount is the positive transfer amount (exchangeRate/toAmount only for cross-currency); payeeName is an optional custom label for the transfer, matched to an existing payee (or created if missing, like a normal transaction) and applied to both legs (omit to auto-generate 'Transfer to/from <account>'). " +
       "update: { transactionId, amount?, date?, payeeName?, categoryName?, description?, createPayeeIfMissing? } -- provide only the fields to change (at least one); a category-only change is just transactionId + categoryName. First call search_transactions to obtain the transactionId. Transfers are auto-detected and edited correctly; for a transfer, payeeName sets its custom label (matched to an existing payee or created if missing, like a normal transaction). " +
+      "split transactions (create or update): add a 'splits' array of { categoryName, amount, memo? } (>= 2 lines, category splits only) instead of a single categoryName; the split amounts must sum to the transaction amount (e.g. a -100 expense split -60 Groceries / -40 Household). On create also give accountName, amount, date; on update give transactionId and splits (replaces the whole split set). Send split transactions one at a time (a single item), not mixed into a multi-row batch. " +
       "delete: { transactionId } -- removes the transaction (and any linked transfer legs / split children). First call search_transactions to obtain the transactionId. " +
       "approvalMode = 'bulk' (default) shows one card for the whole batch; 'individual' shows one card per item the user approves separately. Ignored for a single item. Maximum 25 items per call; if the user pastes more, process the first 25 and tell them to send the rest. After calling this tool, briefly tell the user to review and approve the card(s); never claim the change was applied.",
     inputSchema: {
@@ -545,6 +546,32 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
                 type: "number",
                 description:
                   "create (transfer): explicit destination amount for a cross-currency transfer. Overrides exchangeRate.",
+              },
+              splits: {
+                type: "array",
+                minItems: 2,
+                description:
+                  "Category splits (create/update). Provide >= 2 lines instead of a single categoryName; the amounts must sum to the transaction amount. Send split transactions one item at a time.",
+                items: {
+                  type: "object",
+                  properties: {
+                    categoryName: {
+                      type: "string",
+                      description:
+                        'Category for this split line. Exact name ("Parent: Child" for a subcategory).',
+                    },
+                    amount: {
+                      type: "number",
+                      description:
+                        "Signed amount for this split line (same sign as the transaction). Up to 4 decimal places.",
+                    },
+                    memo: {
+                      type: "string",
+                      description: "Optional memo for this split line.",
+                    },
+                  },
+                  required: ["categoryName", "amount"],
+                },
               },
             },
           },

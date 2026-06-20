@@ -8,6 +8,7 @@ import { AccountsService } from "../accounts/accounts.service";
 import { TransactionsService } from "./transactions.service";
 import { TransactionTransferService } from "./transaction-transfer.service";
 import { TransactionAnalyticsService } from "./transaction-analytics.service";
+import { TransactionSplitService } from "./transaction-split.service";
 
 describe("TransactionToolPrepService", () => {
   let service: TransactionToolPrepService;
@@ -15,6 +16,7 @@ describe("TransactionToolPrepService", () => {
   let transactions: Record<string, jest.Mock>;
   let transfer: Record<string, jest.Mock>;
   let analytics: Record<string, jest.Mock>;
+  let splitService: Record<string, jest.Mock>;
 
   const userId = "user-1";
 
@@ -113,6 +115,9 @@ describe("TransactionToolPrepService", () => {
         .fn()
         .mockResolvedValue({ categoryIds: ["c1"], unresolved: [] }),
     };
+    splitService = {
+      validateSplits: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -121,6 +126,7 @@ describe("TransactionToolPrepService", () => {
         { provide: TransactionsService, useValue: transactions },
         { provide: TransactionTransferService, useValue: transfer },
         { provide: TransactionAnalyticsService, useValue: analytics },
+        { provide: TransactionSplitService, useValue: splitService },
       ],
     }).compile();
 
@@ -213,6 +219,49 @@ describe("TransactionToolPrepService", () => {
           createPayeeIfMissing: false,
         }),
       );
+    });
+
+    it("resolves split categories, validates the sum, and omits a single category", async () => {
+      const result = await service.prepareCreateSingle(userId, {
+        accountName: "Checking",
+        amount: -100,
+        date: "2026-01-15",
+        splits: [
+          { categoryName: "Dining", amount: -60 },
+          { categoryName: "Dining", amount: -40, memo: "tip" },
+        ],
+      });
+      expect(result.splits).toEqual([
+        { categoryId: "c1", categoryName: "Dining", amount: -60, memo: null },
+        { categoryId: "c1", categoryName: "Dining", amount: -40, memo: "tip" },
+      ]);
+      // Sum validated against the transaction amount via the domain rule.
+      expect(splitService.validateSplits).toHaveBeenCalledWith(
+        expect.any(Array),
+        -100,
+      );
+      // A split parent carries no single category.
+      expect(transactions.previewCreate).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({ categoryId: undefined }),
+      );
+    });
+
+    it("propagates a validateSplits failure", async () => {
+      splitService.validateSplits.mockImplementationOnce(() => {
+        throw new Error("bad sum");
+      });
+      await expect(
+        service.prepareCreateSingle(userId, {
+          accountName: "Checking",
+          amount: -100,
+          date: "2026-01-15",
+          splits: [
+            { categoryName: "Dining", amount: -60 },
+            { categoryName: "Dining", amount: -10 },
+          ],
+        }),
+      ).rejects.toThrow(/bad sum/);
     });
   });
 
@@ -357,6 +406,46 @@ describe("TransactionToolPrepService", () => {
       expect(analytics.resolveLlmCategoryIds).toHaveBeenCalledWith(userId, [
         "Dining",
       ]);
+    });
+
+    it("resolves splits against the effective amount and clears the category", async () => {
+      const result = await service.prepareUpdate(userId, {
+        transactionId: "t1",
+        splits: [
+          { categoryName: "Dining", amount: -20 },
+          { categoryName: "Dining", amount: -10 },
+        ],
+      });
+      expect(result.kind).toBe("standard");
+      if (result.kind !== "standard") throw new Error("expected standard");
+      expect(result.splits).toHaveLength(2);
+      // previewUpdate amount is -30, used as the split sum target.
+      expect(splitService.validateSplits).toHaveBeenCalledWith(
+        expect.any(Array),
+        -30,
+      );
+      expect(transactions.previewUpdate).toHaveBeenCalledWith(
+        userId,
+        "t1",
+        expect.objectContaining({ categoryId: undefined }),
+      );
+    });
+
+    it("rejects splits on a transfer", async () => {
+      transactions.findOne.mockResolvedValueOnce({
+        id: "t1",
+        isTransfer: true,
+        linkedTransactionId: "t2",
+      });
+      await expect(
+        service.prepareUpdate(userId, {
+          transactionId: "t1",
+          splits: [
+            { categoryName: "Dining", amount: -20 },
+            { categoryName: "Dining", amount: -10 },
+          ],
+        }),
+      ).rejects.toThrow(/transfer cannot be converted/i);
     });
 
     it("auto-detects a transfer and returns a transfer preview", async () => {

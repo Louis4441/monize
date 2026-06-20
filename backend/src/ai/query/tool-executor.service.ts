@@ -21,6 +21,7 @@ import {
   CreateRowInput,
   TransferRowInput,
   UpdateRowInput,
+  SplitLineInput,
 } from "../../transactions/transaction-tool-prep.service";
 import { AccountType } from "../../accounts/entities/account.entity";
 import { CategoriesService } from "../../categories/categories.service";
@@ -459,6 +460,15 @@ export class ToolExecutorService {
       (input.approvalMode as "bulk" | "individual" | undefined) ?? "bulk";
     const single = items.length === 1;
 
+    // Split transactions are the "rich" single unit: the bulk card paths do not
+    // carry splits, so reject a multi-row batch that mixes in a split row rather
+    // than silently dropping the splits.
+    if (!single && items.some((i) => i.splits !== undefined)) {
+      return this.toolError(
+        "Split transactions must be sent one at a time: use a single item with a splits array.",
+      );
+    }
+
     if (operation === "create") {
       return this.manageCreate(userId, items, single, approvalMode);
     }
@@ -481,6 +491,7 @@ export class ToolExecutorService {
       categoryName: item.categoryName as string | undefined,
       description: item.description as string | undefined,
       createPayeeIfMissing: item.createPayeeIfMissing as boolean | undefined,
+      splits: item.splits as SplitLineInput[] | undefined,
     };
   }
 
@@ -507,6 +518,7 @@ export class ToolExecutorService {
       categoryName: item.categoryName as string | undefined,
       description: item.description as string | undefined,
       createPayeeIfMissing: item.createPayeeIfMissing as boolean | undefined,
+      splits: item.splits as SplitLineInput[] | undefined,
     };
   }
 
@@ -535,17 +547,21 @@ export class ToolExecutorService {
             pendingAction,
           };
         }
-        const { preview } = await this.prepService.prepareCreateSingle(
+        const { preview, splits } = await this.prepService.prepareCreateSingle(
           userId,
           this.toCreateRow(item),
         );
         const pendingAction = this.actionBuilder.buildCreateTransaction(
           userId,
           preview,
+          splits,
         );
+        const summary = splits
+          ? `Prepared a split transaction in ${preview.accountName} (${preview.amount} ${preview.currencyCode}) dated ${preview.transactionDate} across ${splits.length} categories. Awaiting user confirmation.`
+          : `Prepared a transaction for ${preview.accountName} (${preview.amount} ${preview.currencyCode}) dated ${preview.transactionDate}.${preview.payeeWillBeCreated ? ` A new payee "${preview.payeeName}" will be created on approval.` : ""} Awaiting user confirmation.`;
         return {
           data: PENDING_ACTION_TOOL_RESULT,
-          summary: `Prepared a transaction for ${preview.accountName} (${preview.amount} ${preview.currencyCode}) dated ${preview.transactionDate}.${preview.payeeWillBeCreated ? ` A new payee "${preview.payeeName}" will be created on approval.` : ""} Awaiting user confirmation.`,
+          summary,
           sources: [],
           pendingAction,
         };
@@ -655,10 +671,14 @@ export class ToolExecutorService {
         const pendingAction = this.actionBuilder.buildUpdateTransaction(
           userId,
           result.preview,
+          result.splits,
         );
+        const summary = result.splits
+          ? `Prepared an update to the transaction in ${result.preview.accountName} (${result.preview.amount} ${result.preview.currencyCode}) dated ${result.preview.transactionDate}, replacing its splits with ${result.splits.length} categories. Awaiting user confirmation.`
+          : `Prepared an update to the transaction in ${result.preview.accountName} (${result.preview.amount} ${result.preview.currencyCode}) dated ${result.preview.transactionDate}.${result.preview.payeeWillBeCreated ? ` A new payee "${result.preview.payeeName}" will be created on approval.` : ""} Awaiting user confirmation.`;
         return {
           data: PENDING_ACTION_TOOL_RESULT,
-          summary: `Prepared an update to the transaction in ${result.preview.accountName} (${result.preview.amount} ${result.preview.currencyCode}) dated ${result.preview.transactionDate}.${result.preview.payeeWillBeCreated ? ` A new payee "${result.preview.payeeName}" will be created on approval.` : ""} Awaiting user confirmation.`,
+          summary,
           sources: [],
           pendingAction,
         };

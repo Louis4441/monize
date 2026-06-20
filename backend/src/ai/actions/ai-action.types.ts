@@ -77,6 +77,26 @@ interface BaseDescriptor {
   expiresAt: number;
 }
 
+/**
+ * One resolved category-split line carried on a create/update transaction
+ * descriptor. Ids are resolved at preview time and covered by the signature.
+ * Category splits only: the AI tool does not expose transfer/investment splits.
+ */
+export interface SplitRowDescriptor {
+  categoryId: string;
+  amount: number;
+  memo: string | null;
+}
+
+/**
+ * A category-split line resolved at preview time: carries both the id (for the
+ * signed descriptor) and the display name (for the confirmation card). Produced
+ * by the shared prep service and consumed by the action builder.
+ */
+export interface ResolvedSplitLine extends SplitRowDescriptor {
+  categoryName: string;
+}
+
 export interface CreateTransactionDescriptor extends BaseDescriptor {
   type: "create_transaction";
   accountId: string;
@@ -94,6 +114,11 @@ export interface CreateTransactionDescriptor extends BaseDescriptor {
   categoryId: string | null;
   description: string | null;
   currencyCode: string;
+  /**
+   * When present, the transaction is created as a split across these category
+   * lines (their amounts sum to `amount`) and `categoryId` is ignored.
+   */
+  splits?: SplitRowDescriptor[];
 }
 
 export interface CategorizeTransactionDescriptor extends BaseDescriptor {
@@ -242,6 +267,11 @@ export interface UpdateTransactionDescriptor extends BaseDescriptor {
   categoryId: string | null;
   description: string | null;
   currencyCode: string;
+  /**
+   * When present, confirm replaces the transaction's split set with these
+   * category lines (their amounts sum to `amount`); `categoryId` is ignored.
+   */
+  splits?: SplitRowDescriptor[];
 }
 
 /** Delete an existing transaction (identified only; confirm re-checks ownership). */
@@ -484,6 +514,16 @@ export type AiActionDescriptor =
   | BatchActionsDescriptor;
 
 /**
+ * Display-only preview of one category-split line on a split create/update card.
+ * Carries the resolved category name so the user sees the breakdown.
+ */
+export interface AiActionSplitPreview {
+  categoryName: string | null;
+  amount: number;
+  memo?: string | null;
+}
+
+/**
  * Human-readable preview shown on the confirmation card. Display-only (not part
  * of the signed descriptor) -- it carries resolved names so the user sees what
  * the action will do.
@@ -501,6 +541,11 @@ export interface AiActionPreview {
   currentCategoryName?: string | null;
   description?: string | null;
   name?: string | null;
+  /**
+   * Resolved category-split lines for a split create/update. Display-only --
+   * shown on the confirmation card in place of the single category row.
+   */
+  splits?: AiActionSplitPreview[];
   // create_investment_transaction display fields.
   investmentAction?: InvestmentAction;
   symbol?: string | null;

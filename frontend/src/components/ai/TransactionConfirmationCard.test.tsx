@@ -40,6 +40,33 @@ describe('TransactionConfirmationCard', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
+  it('renders split lines in place of the single category for a split transaction', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeAction({
+          preview: {
+            accountName: 'Checking',
+            amount: -100,
+            currencyCode: 'USD',
+            transactionDate: '2026-01-15',
+            payeeName: 'Costco',
+            splits: [
+              { categoryName: 'Groceries', amount: -60 },
+              { categoryName: 'Household', amount: -40, memo: 'soap' },
+            ],
+          },
+        })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Splits')).toBeInTheDocument();
+    expect(screen.getByText(/Groceries:/)).toBeInTheDocument();
+    expect(screen.getByText(/Household:.*soap/)).toBeInTheDocument();
+    // The single-category row is not shown for a split.
+    expect(screen.queryByText('Category')).not.toBeInTheDocument();
+  });
+
   it('marks the payee as new when a payee will be created on approval', () => {
     render(
       <TransactionConfirmationCard

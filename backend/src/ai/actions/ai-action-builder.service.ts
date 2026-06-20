@@ -28,6 +28,9 @@ import {
   UpdateInvestmentTransactionDescriptor,
   DeleteInvestmentTransactionDescriptor,
   PendingAiAction,
+  ResolvedSplitLine,
+  SplitRowDescriptor,
+  AiActionSplitPreview,
 } from "./ai-action.types";
 import {
   CategorizeTransactionPreview,
@@ -54,6 +57,20 @@ import {
   UpdateSecurityPreview,
   DeleteSecurityPreview,
 } from "../../securities/securities.service";
+
+/** Strip a resolved split line down to the signed-descriptor shape (ids only). */
+function toSplitRowDescriptor(line: ResolvedSplitLine): SplitRowDescriptor {
+  return { categoryId: line.categoryId, amount: line.amount, memo: line.memo };
+}
+
+/** Map a resolved split line to its display-only confirmation-card shape. */
+function toSplitPreview(line: ResolvedSplitLine): AiActionSplitPreview {
+  return {
+    categoryName: line.categoryName,
+    amount: line.amount,
+    memo: line.memo,
+  };
+}
 
 /**
  * Map a resolved cash-transaction preview to the display row shown on the bulk
@@ -171,6 +188,7 @@ export class AiActionBuilderService {
   buildCreateTransaction(
     userId: string,
     preview: CreateTransactionPreview,
+    splits?: ResolvedSplitLine[],
   ): PendingAiAction {
     const { actionId, expiresAt } = this.newEnvelope();
     const descriptor: CreateTransactionDescriptor = {
@@ -184,9 +202,11 @@ export class AiActionBuilderService {
       payeeId: preview.payeeId,
       payeeName: preview.payeeName,
       createPayee: preview.payeeWillBeCreated,
-      categoryId: preview.categoryId,
+      // A split transaction has no single category; categories live in `splits`.
+      categoryId: splits ? null : preview.categoryId,
       description: preview.description,
       currencyCode: preview.currencyCode,
+      ...(splits ? { splits: splits.map(toSplitRowDescriptor) } : {}),
     };
     return {
       actionId,
@@ -203,6 +223,7 @@ export class AiActionBuilderService {
         payeeWillBeCreated: preview.payeeWillBeCreated,
         categoryName: preview.categoryName,
         description: preview.description,
+        ...(splits ? { splits: splits.map(toSplitPreview) } : {}),
       },
     };
   }
@@ -459,6 +480,7 @@ export class AiActionBuilderService {
   buildUpdateTransaction(
     userId: string,
     preview: UpdateTransactionPreview,
+    splits?: ResolvedSplitLine[],
   ): PendingAiAction {
     const { actionId, expiresAt } = this.newEnvelope();
     const descriptor: UpdateTransactionDescriptor = {
@@ -473,9 +495,11 @@ export class AiActionBuilderService {
       payeeId: preview.payeeId,
       payeeName: preview.payeeName,
       createPayee: preview.payeeWillBeCreated,
-      categoryId: preview.categoryId,
+      // Replacing the split set clears any single category on the parent.
+      categoryId: splits ? null : preview.categoryId,
       description: preview.description,
       currencyCode: preview.currencyCode,
+      ...(splits ? { splits: splits.map(toSplitRowDescriptor) } : {}),
     };
     return {
       actionId,
@@ -492,6 +516,7 @@ export class AiActionBuilderService {
         payeeWillBeCreated: preview.payeeWillBeCreated,
         categoryName: preview.categoryName,
         description: preview.description,
+        ...(splits ? { splits: splits.map(toSplitPreview) } : {}),
       },
     };
   }

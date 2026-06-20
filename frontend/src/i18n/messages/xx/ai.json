@@ -51,6 +51,7 @@
     "payee": "[XX-Payee-XX]",
     "newPayee": "[XX-(new payee)-XX]",
     "category": "[XX-Category-XX]",
+    "splits": "[XX-Splits-XX]",
     "newCategory": "[XX-New category-XX]",
     "currentCategory": "[XX-Current category-XX]",
     "description": "[XX-Description-XX]",

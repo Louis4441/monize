@@ -2,6 +2,7 @@ import {
   Injectable,
   Inject,
   forwardRef,
+  BadRequestException,
   HttpException,
   Logger,
   NotFoundException,
@@ -19,11 +20,14 @@ import {
   UpdateTransferPreview,
 } from "./transaction-transfer.service";
 import { TransactionAnalyticsService } from "./transaction-analytics.service";
+import { TransactionSplitService } from "./transaction-split.service";
+import { CreateTransactionSplitDto } from "./dto/create-transaction-split.dto";
 import {
   AiActionPreviewRow,
   BatchUpdateTransactionRow,
   BatchDeleteTransactionRow,
   BatchCreateTransferRow,
+  ResolvedSplitLine,
 } from "../ai/actions/ai-action.types";
 import {
   transactionPreviewRow,
@@ -31,6 +35,13 @@ import {
 } from "../ai/actions/ai-action-builder.service";
 import { BulkCreateSkip, bulkSkipReason } from "../common/bulk-create.types";
 import { tr } from "../i18n/translate";
+
+/** One category-split line on a create/update row (names; resolved internally). */
+export interface SplitLineInput {
+  categoryName: string;
+  amount: number;
+  memo?: string;
+}
 
 /** Standard create-row input (names; resolved internally). */
 export interface CreateRowInput {
@@ -41,6 +52,8 @@ export interface CreateRowInput {
   categoryName?: string;
   description?: string;
   createPayeeIfMissing?: boolean;
+  /** Category splits; when present the transaction is created as a split. */
+  splits?: SplitLineInput[];
 }
 
 /** Transfer create-row input (names; resolved internally). */
@@ -65,6 +78,8 @@ export interface UpdateRowInput {
   categoryName?: string;
   description?: string;
   createPayeeIfMissing?: boolean;
+  /** Category splits; when present the transaction's split set is replaced. */
+  splits?: SplitLineInput[];
 }
 
 export interface PrepareCreateResult {
@@ -88,6 +103,8 @@ export type PrepareUpdateResult =
       kind: "standard";
       preview: UpdateTransactionPreview;
       createPayee: boolean;
+      /** Resolved category splits when the edit replaces the split set. */
+      splits?: ResolvedSplitLine[];
     }
   | { kind: "transfer"; preview: UpdateTransferPreview };
 
@@ -126,6 +143,7 @@ export class TransactionToolPrepService {
     private readonly transferService: TransactionTransferService,
     @Inject(forwardRef(() => TransactionAnalyticsService))
     private readonly analyticsService: TransactionAnalyticsService,
+    private readonly splitService: TransactionSplitService,
   ) {}
 
   private async resolveCategoryId(
@@ -136,6 +154,42 @@ export class TransactionToolPrepService {
       categoryName,
     ]);
     return resolved.categoryIds[0] ?? null;
+  }
+
+  /**
+   * Resolve each split line's category name to an id and validate that the
+   * lines sum to `transactionAmount` (reusing the domain rule). Category splits
+   * only -- the tool does not expose transfer/investment splits. Throws on an
+   * unknown category or an invalid sum so the single-card path surfaces a 4xx.
+   */
+  private async resolveSplits(
+    userId: string,
+    splits: SplitLineInput[],
+    transactionAmount: number,
+  ): Promise<ResolvedSplitLine[]> {
+    const resolved: ResolvedSplitLine[] = [];
+    for (const line of splits) {
+      const categoryId = await this.resolveCategoryId(
+        userId,
+        line.categoryName,
+      );
+      if (!categoryId) throw this.unknownCategoryError(line.categoryName);
+      resolved.push({
+        categoryId,
+        categoryName: line.categoryName,
+        amount: line.amount,
+        memo: line.memo ?? null,
+      });
+    }
+    // Reuse the domain sum/sign validation so the preview rejects bad splits
+    // the same way the REST endpoint and confirm step would.
+    const dtos = resolved.map<CreateTransactionSplitDto>((s) => ({
+      categoryId: s.categoryId,
+      amount: s.amount,
+      memo: s.memo ?? undefined,
+    }));
+    this.splitService.validateSplits(dtos, transactionAmount);
+    return resolved;
   }
 
   private unknownCategoryError(categoryName: string): NotFoundException {
@@ -336,7 +390,11 @@ export class TransactionToolPrepService {
   async prepareCreateSingle(
     userId: string,
     row: CreateRowInput,
-  ): Promise<{ preview: CreateTransactionPreview; createPayee: boolean }> {
+  ): Promise<{
+    preview: CreateTransactionPreview;
+    createPayee: boolean;
+    splits?: ResolvedSplitLine[];
+  }> {
     const createPayee = row.createPayeeIfMissing ?? true;
     const account = await this.accountsService.resolveByName(
       userId,
@@ -347,8 +405,13 @@ export class TransactionToolPrepService {
         `Unknown account: ${row.accountName}. Use an exact name from the user's account list.`,
       );
     }
+    // A split row carries its categories in the splits array; the parent has no
+    // single category.
+    const splits = row.splits
+      ? await this.resolveSplits(userId, row.splits, row.amount)
+      : undefined;
     let categoryId: string | undefined;
-    if (row.categoryName) {
+    if (!splits && row.categoryName) {
       const resolved = await this.resolveCategoryId(userId, row.categoryName);
       if (!resolved) throw this.unknownCategoryError(row.categoryName);
       categoryId = resolved;
@@ -362,7 +425,7 @@ export class TransactionToolPrepService {
       description: row.description,
       createPayeeIfMissing: createPayee,
     });
-    return { preview, createPayee };
+    return { preview, createPayee, splits };
   }
 
   /**
@@ -379,6 +442,11 @@ export class TransactionToolPrepService {
     );
 
     if (this.transferService.isTransfer(existing)) {
+      if (item.splits) {
+        throw new BadRequestException(
+          "A transfer cannot be converted into a split transaction.",
+        );
+      }
       const preview = await this.transferService.previewUpdateTransfer(
         userId,
         item.transactionId,
@@ -396,7 +464,7 @@ export class TransactionToolPrepService {
 
     const createPayee = item.createPayeeIfMissing ?? true;
     let categoryId: string | undefined;
-    if (item.categoryName !== undefined) {
+    if (item.splits === undefined && item.categoryName !== undefined) {
       const resolved = await this.resolveCategoryId(userId, item.categoryName);
       if (!resolved) throw this.unknownCategoryError(item.categoryName);
       categoryId = resolved;
@@ -413,7 +481,12 @@ export class TransactionToolPrepService {
         createPayeeIfMissing: createPayee,
       },
     );
-    return { kind: "standard", preview, createPayee };
+    // Validate splits against the effective amount the edit will leave on the
+    // transaction (preview.amount reflects item.amount or the existing value).
+    const splits = item.splits
+      ? await this.resolveSplits(userId, item.splits, preview.amount)
+      : undefined;
+    return { kind: "standard", preview, createPayee, splits };
   }
 
   /** Preview a single delete (works for standard, split, and transfer). */

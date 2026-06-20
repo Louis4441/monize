@@ -51,6 +51,7 @@
     "payee": "Payee",
     "newPayee": "(new payee)",
     "category": "Category",
+    "splits": "Splits",
     "newCategory": "New category",
     "currentCategory": "Current category",
     "description": "Description",
