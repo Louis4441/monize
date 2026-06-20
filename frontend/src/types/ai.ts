@@ -173,6 +173,8 @@ export type AiActionType =
   | 'create_transaction'
   | 'categorize_transaction'
   | 'create_payee'
+  | 'update_payee'
+  | 'delete_payee'
   | 'create_security'
   | 'create_investment_transaction'
   | 'create_transactions'
@@ -244,6 +246,8 @@ export interface PendingActionPreview {
 export interface PendingActionPreviewRow {
   status: 'ok' | 'error';
   error?: string;
+  // Payee display field (batch_actions with a payee operation).
+  name?: string | null;
   accountName?: string;
   amount?: number;
   currencyCode?: string;

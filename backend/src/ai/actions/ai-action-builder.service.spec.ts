@@ -112,6 +112,44 @@ describe("AiActionBuilderService", () => {
     });
   });
 
+  it("builds an update_payee action", () => {
+    const action = builder.buildUpdatePayee("u1", {
+      payeeId: "p9",
+      name: "Hydro One",
+      defaultCategoryId: "c3",
+      defaultCategoryName: "Utilities",
+    });
+
+    expect(action.type).toBe("update_payee");
+    expect(action.descriptor).toMatchObject({
+      type: "update_payee",
+      userId: "u1",
+      payeeId: "p9",
+      name: "Hydro One",
+      defaultCategoryId: "c3",
+    });
+    expect(signing.sign).toHaveBeenCalledWith(action.descriptor);
+    expect(action.preview).toMatchObject({
+      name: "Hydro One",
+      categoryName: "Utilities",
+    });
+  });
+
+  it("builds a delete_payee action", () => {
+    const action = builder.buildDeletePayee("u1", {
+      payeeId: "p9",
+      name: "Hydro",
+    });
+
+    expect(action.type).toBe("delete_payee");
+    expect(action.descriptor).toMatchObject({
+      type: "delete_payee",
+      userId: "u1",
+      payeeId: "p9",
+    });
+    expect(action.preview).toMatchObject({ name: "Hydro" });
+  });
+
   it("builds a create_security action from a preview", () => {
     const preview = {
       symbol: "AAPL",

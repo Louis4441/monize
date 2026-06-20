@@ -14,6 +14,7 @@ import { SecuritiesService } from "../../securities/securities.service";
 import { CreateTransactionDto } from "../../transactions/dto/create-transaction.dto";
 import { UpdateTransactionDto } from "../../transactions/dto/update-transaction.dto";
 import { CreatePayeeDto } from "../../payees/dto/create-payee.dto";
+import { UpdatePayeeDto } from "../../payees/dto/update-payee.dto";
 import { CreateInvestmentTransactionDto } from "../../securities/dto/create-investment-transaction.dto";
 import { UpdateInvestmentTransactionDto } from "../../securities/dto/update-investment-transaction.dto";
 import { CreateSecurityDto } from "../../securities/dto/create-security.dto";
@@ -25,6 +26,8 @@ import {
   AiActionDescriptor,
   CategorizeTransactionDescriptor,
   CreatePayeeDescriptor,
+  UpdatePayeeDescriptor,
+  DeletePayeeDescriptor,
   CreateSecurityDescriptor,
   CreateTransactionDescriptor,
   CreateInvestmentTransactionDescriptor,
@@ -42,6 +45,9 @@ import {
   BatchCreateTransferRow,
   BatchUpdateInvestmentTransactionRow,
   BatchDeleteInvestmentTransactionRow,
+  BatchCreatePayeeRow,
+  BatchUpdatePayeeRow,
+  BatchDeletePayeeRow,
   TransactionRowDescriptor,
   MAX_BULK_ACTION_ROWS,
 } from "./ai-action.types";
@@ -196,6 +202,10 @@ export class AiActionsService {
         return this.executeCategorize(userId, descriptor);
       case "create_payee":
         return this.executeCreatePayee(userId, descriptor);
+      case "update_payee":
+        return this.executeUpdatePayee(userId, descriptor);
+      case "delete_payee":
+        return this.executeDeletePayee(userId, descriptor);
       case "create_security":
         return this.executeCreateSecurity(userId, descriptor);
       case "create_investment_transaction":
@@ -424,6 +434,29 @@ export class AiActionsService {
         );
         return r.transactionId;
       }
+      case "create_payee": {
+        const r = row as BatchCreatePayeeRow;
+        const dto = await this.toValidatedDto(CreatePayeeDto, {
+          name: r.name,
+          defaultCategoryId: r.defaultCategoryId ?? undefined,
+        });
+        const payee = await this.payeesService.create(userId, dto);
+        return payee.id;
+      }
+      case "update_payee": {
+        const r = row as BatchUpdatePayeeRow;
+        const dto = await this.toValidatedDto(UpdatePayeeDto, {
+          name: r.name,
+          defaultCategoryId: r.defaultCategoryId,
+        });
+        const payee = await this.payeesService.update(userId, r.payeeId, dto);
+        return payee.id;
+      }
+      case "delete_payee": {
+        const r = row as BatchDeletePayeeRow;
+        await this.payeesService.remove(userId, r.payeeId);
+        return r.payeeId;
+      }
     }
   }
 
@@ -542,6 +575,30 @@ export class AiActionsService {
     });
     const payee = await this.payeesService.create(userId, dto);
     return { type: "create_payee", id: payee.id };
+  }
+
+  private async executeUpdatePayee(
+    userId: string,
+    descriptor: UpdatePayeeDescriptor,
+  ): Promise<ConfirmActionResult> {
+    const dto = await this.toValidatedDto(UpdatePayeeDto, {
+      name: descriptor.name,
+      defaultCategoryId: descriptor.defaultCategoryId,
+    });
+    const payee = await this.payeesService.update(
+      userId,
+      descriptor.payeeId,
+      dto,
+    );
+    return { type: "update_payee", id: payee.id };
+  }
+
+  private async executeDeletePayee(
+    userId: string,
+    descriptor: DeletePayeeDescriptor,
+  ): Promise<ConfirmActionResult> {
+    await this.payeesService.remove(userId, descriptor.payeeId);
+    return { type: "delete_payee", id: descriptor.payeeId };
   }
 
   private async executeCreateSecurity(

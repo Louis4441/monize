@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "\"{{ name }}\" adlı alacaklı zaten mevcut",
+    "nameRequired": "Alacaklı adı gereklidir",
     "notFound": "{{ id }} kimliğine sahip alacaklı bulunamadı",
     "categoryIdsNotOwned": "Kategori kimlikleri bulunamadı veya kullanıcıya ait değil: {{ ids }}",
     "aliasEmpty": "Takma ad boş olamaz",

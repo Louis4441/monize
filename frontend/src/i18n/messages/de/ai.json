@@ -129,7 +129,18 @@
     "deletedTransactions": "{count, plural, =0 {Keine Transaktionen gelöscht} one {# Transaktion gelöscht} other {# Transaktionen gelöscht}}",
     "updatedInvestmentTransactions": "{count, plural, =0 {Keine Anlagetransaktionen aktualisiert} one {# Anlagetransaktion aktualisiert} other {# Anlagetransaktionen aktualisiert}}",
     "deletedInvestmentTransactions": "{count, plural, =0 {Keine Anlagetransaktionen gelöscht} one {# Anlagetransaktion gelöscht} other {# Anlagetransaktionen gelöscht}}",
-    "createdTransfers": "{count, plural, =0 {Keine Überweisungen erstellt} one {# Überweisung erstellt} other {# Überweisungen erstellt}}"
+    "createdTransfers": "{count, plural, =0 {Keine Überweisungen erstellt} one {# Überweisung erstellt} other {# Überweisungen erstellt}}",
+    "updatePayeeTitle": "Diesen Zahlungsempfänger bearbeiten?",
+    "deletePayeeTitle": "Diesen Zahlungsempfänger löschen?",
+    "updatedPayee": "Zahlungsempfänger aktualisiert",
+    "deletedPayee": "Zahlungsempfänger gelöscht",
+    "viewPayees": "Zahlungsempfänger anzeigen",
+    "createPayeesTitle": "Diese Zahlungsempfänger erstellen?",
+    "updatePayeesTitle": "Diese Zahlungsempfänger bearbeiten?",
+    "deletePayeesTitle": "Diese Zahlungsempfänger löschen?",
+    "createdPayees": "{count, plural, =0 {Keine Zahlungsempfänger erstellt} one {# Zahlungsempfänger erstellt} other {# Zahlungsempfänger erstellt}}",
+    "updatedPayees": "{count, plural, =0 {Keine Zahlungsempfänger aktualisiert} one {# Zahlungsempfänger aktualisiert} other {# Zahlungsempfänger aktualisiert}}",
+    "deletedPayees": "{count, plural, =0 {Keine Zahlungsempfänger gelöscht} one {# Zahlungsempfänger gelöscht} other {# Zahlungsempfänger gelöscht}}"
   },
   "table": {
     "downloadTitle": "Tabelle als CSV herunterladen",

@@ -235,11 +235,26 @@ export const getPayeesOutput = {
   ),
 };
 
-export const createPayeeOutput = {
-  // Created branch (direct MCP client).
+/**
+ * Tolerant output for the unified `manage_payees` tool. Like
+ * manage_transactions it has many result branches (dry-run preview, single
+ * created/updated/deleted, bulk count/skipped, and the relay branch), so ALL
+ * fields are optional and the object is loose.
+ */
+export const managePayeesOutput = {
+  // Dry-run preview branch (per-item previews + skipped rows).
+  dryRun: bool.optional(),
+  operation: str.optional(),
+  previews: z.array(looseObject({})).optional(),
+  message: str.optional(),
+  // Single created/updated/deleted branch.
   id: str.optional(),
   name: str.optional(),
-  message: str.optional(),
+  deleted: bool.optional(),
+  // Bulk branch.
+  ids: z.array(str).optional(),
+  count: num.optional(),
+  skipped: z.array(bulkSkippedRow).optional(),
   // Relay branch: a confirmation card was shown in the web chat instead.
   status: str.optional(),
 };

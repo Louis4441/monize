@@ -203,9 +203,19 @@ export const categorizeTransactionSchema = z.object({
   categoryName: z.string().min(1).max(100),
 });
 
-export const createPayeeSchema = z.object({
-  name: z.string().min(1).max(100),
-  defaultCategoryName: z.string().max(100).optional(),
+export const managePayeesSchema = z.object({
+  operation: z.enum(["create", "update", "delete"]),
+  items: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(100),
+        newName: z.string().min(1).max(100).optional(),
+        categoryName: z.string().max(100).optional(),
+      }),
+    )
+    .min(1)
+    .max(MAX_BULK_ACTION_ROWS),
+  approvalMode: z.enum(["bulk", "individual"]).optional(),
 });
 
 export const lookupSecuritiesSchema = z.object({
@@ -503,7 +513,7 @@ export const toolInputSchemas: Record<string, z.ZodSchema> = {
   calculate: calculateSchema,
   render_chart: renderChartSchema,
   manage_transactions: manageTransactionsSchema,
-  create_payee: createPayeeSchema,
+  manage_payees: managePayeesSchema,
   create_security: createSecuritySchema,
   lookup_securities: lookupSecuritiesSchema,
   manage_investment_transactions: manageInvestmentTransactionsSchema,

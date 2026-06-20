@@ -6,6 +6,7 @@ import { Transaction } from "../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { PayeesService } from "./payees.service";
+import { PayeeToolPrepService } from "./payee-tool-prep.service";
 import { PayeeAutoMergeService } from "./payee-auto-merge.service";
 import { PayeesController } from "./payees.controller";
 import { ActionHistoryModule } from "../action-history/action-history.module";
@@ -21,8 +22,8 @@ import { ActionHistoryModule } from "../action-history/action-history.module";
     ]),
     ActionHistoryModule,
   ],
-  providers: [PayeesService, PayeeAutoMergeService],
+  providers: [PayeesService, PayeeToolPrepService, PayeeAutoMergeService],
   controllers: [PayeesController],
-  exports: [PayeesService],
+  exports: [PayeesService, PayeeToolPrepService],
 })
 export class PayeesModule {}

@@ -38,6 +38,24 @@ export interface CreatePayeePreview {
   defaultCategoryName: string | null;
 }
 
+/**
+ * Resolved preview of a proposed payee edit. Carries the resulting name and
+ * default category so the AI Assistant confirmation card shows what the edit
+ * will do and confirm applies an idempotent overwrite of the identified payee.
+ */
+export interface UpdatePayeePreview {
+  payeeId: string;
+  name: string;
+  defaultCategoryId: string | null;
+  defaultCategoryName: string | null;
+}
+
+/** Resolved preview of a proposed payee deletion. */
+export interface DeletePayeePreview {
+  payeeId: string;
+  name: string;
+}
+
 function escapeLikeWildcards(value: string): string {
   // Escape backslash first, then the LIKE wildcards. Escaping only the
   // wildcards would leave backslashes unescaped, letting an attacker submit
@@ -160,6 +178,143 @@ export class PayeesService {
     }
 
     return { name, defaultCategoryId, defaultCategoryName };
+  }
+
+  /**
+   * Resolve a category name (optionally "Parent: Child") to its id and display
+   * name for the manage_payees default-category field. Names everywhere -- the
+   * tool layers pass names and this resolves them so both surfaces behave the
+   * same. Throws NotFound when the name matches nothing.
+   */
+  private async resolveCategoryByName(
+    userId: string,
+    categoryName: string,
+  ): Promise<{ id: string; name: string }> {
+    const trimmed = categoryName.trim();
+    const sep = trimmed.lastIndexOf(":");
+    const childName = sep >= 0 ? trimmed.slice(sep + 1).trim() : trimmed;
+    const parentName = sep >= 0 ? trimmed.slice(0, sep).trim() : null;
+
+    const qb = this.categoriesRepository
+      .createQueryBuilder("category")
+      .leftJoinAndSelect("category.parent", "parent")
+      .where("category.user_id = :userId", { userId })
+      .andWhere("LOWER(category.name) = LOWER(:childName)", { childName });
+    if (parentName) {
+      qb.andWhere("LOWER(parent.name) = LOWER(:parentName)", { parentName });
+    }
+    const match = await qb.orderBy("category.name", "ASC").getOne();
+    if (!match) {
+      throw new NotFoundException(
+        tr(
+          "errors.transactions.categoryNotFound",
+          `Unknown category: ${categoryName}`,
+          { name: categoryName },
+        ),
+      );
+    }
+    return { id: match.id, name: match.name };
+  }
+
+  /**
+   * Resolve a payee by its current name for an edit/delete, throwing NotFound
+   * when no payee matches. Used by the manage_payees confirmation flow.
+   */
+  private async resolvePayeeForManage(
+    userId: string,
+    name: string,
+  ): Promise<Payee> {
+    const payee = await this.findByName(userId, name);
+    if (!payee) {
+      throw new NotFoundException(
+        tr("errors.payees.notFound", `Payee "${name}" not found`, {
+          id: name,
+        }),
+      );
+    }
+    return payee;
+  }
+
+  /**
+   * Validate + resolve a proposed new payee from NAMES (the category is given by
+   * name, not id), reusing previewCreate for the duplicate/sanitize checks.
+   */
+  async previewCreatePayee(
+    userId: string,
+    input: { name: string; categoryName?: string | null },
+  ): Promise<CreatePayeePreview> {
+    let defaultCategoryId: string | null = null;
+    if (input.categoryName) {
+      defaultCategoryId = (
+        await this.resolveCategoryByName(userId, input.categoryName)
+      ).id;
+    }
+    return this.previewCreate(userId, { name: input.name, defaultCategoryId });
+  }
+
+  /**
+   * Validate + resolve a proposed payee edit WITHOUT persisting. Resolves the
+   * target payee by its current name, sanitizes/checks any new name for
+   * conflicts, and resolves the optional new default category by name.
+   */
+  async previewUpdatePayee(
+    userId: string,
+    input: { name: string; newName?: string; categoryName?: string | null },
+  ): Promise<UpdatePayeePreview> {
+    const payee = await this.resolvePayeeForManage(userId, input.name);
+
+    let name = payee.name;
+    if (input.newName !== undefined) {
+      const sanitized = stripHtml(input.newName)?.trim() || "";
+      if (!sanitized) {
+        throw new BadRequestException(
+          tr("errors.payees.nameRequired", "Payee name is required"),
+        );
+      }
+      if (sanitized !== payee.name) {
+        const existing = await this.payeesRepository.findOne({
+          where: { userId, name: sanitized },
+        });
+        if (existing) {
+          throw new ConflictException(
+            tr(
+              "errors.payees.nameConflict",
+              `Payee with name "${sanitized}" already exists`,
+              { name: sanitized },
+            ),
+          );
+        }
+      }
+      name = sanitized;
+    }
+
+    let defaultCategoryId: string | null = payee.defaultCategoryId;
+    let defaultCategoryName: string | null =
+      payee.defaultCategory?.name ?? null;
+    if (input.categoryName !== undefined) {
+      if (input.categoryName === null || input.categoryName === "") {
+        defaultCategoryId = null;
+        defaultCategoryName = null;
+      } else {
+        const cat = await this.resolveCategoryByName(
+          userId,
+          input.categoryName,
+        );
+        defaultCategoryId = cat.id;
+        defaultCategoryName = cat.name;
+      }
+    }
+
+    return { payeeId: payee.id, name, defaultCategoryId, defaultCategoryName };
+  }
+
+  /** Validate + resolve a proposed payee deletion (by name) WITHOUT persisting. */
+  async previewDeletePayee(
+    userId: string,
+    input: { name: string },
+  ): Promise<DeletePayeePreview> {
+    const payee = await this.resolvePayeeForManage(userId, input.name);
+    return { payeeId: payee.id, name: payee.name };
   }
 
   async findAll(

@@ -21,6 +21,8 @@ export type AiActionType =
   | "create_transaction"
   | "categorize_transaction"
   | "create_payee"
+  | "update_payee"
+  | "delete_payee"
   | "create_security"
   | "create_investment_transaction"
   | "create_transactions"
@@ -37,6 +39,8 @@ export const AI_ACTION_TYPES: AiActionType[] = [
   "create_transaction",
   "categorize_transaction",
   "create_payee",
+  "update_payee",
+  "delete_payee",
   "create_security",
   "create_investment_transaction",
   "create_transactions",
@@ -98,6 +102,23 @@ export interface CreatePayeeDescriptor extends BaseDescriptor {
   type: "create_payee";
   name: string;
   defaultCategoryId: string | null;
+}
+
+/**
+ * Edit an existing payee. Carries the resulting state (name + default category)
+ * so confirm applies an idempotent overwrite of the identified payee.
+ */
+export interface UpdatePayeeDescriptor extends BaseDescriptor {
+  type: "update_payee";
+  payeeId: string;
+  name: string;
+  defaultCategoryId: string | null;
+}
+
+/** Delete an existing payee (identified only; confirm re-checks ownership). */
+export interface DeletePayeeDescriptor extends BaseDescriptor {
+  type: "delete_payee";
+  payeeId: string;
 }
 
 export interface CreateSecurityDescriptor extends BaseDescriptor {
@@ -333,13 +354,34 @@ export interface BatchDeleteInvestmentTransactionRow {
   transactionId: string;
 }
 
+/** One resolved new payee inside a `batch_actions` envelope (operation `create_payee`). */
+export interface BatchCreatePayeeRow {
+  name: string;
+  defaultCategoryId: string | null;
+}
+
+/** One resolved payee edit inside a `batch_actions` envelope (operation `update_payee`). */
+export interface BatchUpdatePayeeRow {
+  payeeId: string;
+  name: string;
+  defaultCategoryId: string | null;
+}
+
+/** One payee deletion inside a `batch_actions` envelope (operation `delete_payee`). */
+export interface BatchDeletePayeeRow {
+  payeeId: string;
+}
+
 export type BatchActionRow =
   | TransactionRowDescriptor
   | BatchUpdateTransactionRow
   | BatchDeleteTransactionRow
   | BatchCreateTransferRow
   | BatchUpdateInvestmentTransactionRow
-  | BatchDeleteInvestmentTransactionRow;
+  | BatchDeleteInvestmentTransactionRow
+  | BatchCreatePayeeRow
+  | BatchUpdatePayeeRow
+  | BatchDeletePayeeRow;
 
 /**
  * Generic homogeneous bulk envelope executed as one unit. `operation` selects
@@ -357,7 +399,10 @@ export interface BatchActionsDescriptor extends BaseDescriptor {
     | "delete"
     | "create_transfer"
     | "update_investment"
-    | "delete_investment";
+    | "delete_investment"
+    | "create_payee"
+    | "update_payee"
+    | "delete_payee";
   /** Order is load-bearing: covered by the signature and preserved on confirm. */
   rows: BatchActionRow[];
 }
@@ -366,6 +411,8 @@ export type AiActionDescriptor =
   | CreateTransactionDescriptor
   | CategorizeTransactionDescriptor
   | CreatePayeeDescriptor
+  | UpdatePayeeDescriptor
+  | DeletePayeeDescriptor
   | CreateSecurityDescriptor
   | CreateInvestmentTransactionDescriptor
   | CreateTransactionsDescriptor
@@ -439,6 +486,8 @@ export interface AiActionPreviewRow {
   status: "ok" | "error";
   /** Human-readable reason the row was dropped, when status is "error". */
   error?: string;
+  // Payee display field (batch_actions with a payee operation).
+  name?: string | null;
   // Shared / cash-transaction display fields.
   accountName?: string;
   amount?: number;

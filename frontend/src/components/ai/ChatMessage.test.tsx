@@ -223,8 +223,8 @@ describe('ChatMessage', () => {
       const tools = [
         { name: 'list_transactions', expected: 'Transactions' },
         { name: 'list_accounts', expected: 'Accounts' },
-        { name: 'get_spending_by_category', expected: 'Spending by Category' },
-        { name: 'get_income_summary', expected: 'Income Summary' },
+        { name: 'manage_payees', expected: 'Manage Payees' },
+        { name: 'list_investment_transactions', expected: 'Investment Transactions' },
         { name: 'get_net_worth_history', expected: 'Net Worth History' },
         { name: 'compare_periods', expected: 'Period Comparison' },
       ];

@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "Er bestaat al een begunstigde met de naam \"{{ name }}\"",
+    "nameRequired": "Naam van begunstigde is verplicht",
     "notFound": "Begunstigde met ID {{ id }} niet gevonden",
     "categoryIdsNotOwned": "Categorie-ID's niet gevonden of niet eigendom van gebruiker: {{ ids }}",
     "aliasEmpty": "Alias mag niet leeg zijn",

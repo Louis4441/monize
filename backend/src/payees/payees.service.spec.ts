@@ -49,6 +49,7 @@ describe("PayeesService", () => {
   };
 
   let queryBuilderMock: Record<string, jest.Mock>;
+  let categoryQueryBuilderMock: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     queryBuilderMock = {
@@ -95,9 +96,18 @@ describe("PayeesService", () => {
       update: jest.fn(),
     };
 
+    categoryQueryBuilderMock = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    };
+
     categoriesRepository = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
+      createQueryBuilder: jest.fn(() => categoryQueryBuilderMock),
     };
 
     const aliasQueryBuilderMock = {
@@ -2167,6 +2177,111 @@ describe("PayeesService", () => {
         service.previewCreate(userId, {
           name: "Acme",
           defaultCategoryId: "cat-x",
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("manage payee previews", () => {
+    it("previewCreatePayee resolves the category by name", async () => {
+      payeesRepository.findOne.mockResolvedValue(null); // no duplicate
+      categoryQueryBuilderMock.getOne.mockResolvedValue({
+        id: "cat-9",
+        name: "Utilities",
+      });
+      // previewCreate re-validates the resolved category id by primary key.
+      categoriesRepository.findOne.mockResolvedValue({
+        id: "cat-9",
+        name: "Utilities",
+      });
+
+      const preview = await service.previewCreatePayee(userId, {
+        name: "Hydro",
+        categoryName: "Utilities",
+      });
+
+      expect(preview).toEqual({
+        name: "Hydro",
+        defaultCategoryId: "cat-9",
+        defaultCategoryName: "Utilities",
+      });
+    });
+
+    it("previewUpdatePayee renames and resolves a new category", async () => {
+      payeesRepository.findOne.mockImplementation(
+        async ({ where }: { where: { name: string } }) =>
+          where.name === "Old"
+            ? {
+                id: "p1",
+                name: "Old",
+                defaultCategoryId: null,
+                defaultCategory: null,
+              }
+            : null,
+      );
+      categoryQueryBuilderMock.getOne.mockResolvedValue({
+        id: "cat-2",
+        name: "Bills",
+      });
+
+      const preview = await service.previewUpdatePayee(userId, {
+        name: "Old",
+        newName: "New",
+        categoryName: "Bills",
+      });
+
+      expect(preview).toEqual({
+        payeeId: "p1",
+        name: "New",
+        defaultCategoryId: "cat-2",
+        defaultCategoryName: "Bills",
+      });
+    });
+
+    it("previewUpdatePayee rejects a rename that collides with another payee", async () => {
+      payeesRepository.findOne.mockImplementation(
+        async ({ where }: { where: { name: string } }) =>
+          where.name === "Old"
+            ? { id: "p1", name: "Old", defaultCategoryId: null }
+            : { id: "p2", name: "Taken" },
+      );
+
+      await expect(
+        service.previewUpdatePayee(userId, { name: "Old", newName: "Taken" }),
+      ).rejects.toThrow();
+    });
+
+    it("previewUpdatePayee clears the category for an empty categoryName", async () => {
+      payeesRepository.findOne.mockResolvedValue({
+        id: "p1",
+        name: "Old",
+        defaultCategoryId: "cat-1",
+        defaultCategory: { id: "cat-1", name: "Food" },
+      });
+
+      const preview = await service.previewUpdatePayee(userId, {
+        name: "Old",
+        categoryName: "",
+      });
+
+      expect(preview.defaultCategoryId).toBeNull();
+      expect(preview.defaultCategoryName).toBeNull();
+    });
+
+    it("previewDeletePayee throws when the payee is not found", async () => {
+      payeesRepository.findOne.mockResolvedValue(null);
+      await expect(
+        service.previewDeletePayee(userId, { name: "Ghost" }),
+      ).rejects.toThrow();
+    });
+
+    it("previewCreatePayee throws when the category name is unknown", async () => {
+      payeesRepository.findOne.mockResolvedValue(null);
+      categoryQueryBuilderMock.getOne.mockResolvedValue(null);
+      await expect(
+        service.previewCreatePayee(userId, {
+          name: "Hydro",
+          categoryName: "Nonexistent",
         }),
       ).rejects.toThrow();
     });

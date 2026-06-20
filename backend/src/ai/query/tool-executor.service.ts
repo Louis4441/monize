@@ -8,6 +8,12 @@ import {
 import { AccountsService } from "../../accounts/accounts.service";
 import { TransactionsService } from "../../transactions/transactions.service";
 import { PayeesService } from "../../payees/payees.service";
+import {
+  PayeeToolPrepService,
+  ManageCreatePayeeRow,
+  ManageUpdatePayeeRow,
+  ManageDeletePayeeRow,
+} from "../../payees/payee-tool-prep.service";
 import { AiActionBuilderService } from "../actions/ai-action-builder.service";
 import { PendingAiAction } from "../actions/ai-action.types";
 import {
@@ -92,6 +98,8 @@ export class ToolExecutorService {
     private readonly transactionsService: TransactionsService,
     @Inject(forwardRef(() => PayeesService))
     private readonly payeesService: PayeesService,
+    @Inject(forwardRef(() => PayeeToolPrepService))
+    private readonly payeePrepService: PayeeToolPrepService,
     @Inject(forwardRef(() => TransactionToolPrepService))
     private readonly prepService: TransactionToolPrepService,
     private readonly actionBuilder: AiActionBuilderService,
@@ -167,8 +175,8 @@ export class ToolExecutorService {
         case "manage_transactions":
           result = await this.manageTransactions(userId, validatedInput);
           break;
-        case "create_payee":
-          result = await this.createPayeeAction(userId, validatedInput);
+        case "manage_payees":
+          result = await this.managePayees(userId, validatedInput);
           break;
         case "create_security":
           result = await this.createSecurityAction(userId, validatedInput);
@@ -790,44 +798,222 @@ export class ToolExecutorService {
     };
   }
 
-  private async createPayeeAction(
+  /**
+   * Unified payee write handler. Mirrors manageTransactions: resolves names +
+   * builds previews via the shared PayeeToolPrepService, then emits the right
+   * pending action(s) per operation/approvalMode (single -> one card; bulk +
+   * bulk mode -> one batch card; bulk + individual -> an array of single cards).
+   */
+  private async managePayees(
     userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const name = input.name as string;
-    const defaultCategoryName = input.defaultCategoryName as string | undefined;
+    const operation = input.operation as "create" | "update" | "delete";
+    const items = (input.items as Array<Record<string, unknown>>) ?? [];
+    const approvalMode =
+      (input.approvalMode as "bulk" | "individual" | undefined) ?? "bulk";
+    const single = items.length === 1;
 
-    let defaultCategoryId: string | undefined;
-    if (defaultCategoryName) {
-      const resolved = await this.resolveSingleCategoryId(
-        userId,
-        defaultCategoryName,
-      );
-      if (!resolved) {
-        return this.toolError(
-          `Unknown category: ${defaultCategoryName}. Call get_categories to look up valid names.`,
+    if (operation === "create") {
+      return this.managePayeeCreate(userId, items, single, approvalMode);
+    }
+    if (operation === "update") {
+      return this.managePayeeUpdate(userId, items, single, approvalMode);
+    }
+    return this.managePayeeDelete(userId, items, single, approvalMode);
+  }
+
+  private toPayeeCreateRow(
+    item: Record<string, unknown>,
+  ): ManageCreatePayeeRow {
+    return {
+      name: item.name as string,
+      categoryName: item.categoryName as string | undefined,
+    };
+  }
+
+  private toPayeeUpdateRow(
+    item: Record<string, unknown>,
+  ): ManageUpdatePayeeRow {
+    return {
+      name: item.name as string,
+      newName: item.newName as string | undefined,
+      categoryName: item.categoryName as string | undefined,
+    };
+  }
+
+  private toPayeeDeleteRow(
+    item: Record<string, unknown>,
+  ): ManageDeletePayeeRow {
+    return { name: item.name as string };
+  }
+
+  private async managePayeeCreate(
+    userId: string,
+    items: Array<Record<string, unknown>>,
+    single: boolean,
+    approvalMode: "bulk" | "individual",
+  ): Promise<ToolResult> {
+    if (single) {
+      try {
+        const preview = await this.payeePrepService.prepareCreatePayeeSingle(
+          userId,
+          this.toPayeeCreateRow(items[0]),
         );
+        return {
+          data: PENDING_ACTION_TOOL_RESULT,
+          summary: `Prepared to create payee "${preview.name}"${preview.defaultCategoryName ? ` with default category ${preview.defaultCategoryName}` : ""}. Awaiting user confirmation.`,
+          sources: [],
+          pendingAction: this.actionBuilder.buildCreatePayee(userId, preview),
+        };
+      } catch (err) {
+        return this.toolErrorFromException(err, "Could not prepare the payee.");
       }
-      defaultCategoryId = resolved;
     }
 
-    let preview;
-    try {
-      preview = await this.payeesService.previewCreate(userId, {
-        name,
-        defaultCategoryId,
-      });
-    } catch (err) {
-      return this.toolErrorFromException(err, "Could not prepare the payee.");
+    const prep = await this.payeePrepService.prepareCreatePayees(
+      userId,
+      items.map((i) => this.toPayeeCreateRow(i)),
+    );
+    if (prep.okPreviews.length === 0) {
+      return this.toolError(
+        "None of the payees could be prepared. Check the name and category for each row.",
+      );
     }
-
-    const pendingAction = this.actionBuilder.buildCreatePayee(userId, preview);
-
+    if (approvalMode === "individual") {
+      return {
+        data: PENDING_ACTION_TOOL_RESULT,
+        summary: `Prepared ${prep.okPreviews.length} individual payee card${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+        sources: [],
+        pendingActions: prep.okPreviews.map((p) =>
+          this.actionBuilder.buildCreatePayee(userId, p),
+        ),
+      };
+    }
     return {
       data: PENDING_ACTION_TOOL_RESULT,
-      summary: `Prepared to create payee "${preview.name}". Awaiting user confirmation.`,
+      summary: `Prepared ${prep.okPreviews.length} payee${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
       sources: [],
-      pendingAction,
+      pendingAction: this.actionBuilder.buildBatchActions(
+        userId,
+        "create_payee",
+        prep.okRows,
+        prep.previewRows,
+      ),
+    };
+  }
+
+  private async managePayeeUpdate(
+    userId: string,
+    items: Array<Record<string, unknown>>,
+    single: boolean,
+    approvalMode: "bulk" | "individual",
+  ): Promise<ToolResult> {
+    if (single) {
+      try {
+        const preview = await this.payeePrepService.prepareUpdatePayeeSingle(
+          userId,
+          this.toPayeeUpdateRow(items[0]),
+        );
+        return {
+          data: PENDING_ACTION_TOOL_RESULT,
+          summary: `Prepared an edit to payee "${preview.name}" (default category ${preview.defaultCategoryName ?? "none"}). Awaiting user confirmation.`,
+          sources: [],
+          pendingAction: this.actionBuilder.buildUpdatePayee(userId, preview),
+        };
+      } catch (err) {
+        return this.toolErrorFromException(
+          err,
+          "Could not prepare the payee edit.",
+        );
+      }
+    }
+
+    const prep = await this.payeePrepService.prepareUpdatePayees(
+      userId,
+      items.map((i) => this.toPayeeUpdateRow(i)),
+    );
+    if (prep.okPreviews.length === 0) {
+      return this.toolError("None of the payee edits could be prepared.");
+    }
+    if (approvalMode === "individual") {
+      return {
+        data: PENDING_ACTION_TOOL_RESULT,
+        summary: `Prepared ${prep.okPreviews.length} individual payee edit card${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+        sources: [],
+        pendingActions: prep.okPreviews.map((p) =>
+          this.actionBuilder.buildUpdatePayee(userId, p),
+        ),
+      };
+    }
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared ${prep.okPreviews.length} payee edit${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+      sources: [],
+      pendingAction: this.actionBuilder.buildBatchActions(
+        userId,
+        "update_payee",
+        prep.okRows,
+        prep.previewRows,
+      ),
+    };
+  }
+
+  private async managePayeeDelete(
+    userId: string,
+    items: Array<Record<string, unknown>>,
+    single: boolean,
+    approvalMode: "bulk" | "individual",
+  ): Promise<ToolResult> {
+    if (single) {
+      try {
+        const preview = await this.payeePrepService.prepareDeletePayeeSingle(
+          userId,
+          this.toPayeeDeleteRow(items[0]),
+        );
+        return {
+          data: PENDING_ACTION_TOOL_RESULT,
+          summary: `Prepared to delete payee "${preview.name}". Awaiting user confirmation.`,
+          sources: [],
+          pendingAction: this.actionBuilder.buildDeletePayee(userId, preview),
+        };
+      } catch (err) {
+        return this.toolErrorFromException(
+          err,
+          "Could not prepare the payee deletion.",
+        );
+      }
+    }
+
+    const prep = await this.payeePrepService.prepareDeletePayees(
+      userId,
+      items.map((i) => this.toPayeeDeleteRow(i)),
+    );
+    if (prep.okPreviews.length === 0) {
+      return this.toolError(
+        "None of the payees could be prepared for deletion.",
+      );
+    }
+    if (approvalMode === "individual") {
+      return {
+        data: PENDING_ACTION_TOOL_RESULT,
+        summary: `Prepared ${prep.okPreviews.length} individual payee delete card${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+        sources: [],
+        pendingActions: prep.okPreviews.map((p) =>
+          this.actionBuilder.buildDeletePayee(userId, p),
+        ),
+      };
+    }
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared to delete ${prep.okPreviews.length} payee${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+      sources: [],
+      pendingAction: this.actionBuilder.buildBatchActions(
+        userId,
+        "delete_payee",
+        prep.okRows,
+        prep.previewRows,
+      ),
     };
   }
 

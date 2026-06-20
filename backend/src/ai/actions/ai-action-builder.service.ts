@@ -14,6 +14,8 @@ import {
   CreateInvestmentTransactionDescriptor,
   CreateInvestmentTransactionsDescriptor,
   CreatePayeeDescriptor,
+  UpdatePayeeDescriptor,
+  DeletePayeeDescriptor,
   CreateSecurityDescriptor,
   CreateTransactionDescriptor,
   CreateTransactionsDescriptor,
@@ -35,7 +37,11 @@ import {
   CreateTransferPreview,
   UpdateTransferPreview,
 } from "../../transactions/transaction-transfer.service";
-import { CreatePayeePreview } from "../../payees/payees.service";
+import {
+  CreatePayeePreview,
+  UpdatePayeePreview,
+  DeletePayeePreview,
+} from "../../payees/payees.service";
 import {
   CreateInvestmentTransactionPreview,
   UpdateInvestmentTransactionPreview,
@@ -61,6 +67,17 @@ export function transactionPreviewRow(
     payeeWillBeCreated: preview.payeeWillBeCreated,
     categoryName: preview.categoryName,
     description: preview.description,
+  };
+}
+
+/** Map a resolved payee create/edit preview to a bulk-card display row. */
+export function payeePreviewRow(
+  preview: CreatePayeePreview | UpdatePayeePreview,
+): AiActionPreviewRow {
+  return {
+    status: "ok",
+    name: preview.name,
+    categoryName: preview.defaultCategoryName,
   };
 }
 
@@ -226,6 +243,57 @@ export class AiActionBuilderService {
       preview: {
         name: preview.name,
         categoryName: preview.defaultCategoryName,
+      },
+    };
+  }
+
+  buildUpdatePayee(
+    userId: string,
+    preview: UpdatePayeePreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: UpdatePayeeDescriptor = {
+      type: "update_payee",
+      userId,
+      actionId,
+      expiresAt,
+      payeeId: preview.payeeId,
+      name: preview.name,
+      defaultCategoryId: preview.defaultCategoryId,
+    };
+    return {
+      actionId,
+      type: "update_payee",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        name: preview.name,
+        categoryName: preview.defaultCategoryName,
+      },
+    };
+  }
+
+  buildDeletePayee(
+    userId: string,
+    preview: DeletePayeePreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: DeletePayeeDescriptor = {
+      type: "delete_payee",
+      userId,
+      actionId,
+      expiresAt,
+      payeeId: preview.payeeId,
+    };
+    return {
+      actionId,
+      type: "delete_payee",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        name: preview.name,
       },
     };
   }

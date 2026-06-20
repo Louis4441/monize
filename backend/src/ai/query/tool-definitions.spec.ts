@@ -24,7 +24,7 @@ describe("FINANCIAL_TOOLS", () => {
     "calculate",
     "render_chart",
     "manage_transactions",
-    "create_payee",
+    "manage_payees",
     "lookup_securities",
     "create_security",
     "manage_investment_transactions",

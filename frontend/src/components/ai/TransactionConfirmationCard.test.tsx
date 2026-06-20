@@ -430,6 +430,57 @@ describe('TransactionConfirmationCard', () => {
     });
   });
 
+  describe('payee actions', () => {
+    it('renders a create_payee card with name and category', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({
+            type: 'create_payee',
+            descriptor: { type: 'create_payee' },
+            preview: { name: 'Hydro One', categoryName: 'Utilities' },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Create this payee?')).toBeInTheDocument();
+      expect(screen.getByText('Hydro One')).toBeInTheDocument();
+      expect(screen.getByText('Utilities')).toBeInTheDocument();
+    });
+
+    it('renders an update_payee card and success message', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({
+            type: 'update_payee',
+            descriptor: { type: 'update_payee' },
+            status: 'confirmed',
+            preview: { name: 'Hydro One', categoryName: 'Bills' },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Payee updated')).toBeInTheDocument();
+    });
+
+    it('renders a delete_payee card showing only the name', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({
+            type: 'delete_payee',
+            descriptor: { type: 'delete_payee' },
+            preview: { name: 'Old Payee' },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Delete this payee?')).toBeInTheDocument();
+      expect(screen.getByText('Old Payee')).toBeInTheDocument();
+    });
+  });
+
   describe('transfer actions', () => {
     function makeTransferAction(
       previewOverrides: Partial<PendingAction['preview']> = {},

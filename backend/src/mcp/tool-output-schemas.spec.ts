@@ -371,9 +371,18 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     ],
   },
   {
-    name: "createPayeeOutput",
-    schema: schemas.createPayeeOutput,
-    raw: { id: "p1", name: "Amazon", message: "Payee created successfully" },
+    name: "managePayeesOutput (single created branch)",
+    schema: schemas.managePayeesOutput,
+    raw: { id: "p1", name: "Amazon", count: 1 },
+  },
+  {
+    name: "managePayeesOutput (bulk branch)",
+    schema: schemas.managePayeesOutput,
+    raw: {
+      ids: ["p1", "p2"],
+      count: 2,
+      skipped: [{ index: 2, reason: "Payee \"x\" not found" }],
+    },
   },
   {
     name: "generateReportOutput",

@@ -15,6 +15,7 @@ import { PayeesService } from "../../payees/payees.service";
 import { AiActionSigningService } from "../actions/ai-action-signing.service";
 import { AiActionBuilderService } from "../actions/ai-action-builder.service";
 import { TransactionToolPrepService } from "../../transactions/transaction-tool-prep.service";
+import { PayeeToolPrepService } from "../../payees/payee-tool-prep.service";
 import { TransactionTransferService } from "../../transactions/transaction-transfer.service";
 
 describe("ToolExecutorService", () => {
@@ -406,6 +407,21 @@ describe("ToolExecutorService", () => {
         defaultCategoryId: "cat-1",
         defaultCategoryName: "Dining",
       }),
+      previewCreatePayee: jest.fn().mockResolvedValue({
+        name: "Acme",
+        defaultCategoryId: "cat-1",
+        defaultCategoryName: "Dining",
+      }),
+      previewUpdatePayee: jest.fn().mockResolvedValue({
+        payeeId: "payee-1",
+        name: "Acme",
+        defaultCategoryId: "cat-1",
+        defaultCategoryName: "Dining",
+      }),
+      previewDeletePayee: jest.fn().mockResolvedValue({
+        payeeId: "payee-1",
+        name: "Walmart",
+      }),
     };
 
     securities = {
@@ -508,6 +524,7 @@ describe("ToolExecutorService", () => {
         // name resolution, preview building, and pending-action construction
         // (and signing.sign assertions) still run end-to-end.
         TransactionToolPrepService,
+        PayeeToolPrepService,
         AiActionBuilderService,
       ],
     }).compile();
@@ -1690,22 +1707,57 @@ describe("ToolExecutorService", () => {
     });
   });
 
-  describe("create_payee (human-in-the-loop)", () => {
-    it("returns a signed pending action", async () => {
-      const result = await service.execute(userId, "create_payee", {
-        name: "Acme",
-        defaultCategoryName: "Dining",
+  describe("manage_payees (human-in-the-loop)", () => {
+    it("create returns a signed pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "create",
+        items: [{ name: "Acme", categoryName: "Dining" }],
       });
 
-      expect(payees.previewCreate).toHaveBeenCalledWith(userId, {
+      expect(payees.previewCreatePayee).toHaveBeenCalledWith(userId, {
         name: "Acme",
-        defaultCategoryId: "cat-1",
+        categoryName: "Dining",
       });
       expect(result.pendingAction?.type).toBe("create_payee");
       expect(result.pendingAction?.preview).toMatchObject({
         name: "Acme",
         categoryName: "Dining",
       });
+    });
+
+    it("update returns a signed pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "update",
+        items: [{ name: "Acme", newName: "Acme Inc" }],
+      });
+
+      expect(payees.previewUpdatePayee).toHaveBeenCalled();
+      expect(result.pendingAction?.type).toBe("update_payee");
+    });
+
+    it("delete returns a signed pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "delete",
+        items: [{ name: "Walmart" }],
+      });
+
+      expect(payees.previewDeletePayee).toHaveBeenCalled();
+      expect(result.pendingAction?.type).toBe("delete_payee");
+    });
+
+    it("bulk create returns one batch pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "create",
+        items: [
+          { name: "Acme", categoryName: "Dining" },
+          { name: "Beta" },
+        ],
+      });
+
+      expect(result.pendingAction?.type).toBe("batch_actions");
+      expect(
+        (result.pendingAction?.descriptor as { operation?: string }).operation,
+      ).toBe("create_payee");
     });
   });
 

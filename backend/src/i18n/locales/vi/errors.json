@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "Người nhận với tên \"{{ name }}\" đã tồn tại",
+    "nameRequired": "Tên người nhận là bắt buộc",
     "notFound": "Không tìm thấy người nhận với ID {{ id }}",
     "categoryIdsNotOwned": "Không tìm thấy ID danh mục hoặc không thuộc sở hữu của người dùng: {{ ids }}",
     "aliasEmpty": "Bí danh không được để trống",

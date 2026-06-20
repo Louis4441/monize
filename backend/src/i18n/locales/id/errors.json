@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "Penerima bernama \"{{ name }}\" sudah ada",
+    "nameRequired": "Nama penerima wajib diisi",
     "notFound": "Penerima dengan ID {{ id }} tidak ditemukan",
     "categoryIdsNotOwned": "ID kategori tidak ditemukan atau bukan milik pengguna: {{ ids }}",
     "aliasEmpty": "Alias tidak boleh kosong",

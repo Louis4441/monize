@@ -129,7 +129,18 @@
     "deletedTransactions": "{count, plural, =0 {Транзакції не видалено} one {Видалено # транзакцію} other {Видалено # транзакцій}}",
     "updatedInvestmentTransactions": "{count, plural, =0 {Інвестиційні операції не оновлено} one {Оновлено # інвестиційну операцію} other {Оновлено # інвестиційних операцій}}",
     "deletedInvestmentTransactions": "{count, plural, =0 {Інвестиційні операції не видалено} one {Видалено # інвестиційну операцію} other {Видалено # інвестиційних операцій}}",
-    "createdTransfers": "{count, plural, =0 {Перекази не створено} one {Створено # переказ} other {Створено # переказів}}"
+    "createdTransfers": "{count, plural, =0 {Перекази не створено} one {Створено # переказ} other {Створено # переказів}}",
+    "updatePayeeTitle": "Змінити цього одержувача?",
+    "deletePayeeTitle": "Видалити цього одержувача?",
+    "updatedPayee": "Одержувача оновлено",
+    "deletedPayee": "Одержувача видалено",
+    "viewPayees": "Переглянути одержувачів",
+    "createPayeesTitle": "Створити цих одержувачів?",
+    "updatePayeesTitle": "Змінити цих одержувачів?",
+    "deletePayeesTitle": "Видалити цих одержувачів?",
+    "createdPayees": "{count, plural, =0 {Одержувачів не створено} one {Створено # одержувача} other {Створено # одержувачів}}",
+    "updatedPayees": "{count, plural, =0 {Одержувачів не оновлено} one {Оновлено # одержувача} other {Оновлено # одержувачів}}",
+    "deletedPayees": "{count, plural, =0 {Одержувачів не видалено} one {Видалено # одержувача} other {Видалено # одержувачів}}"
   },
   "table": {
     "downloadTitle": "Завантажити таблицю як CSV",

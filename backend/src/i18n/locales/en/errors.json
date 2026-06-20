@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "Payee with name \"{{ name }}\" already exists",
+    "nameRequired": "Payee name is required",
     "notFound": "Payee with ID {{ id }} not found",
     "categoryIdsNotOwned": "Category IDs not found or not owned by user: {{ ids }}",
     "aliasEmpty": "Alias cannot be empty",

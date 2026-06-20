@@ -62,6 +62,8 @@ export function TransactionConfirmationCard({
     ),
     create_security: t('confirmAction.createSecurityTitle'),
     create_payee: t('confirmAction.createPayeeTitle'),
+    update_payee: t('confirmAction.updatePayeeTitle'),
+    delete_payee: t('confirmAction.deletePayeeTitle'),
     create_transfer: t('confirmAction.createTransferTitle'),
     update_transfer: t('confirmAction.updateTransferTitle'),
   };
@@ -240,7 +242,13 @@ export function TransactionConfirmationCard({
         label: t('confirmAction.favourite'),
         value: t('confirmAction.favouriteYes'),
       });
+  } else if (type === 'delete_payee') {
+    rows.push({
+      label: t('confirmAction.name'),
+      value: preview.name || none,
+    });
   } else {
+    // create_payee | update_payee
     rows.push({
       label: t('confirmAction.name'),
       value: preview.name || none,
@@ -252,9 +260,12 @@ export function TransactionConfirmationCard({
   }
 
   const isSecurityResult = type === 'create_security';
+  const isPayeeWriteType = type === 'create_payee' || type === 'update_payee';
   // A deletion removes the record, so there is nothing to navigate to.
   const isDeletion =
-    type === 'delete_transaction' || type === 'delete_investment_transaction';
+    type === 'delete_transaction' ||
+    type === 'delete_investment_transaction' ||
+    type === 'delete_payee';
   // The affected record's home, surfaced as a "view" link on success.
   const viewLink = isDeletion
     ? null
@@ -262,9 +273,11 @@ export function TransactionConfirmationCard({
       ? { href: '/investments', label: t('confirmAction.viewInvestments') }
       : isSecurityResult
         ? { href: '/securities', label: t('confirmAction.viewSecurities') }
-        : isCashTxType || isTransferType || type === 'categorize_transaction'
-          ? { href: '/transactions', label: t('confirmAction.viewTransaction') }
-          : null;
+        : isPayeeWriteType
+          ? { href: '/payees', label: t('confirmAction.viewPayees') }
+          : isCashTxType || isTransferType || type === 'categorize_transaction'
+            ? { href: '/transactions', label: t('confirmAction.viewTransaction') }
+            : null;
   const successByType: Partial<Record<typeof type, string>> = {
     create_transaction: t('confirmAction.createdTransaction'),
     update_transaction: t('confirmAction.updatedTransaction'),
@@ -281,6 +294,8 @@ export function TransactionConfirmationCard({
     ),
     create_security: t('confirmAction.createdSecurity'),
     create_payee: t('confirmAction.createdPayee'),
+    update_payee: t('confirmAction.updatedPayee'),
+    delete_payee: t('confirmAction.deletedPayee'),
     create_transfer: t('confirmAction.createdTransfer'),
     update_transfer: t('confirmAction.updatedTransfer'),
   };

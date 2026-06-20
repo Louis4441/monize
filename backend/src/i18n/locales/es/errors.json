@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "Ya existe un beneficiario con el nombre \"{{ name }}\"",
+    "nameRequired": "El nombre del beneficiario es obligatorio",
     "notFound": "Beneficiario con ID {{ id }} no encontrado",
     "categoryIdsNotOwned": "IDs de categoría no encontrados o no pertenecen al usuario: {{ ids }}",
     "aliasEmpty": "El alias no puede estar vacío",

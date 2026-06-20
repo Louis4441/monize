@@ -129,7 +129,18 @@
     "deletedTransactions": "{count, plural, =0 {Geen transacties verwijderd} one {# transactie verwijderd} other {# transacties verwijderd}}",
     "updatedInvestmentTransactions": "{count, plural, =0 {Geen beleggingstransacties bijgewerkt} one {# beleggingstransactie bijgewerkt} other {# beleggingstransacties bijgewerkt}}",
     "deletedInvestmentTransactions": "{count, plural, =0 {Geen beleggingstransacties verwijderd} one {# beleggingstransactie verwijderd} other {# beleggingstransacties verwijderd}}",
-    "createdTransfers": "{count, plural, =0 {Geen overboekingen aangemaakt} one {# overboeking aangemaakt} other {# overboekingen aangemaakt}}"
+    "createdTransfers": "{count, plural, =0 {Geen overboekingen aangemaakt} one {# overboeking aangemaakt} other {# overboekingen aangemaakt}}",
+    "updatePayeeTitle": "Deze begunstigde bewerken?",
+    "deletePayeeTitle": "Deze begunstigde verwijderen?",
+    "updatedPayee": "Begunstigde bijgewerkt",
+    "deletedPayee": "Begunstigde verwijderd",
+    "viewPayees": "Begunstigden bekijken",
+    "createPayeesTitle": "Deze begunstigden aanmaken?",
+    "updatePayeesTitle": "Deze begunstigden bewerken?",
+    "deletePayeesTitle": "Deze begunstigden verwijderen?",
+    "createdPayees": "{count, plural, =0 {Geen begunstigden aangemaakt} one {# begunstigde aangemaakt} other {# begunstigden aangemaakt}}",
+    "updatedPayees": "{count, plural, =0 {Geen begunstigden bijgewerkt} one {# begunstigde bijgewerkt} other {# begunstigden bijgewerkt}}",
+    "deletedPayees": "{count, plural, =0 {Geen begunstigden verwijderd} one {# begunstigde verwijderd} other {# begunstigden verwijderd}}"
   },
   "table": {
     "downloadTitle": "Tabel downloaden als CSV",

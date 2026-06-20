@@ -554,23 +554,49 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
     },
   },
   {
-    name: "create_payee",
+    name: "manage_payees",
     description:
-      "Propose creating a new payee. This does NOT create anything immediately: it shows the user a confirmation card they must approve. Use it only when the user clearly asks to add a payee. After calling this tool, briefly tell the user to review and approve the card; never claim the payee was created.",
+      "Create, edit, or delete the user's payees. This does NOT change anything immediately: it shows the user a confirmation card (or cards) they must approve. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). create: { name, categoryName? }. update: { name, newName?, categoryName? } (name identifies the existing payee; provide newName to rename and/or categoryName to set the default category; an empty categoryName clears it; at least one change is required). delete: { name }. approvalMode = 'bulk' (default; one card for the whole batch) or 'individual' (one card per item); ignored for a single item. Accepts NAMES (payee + category) and resolves them internally. After calling, briefly tell the user to review and approve the card(s); never claim the change was made.",
     inputSchema: {
       type: "object",
       properties: {
-        name: {
+        operation: {
           type: "string",
-          description: "Payee name.",
+          enum: ["create", "update", "delete"],
+          description: "The operation to perform on every item.",
         },
-        defaultCategoryName: {
+        items: {
+          type: "array",
+          description: "The rows to act on (1-25).",
+          items: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description:
+                  "create: the new payee name. update/delete: the existing payee's current name.",
+              },
+              newName: {
+                type: "string",
+                description: "update: the payee's new name.",
+              },
+              categoryName: {
+                type: "string",
+                description:
+                  'create/update: default category name ("Parent: Child" for a subcategory). update: empty string clears it.',
+              },
+            },
+            required: ["name"],
+          },
+        },
+        approvalMode: {
           type: "string",
+          enum: ["bulk", "individual"],
           description:
-            "Optional default category for this payee. Use an exact name from the user's category list.",
+            "How multi-item batches are approved: 'bulk' (default) one card for all; 'individual' one card per item. Ignored for a single item.",
         },
       },
-      required: ["name"],
+      required: ["operation", "items"],
     },
   },
   {

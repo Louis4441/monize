@@ -129,7 +129,18 @@
     "deletedTransactions": "{count, plural, =0 {No se eliminaron transacciones} one {# transacción eliminada} other {# transacciones eliminadas}}",
     "updatedInvestmentTransactions": "{count, plural, =0 {No se actualizaron transacciones de inversión} one {# transacción de inversión actualizada} other {# transacciones de inversión actualizadas}}",
     "deletedInvestmentTransactions": "{count, plural, =0 {No se eliminaron transacciones de inversión} one {# transacción de inversión eliminada} other {# transacciones de inversión eliminadas}}",
-    "createdTransfers": "{count, plural, =0 {No se crearon transferencias} one {# transferencia creada} other {# transferencias creadas}}"
+    "createdTransfers": "{count, plural, =0 {No se crearon transferencias} one {# transferencia creada} other {# transferencias creadas}}",
+    "updatePayeeTitle": "¿Editar este beneficiario?",
+    "deletePayeeTitle": "¿Eliminar este beneficiario?",
+    "updatedPayee": "Beneficiario actualizado",
+    "deletedPayee": "Beneficiario eliminado",
+    "viewPayees": "Ver beneficiarios",
+    "createPayeesTitle": "¿Crear estos beneficiarios?",
+    "updatePayeesTitle": "¿Editar estos beneficiarios?",
+    "deletePayeesTitle": "¿Eliminar estos beneficiarios?",
+    "createdPayees": "{count, plural, =0 {No se crearon beneficiarios} one {# beneficiario creado} other {# beneficiarios creados}}",
+    "updatedPayees": "{count, plural, =0 {No se actualizaron beneficiarios} one {# beneficiario actualizado} other {# beneficiarios actualizados}}",
+    "deletedPayees": "{count, plural, =0 {No se eliminaron beneficiarios} one {# beneficiario eliminado} other {# beneficiarios eliminados}}"
   },
   "table": {
     "downloadTitle": "Descargar tabla como CSV",

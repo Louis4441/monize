@@ -164,6 +164,59 @@ describe('BulkConfirmationCard', () => {
       expect(screen.getByText(/1 transaction updated/)).toBeInTheDocument();
     });
 
+    it('renders a create_payee batch with payee names and title', () => {
+      const { rerender } = render(
+        <BulkConfirmationCard
+          action={makeAction({
+            type: 'batch_actions',
+            descriptor: { type: 'batch_actions', operation: 'create_payee' },
+            preview: {
+              rows: [
+                { status: 'ok', name: 'Hydro One', categoryName: 'Utilities' },
+                { status: 'ok', name: 'City Water' },
+              ],
+            },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Create these payees?')).toBeInTheDocument();
+      expect(screen.getByText('Hydro One')).toBeInTheDocument();
+      expect(screen.getByText('Utilities')).toBeInTheDocument();
+
+      rerender(
+        <BulkConfirmationCard
+          action={makeAction({
+            type: 'batch_actions',
+            descriptor: { type: 'batch_actions', operation: 'create_payee' },
+            status: 'confirmed',
+            resultCount: 2,
+            preview: { rows: [] },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText(/2 payees created/)).toBeInTheDocument();
+    });
+
+    it('renders a delete_payee batch with the delete title', () => {
+      render(
+        <BulkConfirmationCard
+          action={makeAction({
+            type: 'batch_actions',
+            descriptor: { type: 'batch_actions', operation: 'delete_payee' },
+            preview: { rows: [{ status: 'ok', name: 'Old Payee' }] },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Delete these payees?')).toBeInTheDocument();
+      expect(screen.getByText('Old Payee')).toBeInTheDocument();
+    });
+
     it('renders a delete batch with the delete title', () => {
       render(
         <BulkConfirmationCard

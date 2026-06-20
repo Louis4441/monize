@@ -64,6 +64,8 @@ describe("AiActionsService", () => {
     };
     payees = {
       create: jest.fn().mockResolvedValue({ id: "payee-new" }),
+      update: jest.fn().mockResolvedValue({ id: "payee-1" }),
+      remove: jest.fn().mockResolvedValue(undefined),
       findOrCreate: jest.fn().mockResolvedValue({ id: PAYEE2 }),
     };
     investments = {
@@ -210,6 +212,38 @@ describe("AiActionsService", () => {
       expect.objectContaining({ name: "Acme", defaultCategoryId: CAT }),
     );
     expect(result).toEqual({ type: "create_payee", id: "payee-new" });
+  });
+
+  it("updates a payee on a valid confirmation", async () => {
+    const descriptor = {
+      type: "update_payee" as const,
+      userId: USER,
+      actionId: "act-payee-upd",
+      expiresAt: Date.now() + 60_000,
+      payeeId: "payee-1",
+      name: "Acme Inc",
+      defaultCategoryId: CAT,
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(payees.update).toHaveBeenCalledWith(
+      USER,
+      "payee-1",
+      expect.objectContaining({ name: "Acme Inc", defaultCategoryId: CAT }),
+    );
+    expect(result).toEqual({ type: "update_payee", id: "payee-1" });
+  });
+
+  it("deletes a payee on a valid confirmation", async () => {
+    const descriptor = {
+      type: "delete_payee" as const,
+      userId: USER,
+      actionId: "act-payee-del",
+      expiresAt: Date.now() + 60_000,
+      payeeId: "payee-1",
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(payees.remove).toHaveBeenCalledWith(USER, "payee-1");
+    expect(result).toEqual({ type: "delete_payee", id: "payee-1" });
   });
 
   it("creates a security on a valid confirmation", async () => {

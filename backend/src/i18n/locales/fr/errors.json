@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "Un bénéficiaire avec le nom « {{ name }} » existe déjà",
+    "nameRequired": "Le nom du bénéficiaire est requis",
     "notFound": "Bénéficiaire avec l'ID {{ id }} introuvable",
     "categoryIdsNotOwned": "IDs de catégorie introuvables ou n'appartenant pas à l'utilisateur : {{ ids }}",
     "aliasEmpty": "L'alias ne peut pas être vide",
