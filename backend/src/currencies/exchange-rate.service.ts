@@ -568,6 +568,75 @@ export class ExchangeRateService implements OnModuleInit {
   }
 
   /**
+   * Get the exchange rate for a currency pair as of a specific date.
+   *
+   * Unlike getLatestRate (the once-a-day stored snapshot), this returns the
+   * rate that applied on the transaction's date -- essential for back-dated
+   * transactions, where the latest snapshot can be far from the historical
+   * rate. Precedence:
+   *   1. The stored rate on the closest date on or before the target
+   *      (carry-forward, matching how a missing weekend/holiday is handled).
+   *   2. A historical daily series fetched from Yahoo for the pair; the value
+   *      on the closest day on or before the target is used and persisted for
+   *      reuse.
+   * Returns null when no rate can be determined (so the caller can reject or
+   * flag the operation rather than silently assuming 1.0).
+   */
+  async getRateForDate(
+    from: string,
+    to: string,
+    date: string | Date,
+  ): Promise<number | null> {
+    if (from === to) return 1;
+
+    const target =
+      typeof date === "string"
+        ? date.slice(0, 10)
+        : date.toISOString().slice(0, 10);
+    const targetDate = new Date(`${target}T00:00:00.000Z`);
+
+    // 1. Closest stored rate on or before the target date.
+    const stored = await this.exchangeRateRepository.findOne({
+      where: {
+        fromCurrency: from,
+        toCurrency: to,
+        rateDate: LessThanOrEqual(targetDate),
+      },
+      order: { rateDate: "DESC" },
+    });
+    if (stored) return Number(stored.rate);
+
+    // 2. Fetch the historical daily series from Yahoo and use the rate on the
+    //    closest day on or before the target. Persist just the chosen point
+    //    (and its inverse, via saveRate) so a repeat lookup hits the database
+    //    without re-fetching the whole series.
+    const series = await this.fetchYahooHistoricalRates(from, to);
+    if (series && series.length > 0) {
+      const targetTime = targetDate.getTime();
+      const sorted = [...series].sort(
+        (a, b) => a.date.getTime() - b.date.getTime(),
+      );
+      const onOrBefore = sorted.filter((p) => p.date.getTime() <= targetTime);
+      // Fall back to the earliest available point when the target predates the
+      // series -- a best-effort rate is still far better than a silent 1.0.
+      const chosen =
+        onOrBefore.length > 0 ? onOrBefore[onOrBefore.length - 1] : sorted[0];
+      try {
+        await this.saveRate(from, to, chosen.rate, chosen.date);
+      } catch (error) {
+        this.logger.warn(
+          `Could not persist historical rate ${from}->${to} for ${target}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+      return chosen.rate;
+    }
+
+    return null;
+  }
+
+  /**
    * Get the current spot rate for a currency pair, fetched live from the quote
    * provider. Tries the direct pair, then the reverse pair (inverted), then
    * falls back to the most recent stored daily rate when the live fetch is

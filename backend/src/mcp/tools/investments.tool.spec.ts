@@ -1037,6 +1037,32 @@ describe("McpInvestmentsTools", () => {
       expect(parsed.count).toBe(1);
     });
 
+    it("forwards an explicit exchangeRate to the create prep (issue #744)", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      investmentTransactionsService.prepareCreateInvestmentSingle.mockResolvedValue(
+        createPreview,
+      );
+      investmentTransactionsService.create.mockResolvedValue({
+        id: "inv-1",
+        transactionDate: "2026-01-15",
+      });
+
+      await handlers["manage_investment_transactions"](
+        {
+          operation: "create",
+          items: [{ ...createArgs.items[0], exchangeRate: 4.2514 }],
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(
+        investmentTransactionsService.prepareCreateInvestmentSingle,
+      ).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({ exchangeRate: 4.2514 }),
+      );
+    });
+
     it("surfaces an unknown-account error from the single create prep", async () => {
       resolve.mockReturnValue({ userId: "u1", scopes: "write" });
       investmentTransactionsService.prepareCreateInvestmentSingle.mockRejectedValue(

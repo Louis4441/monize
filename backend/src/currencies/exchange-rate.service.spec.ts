@@ -773,6 +773,58 @@ describe("ExchangeRateService", () => {
     });
   });
 
+  describe("getRateForDate", () => {
+    it("returns 1 for the same currency without any lookup", async () => {
+      const result = await service.getRateForDate("USD", "USD", "2026-06-08");
+
+      expect(result).toBe(1);
+      expect(exchangeRateRepository.findOne).not.toHaveBeenCalled();
+      expect(yahooFinanceService.fetchHistorical).not.toHaveBeenCalled();
+    });
+
+    it("returns the closest stored rate on or before the target date", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
+
+      const result = await service.getRateForDate("USD", "CAD", "2026-06-08");
+
+      expect(result).toBe(1.365);
+      // Looked up the latest stored rate not after the target date.
+      const call = exchangeRateRepository.findOne.mock.calls[0][0];
+      expect(call.where.fromCurrency).toBe("USD");
+      expect(call.where.toCurrency).toBe("CAD");
+      expect(call.order).toEqual({ rateDate: "DESC" });
+      // No Yahoo fetch needed when a stored rate exists.
+      expect(yahooFinanceService.fetchHistorical).not.toHaveBeenCalled();
+    });
+
+    it("fetches the historical rate for the date from Yahoo when none is stored", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue(null);
+      exchangeRateRepository.save.mockImplementation((data) => data);
+      // Daily series straddling the target 2026-06-08 (a weekend in this set):
+      // the closest day on or before is 2026-06-05.
+      yahooFinanceService.fetchHistorical.mockResolvedValue([
+        { date: new Date("2026-06-05"), close: 4.25, open: null, high: null, low: null, volume: null },
+        { date: new Date("2026-06-09"), close: 4.3, open: null, high: null, low: null, volume: null },
+      ]);
+
+      const result = await service.getRateForDate("EUR", "PLN", "2026-06-08");
+
+      expect(result).toBe(4.25);
+      expect(yahooFinanceService.fetchHistorical).toHaveBeenCalled();
+      // The chosen point is persisted for reuse (forward + inverse via saveRate).
+      expect(exchangeRateRepository.save).toHaveBeenCalled();
+    });
+
+    it("returns null when neither a stored rate nor a Yahoo series is available", async () => {
+      exchangeRateRepository.findOne.mockResolvedValue(null);
+      yahooFinanceService.fetchHistorical.mockResolvedValue(null);
+
+      const result = await service.getRateForDate("EUR", "PLN", "2026-06-08");
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe("getLatestRates", () => {
     it("returns latest rates using distinctOn query", async () => {
       const rates = [mockExchangeRate];

@@ -64,6 +64,7 @@ interface ManageInvItem {
   quantity?: number;
   price?: number;
   commission?: number;
+  exchangeRate?: number;
   description?: string;
   // update / delete
   transactionId?: string;
@@ -548,6 +549,14 @@ export class McpInvestmentsTools {
                   .max(999999999999)
                   .optional()
                   .describe("Commission or fee (4 dp). Defaults to 0."),
+                exchangeRate: z
+                  .number()
+                  .min(0)
+                  .max(999999999999)
+                  .optional()
+                  .describe(
+                    "create/update: FX rate converting the security's currency into the funding cash account's currency (e.g. for a EUR security funded from a PLN account, the EUR->PLN rate such as 4.2514). Supply this when the broker's settlement data gives the rate or the converted cash total, so the cash posting is exact. Omit for same-currency transactions, or to use the rate for the transaction date.",
+                  ),
                 description: z
                   .string()
                   .max(500)
@@ -629,6 +638,7 @@ export class McpInvestmentsTools {
       price: item.price,
       commission: item.commission,
       fundingAccountName: item.fundingAccountName,
+      exchangeRate: item.exchangeRate,
       description: item.description,
     };
   }
@@ -642,6 +652,7 @@ export class McpInvestmentsTools {
       quantity: item.quantity,
       price: item.price,
       commission: item.commission,
+      exchangeRate: item.exchangeRate,
       description: item.description,
     };
   }

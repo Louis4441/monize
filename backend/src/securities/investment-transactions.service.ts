@@ -231,6 +231,8 @@ export interface InvestmentCreateRowInput {
   price?: number;
   commission?: number;
   fundingAccountName?: string;
+  /** Optional FX rate (security currency -> cash currency) to pin the cash posting. */
+  exchangeRate?: number;
   description?: string;
 }
 
@@ -243,6 +245,8 @@ export interface InvestmentUpdateRowInput {
   quantity?: number;
   price?: number;
   commission?: number;
+  /** Optional FX rate (security currency -> cash currency) to pin the cash posting. */
+  exchangeRate?: number;
   description?: string;
 }
 
@@ -381,9 +385,16 @@ export class InvestmentTransactionsService {
    * (expressed in the security's currency) into the cash account's currency.
    *
    * Precedence:
-   *  1. Explicit DTO override (the user entered a rate in the form).
-   *  2. Latest market rate between source and target currencies.
-   *  3. Fallback of 1 when no rate is available.
+   *  1. Explicit override (the user entered a rate in the form, or an MCP/AI
+   *     caller supplied one from the broker's settlement data).
+   *  2. The market rate as of the transaction's date (stored, or fetched from
+   *     Yahoo for that date), not the latest snapshot -- a back-dated buy must
+   *     convert at the historical rate.
+   *  3. The latest stored rate, as a secondary source.
+   *
+   * For a genuine cross-currency pair with no determinable rate this throws
+   * rather than silently returning 1.0: posting at 1.0 corrupts the cash
+   * balance and cost basis by the size of the FX rate (see issue #744).
    */
   private async resolveCashExchangeRate(
     userId: string,
@@ -391,6 +402,7 @@ export class InvestmentTransactionsService {
     fundingAccountId: string | null | undefined,
     securityId: string | null | undefined,
     dtoRate: number | undefined,
+    transactionDate?: string | Date,
   ): Promise<number> {
     if (dtoRate !== undefined && dtoRate !== null) {
       return Number(dtoRate);
@@ -416,19 +428,34 @@ export class InvestmentTransactionsService {
       return 1;
     }
 
-    const rate = await this.exchangeRateService.getLatestRate(
-      sourceCurrency,
-      cashAccount.currencyCode,
-    );
-
-    if (rate === null) {
-      this.logger.warn(
-        `No exchange rate found for ${sourceCurrency}->${cashAccount.currencyCode}, falling back to 1`,
+    // Prefer the rate as of the transaction date (fetching from Yahoo for that
+    // date when not already stored); fall back to the latest stored snapshot.
+    let rate: number | null = null;
+    if (transactionDate) {
+      rate = await this.exchangeRateService.getRateForDate(
+        sourceCurrency,
+        cashAccount.currencyCode,
+        transactionDate,
       );
-      return 1;
+    }
+    if (rate === null) {
+      rate = await this.exchangeRateService.getLatestRate(
+        sourceCurrency,
+        cashAccount.currencyCode,
+      );
     }
 
-    return rate;
+    if (rate === null || !(Number(rate) > 0)) {
+      throw new BadRequestException(
+        tr(
+          "errors.securities.exchangeRateUnavailable",
+          `Could not determine an exchange rate for ${sourceCurrency} -> ${cashAccount.currencyCode} on the transaction date. Supply an explicit exchangeRate so the cash posting is correct.`,
+          { from: sourceCurrency, to: cashAccount.currencyCode },
+        ),
+      );
+    }
+
+    return Number(rate);
   }
 
   private formatCashTransactionPayeeName(
@@ -644,6 +671,7 @@ export class InvestmentTransactionsService {
       createDto.fundingAccountId ?? null,
       createDto.securityId ?? null,
       createDto.exchangeRate,
+      createDto.transactionDate,
     );
 
     const queryRunner = this.dataSource.createQueryRunner();
@@ -801,6 +829,7 @@ export class InvestmentTransactionsService {
       price?: number;
       commission?: number;
       fundingAccountId?: string;
+      exchangeRate?: number;
       description?: string;
     },
   ): Promise<CreateInvestmentTransactionPreview> {
@@ -910,7 +939,8 @@ export class InvestmentTransactionsService {
       input.accountId,
       input.fundingAccountId ?? null,
       security?.id ?? null,
-      undefined,
+      input.exchangeRate,
+      input.transactionDate,
     );
 
     // Signed cash impact in the security's currency, converted to the cash
@@ -981,6 +1011,7 @@ export class InvestmentTransactionsService {
       quantity?: number;
       price?: number;
       commission?: number;
+      exchangeRate?: number;
       description?: string;
     },
   ): Promise<UpdateInvestmentTransactionPreview> {
@@ -993,6 +1024,7 @@ export class InvestmentTransactionsService {
       input.quantity !== undefined ||
       input.price !== undefined ||
       input.commission !== undefined ||
+      input.exchangeRate !== undefined ||
       input.description !== undefined;
     if (!hasChange) {
       throw new BadRequestException(
@@ -1020,6 +1052,10 @@ export class InvestmentTransactionsService {
           : undefined),
       commission: input.commission ?? Number(existing.commission ?? 0),
       fundingAccountId: existing.fundingAccountId ?? undefined,
+      // Only an explicit override pins the rate; otherwise the preview
+      // re-resolves it fresh (for the new currency pair if the security or
+      // account changed), matching update()'s re-resolution precedence.
+      exchangeRate: input.exchangeRate,
       description: input.description ?? existing.description ?? undefined,
     });
 
@@ -1158,6 +1194,7 @@ export class InvestmentTransactionsService {
       price: row.price,
       commission: row.commission,
       fundingAccountId,
+      exchangeRate: row.exchangeRate,
       description: row.description,
     });
   }
@@ -1233,6 +1270,7 @@ export class InvestmentTransactionsService {
           price: row.price,
           commission: row.commission,
           fundingAccountId,
+          exchangeRate: row.exchangeRate,
           description: row.description,
         });
         okPreviews.push(preview);
@@ -1275,6 +1313,7 @@ export class InvestmentTransactionsService {
             quantity: row.quantity,
             price: row.price,
             commission: row.commission,
+            exchangeRate: row.exchangeRate,
             description: row.description,
           },
         );
@@ -1893,6 +1932,7 @@ export class InvestmentTransactionsService {
       cashAccountId,
       dto.securityId ?? null,
       dto.exchangeRate ?? undefined,
+      parentTransactionDate,
     );
 
     const investmentTransaction = queryRunner.manager.create(
@@ -2942,6 +2982,7 @@ export class InvestmentTransactionsService {
             transaction.fundingAccountId,
             transaction.securityId,
             undefined,
+            transaction.transactionDate,
           );
         }
       }

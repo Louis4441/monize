@@ -1380,6 +1380,30 @@ describe("ToolExecutorService", () => {
       expect(JSON.stringify(result.data)).not.toContain("signature-abc");
     });
 
+    it("forwards an explicit exchangeRate to the create prep (issue #744)", async () => {
+      await service.execute(userId, "manage_investment_transactions", {
+        operation: "create",
+        items: [
+          {
+            accountName: "Brokerage",
+            action: "BUY",
+            date: "2026-01-15",
+            security: "AAPL",
+            quantity: 10,
+            price: 150,
+            exchangeRate: 4.2514,
+          },
+        ],
+      });
+
+      expect(
+        investmentTransactions.prepareCreateInvestmentSingle,
+      ).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({ exchangeRate: 4.2514 }),
+      );
+    });
+
     it("single create surfaces a 4xx preview error without a pending action", async () => {
       investmentTransactions.prepareCreateInvestmentSingle.mockRejectedValueOnce(
         new BadRequestException(

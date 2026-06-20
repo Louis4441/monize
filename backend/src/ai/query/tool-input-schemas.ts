@@ -284,6 +284,7 @@ const manageInvestmentItemSchema = z
     quantity: nonNegativeAmountSchema.optional(),
     price: nonNegativeAmountSchema.optional(),
     commission: nonNegativeAmountSchema.optional(),
+    exchangeRate: nonNegativeAmountSchema.optional(),
     description: z.string().max(500).optional(),
     transactionId: z.string().uuid().optional(),
   })
