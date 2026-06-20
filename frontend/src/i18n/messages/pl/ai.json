@@ -49,6 +49,7 @@
     "payee": "Odbiorca",
     "newPayee": "(nowy odbiorca)",
     "category": "Kategoria",
+    "splits": "Podziały",
     "newCategory": "Nowa kategoria",
     "currentCategory": "Bieżąca kategoria",
     "description": "Opis",

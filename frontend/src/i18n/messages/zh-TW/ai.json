@@ -49,6 +49,7 @@
     "payee": "收款人",
     "newPayee": "(新收款人)",
     "category": "類別",
+    "splits": "拆分",
     "newCategory": "新類別",
     "currentCategory": "目前類別",
     "description": "描述",

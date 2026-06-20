@@ -49,6 +49,7 @@
     "payee": "수취인",
     "newPayee": "(새 수취인)",
     "category": "카테고리",
+    "splits": "분할",
     "newCategory": "새 카테고리",
     "currentCategory": "현재 카테고리",
     "description": "설명",

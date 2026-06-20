@@ -49,6 +49,7 @@
     "payee": "Beneficiario",
     "newPayee": "(nuovo beneficiario)",
     "category": "Categoria",
+    "splits": "Suddivisioni",
     "newCategory": "Nuova categoria",
     "currentCategory": "Categoria attuale",
     "description": "Descrizione",

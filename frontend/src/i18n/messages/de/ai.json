@@ -49,6 +49,7 @@
     "payee": "Zahlungsempfänger",
     "newPayee": "(neuer Zahlungsempfänger)",
     "category": "Kategorie",
+    "splits": "Aufteilungen",
     "newCategory": "Neue Kategorie",
     "currentCategory": "Aktuelle Kategorie",
     "description": "Beschreibung",

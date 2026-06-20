@@ -49,6 +49,7 @@
     "payee": "Bénéficiaire",
     "newPayee": "(nouveau bénéficiaire)",
     "category": "Catégorie",
+    "splits": "Ventilations",
     "newCategory": "Nouvelle catégorie",
     "currentCategory": "Catégorie actuelle",
     "description": "Description",

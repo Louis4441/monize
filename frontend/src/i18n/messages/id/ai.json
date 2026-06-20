@@ -49,6 +49,7 @@
     "payee": "Penerima",
     "newPayee": "(penerima baru)",
     "category": "Kategori",
+    "splits": "Pembagian",
     "newCategory": "Kategori baru",
     "currentCategory": "Kategori saat ini",
     "description": "Keterangan",

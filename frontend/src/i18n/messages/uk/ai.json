@@ -49,6 +49,7 @@
     "payee": "Одержувач платежу",
     "newPayee": "(новий одержувач платежу)",
     "category": "Категорія",
+    "splits": "Розподіли",
     "newCategory": "Нова категорія",
     "currentCategory": "Поточна категорія",
     "description": "Опис",

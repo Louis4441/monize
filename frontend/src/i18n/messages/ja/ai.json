@@ -49,6 +49,7 @@
     "payee": "支払先",
     "newPayee": "(新しい支払先)",
     "category": "カテゴリ",
+    "splits": "分割",
     "newCategory": "新しいカテゴリ",
     "currentCategory": "現在のカテゴリ",
     "description": "説明",
