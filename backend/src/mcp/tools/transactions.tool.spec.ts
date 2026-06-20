@@ -1,6 +1,5 @@
 import { McpTransactionsTools } from "./transactions.tool";
 import { UserContextResolver } from "../mcp-context";
-import { MCP_DAILY_WRITE_LIMIT } from "../mcp-write-limiter";
 
 describe("McpTransactionsTools", () => {
   let tool: McpTransactionsTools;
@@ -12,6 +11,8 @@ describe("McpTransactionsTools", () => {
   };
   let elicitInput: jest.Mock;
   let relayService: { emitPendingAction: jest.Mock };
+  let actionBuilder: Record<string, jest.Mock>;
+  let prepService: Record<string, jest.Mock>;
   let resolve: jest.MockedFunction<UserContextResolver>;
   const handlers: Record<string, (...args: any[]) => any> = {};
 
@@ -36,6 +37,8 @@ describe("McpTransactionsTools", () => {
       remove: jest.fn().mockResolvedValue(undefined),
       previewUpdate: jest.fn(),
       previewDelete: jest.fn(),
+      createTransfer: jest.fn(),
+      updateTransfer: jest.fn(),
     };
 
     analyticsService = {
@@ -49,12 +52,45 @@ describe("McpTransactionsTools", () => {
     // Default: not serving a relayed prompt, so the tool uses its normal
     // (direct MCP-client) confirmation path and the existing assertions hold.
     relayService = { emitPendingAction: jest.fn().mockReturnValue(false) };
-    const actionBuilder = {
-      buildCreateTransaction: jest.fn().mockReturnValue({}),
-      buildCreateTransactions: jest.fn().mockReturnValue({}),
+    actionBuilder = {
+      buildCreateTransaction: jest
+        .fn()
+        .mockReturnValue({ type: "create_transaction", preview: {} }),
+      buildCreateTransactions: jest
+        .fn()
+        .mockReturnValue({ type: "create_transactions", preview: {} }),
       buildCategorizeTransaction: jest.fn().mockReturnValue({}),
-      buildUpdateTransaction: jest.fn().mockReturnValue({}),
-      buildDeleteTransaction: jest.fn().mockReturnValue({}),
+      buildUpdateTransaction: jest
+        .fn()
+        .mockReturnValue({ type: "update_transaction", preview: {} }),
+      buildDeleteTransaction: jest
+        .fn()
+        .mockReturnValue({ type: "delete_transaction", preview: {} }),
+      buildCreateTransfer: jest
+        .fn()
+        .mockReturnValue({ type: "create_transfer", preview: {} }),
+      buildUpdateTransfer: jest
+        .fn()
+        .mockReturnValue({ type: "update_transfer", preview: {} }),
+      buildBatchActions: jest
+        .fn()
+        .mockReturnValue({ type: "batch_actions", preview: {} }),
+    };
+    prepService = {
+      prepareCreate: jest.fn(),
+      prepareCreateTransfer: jest.fn().mockResolvedValue({
+        okPreviews: [],
+        okIndex: [],
+        previewRows: [],
+        skipped: [],
+      }),
+      prepareCreateSingle: jest.fn(),
+      prepareCreateTransferSingle: jest.fn(),
+      prepareUpdate: jest.fn(),
+      prepareUpdateBulk: jest.fn(),
+      prepareDelete: jest.fn(),
+      prepareDeleteBulk: jest.fn(),
+      transferToBatchRow: jest.fn((p) => p),
     };
 
     tool = new McpTransactionsTools(
@@ -62,6 +98,7 @@ describe("McpTransactionsTools", () => {
       analyticsService as any,
       relayService as any,
       actionBuilder as any,
+      prepService as any,
     );
 
     elicitInput = jest.fn();
@@ -82,8 +119,8 @@ describe("McpTransactionsTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 11 tools", () => {
-    expect(server.registerTool).toHaveBeenCalledTimes(11);
+  it("should register 7 tools", () => {
+    expect(server.registerTool).toHaveBeenCalledTimes(7);
   });
 
   describe("query_transactions", () => {
@@ -442,579 +479,8 @@ describe("McpTransactionsTools", () => {
     });
   });
 
-  describe("create_transaction", () => {
-    it("should require write scope", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
-      const result = await handlers["create_transaction"](
-        { accountId: "a1", amount: -50, date: "2025-01-15" },
-        { sessionId: "s1" },
-      );
-      expect(result.isError).toBe(true);
-    });
-
-    it("should create transaction with account currency and link the resolved payee", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -50,
-        transactionDate: "2025-01-15",
-        payeeId: "p1",
-        payeeName: "Store",
-        payeeMatched: true,
-        payeeWillBeCreated: false,
-        categoryId: null,
-        categoryName: null,
-        description: null,
-        currencyCode: "USD",
-      });
-      // The entity carries amount as a string (decimal column, no numeric
-      // transformer); the tool must coerce it to a number for the output schema.
-      transactionsService.create.mockResolvedValue({
-        id: "t1",
-        transactionDate: "2025-01-15",
-        amount: "-50.0000",
-        payeeId: "p1",
-        payeeName: "Store",
-        status: "pending",
-      });
-
-      const result = await handlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -50,
-          date: "2025-01-15",
-          payeeName: "Store",
-          dryRun: false,
-        },
-        { sessionId: "s1" },
-      );
-      expect(transactionsService.previewCreate).toHaveBeenCalledWith(
-        "u1",
-        expect.objectContaining({ accountId: "a1", amount: -50 }),
-      );
-      expect(transactionsService.create).toHaveBeenCalledWith(
-        "u1",
-        expect.objectContaining({
-          currencyCode: "USD",
-          amount: -50,
-          payeeId: "p1",
-        }),
-        { createPayeeIfMissing: true },
-      );
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.id).toBe("t1");
-      // dryRun=false must not error on the amount field: it comes back numeric.
-      expect(parsed.amount).toBe(-50);
-      expect(typeof parsed.amount).toBe("number");
-      expect(parsed.payeeId).toBe("p1");
-    });
-
-    it("confirms via elicitation and creates when the user accepts", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      server.server.getClientCapabilities.mockReturnValue({
-        elicitation: { form: {} },
-      });
-      elicitInput.mockResolvedValue({ action: "accept" });
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -50,
-        transactionDate: "2025-01-15",
-        payeeId: "p1",
-        payeeName: "Store",
-        payeeMatched: true,
-        payeeWillBeCreated: false,
-        categoryId: null,
-        categoryName: null,
-        description: null,
-        currencyCode: "USD",
-      });
-      transactionsService.create.mockResolvedValue({
-        id: "t1",
-        transactionDate: "2025-01-15",
-        amount: "-50.0000",
-        payeeId: "p1",
-        payeeName: "Store",
-        status: "pending",
-      });
-
-      const result = await handlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -50,
-          date: "2025-01-15",
-          payeeName: "Store",
-          dryRun: false,
-        },
-        { sessionId: "s1", requestId: "call-1" },
-      );
-
-      // The elicitation must be related to the tool call's request id so the
-      // Streamable HTTP transport delivers it on that call's POST SSE stream
-      // rather than the (typically absent) standalone GET stream.
-      expect(elicitInput).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ relatedRequestId: "call-1" }),
-      );
-      expect(transactionsService.create).toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.id).toBe("t1");
-    });
-
-    it("does not create when the user declines the confirmation", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      server.server.getClientCapabilities.mockReturnValue({
-        elicitation: { form: {} },
-      });
-      elicitInput.mockResolvedValue({ action: "decline" });
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -50,
-        transactionDate: "2025-01-15",
-        payeeId: null,
-        payeeName: "Store",
-        payeeMatched: false,
-        categoryId: null,
-        categoryName: null,
-        description: null,
-        currencyCode: "USD",
-      });
-
-      const result = await handlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -50,
-          date: "2025-01-15",
-          payeeName: "Store",
-          dryRun: false,
-        },
-        { sessionId: "s1" },
-      );
-
-      expect(elicitInput).toHaveBeenCalled();
-      expect(transactionsService.create).not.toHaveBeenCalled();
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("declined");
-    });
-
-    it("shows a web-chat card (no elicitation, no write) when serving a relayed prompt", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      server.server.getClientCapabilities.mockReturnValue({
-        elicitation: { form: {} },
-      });
-      // The user is driving from the Monize web chat via the reverse relay.
-      relayService.emitPendingAction.mockReturnValue(true);
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -50,
-        transactionDate: "2025-01-15",
-        payeeId: "p1",
-        payeeName: "Store",
-        payeeMatched: true,
-        payeeWillBeCreated: false,
-        categoryId: null,
-        categoryName: null,
-        description: null,
-        currencyCode: "USD",
-      });
-
-      const result = await handlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -50,
-          date: "2025-01-15",
-          payeeName: "Store",
-          dryRun: false,
-        },
-        { sessionId: "s1", requestId: "call-1" },
-      );
-
-      // Confirmation goes to the browser card, not an MCP-client dialog, and the
-      // write is deferred to /ai/actions/confirm.
-      expect(relayService.emitPendingAction).toHaveBeenCalled();
-      expect(elicitInput).not.toHaveBeenCalled();
-      expect(transactionsService.create).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.status).toBe("preview_shown");
-    });
-
-    it("does not elicit a confirmation in dry-run mode", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      server.server.getClientCapabilities.mockReturnValue({
-        elicitation: { form: {} },
-      });
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -75,
-        transactionDate: "2025-02-01",
-        payeeId: null,
-        payeeName: "Coffee Shop",
-        payeeMatched: false,
-        payeeWillBeCreated: true,
-        categoryId: null,
-        categoryName: null,
-        description: null,
-        currencyCode: "USD",
-      });
-
-      await handlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -75,
-          date: "2025-02-01",
-          payeeName: "Coffee Shop",
-          dryRun: true,
-        },
-        { sessionId: "s1" },
-      );
-
-      expect(elicitInput).not.toHaveBeenCalled();
-      expect(transactionsService.create).not.toHaveBeenCalled();
-    });
-
-    it("should return preview in dry-run mode without creating and flag that an unmatched payee will be created", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -75,
-        transactionDate: "2025-02-01",
-        payeeId: null,
-        payeeName: "Coffee Shop",
-        payeeMatched: false,
-        payeeWillBeCreated: true,
-        categoryId: null,
-        categoryName: null,
-        description: null,
-        currencyCode: "USD",
-      });
-
-      const result = await handlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -75,
-          date: "2025-02-01",
-          payeeName: "Coffee Shop",
-          dryRun: true,
-        },
-        { sessionId: "s1" },
-      );
-
-      // Should NOT call create
-      expect(transactionsService.create).not.toHaveBeenCalled();
-
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.dryRun).toBe(true);
-      expect(parsed.preview.amount).toBe(-75);
-      expect(parsed.preview.accountName).toBe("Checking");
-      expect(parsed.preview.currencyCode).toBe("USD");
-      expect(parsed.preview.payeeMatched).toBe(false);
-      expect(parsed.preview.payeeWillBeCreated).toBe(true);
-      expect(parsed.message).toContain("preview");
-      // No matching payee + default create -> a new payee will be created.
-      expect(parsed.message).toContain("a new payee will be created");
-    });
-
-    it("persists the sanitized preview values (LLM07-F3)", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      // previewCreate is responsible for stripping HTML; the tool persists
-      // exactly what it returns.
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -50,
-        transactionDate: "2025-01-15",
-        payeeId: null,
-        payeeName: "scriptalert('XSS')/script",
-        payeeMatched: false,
-        categoryId: null,
-        categoryName: null,
-        description: "Purchase at bStore/b",
-        currencyCode: "USD",
-      });
-      transactionsService.create.mockResolvedValue({
-        id: "t1",
-        transactionDate: "2025-01-15",
-        amount: "-50.0000",
-        payeeName: "scriptalert('XSS')/script",
-        status: "pending",
-      });
-
-      await handlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -50,
-          date: "2025-01-15",
-          payeeName: "<script>alert('XSS')</script>",
-          description: "Purchase at <b>Store</b>",
-          dryRun: false,
-        },
-        { sessionId: "s1" },
-      );
-
-      expect(transactionsService.create).toHaveBeenCalledWith(
-        "u1",
-        expect.objectContaining({
-          payeeName: "scriptalert('XSS')/script",
-          description: "Purchase at bStore/b",
-        }),
-        { createPayeeIfMissing: true },
-      );
-    });
-
-    it("records a free-text payee (no payee created) when createPayeeIfMissing is false", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -50,
-        transactionDate: "2025-01-15",
-        payeeId: null,
-        payeeName: "Coffee Shop",
-        payeeMatched: false,
-        payeeWillBeCreated: false,
-        categoryId: null,
-        categoryName: null,
-        description: null,
-        currencyCode: "USD",
-      });
-      transactionsService.create.mockResolvedValue({
-        id: "t1",
-        transactionDate: "2025-01-15",
-        amount: "-50.0000",
-        payeeId: null,
-        payeeName: "Coffee Shop",
-        status: "pending",
-      });
-
-      const result = await handlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -50,
-          date: "2025-01-15",
-          payeeName: "Coffee Shop",
-          createPayeeIfMissing: false,
-          dryRun: false,
-        },
-        { sessionId: "s1" },
-      );
-
-      expect(transactionsService.create).toHaveBeenCalledWith(
-        "u1",
-        expect.objectContaining({
-          payeeName: "Coffee Shop",
-          payeeId: undefined,
-        }),
-        { createPayeeIfMissing: false },
-      );
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.payeeCreated).toBe(false);
-    });
-
-    it("reports payeeCreated when an unmatched payee is auto-created", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -50,
-        transactionDate: "2025-01-15",
-        payeeId: null,
-        payeeName: "Coffee Shop",
-        payeeMatched: false,
-        payeeWillBeCreated: true,
-        categoryId: null,
-        categoryName: null,
-        description: null,
-        currencyCode: "USD",
-      });
-      // create() resolves the name to a freshly created payee and links it.
-      transactionsService.create.mockResolvedValue({
-        id: "t1",
-        transactionDate: "2025-01-15",
-        amount: "-50.0000",
-        payeeId: "new-payee-1",
-        payeeName: "Coffee Shop",
-        status: "pending",
-      });
-
-      const result = await handlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -50,
-          date: "2025-01-15",
-          payeeName: "Coffee Shop",
-          dryRun: false,
-        },
-        { sessionId: "s1" },
-      );
-
-      expect(transactionsService.create).toHaveBeenCalledWith(
-        "u1",
-        expect.objectContaining({ payeeName: "Coffee Shop" }),
-        { createPayeeIfMissing: true },
-      );
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.payeeCreated).toBe(true);
-      expect(parsed.payeeId).toBe("new-payee-1");
-    });
-
-    it("should enforce daily write rate limit", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      transactionsService.previewCreate.mockResolvedValue({
-        accountId: "a1",
-        accountName: "Checking",
-        amount: -10,
-        transactionDate: "2025-01-15",
-        payeeId: null,
-        payeeName: null,
-        payeeMatched: false,
-        categoryId: null,
-        categoryName: null,
-        description: null,
-        currencyCode: "USD",
-      });
-      transactionsService.create.mockResolvedValue({
-        id: "t-new",
-        transactionDate: "2025-01-15",
-        amount: "-10.0000",
-        payeeName: "Store",
-        status: "pending",
-      });
-
-      // Exhaust the rate limit by creating a new tool instance
-      // and manually filling up the limiter
-      const freshTool = new McpTransactionsTools(
-        transactionsService as any,
-        analyticsService as any,
-        relayService as any,
-        {
-          buildCreateTransaction: jest.fn(),
-          buildCategorizeTransaction: jest.fn(),
-        } as any,
-      );
-      const freshHandlers: Record<string, (...args: any[]) => any> = {};
-      const freshServer = {
-        registerTool: jest.fn((name: string, _opts: any, handler: any) => {
-          freshHandlers[name] = handler;
-        }),
-      };
-      freshTool.register(freshServer as any, resolve);
-
-      // Fill up the limiter via internal access
-      const limiter = (freshTool as any).writeLimiter;
-      for (let i = 0; i < MCP_DAILY_WRITE_LIMIT; i++) {
-        limiter.record("u1", "create_transaction");
-      }
-
-      const result = await freshHandlers["create_transaction"](
-        {
-          accountId: "a1",
-          amount: -10,
-          date: "2025-01-15",
-          dryRun: false,
-        },
-        { sessionId: "s1" },
-      );
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Daily write limit reached");
-    });
-  });
-
-  describe("categorize_transaction", () => {
-    it("should categorize a transaction", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      transactionsService.update.mockResolvedValue({
-        id: "t1",
-        categoryId: "c1",
-      });
-
-      const result = await handlers["categorize_transaction"](
-        { transactionId: "t1", categoryId: "c1" },
-        { sessionId: "s1" },
-      );
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.message).toContain("categorized");
-    });
-
-    it("does not update when the user declines the confirmation", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      server.server.getClientCapabilities.mockReturnValue({
-        elicitation: { form: {} },
-      });
-      elicitInput.mockResolvedValue({ action: "cancel" });
-
-      const result = await handlers["categorize_transaction"](
-        { transactionId: "t1", categoryId: "c1" },
-        { sessionId: "s1" },
-      );
-
-      expect(transactionsService.previewCategorize).toHaveBeenCalled();
-      expect(transactionsService.update).not.toHaveBeenCalled();
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("declined");
-    });
-
-    it("shows a web-chat card (no elicitation, no write) when serving a relayed prompt", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-      server.server.getClientCapabilities.mockReturnValue({
-        elicitation: { form: {} },
-      });
-      relayService.emitPendingAction.mockReturnValue(true);
-
-      const result = await handlers["categorize_transaction"](
-        { transactionId: "t1", categoryId: "c1" },
-        { sessionId: "s1", requestId: "call-1" },
-      );
-
-      expect(relayService.emitPendingAction).toHaveBeenCalled();
-      expect(elicitInput).not.toHaveBeenCalled();
-      expect(transactionsService.update).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.status).toBe("preview_shown");
-    });
-
-    it("should enforce daily write rate limit for categorization", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
-
-      const freshTool = new McpTransactionsTools(
-        transactionsService as any,
-        analyticsService as any,
-        relayService as any,
-        {
-          buildCreateTransaction: jest.fn(),
-          buildCategorizeTransaction: jest.fn(),
-        } as any,
-      );
-      const freshHandlers: Record<string, (...args: any[]) => any> = {};
-      const freshServer = {
-        registerTool: jest.fn((name: string, _opts: any, handler: any) => {
-          freshHandlers[name] = handler;
-        }),
-      };
-      freshTool.register(freshServer as any, resolve);
-
-      const limiter = (freshTool as any).writeLimiter;
-      for (let i = 0; i < MCP_DAILY_WRITE_LIMIT; i++) {
-        limiter.record("u1", "categorize_transaction");
-      }
-
-      const result = await freshHandlers["categorize_transaction"](
-        { transactionId: "t1", categoryId: "c1" },
-        { sessionId: "s1" },
-      );
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Daily write limit reached");
-    });
-  });
-
-  describe("create_transactions (bulk)", () => {
-    const preview = {
+  describe("manage_transactions", () => {
+    const stdPreview = {
       accountId: "a1",
       accountName: "Checking",
       amount: -50,
@@ -1028,208 +494,342 @@ describe("McpTransactionsTools", () => {
       description: null,
       currencyCode: "USD",
     };
-    const rows = [
-      { accountId: "a1", amount: -50, date: "2025-01-15" },
-      { accountId: "a1", amount: -20, date: "2025-01-16" },
-    ];
-
-    it("previews every row on dryRun without persisting", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
-      transactionsService.previewCreate.mockResolvedValue(preview);
-
-      const result = await handlers["create_transactions"](
-        { rows, dryRun: true },
-        { sessionId: "s1" },
-      );
-
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.dryRun).toBe(true);
-      expect(parsed.preview.rows).toHaveLength(2);
-      expect(transactionsService.createBulk).not.toHaveBeenCalled();
-    });
-
-    it("creates valid rows best-effort when the client cannot elicit", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
-      transactionsService.previewCreate.mockResolvedValue(preview);
-      transactionsService.createBulk.mockResolvedValue({
-        created: [
-          { id: "t1", transactionDate: "2025-01-15", amount: "-50.0000" },
-          { id: "t2", transactionDate: "2025-01-16", amount: "-20.0000" },
-        ],
-        skipped: [],
-      });
-
-      const result = await handlers["create_transactions"](
-        { rows },
-        { sessionId: "s1" },
-      );
-
-      expect(transactionsService.createBulk).toHaveBeenCalledTimes(1);
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.count).toBe(2);
-      expect(parsed.ids).toEqual(["t1", "t2"]);
-    });
-
-    it("shows one relay card and does not write when a relay prompt is in flight", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
-      transactionsService.previewCreate.mockResolvedValue(preview);
-
-      const result = await handlers["create_transactions"](
-        { rows },
-        { sessionId: "s1" },
-      );
-
-      expect(relayService.emitPendingAction).toHaveBeenCalledTimes(1);
-      expect(transactionsService.createBulk).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.status).toBeDefined();
-    });
-  });
-
-  describe("update_transaction", () => {
-    const preview = {
-      transactionId: "t1",
-      accountId: "a1",
-      accountName: "Checking",
-      amount: -75,
-      transactionDate: "2025-02-01",
-      payeeId: "p1",
-      payeeName: "Store",
-      payeeMatched: true,
-      payeeWillBeCreated: false,
-      categoryId: "c1",
-      categoryName: "Groceries",
-      description: null,
-      currencyCode: "USD",
-    };
-
-    it("previews without writing when dryRun is true", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
-      transactionsService.previewUpdate.mockResolvedValue(preview);
-
-      const result = await handlers["update_transaction"](
-        { transactionId: "t1", amount: -75, dryRun: true },
-        { sessionId: "s1" },
-      );
-
-      expect(transactionsService.update).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.dryRun).toBe(true);
-      expect(parsed.preview.amount).toBe(-75);
-    });
-
-    it("applies the resulting state when the client cannot elicit", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
-      transactionsService.previewUpdate.mockResolvedValue(preview);
-      transactionsService.update.mockResolvedValue({
-        id: "t1",
-        transactionDate: "2025-02-01",
-        amount: "-75.0000",
-        payeeId: "p1",
-        payeeName: "Store",
-        categoryId: "c1",
-      });
-
-      const result = await handlers["update_transaction"](
-        { transactionId: "t1", amount: -75 },
-        { sessionId: "s1" },
-      );
-
-      expect(transactionsService.update).toHaveBeenCalledWith(
-        "u1",
-        "t1",
-        expect.objectContaining({ amount: -75, currencyCode: "USD" }),
-        { createPayeeIfMissing: true },
-      );
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.id).toBe("t1");
-      expect(parsed.amount).toBe(-75);
-    });
-
-    it("shows one relay card and does not write when a relay prompt is in flight", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
-      relayService.emitPendingAction.mockReturnValue(true);
-      transactionsService.previewUpdate.mockResolvedValue(preview);
-
-      const result = await handlers["update_transaction"](
-        { transactionId: "t1", amount: -75 },
-        { sessionId: "s1" },
-      );
-
-      expect(relayService.emitPendingAction).toHaveBeenCalledTimes(1);
-      expect(transactionsService.update).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.status).toBeDefined();
-    });
 
     it("requires write scope", async () => {
       resolve.mockReturnValue({ userId: "u1", scopes: "read" });
-      const result = await handlers["update_transaction"](
-        { transactionId: "t1", amount: -75 },
+      const result = await handlers["manage_transactions"](
+        { operation: "create", items: [{ accountName: "Checking" }] },
         { sessionId: "s1" },
       );
       expect(result.isError).toBe(true);
-      expect(transactionsService.previewUpdate).not.toHaveBeenCalled();
     });
-  });
 
-  describe("delete_transaction", () => {
-    const preview = {
-      transactionId: "t1",
-      accountName: "Checking",
-      amount: -75,
-      transactionDate: "2025-02-01",
-      payeeName: "Store",
-      categoryName: "Groceries",
-      description: null,
-      currencyCode: "USD",
-    };
-
-    it("previews without deleting when dryRun is true", async () => {
+    it("dryRun previews create rows without writing", async () => {
       resolve.mockReturnValue({ userId: "u1", scopes: "write" });
-      transactionsService.previewDelete.mockResolvedValue(preview);
+      prepService.prepareCreate.mockResolvedValue({
+        okPreviews: [stdPreview],
+        okCreatePayee: [true],
+        okIndex: [0],
+        previewRows: [{ status: "ok", accountName: "Checking" }],
+        skipped: [],
+      });
 
-      const result = await handlers["delete_transaction"](
-        { transactionId: "t1", dryRun: true },
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "create",
+          items: [{ accountName: "Checking", amount: -50, date: "2025-01-15" }],
+          dryRun: true,
+        },
         { sessionId: "s1" },
       );
 
-      expect(transactionsService.remove).not.toHaveBeenCalled();
+      expect(transactionsService.create).not.toHaveBeenCalled();
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.dryRun).toBe(true);
-      expect(parsed.preview.transactionId).toBe("t1");
+      expect(parsed.previews).toHaveLength(1);
     });
 
-    it("deletes when the client cannot elicit", async () => {
+    it("creates a single standard transaction when the client cannot elicit", async () => {
       resolve.mockReturnValue({ userId: "u1", scopes: "write" });
-      transactionsService.previewDelete.mockResolvedValue(preview);
+      prepService.prepareCreate.mockResolvedValue({
+        okPreviews: [stdPreview],
+        okCreatePayee: [true],
+        okIndex: [0],
+        previewRows: [{ status: "ok" }],
+        skipped: [],
+      });
+      transactionsService.create.mockResolvedValue({
+        id: "t1",
+        transactionDate: "2025-01-15",
+      });
 
-      const result = await handlers["delete_transaction"](
-        { transactionId: "t1" },
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "create",
+          items: [{ accountName: "Checking", amount: -50, date: "2025-01-15" }],
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(transactionsService.create).toHaveBeenCalledTimes(1);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.id).toBe("t1");
+      expect(parsed.count).toBe(1);
+    });
+
+    it("creates a single transfer when the item carries toAccountName", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      const xferPreview = {
+        fromAccountId: "a1",
+        fromAccountName: "Checking",
+        fromCurrencyCode: "USD",
+        toAccountId: "a2",
+        toAccountName: "Savings",
+        toCurrencyCode: "USD",
+        amount: 100,
+        toAmount: 100,
+        exchangeRate: 1,
+        transactionDate: "2025-01-15",
+        description: null,
+      };
+      prepService.prepareCreate.mockResolvedValue({
+        okPreviews: [],
+        okCreatePayee: [],
+        okIndex: [],
+        previewRows: [],
+        skipped: [],
+      });
+      prepService.prepareCreateTransfer.mockResolvedValue({
+        okPreviews: [xferPreview],
+        okIndex: [0],
+        previewRows: [{ status: "ok" }],
+        skipped: [],
+      });
+      transactionsService.createTransfer.mockResolvedValue({
+        fromTransaction: { id: "tf1" },
+        toTransaction: { id: "tf2" },
+      });
+
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "create",
+          items: [
+            {
+              fromAccountName: "Checking",
+              toAccountName: "Savings",
+              amount: 100,
+              date: "2025-01-15",
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(transactionsService.createTransfer).toHaveBeenCalledTimes(1);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.id).toBe("tf1");
+    });
+
+    it("bulk create (bulk mode) emits one relay card", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      relayService.emitPendingAction.mockReturnValue(true);
+      prepService.prepareCreate.mockResolvedValue({
+        okPreviews: [stdPreview, stdPreview],
+        okCreatePayee: [true, true],
+        okIndex: [0, 1],
+        previewRows: [{ status: "ok" }, { status: "ok" }],
+        skipped: [],
+      });
+
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "create",
+          items: [
+            { accountName: "Checking", amount: -50, date: "2025-01-15" },
+            { accountName: "Checking", amount: -20, date: "2025-01-16" },
+          ],
+          approvalMode: "bulk",
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(actionBuilder.buildCreateTransactions).toHaveBeenCalledTimes(1);
+      expect(relayService.emitPendingAction).toHaveBeenCalledTimes(1);
+      expect(transactionsService.create).not.toHaveBeenCalled();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.status).toBeDefined();
+    });
+
+    it("bulk create (individual mode) emits one relay card per item", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      relayService.emitPendingAction.mockReturnValue(true);
+      prepService.prepareCreate.mockResolvedValue({
+        okPreviews: [stdPreview, stdPreview],
+        okCreatePayee: [true, true],
+        okIndex: [0, 1],
+        previewRows: [{ status: "ok" }, { status: "ok" }],
+        skipped: [],
+      });
+
+      await handlers["manage_transactions"](
+        {
+          operation: "create",
+          items: [
+            { accountName: "Checking", amount: -50, date: "2025-01-15" },
+            { accountName: "Checking", amount: -20, date: "2025-01-16" },
+          ],
+          approvalMode: "individual",
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(actionBuilder.buildCreateTransaction).toHaveBeenCalledTimes(2);
+      expect(relayService.emitPendingAction).toHaveBeenCalledTimes(2);
+    });
+
+    it("updates a single transaction (standard) when the client cannot elicit", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      prepService.prepareUpdate.mockResolvedValue({
+        kind: "standard",
+        createPayee: true,
+        preview: {
+          transactionId: "t1",
+          accountId: "a1",
+          accountName: "Checking",
+          amount: -75,
+          transactionDate: "2025-02-01",
+          payeeId: "p1",
+          payeeName: "Store",
+          payeeMatched: true,
+          payeeWillBeCreated: false,
+          categoryId: "c1",
+          categoryName: "Groceries",
+          description: null,
+          currencyCode: "USD",
+        },
+      });
+      transactionsService.update.mockResolvedValue({ id: "t1" });
+
+      const result = await handlers["manage_transactions"](
+        {
+          operation: "update",
+          items: [{ transactionId: "t1", amount: -75 }],
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(transactionsService.update).toHaveBeenCalledTimes(1);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.id).toBe("t1");
+    });
+
+    it("routes a single transfer update through updateTransfer", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      prepService.prepareUpdate.mockResolvedValue({
+        kind: "transfer",
+        preview: {
+          transactionId: "t1",
+          fromAccountId: "a1",
+          fromAccountName: "Checking",
+          fromCurrencyCode: "USD",
+          toAccountId: "a2",
+          toAccountName: "Savings",
+          toCurrencyCode: "USD",
+          amount: 100,
+          toAmount: 100,
+          exchangeRate: 1,
+          transactionDate: "2025-02-01",
+          description: null,
+        },
+      });
+      transactionsService.updateTransfer.mockResolvedValue({
+        fromTransaction: { id: "t1" },
+        toTransaction: { id: "t2" },
+      });
+
+      await handlers["manage_transactions"](
+        {
+          operation: "update",
+          items: [{ transactionId: "t1", amount: 100 }],
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(transactionsService.updateTransfer).toHaveBeenCalledTimes(1);
+    });
+
+    it("bulk update (bulk mode) builds one batch card", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      relayService.emitPendingAction.mockReturnValue(true);
+      prepService.prepareUpdateBulk.mockResolvedValue({
+        okRows: [
+          {
+            transactionId: "t1",
+            accountId: "a1",
+            amount: -5,
+            transactionDate: "2025-01-01",
+            payeeId: null,
+            payeeName: null,
+            createPayee: false,
+            categoryId: "c1",
+            description: null,
+            currencyCode: "USD",
+          },
+        ],
+        previewRows: [{ status: "ok" }],
+        okIndex: [0],
+        skipped: [],
+      });
+
+      await handlers["manage_transactions"](
+        {
+          operation: "update",
+          items: [
+            { transactionId: "t1", categoryName: "Groceries" },
+            { transactionId: "t2", categoryName: "Groceries" },
+          ],
+          approvalMode: "bulk",
+        },
+        { sessionId: "s1" },
+      );
+
+      expect(actionBuilder.buildBatchActions).toHaveBeenCalledWith(
+        "u1",
+        "update",
+        expect.any(Array),
+        expect.any(Array),
+      );
+      expect(relayService.emitPendingAction).toHaveBeenCalledTimes(1);
+    });
+
+    it("deletes a single transaction when the client cannot elicit", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      prepService.prepareDelete.mockResolvedValue({
+        transactionId: "t1",
+        accountName: "Checking",
+        amount: -75,
+        transactionDate: "2025-02-01",
+        payeeName: "Store",
+        categoryName: "Groceries",
+        description: null,
+        currencyCode: "USD",
+      });
+
+      const result = await handlers["manage_transactions"](
+        { operation: "delete", items: [{ transactionId: "t1" }] },
         { sessionId: "s1" },
       );
 
       expect(transactionsService.remove).toHaveBeenCalledWith("u1", "t1");
       const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.id).toBe("t1");
       expect(parsed.deleted).toBe(true);
     });
 
-    it("shows one relay card and does not delete when a relay prompt is in flight", async () => {
+    it("bulk delete (bulk mode) builds one batch card", async () => {
       resolve.mockReturnValue({ userId: "u1", scopes: "write" });
       relayService.emitPendingAction.mockReturnValue(true);
-      transactionsService.previewDelete.mockResolvedValue(preview);
+      prepService.prepareDeleteBulk.mockResolvedValue({
+        okRows: [{ transactionId: "t1" }, { transactionId: "t2" }],
+        previewRows: [{ status: "ok" }, { status: "ok" }],
+        okIndex: [0, 1],
+        skipped: [],
+      });
 
-      const result = await handlers["delete_transaction"](
-        { transactionId: "t1" },
+      await handlers["manage_transactions"](
+        {
+          operation: "delete",
+          items: [{ transactionId: "t1" }, { transactionId: "t2" }],
+          approvalMode: "bulk",
+        },
         { sessionId: "s1" },
       );
 
-      expect(relayService.emitPendingAction).toHaveBeenCalledTimes(1);
-      expect(transactionsService.remove).not.toHaveBeenCalled();
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.status).toBeDefined();
+      expect(actionBuilder.buildBatchActions).toHaveBeenCalledWith(
+        "u1",
+        "delete",
+        expect.any(Array),
+        expect.any(Array),
+      );
     });
   });
 });

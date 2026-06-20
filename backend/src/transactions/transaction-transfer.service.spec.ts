@@ -1491,4 +1491,133 @@ describe("TransactionTransferService", () => {
       expect(mockQueryRunner.release).toHaveBeenCalled();
     });
   });
+
+  describe("isTransfer", () => {
+    it("returns true for a transfer leg", () => {
+      expect(service.isTransfer({ isTransfer: true } as any)).toBe(true);
+    });
+    it("returns false for a normal transaction", () => {
+      expect(service.isTransfer({ isTransfer: false } as any)).toBe(false);
+    });
+  });
+
+  describe("previewCreateTransfer", () => {
+    it("resolves accounts, derives currencies, and computes toAmount from exchangeRate", async () => {
+      const preview = await service.previewCreateTransfer("user-1", {
+        fromAccountId: "from-account",
+        toAccountId: "to-account",
+        amount: 100,
+        transactionDate: "2026-01-15",
+        exchangeRate: 1.25,
+      });
+      expect(preview).toMatchObject({
+        fromAccountId: "from-account",
+        fromAccountName: "Checking",
+        fromCurrencyCode: "USD",
+        toAccountId: "to-account",
+        toAccountName: "Savings",
+        toCurrencyCode: "USD",
+        amount: 100,
+        toAmount: 125,
+        exchangeRate: 1.25,
+        transactionDate: "2026-01-15",
+        description: null,
+      });
+    });
+
+    it("uses an explicit toAmount over the exchange rate and strips html from description", async () => {
+      const preview = await service.previewCreateTransfer("user-1", {
+        fromAccountId: "from-account",
+        toAccountId: "to-account",
+        amount: 100,
+        transactionDate: "2026-01-15",
+        exchangeRate: 2,
+        toAmount: 90,
+        description: "Wire <b>x</b>",
+      });
+      expect(preview.toAmount).toBe(90);
+      expect(preview.description).toBe("Wire x");
+    });
+
+    it("rejects same source and destination account", async () => {
+      await expect(
+        service.previewCreateTransfer("user-1", {
+          fromAccountId: "from-account",
+          toAccountId: "from-account",
+          amount: 100,
+          transactionDate: "2026-01-15",
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("rejects a negative amount", async () => {
+      await expect(
+        service.previewCreateTransfer("user-1", {
+          fromAccountId: "from-account",
+          toAccountId: "to-account",
+          amount: -1,
+          transactionDate: "2026-01-15",
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe("previewUpdateTransfer", () => {
+    const fromLeg = {
+      id: "from-tx",
+      accountId: "from-account",
+      account: { name: "Checking" },
+      amount: -100,
+      currencyCode: "USD",
+      exchangeRate: 1,
+      transactionDate: "2026-01-15",
+      description: "old",
+      isTransfer: true,
+      linkedTransactionId: "to-tx",
+    };
+    const toLeg = {
+      id: "to-tx",
+      accountId: "to-account",
+      account: { name: "Savings" },
+      amount: 100,
+      currencyCode: "USD",
+      exchangeRate: 1,
+      transactionDate: "2026-01-15",
+      description: "old",
+      isTransfer: true,
+      linkedTransactionId: "from-tx",
+    };
+
+    it("determines canonical from/to legs and returns the resulting state", async () => {
+      const findOne = jest.fn(async (_uid: string, id: string) =>
+        id === "from-tx" ? fromLeg : toLeg,
+      );
+      const preview = await service.previewUpdateTransfer(
+        "user-1",
+        "from-tx",
+        { amount: 200 },
+        findOne as any,
+      );
+      expect(preview).toMatchObject({
+        transactionId: "from-tx",
+        fromAccountId: "from-account",
+        fromAccountName: "Checking",
+        toAccountId: "to-account",
+        toAccountName: "Savings",
+        amount: 200,
+        toAmount: 200,
+      });
+    });
+
+    it("throws notATransfer when the target is not a transfer", async () => {
+      const findOne = jest.fn(async () => ({
+        id: "x",
+        isTransfer: false,
+        linkedTransactionId: null,
+      }));
+      await expect(
+        service.previewUpdateTransfer("user-1", "x", {}, findOne as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 });

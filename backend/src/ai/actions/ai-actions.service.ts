@@ -34,8 +34,17 @@ import {
   DeleteTransactionDescriptor,
   UpdateInvestmentTransactionDescriptor,
   DeleteInvestmentTransactionDescriptor,
+  CreateTransferDescriptor,
+  UpdateTransferDescriptor,
+  BatchActionsDescriptor,
+  BatchUpdateTransactionRow,
+  BatchDeleteTransactionRow,
+  BatchCreateTransferRow,
+  TransactionRowDescriptor,
   MAX_BULK_ACTION_ROWS,
 } from "./ai-action.types";
+import { CreateTransferDto } from "../../transactions/dto/create-transfer.dto";
+import { UpdateTransferDto } from "../../transactions/dto/update-transfer.dto";
 import { BulkCreateSkip } from "../../common/bulk-create.types";
 import { ConfirmAiActionDto } from "./dto/confirm-ai-action.dto";
 
@@ -166,7 +175,8 @@ export class AiActionsService {
   private proposedWriteCount(descriptor: AiActionDescriptor): number {
     if (
       descriptor.type === "create_transactions" ||
-      descriptor.type === "create_investment_transactions"
+      descriptor.type === "create_investment_transactions" ||
+      descriptor.type === "batch_actions"
     ) {
       return descriptor.rows.length;
     }
@@ -200,6 +210,150 @@ export class AiActionsService {
         return this.executeUpdateInvestmentTransaction(userId, descriptor);
       case "delete_investment_transaction":
         return this.executeDeleteInvestmentTransaction(userId, descriptor);
+      case "create_transfer":
+        return this.executeCreateTransfer(userId, descriptor);
+      case "update_transfer":
+        return this.executeUpdateTransfer(userId, descriptor);
+      case "batch_actions":
+        return this.executeBatchActions(userId, descriptor);
+    }
+  }
+
+  private async executeCreateTransfer(
+    userId: string,
+    descriptor: CreateTransferDescriptor,
+  ): Promise<ConfirmActionResult> {
+    const dto = await this.toValidatedDto(CreateTransferDto, {
+      fromAccountId: descriptor.fromAccountId,
+      toAccountId: descriptor.toAccountId,
+      transactionDate: descriptor.transactionDate,
+      amount: descriptor.amount,
+      fromCurrencyCode: descriptor.fromCurrencyCode,
+      toCurrencyCode: descriptor.toCurrencyCode,
+      exchangeRate: descriptor.exchangeRate,
+      toAmount: descriptor.toAmount,
+      description: descriptor.description ?? undefined,
+    });
+    const result = await this.transactionsService.createTransfer(userId, dto);
+    return { type: "create_transfer", id: result.fromTransaction.id };
+  }
+
+  private async executeUpdateTransfer(
+    userId: string,
+    descriptor: UpdateTransferDescriptor,
+  ): Promise<ConfirmActionResult> {
+    const dto = await this.toValidatedDto(UpdateTransferDto, {
+      amount: descriptor.amount,
+      transactionDate: descriptor.transactionDate,
+      exchangeRate: descriptor.exchangeRate,
+      toAmount: descriptor.toAmount,
+      description: descriptor.description ?? undefined,
+    });
+    const result = await this.transactionsService.updateTransfer(
+      userId,
+      descriptor.transactionId,
+      dto,
+    );
+    return { type: "update_transfer", id: result.fromTransaction.id };
+  }
+
+  /**
+   * Execute a generic bulk envelope best-effort: each row is attempted in
+   * isolation (a failing row is skipped by index, not aborting the batch),
+   * reusing the SAME domain calls the single executors use.
+   */
+  private async executeBatchActions(
+    userId: string,
+    descriptor: BatchActionsDescriptor,
+  ): Promise<ConfirmActionResult> {
+    this.assertBulkRowCount(descriptor.rows.length);
+
+    const ids: string[] = [];
+    const skipped: BulkCreateSkip[] = [];
+
+    for (let i = 0; i < descriptor.rows.length; i++) {
+      try {
+        const id = await this.executeBatchRow(
+          userId,
+          descriptor.operation,
+          descriptor.rows[i],
+        );
+        ids.push(id);
+      } catch {
+        skipped.push({ index: i, reason: this.bulkRowInvalidReason() });
+      }
+    }
+
+    return this.toBulkResult("batch_actions", ids, skipped);
+  }
+
+  private async executeBatchRow(
+    userId: string,
+    operation: BatchActionsDescriptor["operation"],
+    row: BatchActionsDescriptor["rows"][number],
+  ): Promise<string> {
+    switch (operation) {
+      case "update": {
+        const r = row as BatchUpdateTransactionRow;
+        const dto = await this.toValidatedDto(UpdateTransactionDto, {
+          accountId: r.accountId,
+          transactionDate: r.transactionDate,
+          amount: r.amount,
+          currencyCode: r.currencyCode,
+          payeeId: r.payeeId ?? undefined,
+          payeeName: r.payeeName ?? undefined,
+          categoryId: r.categoryId ?? undefined,
+          description: r.description ?? undefined,
+        });
+        const transaction = await this.transactionsService.update(
+          userId,
+          r.transactionId,
+          dto,
+          { createPayeeIfMissing: r.createPayee === true },
+        );
+        return transaction.id;
+      }
+      case "delete": {
+        const r = row as BatchDeleteTransactionRow;
+        await this.transactionsService.remove(userId, r.transactionId);
+        return r.transactionId;
+      }
+      case "create_transfer": {
+        const r = row as BatchCreateTransferRow;
+        const dto = await this.toValidatedDto(CreateTransferDto, {
+          fromAccountId: r.fromAccountId,
+          toAccountId: r.toAccountId,
+          transactionDate: r.transactionDate,
+          amount: r.amount,
+          fromCurrencyCode: r.fromCurrencyCode,
+          toCurrencyCode: r.toCurrencyCode,
+          exchangeRate: r.exchangeRate,
+          toAmount: r.toAmount,
+          description: r.description ?? undefined,
+        });
+        const result = await this.transactionsService.createTransfer(
+          userId,
+          dto,
+        );
+        return result.fromTransaction.id;
+      }
+      case "create": {
+        const r = row as TransactionRowDescriptor;
+        const dto = await this.toValidatedDto(CreateTransactionDto, {
+          accountId: r.accountId,
+          transactionDate: r.transactionDate,
+          amount: r.amount,
+          currencyCode: r.currencyCode,
+          payeeId: r.payeeId ?? undefined,
+          payeeName: r.payeeName ?? undefined,
+          categoryId: r.categoryId ?? undefined,
+          description: r.description ?? undefined,
+        });
+        const transaction = await this.transactionsService.create(userId, dto, {
+          createPayeeIfMissing: r.createPayee === true,
+        });
+        return transaction.id;
+      }
     }
   }
 

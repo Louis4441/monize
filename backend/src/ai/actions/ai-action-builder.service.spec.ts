@@ -421,4 +421,106 @@ describe("AiActionBuilderService", () => {
       totalAmount: 2001,
     });
   });
+
+  it("builds a signed create_transfer action and preview", () => {
+    const preview = {
+      fromAccountId: "a1",
+      fromAccountName: "Checking",
+      fromCurrencyCode: "USD",
+      toAccountId: "a2",
+      toAccountName: "Savings",
+      toCurrencyCode: "USD",
+      amount: 100,
+      toAmount: 100,
+      exchangeRate: 1,
+      transactionDate: "2026-01-15",
+      description: null,
+    };
+    const action = builder.buildCreateTransfer("user-1", preview);
+    expect(action.type).toBe("create_transfer");
+    expect(action.signature).toBe("sig-123");
+    expect(action.descriptor).toMatchObject({
+      type: "create_transfer",
+      userId: "user-1",
+      fromAccountId: "a1",
+      toAccountId: "a2",
+      amount: 100,
+      toAmount: 100,
+    });
+    expect(action.preview).toMatchObject({
+      fromAccountName: "Checking",
+      toAccountName: "Savings",
+      toAmount: 100,
+    });
+  });
+
+  it("builds a signed update_transfer action", () => {
+    const action = builder.buildUpdateTransfer("user-1", {
+      transactionId: "t1",
+      fromAccountId: "a1",
+      fromAccountName: "Checking",
+      fromCurrencyCode: "USD",
+      toAccountId: "a2",
+      toAccountName: "Savings",
+      toCurrencyCode: "USD",
+      amount: 200,
+      toAmount: 200,
+      exchangeRate: 1,
+      transactionDate: "2026-01-15",
+      description: null,
+    });
+    expect(action.type).toBe("update_transfer");
+    expect(action.descriptor).toMatchObject({
+      type: "update_transfer",
+      transactionId: "t1",
+      amount: 200,
+    });
+  });
+
+  it("builds a signed batch_actions envelope carrying rows and preview rows", () => {
+    const rows = [{ transactionId: "t1" }, { transactionId: "t2" }];
+    const previewRows = [
+      { status: "ok" as const },
+      { status: "ok" as const },
+    ];
+    const action = builder.buildBatchActions(
+      "user-1",
+      "delete",
+      rows as never,
+      previewRows,
+    );
+    expect(action.type).toBe("batch_actions");
+    expect(action.descriptor).toMatchObject({
+      type: "batch_actions",
+      operation: "delete",
+      rows,
+    });
+    expect(action.preview.rows).toHaveLength(2);
+  });
+
+  it("transferPreviewRow maps a transfer preview to a display row", () => {
+    const {
+      transferPreviewRow,
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+    } = require("./ai-action-builder.service");
+    const row = transferPreviewRow({
+      fromAccountId: "a1",
+      fromAccountName: "Checking",
+      fromCurrencyCode: "USD",
+      toAccountId: "a2",
+      toAccountName: "Savings",
+      toCurrencyCode: "USD",
+      amount: 100,
+      toAmount: 100,
+      exchangeRate: 1,
+      transactionDate: "2026-01-15",
+      description: null,
+    });
+    expect(row).toMatchObject({
+      status: "ok",
+      accountName: "Checking",
+      toAccountName: "Savings",
+      toAmount: 100,
+    });
+  });
 });
