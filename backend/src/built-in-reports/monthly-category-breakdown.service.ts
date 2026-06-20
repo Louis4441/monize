@@ -88,7 +88,16 @@ export class MonthlyCategoryBreakdownService {
       LEFT JOIN accounts a ON a.id = t.account_id
       WHERE t.user_id = $1
         AND t.transaction_date <= $2
-        AND t.is_transfer = false
+        -- Non-transfer rows feed the breakdown as usual. A transfer is also
+        -- included when it carries a category, but only its outflow leg
+        -- (amount < 0) so the contribution shows as a single withdrawal under
+        -- its category and is not double-counted by the inflow leg. The
+        -- transfer is still excluded from every other report, so it never
+        -- counts as income/expense or affects net worth.
+        AND (
+          t.is_transfer = false
+          OR (t.is_transfer = true AND t.category_id IS NOT NULL AND t.amount < 0)
+        )
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
         AND a.account_type != 'INVESTMENT'
@@ -222,6 +231,9 @@ export class MonthlyCategoryBreakdownService {
       WHERE t.user_id = $1
         AND t.transaction_date <= $2
         AND t.is_transfer = true
+        -- Categorized transfers are surfaced under their category above, so
+        -- exclude them here to avoid showing the same movement twice.
+        AND t.category_id IS NULL
         AND (t.status IS NULL OR t.status != 'VOID')
         AND t.parent_transaction_id IS NULL
     `;

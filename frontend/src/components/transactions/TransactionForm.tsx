@@ -758,6 +758,9 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           status: data.status,
           payeeId: transferPayeeId || null,
           payeeName: transferPayeeName || null,
+          // Optional category: lets the transfer surface in the monthly category
+          // breakdown without counting as income/expense. null clears it on edit.
+          categoryId: data.categoryId || null,
           tagIds: selectedTagIds.length > 0 ? selectedTagIds : [],
         };
 
@@ -1001,6 +1004,10 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           crossCurrencyInfo={crossCurrencyInfo}
           payees={payees}
           payeeAliasMap={payeeAliasMap}
+          categoryOptions={categoryOptions}
+          selectedCategoryId={selectedCategoryId}
+          handleCategoryChange={handleCategoryChange}
+          handleCategoryCreate={handleCategoryCreate}
           transaction={transaction}
           createdAtSlot={createdAtSlot}
         />
