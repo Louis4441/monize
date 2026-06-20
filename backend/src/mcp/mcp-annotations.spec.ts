@@ -13,21 +13,23 @@ import { McpRelayTools } from "./tools/relay.tool";
 // Tools that mutate state; everything else must be read-only.
 const WRITE_TOOLS = new Set([
   "manage_transactions",
-  "create_payee",
-  "create_security",
+  "manage_payees",
+  "manage_securities",
   "manage_investment_transactions",
 ]);
 // Write tools whose repeated calls converge to the same state.
 const IDEMPOTENT_WRITES = new Set<string>([]);
-// Write tools that remove data (destructiveHint: true). manage_transactions and
-// manage_investment_transactions can delete, so they are destructive (and
-// non-idempotent because they can also create).
+// Write tools that remove data (destructiveHint: true). The manage_* tools can
+// delete, so they are destructive (and non-idempotent because they can also
+// create).
 const DESTRUCTIVE_TOOLS = new Set([
   "manage_transactions",
+  "manage_payees",
+  "manage_securities",
   "manage_investment_transactions",
 ]);
 
-const EXPECTED_TOOL_COUNT = 26;
+const EXPECTED_TOOL_COUNT = 24;
 
 interface ToolProvider {
   register: (server: unknown, resolve?: unknown) => void;
@@ -52,9 +54,11 @@ function collectToolConfigs(): Array<{ name: string; config: any }> {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     ) as unknown as ToolProvider,
     new McpReportsTools({} as any) as unknown as ToolProvider,
     new McpInvestmentsTools(
+      {} as any,
       {} as any,
       {} as any,
       {} as any,

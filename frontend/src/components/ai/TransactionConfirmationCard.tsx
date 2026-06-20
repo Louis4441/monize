@@ -61,7 +61,11 @@ export function TransactionConfirmationCard({
       'confirmAction.deleteInvestmentTransactionTitle',
     ),
     create_security: t('confirmAction.createSecurityTitle'),
+    update_security: t('confirmAction.updateSecurityTitle'),
+    delete_security: t('confirmAction.deleteSecurityTitle'),
     create_payee: t('confirmAction.createPayeeTitle'),
+    update_payee: t('confirmAction.updatePayeeTitle'),
+    delete_payee: t('confirmAction.deletePayeeTitle'),
     create_transfer: t('confirmAction.createTransferTitle'),
     update_transfer: t('confirmAction.updateTransferTitle'),
   };
@@ -217,7 +221,12 @@ export function TransactionConfirmationCard({
         label: t('confirmAction.description'),
         value: preview.description,
       });
-  } else if (type === 'create_security') {
+  } else if (type === 'delete_security') {
+    if (preview.symbol)
+      rows.push({ label: t('confirmAction.symbol'), value: preview.symbol });
+    if (preview.securityName)
+      rows.push({ label: t('confirmAction.name'), value: preview.securityName });
+  } else if (type === 'create_security' || type === 'update_security') {
     if (preview.symbol)
       rows.push({ label: t('confirmAction.symbol'), value: preview.symbol });
     if (preview.securityName)
@@ -240,7 +249,13 @@ export function TransactionConfirmationCard({
         label: t('confirmAction.favourite'),
         value: t('confirmAction.favouriteYes'),
       });
+  } else if (type === 'delete_payee') {
+    rows.push({
+      label: t('confirmAction.name'),
+      value: preview.name || none,
+    });
   } else {
+    // create_payee | update_payee
     rows.push({
       label: t('confirmAction.name'),
       value: preview.name || none,
@@ -251,10 +266,15 @@ export function TransactionConfirmationCard({
     });
   }
 
-  const isSecurityResult = type === 'create_security';
+  const isSecurityResult =
+    type === 'create_security' || type === 'update_security';
+  const isPayeeWriteType = type === 'create_payee' || type === 'update_payee';
   // A deletion removes the record, so there is nothing to navigate to.
   const isDeletion =
-    type === 'delete_transaction' || type === 'delete_investment_transaction';
+    type === 'delete_transaction' ||
+    type === 'delete_investment_transaction' ||
+    type === 'delete_payee' ||
+    type === 'delete_security';
   // The affected record's home, surfaced as a "view" link on success.
   const viewLink = isDeletion
     ? null
@@ -262,9 +282,11 @@ export function TransactionConfirmationCard({
       ? { href: '/investments', label: t('confirmAction.viewInvestments') }
       : isSecurityResult
         ? { href: '/securities', label: t('confirmAction.viewSecurities') }
-        : isCashTxType || isTransferType || type === 'categorize_transaction'
-          ? { href: '/transactions', label: t('confirmAction.viewTransaction') }
-          : null;
+        : isPayeeWriteType
+          ? { href: '/payees', label: t('confirmAction.viewPayees') }
+          : isCashTxType || isTransferType || type === 'categorize_transaction'
+            ? { href: '/transactions', label: t('confirmAction.viewTransaction') }
+            : null;
   const successByType: Partial<Record<typeof type, string>> = {
     create_transaction: t('confirmAction.createdTransaction'),
     update_transaction: t('confirmAction.updatedTransaction'),
@@ -280,7 +302,11 @@ export function TransactionConfirmationCard({
       'confirmAction.deletedInvestmentTransaction',
     ),
     create_security: t('confirmAction.createdSecurity'),
+    update_security: t('confirmAction.updatedSecurity'),
+    delete_security: t('confirmAction.deletedSecurity'),
     create_payee: t('confirmAction.createdPayee'),
+    update_payee: t('confirmAction.updatedPayee'),
+    delete_payee: t('confirmAction.deletedPayee'),
     create_transfer: t('confirmAction.createdTransfer'),
     update_transfer: t('confirmAction.updatedTransfer'),
   };

@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "Odbiorca o nazwie \"{{ name }}\" już istnieje",
+    "nameRequired": "Nazwa odbiorcy jest wymagana",
     "notFound": "Nie znaleziono odbiorcy o ID {{ id }}",
     "categoryIdsNotOwned": "Identyfikatory kategorii nie zostały znalezione lub nie należą do użytkownika: {{ ids }}",
     "aliasEmpty": "Alias nie może być pusty",

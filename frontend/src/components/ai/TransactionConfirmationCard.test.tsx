@@ -312,6 +312,41 @@ describe('TransactionConfirmationCard', () => {
     ).toHaveAttribute('href', '/securities');
   });
 
+  it('renders an update_security card and success message', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeSecurityAction(
+          {},
+          {
+            type: 'update_security',
+            descriptor: { type: 'update_security' },
+            status: 'confirmed',
+          },
+        )}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Security updated')).toBeInTheDocument();
+  });
+
+  it('renders a delete_security card showing symbol and name only', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeSecurityAction(
+          {},
+          { type: 'delete_security', descriptor: { type: 'delete_security' } },
+        )}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Delete this security?')).toBeInTheDocument();
+    expect(screen.getByText('AAPL')).toBeInTheDocument();
+    // Delete card omits the classification rows.
+    expect(screen.queryByText('STOCK')).toBeNull();
+  });
+
   describe('edit and delete actions', () => {
     it('renders an update_transaction card with the resulting values', () => {
       render(
@@ -427,6 +462,57 @@ describe('TransactionConfirmationCard', () => {
         screen.getByText('Investment transaction deleted'),
       ).toBeInTheDocument();
       expect(screen.queryByRole('link')).toBeNull();
+    });
+  });
+
+  describe('payee actions', () => {
+    it('renders a create_payee card with name and category', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({
+            type: 'create_payee',
+            descriptor: { type: 'create_payee' },
+            preview: { name: 'Hydro One', categoryName: 'Utilities' },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Create this payee?')).toBeInTheDocument();
+      expect(screen.getByText('Hydro One')).toBeInTheDocument();
+      expect(screen.getByText('Utilities')).toBeInTheDocument();
+    });
+
+    it('renders an update_payee card and success message', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({
+            type: 'update_payee',
+            descriptor: { type: 'update_payee' },
+            status: 'confirmed',
+            preview: { name: 'Hydro One', categoryName: 'Bills' },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Payee updated')).toBeInTheDocument();
+    });
+
+    it('renders a delete_payee card showing only the name', () => {
+      render(
+        <TransactionConfirmationCard
+          action={makeAction({
+            type: 'delete_payee',
+            descriptor: { type: 'delete_payee' },
+            preview: { name: 'Old Payee' },
+          })}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+      );
+      expect(screen.getByText('Delete this payee?')).toBeInTheDocument();
+      expect(screen.getByText('Old Payee')).toBeInTheDocument();
     });
   });
 

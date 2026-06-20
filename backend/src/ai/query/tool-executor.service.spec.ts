@@ -15,6 +15,8 @@ import { PayeesService } from "../../payees/payees.service";
 import { AiActionSigningService } from "../actions/ai-action-signing.service";
 import { AiActionBuilderService } from "../actions/ai-action-builder.service";
 import { TransactionToolPrepService } from "../../transactions/transaction-tool-prep.service";
+import { PayeeToolPrepService } from "../../payees/payee-tool-prep.service";
+import { SecurityToolPrepService } from "../../securities/security-tool-prep.service";
 import { TransactionTransferService } from "../../transactions/transaction-transfer.service";
 
 describe("ToolExecutorService", () => {
@@ -110,22 +112,6 @@ describe("ToolExecutorService", () => {
         groups: null,
         transfers: null,
         perCurrency: [],
-      }),
-      getLlmSpendingByCategory: jest.fn().mockResolvedValue({
-        categories: [
-          {
-            category: "Groceries",
-            amount: 500,
-            percentage: 50,
-            transactionCount: 10,
-          },
-        ],
-        totalSpending: 1000,
-      }),
-      getLlmIncomeSummary: jest.fn().mockResolvedValue({
-        items: [{ label: "Salary", amount: 5000, count: 1 }],
-        totalIncome: 5000,
-        groupedBy: "category",
       }),
       getLlmPeriodComparison: jest.fn().mockResolvedValue({
         period1: { start: "2025-12-01", end: "2025-12-31", total: 3000 },
@@ -422,6 +408,21 @@ describe("ToolExecutorService", () => {
         defaultCategoryId: "cat-1",
         defaultCategoryName: "Dining",
       }),
+      previewCreatePayee: jest.fn().mockResolvedValue({
+        name: "Acme",
+        defaultCategoryId: "cat-1",
+        defaultCategoryName: "Dining",
+      }),
+      previewUpdatePayee: jest.fn().mockResolvedValue({
+        payeeId: "payee-1",
+        name: "Acme",
+        defaultCategoryId: "cat-1",
+        defaultCategoryName: "Dining",
+      }),
+      previewDeletePayee: jest.fn().mockResolvedValue({
+        payeeId: "payee-1",
+        name: "Walmart",
+      }),
     };
 
     securities = {
@@ -434,6 +435,20 @@ describe("ToolExecutorService", () => {
         isFavourite: false,
         quoteProvider: "yahoo",
         msnInstrumentId: null,
+      }),
+      previewUpdateSecurity: jest.fn().mockResolvedValue({
+        securityId: "sec-1",
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        securityType: "STOCK",
+        exchange: "NASDAQ",
+        currencyCode: "USD",
+        isFavourite: true,
+      }),
+      previewDeleteSecurity: jest.fn().mockResolvedValue({
+        securityId: "sec-1",
+        symbol: "AAPL",
+        name: "Apple Inc.",
       }),
       lookupSecuritiesForLlm: jest.fn().mockResolvedValue({
         query: "apple",
@@ -524,6 +539,8 @@ describe("ToolExecutorService", () => {
         // name resolution, preview building, and pending-action construction
         // (and signing.sign assertions) still run end-to-end.
         TransactionToolPrepService,
+        PayeeToolPrepService,
+        SecurityToolPrepService,
         AiActionBuilderService,
       ],
     }).compile();
@@ -728,63 +745,6 @@ describe("ToolExecutorService", () => {
       });
     });
 
-    it("get_spending_by_category delegates to analytics.getLlmSpendingByCategory", async () => {
-      const result = await service.execute(userId, "get_spending_by_category", {
-        startDate: "2026-01-01",
-        endDate: "2026-01-31",
-        topN: 10,
-      });
-
-      expect(analytics.getLlmSpendingByCategory).toHaveBeenCalledWith(
-        userId,
-        "2026-01-01",
-        "2026-01-31",
-        10,
-      );
-      expect(result.sources[0].type).toBe("spending");
-    });
-
-    it("get_spending_by_category defaults topN to 10 and fills in dates when omitted", async () => {
-      await service.execute(userId, "get_spending_by_category", {});
-
-      expect(analytics.getLlmSpendingByCategory).toHaveBeenCalledWith(
-        userId,
-        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-        10,
-      );
-    });
-
-    it("get_income_summary delegates to analytics.getLlmIncomeSummary", async () => {
-      const result = await service.execute(userId, "get_income_summary", {
-        startDate: "2026-01-01",
-        endDate: "2026-01-31",
-        groupBy: "payee",
-      });
-
-      expect(analytics.getLlmIncomeSummary).toHaveBeenCalledWith(
-        userId,
-        "2026-01-01",
-        "2026-01-31",
-        "payee",
-      );
-      expect(result.sources[0].type).toBe("income");
-    });
-
-    it("get_income_summary defaults groupBy to category", async () => {
-      await service.execute(userId, "get_income_summary", {
-        startDate: "2026-01-01",
-        endDate: "2026-01-31",
-      });
-
-      expect(analytics.getLlmIncomeSummary).toHaveBeenCalledWith(
-        userId,
-        "2026-01-01",
-        "2026-01-31",
-        "category",
-      );
-    });
-
     it("get_net_worth_history delegates to netWorthService.getLlmHistory", async () => {
       const result = await service.execute(userId, "get_net_worth_history", {});
 
@@ -848,7 +808,7 @@ describe("ToolExecutorService", () => {
       expect(result.sources[0].type).toBe("portfolio");
     });
 
-    it("query_investment_transactions delegates to investmentTransactions.getLlmInvestmentTransactions", async () => {
+    it("list_investment_transactions delegates to investmentTransactions.getLlmInvestmentTransactions", async () => {
       investmentTransactions.getLlmInvestmentTransactions.mockResolvedValueOnce(
         {
           transactionCount: 3,
@@ -872,7 +832,7 @@ describe("ToolExecutorService", () => {
       );
       const result = await service.execute(
         userId,
-        "query_investment_transactions",
+        "list_investment_transactions",
         {
           startDate: "2026-01-01",
           endDate: "2026-03-31",
@@ -898,8 +858,8 @@ describe("ToolExecutorService", () => {
       expect(result.summary).toContain("grouped by security");
     });
 
-    it("query_investment_transactions resolves account names to IDs", async () => {
-      await service.execute(userId, "query_investment_transactions", {
+    it("list_investment_transactions resolves account names to IDs", async () => {
+      await service.execute(userId, "list_investment_transactions", {
         accountNames: ["Checking"],
       });
 
@@ -912,18 +872,18 @@ describe("ToolExecutorService", () => {
       );
     });
 
-    it("query_investment_transactions handles all-dates summary", async () => {
+    it("list_investment_transactions handles all-dates summary", async () => {
       const result = await service.execute(
         userId,
-        "query_investment_transactions",
+        "list_investment_transactions",
         {},
       );
 
       expect(result.sources[0].dateRange).toBe("all dates");
     });
 
-    it("query_investment_transactions defaults groupBy to 'security' when omitted", async () => {
-      await service.execute(userId, "query_investment_transactions", {});
+    it("list_investment_transactions defaults groupBy to 'security' when omitted", async () => {
+      await service.execute(userId, "list_investment_transactions", {});
 
       expect(
         investmentTransactions.getLlmInvestmentTransactions,
@@ -973,17 +933,6 @@ describe("ToolExecutorService", () => {
           accountIds: ["acc-1"],
           groupBy: "month",
         }),
-      );
-    });
-
-    it("get_income_summary applies default date range when omitted", async () => {
-      await service.execute(userId, "get_income_summary", {});
-
-      expect(analytics.getLlmIncomeSummary).toHaveBeenCalledWith(
-        userId,
-        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-        expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-        "category",
       );
     });
 
@@ -1206,6 +1155,35 @@ describe("ToolExecutorService", () => {
       ).toBe(true);
     });
 
+    it("bulk create (bulk mode) splits standard and transfer rows into two cards", async () => {
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "create",
+        items: [
+          { accountName: "Checking", amount: -10, date: "2026-01-15" },
+          {
+            fromAccountName: "Checking",
+            toAccountName: "Savings",
+            amount: 100,
+            date: "2026-01-16",
+          },
+        ],
+        approvalMode: "bulk",
+      });
+      const types = (result.pendingActions ?? []).map((a) => a.type).sort();
+      expect(types).toEqual(["batch_actions", "create_transactions"]);
+    });
+
+    it("errors when none of the bulk create rows can be prepared", async () => {
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "create",
+        items: [
+          { accountName: "Ghost", amount: -10, date: "2026-01-15" },
+          { accountName: "Ghost", amount: -20, date: "2026-01-16" },
+        ],
+      });
+      expect(result.isError).toBe(true);
+    });
+
     it("does not leak the signature into the LLM-facing data", async () => {
       const result = await service.execute(userId, "manage_transactions", {
         operation: "create",
@@ -1258,6 +1236,50 @@ describe("ToolExecutorService", () => {
       });
       expect(result.isError).toBe(true);
     });
+
+    const TXID2 = "22222222-2222-4222-8222-222222222222";
+
+    it("bulk update (bulk mode) builds one batch_actions card", async () => {
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "update",
+        items: [
+          { transactionId: TXID, amount: -5 },
+          { transactionId: TXID2, amount: -6 },
+        ],
+        approvalMode: "bulk",
+      });
+      expect(result.pendingAction?.type).toBe("batch_actions");
+      expect(
+        (result.pendingAction?.descriptor as { operation?: string }).operation,
+      ).toBe("update");
+    });
+
+    it("individual update returns one card per item", async () => {
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "update",
+        items: [
+          { transactionId: TXID, amount: -5 },
+          { transactionId: TXID2, amount: -6 },
+        ],
+        approvalMode: "individual",
+      });
+      expect(result.pendingActions).toHaveLength(2);
+    });
+
+    it("bulk update errors when none can be prepared", async () => {
+      transactions.previewUpdate.mockRejectedValue(
+        new BadRequestException("nope"),
+      );
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "update",
+        items: [
+          { transactionId: TXID, amount: -5 },
+          { transactionId: TXID2, amount: -6 },
+        ],
+        approvalMode: "individual",
+      });
+      expect(result.isError).toBe(true);
+    });
   });
 
   describe("manage_transactions (delete, human-in-the-loop)", () => {
@@ -1282,6 +1304,33 @@ describe("ToolExecutorService", () => {
         approvalMode: "bulk",
       });
       expect(result.pendingAction?.type).toBe("batch_actions");
+    });
+
+    it("individual delete returns one card per item", async () => {
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "delete",
+        items: [
+          { transactionId: "11111111-1111-4111-8111-111111111111" },
+          { transactionId: "22222222-2222-4222-8222-222222222222" },
+        ],
+        approvalMode: "individual",
+      });
+      expect(result.pendingActions).toHaveLength(2);
+    });
+
+    it("individual delete errors when none can be prepared", async () => {
+      transactions.previewDelete.mockRejectedValue(
+        new BadRequestException("nope"),
+      );
+      const result = await service.execute(userId, "manage_transactions", {
+        operation: "delete",
+        items: [
+          { transactionId: "11111111-1111-4111-8111-111111111111" },
+          { transactionId: "22222222-2222-4222-8222-222222222222" },
+        ],
+        approvalMode: "individual",
+      });
+      expect(result.isError).toBe(true);
     });
   });
 
@@ -1774,16 +1823,16 @@ describe("ToolExecutorService", () => {
     });
   });
 
-  describe("create_payee (human-in-the-loop)", () => {
-    it("returns a signed pending action", async () => {
-      const result = await service.execute(userId, "create_payee", {
-        name: "Acme",
-        defaultCategoryName: "Dining",
+  describe("manage_payees (human-in-the-loop)", () => {
+    it("create returns a signed pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "create",
+        items: [{ name: "Acme", categoryName: "Dining" }],
       });
 
-      expect(payees.previewCreate).toHaveBeenCalledWith(userId, {
+      expect(payees.previewCreatePayee).toHaveBeenCalledWith(userId, {
         name: "Acme",
-        defaultCategoryId: "cat-1",
+        categoryName: "Dining",
       });
       expect(result.pendingAction?.type).toBe("create_payee");
       expect(result.pendingAction?.preview).toMatchObject({
@@ -1791,12 +1840,117 @@ describe("ToolExecutorService", () => {
         categoryName: "Dining",
       });
     });
+
+    it("update returns a signed pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "update",
+        items: [{ name: "Acme", newName: "Acme Inc" }],
+      });
+
+      expect(payees.previewUpdatePayee).toHaveBeenCalled();
+      expect(result.pendingAction?.type).toBe("update_payee");
+    });
+
+    it("delete returns a signed pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "delete",
+        items: [{ name: "Walmart" }],
+      });
+
+      expect(payees.previewDeletePayee).toHaveBeenCalled();
+      expect(result.pendingAction?.type).toBe("delete_payee");
+    });
+
+    it("bulk create returns one batch pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "create",
+        items: [{ name: "Acme", categoryName: "Dining" }, { name: "Beta" }],
+      });
+
+      expect(result.pendingAction?.type).toBe("batch_actions");
+      expect(
+        (result.pendingAction?.descriptor as { operation?: string }).operation,
+      ).toBe("create_payee");
+    });
+
+    it("bulk update returns one batch pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "update",
+        items: [
+          { name: "Acme", newName: "Acme Inc" },
+          { name: "Beta", newName: "Beta Inc" },
+        ],
+      });
+      expect(
+        (result.pendingAction?.descriptor as { operation?: string }).operation,
+      ).toBe("update_payee");
+    });
+
+    it("individual update returns one card per item", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "update",
+        items: [
+          { name: "Acme", newName: "Acme Inc" },
+          { name: "Beta", newName: "Beta Inc" },
+        ],
+        approvalMode: "individual",
+      });
+      expect(result.pendingActions).toHaveLength(2);
+    });
+
+    it("bulk delete returns one batch pending action", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "delete",
+        items: [{ name: "Acme" }, { name: "Beta" }],
+      });
+      expect(
+        (result.pendingAction?.descriptor as { operation?: string }).operation,
+      ).toBe("delete_payee");
+    });
+
+    it("individual delete returns one card per item", async () => {
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "delete",
+        items: [{ name: "Acme" }, { name: "Beta" }],
+        approvalMode: "individual",
+      });
+      expect(result.pendingActions).toHaveLength(2);
+    });
+
+    it("bulk create reports skipped rows that fail to prepare", async () => {
+      payees.previewCreatePayee
+        .mockResolvedValueOnce({
+          name: "Acme",
+          defaultCategoryId: null,
+          defaultCategoryName: null,
+        })
+        .mockRejectedValueOnce(new BadRequestException("dup"));
+
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "create",
+        items: [{ name: "Acme" }, { name: "Dup" }],
+      });
+      expect(result.pendingAction?.type).toBe("batch_actions");
+      expect(result.summary).toContain("skipped");
+    });
+
+    it("errors when no payee could be prepared", async () => {
+      payees.previewCreatePayee.mockRejectedValue(
+        new BadRequestException("dup"),
+      );
+      const result = await service.execute(userId, "manage_payees", {
+        operation: "create",
+        items: [{ name: "A" }, { name: "B" }],
+      });
+      expect(result.isError).toBe(true);
+    });
   });
 
-  describe("create_security (human-in-the-loop)", () => {
-    it("looks the security up and returns a signed pending action", async () => {
-      const result = await service.execute(userId, "create_security", {
-        query: "AAPL",
+  describe("manage_securities (human-in-the-loop)", () => {
+    it("create looks the security up and returns a signed pending action", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "create",
+        items: [{ query: "AAPL" }],
       });
 
       expect(securities.previewCreateSecurity).toHaveBeenCalledWith(
@@ -1821,13 +1975,142 @@ describe("ToolExecutorService", () => {
       });
     });
 
+    it("update returns a signed update_security pending action", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "update",
+        items: [{ symbol: "AAPL", isFavourite: true }],
+      });
+      expect(securities.previewUpdateSecurity).toHaveBeenCalled();
+      expect(result.pendingAction?.type).toBe("update_security");
+    });
+
+    it("delete returns a signed delete_security pending action", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "delete",
+        items: [{ symbol: "AAPL" }],
+      });
+      expect(securities.previewDeleteSecurity).toHaveBeenCalled();
+      expect(result.pendingAction?.type).toBe("delete_security");
+    });
+
+    it("bulk create returns one batch pending action", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "create",
+        items: [{ query: "AAPL" }, { query: "MSFT" }],
+      });
+      expect(result.pendingAction?.type).toBe("batch_actions");
+      expect(
+        (result.pendingAction?.descriptor as { operation?: string }).operation,
+      ).toBe("create_security");
+    });
+
+    it("bulk update returns one batch pending action", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "update",
+        items: [
+          { symbol: "AAPL", isFavourite: true },
+          { symbol: "MSFT", isFavourite: true },
+        ],
+      });
+      expect(
+        (result.pendingAction?.descriptor as { operation?: string }).operation,
+      ).toBe("update_security");
+    });
+
+    it("individual update returns one card per item", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "update",
+        items: [
+          { symbol: "AAPL", isFavourite: true },
+          { symbol: "MSFT", isFavourite: true },
+        ],
+        approvalMode: "individual",
+      });
+      expect(result.pendingActions).toHaveLength(2);
+    });
+
+    it("bulk delete returns one batch pending action", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "delete",
+        items: [{ symbol: "AAPL" }, { symbol: "MSFT" }],
+      });
+      expect(
+        (result.pendingAction?.descriptor as { operation?: string }).operation,
+      ).toBe("delete_security");
+    });
+
+    it("individual delete returns one card per item", async () => {
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "delete",
+        items: [{ symbol: "AAPL" }, { symbol: "MSFT" }],
+        approvalMode: "individual",
+      });
+      expect(result.pendingActions).toHaveLength(2);
+    });
+
+    it("bulk create reports skipped securities that fail to resolve", async () => {
+      securities.previewCreateSecurity
+        .mockResolvedValueOnce({
+          symbol: "AAPL",
+          name: "Apple Inc.",
+          securityType: "STOCK",
+          exchange: "NASDAQ",
+          currencyCode: "USD",
+          isFavourite: false,
+          quoteProvider: "yahoo",
+          msnInstrumentId: null,
+        })
+        .mockRejectedValueOnce(new BadRequestException("not found"));
+
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "create",
+        items: [{ query: "AAPL" }, { query: "ZZZZ" }],
+      });
+      expect(result.pendingAction?.type).toBe("batch_actions");
+      expect(result.summary).toContain("skipped");
+    });
+
+    it("errors when no security could be prepared", async () => {
+      securities.previewCreateSecurity.mockRejectedValue(
+        new BadRequestException("not found"),
+      );
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "create",
+        items: [{ query: "A" }, { query: "B" }],
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it("errors when no security update could be prepared", async () => {
+      securities.previewUpdateSecurity.mockRejectedValue(
+        new BadRequestException("not found"),
+      );
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "update",
+        items: [{ symbol: "A" }, { symbol: "B" }],
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it("errors when no security delete could be prepared", async () => {
+      securities.previewDeleteSecurity.mockRejectedValue(
+        new BadRequestException("not found"),
+      );
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "delete",
+        items: [{ symbol: "A" }, { symbol: "B" }],
+      });
+      expect(result.isError).toBe(true);
+    });
+
     it("surfaces a 4xx lookup failure as a tool error without a pending action", async () => {
       securities.previewCreateSecurity.mockRejectedValueOnce(
         new BadRequestException('No security found matching "ZZZZ".'),
       );
 
-      const result = await service.execute(userId, "create_security", {
-        query: "ZZZZ",
+      const result = await service.execute(userId, "manage_securities", {
+        operation: "create",
+        items: [{ query: "ZZZZ" }],
       });
 
       expect(result.isError).toBe(true);

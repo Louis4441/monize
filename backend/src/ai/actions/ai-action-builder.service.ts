@@ -14,7 +14,11 @@ import {
   CreateInvestmentTransactionDescriptor,
   CreateInvestmentTransactionsDescriptor,
   CreatePayeeDescriptor,
+  UpdatePayeeDescriptor,
+  DeletePayeeDescriptor,
   CreateSecurityDescriptor,
+  UpdateSecurityDescriptor,
+  DeleteSecurityDescriptor,
   CreateTransactionDescriptor,
   CreateTransactionsDescriptor,
   CreateTransferDescriptor,
@@ -35,13 +39,21 @@ import {
   CreateTransferPreview,
   UpdateTransferPreview,
 } from "../../transactions/transaction-transfer.service";
-import { CreatePayeePreview } from "../../payees/payees.service";
+import {
+  CreatePayeePreview,
+  UpdatePayeePreview,
+  DeletePayeePreview,
+} from "../../payees/payees.service";
 import {
   CreateInvestmentTransactionPreview,
   UpdateInvestmentTransactionPreview,
   DeleteInvestmentTransactionPreview,
 } from "../../securities/investment-transactions.service";
-import { CreateSecurityPreview } from "../../securities/securities.service";
+import {
+  CreateSecurityPreview,
+  UpdateSecurityPreview,
+  DeleteSecurityPreview,
+} from "../../securities/securities.service";
 
 /**
  * Map a resolved cash-transaction preview to the display row shown on the bulk
@@ -61,6 +73,29 @@ export function transactionPreviewRow(
     payeeWillBeCreated: preview.payeeWillBeCreated,
     categoryName: preview.categoryName,
     description: preview.description,
+  };
+}
+
+/** Map a resolved payee create/edit preview to a bulk-card display row. */
+export function payeePreviewRow(
+  preview: CreatePayeePreview | UpdatePayeePreview,
+): AiActionPreviewRow {
+  return {
+    status: "ok",
+    name: preview.name,
+    categoryName: preview.defaultCategoryName,
+  };
+}
+
+/** Map a resolved security create/edit preview to a bulk-card display row. */
+export function securityPreviewRow(
+  preview: CreateSecurityPreview | UpdateSecurityPreview,
+): AiActionPreviewRow {
+  return {
+    status: "ok",
+    symbol: preview.symbol,
+    securityName: preview.name,
+    securityCurrency: preview.currencyCode,
   };
 }
 
@@ -230,6 +265,57 @@ export class AiActionBuilderService {
     };
   }
 
+  buildUpdatePayee(
+    userId: string,
+    preview: UpdatePayeePreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: UpdatePayeeDescriptor = {
+      type: "update_payee",
+      userId,
+      actionId,
+      expiresAt,
+      payeeId: preview.payeeId,
+      name: preview.name,
+      defaultCategoryId: preview.defaultCategoryId,
+    };
+    return {
+      actionId,
+      type: "update_payee",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        name: preview.name,
+        categoryName: preview.defaultCategoryName,
+      },
+    };
+  }
+
+  buildDeletePayee(
+    userId: string,
+    preview: DeletePayeePreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: DeletePayeeDescriptor = {
+      type: "delete_payee",
+      userId,
+      actionId,
+      expiresAt,
+      payeeId: preview.payeeId,
+    };
+    return {
+      actionId,
+      type: "delete_payee",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        name: preview.name,
+      },
+    };
+  }
+
   buildCreateSecurity(
     userId: string,
     preview: CreateSecurityPreview,
@@ -262,6 +348,64 @@ export class AiActionBuilderService {
         exchange: preview.exchange,
         securityCurrency: preview.currencyCode,
         isFavourite: preview.isFavourite,
+      },
+    };
+  }
+
+  buildUpdateSecurity(
+    userId: string,
+    preview: UpdateSecurityPreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: UpdateSecurityDescriptor = {
+      type: "update_security",
+      userId,
+      actionId,
+      expiresAt,
+      securityId: preview.securityId,
+      securityType: preview.securityType,
+      exchange: preview.exchange,
+      currencyCode: preview.currencyCode,
+      isFavourite: preview.isFavourite,
+    };
+    return {
+      actionId,
+      type: "update_security",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        symbol: preview.symbol,
+        securityName: preview.name,
+        securityType: preview.securityType,
+        exchange: preview.exchange,
+        securityCurrency: preview.currencyCode,
+        isFavourite: preview.isFavourite,
+      },
+    };
+  }
+
+  buildDeleteSecurity(
+    userId: string,
+    preview: DeleteSecurityPreview,
+  ): PendingAiAction {
+    const { actionId, expiresAt } = this.newEnvelope();
+    const descriptor: DeleteSecurityDescriptor = {
+      type: "delete_security",
+      userId,
+      actionId,
+      expiresAt,
+      securityId: preview.securityId,
+    };
+    return {
+      actionId,
+      type: "delete_security",
+      expiresAt,
+      descriptor,
+      signature: this.signingService.sign(descriptor),
+      preview: {
+        symbol: preview.symbol,
+        securityName: preview.name,
       },
     };
   }

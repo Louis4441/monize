@@ -14,9 +14,11 @@ import { SecuritiesService } from "../../securities/securities.service";
 import { CreateTransactionDto } from "../../transactions/dto/create-transaction.dto";
 import { UpdateTransactionDto } from "../../transactions/dto/update-transaction.dto";
 import { CreatePayeeDto } from "../../payees/dto/create-payee.dto";
+import { UpdatePayeeDto } from "../../payees/dto/update-payee.dto";
 import { CreateInvestmentTransactionDto } from "../../securities/dto/create-investment-transaction.dto";
 import { UpdateInvestmentTransactionDto } from "../../securities/dto/update-investment-transaction.dto";
 import { CreateSecurityDto } from "../../securities/dto/create-security.dto";
+import { UpdateSecurityDto } from "../../securities/dto/update-security.dto";
 import { tr } from "../../i18n/translate";
 import { AiActionSigningService } from "./ai-action-signing.service";
 import { AiWriteLimiter } from "./ai-write-limiter";
@@ -25,7 +27,11 @@ import {
   AiActionDescriptor,
   CategorizeTransactionDescriptor,
   CreatePayeeDescriptor,
+  UpdatePayeeDescriptor,
+  DeletePayeeDescriptor,
   CreateSecurityDescriptor,
+  UpdateSecurityDescriptor,
+  DeleteSecurityDescriptor,
   CreateTransactionDescriptor,
   CreateInvestmentTransactionDescriptor,
   CreateTransactionsDescriptor,
@@ -42,6 +48,12 @@ import {
   BatchCreateTransferRow,
   BatchUpdateInvestmentTransactionRow,
   BatchDeleteInvestmentTransactionRow,
+  BatchCreatePayeeRow,
+  BatchUpdatePayeeRow,
+  BatchDeletePayeeRow,
+  BatchCreateSecurityRow,
+  BatchUpdateSecurityRow,
+  BatchDeleteSecurityRow,
   TransactionRowDescriptor,
   MAX_BULK_ACTION_ROWS,
 } from "./ai-action.types";
@@ -196,8 +208,16 @@ export class AiActionsService {
         return this.executeCategorize(userId, descriptor);
       case "create_payee":
         return this.executeCreatePayee(userId, descriptor);
+      case "update_payee":
+        return this.executeUpdatePayee(userId, descriptor);
+      case "delete_payee":
+        return this.executeDeletePayee(userId, descriptor);
       case "create_security":
         return this.executeCreateSecurity(userId, descriptor);
+      case "update_security":
+        return this.executeUpdateSecurity(userId, descriptor);
+      case "delete_security":
+        return this.executeDeleteSecurity(userId, descriptor);
       case "create_investment_transaction":
         return this.executeCreateInvestmentTransaction(userId, descriptor);
       case "create_transactions":
@@ -424,6 +444,64 @@ export class AiActionsService {
         );
         return r.transactionId;
       }
+      case "create_payee": {
+        const r = row as BatchCreatePayeeRow;
+        const dto = await this.toValidatedDto(CreatePayeeDto, {
+          name: r.name,
+          defaultCategoryId: r.defaultCategoryId ?? undefined,
+        });
+        const payee = await this.payeesService.create(userId, dto);
+        return payee.id;
+      }
+      case "update_payee": {
+        const r = row as BatchUpdatePayeeRow;
+        const dto = await this.toValidatedDto(UpdatePayeeDto, {
+          name: r.name,
+          defaultCategoryId: r.defaultCategoryId,
+        });
+        const payee = await this.payeesService.update(userId, r.payeeId, dto);
+        return payee.id;
+      }
+      case "delete_payee": {
+        const r = row as BatchDeletePayeeRow;
+        await this.payeesService.remove(userId, r.payeeId);
+        return r.payeeId;
+      }
+      case "create_security": {
+        const r = row as BatchCreateSecurityRow;
+        const dto = await this.toValidatedDto(CreateSecurityDto, {
+          symbol: r.symbol,
+          name: r.name,
+          securityType: r.securityType ?? undefined,
+          exchange: r.exchange ?? undefined,
+          currencyCode: r.currencyCode,
+          isFavourite: r.isFavourite,
+          quoteProvider: r.quoteProvider ?? undefined,
+          msnInstrumentId: r.msnInstrumentId ?? undefined,
+        });
+        const security = await this.securitiesService.create(userId, dto);
+        return security.id;
+      }
+      case "update_security": {
+        const r = row as BatchUpdateSecurityRow;
+        const dto = await this.toValidatedDto(UpdateSecurityDto, {
+          securityType: r.securityType ?? undefined,
+          exchange: r.exchange ?? undefined,
+          currencyCode: r.currencyCode,
+          isFavourite: r.isFavourite,
+        });
+        const security = await this.securitiesService.update(
+          userId,
+          r.securityId,
+          dto,
+        );
+        return security.id;
+      }
+      case "delete_security": {
+        const r = row as BatchDeleteSecurityRow;
+        await this.securitiesService.remove(userId, r.securityId);
+        return r.securityId;
+      }
     }
   }
 
@@ -544,6 +622,30 @@ export class AiActionsService {
     return { type: "create_payee", id: payee.id };
   }
 
+  private async executeUpdatePayee(
+    userId: string,
+    descriptor: UpdatePayeeDescriptor,
+  ): Promise<ConfirmActionResult> {
+    const dto = await this.toValidatedDto(UpdatePayeeDto, {
+      name: descriptor.name,
+      defaultCategoryId: descriptor.defaultCategoryId,
+    });
+    const payee = await this.payeesService.update(
+      userId,
+      descriptor.payeeId,
+      dto,
+    );
+    return { type: "update_payee", id: payee.id };
+  }
+
+  private async executeDeletePayee(
+    userId: string,
+    descriptor: DeletePayeeDescriptor,
+  ): Promise<ConfirmActionResult> {
+    await this.payeesService.remove(userId, descriptor.payeeId);
+    return { type: "delete_payee", id: descriptor.payeeId };
+  }
+
   private async executeCreateSecurity(
     userId: string,
     descriptor: CreateSecurityDescriptor,
@@ -560,6 +662,32 @@ export class AiActionsService {
     });
     const security = await this.securitiesService.create(userId, dto);
     return { type: "create_security", id: security.id };
+  }
+
+  private async executeUpdateSecurity(
+    userId: string,
+    descriptor: UpdateSecurityDescriptor,
+  ): Promise<ConfirmActionResult> {
+    const dto = await this.toValidatedDto(UpdateSecurityDto, {
+      securityType: descriptor.securityType ?? undefined,
+      exchange: descriptor.exchange ?? undefined,
+      currencyCode: descriptor.currencyCode,
+      isFavourite: descriptor.isFavourite,
+    });
+    const security = await this.securitiesService.update(
+      userId,
+      descriptor.securityId,
+      dto,
+    );
+    return { type: "update_security", id: security.id };
+  }
+
+  private async executeDeleteSecurity(
+    userId: string,
+    descriptor: DeleteSecurityDescriptor,
+  ): Promise<ConfirmActionResult> {
+    await this.securitiesService.remove(userId, descriptor.securityId);
+    return { type: "delete_security", id: descriptor.securityId };
   }
 
   private async executeCreateInvestmentTransaction(

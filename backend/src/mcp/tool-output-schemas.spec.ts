@@ -126,25 +126,6 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     },
   },
   {
-    name: "getSpendingByCategoryOutput",
-    schema: schemas.getSpendingByCategoryOutput,
-    raw: {
-      categories: [
-        { category: "Food", amount: 5, percentage: 100, transactionCount: 1 },
-      ],
-      totalSpending: 5,
-    },
-  },
-  {
-    name: "getIncomeSummaryOutput",
-    schema: schemas.getIncomeSummaryOutput,
-    raw: {
-      items: [{ label: "Salary", amount: 100, count: 1 }],
-      totalIncome: 100,
-      groupedBy: "category",
-    },
-  },
-  {
     name: "comparePeriodsOutput (tolerates NaN percentage from divide-by-zero)",
     schema: schemas.comparePeriodsOutput,
     raw: {
@@ -287,8 +268,8 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     },
   },
   {
-    name: "createSecurityOutput (created branch)",
-    schema: schemas.createSecurityOutput,
+    name: "manageSecuritiesOutput (single created branch)",
+    schema: schemas.manageSecuritiesOutput,
     raw: {
       id: "sec1",
       symbol: "AAPL",
@@ -297,28 +278,32 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
       exchange: "NASDAQ",
       currencyCode: "USD",
       isFavourite: false,
+      count: 1,
     },
   },
   {
-    name: "createSecurityOutput (dry-run branch)",
-    schema: schemas.createSecurityOutput,
+    name: "manageSecuritiesOutput (dry-run branch)",
+    schema: schemas.manageSecuritiesOutput,
     raw: {
       dryRun: true,
-      preview: {
-        symbol: "AAPL",
-        name: "Apple Inc.",
-        securityType: "STOCK",
-        exchange: "NASDAQ",
-        currencyCode: "USD",
-        isFavourite: false,
-        quoteProvider: "yahoo",
-      },
+      operation: "create",
+      previews: [{ status: "ok", symbol: "AAPL", securityName: "Apple Inc." }],
+      skipped: [],
       message: "This is a preview.",
     },
   },
   {
-    name: "createSecurityOutput (relay branch)",
-    schema: schemas.createSecurityOutput,
+    name: "manageSecuritiesOutput (bulk branch)",
+    schema: schemas.manageSecuritiesOutput,
+    raw: {
+      ids: ["sec1", "sec2"],
+      count: 2,
+      skipped: [{ index: 2, reason: 'No security matches "X"' }],
+    },
+  },
+  {
+    name: "manageSecuritiesOutput (relay branch)",
+    schema: schemas.manageSecuritiesOutput,
     raw: { status: "preview_shown" },
   },
   {
@@ -390,9 +375,18 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     ],
   },
   {
-    name: "createPayeeOutput",
-    schema: schemas.createPayeeOutput,
-    raw: { id: "p1", name: "Amazon", message: "Payee created successfully" },
+    name: "managePayeesOutput (single created branch)",
+    schema: schemas.managePayeesOutput,
+    raw: { id: "p1", name: "Amazon", count: 1 },
+  },
+  {
+    name: "managePayeesOutput (bulk branch)",
+    schema: schemas.managePayeesOutput,
+    raw: {
+      ids: ["p1", "p2"],
+      count: 2,
+      skipped: [{ index: 2, reason: 'Payee "x" not found' }],
+    },
   },
   {
     name: "generateReportOutput",
@@ -480,8 +474,8 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     },
   },
   {
-    name: "queryInvestmentTransactionsOutput",
-    schema: schemas.queryInvestmentTransactionsOutput,
+    name: "listInvestmentTransactionsOutput",
+    schema: schemas.listInvestmentTransactionsOutput,
     raw: {
       transactionCount: 1,
       totalAmount: 100,

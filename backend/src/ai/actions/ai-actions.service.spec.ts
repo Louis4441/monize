@@ -64,6 +64,8 @@ describe("AiActionsService", () => {
     };
     payees = {
       create: jest.fn().mockResolvedValue({ id: "payee-new" }),
+      update: jest.fn().mockResolvedValue({ id: "payee-1" }),
+      remove: jest.fn().mockResolvedValue(undefined),
       findOrCreate: jest.fn().mockResolvedValue({ id: PAYEE2 }),
     };
     investments = {
@@ -74,6 +76,8 @@ describe("AiActionsService", () => {
     };
     securities = {
       create: jest.fn().mockResolvedValue({ id: "sec-new" }),
+      update: jest.fn().mockResolvedValue({ id: "sec-1" }),
+      remove: jest.fn().mockResolvedValue(undefined),
     };
     service = new AiActionsService(
       transactions as never,
@@ -212,6 +216,38 @@ describe("AiActionsService", () => {
     expect(result).toEqual({ type: "create_payee", id: "payee-new" });
   });
 
+  it("updates a payee on a valid confirmation", async () => {
+    const descriptor = {
+      type: "update_payee" as const,
+      userId: USER,
+      actionId: "act-payee-upd",
+      expiresAt: Date.now() + 60_000,
+      payeeId: "payee-1",
+      name: "Acme Inc",
+      defaultCategoryId: CAT,
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(payees.update).toHaveBeenCalledWith(
+      USER,
+      "payee-1",
+      expect.objectContaining({ name: "Acme Inc", defaultCategoryId: CAT }),
+    );
+    expect(result).toEqual({ type: "update_payee", id: "payee-1" });
+  });
+
+  it("deletes a payee on a valid confirmation", async () => {
+    const descriptor = {
+      type: "delete_payee" as const,
+      userId: USER,
+      actionId: "act-payee-del",
+      expiresAt: Date.now() + 60_000,
+      payeeId: "payee-1",
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(payees.remove).toHaveBeenCalledWith(USER, "payee-1");
+    expect(result).toEqual({ type: "delete_payee", id: "payee-1" });
+  });
+
   it("creates a security on a valid confirmation", async () => {
     const descriptor: CreateSecurityDescriptor = {
       type: "create_security",
@@ -239,6 +275,151 @@ describe("AiActionsService", () => {
       }),
     );
     expect(result).toEqual({ type: "create_security", id: "sec-new" });
+  });
+
+  it("updates a security on a valid confirmation", async () => {
+    const descriptor = {
+      type: "update_security" as const,
+      userId: USER,
+      actionId: "act-sec-upd",
+      expiresAt: Date.now() + 60_000,
+      securityId: "sec-1",
+      securityType: "ETF",
+      exchange: "NYSE",
+      currencyCode: "USD",
+      isFavourite: true,
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(securities.update).toHaveBeenCalledWith(
+      USER,
+      "sec-1",
+      expect.objectContaining({ securityType: "ETF", isFavourite: true }),
+    );
+    expect(result).toEqual({ type: "update_security", id: "sec-1" });
+  });
+
+  it("deletes a security on a valid confirmation", async () => {
+    const descriptor = {
+      type: "delete_security" as const,
+      userId: USER,
+      actionId: "act-sec-del",
+      expiresAt: Date.now() + 60_000,
+      securityId: "sec-1",
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(securities.remove).toHaveBeenCalledWith(USER, "sec-1");
+    expect(result).toEqual({ type: "delete_security", id: "sec-1" });
+  });
+
+  it("executes a batch_actions create_payee envelope", async () => {
+    const descriptor = {
+      type: "batch_actions" as const,
+      userId: USER,
+      actionId: "act-batch-cp",
+      expiresAt: Date.now() + 60_000,
+      operation: "create_payee" as const,
+      rows: [{ name: "Acme", defaultCategoryId: CAT }],
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(payees.create).toHaveBeenCalled();
+    expect(result).toMatchObject({ type: "batch_actions", count: 1 });
+  });
+
+  it("executes a batch_actions update_payee envelope", async () => {
+    const descriptor = {
+      type: "batch_actions" as const,
+      userId: USER,
+      actionId: "act-batch-up",
+      expiresAt: Date.now() + 60_000,
+      operation: "update_payee" as const,
+      rows: [{ payeeId: "payee-1", name: "Acme Inc", defaultCategoryId: CAT }],
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(payees.update).toHaveBeenCalledWith(
+      USER,
+      "payee-1",
+      expect.any(Object),
+    );
+    expect(result).toMatchObject({ type: "batch_actions", count: 1 });
+  });
+
+  it("executes a batch_actions delete_payee envelope", async () => {
+    const descriptor = {
+      type: "batch_actions" as const,
+      userId: USER,
+      actionId: "act-batch-dp",
+      expiresAt: Date.now() + 60_000,
+      operation: "delete_payee" as const,
+      rows: [{ payeeId: "payee-1" }],
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(payees.remove).toHaveBeenCalledWith(USER, "payee-1");
+    expect(result).toMatchObject({ type: "batch_actions", count: 1 });
+  });
+
+  it("executes a batch_actions create_security envelope", async () => {
+    const descriptor = {
+      type: "batch_actions" as const,
+      userId: USER,
+      actionId: "act-batch-cs",
+      expiresAt: Date.now() + 60_000,
+      operation: "create_security" as const,
+      rows: [
+        {
+          symbol: "AAPL",
+          name: "Apple Inc.",
+          securityType: "STOCK",
+          exchange: "NASDAQ",
+          currencyCode: "USD",
+          isFavourite: false,
+          quoteProvider: "yahoo" as const,
+          msnInstrumentId: null,
+        },
+      ],
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(securities.create).toHaveBeenCalled();
+    expect(result).toMatchObject({ type: "batch_actions", count: 1 });
+  });
+
+  it("executes a batch_actions update_security envelope", async () => {
+    const descriptor = {
+      type: "batch_actions" as const,
+      userId: USER,
+      actionId: "act-batch-us",
+      expiresAt: Date.now() + 60_000,
+      operation: "update_security" as const,
+      rows: [
+        {
+          securityId: "sec-1",
+          securityType: "ETF",
+          exchange: "NYSE",
+          currencyCode: "USD",
+          isFavourite: true,
+        },
+      ],
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(securities.update).toHaveBeenCalledWith(
+      USER,
+      "sec-1",
+      expect.any(Object),
+    );
+    expect(result).toMatchObject({ type: "batch_actions", count: 1 });
+  });
+
+  it("executes a batch_actions delete_security envelope", async () => {
+    const descriptor = {
+      type: "batch_actions" as const,
+      userId: USER,
+      actionId: "act-batch-ds",
+      expiresAt: Date.now() + 60_000,
+      operation: "delete_security" as const,
+      rows: [{ securityId: "sec-1" }],
+    };
+    const result = await service.confirm(USER, dtoFor(descriptor));
+    expect(securities.remove).toHaveBeenCalledWith(USER, "sec-1");
+    expect(result).toMatchObject({ type: "batch_actions", count: 1 });
   });
 
   it("creates an investment transaction on a valid confirmation", async () => {
@@ -391,6 +572,34 @@ describe("AiActionsService", () => {
     await expect(
       service.confirm(USER, dtoFor(descriptor)),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("rejects a malformed descriptor (not an object)", async () => {
+    await expect(
+      service.confirm(USER, {
+        actionId: "x",
+        signature: "y",
+        descriptor: null as unknown as Record<string, unknown>,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("rejects an unknown descriptor type", async () => {
+    const descriptor = createTxDescriptor();
+    const dto = dtoFor(descriptor);
+    (dto.descriptor as Record<string, unknown>).type = "not_a_real_action";
+    await expect(service.confirm(USER, dto)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it("rejects when the descriptor actionId does not match the dto", async () => {
+    const descriptor = createTxDescriptor();
+    const dto = dtoFor(descriptor);
+    dto.actionId = "different-action-id";
+    await expect(service.confirm(USER, dto)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it("rejects a descriptor minted for another user", async () => {
@@ -726,6 +935,59 @@ describe("AiActionsService", () => {
       expect(result.type).toBe("batch_actions");
       expect(result.count).toBe(1);
       expect(result.skipped).toHaveLength(1);
+    });
+
+    it("executes batch_actions(update) for each row", async () => {
+      const descriptor: import("./ai-action.types").BatchActionsDescriptor = {
+        type: "batch_actions",
+        userId: USER,
+        actionId: "act-batch-upd",
+        expiresAt: Date.now() + 60_000,
+        operation: "update",
+        rows: [
+          {
+            transactionId: TX,
+            accountId: ACC,
+            amount: -25,
+            transactionDate: "2026-01-15",
+            payeeId: null,
+            payeeName: null,
+            createPayee: false,
+            categoryId: CAT,
+            description: null,
+            currencyCode: "USD",
+          },
+        ],
+      };
+      const result = await service.confirm(USER, dtoFor(descriptor));
+      expect(transactions.update).toHaveBeenCalled();
+      expect(result).toMatchObject({ type: "batch_actions", count: 1 });
+    });
+
+    it("executes batch_actions(create) for each row", async () => {
+      const descriptor: import("./ai-action.types").BatchActionsDescriptor = {
+        type: "batch_actions",
+        userId: USER,
+        actionId: "act-batch-create",
+        expiresAt: Date.now() + 60_000,
+        operation: "create",
+        rows: [
+          {
+            accountId: ACC,
+            amount: -25,
+            transactionDate: "2026-01-15",
+            payeeId: null,
+            payeeName: null,
+            createPayee: false,
+            categoryId: CAT,
+            description: null,
+            currencyCode: "USD",
+          },
+        ],
+      };
+      const result = await service.confirm(USER, dtoFor(descriptor));
+      expect(transactions.create).toHaveBeenCalled();
+      expect(result).toMatchObject({ type: "batch_actions", count: 1 });
     });
 
     it("executes batch_actions(create_transfer) for each row", async () => {

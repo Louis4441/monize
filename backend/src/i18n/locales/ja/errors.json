@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "「{{ name }}」という名前の支払先はすでに存在します",
+    "nameRequired": "支払先名は必須です",
     "notFound": "ID {{ id }} の支払先が見つかりません",
     "categoryIdsNotOwned": "カテゴリIDが見つからないか、ユーザーが所有していません：{{ ids }}",
     "aliasEmpty": "エイリアスは空にできません",

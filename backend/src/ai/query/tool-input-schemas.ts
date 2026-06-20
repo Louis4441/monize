@@ -37,6 +37,8 @@ export const listTransactionsSchema = z.object({
   transfersOnly: z.boolean().optional(),
   includeTransactions: z.boolean().optional(),
   limit: positiveIntSchema(1, 100).optional(),
+  sortBy: z.enum(["date", "amount", "payee"]).optional(),
+  sortDirection: z.enum(["asc", "desc"]).optional(),
 });
 
 const accountTypeSchema = z.preprocess(
@@ -66,18 +68,6 @@ export const listAccountsSchema = z.object({
 export const getCategoriesSchema = z.object({
   type: z.enum(["expense", "income", "all"]).optional(),
   search: z.string().max(100).optional(),
-});
-
-export const getSpendingByCategorySchema = z.object({
-  startDate: isoDateSchema.optional(),
-  endDate: isoDateSchema.optional(),
-  topN: positiveIntSchema(1, 50).optional(),
-});
-
-export const getIncomeSummarySchema = z.object({
-  startDate: isoDateSchema.optional(),
-  endDate: isoDateSchema.optional(),
-  groupBy: z.enum(["category", "payee", "month"]).optional(),
 });
 
 export const getNetWorthHistorySchema = z.object({
@@ -117,7 +107,7 @@ const investmentActionSchema = z.preprocess(
   z.enum(INVESTMENT_ACTIONS),
 );
 
-export const queryInvestmentTransactionsSchema = z.object({
+export const listInvestmentTransactionsSchema = z.object({
   startDate: isoDateSchema.optional(),
   endDate: isoDateSchema.optional(),
   accountNames: z.array(z.string().max(100)).max(50).optional(),
@@ -214,9 +204,19 @@ export const categorizeTransactionSchema = z.object({
   categoryName: z.string().min(1).max(100),
 });
 
-export const createPayeeSchema = z.object({
-  name: z.string().min(1).max(100),
-  defaultCategoryName: z.string().max(100).optional(),
+export const managePayeesSchema = z.object({
+  operation: z.enum(["create", "update", "delete"]),
+  items: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(100),
+        newName: z.string().min(1).max(100).optional(),
+        categoryName: z.string().max(100).optional(),
+      }),
+    )
+    .min(1)
+    .max(MAX_BULK_ACTION_ROWS),
+  approvalMode: z.enum(["bulk", "individual"]).optional(),
 });
 
 export const lookupSecuritiesSchema = z.object({
@@ -225,17 +225,28 @@ export const lookupSecuritiesSchema = z.object({
   provider: z.enum(["yahoo", "msn", "auto"]).optional(),
 });
 
-export const createSecuritySchema = z.object({
-  query: z.string().min(1).max(100),
-  exchange: z.enum(SECURITY_EXCHANGES).optional(),
-  securityType: z.enum(SECURITY_TYPES).optional(),
-  isFavourite: z.boolean().optional(),
-  // ISO 4217 alphabetic code; the confirm-time DTO re-validates it as a known
-  // currency, so the schema only needs to enforce the 3-letter shape here.
-  currencyCode: z
-    .string()
-    .regex(/^[A-Za-z]{3}$/)
-    .optional(),
+export const manageSecuritiesSchema = z.object({
+  operation: z.enum(["create", "update", "delete"]),
+  items: z
+    .array(
+      z.object({
+        // create: lookup query; update/delete: existing symbol or name.
+        query: z.string().min(1).max(100).optional(),
+        symbol: z.string().min(1).max(100).optional(),
+        exchange: z.enum(SECURITY_EXCHANGES).optional(),
+        securityType: z.enum(SECURITY_TYPES).optional(),
+        isFavourite: z.boolean().optional(),
+        // ISO 4217 alphabetic code; the confirm-time DTO re-validates it as a
+        // known currency, so the schema only enforces the 3-letter shape here.
+        currencyCode: z
+          .string()
+          .regex(/^[A-Za-z]{3}$/)
+          .optional(),
+      }),
+    )
+    .min(1)
+    .max(MAX_BULK_ACTION_ROWS),
+  approvalMode: z.enum(["bulk", "individual"]).optional(),
 });
 
 /**
@@ -504,20 +515,18 @@ export const toolInputSchemas: Record<string, z.ZodSchema> = {
   list_transactions: listTransactionsSchema,
   list_accounts: listAccountsSchema,
   get_categories: getCategoriesSchema,
-  get_spending_by_category: getSpendingByCategorySchema,
-  get_income_summary: getIncomeSummarySchema,
   get_net_worth_history: getNetWorthHistorySchema,
   compare_periods: comparePeriodsSchema,
   get_portfolio_summary: getPortfolioSummarySchema,
-  query_investment_transactions: queryInvestmentTransactionsSchema,
+  list_investment_transactions: listInvestmentTransactionsSchema,
   get_capital_gains: getCapitalGainsSchema,
   get_budget_status: getBudgetStatusSchema,
   get_upcoming_bills: getUpcomingBillsSchema,
   calculate: calculateSchema,
   render_chart: renderChartSchema,
   manage_transactions: manageTransactionsSchema,
-  create_payee: createPayeeSchema,
-  create_security: createSecuritySchema,
+  manage_payees: managePayeesSchema,
+  manage_securities: manageSecuritiesSchema,
   lookup_securities: lookupSecuritiesSchema,
   manage_investment_transactions: manageInvestmentTransactionsSchema,
 };

@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "名为\"{{ name }}\"的收款人已存在",
+    "nameRequired": "收款人名称为必填项",
     "notFound": "未找到 ID 为 {{ id }} 的收款人",
     "categoryIdsNotOwned": "未找到分类 ID 或不属于该用户：{{ ids }}",
     "aliasEmpty": "别名不能为空",

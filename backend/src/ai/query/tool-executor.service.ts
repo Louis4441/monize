@@ -8,6 +8,12 @@ import {
 import { AccountsService } from "../../accounts/accounts.service";
 import { TransactionsService } from "../../transactions/transactions.service";
 import { PayeesService } from "../../payees/payees.service";
+import {
+  PayeeToolPrepService,
+  ManageCreatePayeeRow,
+  ManageUpdatePayeeRow,
+  ManageDeletePayeeRow,
+} from "../../payees/payee-tool-prep.service";
 import { AiActionBuilderService } from "../actions/ai-action-builder.service";
 import { PendingAiAction } from "../actions/ai-action.types";
 import {
@@ -24,6 +30,12 @@ import { BudgetReportsService } from "../../budgets/budget-reports.service";
 import { PortfolioService } from "../../securities/portfolio.service";
 import { SecuritiesService } from "../../securities/securities.service";
 import {
+  SecurityToolPrepService,
+  ManageCreateSecurityRow,
+  ManageUpdateSecurityRow,
+  ManageDeleteSecurityRow,
+} from "../../securities/security-tool-prep.service";
+import {
   InvestmentTransactionsService,
   InvestmentCreateRowInput,
   InvestmentUpdateRowInput,
@@ -39,7 +51,6 @@ import { validateToolInput } from "./tool-input-schemas";
 import { executeCalculation, CalculateInput } from "./calculate-tool";
 import { sanitizePromptValue } from "../../common/sanitization.util";
 import {
-  DEFAULT_TOP_N,
   getDefaultDateRange,
   resolveComparePeriods,
 } from "../../common/tool-schemas";
@@ -86,6 +97,7 @@ export class ToolExecutorService {
     private readonly budgetReportsService: BudgetReportsService,
     private readonly portfolioService: PortfolioService,
     private readonly securitiesService: SecuritiesService,
+    private readonly securityPrepService: SecurityToolPrepService,
     private readonly investmentTransactionsService: InvestmentTransactionsService,
     @Inject(forwardRef(() => ScheduledTransactionsService))
     private readonly scheduledTransactionsService: ScheduledTransactionsService,
@@ -93,6 +105,8 @@ export class ToolExecutorService {
     private readonly transactionsService: TransactionsService,
     @Inject(forwardRef(() => PayeesService))
     private readonly payeesService: PayeesService,
+    @Inject(forwardRef(() => PayeeToolPrepService))
+    private readonly payeePrepService: PayeeToolPrepService,
     @Inject(forwardRef(() => TransactionToolPrepService))
     private readonly prepService: TransactionToolPrepService,
     private readonly actionBuilder: AiActionBuilderService,
@@ -135,12 +149,6 @@ export class ToolExecutorService {
         case "get_categories":
           result = await this.getCategories(userId, validatedInput);
           break;
-        case "get_spending_by_category":
-          result = await this.getSpendingByCategory(userId, validatedInput);
-          break;
-        case "get_income_summary":
-          result = await this.getIncomeSummary(userId, validatedInput);
-          break;
         case "get_net_worth_history":
           result = await this.getNetWorthHistory(userId, validatedInput);
           break;
@@ -150,8 +158,8 @@ export class ToolExecutorService {
         case "get_portfolio_summary":
           result = await this.getPortfolioSummary(userId, validatedInput);
           break;
-        case "query_investment_transactions":
-          result = await this.queryInvestmentTransactions(
+        case "list_investment_transactions":
+          result = await this.listInvestmentTransactions(
             userId,
             validatedInput,
           );
@@ -174,11 +182,11 @@ export class ToolExecutorService {
         case "manage_transactions":
           result = await this.manageTransactions(userId, validatedInput);
           break;
-        case "create_payee":
-          result = await this.createPayeeAction(userId, validatedInput);
+        case "manage_payees":
+          result = await this.managePayees(userId, validatedInput);
           break;
-        case "create_security":
-          result = await this.createSecurityAction(userId, validatedInput);
+        case "manage_securities":
+          result = await this.manageSecurities(userId, validatedInput);
           break;
         case "lookup_securities":
           result = await this.lookupSecuritiesAction(userId, validatedInput);
@@ -321,6 +329,10 @@ export class ToolExecutorService {
     const includeTransactions =
       (input.includeTransactions as boolean | undefined) ?? false;
     const limit = Math.min((input.limit as number | undefined) ?? 50, 100);
+    const sortBy =
+      (input.sortBy as "date" | "amount" | "payee" | undefined) ?? "date";
+    const sortDirection =
+      (input.sortDirection as "asc" | "desc" | undefined) ?? "desc";
 
     const accountIds = await this.resolveAccountIds(userId, accountNames);
 
@@ -386,6 +398,8 @@ export class ToolExecutorService {
           minAmount,
           maxAmount,
           limit,
+          sortBy,
+          sortDirection,
         },
       );
       merged = {
@@ -795,83 +809,461 @@ export class ToolExecutorService {
     };
   }
 
-  private async createPayeeAction(
+  /**
+   * Unified payee write handler. Mirrors manageTransactions: resolves names +
+   * builds previews via the shared PayeeToolPrepService, then emits the right
+   * pending action(s) per operation/approvalMode (single -> one card; bulk +
+   * bulk mode -> one batch card; bulk + individual -> an array of single cards).
+   */
+  private async managePayees(
     userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const name = input.name as string;
-    const defaultCategoryName = input.defaultCategoryName as string | undefined;
+    const operation = input.operation as "create" | "update" | "delete";
+    const items = (input.items as Array<Record<string, unknown>>) ?? [];
+    const approvalMode =
+      (input.approvalMode as "bulk" | "individual" | undefined) ?? "bulk";
+    const single = items.length === 1;
 
-    let defaultCategoryId: string | undefined;
-    if (defaultCategoryName) {
-      const resolved = await this.resolveSingleCategoryId(
-        userId,
-        defaultCategoryName,
-      );
-      if (!resolved) {
-        return this.toolError(
-          `Unknown category: ${defaultCategoryName}. Call get_categories to look up valid names.`,
-        );
-      }
-      defaultCategoryId = resolved;
+    if (operation === "create") {
+      return this.managePayeeCreate(userId, items, single, approvalMode);
     }
-
-    let preview;
-    try {
-      preview = await this.payeesService.previewCreate(userId, {
-        name,
-        defaultCategoryId,
-      });
-    } catch (err) {
-      return this.toolErrorFromException(err, "Could not prepare the payee.");
+    if (operation === "update") {
+      return this.managePayeeUpdate(userId, items, single, approvalMode);
     }
+    return this.managePayeeDelete(userId, items, single, approvalMode);
+  }
 
-    const pendingAction = this.actionBuilder.buildCreatePayee(userId, preview);
-
+  private toPayeeCreateRow(
+    item: Record<string, unknown>,
+  ): ManageCreatePayeeRow {
     return {
-      data: PENDING_ACTION_TOOL_RESULT,
-      summary: `Prepared to create payee "${preview.name}". Awaiting user confirmation.`,
-      sources: [],
-      pendingAction,
+      name: item.name as string,
+      categoryName: item.categoryName as string | undefined,
     };
   }
 
-  private async createSecurityAction(
+  private toPayeeUpdateRow(
+    item: Record<string, unknown>,
+  ): ManageUpdatePayeeRow {
+    return {
+      name: item.name as string,
+      newName: item.newName as string | undefined,
+      categoryName: item.categoryName as string | undefined,
+    };
+  }
+
+  private toPayeeDeleteRow(
+    item: Record<string, unknown>,
+  ): ManageDeletePayeeRow {
+    return { name: item.name as string };
+  }
+
+  private async managePayeeCreate(
+    userId: string,
+    items: Array<Record<string, unknown>>,
+    single: boolean,
+    approvalMode: "bulk" | "individual",
+  ): Promise<ToolResult> {
+    if (single) {
+      try {
+        const preview = await this.payeePrepService.prepareCreatePayeeSingle(
+          userId,
+          this.toPayeeCreateRow(items[0]),
+        );
+        return {
+          data: PENDING_ACTION_TOOL_RESULT,
+          summary: `Prepared to create payee "${preview.name}"${preview.defaultCategoryName ? ` with default category ${preview.defaultCategoryName}` : ""}. Awaiting user confirmation.`,
+          sources: [],
+          pendingAction: this.actionBuilder.buildCreatePayee(userId, preview),
+        };
+      } catch (err) {
+        return this.toolErrorFromException(err, "Could not prepare the payee.");
+      }
+    }
+
+    const prep = await this.payeePrepService.prepareCreatePayees(
+      userId,
+      items.map((i) => this.toPayeeCreateRow(i)),
+    );
+    if (prep.okPreviews.length === 0) {
+      return this.toolError(
+        "None of the payees could be prepared. Check the name and category for each row.",
+      );
+    }
+    if (approvalMode === "individual") {
+      return {
+        data: PENDING_ACTION_TOOL_RESULT,
+        summary: `Prepared ${prep.okPreviews.length} individual payee card${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+        sources: [],
+        pendingActions: prep.okPreviews.map((p) =>
+          this.actionBuilder.buildCreatePayee(userId, p),
+        ),
+      };
+    }
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared ${prep.okPreviews.length} payee${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+      sources: [],
+      pendingAction: this.actionBuilder.buildBatchActions(
+        userId,
+        "create_payee",
+        prep.okRows,
+        prep.previewRows,
+      ),
+    };
+  }
+
+  private async managePayeeUpdate(
+    userId: string,
+    items: Array<Record<string, unknown>>,
+    single: boolean,
+    approvalMode: "bulk" | "individual",
+  ): Promise<ToolResult> {
+    if (single) {
+      try {
+        const preview = await this.payeePrepService.prepareUpdatePayeeSingle(
+          userId,
+          this.toPayeeUpdateRow(items[0]),
+        );
+        return {
+          data: PENDING_ACTION_TOOL_RESULT,
+          summary: `Prepared an edit to payee "${preview.name}" (default category ${preview.defaultCategoryName ?? "none"}). Awaiting user confirmation.`,
+          sources: [],
+          pendingAction: this.actionBuilder.buildUpdatePayee(userId, preview),
+        };
+      } catch (err) {
+        return this.toolErrorFromException(
+          err,
+          "Could not prepare the payee edit.",
+        );
+      }
+    }
+
+    const prep = await this.payeePrepService.prepareUpdatePayees(
+      userId,
+      items.map((i) => this.toPayeeUpdateRow(i)),
+    );
+    if (prep.okPreviews.length === 0) {
+      return this.toolError("None of the payee edits could be prepared.");
+    }
+    if (approvalMode === "individual") {
+      return {
+        data: PENDING_ACTION_TOOL_RESULT,
+        summary: `Prepared ${prep.okPreviews.length} individual payee edit card${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+        sources: [],
+        pendingActions: prep.okPreviews.map((p) =>
+          this.actionBuilder.buildUpdatePayee(userId, p),
+        ),
+      };
+    }
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared ${prep.okPreviews.length} payee edit${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+      sources: [],
+      pendingAction: this.actionBuilder.buildBatchActions(
+        userId,
+        "update_payee",
+        prep.okRows,
+        prep.previewRows,
+      ),
+    };
+  }
+
+  private async managePayeeDelete(
+    userId: string,
+    items: Array<Record<string, unknown>>,
+    single: boolean,
+    approvalMode: "bulk" | "individual",
+  ): Promise<ToolResult> {
+    if (single) {
+      try {
+        const preview = await this.payeePrepService.prepareDeletePayeeSingle(
+          userId,
+          this.toPayeeDeleteRow(items[0]),
+        );
+        return {
+          data: PENDING_ACTION_TOOL_RESULT,
+          summary: `Prepared to delete payee "${preview.name}". Awaiting user confirmation.`,
+          sources: [],
+          pendingAction: this.actionBuilder.buildDeletePayee(userId, preview),
+        };
+      } catch (err) {
+        return this.toolErrorFromException(
+          err,
+          "Could not prepare the payee deletion.",
+        );
+      }
+    }
+
+    const prep = await this.payeePrepService.prepareDeletePayees(
+      userId,
+      items.map((i) => this.toPayeeDeleteRow(i)),
+    );
+    if (prep.okPreviews.length === 0) {
+      return this.toolError(
+        "None of the payees could be prepared for deletion.",
+      );
+    }
+    if (approvalMode === "individual") {
+      return {
+        data: PENDING_ACTION_TOOL_RESULT,
+        summary: `Prepared ${prep.okPreviews.length} individual payee delete card${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+        sources: [],
+        pendingActions: prep.okPreviews.map((p) =>
+          this.actionBuilder.buildDeletePayee(userId, p),
+        ),
+      };
+    }
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared to delete ${prep.okPreviews.length} payee${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+      sources: [],
+      pendingAction: this.actionBuilder.buildBatchActions(
+        userId,
+        "delete_payee",
+        prep.okRows,
+        prep.previewRows,
+      ),
+    };
+  }
+
+  /**
+   * Unified security write handler. Mirrors manageTransactions/managePayees:
+   * resolves the lookup/symbol + builds previews via the shared
+   * SecurityToolPrepService, then emits the right pending action(s) per
+   * operation/approvalMode.
+   */
+  private async manageSecurities(
     userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
-    const query = input.query as string;
-    const exchange = input.exchange as string | undefined;
-    const securityType = input.securityType as string | undefined;
-    const isFavourite = input.isFavourite as boolean | undefined;
-    const currencyCode = input.currencyCode as string | undefined;
+    const operation = input.operation as "create" | "update" | "delete";
+    const items = (input.items as Array<Record<string, unknown>>) ?? [];
+    const approvalMode =
+      (input.approvalMode as "bulk" | "individual" | undefined) ?? "bulk";
+    const single = items.length === 1;
 
-    let preview;
-    try {
-      preview = await this.securitiesService.previewCreateSecurity(userId, {
-        query,
-        exchange,
-        securityType,
-        isFavourite,
-        currencyCode,
-      });
-    } catch (err) {
-      return this.toolErrorFromException(
-        err,
-        "Could not prepare the security.",
-      );
+    if (operation === "create") {
+      return this.manageSecurityCreate(userId, items, single, approvalMode);
+    }
+    if (operation === "update") {
+      return this.manageSecurityUpdate(userId, items, single, approvalMode);
+    }
+    return this.manageSecurityDelete(userId, items, single, approvalMode);
+  }
+
+  private toSecurityCreateRow(
+    item: Record<string, unknown>,
+  ): ManageCreateSecurityRow {
+    return {
+      query: item.query as string,
+      exchange: item.exchange as string | undefined,
+      securityType: item.securityType as string | undefined,
+      isFavourite: item.isFavourite as boolean | undefined,
+      currencyCode: item.currencyCode as string | undefined,
+    };
+  }
+
+  private toSecurityUpdateRow(
+    item: Record<string, unknown>,
+  ): ManageUpdateSecurityRow {
+    return {
+      query: item.symbol as string,
+      securityType: item.securityType as string | undefined,
+      exchange: item.exchange as string | undefined,
+      isFavourite: item.isFavourite as boolean | undefined,
+      currencyCode: item.currencyCode as string | undefined,
+    };
+  }
+
+  private toSecurityDeleteRow(
+    item: Record<string, unknown>,
+  ): ManageDeleteSecurityRow {
+    return { query: item.symbol as string };
+  }
+
+  private async manageSecurityCreate(
+    userId: string,
+    items: Array<Record<string, unknown>>,
+    single: boolean,
+    approvalMode: "bulk" | "individual",
+  ): Promise<ToolResult> {
+    if (single) {
+      try {
+        const preview =
+          await this.securityPrepService.prepareCreateSecuritySingle(
+            userId,
+            this.toSecurityCreateRow(items[0]),
+          );
+        return {
+          data: PENDING_ACTION_TOOL_RESULT,
+          summary: `Prepared to create security ${preview.symbol} (${preview.name})${preview.exchange ? ` on ${preview.exchange}` : ""}. Awaiting user confirmation.`,
+          sources: [],
+          pendingAction: this.actionBuilder.buildCreateSecurity(
+            userId,
+            preview,
+          ),
+        };
+      } catch (err) {
+        return this.toolErrorFromException(
+          err,
+          "Could not prepare the security.",
+        );
+      }
     }
 
-    const pendingAction = this.actionBuilder.buildCreateSecurity(
+    const prep = await this.securityPrepService.prepareCreateSecurities(
       userId,
-      preview,
+      items.map((i) => this.toSecurityCreateRow(i)),
     );
-
+    if (prep.okPreviews.length === 0) {
+      return this.toolError(
+        "None of the securities could be prepared. Check the ticker/name for each row.",
+      );
+    }
+    if (approvalMode === "individual") {
+      return {
+        data: PENDING_ACTION_TOOL_RESULT,
+        summary: `Prepared ${prep.okPreviews.length} individual security card${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+        sources: [],
+        pendingActions: prep.okPreviews.map((p) =>
+          this.actionBuilder.buildCreateSecurity(userId, p),
+        ),
+      };
+    }
     return {
       data: PENDING_ACTION_TOOL_RESULT,
-      summary: `Prepared to create security ${preview.symbol} (${preview.name})${preview.exchange ? ` on ${preview.exchange}` : ""}. Awaiting user confirmation.`,
+      summary: `Prepared ${prep.okPreviews.length} security/securities${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
       sources: [],
-      pendingAction,
+      pendingAction: this.actionBuilder.buildBatchActions(
+        userId,
+        "create_security",
+        prep.okRows,
+        prep.previewRows,
+      ),
+    };
+  }
+
+  private async manageSecurityUpdate(
+    userId: string,
+    items: Array<Record<string, unknown>>,
+    single: boolean,
+    approvalMode: "bulk" | "individual",
+  ): Promise<ToolResult> {
+    if (single) {
+      try {
+        const preview =
+          await this.securityPrepService.prepareUpdateSecuritySingle(
+            userId,
+            this.toSecurityUpdateRow(items[0]),
+          );
+        return {
+          data: PENDING_ACTION_TOOL_RESULT,
+          summary: `Prepared an edit to security ${preview.symbol}. Awaiting user confirmation.`,
+          sources: [],
+          pendingAction: this.actionBuilder.buildUpdateSecurity(
+            userId,
+            preview,
+          ),
+        };
+      } catch (err) {
+        return this.toolErrorFromException(
+          err,
+          "Could not prepare the security edit.",
+        );
+      }
+    }
+
+    const prep = await this.securityPrepService.prepareUpdateSecurities(
+      userId,
+      items.map((i) => this.toSecurityUpdateRow(i)),
+    );
+    if (prep.okPreviews.length === 0) {
+      return this.toolError("None of the security edits could be prepared.");
+    }
+    if (approvalMode === "individual") {
+      return {
+        data: PENDING_ACTION_TOOL_RESULT,
+        summary: `Prepared ${prep.okPreviews.length} individual security edit card${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+        sources: [],
+        pendingActions: prep.okPreviews.map((p) =>
+          this.actionBuilder.buildUpdateSecurity(userId, p),
+        ),
+      };
+    }
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared ${prep.okPreviews.length} security edit${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+      sources: [],
+      pendingAction: this.actionBuilder.buildBatchActions(
+        userId,
+        "update_security",
+        prep.okRows,
+        prep.previewRows,
+      ),
+    };
+  }
+
+  private async manageSecurityDelete(
+    userId: string,
+    items: Array<Record<string, unknown>>,
+    single: boolean,
+    approvalMode: "bulk" | "individual",
+  ): Promise<ToolResult> {
+    if (single) {
+      try {
+        const preview =
+          await this.securityPrepService.prepareDeleteSecuritySingle(
+            userId,
+            this.toSecurityDeleteRow(items[0]),
+          );
+        return {
+          data: PENDING_ACTION_TOOL_RESULT,
+          summary: `Prepared to delete security ${preview.symbol} (${preview.name}). Awaiting user confirmation.`,
+          sources: [],
+          pendingAction: this.actionBuilder.buildDeleteSecurity(
+            userId,
+            preview,
+          ),
+        };
+      } catch (err) {
+        return this.toolErrorFromException(
+          err,
+          "Could not prepare the security deletion.",
+        );
+      }
+    }
+
+    const prep = await this.securityPrepService.prepareDeleteSecurities(
+      userId,
+      items.map((i) => this.toSecurityDeleteRow(i)),
+    );
+    if (prep.okPreviews.length === 0) {
+      return this.toolError(
+        "None of the securities could be prepared for deletion.",
+      );
+    }
+    if (approvalMode === "individual") {
+      return {
+        data: PENDING_ACTION_TOOL_RESULT,
+        summary: `Prepared ${prep.okPreviews.length} individual security delete card${prep.okPreviews.length === 1 ? "" : "s"}${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+        sources: [],
+        pendingActions: prep.okPreviews.map((p) =>
+          this.actionBuilder.buildDeleteSecurity(userId, p),
+        ),
+      };
+    }
+    return {
+      data: PENDING_ACTION_TOOL_RESULT,
+      summary: `Prepared to delete ${prep.okPreviews.length} security/securities${prep.skipped.length ? ` (${prep.skipped.length} skipped)` : ""}. Awaiting user confirmation.`,
+      sources: [],
+      pendingAction: this.actionBuilder.buildBatchActions(
+        userId,
+        "delete_security",
+        prep.okRows,
+        prep.previewRows,
+      ),
     };
   }
 
@@ -1303,65 +1695,6 @@ export class ToolExecutorService {
     };
   }
 
-  private async getSpendingByCategory(
-    userId: string,
-    input: Record<string, unknown>,
-  ): Promise<ToolResult> {
-    const defaults = getDefaultDateRange();
-    const startDate = (input.startDate as string) ?? defaults.startDate;
-    const endDate = (input.endDate as string) ?? defaults.endDate;
-    const topN = (input.topN as number | undefined) ?? DEFAULT_TOP_N;
-
-    const data = await this.analyticsService.getLlmSpendingByCategory(
-      userId,
-      startDate,
-      endDate,
-      topN,
-    );
-
-    return {
-      data,
-      summary: `Total spending: ${data.totalSpending.toFixed(2)} across ${data.categories.length} categories from ${startDate} to ${endDate}`,
-      sources: [
-        {
-          type: "spending",
-          description: "Spending breakdown by category",
-          dateRange: `${startDate} to ${endDate}`,
-        },
-      ],
-    };
-  }
-
-  private async getIncomeSummary(
-    userId: string,
-    input: Record<string, unknown>,
-  ): Promise<ToolResult> {
-    const defaults = getDefaultDateRange();
-    const startDate = (input.startDate as string) ?? defaults.startDate;
-    const endDate = (input.endDate as string) ?? defaults.endDate;
-    const groupBy =
-      (input.groupBy as "category" | "payee" | "month") || "category";
-
-    const data = await this.analyticsService.getLlmIncomeSummary(
-      userId,
-      startDate,
-      endDate,
-      groupBy,
-    );
-
-    return {
-      data,
-      summary: `Total income: ${data.totalIncome.toFixed(2)} from ${startDate} to ${endDate}, grouped by ${groupBy}`,
-      sources: [
-        {
-          type: "income",
-          description: `Income summary by ${groupBy}`,
-          dateRange: `${startDate} to ${endDate}`,
-        },
-      ],
-    };
-  }
-
   private async getNetWorthHistory(
     userId: string,
     input: Record<string, unknown>,
@@ -1462,7 +1795,7 @@ export class ToolExecutorService {
     };
   }
 
-  private async queryInvestmentTransactions(
+  private async listInvestmentTransactions(
     userId: string,
     input: Record<string, unknown>,
   ): Promise<ToolResult> {

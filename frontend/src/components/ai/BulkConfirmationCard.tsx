@@ -41,6 +41,14 @@ export function BulkConfirmationCard({
     batchOp === 'update_investment' ||
     batchOp === 'delete_investment';
   const isTransfer = batchOp === 'create_transfer';
+  const isPayee =
+    batchOp === 'create_payee' ||
+    batchOp === 'update_payee' ||
+    batchOp === 'delete_payee';
+  const isSecurity =
+    batchOp === 'create_security' ||
+    batchOp === 'update_security' ||
+    batchOp === 'delete_security';
 
   const rows = preview.rows ?? [];
   const validCount = rows.filter((r) => r.status === 'ok').length;
@@ -53,17 +61,33 @@ export function BulkConfirmationCard({
         ? t('confirmAction.deleteInvestmentTransactionsTitle')
         : type === 'create_investment_transactions'
           ? t('confirmAction.createInvestmentTransactionsTitle')
-          : batchOp === 'update'
-            ? t('confirmAction.updateTransactionsTitle')
-            : batchOp === 'delete'
-              ? t('confirmAction.deleteTransactionsTitle')
-              : isTransfer
-                ? t('confirmAction.createTransfersTitle')
-                : t('confirmAction.createTransactionsTitle');
+          : batchOp === 'create_payee'
+            ? t('confirmAction.createPayeesTitle')
+            : batchOp === 'update_payee'
+              ? t('confirmAction.updatePayeesTitle')
+              : batchOp === 'delete_payee'
+                ? t('confirmAction.deletePayeesTitle')
+                : batchOp === 'create_security'
+                  ? t('confirmAction.createSecuritiesTitle')
+                  : batchOp === 'update_security'
+                    ? t('confirmAction.updateSecuritiesTitle')
+                    : batchOp === 'delete_security'
+                      ? t('confirmAction.deleteSecuritiesTitle')
+                      : batchOp === 'update'
+                  ? t('confirmAction.updateTransactionsTitle')
+                  : batchOp === 'delete'
+                    ? t('confirmAction.deleteTransactionsTitle')
+                    : isTransfer
+                      ? t('confirmAction.createTransfersTitle')
+                      : t('confirmAction.createTransactionsTitle');
 
   const viewLink = isInvestment
     ? { href: '/investments', label: t('confirmAction.viewInvestments') }
-    : { href: '/transactions', label: t('confirmAction.viewTransaction') };
+    : isPayee
+      ? { href: '/payees', label: t('confirmAction.viewPayees') }
+      : isSecurity
+        ? { href: '/securities', label: t('confirmAction.viewSecurities') }
+        : { href: '/transactions', label: t('confirmAction.viewTransaction') };
 
   // On success, prefer the server's actual affected count; fall back to the
   // number of valid rows the card displayed.
@@ -79,15 +103,33 @@ export function BulkConfirmationCard({
           ? t('confirmAction.createdInvestmentTransactions', {
               count: createdCount,
             })
-          : batchOp === 'update'
-            ? t('confirmAction.updatedTransactions', { count: createdCount })
-            : batchOp === 'delete'
-              ? t('confirmAction.deletedTransactions', { count: createdCount })
-              : isTransfer
-                ? t('confirmAction.createdTransfers', { count: createdCount })
-                : t('confirmAction.createdTransactions', {
-                    count: createdCount,
-                  });
+          : batchOp === 'create_payee'
+            ? t('confirmAction.createdPayees', { count: createdCount })
+            : batchOp === 'update_payee'
+              ? t('confirmAction.updatedPayees', { count: createdCount })
+              : batchOp === 'delete_payee'
+                ? t('confirmAction.deletedPayees', { count: createdCount })
+                : batchOp === 'create_security'
+                  ? t('confirmAction.createdSecurities', { count: createdCount })
+                  : batchOp === 'update_security'
+                    ? t('confirmAction.updatedSecurities', {
+                        count: createdCount,
+                      })
+                    : batchOp === 'delete_security'
+                      ? t('confirmAction.deletedSecurities', {
+                          count: createdCount,
+                        })
+                      : batchOp === 'update'
+                  ? t('confirmAction.updatedTransactions', { count: createdCount })
+                  : batchOp === 'delete'
+                    ? t('confirmAction.deletedTransactions', {
+                        count: createdCount,
+                      })
+                    : isTransfer
+                      ? t('confirmAction.createdTransfers', { count: createdCount })
+                      : t('confirmAction.createdTransactions', {
+                          count: createdCount,
+                        });
   const skippedAtConfirm = action.resultSkipped?.length ?? 0;
 
   function describeRow(row: PendingActionPreviewRow): {
@@ -147,6 +189,18 @@ export function BulkConfirmationCard({
             : row.payeeName,
         );
       return { primary, secondary: parts.join(' · ') };
+    }
+    if (isPayee) {
+      return {
+        primary: row.name || '',
+        secondary: row.categoryName || '',
+      };
+    }
+    if (isSecurity) {
+      return {
+        primary: row.symbol || '',
+        secondary: row.securityName || '',
+      };
     }
     const payee = row.payeeName || row.accountName || '';
     const primary = [date, payee].filter(Boolean).join(' · ');

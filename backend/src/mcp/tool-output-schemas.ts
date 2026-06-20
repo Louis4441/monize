@@ -93,30 +93,6 @@ export const getNetWorthHistoryOutput = {
 // transactions.tool.ts
 // ---------------------------------------------------------------------------
 
-export const getSpendingByCategoryOutput = {
-  categories: z.array(
-    looseObject({
-      category: str,
-      amount: num,
-      percentage: num,
-      transactionCount: num,
-    }),
-  ),
-  totalSpending: num,
-};
-
-export const getIncomeSummaryOutput = {
-  items: z.array(
-    looseObject({
-      label: str,
-      amount: num,
-      count: num,
-    }),
-  ),
-  totalIncome: num,
-  groupedBy: str,
-};
-
 export const comparePeriodsOutput = {
   period1: looseObject({ start: str, end: str, total: num }),
   period2: looseObject({ start: str, end: str, total: num }),
@@ -259,11 +235,26 @@ export const getPayeesOutput = {
   ),
 };
 
-export const createPayeeOutput = {
-  // Created branch (direct MCP client).
+/**
+ * Tolerant output for the unified `manage_payees` tool. Like
+ * manage_transactions it has many result branches (dry-run preview, single
+ * created/updated/deleted, bulk count/skipped, and the relay branch), so ALL
+ * fields are optional and the object is loose.
+ */
+export const managePayeesOutput = {
+  // Dry-run preview branch (per-item previews + skipped rows).
+  dryRun: bool.optional(),
+  operation: str.optional(),
+  previews: z.array(looseObject({})).optional(),
+  message: str.optional(),
+  // Single created/updated/deleted branch.
   id: str.optional(),
   name: str.optional(),
-  message: str.optional(),
+  deleted: bool.optional(),
+  // Bulk branch.
+  ids: z.array(str).optional(),
+  count: num.optional(),
+  skipped: z.array(bulkSkippedRow).optional(),
   // Relay branch: a confirmation card was shown in the web chat instead.
   status: str.optional(),
 };
@@ -354,7 +345,7 @@ export const getPortfolioSummaryOutput = {
   ),
 };
 
-export const queryInvestmentTransactionsOutput = {
+export const listInvestmentTransactionsOutput = {
   transactionCount: num,
   totalAmount: num,
   totalCommission: num,
@@ -445,22 +436,19 @@ export const lookupSecuritiesOutput = {
   ),
 };
 
-export const createSecurityOutput = {
-  // Dry-run preview branch.
+/**
+ * Tolerant output for the unified `manage_securities` tool. Like
+ * manage_transactions it has many result branches (dry-run preview, single
+ * created/updated/deleted, bulk count/skipped, and the relay branch), so ALL
+ * fields are optional and the object is loose.
+ */
+export const manageSecuritiesOutput = {
+  // Dry-run preview branch (per-item previews + skipped rows).
   dryRun: bool.optional(),
-  preview: z
-    .object({
-      symbol: str.optional(),
-      name: str.optional(),
-      securityType: strNull.optional(),
-      exchange: strNull.optional(),
-      currencyCode: str.optional(),
-      isFavourite: bool.optional(),
-      quoteProvider: strNull.optional(),
-    })
-    .optional(),
+  operation: str.optional(),
+  previews: z.array(looseObject({})).optional(),
   message: str.optional(),
-  // Created-security branch.
+  // Single created/updated/deleted branch.
   id: str.optional(),
   symbol: str.optional(),
   name: str.optional(),
@@ -468,6 +456,11 @@ export const createSecurityOutput = {
   exchange: strNull.optional(),
   currencyCode: str.optional(),
   isFavourite: bool.optional(),
+  deleted: bool.optional(),
+  // Bulk branch.
+  ids: z.array(str).optional(),
+  count: num.optional(),
+  skipped: z.array(bulkSkippedRow).optional(),
   // Relay branch: a confirmation card was shown in the web chat instead.
   status: str.optional(),
 };

@@ -286,6 +286,7 @@
   },
   "payees": {
     "nameConflict": "Zahlungsempfänger mit dem Namen \"{{ name }}\" existiert bereits",
+    "nameRequired": "Name des Zahlungsempfängers ist erforderlich",
     "notFound": "Zahlungsempfänger mit ID {{ id }} nicht gefunden",
     "categoryIdsNotOwned": "Kategorie-IDs nicht gefunden oder nicht im Besitz des Benutzers: {{ ids }}",
     "aliasEmpty": "Alias darf nicht leer sein",
