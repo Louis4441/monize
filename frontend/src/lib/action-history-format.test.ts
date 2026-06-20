@@ -22,6 +22,30 @@ describe('renderActionDescription', () => {
     ).toBe('actionHistory.descriptions.createdPayee::{"name":"Acme"}');
   });
 
+  it('localizes the action enum for investment transaction keys', () => {
+    expect(
+      renderActionDescription(t, {
+        description: 'Created BUY transaction',
+        descriptionKey: 'createdInvestmentTransaction',
+        descriptionParams: { action: 'BUY' },
+      }),
+    ).toBe(
+      'actionHistory.descriptions.createdInvestmentTransaction::{"action":"actionHistory.actionLabels.BUY"}',
+    );
+  });
+
+  it('leaves an unknown action enum value untouched', () => {
+    expect(
+      renderActionDescription(t, {
+        description: 'Created MYSTERY transaction',
+        descriptionKey: 'createdInvestmentTransaction',
+        descriptionParams: { action: 'MYSTERY' },
+      }),
+    ).toBe(
+      'actionHistory.descriptions.createdInvestmentTransaction::{"action":"MYSTERY"}',
+    );
+  });
+
   it('passes an empty params object for keys without params', () => {
     expect(
       renderActionDescription(t, {

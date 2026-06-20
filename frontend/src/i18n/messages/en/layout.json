@@ -62,6 +62,19 @@
       "budget": "Budget",
       "custom_report": "Report"
     },
+    "actionLabels": {
+      "BUY": "Buy",
+      "SELL": "Sell",
+      "DIVIDEND": "Dividend",
+      "INTEREST": "Interest",
+      "CAPITAL_GAIN": "Capital Gain",
+      "SPLIT": "Split",
+      "TRANSFER_IN": "Transfer In",
+      "TRANSFER_OUT": "Transfer Out",
+      "REINVEST": "Reinvest",
+      "ADD_SHARES": "Add Shares",
+      "REMOVE_SHARES": "Remove Shares"
+    },
     "descriptions": {
       "createdAccount": "Created account \"{name}\"",
       "updatedAccount": "Updated account \"{name}\"",

@@ -62,6 +62,19 @@
       "budget": "[XX-Budget-XX]",
       "custom_report": "[XX-Report-XX]"
     },
+    "actionLabels": {
+      "BUY": "[XX-Buy-XX]",
+      "SELL": "[XX-Sell-XX]",
+      "DIVIDEND": "[XX-Dividend-XX]",
+      "INTEREST": "[XX-Interest-XX]",
+      "CAPITAL_GAIN": "[XX-Capital Gain-XX]",
+      "SPLIT": "[XX-Split-XX]",
+      "TRANSFER_IN": "[XX-Transfer In-XX]",
+      "TRANSFER_OUT": "[XX-Transfer Out-XX]",
+      "REINVEST": "[XX-Reinvest-XX]",
+      "ADD_SHARES": "[XX-Add Shares-XX]",
+      "REMOVE_SHARES": "[XX-Remove Shares-XX]"
+    },
     "descriptions": {
       "createdAccount": "[XX-Created account \"{name}\"-XX]",
       "updatedAccount": "[XX-Updated account \"{name}\"-XX]",
