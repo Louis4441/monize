@@ -137,8 +137,8 @@ export function TransferTransactionFields({
         />
       </div>
 
-      {/* Row 3: Transfer Amount under From, Received Amount under To (for cross-currency) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Row 3: Transfer Amount, Received Amount (cross-currency only), and Reference Number */}
+      <div className={`grid grid-cols-1 gap-4 ${crossCurrencyInfo ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
         <div>
           <CurrencyInput
             label={crossCurrencyInfo ? t('form.fields.transferAmountWithCurrency', { currency: crossCurrencyInfo.fromCurrency }) : t('form.fields.transferAmount')}
@@ -170,9 +170,17 @@ export function TransferTransactionFields({
             </p>
           </div>
         )}
+
+        <Input
+          label={t('form.fields.referenceNumber')}
+          type="text"
+          placeholder={t('form.placeholders.referenceNumber')}
+          error={errors.referenceNumber?.message as string | undefined}
+          {...register('referenceNumber')}
+        />
       </div>
 
-      {/* Row 4: Payee and Reference Number */}
+      {/* Row 4: Payee and Category */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Combobox
           label={t('form.fields.payeeOptional')}
@@ -190,33 +198,24 @@ export function TransferTransactionFields({
           }}
           allowCustomValue={true}
         />
-        <Input
-          label={t('form.fields.referenceNumber')}
-          type="text"
-          placeholder={t('form.placeholders.referenceNumber')}
-          error={errors.referenceNumber?.message as string | undefined}
-          {...register('referenceNumber')}
-        />
-      </div>
-
-      {/* Row 5: Optional category. A transfer never counts as income/expense,
-          but a category lets it appear in the monthly category breakdown
-          (e.g. tracking monthly investment contributions). */}
-      <div>
-        <Combobox
-          label={t('form.fields.categoryOptional')}
-          placeholder={t('form.placeholders.selectOrCreateCategory')}
-          options={categoryOptions}
-          value={selectedCategoryId}
-          initialDisplayValue={transaction?.category?.name || ''}
-          onChange={handleCategoryChange}
-          onCreateNew={handleCategoryCreate}
-          allowCustomValue={true}
-          error={errors.categoryId?.message as string | undefined}
-        />
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {t('form.transferCategoryNote')}
-        </p>
+        {/* A transfer never counts as income/expense, but a category lets it
+            appear in the monthly category breakdown (e.g. investment contributions). */}
+        <div>
+          <Combobox
+            label={t('form.fields.categoryOptional')}
+            placeholder={t('form.placeholders.selectOrCreateCategory')}
+            options={categoryOptions}
+            value={selectedCategoryId}
+            initialDisplayValue={transaction?.category?.name || ''}
+            onChange={handleCategoryChange}
+            onCreateNew={handleCategoryCreate}
+            allowCustomValue={true}
+            error={errors.categoryId?.message as string | undefined}
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t('form.transferCategoryNote')}
+          </p>
+        </div>
       </div>
     </div>
   );
