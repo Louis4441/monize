@@ -639,6 +639,37 @@ describe("SectorWeightingService", () => {
       expect(result.unclassifiedValue).toBe(0);
     });
 
+    it("folds a provider 'Other' slice into the unclassified remainder", async () => {
+      withAccount();
+      holdingsRepo.find.mockResolvedValue([
+        {
+          id: "h1",
+          accountId: "acct-1",
+          securityId: "sec-etf-1",
+          quantity: 10,
+          security: {
+            ...mockEtfSecurity,
+            countryWeightings: [
+              { name: "United States", weight: 0.6 },
+              { name: "Other", weight: 0.1 },
+            ],
+          },
+        },
+      ]);
+      priceRepo.query.mockResolvedValue([
+        { security_id: "sec-etf-1", close_price: "100" },
+      ]);
+
+      const result = await service.getCountryWeightings("user-1");
+
+      // No "Other" country item; the 0.1 stays in the remainder along with the
+      // unallocated 0.3 -> $400 unclassified out of $1,000.
+      expect(result.items.find((i) => i.country === "Other")).toBeUndefined();
+      const us = result.items.find((i) => i.country === "United States");
+      expect(us?.etfValue).toBe(600);
+      expect(result.unclassifiedValue).toBe(400);
+    });
+
     it("treats an ETF with no country weightings as fully Other", async () => {
       withAccount();
       holdingsRepo.find.mockResolvedValue([

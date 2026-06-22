@@ -731,6 +731,24 @@ describe('SecurityForm', () => {
       expect(screen.getByDisplayValue('25')).toBeInTheDocument();
     });
 
+    it('does not surface a provider "Other" slice as a country row', async () => {
+      const etf = createSecurity({
+        securityType: 'ETF',
+        countryWeightings: [
+          { name: 'United States', weight: 0.6 },
+          { name: 'Other', weight: 0.1 },
+        ],
+      });
+      render(<SecurityForm security={etf} onSubmit={onSubmit} onCancel={onCancel} />);
+      await waitFor(() => {
+        expect(screen.getByText('Country allocation')).toBeInTheDocument();
+      });
+      // The real country shows as an editable row...
+      expect(screen.getByDisplayValue('60')).toBeInTheDocument();
+      // ...but the provider "Other" (10) is not rendered as its own row.
+      expect(screen.queryByDisplayValue('10')).not.toBeInTheDocument();
+    });
+
     it('submits the country allocation back as decimals (0-1)', async () => {
       const etf = createSecurity({
         securityType: 'ETF',

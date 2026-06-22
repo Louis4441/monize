@@ -20,7 +20,7 @@ import { SecurityPriceService } from "./security-price.service";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { SecurityLookupResult } from "./providers/quote-provider.interface";
-import { normalizeCountryName } from "./security-enums";
+import { normalizeCountryName, isOtherAllocationName } from "./security-enums";
 
 /** A single {name, weight} allocation slice; weight is a decimal 0-1. */
 export interface AllocationWeight {
@@ -167,7 +167,9 @@ export class SecuritiesService {
     const byName = new Map<string, number>();
     for (const slice of input) {
       const name = normalizeCountryName(slice?.name ?? "");
-      if (!name) continue;
+      // A provider-supplied "Other" bucket is not a country: drop it so its
+      // weight falls into the computed (100 - sum) remainder instead.
+      if (!name || isOtherAllocationName(name)) continue;
       const weight = Number(slice?.weight);
       if (!Number.isFinite(weight) || weight <= 0) continue;
       const clamped = Math.min(weight, 1);

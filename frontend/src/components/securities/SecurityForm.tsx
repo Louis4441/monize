@@ -34,10 +34,14 @@ import { EXCHANGE_OPTIONS, COUNTRY_OPTIONS } from '@/lib/constants';
 const toCountryRows = (
   weightings: { name: string; weight: number }[] | null | undefined,
 ): AllocationRow[] =>
-  (weightings ?? []).map((w) => ({
-    name: w.name,
-    weight: String(Math.round(w.weight * 1000000) / 10000),
-  }));
+  (weightings ?? [])
+    // A provider "Other" bucket isn't a country: don't surface it as a row --
+    // it's folded into the editor's computed (100 - total) "Other" remainder.
+    .filter((w) => (w.name ?? '').trim().toLowerCase() !== 'other')
+    .map((w) => ({
+      name: w.name,
+      weight: String(Math.round(w.weight * 1000000) / 10000),
+    }));
 
 const logger = createLogger('SecurityForm');
 

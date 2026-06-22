@@ -8,7 +8,7 @@ import { SecurityPrice } from "./entities/security-price.entity";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { roundMoney, sumMoney } from "../common/round.util";
-import { EXCHANGE_TO_COUNTRY } from "./security-enums";
+import { EXCHANGE_TO_COUNTRY, isOtherAllocationName } from "./security-enums";
 
 export interface SectorWeightingItem {
   sector: string;
@@ -430,6 +430,9 @@ export class SectorWeightingService {
         for (const cw of sec.countryWeightings) {
           const weight = Number(cw.weight);
           if (!Number.isFinite(weight) || weight <= 0) continue;
+          // A provider "Other" slice isn't a country: leave its weight in the
+          // remainder so it merges with the computed "Other" (unclassified).
+          if (isOtherAllocationName(cw.name)) continue;
           etfMap.set(
             cw.name,
             (etfMap.get(cw.name) || 0) + marketValue * weight,

@@ -1334,6 +1334,16 @@ describe("SecuritiesService", () => {
       expect(result).toEqual([{ name: "United States", weight: 0.3 }]);
     });
 
+    it("drops a provider 'Other' slice so it folds into the computed remainder", () => {
+      const result = service.normalizeAllocationWeightings([
+        { name: "United States", weight: 0.6 },
+        { name: "Other", weight: 0.1 },
+        { name: "OTHER", weight: 0.05 },
+      ]);
+      // No "Other" country is stored; its weight becomes the implicit remainder.
+      expect(result).toEqual([{ name: "United States", weight: 0.6 }]);
+    });
+
     it("allows a sub-100% total (the remainder is Other)", () => {
       const result = service.normalizeAllocationWeightings([
         { name: "United States", weight: 0.6 },

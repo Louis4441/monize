@@ -168,6 +168,16 @@ export function normalizeCountryName(input: string): string {
 }
 
 /**
+ * True when an allocation slice name is the catch-all "Other" bucket (which
+ * providers often include in their breakdowns). Such slices must NOT be stored
+ * or rendered as a country -- their weight is folded into the single computed
+ * "Other" remainder instead. Matches the literal name case-insensitively.
+ */
+export function isOtherAllocationName(name: string): boolean {
+  return (name ?? "").trim().toLowerCase() === "other";
+}
+
+/**
  * Maps a canonical `SECURITY_EXCHANGES` code to the country its listings trade
  * in. Used by the country-weightings rollup to place individual stocks (which
  * have no manual breakdown) into a country by their listing exchange.
