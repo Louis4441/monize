@@ -306,7 +306,15 @@ export function TransactionConfirmationCard({
         : isPayeeWriteType
           ? { href: '/payees', label: t('confirmAction.viewPayees') }
           : isCashTxType || isTransferType || type === 'categorize_transaction'
-            ? { href: '/transactions', label: t('confirmAction.viewTransaction') }
+            ? {
+                // Deep-link to the affected transaction so the list jumps to and
+                // flashes that row; fall back to the unfiltered list if the id
+                // is missing (e.g. an older pending action without a result).
+                href: action.resultId
+                  ? `/transactions?targetTransactionId=${action.resultId}`
+                  : '/transactions',
+                label: t('confirmAction.viewTransaction'),
+              }
             : null;
   const successByType: Partial<Record<typeof type, string>> = {
     create_transaction: t('confirmAction.createdTransaction'),

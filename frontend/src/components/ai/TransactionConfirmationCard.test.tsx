@@ -137,10 +137,24 @@ describe('TransactionConfirmationCard', () => {
       />,
     );
     expect(screen.getByText('Transaction created')).toBeInTheDocument();
+    // The link deep-links to the created transaction so the list flashes it.
+    expect(
+      screen.getByRole('link', { name: 'View transaction' }),
+    ).toHaveAttribute('href', '/transactions?targetTransactionId=tx-1');
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+  });
+
+  it('falls back to the unfiltered list when no result id is present', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeAction({ status: 'confirmed' })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
     expect(
       screen.getByRole('link', { name: 'View transaction' }),
     ).toHaveAttribute('href', '/transactions');
-    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
   });
 
   it('shows an error message and a retry button on error', () => {
@@ -417,7 +431,7 @@ describe('TransactionConfirmationCard', () => {
       expect(screen.getByText('Transaction updated')).toBeInTheDocument();
       expect(
         screen.getByRole('link', { name: 'View transaction' }),
-      ).toHaveAttribute('href', '/transactions');
+      ).toHaveAttribute('href', '/transactions?targetTransactionId=tx-1');
     });
 
     it('renders a delete_transaction card and offers no view link on success', () => {
@@ -698,7 +712,7 @@ describe('TransactionConfirmationCard', () => {
       expect(screen.getByText('Transfer updated')).toBeInTheDocument();
       expect(
         screen.getByRole('link', { name: 'View transaction' }),
-      ).toHaveAttribute('href', '/transactions');
+      ).toHaveAttribute('href', '/transactions?targetTransactionId=tx-1');
     });
   });
 });
