@@ -1,4 +1,5 @@
 import { McpPayeesTools } from "./payees.tool";
+import { McpWriteLimiter } from "../mcp-write-limiter";
 import { UserContextResolver } from "../mcp-context";
 
 describe("McpPayeesTools", () => {
@@ -80,6 +81,7 @@ describe("McpPayeesTools", () => {
       prepService as any,
       relayService as any,
       actionBuilder as any,
+      new McpWriteLimiter(),
     );
 
     elicitInput = jest.fn().mockResolvedValue({ action: "accept" });

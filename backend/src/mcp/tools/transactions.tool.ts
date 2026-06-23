@@ -65,8 +65,6 @@ interface ManageItem {
 
 @Injectable()
 export class McpTransactionsTools {
-  private readonly writeLimiter = new McpWriteLimiter();
-
   constructor(
     private readonly transactionsService: TransactionsService,
     private readonly payeesService: PayeesService,
@@ -75,6 +73,7 @@ export class McpTransactionsTools {
     private readonly actionBuilder: AiActionBuilderService,
     private readonly prepService: TransactionToolPrepService,
     private readonly accountsService: AccountsService,
+    private readonly writeLimiter: McpWriteLimiter,
   ) {}
 
   register(server: McpServer, resolve: UserContextResolver) {
@@ -694,20 +693,6 @@ export class McpTransactionsTools {
     };
   }
 
-  /**
-   * Reserve N writes against the daily cap or return an error result. Returns
-   * undefined when allowed.
-   */
-  private checkWriteBudget(userId: string, count: number) {
-    const limitCheck = this.writeLimiter.checkLimit(userId);
-    if (limitCheck.currentCount + count > limitCheck.limit) {
-      return toolError(
-        `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
-      );
-    }
-    return undefined;
-  }
-
   /** Dry-run preview for a single category-split create/update item. */
   private async manageDryRunSplit(
     userId: string,
@@ -871,7 +856,7 @@ export class McpTransactionsTools {
     item: ManageItem,
     requestId: unknown,
   ) {
-    const budget = this.checkWriteBudget(userId, 1);
+    const budget = this.writeLimiter.reserve(userId, 1);
     if (budget) return budget;
     const { preview, createPayee, splits } =
       await this.prepService.prepareCreateSingle(
@@ -951,7 +936,7 @@ export class McpTransactionsTools {
       );
     }
 
-    const budget = this.checkWriteBudget(userId, okCount);
+    const budget = this.writeLimiter.reserve(userId, okCount);
     if (budget) return budget;
 
     if (single) {
@@ -1134,7 +1119,7 @@ export class McpTransactionsTools {
         userId,
         this.toUpdateRow(items[0]),
       );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       if (result.kind === "transfer") {
         const preview = result.preview;
@@ -1244,7 +1229,7 @@ export class McpTransactionsTools {
       }
       if (cards.length === 0)
         return toolError("None of the transaction edits could be prepared.");
-      const budget = this.checkWriteBudget(userId, cards.length);
+      const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runIndividual(server, userId, cards, requestId, skipped);
     }
@@ -1256,7 +1241,7 @@ export class McpTransactionsTools {
     );
     if (bulk.okRows.length === 0)
       return toolError("None of the transaction edits could be prepared.");
-    const budget = this.checkWriteBudget(userId, bulk.okRows.length);
+    const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchActions(
       userId,
@@ -1312,7 +1297,7 @@ export class McpTransactionsTools {
         userId,
         items[0].transactionId as string,
       );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildDeleteTransaction(userId, preview);
       const outcome = await this.emitOrConfirm(
@@ -1350,7 +1335,7 @@ export class McpTransactionsTools {
       }
       if (cards.length === 0)
         return toolError("None of the transactions could be prepared.");
-      const budget = this.checkWriteBudget(userId, cards.length);
+      const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runIndividual(server, userId, cards, requestId, skipped);
     }
@@ -1361,7 +1346,7 @@ export class McpTransactionsTools {
     );
     if (bulk.okRows.length === 0)
       return toolError("None of the transactions could be prepared.");
-    const budget = this.checkWriteBudget(userId, bulk.okRows.length);
+    const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchActions(
       userId,

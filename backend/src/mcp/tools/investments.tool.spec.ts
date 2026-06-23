@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { McpInvestmentsTools } from "./investments.tool";
+import { McpWriteLimiter } from "../mcp-write-limiter";
 import { UserContextResolver } from "../mcp-context";
 
 describe("McpInvestmentsTools", () => {
@@ -132,6 +133,7 @@ describe("McpInvestmentsTools", () => {
       relayService as any,
       actionBuilder as any,
       accountsService as any,
+      new McpWriteLimiter(),
     );
 
     elicitInput = jest.fn();

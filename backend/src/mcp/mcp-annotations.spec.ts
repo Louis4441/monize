@@ -48,6 +48,7 @@ function collectToolConfigs(): Array<{ name: string; config: any }> {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     ) as unknown as ToolProvider,
     new McpCategoriesTools({} as any) as unknown as ToolProvider,
     new McpPayeesTools(
@@ -55,9 +56,11 @@ function collectToolConfigs(): Array<{ name: string; config: any }> {
       {} as any,
       {} as any,
       {} as any,
+      {} as any,
     ) as unknown as ToolProvider,
     new McpReportsTools({} as any) as unknown as ToolProvider,
     new McpInvestmentsTools(
+      {} as any,
       {} as any,
       {} as any,
       {} as any,

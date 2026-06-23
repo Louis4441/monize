@@ -85,8 +85,6 @@ interface ManageSecItem {
 
 @Injectable()
 export class McpInvestmentsTools {
-  private readonly writeLimiter = new McpWriteLimiter();
-
   constructor(
     private readonly portfolioService: PortfolioService,
     private readonly holdingsService: HoldingsService,
@@ -96,6 +94,7 @@ export class McpInvestmentsTools {
     private readonly relayService: AiRelayService,
     private readonly actionBuilder: AiActionBuilderService,
     private readonly accountsService: AccountsService,
+    private readonly writeLimiter: McpWriteLimiter,
   ) {}
 
   register(server: McpServer, resolve: UserContextResolver) {
@@ -685,20 +684,6 @@ export class McpInvestmentsTools {
     };
   }
 
-  /**
-   * Reserve N writes against the daily cap or return an error result. Returns
-   * undefined when allowed.
-   */
-  private checkWriteBudget(userId: string, count: number) {
-    const limitCheck = this.writeLimiter.checkLimit(userId);
-    if (limitCheck.currentCount + count > limitCheck.limit) {
-      return toolError(
-        `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
-      );
-    }
-    return undefined;
-  }
-
   private async manageInvCreate(
     server: McpServer,
     userId: string,
@@ -714,7 +699,7 @@ export class McpInvestmentsTools {
           userId,
           this.toInvCreateRow(items[0]),
         );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildCreateInvestmentTransaction(
         userId,
@@ -759,7 +744,7 @@ export class McpInvestmentsTools {
         "None of the investment transactions could be prepared. Check the account, security, action, and date for each row.",
       );
     }
-    const budget = this.checkWriteBudget(userId, bulk.okPreviews.length);
+    const budget = this.writeLimiter.reserve(userId, bulk.okPreviews.length);
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -839,7 +824,7 @@ export class McpInvestmentsTools {
           items[0].transactionId as string,
           this.toInvUpdateRow(items[0]),
         );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildUpdateInvestmentTransaction(
         userId,
@@ -905,7 +890,7 @@ export class McpInvestmentsTools {
         return toolError(
           "None of the investment transaction edits could be prepared.",
         );
-      const budget = this.checkWriteBudget(userId, cards.length);
+      const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runInvIndividual(server, userId, cards, requestId, skipped);
     }
@@ -919,7 +904,7 @@ export class McpInvestmentsTools {
       return toolError(
         "None of the investment transaction edits could be prepared.",
       );
-    const budget = this.checkWriteBudget(userId, bulk.okRows.length);
+    const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchUpdateInvestmentTransactions(
       userId,
@@ -976,7 +961,7 @@ export class McpInvestmentsTools {
           userId,
           items[0].transactionId as string,
         );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildDeleteInvestmentTransaction(
         userId,
@@ -1032,7 +1017,7 @@ export class McpInvestmentsTools {
         return toolError(
           "None of the investment transactions could be prepared.",
         );
-      const budget = this.checkWriteBudget(userId, cards.length);
+      const budget = this.writeLimiter.reserve(userId, cards.length);
       if (budget) return budget;
       return this.runInvIndividual(server, userId, cards, requestId, skipped);
     }
@@ -1046,7 +1031,7 @@ export class McpInvestmentsTools {
       return toolError(
         "None of the investment transactions could be prepared.",
       );
-    const budget = this.checkWriteBudget(userId, bulk.okRows.length);
+    const budget = this.writeLimiter.reserve(userId, bulk.okRows.length);
     if (budget) return budget;
     const action = this.actionBuilder.buildBatchDeleteInvestmentTransactions(
       userId,
@@ -1329,7 +1314,7 @@ export class McpInvestmentsTools {
           userId,
           this.toSecCreateRow(items[0]),
         );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildCreateSecurity(userId, preview);
       const outcome = await this.emitOrConfirmSec(
@@ -1362,7 +1347,7 @@ export class McpInvestmentsTools {
         "None of the securities could be prepared. Check the ticker/name for each row.",
       );
     }
-    const budget = this.checkWriteBudget(userId, prep.okPreviews.length);
+    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -1417,7 +1402,7 @@ export class McpInvestmentsTools {
           userId,
           this.toSecUpdateRow(items[0]),
         );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildUpdateSecurity(userId, preview);
       const outcome = await this.emitOrConfirmSec(
@@ -1448,7 +1433,7 @@ export class McpInvestmentsTools {
     if (prep.okPreviews.length === 0) {
       return toolError("None of the security edits could be prepared.");
     }
-    const budget = this.checkWriteBudget(userId, prep.okPreviews.length);
+    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -1503,7 +1488,7 @@ export class McpInvestmentsTools {
           userId,
           this.toSecDeleteRow(items[0]),
         );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildDeleteSecurity(userId, preview);
       const outcome = await this.emitOrConfirmSec(
@@ -1530,7 +1515,7 @@ export class McpInvestmentsTools {
     if (prep.okPreviews.length === 0) {
       return toolError("None of the securities could be prepared.");
     }
-    const budget = this.checkWriteBudget(userId, prep.okPreviews.length);
+    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;
 
     if (approvalMode === "individual") {

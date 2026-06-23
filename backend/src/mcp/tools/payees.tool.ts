@@ -40,13 +40,12 @@ interface ManagePayeeItem {
 
 @Injectable()
 export class McpPayeesTools {
-  private readonly writeLimiter = new McpWriteLimiter();
-
   constructor(
     private readonly payeesService: PayeesService,
     private readonly prepService: PayeeToolPrepService,
     private readonly relayService: AiRelayService,
     private readonly actionBuilder: AiActionBuilderService,
+    private readonly writeLimiter: McpWriteLimiter,
   ) {}
 
   register(server: McpServer, resolve: UserContextResolver) {
@@ -211,16 +210,6 @@ export class McpPayeesTools {
     return { name: item.name as string };
   }
 
-  private checkWriteBudget(userId: string, count: number) {
-    const limitCheck = this.writeLimiter.checkLimit(userId);
-    if (limitCheck.currentCount + count > limitCheck.limit) {
-      return toolError(
-        `Daily write limit reached (${limitCheck.limit} operations per day). Try again tomorrow.`,
-      );
-    }
-    return undefined;
-  }
-
   private async manageDryRun(
     userId: string,
     operation: ManagePayeeOperation,
@@ -281,7 +270,7 @@ export class McpPayeesTools {
         userId,
         this.toCreateRow(items[0]),
       );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildCreatePayee(userId, preview);
       const outcome = await this.emitOrConfirm(
@@ -313,7 +302,7 @@ export class McpPayeesTools {
         "None of the payees could be prepared. Check the name and category for each row.",
       );
     }
-    const budget = this.checkWriteBudget(userId, prep.okPreviews.length);
+    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -365,7 +354,7 @@ export class McpPayeesTools {
         userId,
         this.toUpdateRow(items[0]),
       );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildUpdatePayee(userId, preview);
       const outcome = await this.emitOrConfirm(
@@ -395,7 +384,7 @@ export class McpPayeesTools {
     if (prep.okPreviews.length === 0) {
       return toolError("None of the payee edits could be prepared.");
     }
-    const budget = this.checkWriteBudget(userId, prep.okPreviews.length);
+    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;
 
     if (approvalMode === "individual") {
@@ -447,7 +436,7 @@ export class McpPayeesTools {
         userId,
         this.toDeleteRow(items[0]),
       );
-      const budget = this.checkWriteBudget(userId, 1);
+      const budget = this.writeLimiter.reserve(userId, 1);
       if (budget) return budget;
       const action = this.actionBuilder.buildDeletePayee(userId, preview);
       const outcome = await this.emitOrConfirm(
@@ -474,7 +463,7 @@ export class McpPayeesTools {
     if (prep.okPreviews.length === 0) {
       return toolError("None of the payees could be prepared.");
     }
-    const budget = this.checkWriteBudget(userId, prep.okPreviews.length);
+    const budget = this.writeLimiter.reserve(userId, prep.okPreviews.length);
     if (budget) return budget;
 
     if (approvalMode === "individual") {

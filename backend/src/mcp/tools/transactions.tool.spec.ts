@@ -1,4 +1,5 @@
 import { McpTransactionsTools } from "./transactions.tool";
+import { McpWriteLimiter } from "../mcp-write-limiter";
 import { UserContextResolver } from "../mcp-context";
 
 describe("McpTransactionsTools", () => {
@@ -117,6 +118,7 @@ describe("McpTransactionsTools", () => {
       actionBuilder as any,
       prepService as any,
       accountsService as any,
+      new McpWriteLimiter(),
     );
 
     elicitInput = jest.fn();
@@ -777,9 +779,7 @@ describe("McpTransactionsTools", () => {
       await handlers["manage_transactions"](
         {
           operation: "update",
-          items: [
-            { transactionId: "t1", categoryName: "Investments: IKE" },
-          ],
+          items: [{ transactionId: "t1", categoryName: "Investments: IKE" }],
         },
         { sessionId: "s1" },
       );

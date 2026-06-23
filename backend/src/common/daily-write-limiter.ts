@@ -16,6 +16,17 @@ export interface WriteOperation {
   timestamp: number;
 }
 
+/**
+ * Resolve a daily write limit from a (possibly string) environment value,
+ * falling back to `fallback` when the value is missing or not a positive
+ * integer. Env vars arrive as strings, so coerce explicitly rather than
+ * relying on the value already being numeric.
+ */
+export function resolveDailyWriteLimit(raw: unknown, fallback: number): number {
+  const parsed = typeof raw === "number" ? raw : Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export class DailyWriteLimiter {
   private readonly operations: WriteOperation[] = [];
 
