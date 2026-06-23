@@ -130,6 +130,7 @@
     "pricePerShareLabel": "주당 가격",
     "totalPriceLabel": "총 가격",
     "totalAmountLabel": "총 금액",
+    "amountLabel": "금액",
     "categoryLabel": "카테고리",
     "splitLabel": "이번 발생 분할",
     "descriptionLabel": "설명 (선택사항)",

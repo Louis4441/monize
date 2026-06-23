@@ -130,6 +130,7 @@
     "pricePerShareLabel": "Hisse başı fiyat",
     "totalPriceLabel": "Toplam Fiyat",
     "totalAmountLabel": "Toplam Tutar",
+    "amountLabel": "Miktar",
     "categoryLabel": "Kategori",
     "splitLabel": "Bu tekrarı böl",
     "descriptionLabel": "Açıklama (isteğe bağlı)",

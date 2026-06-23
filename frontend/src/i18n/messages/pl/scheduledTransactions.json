@@ -130,6 +130,7 @@
     "pricePerShareLabel": "Cena za jednostkę",
     "totalPriceLabel": "Cena łączna",
     "totalAmountLabel": "Kwota łączna",
+    "amountLabel": "Kwota",
     "categoryLabel": "Kategoria",
     "splitLabel": "Podziel to wystąpienie",
     "descriptionLabel": "Opis (opcjonalnie)",

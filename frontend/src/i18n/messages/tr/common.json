@@ -114,7 +114,8 @@
   },
   "currencyInput": {
     "openCalculator": "Hesap makinesi aç",
-    "calculator": "Hesap Makinesi"
+    "calculator": "Hesap Makinesi",
+    "toggleSign": "İşareti değiştir"
   },
   "dateInput": {
     "shortcutsTitle": "Klavye kısayolları",

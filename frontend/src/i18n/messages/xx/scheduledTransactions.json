@@ -130,6 +130,7 @@
     "pricePerShareLabel": "[XX-Price per share-XX]",
     "totalPriceLabel": "[XX-Total Price-XX]",
     "totalAmountLabel": "[XX-Total Amount-XX]",
+    "amountLabel": "[XX-Amount-XX]",
     "categoryLabel": "[XX-Category-XX]",
     "splitLabel": "[XX-Split this occurrence-XX]",
     "descriptionLabel": "[XX-Description (optional)-XX]",

@@ -114,7 +114,8 @@
   },
   "currencyInput": {
     "openCalculator": "電卓を開く",
-    "calculator": "電卓"
+    "calculator": "電卓",
+    "toggleSign": "符号を変更"
   },
   "dateInput": {
     "shortcutsTitle": "キーボードショートカット",

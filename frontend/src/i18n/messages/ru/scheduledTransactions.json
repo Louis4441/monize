@@ -130,6 +130,7 @@
     "pricePerShareLabel": "Цена за акцию",
     "totalPriceLabel": "Общая стоимость",
     "totalAmountLabel": "Общая сумма",
+    "amountLabel": "Сумма",
     "categoryLabel": "Категория",
     "splitLabel": "Разделить это вхождение",
     "descriptionLabel": "Описание (необязательно)",

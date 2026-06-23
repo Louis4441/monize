@@ -488,7 +488,7 @@ export function OverrideEditorDialog({
         {/* Amount — non-investment only */}
         {!isInvestmentKind && (
           <CurrencyInput
-            label="Amount"
+            label={t('overrideEditor.amountLabel')}
             prefix={getCurrencySymbol(scheduledTransaction.currencyCode)}
             value={amount}
             onChange={(value) => setAmount(value ?? 0)}

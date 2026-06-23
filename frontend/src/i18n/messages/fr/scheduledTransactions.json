@@ -130,6 +130,7 @@
     "pricePerShareLabel": "Prix par action",
     "totalPriceLabel": "Prix total",
     "totalAmountLabel": "Montant total",
+    "amountLabel": "Montant",
     "categoryLabel": "Catégorie",
     "splitLabel": "Répartir cette occurrence",
     "descriptionLabel": "Description (facultatif)",

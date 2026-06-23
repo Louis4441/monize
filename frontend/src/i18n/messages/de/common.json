@@ -114,7 +114,8 @@
   },
   "currencyInput": {
     "openCalculator": "Rechner öffnen",
-    "calculator": "Rechner"
+    "calculator": "Rechner",
+    "toggleSign": "Vorzeichen ändern"
   },
   "dateInput": {
     "shortcutsTitle": "Tastaturkürzel",

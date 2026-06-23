@@ -130,6 +130,7 @@
     "pricePerShareLabel": "Ціна за акцію",
     "totalPriceLabel": "Загальна ціна",
     "totalAmountLabel": "Загальна сума",
+    "amountLabel": "Сума",
     "categoryLabel": "Категорія",
     "splitLabel": "Розділити це повторення",
     "descriptionLabel": "Опис (необов'язково)",

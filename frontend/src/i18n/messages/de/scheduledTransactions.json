@@ -130,6 +130,7 @@
     "pricePerShareLabel": "Kurs pro Anteil",
     "totalPriceLabel": "Gesamtpreis",
     "totalAmountLabel": "Gesamtbetrag",
+    "amountLabel": "Betrag",
     "categoryLabel": "Kategorie",
     "splitLabel": "Diese Ausführung aufteilen",
     "descriptionLabel": "Beschreibung (optional)",

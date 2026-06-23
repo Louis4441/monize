@@ -114,7 +114,8 @@
   },
   "currencyInput": {
     "openCalculator": "Mở máy tính",
-    "calculator": "Máy tính"
+    "calculator": "Máy tính",
+    "toggleSign": "Đổi dấu"
   },
   "dateInput": {
     "shortcutsTitle": "Phím tắt bàn phím",

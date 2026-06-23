@@ -130,6 +130,7 @@
     "pricePerShareLabel": "1株あたりの価格",
     "totalPriceLabel": "合計価格",
     "totalAmountLabel": "合計金額",
+    "amountLabel": "金額",
     "categoryLabel": "カテゴリ",
     "splitLabel": "この発生を分割",
     "descriptionLabel": "説明（任意）",
