@@ -114,7 +114,8 @@
   },
   "currencyInput": {
     "openCalculator": "계산기 열기",
-    "calculator": "계산기"
+    "calculator": "계산기",
+    "toggleSign": "부호 변경"
   },
   "dateInput": {
     "shortcutsTitle": "키보드 단축키",

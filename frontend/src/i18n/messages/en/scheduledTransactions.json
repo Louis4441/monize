@@ -130,6 +130,7 @@
     "pricePerShareLabel": "Price per share",
     "totalPriceLabel": "Total Price",
     "totalAmountLabel": "Total Amount",
+    "amountLabel": "Amount",
     "categoryLabel": "Category",
     "splitLabel": "Split this occurrence",
     "descriptionLabel": "Description (optional)",

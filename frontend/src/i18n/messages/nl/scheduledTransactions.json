@@ -130,6 +130,7 @@
     "pricePerShareLabel": "Koers per aandeel",
     "totalPriceLabel": "Totaalprijs",
     "totalAmountLabel": "Totaalbedrag",
+    "amountLabel": "Bedrag",
     "categoryLabel": "Categorie",
     "splitLabel": "Deze herhaling splitsen",
     "descriptionLabel": "Beschrijving (optioneel)",

@@ -130,6 +130,7 @@
     "pricePerShareLabel": "每股价格",
     "totalPriceLabel": "总价",
     "totalAmountLabel": "总金额",
+    "amountLabel": "金额",
     "categoryLabel": "分类",
     "splitLabel": "拆分本次发生",
     "descriptionLabel": "描述（可选）",

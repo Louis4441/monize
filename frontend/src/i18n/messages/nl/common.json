@@ -114,7 +114,8 @@
   },
   "currencyInput": {
     "openCalculator": "Calculator openen",
-    "calculator": "Calculator"
+    "calculator": "Calculator",
+    "toggleSign": "Teken wijzigen"
   },
   "dateInput": {
     "shortcutsTitle": "Sneltoetsen",

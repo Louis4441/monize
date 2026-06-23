@@ -114,7 +114,8 @@
   },
   "currencyInput": {
     "openCalculator": "Відкрити калькулятор",
-    "calculator": "Калькулятор"
+    "calculator": "Калькулятор",
+    "toggleSign": "Змінити знак"
   },
   "dateInput": {
     "shortcutsTitle": "Комбінації клавіш",

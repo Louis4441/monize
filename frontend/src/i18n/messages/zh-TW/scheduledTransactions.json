@@ -130,6 +130,7 @@
     "pricePerShareLabel": "每股價格",
     "totalPriceLabel": "總價格",
     "totalAmountLabel": "總金額",
+    "amountLabel": "金額",
     "categoryLabel": "類別",
     "splitLabel": "分割此次付款",
     "descriptionLabel": "描述（選填）",
