@@ -939,6 +939,20 @@ export function ScheduledTransactionForm({
     </div>
   );
 
+  // Shared footer: Active/Auto-post toggles and the Cancel/Submit buttons share
+  // one row (toggles left, actions right), stacking on narrow screens.
+  const renderFooter = (idSuffix: string) => (
+    <div className="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
+      {renderOptions(idSuffix)}
+      <FormActions
+        onCancel={onCancel}
+        submitLabel={scheduledTransaction ? t('form.submitUpdate') : t('form.submitCreate')}
+        isSubmitting={isLoading}
+        className="pt-0"
+      />
+    </div>
+  );
+
   // Shared Tags section
   const renderTags = () => (
     <>
@@ -1123,8 +1137,8 @@ export function ScheduledTransactionForm({
           {/* Row 7: Description */}
           {renderDescription()}
 
-          {/* Row 8: Active/Auto-post */}
-          {renderOptions('Tx')}
+          {/* Row 8: Active/Auto-post and actions */}
+          {renderFooter('Tx')}
         </div>
       )}
 
@@ -1254,8 +1268,8 @@ export function ScheduledTransactionForm({
           {/* Row 7: End Condition */}
           {renderEndCondition('Split')}
 
-          {/* Row 8: Active/Auto-post */}
-          {renderOptions('Split')}
+          {/* Row 8: Active/Auto-post and actions */}
+          {renderFooter('Split')}
         </div>
       )}
 
@@ -1384,8 +1398,8 @@ export function ScheduledTransactionForm({
           {/* Row 8: Description */}
           {renderDescription()}
 
-          {/* Row 9: Active/Auto-post */}
-          {renderOptions('Transfer')}
+          {/* Row 9: Active/Auto-post and actions */}
+          {renderFooter('Transfer')}
         </div>
       )}
 
@@ -1572,13 +1586,10 @@ export function ScheduledTransactionForm({
           {/* Description */}
           {renderDescription()}
 
-          {/* Active / Auto-post */}
-          {renderOptions('Inv')}
+          {/* Active / Auto-post and actions */}
+          {renderFooter('Inv')}
         </div>
       )}
-
-      {/* Actions */}
-      <FormActions onCancel={onCancel} submitLabel={scheduledTransaction ? t('form.submitUpdate') : t('form.submitCreate')} isSubmitting={isLoading} />
     </form>
   );
 }
