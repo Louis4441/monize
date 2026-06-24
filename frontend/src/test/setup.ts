@@ -89,8 +89,8 @@ Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 // Mock scrollTo (not implemented in jsdom)
 window.scrollTo = vi.fn() as any;
 
-// Mock scrollIntoView (not implemented in jsdom)
-Element.prototype.scrollIntoView = vi.fn();
+// Mock scrollIntoView (not implemented in jsdom); used by dropdown/combobox lists
+Element.prototype.scrollIntoView = vi.fn() as any;
 
 // Mock matchMedia
 Object.defineProperty(window, 'matchMedia', {
