@@ -6,7 +6,6 @@ import { UserContextResolver } from "../mcp-context";
 describe("McpInvestmentsTools", () => {
   let tool: McpInvestmentsTools;
   let portfolioService: Record<string, jest.Mock>;
-  let holdingsService: Record<string, jest.Mock>;
   let investmentTransactionsService: Record<string, jest.Mock>;
   let securitiesService: Record<string, jest.Mock>;
   let securityPrepService: Record<string, jest.Mock>;
@@ -25,10 +24,6 @@ describe("McpInvestmentsTools", () => {
     portfolioService = {
       getPortfolioSummary: jest.fn(),
       getLlmSummary: jest.fn(),
-    };
-
-    holdingsService = {
-      findAll: jest.fn(),
     };
 
     investmentTransactionsService = {
@@ -126,7 +121,6 @@ describe("McpInvestmentsTools", () => {
 
     tool = new McpInvestmentsTools(
       portfolioService as any,
-      holdingsService as any,
       investmentTransactionsService as any,
       securitiesService as any,
       securityPrepService as any,
@@ -154,11 +148,10 @@ describe("McpInvestmentsTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 7 tools", () => {
+  it("should register 6 tools", () => {
     // get_portfolio_summary, list_investment_transactions, list_capital_gains,
-    // list_holding_details, lookup_securities, manage_securities,
-    // manage_investment_transactions.
-    expect(server.registerTool).toHaveBeenCalledTimes(7);
+    // lookup_securities, manage_securities, manage_investment_transactions.
+    expect(server.registerTool).toHaveBeenCalledTimes(6);
   });
 
   describe("get_portfolio_summary", () => {
@@ -427,32 +420,6 @@ describe("McpInvestmentsTools", () => {
 
       const result = await handlers["list_capital_gains"](
         { startDate: "2024-01-01", endDate: "2024-12-31" },
-        { sessionId: "s1" },
-      );
-      expect(result.isError).toBe(true);
-    });
-  });
-
-  describe("list_holding_details", () => {
-    it("should return holdings", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
-      holdingsService.findAll.mockResolvedValue([{ id: "h1", symbol: "AAPL" }]);
-
-      const result = await handlers["list_holding_details"](
-        { accountId: "a1" },
-        { sessionId: "s1" },
-      );
-      expect(holdingsService.findAll).toHaveBeenCalledWith("u1", "a1");
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed[0].symbol).toBe("AAPL");
-    });
-
-    it("should handle service errors", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
-      holdingsService.findAll.mockRejectedValue(new Error("fail"));
-
-      const result = await handlers["list_holding_details"](
-        {},
         { sessionId: "s1" },
       );
       expect(result.isError).toBe(true);

@@ -52,7 +52,6 @@ import {
   LlmScheduledKind,
 } from "../../scheduled-transactions/scheduled-transactions.service";
 import { BuiltInReportsService } from "../../built-in-reports/built-in-reports.service";
-import { HoldingsService } from "../../securities/holdings.service";
 import { validateToolInput } from "./tool-input-schemas";
 import { executeCalculation, CalculateInput } from "./calculate-tool";
 import { sanitizePromptValue } from "../../common/sanitization.util";
@@ -61,7 +60,6 @@ import {
   getDefaultPreviousMonth,
   resolveComparePeriods,
 } from "../../common/tool-schemas";
-import { didYouMean } from "../../common/name-suggestions.util";
 
 interface ToolResult {
   data: unknown;
@@ -119,7 +117,6 @@ export class ToolExecutorService {
     private readonly prepService: TransactionToolPrepService,
     private readonly actionBuilder: AiActionBuilderService,
     private readonly builtInReportsService: BuiltInReportsService,
-    private readonly holdingsService: HoldingsService,
   ) {}
 
   async execute(
@@ -209,9 +206,6 @@ export class ToolExecutorService {
           break;
         case "list_payees":
           result = await this.listPayees(userId, validatedInput);
-          break;
-        case "list_holding_details":
-          result = await this.listHoldingDetails(userId, validatedInput);
           break;
         case "generate_report":
           result = await this.generateReport(userId, validatedInput);
@@ -2065,50 +2059,6 @@ export class ToolExecutorService {
         {
           type: "payees",
           description: search ? `Payees matching "${search}"` : "All payees",
-        },
-      ],
-    };
-  }
-
-  /**
-   * Detailed individual holding positions, optionally restricted to one account
-   * by name. Mirrors the MCP list_holding_details tool but accepts an account
-   * NAME (resolved internally) instead of a UUID; the returned holdings array is
-   * the same shape on both surfaces.
-   */
-  private async listHoldingDetails(
-    userId: string,
-    input: Record<string, unknown>,
-  ): Promise<ToolResult> {
-    const accountName = input.accountName as string | undefined;
-    let accountId: string | undefined;
-    if (accountName) {
-      const account = await this.resolveAccountByName(userId, accountName);
-      if (!account) {
-        const accounts = await this.accountsService.findAll(userId, true);
-        const suggestion = didYouMean(
-          accountName,
-          accounts.map((a) => a.name),
-        );
-        return this.toolError(
-          `Unknown account: ${accountName}.${suggestion} Call list_accounts to look up valid names.`,
-        );
-      }
-      accountId = account.id;
-    }
-
-    const holdings = await this.holdingsService.findAll(userId, accountId);
-    return {
-      data: holdings,
-      summary: `${holdings.length} holding${holdings.length === 1 ? "" : "s"}${
-        accountName ? ` in ${accountName}` : ""
-      }.`,
-      sources: [
-        {
-          type: "holdings",
-          description: accountName
-            ? `Holding details for ${accountName}`
-            : "Holding details across all investment accounts",
         },
       ],
     };

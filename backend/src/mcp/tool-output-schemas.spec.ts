@@ -462,6 +462,31 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
           gainLossPercent: 25,
         },
       ],
+      holdingsByAccount: [
+        {
+          accountName: "TFSA",
+          currency: "USD",
+          cashBalance: 0,
+          totalCostBasis: 80,
+          totalMarketValue: 100,
+          totalGainLoss: 20,
+          totalGainLossPercent: 25,
+          holdings: [
+            {
+              symbol: "AAPL",
+              name: "Apple",
+              securityType: "stock",
+              currency: "USD",
+              quantity: 1,
+              averageCost: 80,
+              costBasis: 80,
+              marketValue: 100,
+              gainLoss: 20,
+              gainLossPercent: 25,
+            },
+          ],
+        },
+      ],
       allocation: [
         {
           name: "Apple",
@@ -527,19 +552,6 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
       entryCount: 1,
       truncatedEntryList: false,
     },
-  },
-  {
-    name: "getHoldingDetailsOutput",
-    schema: schemas.getHoldingDetailsOutput,
-    raw: [
-      {
-        id: "h1",
-        accountId: "a1",
-        securityId: "s1",
-        quantity: 1,
-        averageCost: 80,
-      },
-    ],
   },
   {
     name: "getUpcomingBillsOutput",

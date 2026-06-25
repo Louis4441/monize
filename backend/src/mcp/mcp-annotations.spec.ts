@@ -29,7 +29,7 @@ const DESTRUCTIVE_TOOLS = new Set([
   "manage_investment_transactions",
 ]);
 
-const EXPECTED_TOOL_COUNT = 24;
+const EXPECTED_TOOL_COUNT = 23;
 
 interface ToolProvider {
   register: (server: unknown, resolve?: unknown) => void;
@@ -60,7 +60,6 @@ function collectToolConfigs(): Array<{ name: string; config: any }> {
     ) as unknown as ToolProvider,
     new McpReportsTools({} as any) as unknown as ToolProvider,
     new McpInvestmentsTools(
-      {} as any,
       {} as any,
       {} as any,
       {} as any,

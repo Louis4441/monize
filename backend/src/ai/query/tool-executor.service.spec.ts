@@ -9,7 +9,6 @@ import { BudgetReportsService } from "../../budgets/budget-reports.service";
 import { PortfolioService } from "../../securities/portfolio.service";
 import { SecuritiesService } from "../../securities/securities.service";
 import { BuiltInReportsService } from "../../built-in-reports/built-in-reports.service";
-import { HoldingsService } from "../../securities/holdings.service";
 import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
 import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
 import { TransactionsService } from "../../transactions/transactions.service";
@@ -39,7 +38,6 @@ describe("ToolExecutorService", () => {
   let transfer: Record<string, jest.Mock>;
   let splitService: Record<string, jest.Mock>;
   let builtInReports: Record<string, jest.Mock>;
-  let holdings: Record<string, jest.Mock>;
 
   const userId = "user-1";
 
@@ -312,6 +310,7 @@ describe("ToolExecutorService", () => {
         timeWeightedReturn: null,
         cagr: null,
         holdings: [],
+        holdingsByAccount: [],
         allocation: [],
       }),
     };
@@ -554,13 +553,6 @@ describe("ToolExecutorService", () => {
       }),
     };
 
-    holdings = {
-      findAll: jest.fn().mockResolvedValue([
-        { id: "h-1", symbol: "AAPL", quantity: 10 },
-        { id: "h-2", symbol: "MSFT", quantity: 5 },
-      ]),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ToolExecutorService,
@@ -585,7 +577,6 @@ describe("ToolExecutorService", () => {
         { provide: TransactionSplitService, useValue: splitService },
         { provide: AiActionSigningService, useValue: signing },
         { provide: BuiltInReportsService, useValue: builtInReports },
-        { provide: HoldingsService, useValue: holdings },
         // Real prep + builder wrapping the mocked services, so the executor's
         // name resolution, preview building, and pending-action construction
         // (and signing.sign assertions) still run end-to-end.
@@ -1048,33 +1039,6 @@ describe("ToolExecutorService", () => {
 
       expect(payees.search).toHaveBeenCalledWith(userId, "wal", 50);
       expect(result.summary).toContain('matching "wal"');
-    });
-
-    it("list_holding_details delegates to holdings.findAll across all accounts", async () => {
-      const result = await service.execute(userId, "list_holding_details", {});
-
-      expect(holdings.findAll).toHaveBeenCalledWith(userId, undefined);
-      expect(result.sources[0].type).toBe("holdings");
-      expect(result.summary).toContain("2 holdings");
-    });
-
-    it("list_holding_details resolves an account name to its id", async () => {
-      await service.execute(userId, "list_holding_details", {
-        accountName: "Brokerage",
-      });
-
-      expect(holdings.findAll).toHaveBeenCalledWith(userId, "acc-3");
-    });
-
-    it("list_holding_details returns a did-you-mean error for an unknown account", async () => {
-      const result = await service.execute(userId, "list_holding_details", {
-        accountName: "Brokrage",
-      });
-
-      expect(result.isError).toBe(true);
-      expect(result.summary).toContain("Unknown account: Brokrage");
-      expect(result.summary).toContain("Did you mean 'Brokerage'?");
-      expect(holdings.findAll).not.toHaveBeenCalled();
     });
 
     it("generate_report delegates to the matching built-in report", async () => {

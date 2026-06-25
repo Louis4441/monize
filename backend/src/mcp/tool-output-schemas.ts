@@ -334,6 +334,31 @@ export const getPortfolioSummaryOutput = {
       gainLossPercent: numNull,
     }),
   ),
+  holdingsByAccount: z.array(
+    looseObject({
+      accountName: str,
+      currency: str,
+      cashBalance: num,
+      totalCostBasis: num,
+      totalMarketValue: num,
+      totalGainLoss: num,
+      totalGainLossPercent: num,
+      holdings: z.array(
+        looseObject({
+          symbol: str,
+          name: str,
+          securityType: str,
+          currency: str,
+          quantity: num,
+          averageCost: numNull,
+          costBasis: num,
+          marketValue: numNull,
+          gainLoss: numNull,
+          gainLossPercent: numNull,
+        }),
+      ),
+    }),
+  ),
   allocation: z.array(
     looseObject({
       name: str,
@@ -406,18 +431,6 @@ export const getCapitalGainsOutput = {
   ),
   entryCount: num,
   truncatedEntryList: bool,
-};
-
-export const getHoldingDetailsOutput = {
-  items: z.array(
-    looseObject({
-      id: str,
-      accountId: str,
-      securityId: str,
-      quantity: num,
-      averageCost: numNull,
-    }),
-  ),
 };
 
 export const lookupSecuritiesOutput = {

@@ -133,10 +133,6 @@ export const listPayeesSchema = z.object({
   search: z.string().max(200).optional(),
 });
 
-export const listHoldingDetailsSchema = z.object({
-  accountName: z.string().max(100).optional(),
-});
-
 export const generateReportSchema = z.object({
   type: z.enum([
     "spending_by_category",
@@ -631,7 +627,6 @@ export const toolInputSchemas: Record<string, z.ZodSchema> = {
   lookup_securities: lookupSecuritiesSchema,
   manage_investment_transactions: manageInvestmentTransactionsSchema,
   list_payees: listPayeesSchema,
-  list_holding_details: listHoldingDetailsSchema,
   generate_report: generateReportSchema,
   list_anomalies: listAnomaliesSchema,
   monthly_comparison: monthlyComparisonSchema,

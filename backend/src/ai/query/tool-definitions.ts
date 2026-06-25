@@ -232,7 +232,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
     name: "get_portfolio_summary",
     description:
-      "Get the user's investment holdings and portfolio performance. Returns each held security (symbol, name, security type, quantity, cost basis, current market value, unrealized gain/loss, and percent return) plus portfolio-wide totals (total holdings value, total cost basis, total portfolio value, total unrealized gain/loss, time-weighted return, CAGR) and asset allocation percentages. Holdings are sorted by market value descending. Use this for questions like 'what stocks do I own', 'how is my portfolio performing', 'what's my asset allocation', or 'how much have I made on <symbol>'. Market values come from the latest stored security prices -- they may be a day or two stale if price updates haven't run.",
+      "Get the user's investment holdings and portfolio performance. Returns each held security (symbol, name, security type, quantity, cost basis, current market value, unrealized gain/loss, and percent return) plus portfolio-wide totals (total holdings value, total cost basis, total portfolio value, total unrealized gain/loss, time-weighted return, CAGR) and asset allocation percentages. Also returns a per-account breakdown (holdingsByAccount) listing the individual positions, cash balance, and rolled-up totals for each investment account, so it answers both overall and per-account holdings questions. Holdings are sorted by market value descending. Use this for questions like 'what stocks do I own', 'how is my portfolio performing', 'what's my asset allocation', 'what do I hold in my TFSA', or 'how much have I made on <symbol>'. Market values come from the latest stored security prices -- they may be a day or two stale if price updates haven't run.",
     inputSchema: {
       type: "object",
       properties: {
@@ -861,21 +861,6 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
           type: "string",
           description:
             "Optional case-insensitive substring match on the payee name. Omit to return all payees.",
-        },
-      },
-    },
-  },
-  {
-    name: "list_holding_details",
-    description:
-      "Get the detailed individual holding positions (each lot/security with quantity, cost basis, current value, and gain/loss) for the user's investment accounts. Use this only when the user asks about the holdings within a specific account; for an overall portfolio view, gains, or asset allocation use get_portfolio_summary instead. Optionally filter to a single account by name.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        accountName: {
-          type: "string",
-          description:
-            "Optional: restrict to a single investment account by name. Use an exact name from the user's account list. Omit to include holdings across all investment accounts.",
         },
       },
     },

@@ -81,7 +81,7 @@ export class McpServerService {
           "- 'What's my net worth?' → list_accounts for current balances and the assets/liabilities/net-worth summary, get_net_worth_history for trends.",
           "- 'Any unusual spending?' → list_anomalies rather than manually scanning transactions.",
           "- 'What bills are coming up?' → list_upcoming_bills.",
-          "- 'How are my investments doing?' → get_portfolio_summary for the overview, list_holding_details only if they ask about a specific account.",
+          "- 'How are my investments doing?' → get_portfolio_summary; it returns both the overall portfolio and a per-account holdings breakdown (holdingsByAccount), so use it for specific-account holdings questions too.",
           "",
           "## Resources",
           "- monize://financial-summary provides a quick snapshot (net worth, current month income/expenses) without needing any tool calls.",

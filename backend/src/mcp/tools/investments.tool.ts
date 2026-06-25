@@ -2,7 +2,6 @@ import { Injectable } from "@nestjs/common";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { PortfolioService } from "../../securities/portfolio.service";
-import { HoldingsService } from "../../securities/holdings.service";
 import { SecuritiesService } from "../../securities/securities.service";
 import {
   SecurityToolPrepService,
@@ -45,7 +44,6 @@ import {
   getPortfolioSummaryOutput,
   listInvestmentTransactionsOutput,
   getCapitalGainsOutput,
-  getHoldingDetailsOutput,
   manageSecuritiesOutput,
   lookupSecuritiesOutput,
   manageInvestmentTransactionsOutput,
@@ -87,7 +85,6 @@ interface ManageSecItem {
 export class McpInvestmentsTools {
   constructor(
     private readonly portfolioService: PortfolioService,
-    private readonly holdingsService: HoldingsService,
     private readonly investmentTransactionsService: InvestmentTransactionsService,
     private readonly securitiesService: SecuritiesService,
     private readonly securityPrepService: SecurityToolPrepService,
@@ -262,39 +259,6 @@ export class McpInvestmentsTools {
               },
             );
           return toolResult(result);
-        } catch (err: unknown) {
-          return safeToolError(err);
-        }
-      },
-    );
-
-    server.registerTool(
-      "list_holding_details",
-      {
-        title: "Holding details",
-        annotations: READ_ONLY,
-        description: "Get details for holdings in a specific account",
-        inputSchema: {
-          accountId: z
-            .string()
-            .uuid()
-            .optional()
-            .describe("Account ID to filter holdings"),
-        },
-        outputSchema: getHoldingDetailsOutput,
-      },
-      async (args, extra) => {
-        const ctx = resolve(extra.sessionId);
-        if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "read");
-        if (check.error) return check.result;
-
-        try {
-          const holdings = await this.holdingsService.findAll(
-            ctx.userId,
-            args.accountId,
-          );
-          return toolResult(holdings);
         } catch (err: unknown) {
           return safeToolError(err);
         }
