@@ -9,7 +9,6 @@ import { BudgetReportsService } from "../../budgets/budget-reports.service";
 import { PortfolioService } from "../../securities/portfolio.service";
 import { SecuritiesService } from "../../securities/securities.service";
 import { BuiltInReportsService } from "../../built-in-reports/built-in-reports.service";
-import { HoldingsService } from "../../securities/holdings.service";
 import { InvestmentTransactionsService } from "../../securities/investment-transactions.service";
 import { ScheduledTransactionsService } from "../../scheduled-transactions/scheduled-transactions.service";
 import { TransactionsService } from "../../transactions/transactions.service";
@@ -39,7 +38,6 @@ describe("ToolExecutorService", () => {
   let transfer: Record<string, jest.Mock>;
   let splitService: Record<string, jest.Mock>;
   let builtInReports: Record<string, jest.Mock>;
-  let holdings: Record<string, jest.Mock>;
 
   const userId = "user-1";
 
@@ -162,6 +160,25 @@ describe("ToolExecutorService", () => {
           brokerage: { id: "acc-3", name: "Brokerage", currencyCode: "USD" },
         };
         return byName[name.toLowerCase()];
+      }),
+      resolveAccountFilter: jest.fn(async (_uid: string, names?: string[]) => {
+        if (!names || names.length === 0) return { accountIds: undefined };
+        const byName: Record<string, string> = {
+          checking: "acc-1",
+          savings: "acc-2",
+          brokerage: "acc-3",
+        };
+        const accountIds: string[] = [];
+        const unresolved: string[] = [];
+        for (const n of names) {
+          const id = byName[n.toLowerCase()];
+          if (id) accountIds.push(id);
+          else unresolved.push(n);
+        }
+        if (unresolved.length > 0) {
+          return { error: `Unknown account: ${unresolved.join(", ")}.` };
+        }
+        return { accountIds };
       }),
       findOne: jest.fn(async (_uid: string, id: string) => {
         const byId: Record<
@@ -312,6 +329,7 @@ describe("ToolExecutorService", () => {
         timeWeightedReturn: null,
         cagr: null,
         holdings: [],
+        holdingsByAccount: [],
         allocation: [],
       }),
     };
@@ -554,13 +572,6 @@ describe("ToolExecutorService", () => {
       }),
     };
 
-    holdings = {
-      findAll: jest.fn().mockResolvedValue([
-        { id: "h-1", symbol: "AAPL", quantity: 10 },
-        { id: "h-2", symbol: "MSFT", quantity: 5 },
-      ]),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ToolExecutorService,
@@ -585,7 +596,6 @@ describe("ToolExecutorService", () => {
         { provide: TransactionSplitService, useValue: splitService },
         { provide: AiActionSigningService, useValue: signing },
         { provide: BuiltInReportsService, useValue: builtInReports },
-        { provide: HoldingsService, useValue: holdings },
         // Real prep + builder wrapping the mocked services, so the executor's
         // name resolution, preview building, and pending-action construction
         // (and signing.sign assertions) still run end-to-end.
@@ -675,11 +685,24 @@ describe("ToolExecutorService", () => {
         accountNames: ["Checking"],
       });
 
-      expect(accounts.findAll).toHaveBeenCalledWith(userId, false);
+      expect(accounts.resolveAccountFilter).toHaveBeenCalledWith(userId, [
+        "Checking",
+      ]);
       expect(analytics.getLlmListTransactions).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({ accountIds: ["acc-1"] }),
       );
+    });
+
+    it("list_transactions surfaces a did-you-mean error for an unknown account name", async () => {
+      const result = await service.execute(userId, "list_transactions", {
+        accountNames: ["Chekcing"],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.summary).toContain("Unknown account: Chekcing");
+      // The unknown name short-circuits before any data query runs.
+      expect(analytics.getLlmListTransactions).not.toHaveBeenCalled();
     });
 
     it("list_transactions resolves category names via analytics helper", async () => {
@@ -708,18 +731,20 @@ describe("ToolExecutorService", () => {
       );
     });
 
-    it("list_transactions errors when a category name cannot be resolved", async () => {
+    it("list_transactions errors with a did-you-mean hint when a category name cannot be resolved", async () => {
       analytics.resolveLlmCategoryIds.mockResolvedValueOnce({
         categoryIds: [],
-        unresolved: ["Bogus"],
+        unresolved: ["Grocries"],
+        suggestions: ["Groceries"],
       });
 
       const result = await service.execute(userId, "list_transactions", {
-        categoryNames: ["Bogus"],
+        categoryNames: ["Grocries"],
       });
 
       expect(result.isError).toBe(true);
-      expect(result.summary).toContain("Bogus");
+      expect(result.summary).toContain("Unknown category: Grocries");
+      expect(result.summary).toContain("Did you mean 'Groceries'?");
       expect(analytics.getLlmListTransactions).not.toHaveBeenCalled();
     });
 
@@ -914,7 +939,9 @@ describe("ToolExecutorService", () => {
         accountNames: ["Checking"],
       });
 
-      expect(accounts.findAll).toHaveBeenCalledWith(userId, false);
+      expect(accounts.resolveAccountFilter).toHaveBeenCalledWith(userId, [
+        "Checking",
+      ]);
       expect(
         investmentTransactions.getLlmInvestmentTransactions,
       ).toHaveBeenCalledWith(
@@ -977,7 +1004,9 @@ describe("ToolExecutorService", () => {
         accountNames: ["Checking"],
       });
 
-      expect(accounts.findAll).toHaveBeenCalledWith(userId, false);
+      expect(accounts.resolveAccountFilter).toHaveBeenCalledWith(userId, [
+        "Checking",
+      ]);
       expect(investmentTransactions.getLlmCapitalGains).toHaveBeenCalledWith(
         userId,
         expect.objectContaining({
@@ -1022,7 +1051,9 @@ describe("ToolExecutorService", () => {
         accountNames: ["Checking"],
       });
 
-      expect(accounts.findAll).toHaveBeenCalledWith(userId, false);
+      expect(accounts.resolveAccountFilter).toHaveBeenCalledWith(userId, [
+        "Checking",
+      ]);
       expect(
         scheduledTransactions.getLlmUpcomingBillsAndDeposits,
       ).toHaveBeenCalledWith(userId, {
@@ -1050,33 +1081,6 @@ describe("ToolExecutorService", () => {
       expect(result.summary).toContain('matching "wal"');
     });
 
-    it("list_holding_details delegates to holdings.findAll across all accounts", async () => {
-      const result = await service.execute(userId, "list_holding_details", {});
-
-      expect(holdings.findAll).toHaveBeenCalledWith(userId, undefined);
-      expect(result.sources[0].type).toBe("holdings");
-      expect(result.summary).toContain("2 holdings");
-    });
-
-    it("list_holding_details resolves an account name to its id", async () => {
-      await service.execute(userId, "list_holding_details", {
-        accountName: "Brokerage",
-      });
-
-      expect(holdings.findAll).toHaveBeenCalledWith(userId, "acc-3");
-    });
-
-    it("list_holding_details returns a did-you-mean error for an unknown account", async () => {
-      const result = await service.execute(userId, "list_holding_details", {
-        accountName: "Brokrage",
-      });
-
-      expect(result.isError).toBe(true);
-      expect(result.summary).toContain("Unknown account: Brokrage");
-      expect(result.summary).toContain("Did you mean 'Brokerage'?");
-      expect(holdings.findAll).not.toHaveBeenCalled();
-    });
-
     it("generate_report delegates to the matching built-in report", async () => {
       const result = await service.execute(userId, "generate_report", {
         type: "spending_by_category",
@@ -1093,8 +1097,9 @@ describe("ToolExecutorService", () => {
       expect(result.summary).toContain("spending_by_category");
     });
 
-    it("list_anomalies delegates to builtInReports.getSpendingAnomalies", async () => {
-      const result = await service.execute(userId, "list_anomalies", {
+    it("generate_report type spending_anomalies delegates to getSpendingAnomalies", async () => {
+      const result = await service.execute(userId, "generate_report", {
+        type: "spending_anomalies",
         months: 6,
       });
 
@@ -1106,8 +1111,9 @@ describe("ToolExecutorService", () => {
       expect(result.summary).toContain("2 spending anomalies");
     });
 
-    it("monthly_comparison delegates to builtInReports.getMonthlyComparison", async () => {
-      const result = await service.execute(userId, "monthly_comparison", {
+    it("generate_report type month_comparison delegates to getMonthlyComparison", async () => {
+      const result = await service.execute(userId, "generate_report", {
+        type: "month_comparison",
         month: "2026-04",
       });
 

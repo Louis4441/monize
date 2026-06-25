@@ -139,6 +139,24 @@ export interface LlmPortfolioAllocation {
   percentage: number;
 }
 
+/**
+ * Per-account holdings breakdown embedded in the LLM portfolio summary. Each
+ * entry lists the individual positions held in one investment account, the
+ * account's cash balance, and its rolled-up totals. This replaces the former
+ * standalone holding-details tool so a single summary call answers both
+ * portfolio-wide and per-account holdings questions.
+ */
+export interface LlmAccountHoldings {
+  accountName: string;
+  currency: string;
+  cashBalance: number;
+  totalCostBasis: number;
+  totalMarketValue: number;
+  totalGainLoss: number;
+  totalGainLossPercent: number;
+  holdings: LlmPortfolioHolding[];
+}
+
 export interface LlmPortfolioSummary {
   holdingCount: number;
   totalCashValue: number;
@@ -150,6 +168,7 @@ export interface LlmPortfolioSummary {
   timeWeightedReturn: number | null;
   cagr: number | null;
   holdings: LlmPortfolioHolding[];
+  holdingsByAccount: LlmAccountHoldings[];
   allocation: LlmPortfolioAllocation[];
 }
 
@@ -461,7 +480,7 @@ export class PortfolioService {
     const roundPct = (v: number | null | undefined): number | null =>
       v === null || v === undefined ? null : Math.round(Number(v) * 100) / 100;
 
-    const holdings: LlmPortfolioHolding[] = summary.holdings.map((h) => ({
+    const toLlmHolding = (h: HoldingWithMarketValue): LlmPortfolioHolding => ({
       symbol: h.symbol,
       name: h.name,
       securityType: h.securityType,
@@ -472,7 +491,21 @@ export class PortfolioService {
       marketValue: roundMoneyNullable(h.marketValue),
       gainLoss: roundMoneyNullable(h.gainLoss),
       gainLossPercent: roundPct(h.gainLossPercent),
-    }));
+    });
+
+    const holdings: LlmPortfolioHolding[] = summary.holdings.map(toLlmHolding);
+
+    const holdingsByAccount: LlmAccountHoldings[] =
+      summary.holdingsByAccount.map((acct) => ({
+        accountName: acct.accountName,
+        currency: acct.currencyCode,
+        cashBalance: roundMoneyValue(acct.cashBalance),
+        totalCostBasis: roundMoneyValue(acct.totalCostBasis),
+        totalMarketValue: roundMoneyValue(acct.totalMarketValue),
+        totalGainLoss: roundMoneyValue(acct.totalGainLoss),
+        totalGainLossPercent: roundPct(acct.totalGainLossPercent) ?? 0,
+        holdings: acct.holdings.map(toLlmHolding),
+      }));
 
     const allocation: LlmPortfolioAllocation[] = summary.allocation.map(
       (a) => ({
@@ -495,6 +528,7 @@ export class PortfolioService {
       timeWeightedReturn: roundPct(summary.timeWeightedReturn),
       cagr: roundPct(summary.cagr),
       holdings,
+      holdingsByAccount,
       allocation,
     };
   }

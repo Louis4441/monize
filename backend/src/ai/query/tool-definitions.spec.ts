@@ -1,8 +1,8 @@
 import { FINANCIAL_TOOLS } from "./tool-definitions";
 
 describe("FINANCIAL_TOOLS", () => {
-  it("defines exactly 22 tools", () => {
-    expect(FINANCIAL_TOOLS).toHaveLength(22);
+  it("defines exactly 19 tools", () => {
+    expect(FINANCIAL_TOOLS).toHaveLength(19);
   });
 
   it("has unique tool names", () => {
@@ -29,10 +29,7 @@ describe("FINANCIAL_TOOLS", () => {
     "manage_securities",
     "manage_investment_transactions",
     "list_payees",
-    "list_holding_details",
     "generate_report",
-    "list_anomalies",
-    "monthly_comparison",
   ];
 
   it("matches the expected tool set exactly", () => {

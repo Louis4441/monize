@@ -6,7 +6,6 @@ import { UserContextResolver } from "../mcp-context";
 describe("McpInvestmentsTools", () => {
   let tool: McpInvestmentsTools;
   let portfolioService: Record<string, jest.Mock>;
-  let holdingsService: Record<string, jest.Mock>;
   let investmentTransactionsService: Record<string, jest.Mock>;
   let securitiesService: Record<string, jest.Mock>;
   let securityPrepService: Record<string, jest.Mock>;
@@ -25,10 +24,6 @@ describe("McpInvestmentsTools", () => {
     portfolioService = {
       getPortfolioSummary: jest.fn(),
       getLlmSummary: jest.fn(),
-    };
-
-    holdingsService = {
-      findAll: jest.fn(),
     };
 
     investmentTransactionsService = {
@@ -66,7 +61,14 @@ describe("McpInvestmentsTools", () => {
       prepareDeleteSecurities: jest.fn(),
     };
 
-    accountsService = { resolveByName: jest.fn() };
+    accountsService = {
+      resolveByName: jest.fn(),
+      // Default: no name filter resolves to "all accounts"; tests that pass
+      // accountNames override this with resolved ids or an error.
+      resolveAccountFilter: jest
+        .fn()
+        .mockResolvedValue({ accountIds: undefined }),
+    };
 
     relayService = { emitPendingAction: jest.fn().mockReturnValue(false) };
     const actionBuilder = {
@@ -126,7 +128,6 @@ describe("McpInvestmentsTools", () => {
 
     tool = new McpInvestmentsTools(
       portfolioService as any,
-      holdingsService as any,
       investmentTransactionsService as any,
       securitiesService as any,
       securityPrepService as any,
@@ -154,11 +155,10 @@ describe("McpInvestmentsTools", () => {
     tool.register(server as any, resolve);
   });
 
-  it("should register 7 tools", () => {
+  it("should register 6 tools", () => {
     // get_portfolio_summary, list_investment_transactions, list_capital_gains,
-    // list_holding_details, lookup_securities, manage_securities,
-    // manage_investment_transactions.
-    expect(server.registerTool).toHaveBeenCalledTimes(7);
+    // lookup_securities, manage_securities, manage_investment_transactions.
+    expect(server.registerTool).toHaveBeenCalledTimes(6);
   });
 
   describe("get_portfolio_summary", () => {
@@ -194,8 +194,11 @@ describe("McpInvestmentsTools", () => {
       expect(parsed.totalGainLoss).toBe(500);
     });
 
-    it("passes accountIds filter through to getLlmSummary", async () => {
+    it("resolves accountNames and passes the ids to getLlmSummary", async () => {
       resolve.mockReturnValue({ userId: "u1", scopes: "read" });
+      accountsService.resolveAccountFilter.mockResolvedValue({
+        accountIds: ["acc-1"],
+      });
       portfolioService.getLlmSummary.mockResolvedValue({
         holdingCount: 0,
         totalPortfolioValue: 0,
@@ -205,11 +208,14 @@ describe("McpInvestmentsTools", () => {
       });
 
       await handlers["get_portfolio_summary"](
-        { accountIds: ["00000000-0000-0000-0000-000000000001"] },
+        { accountNames: ["RRSP"] },
         { sessionId: "s1" },
       );
+      expect(accountsService.resolveAccountFilter).toHaveBeenCalledWith("u1", [
+        "RRSP",
+      ]);
       expect(portfolioService.getLlmSummary).toHaveBeenCalledWith("u1", [
-        "00000000-0000-0000-0000-000000000001",
+        "acc-1",
       ]);
     });
 
@@ -221,6 +227,21 @@ describe("McpInvestmentsTools", () => {
         { sessionId: "s1" },
       );
       expect(result.isError).toBe(true);
+    });
+
+    it("surfaces the resolver's did-you-mean error for an unknown account", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
+      accountsService.resolveAccountFilter.mockResolvedValue({
+        error: "Unknown account: Foo. Did you mean 'RRSP'?",
+      });
+
+      const result = await handlers["get_portfolio_summary"](
+        { accountNames: ["Foo"] },
+        { sessionId: "s1" },
+      );
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("Unknown account: Foo");
+      expect(portfolioService.getLlmSummary).not.toHaveBeenCalled();
     });
   });
 
@@ -258,11 +279,15 @@ describe("McpInvestmentsTools", () => {
         },
       );
 
+      accountsService.resolveAccountFilter.mockResolvedValue({
+        accountIds: ["acc-1"],
+      });
+
       const result = await handlers["list_investment_transactions"](
         {
           startDate: "2026-01-01",
           endDate: "2026-03-31",
-          accountIds: ["00000000-0000-0000-0000-000000000001"],
+          accountNames: ["RRSP"],
           symbols: ["AAPL"],
           actions: ["BUY"],
           groupBy: "security",
@@ -270,12 +295,15 @@ describe("McpInvestmentsTools", () => {
         { sessionId: "s1" },
       );
 
+      expect(accountsService.resolveAccountFilter).toHaveBeenCalledWith("u1", [
+        "RRSP",
+      ]);
       expect(
         investmentTransactionsService.getLlmInvestmentTransactions,
       ).toHaveBeenCalledWith("u1", {
         startDate: "2026-01-01",
         endDate: "2026-03-31",
-        accountIds: ["00000000-0000-0000-0000-000000000001"],
+        accountIds: ["acc-1"],
         symbols: ["AAPL"],
         actions: ["BUY"],
         groupBy: "security",
@@ -369,23 +397,30 @@ describe("McpInvestmentsTools", () => {
         truncatedEntryList: false,
       });
 
+      accountsService.resolveAccountFilter.mockResolvedValue({
+        accountIds: ["acc-1"],
+      });
+
       const result = await handlers["list_capital_gains"](
         {
           startDate: "2024-01-01",
           endDate: "2024-12-31",
-          accountIds: ["00000000-0000-0000-0000-000000000001"],
+          accountNames: ["RRSP"],
           symbols: ["AAA"],
           groupBy: "security",
         },
         { sessionId: "s1" },
       );
 
+      expect(accountsService.resolveAccountFilter).toHaveBeenCalledWith("u1", [
+        "RRSP",
+      ]);
       expect(
         investmentTransactionsService.getLlmCapitalGains,
       ).toHaveBeenCalledWith("u1", {
         startDate: "2024-01-01",
         endDate: "2024-12-31",
-        accountIds: ["00000000-0000-0000-0000-000000000001"],
+        accountIds: ["acc-1"],
         symbols: ["AAA"],
         groupBy: "security",
       });
@@ -427,32 +462,6 @@ describe("McpInvestmentsTools", () => {
 
       const result = await handlers["list_capital_gains"](
         { startDate: "2024-01-01", endDate: "2024-12-31" },
-        { sessionId: "s1" },
-      );
-      expect(result.isError).toBe(true);
-    });
-  });
-
-  describe("list_holding_details", () => {
-    it("should return holdings", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
-      holdingsService.findAll.mockResolvedValue([{ id: "h1", symbol: "AAPL" }]);
-
-      const result = await handlers["list_holding_details"](
-        { accountId: "a1" },
-        { sessionId: "s1" },
-      );
-      expect(holdingsService.findAll).toHaveBeenCalledWith("u1", "a1");
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed[0].symbol).toBe("AAPL");
-    });
-
-    it("should handle service errors", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
-      holdingsService.findAll.mockRejectedValue(new Error("fail"));
-
-      const result = await handlers["list_holding_details"](
-        {},
         { sessionId: "s1" },
       );
       expect(result.isError).toBe(true);

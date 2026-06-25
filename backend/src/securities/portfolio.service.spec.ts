@@ -1515,6 +1515,81 @@ describe("PortfolioService", () => {
       expect(result.holdings[0].gainLoss).toBeNull();
       expect(result.holdings[0].gainLossPercent).toBeNull();
     });
+
+    it("maps the per-account holdings breakdown into the compact LLM shape", async () => {
+      jest.spyOn(service, "getPortfolioSummary").mockResolvedValue({
+        totalCashValue: 0,
+        totalHoldingsValue: 1800,
+        totalCostBasis: 1500,
+        totalNetInvested: 1500,
+        totalPortfolioValue: 1800,
+        totalGainLoss: 300,
+        totalGainLossPercent: 20,
+        timeWeightedReturn: null,
+        cagr: null,
+        holdings: [],
+        holdingsByAccount: [
+          {
+            accountId: "acct-1",
+            accountName: "TFSA",
+            currencyCode: "CAD",
+            cashAccountId: "cash-1",
+            cashBalance: 250.12345,
+            holdings: [
+              {
+                id: "h1",
+                accountId: "acct-1",
+                securityId: "s1",
+                symbol: "AAPL",
+                name: "Apple Inc.",
+                securityType: "STOCK",
+                currencyCode: "USD",
+                quantity: 10,
+                averageCost: 150,
+                costBasis: 1500,
+                costBasisAccountCurrency: 1500,
+                currentPrice: 180,
+                marketValue: 1800.12345,
+                gainLoss: 300.12345,
+                gainLossPercent: 20.567,
+              },
+            ],
+            totalCostBasis: 1500.1234,
+            totalMarketValue: 1800.5678,
+            totalGainLoss: 300.4444,
+            totalGainLossPercent: 20.123456,
+            netInvested: 1500,
+          },
+        ],
+        allocation: [],
+      });
+
+      const result = await service.getLlmSummary("user-1");
+
+      expect(result.holdingsByAccount).toHaveLength(1);
+      const acct = result.holdingsByAccount[0];
+      expect(acct).toMatchObject({
+        accountName: "TFSA",
+        currency: "CAD",
+        cashBalance: 250.1235,
+        totalCostBasis: 1500.1234,
+        totalMarketValue: 1800.5678,
+        totalGainLoss: 300.4444,
+        totalGainLossPercent: 20.12,
+      });
+      expect(acct.holdings[0]).toMatchObject({
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        securityType: "STOCK",
+        currency: "USD",
+        quantity: 10,
+        averageCost: 150,
+        costBasis: 1500,
+        marketValue: 1800.1235,
+        gainLoss: 300.1235,
+        gainLossPercent: 20.57,
+      });
+    });
   });
 
   describe("getTopMovers", () => {

@@ -3019,6 +3019,61 @@ describe("AccountsService", () => {
     });
   });
 
+  describe("resolveAccountFilter", () => {
+    it("returns accountIds: undefined when no names are supplied", async () => {
+      const findAllSpy = jest.spyOn(service, "findAll");
+      expect(await service.resolveAccountFilter("user-1")).toEqual({
+        accountIds: undefined,
+      });
+      expect(await service.resolveAccountFilter("user-1", [])).toEqual({
+        accountIds: undefined,
+      });
+      expect(findAllSpy).not.toHaveBeenCalled();
+    });
+
+    it("maps names to ids case-insensitively over open accounts", async () => {
+      jest.spyOn(service, "findAll").mockResolvedValue([
+        { id: "a1", name: "Checking", currencyCode: "USD" },
+        { id: "a2", name: "RRSP", currencyCode: "CAD" },
+      ] as never);
+
+      const result = await service.resolveAccountFilter("user-1", [
+        "checking",
+        "RRSP",
+      ]);
+      expect(service.findAll).toHaveBeenCalledWith("user-1", false);
+      expect(result).toEqual({ accountIds: ["a1", "a2"] });
+    });
+
+    it("returns a did-you-mean error when a name does not match", async () => {
+      jest.spyOn(service, "findAll").mockResolvedValue([
+        { id: "a1", name: "Checking", currencyCode: "USD" },
+        { id: "a2", name: "Savings", currencyCode: "USD" },
+      ] as never);
+
+      const result = await service.resolveAccountFilter("user-1", ["Savngs"]);
+      expect(result.accountIds).toBeUndefined();
+      expect(result.error).toContain("Unknown account: Savngs.");
+      expect(result.error).toContain("Did you mean 'Savings'?");
+      expect(result.error).toContain("Call list_accounts");
+    });
+
+    it("errors on any unresolved name rather than running with a partial set", async () => {
+      jest
+        .spyOn(service, "findAll")
+        .mockResolvedValue([
+          { id: "a1", name: "Checking", currencyCode: "USD" },
+        ] as never);
+
+      const result = await service.resolveAccountFilter("user-1", [
+        "Checking",
+        "Nope",
+      ]);
+      expect(result.accountIds).toBeUndefined();
+      expect(result.error).toContain("Unknown account: Nope.");
+    });
+  });
+
   describe("resolveBrokerageByName", () => {
     const rrspBrokerage = {
       id: "b1",
@@ -3092,9 +3147,7 @@ describe("AccountsService", () => {
     });
 
     it("does not match the cash half of the pair by its base name", async () => {
-      jest
-        .spyOn(service, "findAll")
-        .mockResolvedValue([rrspCash] as never);
+      jest.spyOn(service, "findAll").mockResolvedValue([rrspCash] as never);
 
       const result = await service.resolveBrokerageByName("user-1", "RRSP");
       expect(result.match).toBeUndefined();

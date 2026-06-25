@@ -389,7 +389,7 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     },
   },
   {
-    name: "generateReportOutput",
+    name: "generateReportOutput (aggregation type)",
     schema: schemas.generateReportOutput,
     raw: {
       data: [{ categoryId: "c1", categoryName: "Food", color: null, total: 5 }],
@@ -397,8 +397,8 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     },
   },
   {
-    name: "monthlyComparisonOutput",
-    schema: schemas.monthlyComparisonOutput,
+    name: "generateReportOutput (month_comparison type)",
+    schema: schemas.generateReportOutput,
     raw: {
       currentMonth: "2026-01",
       previousMonth: "2025-12",
@@ -414,8 +414,8 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     },
   },
   {
-    name: "getAnomaliesOutput",
-    schema: schemas.getAnomaliesOutput,
+    name: "generateReportOutput (spending_anomalies type)",
+    schema: schemas.generateReportOutput,
     raw: {
       statistics: { mean: 5, stdDev: 1 },
       anomalies: [
@@ -460,6 +460,31 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
           marketValue: 100,
           gainLoss: 20,
           gainLossPercent: 25,
+        },
+      ],
+      holdingsByAccount: [
+        {
+          accountName: "TFSA",
+          currency: "USD",
+          cashBalance: 0,
+          totalCostBasis: 80,
+          totalMarketValue: 100,
+          totalGainLoss: 20,
+          totalGainLossPercent: 25,
+          holdings: [
+            {
+              symbol: "AAPL",
+              name: "Apple",
+              securityType: "stock",
+              currency: "USD",
+              quantity: 1,
+              averageCost: 80,
+              costBasis: 80,
+              marketValue: 100,
+              gainLoss: 20,
+              gainLossPercent: 25,
+            },
+          ],
         },
       ],
       allocation: [
@@ -527,19 +552,6 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
       entryCount: 1,
       truncatedEntryList: false,
     },
-  },
-  {
-    name: "getHoldingDetailsOutput",
-    schema: schemas.getHoldingDetailsOutput,
-    raw: [
-      {
-        id: "h1",
-        accountId: "a1",
-        securityId: "s1",
-        quantity: 1,
-        averageCost: 80,
-      },
-    ],
   },
   {
     name: "getUpcomingBillsOutput",

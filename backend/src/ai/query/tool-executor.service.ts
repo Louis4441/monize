@@ -52,16 +52,15 @@ import {
   LlmScheduledKind,
 } from "../../scheduled-transactions/scheduled-transactions.service";
 import { BuiltInReportsService } from "../../built-in-reports/built-in-reports.service";
-import { HoldingsService } from "../../securities/holdings.service";
 import { validateToolInput } from "./tool-input-schemas";
 import { executeCalculation, CalculateInput } from "./calculate-tool";
 import { sanitizePromptValue } from "../../common/sanitization.util";
+import { formatDidYouMean } from "../../common/name-suggestions.util";
 import {
   getDefaultDateRange,
   getDefaultPreviousMonth,
   resolveComparePeriods,
 } from "../../common/tool-schemas";
-import { didYouMean } from "../../common/name-suggestions.util";
 
 interface ToolResult {
   data: unknown;
@@ -119,7 +118,6 @@ export class ToolExecutorService {
     private readonly prepService: TransactionToolPrepService,
     private readonly actionBuilder: AiActionBuilderService,
     private readonly builtInReportsService: BuiltInReportsService,
-    private readonly holdingsService: HoldingsService,
   ) {}
 
   async execute(
@@ -210,17 +208,8 @@ export class ToolExecutorService {
         case "list_payees":
           result = await this.listPayees(userId, validatedInput);
           break;
-        case "list_holding_details":
-          result = await this.listHoldingDetails(userId, validatedInput);
-          break;
         case "generate_report":
           result = await this.generateReport(userId, validatedInput);
-          break;
-        case "list_anomalies":
-          result = await this.listAnomalies(userId, validatedInput);
-          break;
-        case "monthly_comparison":
-          result = await this.monthlyComparison(userId, validatedInput);
           break;
         default:
           this.logger.warn(`execute unknown tool=${toolName} user=${userId}`);
@@ -247,32 +236,6 @@ export class ToolExecutorService {
         isError: true,
       };
     }
-  }
-
-  private async resolveAccountIds(
-    userId: string,
-    accountNames?: string[],
-  ): Promise<string[] | undefined> {
-    if (!accountNames || accountNames.length === 0) return undefined;
-
-    const accounts = await this.accountsService.findAll(userId, false);
-    const nameMap = new Map(accounts.map((a) => [a.name.toLowerCase(), a.id]));
-
-    return accountNames
-      .map((name) => nameMap.get(name.toLowerCase()))
-      .filter((id): id is string => id !== undefined);
-  }
-
-  /**
-   * Resolve a single account name to its id + currency. Returns undefined when
-   * the name does not match any of the user's open accounts. Thin wrapper over
-   * the shared AccountsService.resolveByName.
-   */
-  private async resolveAccountByName(
-    userId: string,
-    accountName: string,
-  ): Promise<{ id: string; name: string; currencyCode: string } | undefined> {
-    return this.accountsService.resolveByName(userId, accountName);
   }
 
   /**
@@ -359,7 +322,12 @@ export class ToolExecutorService {
     const sortDirection =
       (input.sortDirection as "asc" | "desc" | undefined) ?? "desc";
 
-    const accountIds = await this.resolveAccountIds(userId, accountNames);
+    const accountFilter = await this.accountsService.resolveAccountFilter(
+      userId,
+      accountNames,
+    );
+    if (accountFilter.error) return this.toolError(accountFilter.error);
+    const accountIds = accountFilter.accountIds;
 
     let categoryIds: string[] | undefined;
     if (categoryNames && categoryNames.length > 0) {
@@ -369,7 +337,7 @@ export class ToolExecutorService {
       );
       if (resolved.unresolved.length > 0) {
         return this.toolError(
-          `Unknown categor${resolved.unresolved.length === 1 ? "y" : "ies"}: ${resolved.unresolved.join(", ")}. Call list_categories to look up valid names; subcategories can be referenced as "Parent: Child".`,
+          `Unknown categor${resolved.unresolved.length === 1 ? "y" : "ies"}: ${resolved.unresolved.join(", ")}.${formatDidYouMean(resolved.suggestions)} Call list_categories to look up valid names; subcategories can be referenced as "Parent: Child".`,
         );
       }
       categoryIds = resolved.categoryIds;
@@ -1830,7 +1798,12 @@ export class ToolExecutorService {
     input: Record<string, unknown>,
   ): Promise<ToolResult> {
     const accountNames = input.accountNames as string[] | undefined;
-    const accountIds = await this.resolveAccountIds(userId, accountNames);
+    const accountFilter = await this.accountsService.resolveAccountFilter(
+      userId,
+      accountNames,
+    );
+    if (accountFilter.error) return this.toolError(accountFilter.error);
+    const accountIds = accountFilter.accountIds;
 
     const data = await this.portfolioService.getLlmSummary(userId, accountIds);
 
@@ -1861,7 +1834,12 @@ export class ToolExecutorService {
     const groupBy =
       (input.groupBy as LlmInvestmentTxGroupBy | undefined) ?? "security";
 
-    const accountIds = await this.resolveAccountIds(userId, accountNames);
+    const accountFilter = await this.accountsService.resolveAccountFilter(
+      userId,
+      accountNames,
+    );
+    if (accountFilter.error) return this.toolError(accountFilter.error);
+    const accountIds = accountFilter.accountIds;
 
     const data =
       await this.investmentTransactionsService.getLlmInvestmentTransactions(
@@ -1915,7 +1893,12 @@ export class ToolExecutorService {
     const groupBy =
       (input.groupBy as LlmCapitalGainsGroupBy | undefined) ?? "month";
 
-    const accountIds = await this.resolveAccountIds(userId, accountNames);
+    const accountFilter = await this.accountsService.resolveAccountFilter(
+      userId,
+      accountNames,
+    );
+    if (accountFilter.error) return this.toolError(accountFilter.error);
+    const accountIds = accountFilter.accountIds;
 
     const data = await this.investmentTransactionsService.getLlmCapitalGains(
       userId,
@@ -2015,7 +1998,12 @@ export class ToolExecutorService {
     const days = (input.days as number | undefined) ?? 30;
     const kind = input.kind as LlmScheduledKind | "all" | undefined;
     const accountNames = input.accountNames as string[] | undefined;
-    const accountIds = await this.resolveAccountIds(userId, accountNames);
+    const accountFilter = await this.accountsService.resolveAccountFilter(
+      userId,
+      accountNames,
+    );
+    if (accountFilter.error) return this.toolError(accountFilter.error);
+    const accountIds = accountFilter.accountIds;
 
     const data =
       await this.scheduledTransactionsService.getLlmUpcomingBillsAndDeposits(
@@ -2071,52 +2059,10 @@ export class ToolExecutorService {
   }
 
   /**
-   * Detailed individual holding positions, optionally restricted to one account
-   * by name. Mirrors the MCP list_holding_details tool but accepts an account
-   * NAME (resolved internally) instead of a UUID; the returned holdings array is
-   * the same shape on both surfaces.
-   */
-  private async listHoldingDetails(
-    userId: string,
-    input: Record<string, unknown>,
-  ): Promise<ToolResult> {
-    const accountName = input.accountName as string | undefined;
-    let accountId: string | undefined;
-    if (accountName) {
-      const account = await this.resolveAccountByName(userId, accountName);
-      if (!account) {
-        const accounts = await this.accountsService.findAll(userId, true);
-        const suggestion = didYouMean(
-          accountName,
-          accounts.map((a) => a.name),
-        );
-        return this.toolError(
-          `Unknown account: ${accountName}.${suggestion} Call list_accounts to look up valid names.`,
-        );
-      }
-      accountId = account.id;
-    }
-
-    const holdings = await this.holdingsService.findAll(userId, accountId);
-    return {
-      data: holdings,
-      summary: `${holdings.length} holding${holdings.length === 1 ? "" : "s"}${
-        accountName ? ` in ${accountName}` : ""
-      }.`,
-      sources: [
-        {
-          type: "holdings",
-          description: accountName
-            ? `Holding details for ${accountName}`
-            : "Holding details across all investment accounts",
-        },
-      ],
-    };
-  }
-
-  /**
    * Run a built-in financial report. Mirrors the MCP generate_report tool and
-   * returns the same per-type data shape. Dates default to the last 30 days.
+   * returns the same per-type data shape. The five aggregation types take a date
+   * range (default last 30 days); 'spending_anomalies' takes a months window
+   * (default 3); 'month_comparison' takes a month (default the previous month).
    */
   private async generateReport(
     userId: string,
@@ -2127,7 +2073,47 @@ export class ToolExecutorService {
       | "spending_by_payee"
       | "income_vs_expenses"
       | "monthly_trend"
-      | "income_by_source";
+      | "income_by_source"
+      | "spending_anomalies"
+      | "month_comparison";
+
+    if (type === "spending_anomalies") {
+      const months = (input.months as number | undefined) ?? 3;
+      const data = await this.builtInReportsService.getSpendingAnomalies(
+        userId,
+        months,
+      );
+      const count = data.anomalies.length;
+      return {
+        data,
+        summary: `${count} spending anomal${count === 1 ? "y" : "ies"} detected over the last ${months} month${months === 1 ? "" : "s"}.`,
+        sources: [
+          {
+            type: "anomalies",
+            description: "Spending anomaly detection",
+          },
+        ],
+      };
+    }
+
+    if (type === "month_comparison") {
+      const month = (input.month as string) ?? getDefaultPreviousMonth();
+      const data = await this.builtInReportsService.getMonthlyComparison(
+        userId,
+        month,
+      );
+      return {
+        data,
+        summary: `Comparison of ${data.currentMonthLabel} vs ${data.previousMonthLabel}.`,
+        sources: [
+          {
+            type: "monthly_comparison",
+            description: `Monthly comparison for ${data.currentMonthLabel}`,
+          },
+        ],
+      };
+    }
+
     const defaults = getDefaultDateRange();
     const startDate = (input.startDate as string) ?? defaults.startDate;
     const endDate = (input.endDate as string) ?? defaults.endDate;
@@ -2179,59 +2165,6 @@ export class ToolExecutorService {
           type: "report",
           description: `Built-in report: ${type}`,
           dateRange: `${startDate} to ${endDate}`,
-        },
-      ],
-    };
-  }
-
-  /**
-   * Detect statistically unusual spending. Mirrors the MCP list_anomalies tool,
-   * including its argument handling, so both surfaces return the same shape.
-   */
-  private async listAnomalies(
-    userId: string,
-    input: Record<string, unknown>,
-  ): Promise<ToolResult> {
-    const months = (input.months as number | undefined) ?? 3;
-    const data = await this.builtInReportsService.getSpendingAnomalies(
-      userId,
-      months,
-    );
-
-    const count = data.anomalies.length;
-    return {
-      data,
-      summary: `${count} spending anomal${count === 1 ? "y" : "ies"} detected over the last ${months} month${months === 1 ? "" : "s"}.`,
-      sources: [
-        {
-          type: "anomalies",
-          description: "Spending anomaly detection",
-        },
-      ],
-    };
-  }
-
-  /**
-   * Compare a month against the previous month. Mirrors the MCP
-   * monthly_comparison tool and returns the same shape.
-   */
-  private async monthlyComparison(
-    userId: string,
-    input: Record<string, unknown>,
-  ): Promise<ToolResult> {
-    const month = (input.month as string) ?? getDefaultPreviousMonth();
-    const data = await this.builtInReportsService.getMonthlyComparison(
-      userId,
-      month,
-    );
-
-    return {
-      data,
-      summary: `Comparison of ${data.currentMonthLabel} vs ${data.previousMonthLabel}.`,
-      sources: [
-        {
-          type: "monthly_comparison",
-          description: `Monthly comparison for ${data.currentMonthLabel}`,
         },
       ],
     };

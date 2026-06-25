@@ -38,6 +38,7 @@ import {
 } from "./account-name.util";
 import { formatDateYMD, todayInTimezone, todayYMD } from "../common/date-utils";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
+import { didYouMean } from "../common/name-suggestions.util";
 import { ActionHistoryService } from "../action-history/action-history.service";
 
 @Injectable()
@@ -328,9 +329,8 @@ export class AccountsService {
 
   /**
    * Resolve a single account name to its id, canonical name, and currency.
-   * Case-insensitive exact match over the user's OPEN accounts (matching the AI
-   * executor's resolveAccountByName behaviour). Returns undefined when no open
-   * account matches the given name.
+   * Case-insensitive exact match over the user's OPEN accounts. Returns
+   * undefined when no open account matches the given name.
    */
   async resolveByName(
     userId: string,
@@ -343,6 +343,50 @@ export class AccountsService {
     return match
       ? { id: match.id, name: match.name, currencyCode: match.currencyCode }
       : undefined;
+  }
+
+  /**
+   * Resolve a list of account names to an account-id filter. Case-insensitive
+   * exact match over the user's OPEN accounts. Returns:
+   * - `{ accountIds: undefined }` when no names are supplied (treat as "all
+   *   accounts");
+   * - `{ accountIds }` when every name resolves;
+   * - `{ error }` with a "did you mean" hint when one or more names do not
+   *   match, so the caller can surface a self-correcting message instead of
+   *   silently dropping the unknown name (which would scope the answer to the
+   *   wrong set of accounts).
+   *
+   * Shared by the AI Assistant tool executor and the MCP investment tools so
+   * both accept friendly account names with consistent error messaging.
+   */
+  async resolveAccountFilter(
+    userId: string,
+    names?: string[],
+  ): Promise<{ accountIds?: string[]; error?: string }> {
+    if (!names || names.length === 0) return { accountIds: undefined };
+
+    const accounts = await this.findAll(userId, false);
+    const nameMap = new Map(accounts.map((a) => [a.name.toLowerCase(), a.id]));
+
+    const accountIds: string[] = [];
+    const unresolved: string[] = [];
+    for (const name of names) {
+      const id = nameMap.get(name.toLowerCase());
+      if (id) accountIds.push(id);
+      else unresolved.push(name);
+    }
+
+    if (unresolved.length > 0) {
+      const suggestion = didYouMean(
+        unresolved[0],
+        accounts.map((a) => a.name),
+      );
+      return {
+        error: `Unknown account${unresolved.length === 1 ? "" : "s"}: ${unresolved.join(", ")}.${suggestion} Call list_accounts to look up valid names.`,
+      };
+    }
+
+    return { accountIds };
   }
 
   /**
