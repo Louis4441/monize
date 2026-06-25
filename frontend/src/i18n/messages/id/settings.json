@@ -314,10 +314,6 @@
         "write": {
           "label": "Tulis",
           "description": "Buat transaksi, penerima, dan kategori"
-        },
-        "reports": {
-          "label": "Laporan",
-          "description": "Hasilkan laporan keuangan dan analitik"
         }
       },
       "expiry": {

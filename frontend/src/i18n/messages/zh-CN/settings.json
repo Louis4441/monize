@@ -314,10 +314,6 @@
         "write": {
           "label": "写入",
           "description": "创建交易、收款人和分类"
-        },
-        "reports": {
-          "label": "报告",
-          "description": "生成财务报告和分析"
         }
       },
       "expiry": {

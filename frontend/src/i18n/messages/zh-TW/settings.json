@@ -314,10 +314,6 @@
         "write": {
           "label": "寫入",
           "description": "建立交易、收款人和類別"
-        },
-        "reports": {
-          "label": "報表",
-          "description": "產生財務報表和分析"
         }
       },
       "expiry": {

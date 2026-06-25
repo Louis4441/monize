@@ -309,15 +309,11 @@
       "scopes": {
         "read": {
           "label": "Read",
-          "description": "View accounts, transactions, and categories"
+          "description": "View accounts, transactions, categories, and financial reports"
         },
         "write": {
           "label": "Write",
           "description": "Create transactions, payees, and categories"
-        },
-        "reports": {
-          "label": "Reports",
-          "description": "Generate financial reports and analytics"
         }
       },
       "expiry": {

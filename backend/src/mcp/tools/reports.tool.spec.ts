@@ -40,8 +40,8 @@ describe("McpReportsTools", () => {
   });
 
   describe("generate_report", () => {
-    it("should require reports scope", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+    it("should require read scope", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
       const result = await handlers["generate_report"](
         {
           type: "spending_by_category",
@@ -51,11 +51,11 @@ describe("McpReportsTools", () => {
         { sessionId: "s1" },
       );
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("reports");
+      expect(result.content[0].text).toContain("read");
     });
 
     it("should run spending_by_category report", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
       reportsService.getSpendingByCategory.mockResolvedValue({ data: [] });
 
       const result = await handlers["generate_report"](
@@ -75,7 +75,7 @@ describe("McpReportsTools", () => {
     });
 
     it("should run spending_by_payee report", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
       reportsService.getSpendingByPayee.mockResolvedValue({ data: [] });
 
       await handlers["generate_report"](
@@ -90,7 +90,7 @@ describe("McpReportsTools", () => {
     });
 
     it("should run income_vs_expenses report", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
       reportsService.getIncomeVsExpenses.mockResolvedValue({ data: [] });
 
       await handlers["generate_report"](
@@ -105,7 +105,7 @@ describe("McpReportsTools", () => {
     });
 
     it("should run monthly_trend report", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
       reportsService.getMonthlySpendingTrend.mockResolvedValue({ data: [] });
 
       await handlers["generate_report"](
@@ -120,7 +120,7 @@ describe("McpReportsTools", () => {
     });
 
     it("should run income_by_source report", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
       reportsService.getIncomeBySource.mockResolvedValue({ data: [] });
 
       await handlers["generate_report"](
@@ -135,7 +135,7 @@ describe("McpReportsTools", () => {
     });
 
     it("applies default dates when omitted", async () => {
-      resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
       reportsService.getSpendingByCategory.mockResolvedValue({ data: [] });
 
       await handlers["generate_report"](
@@ -162,19 +162,19 @@ describe("McpReportsTools", () => {
     });
 
     describe("type: month_comparison", () => {
-      it("requires reports scope", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      it("requires read scope", async () => {
+        resolve.mockReturnValue({ userId: "u1", scopes: "write" });
 
         const result = await handlers["generate_report"](
           { type: "month_comparison", month: "2026-01" },
           { sessionId: "s1" },
         );
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain("reports");
+        expect(result.content[0].text).toContain("read");
       });
 
       it("calls getMonthlyComparison and returns data", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+        resolve.mockReturnValue({ userId: "u1", scopes: "read" });
         const mockData = { currentMonth: "2026-01", previousMonth: "2025-12" };
         reportsService.getMonthlyComparison.mockResolvedValue(mockData);
 
@@ -193,7 +193,7 @@ describe("McpReportsTools", () => {
       });
 
       it("returns error on service exception", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+        resolve.mockReturnValue({ userId: "u1", scopes: "read" });
         reportsService.getMonthlyComparison.mockRejectedValue(
           new Error("Service failure"),
         );
@@ -207,7 +207,7 @@ describe("McpReportsTools", () => {
       });
 
       it("defaults month to the previous calendar month when omitted", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+        resolve.mockReturnValue({ userId: "u1", scopes: "read" });
         reportsService.getMonthlyComparison.mockResolvedValue({});
 
         await handlers["generate_report"](
@@ -224,7 +224,7 @@ describe("McpReportsTools", () => {
 
     describe("type: spending_anomalies", () => {
       it("detects anomalies with default months", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+        resolve.mockReturnValue({ userId: "u1", scopes: "read" });
         reportsService.getSpendingAnomalies.mockResolvedValue([]);
 
         const result = await handlers["generate_report"](
@@ -239,7 +239,7 @@ describe("McpReportsTools", () => {
       });
 
       it("uses custom months", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+        resolve.mockReturnValue({ userId: "u1", scopes: "read" });
         reportsService.getSpendingAnomalies.mockResolvedValue([]);
 
         await handlers["generate_report"](
@@ -254,19 +254,19 @@ describe("McpReportsTools", () => {
     });
 
     describe("type: net_worth_history", () => {
-      it("requires reports scope", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "read,write" });
+      it("requires read scope", async () => {
+        resolve.mockReturnValue({ userId: "u1", scopes: "write" });
 
         const result = await handlers["generate_report"](
           { type: "net_worth_history" },
           { sessionId: "s1" },
         );
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain("reports");
+        expect(result.content[0].text).toContain("read");
       });
 
       it("calls getLlmHistory and returns the monthly history", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+        resolve.mockReturnValue({ userId: "u1", scopes: "read" });
         netWorthService.getLlmHistory.mockResolvedValue([
           { month: "2025-01", assets: 1, liabilities: 0, netWorth: 1 },
           { month: "2025-02", assets: 2, liabilities: 0, netWorth: 2 },
@@ -288,7 +288,7 @@ describe("McpReportsTools", () => {
       });
 
       it("passes through explicit start and end dates", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+        resolve.mockReturnValue({ userId: "u1", scopes: "read" });
         netWorthService.getLlmHistory.mockResolvedValue([]);
 
         await handlers["generate_report"](
@@ -307,7 +307,7 @@ describe("McpReportsTools", () => {
       });
 
       it("returns error on service exception", async () => {
-        resolve.mockReturnValue({ userId: "u1", scopes: "reports" });
+        resolve.mockReturnValue({ userId: "u1", scopes: "read" });
         netWorthService.getLlmHistory.mockRejectedValue(new Error("boom"));
 
         const result = await handlers["generate_report"](

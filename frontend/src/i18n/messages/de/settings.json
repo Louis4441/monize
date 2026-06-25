@@ -314,10 +314,6 @@
         "write": {
           "label": "Schreiben",
           "description": "Buchungen, Zahlungsempfänger und Kategorien erstellen"
-        },
-        "reports": {
-          "label": "Berichte",
-          "description": "Finanzberichte und Analysen erstellen"
         }
       },
       "expiry": {

@@ -314,10 +314,6 @@
         "write": {
           "label": "Ghi",
           "description": "Tạo giao tác, người nhận và danh mục"
-        },
-        "reports": {
-          "label": "Báo cáo",
-          "description": "Tạo báo cáo tài chính và phân tích"
         }
       },
       "expiry": {

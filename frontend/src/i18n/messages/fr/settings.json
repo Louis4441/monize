@@ -314,10 +314,6 @@
         "write": {
           "label": "Écriture",
           "description": "Créer des transactions, des bénéficiaires et des catégories"
-        },
-        "reports": {
-          "label": "Rapports",
-          "description": "Générer des rapports financiers et des analyses"
         }
       },
       "expiry": {

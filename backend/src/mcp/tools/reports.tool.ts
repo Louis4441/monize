@@ -82,7 +82,7 @@ export class McpReportsTools {
       async (args, extra) => {
         const ctx = resolve(extra.sessionId);
         if (!ctx) return toolError("No user context");
-        const check = requireScope(ctx.scopes, "reports");
+        const check = requireScope(ctx.scopes, "read");
         if (check.error) return check.result;
 
         try {

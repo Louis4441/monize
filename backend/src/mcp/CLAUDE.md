@@ -175,8 +175,10 @@ delete/overwrite tool is introduced.
 ## Scopes
 
 `requireScope(ctx.scopes, ...)` gates each handler. Scopes in use: `read`
-(queries), `reports` (report/anomaly tools), `write` (mutations). Resources gate
-with `hasScope(ctx.scopes, "read")`.
+(queries, including report/anomaly tools) and `write` (mutations). Resources
+gate with `hasScope(ctx.scopes, "read")`. There is no separate `reports` scope:
+the OAuth layer only issues `monize:read`/`monize:write`, so reports are folded
+into `read` and OAuth clients (e.g. Claude Desktop) can run them.
 
 ## Resources & prompts
 

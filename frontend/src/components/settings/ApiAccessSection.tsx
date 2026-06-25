@@ -22,7 +22,6 @@ const MCP_PATH = '/api/v1/mcp';
 const SCOPE_OPTIONS = [
   { value: 'read', labelKey: 'createModal.scopes.read.label', descriptionKey: 'createModal.scopes.read.description' },
   { value: 'write', labelKey: 'createModal.scopes.write.label', descriptionKey: 'createModal.scopes.write.description' },
-  { value: 'reports', labelKey: 'createModal.scopes.reports.label', descriptionKey: 'createModal.scopes.reports.description' },
 ];
 
 const EXPIRY_OPTIONS = [

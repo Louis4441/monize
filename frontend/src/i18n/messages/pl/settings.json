@@ -314,10 +314,6 @@
         "write": {
           "label": "Zapis",
           "description": "Tworzenie transakcji, odbiorców i kategorii"
-        },
-        "reports": {
-          "label": "Raporty",
-          "description": "Generowanie raportów finansowych i analiz"
         }
       },
       "expiry": {

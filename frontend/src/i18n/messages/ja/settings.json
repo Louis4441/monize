@@ -314,10 +314,6 @@
         "write": {
           "label": "書き込み",
           "description": "取引、支払先、カテゴリを作成"
-        },
-        "reports": {
-          "label": "レポート",
-          "description": "財務レポートと分析を生成"
         }
       },
       "expiry": {

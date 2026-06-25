@@ -314,10 +314,6 @@
         "write": {
           "label": "Yaz",
           "description": "İşlemler, alacaklılar ve kategoriler oluştur"
-        },
-        "reports": {
-          "label": "Raporlar",
-          "description": "Finansal raporlar ve analitik oluştur"
         }
       },
       "expiry": {

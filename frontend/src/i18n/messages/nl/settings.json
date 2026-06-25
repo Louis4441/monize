@@ -314,10 +314,6 @@
         "write": {
           "label": "Schrijven",
           "description": "Transacties, begunstigden en categorieën aanmaken"
-        },
-        "reports": {
-          "label": "Rapporten",
-          "description": "Financiële rapporten en analyses genereren"
         }
       },
       "expiry": {

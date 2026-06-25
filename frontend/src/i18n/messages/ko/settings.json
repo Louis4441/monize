@@ -314,10 +314,6 @@
         "write": {
           "label": "쓰기",
           "description": "거래, 수취인, 카테고리 생성"
-        },
-        "reports": {
-          "label": "보고서",
-          "description": "재무 보고서 및 분석 생성"
         }
       },
       "expiry": {
