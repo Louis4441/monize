@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "AI プロバイダーが設定されていません",
     "keyboardHint": "Enter で送信、Shift+Enter で改行",
     "cancelTitle": "キャンセル",
-    "sendTitle": "送信"
+    "sendTitle": "送信",
+    "attachButtonTitle": "ファイルまたは画像を添付",
+    "attachButtonAriaLabel": "添付ファイルを追加",
+    "removeAttachmentAriaLabel": "添付ファイルを削除",
+    "attachmentImageAlt": "添付画像のプレビュー",
+    "dropHint": "ファイルをドロップして添付",
+    "attachmentOnlyPrompt": "添付ファイルをご確認ください。",
+    "errors": {
+      "tooManyAttachments": "添付できるファイルは最大 {max} 件です。",
+      "fileTooLarge": "{filename} はサイズが大きすぎます (最大 {maxMb} MB)。",
+      "totalTooLarge": "添付ファイルが合計サイズ制限 ({maxMb} MB) を超えています。",
+      "unsupportedType": "{filename} はサポートされていないファイル形式です。",
+      "readFailed": "{filename} を読み込めませんでした。もう一度お試しください。"
+    }
   },
   "notConfigured": {
     "heading": "AI が設定されていません",

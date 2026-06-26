@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "AI-provider niet geconfigureerd",
     "keyboardHint": "Druk op Enter om te verzenden, Shift+Enter voor een nieuwe regel",
     "cancelTitle": "Annuleren",
-    "sendTitle": "Verzenden"
+    "sendTitle": "Verzenden",
+    "attachButtonTitle": "Bestanden of afbeeldingen bijvoegen",
+    "attachButtonAriaLabel": "Bijlage toevoegen",
+    "removeAttachmentAriaLabel": "Bijlage verwijderen",
+    "attachmentImageAlt": "Voorbeeld van bijgevoegde afbeelding",
+    "dropHint": "Sleep bestanden hierheen om bij te voegen",
+    "attachmentOnlyPrompt": "Bekijk het/de bijgevoegde bestand(en).",
+    "errors": {
+      "tooManyAttachments": "Je kunt maximaal {max} bestanden bijvoegen.",
+      "fileTooLarge": "{filename} is te groot (max {maxMb} MB).",
+      "totalTooLarge": "Bijlagen overschrijden de totale groottelimiet ({maxMb} MB).",
+      "unsupportedType": "{filename} is geen ondersteund bestandstype.",
+      "readFailed": "Kan {filename} niet lezen. Probeer het opnieuw."
+    }
   },
   "notConfigured": {
     "heading": "AI niet geconfigureerd",

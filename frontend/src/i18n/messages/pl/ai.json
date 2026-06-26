@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "Dostawca AI nie jest skonfigurowany",
     "keyboardHint": "Naciśnij Enter, aby wysłać, Shift+Enter dla nowej linii",
     "cancelTitle": "Anuluj",
-    "sendTitle": "Wyślij"
+    "sendTitle": "Wyślij",
+    "attachButtonTitle": "Załącz pliki lub obrazy",
+    "attachButtonAriaLabel": "Dodaj załącznik",
+    "removeAttachmentAriaLabel": "Usuń załącznik",
+    "attachmentImageAlt": "Podgląd załączonego obrazu",
+    "dropHint": "Upuść pliki, aby je załączyć",
+    "attachmentOnlyPrompt": "Sprawdź załączone pliki.",
+    "errors": {
+      "tooManyAttachments": "Możesz załączyć maksymalnie {max} plików.",
+      "fileTooLarge": "Plik {filename} jest za duży (maks. {maxMb} MB).",
+      "totalTooLarge": "Załączniki przekraczają łączny limit rozmiaru ({maxMb} MB).",
+      "unsupportedType": "{filename} nie jest obsługiwanym typem pliku.",
+      "readFailed": "Nie udało się odczytać pliku {filename}. Spróbuj ponownie."
+    }
   },
   "notConfigured": {
     "heading": "AI nie jest skonfigurowane",

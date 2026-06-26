@@ -84,7 +84,12 @@
     "forecastRateLimited": "最近予測が生成されました。しばらくしてから再試行してください。",
     "insightNotFound": "インサイトが見つかりません",
     "relayTimeout": "アシスタントが応答しませんでした。MCP エージェントが接続され、待機していることを確認してください。",
-    "relayDisconnected": "アシスタントが回答する前に応答しなくなりました。再接続すると、その回答がここに表示されます。"
+    "relayDisconnected": "アシスタントが回答する前に応答しなくなりました。再接続すると、その回答がここに表示されます。",
+    "attachmentTypeMismatch": "添付ファイルの種類がそのファイル形式と一致しません。",
+    "attachmentTooLarge": "添付ファイルが最大ファイルサイズを超えています。",
+    "attachmentCorrupt": "添付ファイルを読み込めなかったか、申告された種類のファイルではありません。",
+    "attachmentsTooLarge": "添付ファイルが合計サイズの上限を超えています。",
+    "modelNoImageSupport": "選択したAIモデルは画像やPDFを読み取れません。添付ファイルを削除してテキストで質問するか、AI設定で画像対応モデルに切り替えてください。"
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "確認の試行回数が多すぎます。もう一度ログインしてください。",

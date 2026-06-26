@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "AI 提供者未設定",
     "keyboardHint": "按 Enter 傳送，Shift+Enter 換行",
     "cancelTitle": "取消",
-    "sendTitle": "傳送"
+    "sendTitle": "傳送",
+    "attachButtonTitle": "附加檔案或圖片",
+    "attachButtonAriaLabel": "新增附件",
+    "removeAttachmentAriaLabel": "移除附件",
+    "attachmentImageAlt": "附加圖片預覽",
+    "dropHint": "拖放檔案以附加",
+    "attachmentOnlyPrompt": "請檢視附加的檔案。",
+    "errors": {
+      "tooManyAttachments": "最多可附加 {max} 個檔案。",
+      "fileTooLarge": "{filename} 過大（上限 {maxMb} MB）。",
+      "totalTooLarge": "附件超過總大小限制（{maxMb} MB）。",
+      "unsupportedType": "{filename} 不是支援的檔案類型。",
+      "readFailed": "無法讀取 {filename}。請重試。"
+    }
   },
   "notConfigured": {
     "heading": "AI 未設定",

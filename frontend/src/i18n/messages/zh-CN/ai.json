@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "未配置 AI 提供商",
     "keyboardHint": "按 Enter 发送，Shift+Enter 换行",
     "cancelTitle": "取消",
-    "sendTitle": "发送"
+    "sendTitle": "发送",
+    "attachButtonTitle": "附加文件或图片",
+    "attachButtonAriaLabel": "添加附件",
+    "removeAttachmentAriaLabel": "移除附件",
+    "attachmentImageAlt": "附加图片预览",
+    "dropHint": "拖放文件以附加",
+    "attachmentOnlyPrompt": "请查看附加的文件。",
+    "errors": {
+      "tooManyAttachments": "最多可附加 {max} 个文件。",
+      "fileTooLarge": "{filename} 过大（最大 {maxMb} MB）。",
+      "totalTooLarge": "附件超过总大小限制（{maxMb} MB）。",
+      "unsupportedType": "{filename} 不是支持的文件类型。",
+      "readFailed": "无法读取 {filename}。请重试。"
+    }
   },
   "notConfigured": {
     "heading": "AI 未配置",

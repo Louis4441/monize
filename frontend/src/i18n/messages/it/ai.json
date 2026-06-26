@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "Provider AI non configurato",
     "keyboardHint": "Premi Invio per inviare, Shift+Invio per una nuova riga",
     "cancelTitle": "Annulla",
-    "sendTitle": "Invia"
+    "sendTitle": "Invia",
+    "attachButtonTitle": "Allega file o immagini",
+    "attachButtonAriaLabel": "Aggiungi allegato",
+    "removeAttachmentAriaLabel": "Rimuovi allegato",
+    "attachmentImageAlt": "Anteprima dell'immagine allegata",
+    "dropHint": "Trascina qui i file da allegare",
+    "attachmentOnlyPrompt": "Esamina il file o i file allegati.",
+    "errors": {
+      "tooManyAttachments": "Puoi allegare fino a {max} file.",
+      "fileTooLarge": "{filename} è troppo grande (max {maxMb} MB).",
+      "totalTooLarge": "Gli allegati superano il limite di dimensione totale ({maxMb} MB).",
+      "unsupportedType": "{filename} non è un tipo di file supportato.",
+      "readFailed": "Impossibile leggere {filename}. Riprova."
+    }
   },
   "notConfigured": {
     "heading": "AI non configurata",

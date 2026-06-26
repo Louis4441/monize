@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "AI प्रदाता कॉन्फ़िगर नहीं है",
     "keyboardHint": "भेजने के लिए Enter दबाएं, नई पंक्ति के लिए Shift+Enter",
     "cancelTitle": "रद्द करें",
-    "sendTitle": "भेजें"
+    "sendTitle": "भेजें",
+    "attachButtonTitle": "फ़ाइलें या छवियां संलग्न करें",
+    "attachButtonAriaLabel": "अनुलग्नक जोड़ें",
+    "removeAttachmentAriaLabel": "अनुलग्नक हटाएं",
+    "attachmentImageAlt": "संलग्न छवि पूर्वावलोकन",
+    "dropHint": "संलग्न करने के लिए फ़ाइलें छोड़ें",
+    "attachmentOnlyPrompt": "कृपया संलग्न फ़ाइल(फ़ाइलों) की समीक्षा करें।",
+    "errors": {
+      "tooManyAttachments": "आप अधिकतम {max} फ़ाइलें संलग्न कर सकते हैं।",
+      "fileTooLarge": "{filename} बहुत बड़ी है (अधिकतम {maxMb} MB)।",
+      "totalTooLarge": "अनुलग्नक कुल आकार सीमा ({maxMb} MB) से अधिक हैं।",
+      "unsupportedType": "{filename} एक समर्थित फ़ाइल प्रकार नहीं है।",
+      "readFailed": "{filename} को पढ़ा नहीं जा सका। पुनः प्रयास करें।"
+    }
   },
   "notConfigured": {
     "heading": "AI कॉन्फ़िगर नहीं है",

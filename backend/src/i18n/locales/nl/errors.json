@@ -84,7 +84,12 @@
     "forecastRateLimited": "Er is onlangs een prognose gegenereerd. Probeer het later opnieuw.",
     "insightNotFound": "Inzicht niet gevonden",
     "relayTimeout": "Je assistent heeft niet gereageerd. Zorg ervoor dat je MCP-agent verbonden is en luistert.",
-    "relayDisconnected": "Je assistent viel stil voordat er een antwoord kwam. Als de verbinding wordt hersteld, verschijnt het antwoord hier."
+    "relayDisconnected": "Je assistent viel stil voordat er een antwoord kwam. Als de verbinding wordt hersteld, verschijnt het antwoord hier.",
+    "attachmentTypeMismatch": "Het type van een bijlage komt niet overeen met het bestandsformaat.",
+    "attachmentTooLarge": "Een bijlage overschrijdt de maximale bestandsgrootte.",
+    "attachmentCorrupt": "Een bijlage kon niet worden gelezen of is niet het bestandstype dat het beweert te zijn.",
+    "attachmentsTooLarge": "De bijlagen overschrijden de totale groottelimiet.",
+    "modelNoImageSupport": "Het geselecteerde AI-model kan geen afbeeldingen of PDF's lezen. Verwijder de bijlage en stel je vraag in tekst, of schakel over naar een model met beeldondersteuning in AI-instellingen."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Te veel verificatiepogingen. Log opnieuw in.",

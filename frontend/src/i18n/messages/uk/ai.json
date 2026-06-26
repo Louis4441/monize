@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "AI-провайдер не налаштований",
     "keyboardHint": "Натисніть Enter для надсилання, Shift+Enter для нового рядка",
     "cancelTitle": "Скасувати",
-    "sendTitle": "Надіслати"
+    "sendTitle": "Надіслати",
+    "attachButtonTitle": "Прикріпити файли або зображення",
+    "attachButtonAriaLabel": "Додати вкладення",
+    "removeAttachmentAriaLabel": "Видалити вкладення",
+    "attachmentImageAlt": "Попередній перегляд прикріпленого зображення",
+    "dropHint": "Перетягніть файли, щоб прикріпити",
+    "attachmentOnlyPrompt": "Будь ласка, перегляньте прикріплені файли.",
+    "errors": {
+      "tooManyAttachments": "Можна прикріпити не більше {max} файлів.",
+      "fileTooLarge": "Файл {filename} завеликий (максимум {maxMb} МБ).",
+      "totalTooLarge": "Вкладення перевищують загальний ліміт розміру ({maxMb} МБ).",
+      "unsupportedType": "{filename} — непідтримуваний тип файлу.",
+      "readFailed": "Не вдалося прочитати {filename}. Спробуйте ще раз."
+    }
   },
   "notConfigured": {
     "heading": "AI не налаштовано",

@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "Fornecedor de IA não configurado",
     "keyboardHint": "Pressione Enter para enviar, Shift+Enter para nova linha",
     "cancelTitle": "Cancelar",
-    "sendTitle": "Enviar"
+    "sendTitle": "Enviar",
+    "attachButtonTitle": "Anexar ficheiros ou imagens",
+    "attachButtonAriaLabel": "Adicionar anexo",
+    "removeAttachmentAriaLabel": "Remover anexo",
+    "attachmentImageAlt": "Pré-visualização da imagem anexada",
+    "dropHint": "Largue ficheiros para anexar",
+    "attachmentOnlyPrompt": "Analise o(s) ficheiro(s) anexado(s).",
+    "errors": {
+      "tooManyAttachments": "Pode anexar até {max} ficheiros.",
+      "fileTooLarge": "{filename} é demasiado grande (máx. {maxMb} MB).",
+      "totalTooLarge": "Os anexos excedem o limite de tamanho total ({maxMb} MB).",
+      "unsupportedType": "{filename} não é um tipo de ficheiro suportado.",
+      "readFailed": "Não foi possível ler {filename}. Tente novamente."
+    }
   },
   "notConfigured": {
     "heading": "IA não configurada",

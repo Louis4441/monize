@@ -84,7 +84,12 @@
     "forecastRateLimited": "Uma previsão foi gerada recentemente. Tente novamente mais tarde.",
     "insightNotFound": "Análise não encontrada",
     "relayTimeout": "Seu assistente não respondeu. Verifique se o seu agente MCP está conectado e escutando.",
-    "relayDisconnected": "Seu assistente ficou em silêncio antes de responder. Se reconectar, a resposta aparecerá aqui."
+    "relayDisconnected": "Seu assistente ficou em silêncio antes de responder. Se reconectar, a resposta aparecerá aqui.",
+    "attachmentTypeMismatch": "O tipo de um anexo não corresponde ao seu formato de arquivo.",
+    "attachmentTooLarge": "Um anexo excede o tamanho máximo de arquivo.",
+    "attachmentCorrupt": "Não foi possível ler um anexo ou ele não é o tipo de arquivo que afirma ser.",
+    "attachmentsTooLarge": "Os anexos excedem o limite de tamanho total.",
+    "modelNoImageSupport": "O modelo de IA selecionado não consegue ler imagens nem PDFs. Remova o anexo e faça a pergunta por texto, ou mude para um modelo com capacidade de visão nas Configurações de IA."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Tentativas de verificação excessivas. Faça login novamente.",

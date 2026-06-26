@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "Поставщик ИИ не настроен",
     "keyboardHint": "Нажмите Enter для отправки, Shift+Enter для новой строки",
     "cancelTitle": "Отмена",
-    "sendTitle": "Отправить"
+    "sendTitle": "Отправить",
+    "attachButtonTitle": "Прикрепить файлы или изображения",
+    "attachButtonAriaLabel": "Добавить вложение",
+    "removeAttachmentAriaLabel": "Удалить вложение",
+    "attachmentImageAlt": "Предпросмотр прикреплённого изображения",
+    "dropHint": "Перетащите файлы, чтобы прикрепить",
+    "attachmentOnlyPrompt": "Пожалуйста, ознакомьтесь с прикреплёнными файлами.",
+    "errors": {
+      "tooManyAttachments": "Можно прикрепить не более {max} файлов.",
+      "fileTooLarge": "Файл {filename} слишком большой (максимум {maxMb} МБ).",
+      "totalTooLarge": "Вложения превышают общий лимит размера ({maxMb} МБ).",
+      "unsupportedType": "{filename} — неподдерживаемый тип файла.",
+      "readFailed": "Не удалось прочитать {filename}. Попробуйте ещё раз."
+    }
   },
   "notConfigured": {
     "heading": "ИИ не настроен",

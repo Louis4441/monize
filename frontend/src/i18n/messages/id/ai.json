@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "Penyedia AI belum dikonfigurasi",
     "keyboardHint": "Tekan Enter untuk mengirim, Shift+Enter untuk baris baru",
     "cancelTitle": "Batal",
-    "sendTitle": "Kirim"
+    "sendTitle": "Kirim",
+    "attachButtonTitle": "Lampirkan file atau gambar",
+    "attachButtonAriaLabel": "Tambah lampiran",
+    "removeAttachmentAriaLabel": "Hapus lampiran",
+    "attachmentImageAlt": "Pratinjau gambar terlampir",
+    "dropHint": "Letakkan file untuk dilampirkan",
+    "attachmentOnlyPrompt": "Silakan tinjau file yang terlampir.",
+    "errors": {
+      "tooManyAttachments": "Anda dapat melampirkan hingga {max} file.",
+      "fileTooLarge": "{filename} terlalu besar (maks {maxMb} MB).",
+      "totalTooLarge": "Lampiran melebihi batas ukuran total ({maxMb} MB).",
+      "unsupportedType": "{filename} bukan tipe file yang didukung.",
+      "readFailed": "Tidak dapat membaca {filename}. Coba lagi."
+    }
   },
   "notConfigured": {
     "heading": "AI Belum Dikonfigurasi",

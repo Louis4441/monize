@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "AI 제공자가 설정되지 않았습니다",
     "keyboardHint": "Enter로 전송, Shift+Enter로 줄 바꿈",
     "cancelTitle": "취소",
-    "sendTitle": "전송"
+    "sendTitle": "전송",
+    "attachButtonTitle": "파일 또는 이미지 첨부",
+    "attachButtonAriaLabel": "첨부 파일 추가",
+    "removeAttachmentAriaLabel": "첨부 파일 제거",
+    "attachmentImageAlt": "첨부된 이미지 미리보기",
+    "dropHint": "파일을 끌어다 놓아 첨부",
+    "attachmentOnlyPrompt": "첨부된 파일을 검토해 주세요.",
+    "errors": {
+      "tooManyAttachments": "최대 {max}개의 파일을 첨부할 수 있습니다.",
+      "fileTooLarge": "{filename}의 크기가 너무 큽니다 (최대 {maxMb} MB).",
+      "totalTooLarge": "첨부 파일이 전체 크기 제한 ({maxMb} MB)을 초과합니다.",
+      "unsupportedType": "{filename}은(는) 지원되는 파일 형식이 아닙니다.",
+      "readFailed": "{filename}을(를) 읽을 수 없습니다. 다시 시도하세요."
+    }
   },
   "notConfigured": {
     "heading": "AI가 설정되지 않았습니다",

@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "Nhà cung cấp AI chưa được cấu hình",
     "keyboardHint": "Nhấn Enter để gửi, Shift+Enter để xuống dòng mới",
     "cancelTitle": "Hủy",
-    "sendTitle": "Gửi"
+    "sendTitle": "Gửi",
+    "attachButtonTitle": "Đính kèm tệp hoặc hình ảnh",
+    "attachButtonAriaLabel": "Thêm tệp đính kèm",
+    "removeAttachmentAriaLabel": "Xóa tệp đính kèm",
+    "attachmentImageAlt": "Xem trước hình ảnh đính kèm",
+    "dropHint": "Thả tệp để đính kèm",
+    "attachmentOnlyPrompt": "Vui lòng xem lại các tệp đính kèm.",
+    "errors": {
+      "tooManyAttachments": "Bạn có thể đính kèm tối đa {max} tệp.",
+      "fileTooLarge": "{filename} quá lớn (tối đa {maxMb} MB).",
+      "totalTooLarge": "Tệp đính kèm vượt quá giới hạn tổng kích thước ({maxMb} MB).",
+      "unsupportedType": "{filename} không phải là loại tệp được hỗ trợ.",
+      "readFailed": "Không thể đọc {filename}. Hãy thử lại."
+    }
   },
   "notConfigured": {
     "heading": "AI chưa được cấu hình",

@@ -108,7 +108,9 @@ export function validateAddition(
 }
 
 function newId(): string {
-  return `att-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  // crypto.randomUUID() (not Math.random) so the security scanner doesn't flag
+  // a weak RNG; this id is only a client-side list key / removal handle.
+  return `att-${crypto.randomUUID()}`;
 }
 
 function readAsDataUrl(file: File): Promise<string> {

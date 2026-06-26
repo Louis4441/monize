@@ -84,7 +84,12 @@
     "forecastRateLimited": "Eine Prognose wurde kürzlich erstellt. Bitte versuchen Sie es später erneut.",
     "insightNotFound": "Insight nicht gefunden",
     "relayTimeout": "Ihr Assistent hat nicht geantwortet. Stellen Sie sicher, dass Ihr MCP-Agent verbunden ist und zuhört.",
-    "relayDisconnected": "Ihr Assistent ist verstummt, bevor er antworten konnte. Wenn er sich wieder verbindet, erscheint seine Antwort hier."
+    "relayDisconnected": "Ihr Assistent ist verstummt, bevor er antworten konnte. Wenn er sich wieder verbindet, erscheint seine Antwort hier.",
+    "attachmentTypeMismatch": "Der Typ eines Anhangs stimmt nicht mit seinem Dateiformat überein.",
+    "attachmentTooLarge": "Ein Anhang überschreitet die maximale Dateigröße.",
+    "attachmentCorrupt": "Ein Anhang konnte nicht gelesen werden oder entspricht nicht dem angegebenen Dateityp.",
+    "attachmentsTooLarge": "Die Anhänge überschreiten die Gesamtgrößenbeschränkung.",
+    "modelNoImageSupport": "Das ausgewählte KI-Modell kann keine Bilder oder PDFs lesen. Entfernen Sie den Anhang und fragen Sie in Textform, oder wechseln Sie in den KI-Einstellungen zu einem Modell mit Bildverarbeitung."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Zu viele Verifikationsversuche. Bitte melden Sie sich erneut an.",

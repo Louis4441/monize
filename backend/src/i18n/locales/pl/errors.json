@@ -84,7 +84,12 @@
     "forecastRateLimited": "Prognoza została niedawno wygenerowana. Spróbuj ponownie później.",
     "insightNotFound": "Nie znaleziono analizy",
     "relayTimeout": "Twój asystent nie odpowiedział. Upewnij się, że agent MCP jest połączony i nasłuchuje.",
-    "relayDisconnected": "Twój asystent zamilkł przed udzieleniem odpowiedzi. Jeśli połączy się ponownie, jego odpowiedź pojawi się tutaj."
+    "relayDisconnected": "Twój asystent zamilkł przed udzieleniem odpowiedzi. Jeśli połączy się ponownie, jego odpowiedź pojawi się tutaj.",
+    "attachmentTypeMismatch": "Typ załącznika nie odpowiada jego formatowi pliku.",
+    "attachmentTooLarge": "Załącznik przekracza maksymalny rozmiar pliku.",
+    "attachmentCorrupt": "Nie udało się odczytać załącznika lub nie jest on plikiem typu, za jaki się podaje.",
+    "attachmentsTooLarge": "Załączniki przekraczają łączny limit rozmiaru.",
+    "modelNoImageSupport": "Wybrany model AI nie potrafi odczytywać obrazów ani plików PDF. Usuń załącznik i zadaj pytanie tekstem albo przełącz się na model obsługujący obrazy w Ustawieniach AI."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Zbyt wiele prób weryfikacji. Zaloguj się ponownie.",

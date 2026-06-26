@@ -84,7 +84,12 @@
     "forecastRateLimited": "Dự báo vừa được tạo gần đây. Vui lòng thử lại sau.",
     "insightNotFound": "Không tìm thấy thông tin chi tiết",
     "relayTimeout": "Trợ lý của bạn không phản hồi. Hãy đảm bảo tác nhân MCP của bạn đang kết nối và lắng nghe.",
-    "relayDisconnected": "Trợ lý của bạn đã im lặng trước khi trả lời. Nếu kết nối lại, câu trả lời sẽ xuất hiện ở đây."
+    "relayDisconnected": "Trợ lý của bạn đã im lặng trước khi trả lời. Nếu kết nối lại, câu trả lời sẽ xuất hiện ở đây.",
+    "attachmentTypeMismatch": "Loại của tệp đính kèm không khớp với định dạng tệp của nó.",
+    "attachmentTooLarge": "Một tệp đính kèm vượt quá kích thước tệp tối đa.",
+    "attachmentCorrupt": "Không thể đọc một tệp đính kèm hoặc nó không phải là loại tệp như đã khai báo.",
+    "attachmentsTooLarge": "Các tệp đính kèm vượt quá giới hạn tổng kích thước.",
+    "modelNoImageSupport": "Mô hình AI đã chọn không thể đọc hình ảnh hoặc PDF. Hãy xóa tệp đính kèm và hỏi bằng văn bản, hoặc chuyển sang một mô hình hỗ trợ hình ảnh trong Cài đặt AI."
   },
   "auth": {
     "tooManyAttemptsLoginAgain": "Quá nhiều lần xác minh thất bại. Vui lòng đăng nhập lại.",

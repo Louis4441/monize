@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "Yapay zeka sağlayıcısı yapılandırılmamış",
     "keyboardHint": "Göndermek için Enter, yeni satır için Shift+Enter",
     "cancelTitle": "İptal",
-    "sendTitle": "Gönder"
+    "sendTitle": "Gönder",
+    "attachButtonTitle": "Dosya veya görsel ekle",
+    "attachButtonAriaLabel": "Ek ekle",
+    "removeAttachmentAriaLabel": "Eki kaldır",
+    "attachmentImageAlt": "Eklenen görsel önizlemesi",
+    "dropHint": "Eklemek için dosyaları bırakın",
+    "attachmentOnlyPrompt": "Lütfen eklenen dosyaları inceleyin.",
+    "errors": {
+      "tooManyAttachments": "En fazla {max} dosya ekleyebilirsiniz.",
+      "fileTooLarge": "{filename} çok büyük (en fazla {maxMb} MB).",
+      "totalTooLarge": "Ekler toplam boyut sınırını aşıyor ({maxMb} MB).",
+      "unsupportedType": "{filename} desteklenen bir dosya türü değil.",
+      "readFailed": "{filename} okunamadı. Tekrar deneyin."
+    }
   },
   "notConfigured": {
     "heading": "Yapay Zeka Yapılandırılmamış",

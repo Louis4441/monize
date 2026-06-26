@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "KI-Anbieter nicht konfiguriert",
     "keyboardHint": "Enter zum Senden, Umschalt+Enter für neue Zeile",
     "cancelTitle": "Abbrechen",
-    "sendTitle": "Senden"
+    "sendTitle": "Senden",
+    "attachButtonTitle": "Dateien oder Bilder anhängen",
+    "attachButtonAriaLabel": "Anhang hinzufügen",
+    "removeAttachmentAriaLabel": "Anhang entfernen",
+    "attachmentImageAlt": "Vorschau des angehängten Bildes",
+    "dropHint": "Dateien zum Anhängen hier ablegen",
+    "attachmentOnlyPrompt": "Bitte sehen Sie sich die angehängte(n) Datei(en) an.",
+    "errors": {
+      "tooManyAttachments": "Sie können bis zu {max} Dateien anhängen.",
+      "fileTooLarge": "{filename} ist zu groß (max. {maxMb} MB).",
+      "totalTooLarge": "Die Anhänge überschreiten die Gesamtgrößenbeschränkung ({maxMb} MB).",
+      "unsupportedType": "{filename} ist kein unterstützter Dateityp.",
+      "readFailed": "{filename} konnte nicht gelesen werden. Bitte versuchen Sie es erneut."
+    }
   },
   "notConfigured": {
     "heading": "KI nicht konfiguriert",

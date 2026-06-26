@@ -10,7 +10,20 @@
     "inputPlaceholderDisabled": "Fournisseur IA non configuré",
     "keyboardHint": "Appuyez sur Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne",
     "cancelTitle": "Annuler",
-    "sendTitle": "Envoyer"
+    "sendTitle": "Envoyer",
+    "attachButtonTitle": "Joindre des fichiers ou des images",
+    "attachButtonAriaLabel": "Ajouter une pièce jointe",
+    "removeAttachmentAriaLabel": "Supprimer la pièce jointe",
+    "attachmentImageAlt": "Aperçu de l'image jointe",
+    "dropHint": "Déposez les fichiers pour les joindre",
+    "attachmentOnlyPrompt": "Veuillez consulter le ou les fichiers joints.",
+    "errors": {
+      "tooManyAttachments": "Vous pouvez joindre jusqu'à {max} fichiers.",
+      "fileTooLarge": "{filename} est trop volumineux (max. {maxMb} Mo).",
+      "totalTooLarge": "Les pièces jointes dépassent la limite de taille totale ({maxMb} Mo).",
+      "unsupportedType": "{filename} n'est pas un type de fichier pris en charge.",
+      "readFailed": "Impossible de lire {filename}. Veuillez réessayer."
+    }
   },
   "notConfigured": {
     "heading": "IA non configurée",
