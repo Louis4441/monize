@@ -608,6 +608,14 @@
     "backLink": "Voltar às Definições",
     "title": "Definições de IA",
     "subtitle": "Configure fornecedores de IA para funcionalidades financeiras inteligentes",
+    "bubble": {
+      "title": "Balão de conversa flutuante",
+      "subtitle": "Mostra um botão de conversa em todas as páginas para poder perguntar ao assistente de IA a partir de qualquer lugar. Abre como um painel inferior que pode expandir para ecrã inteiro.",
+      "toggleLabel": "Ativar o balão de conversa de IA flutuante",
+      "enabled": "Balão de conversa flutuante ativado",
+      "disabled": "Balão de conversa flutuante desativado",
+      "saveFailed": "Não foi possível atualizar a definição do balão de conversa"
+    },
     "demoRestricted": {
       "heading": "Restrito no Modo de Demonstração",
       "body": "A configuração de fornecedores de IA está desativada no modo de demonstração."

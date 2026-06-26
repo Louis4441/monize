@@ -608,6 +608,14 @@
     "backLink": "返回設定",
     "title": "AI 設定",
     "subtitle": "設定 AI 提供者以使用智慧財務功能",
+    "bubble": {
+      "title": "懸浮聊天氣泡",
+      "subtitle": "在每個頁面顯示一個聊天按鈕，讓你隨時隨地向 AI 助手提問。它會以底部面板的形式開啟，你可以將其展開為全螢幕。",
+      "toggleLabel": "啟用懸浮 AI 聊天氣泡",
+      "enabled": "已啟用懸浮聊天氣泡",
+      "disabled": "已停用懸浮聊天氣泡",
+      "saveFailed": "無法更新聊天氣泡設定"
+    },
     "demoRestricted": {
       "heading": "示範模式中受限",
       "body": "示範模式中停用了 AI 提供者設定。"

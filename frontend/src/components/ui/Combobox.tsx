@@ -152,6 +152,26 @@ export function Combobox({
   }, [value, options, isTyping, allowCustomValue, initialDisplayValue, hasInitialized]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // Lift the current typed text to the parent: snap to an exact option match if
+  // one exists, otherwise commit it as a custom value. Shared by the
+  // click-outside and Tab handlers so a freshly-typed value is never discarded
+  // when focus leaves the field without explicitly picking a dropdown option.
+  const commitTypedCustomValue = useCallback(() => {
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+    const matchedOption = options.find(
+      (opt) => opt.label.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (matchedOption) {
+      setSelectedLabel(matchedOption.label);
+      setInputValue(matchedOption.label);
+      onChange(matchedOption.value, matchedOption.label);
+    } else if (trimmed !== selectedLabel) {
+      setSelectedLabel(trimmed);
+      onChange('', trimmed);
+    }
+  }, [inputValue, options, selectedLabel, onChange]);
+
   // Close dropdown when clicking outside. In portal mode the list renders
   // outside wrapperRef, so it is checked separately; otherwise it lives inside
   // the wrapper and the listRef check is harmlessly redundant.
@@ -176,17 +196,7 @@ export function Combobox({
         // Commit the typed value -- even when the click lands on a submit button
         // -- so a freshly-typed custom value is lifted to the parent before the
         // form reads it. Snap to an exact option match when one exists.
-        const matchedOption = options.find(
-          opt => opt.label.toLowerCase() === inputValue.toLowerCase()
-        );
-        if (matchedOption) {
-          setSelectedLabel(matchedOption.label);
-          setInputValue(matchedOption.label);
-          onChange(matchedOption.value, matchedOption.label);
-        } else if (inputValue.trim() !== selectedLabel) {
-          setSelectedLabel(inputValue.trim());
-          onChange('', inputValue.trim());
-        }
+        commitTypedCustomValue();
       } else if (!isSubmitButton && selectedLabel) {
         // Not allowing custom values: restore the committed label, but don't
         // fight a form submission already in progress.
@@ -418,6 +428,11 @@ export function Combobox({
                 handleSelectOption(filteredOptions[optionIndex]);
               }
             }
+          } else if (allowCustomValue) {
+            // No option highlighted: lift any typed custom value to the parent so
+            // tabbing out of the field (instead of clicking away) doesn't discard
+            // it -- otherwise the form reads a blank payee on submit.
+            commitTypedCustomValue();
           }
         }
         setIsOpen(false);

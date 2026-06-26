@@ -3,6 +3,13 @@
     "title": "AI アシスタント",
     "subtitle": "自然言語で財務に関する質問をしてください"
   },
+  "bubble": {
+    "launcherAriaLabel": "AI アシスタントを開く",
+    "title": "AI アシスタント",
+    "expand": "全画面に拡大",
+    "collapse": "パネルに戻す",
+    "close": "閉じる"
+  },
   "chat": {
     "conversationSaved": "会話はブラウザに保存されました",
     "clearConversation": "会話をクリア",

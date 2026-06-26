@@ -608,6 +608,14 @@
     "backLink": "Kembali ke Pengaturan",
     "title": "Pengaturan AI",
     "subtitle": "Konfigurasikan penyedia AI untuk fitur keuangan yang cerdas",
+    "bubble": {
+      "title": "Gelembung obrolan mengambang",
+      "subtitle": "Menampilkan tombol obrolan di setiap halaman sehingga Anda dapat bertanya kepada asisten AI dari mana saja. Terbuka sebagai panel bawah yang dapat Anda perbesar ke layar penuh.",
+      "toggleLabel": "Aktifkan gelembung obrolan AI mengambang",
+      "enabled": "Gelembung obrolan mengambang diaktifkan",
+      "disabled": "Gelembung obrolan mengambang dinonaktifkan",
+      "saveFailed": "Tidak dapat memperbarui pengaturan gelembung obrolan"
+    },
     "demoRestricted": {
       "heading": "Dibatasi dalam Mode Demo",
       "body": "Konfigurasi penyedia AI dinonaktifkan dalam mode demo."

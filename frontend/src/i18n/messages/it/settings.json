@@ -608,6 +608,14 @@
     "backLink": "Torna alle impostazioni",
     "title": "Impostazioni AI",
     "subtitle": "Configura i provider AI per le funzionalità finanziarie intelligenti",
+    "bubble": {
+      "title": "Bolla di chat fluttuante",
+      "subtitle": "Mostra un pulsante di chat su ogni pagina così puoi chiedere all'assistente AI da qualsiasi punto. Si apre come un pannello in basso che puoi espandere a schermo intero.",
+      "toggleLabel": "Abilita la bolla di chat AI fluttuante",
+      "enabled": "Bolla di chat fluttuante abilitata",
+      "disabled": "Bolla di chat fluttuante disabilitata",
+      "saveFailed": "Impossibile aggiornare l'impostazione della bolla di chat"
+    },
     "demoRestricted": {
       "heading": "Limitato in modalità demo",
       "body": "La configurazione dei provider AI è disabilitata in modalità demo."

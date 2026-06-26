@@ -608,6 +608,14 @@
     "backLink": "Powrót do Ustawień",
     "title": "Ustawienia AI",
     "subtitle": "Skonfiguruj dostawców AI dla inteligentnych funkcji finansowych",
+    "bubble": {
+      "title": "Pływający dymek czatu",
+      "subtitle": "Wyświetla przycisk czatu na każdej stronie, dzięki czemu możesz zapytać asystenta AI z dowolnego miejsca. Otwiera się jako panel na dole, który możesz rozwinąć na pełny ekran.",
+      "toggleLabel": "Włącz pływający dymek czatu AI",
+      "enabled": "Pływający dymek czatu włączony",
+      "disabled": "Pływający dymek czatu wyłączony",
+      "saveFailed": "Nie udało się zaktualizować ustawienia dymka czatu"
+    },
     "demoRestricted": {
       "heading": "Ograniczone w trybie demo",
       "body": "Konfiguracja dostawcy AI jest wyłączona w trybie demo."

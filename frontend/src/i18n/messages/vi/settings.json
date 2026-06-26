@@ -608,6 +608,14 @@
     "backLink": "Quay lại Cài đặt",
     "title": "Cài đặt AI",
     "subtitle": "Cấu hình nhà cung cấp AI cho các tính năng tài chính thông minh",
+    "bubble": {
+      "title": "Bong bóng trò chuyện nổi",
+      "subtitle": "Hiển thị nút trò chuyện trên mọi trang để bạn có thể hỏi trợ lý AI từ bất kỳ đâu. Nó mở ra dưới dạng bảng phía dưới mà bạn có thể mở rộng toàn màn hình.",
+      "toggleLabel": "Bật bong bóng trò chuyện AI nổi",
+      "enabled": "Đã bật bong bóng trò chuyện nổi",
+      "disabled": "Đã tắt bong bóng trò chuyện nổi",
+      "saveFailed": "Không thể cập nhật cài đặt bong bóng trò chuyện"
+    },
     "demoRestricted": {
       "heading": "Bị hạn chế trong chế độ demo",
       "body": "Cấu hình nhà cung cấp AI bị vô hiệu hóa trong chế độ demo."

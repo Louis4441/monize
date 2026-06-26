@@ -608,6 +608,14 @@
     "backLink": "Zurück zu den Einstellungen",
     "title": "KI-Einstellungen",
     "subtitle": "KI-Anbieter für intelligente Finanzfunktionen konfigurieren",
+    "bubble": {
+      "title": "Schwebende Chat-Blase",
+      "subtitle": "Zeigt auf jeder Seite eine Chat-Schaltfläche an, damit du den KI-Assistenten von überall fragen kannst. Sie öffnet sich als Fenster am unteren Bildschirmrand, das du auf Vollbild erweitern kannst.",
+      "toggleLabel": "Schwebende KI-Chat-Blase aktivieren",
+      "enabled": "Schwebende Chat-Blase aktiviert",
+      "disabled": "Schwebende Chat-Blase deaktiviert",
+      "saveFailed": "Die Chat-Blasen-Einstellung konnte nicht aktualisiert werden"
+    },
     "demoRestricted": {
       "heading": "Im Demo-Modus eingeschränkt",
       "body": "Die KI-Anbieterkonfiguration ist im Demo-Modus deaktiviert."

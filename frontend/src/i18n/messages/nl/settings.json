@@ -608,6 +608,14 @@
     "backLink": "Terug naar instellingen",
     "title": "AI-instellingen",
     "subtitle": "Configureer AI-providers voor intelligente financiële functies",
+    "bubble": {
+      "title": "Zwevende chatbubbel",
+      "subtitle": "Toont op elke pagina een chatknop zodat je de AI-assistent overal kunt raadplegen. Hij opent als een paneel onderaan dat je naar volledig scherm kunt vergroten.",
+      "toggleLabel": "Zwevende AI-chatbubbel inschakelen",
+      "enabled": "Zwevende chatbubbel ingeschakeld",
+      "disabled": "Zwevende chatbubbel uitgeschakeld",
+      "saveFailed": "Kan de instelling voor de chatbubbel niet bijwerken"
+    },
     "demoRestricted": {
       "heading": "Beperkt in demomodus",
       "body": "AI-providerconfiguratie is uitgeschakeld in demomodus."

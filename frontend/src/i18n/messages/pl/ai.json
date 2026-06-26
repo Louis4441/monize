@@ -3,6 +3,13 @@
     "title": "Asystent AI",
     "subtitle": "Zadawaj pytania o swoje finanse w naturalnym języku"
   },
+  "bubble": {
+    "launcherAriaLabel": "Otwórz asystenta AI",
+    "title": "Asystent AI",
+    "expand": "Rozwiń na pełny ekran",
+    "collapse": "Zwiń do panelu",
+    "close": "Zamknij"
+  },
   "chat": {
     "conversationSaved": "Rozmowa zapisana w przeglądarce",
     "clearConversation": "Wyczyść rozmowę",

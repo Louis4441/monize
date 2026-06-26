@@ -3,6 +3,13 @@
     "title": "Asistente AI",
     "subtitle": "Haz preguntas sobre tus finanzas en lenguaje natural"
   },
+  "bubble": {
+    "launcherAriaLabel": "Abrir el asistente AI",
+    "title": "Asistente AI",
+    "expand": "Ampliar a pantalla completa",
+    "collapse": "Contraer al panel",
+    "close": "Cerrar"
+  },
   "chat": {
     "conversationSaved": "Conversación guardada en tu navegador",
     "clearConversation": "Limpiar conversación",

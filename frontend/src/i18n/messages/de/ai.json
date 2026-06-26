@@ -3,6 +3,13 @@
     "title": "KI-Assistent",
     "subtitle": "Stellen Sie Fragen zu Ihren Finanzen in natürlicher Sprache"
   },
+  "bubble": {
+    "launcherAriaLabel": "KI-Assistent öffnen",
+    "title": "KI-Assistent",
+    "expand": "Auf Vollbild erweitern",
+    "collapse": "Auf Fenster verkleinern",
+    "close": "Schließen"
+  },
   "chat": {
     "conversationSaved": "Gespräch in Ihrem Browser gespeichert",
     "clearConversation": "Gespräch löschen",

@@ -608,6 +608,14 @@
     "backLink": "Volver a Configuración",
     "title": "Configuración de IA",
     "subtitle": "Configura proveedores de IA para funciones financieras inteligentes",
+    "bubble": {
+      "title": "Burbuja de chat flotante",
+      "subtitle": "Muestra un botón de chat en todas las páginas para que puedas preguntarle al asistente AI desde cualquier lugar. Se abre como un panel inferior que puedes ampliar a pantalla completa.",
+      "toggleLabel": "Activar la burbuja de chat AI flotante",
+      "enabled": "Burbuja de chat flotante activada",
+      "disabled": "Burbuja de chat flotante desactivada",
+      "saveFailed": "No se pudo actualizar la configuración de la burbuja de chat"
+    },
     "demoRestricted": {
       "heading": "Restringido en modo demo",
       "body": "La configuración de proveedores de IA está deshabilitada en el modo demo."

@@ -3,6 +3,13 @@
     "title": "Asisten AI",
     "subtitle": "Ajukan pertanyaan tentang keuangan Anda dalam bahasa alami"
   },
+  "bubble": {
+    "launcherAriaLabel": "Buka asisten AI",
+    "title": "Asisten AI",
+    "expand": "Perbesar ke layar penuh",
+    "collapse": "Ciutkan ke panel",
+    "close": "Tutup"
+  },
   "chat": {
     "conversationSaved": "Percakapan disimpan di browser Anda",
     "clearConversation": "Hapus percakapan",

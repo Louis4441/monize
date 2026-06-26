@@ -608,6 +608,14 @@
     "backLink": "Retour aux paramètres",
     "title": "Paramètres IA",
     "subtitle": "Configurez les fournisseurs d'IA pour des fonctionnalités financières intelligentes",
+    "bubble": {
+      "title": "Bulle de discussion flottante",
+      "subtitle": "Affiche un bouton de discussion sur chaque page pour interroger l'assistant IA depuis n'importe où. Elle s'ouvre sous forme de panneau en bas de l'écran que vous pouvez agrandir en plein écran.",
+      "toggleLabel": "Activer la bulle de discussion IA flottante",
+      "enabled": "Bulle de discussion flottante activée",
+      "disabled": "Bulle de discussion flottante désactivée",
+      "saveFailed": "Impossible de mettre à jour le paramètre de la bulle de discussion"
+    },
     "demoRestricted": {
       "heading": "Restreint en mode démo",
       "body": "La configuration des fournisseurs d'IA est désactivée en mode démo."

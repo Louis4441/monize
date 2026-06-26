@@ -608,6 +608,14 @@
     "backLink": "Ayarlara Geri Dön",
     "title": "AI Ayarları",
     "subtitle": "Akıllı finansal özellikler için AI sağlayıcılarını yapılandırın",
+    "bubble": {
+      "title": "Yüzen sohbet balonu",
+      "subtitle": "Her sayfada bir sohbet düğmesi göstererek yapay zeka asistanına her yerden soru sormanızı sağlar. Tam ekrana genişletebileceğiniz, alttan açılan bir panel olarak açılır.",
+      "toggleLabel": "Yüzen yapay zeka sohbet balonunu etkinleştir",
+      "enabled": "Yüzen sohbet balonu etkinleştirildi",
+      "disabled": "Yüzen sohbet balonu devre dışı bırakıldı",
+      "saveFailed": "Sohbet balonu ayarı güncellenemedi"
+    },
     "demoRestricted": {
       "heading": "Demo Modunda Kısıtlandı",
       "body": "AI sağlayıcı yapılandırması demo modunda devre dışıdır."

@@ -608,6 +608,14 @@
     "backLink": "返回设置",
     "title": "AI 设置",
     "subtitle": "为智能财务功能配置 AI 提供商",
+    "bubble": {
+      "title": "悬浮聊天气泡",
+      "subtitle": "在每个页面显示一个聊天按钮，让你随时随地向 AI 助手提问。它会以底部面板的形式打开，你可以将其展开为全屏。",
+      "toggleLabel": "启用悬浮 AI 聊天气泡",
+      "enabled": "已启用悬浮聊天气泡",
+      "disabled": "已禁用悬浮聊天气泡",
+      "saveFailed": "无法更新聊天气泡设置"
+    },
     "demoRestricted": {
       "heading": "演示模式受限",
       "body": "演示模式下，AI 提供商配置已禁用。"

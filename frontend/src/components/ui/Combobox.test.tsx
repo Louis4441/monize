@@ -1284,4 +1284,52 @@ describe('Combobox', () => {
       });
     });
   });
+
+  // Regression: typing a new value (e.g. a payee not in the list) and then
+  // leaving the field by pressing Tab used to discard the text, so the form
+  // read a blank value on submit. A typed custom value must be lifted to the
+  // parent whether focus leaves by Tab or by clicking elsewhere.
+  describe('committing a typed custom value', () => {
+    it('commits a custom value when tabbing out of the field', () => {
+      render(<Combobox options={options} onChange={onChange} allowCustomValue />);
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'Brand New Payee' } });
+      fireEvent.keyDown(input, { key: 'Tab' });
+      expect(onChange).toHaveBeenLastCalledWith('', 'Brand New Payee');
+    });
+
+    it('commits a custom value when focus leaves via an outside click', () => {
+      render(
+        <div>
+          <Combobox options={options} onChange={onChange} allowCustomValue />
+          <button type="button">Outside</button>
+        </div>,
+      );
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'Brand New Payee' } });
+      fireEvent.mouseDown(screen.getByText('Outside'));
+      expect(onChange).toHaveBeenLastCalledWith('', 'Brand New Payee');
+    });
+
+    it('snaps a typed value to an exact option match when leaving the field', () => {
+      render(
+        <div>
+          <Combobox options={options} onChange={onChange} allowCustomValue />
+          <button type="button">Outside</button>
+        </div>,
+      );
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'Banana' } });
+      fireEvent.mouseDown(screen.getByText('Outside'));
+      expect(onChange).toHaveBeenLastCalledWith('2', 'Banana');
+    });
+
+    it('does not commit a typed value on Tab when custom values are disallowed', () => {
+      render(<Combobox options={options} onChange={onChange} />);
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'Unknown' } });
+      fireEvent.keyDown(input, { key: 'Tab' });
+      expect(onChange).not.toHaveBeenCalledWith('', 'Unknown');
+    });
+  });
 });

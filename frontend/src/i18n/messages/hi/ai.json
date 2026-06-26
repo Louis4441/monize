@@ -3,6 +3,13 @@
     "title": "AI सहायक",
     "subtitle": "प्राकृतिक भाषा में अपने वित्त के बारे में प्रश्न पूछें"
   },
+  "bubble": {
+    "launcherAriaLabel": "AI सहायक खोलें",
+    "title": "AI सहायक",
+    "expand": "पूर्ण स्क्रीन पर विस्तृत करें",
+    "collapse": "पैनल में छोटा करें",
+    "close": "बंद करें"
+  },
   "chat": {
     "conversationSaved": "बातचीत आपके ब्राउज़र में सहेजी गई",
     "clearConversation": "बातचीत साफ़ करें",

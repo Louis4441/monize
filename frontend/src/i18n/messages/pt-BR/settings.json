@@ -608,6 +608,14 @@
     "backLink": "Voltar às Configurações",
     "title": "Configurações de IA",
     "subtitle": "Configure provedores de IA para funcionalidades financeiras inteligentes",
+    "bubble": {
+      "title": "Balão de chat flutuante",
+      "subtitle": "Mostra um botão de chat em todas as páginas para você perguntar ao assistente de IA de qualquer lugar. Ele abre como um painel inferior que você pode expandir para tela cheia.",
+      "toggleLabel": "Ativar o balão de chat de IA flutuante",
+      "enabled": "Balão de chat flutuante ativado",
+      "disabled": "Balão de chat flutuante desativado",
+      "saveFailed": "Não foi possível atualizar a configuração do balão de chat"
+    },
     "demoRestricted": {
       "heading": "Restrito no Modo de Demonstração",
       "body": "A configuração de provedores de IA está desativada no modo de demonstração."

@@ -3,6 +3,13 @@
     "title": "AI 어시스턴트",
     "subtitle": "자연어로 재정에 관한 질문을 하세요"
   },
+  "bubble": {
+    "launcherAriaLabel": "AI 어시스턴트 열기",
+    "title": "AI 어시스턴트",
+    "expand": "전체 화면으로 확대",
+    "collapse": "패널로 축소",
+    "close": "닫기"
+  },
   "chat": {
     "conversationSaved": "대화가 브라우저에 저장되었습니다",
     "clearConversation": "대화 지우기",

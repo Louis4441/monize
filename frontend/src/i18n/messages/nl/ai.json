@@ -3,6 +3,13 @@
     "title": "AI-assistent",
     "subtitle": "Stel vragen over je financiën in gewone taal"
   },
+  "bubble": {
+    "launcherAriaLabel": "AI-assistent openen",
+    "title": "AI-assistent",
+    "expand": "Naar volledig scherm vergroten",
+    "collapse": "Tot paneel verkleinen",
+    "close": "Sluiten"
+  },
   "chat": {
     "conversationSaved": "Gesprek opgeslagen in je browser",
     "clearConversation": "Gesprek wissen",

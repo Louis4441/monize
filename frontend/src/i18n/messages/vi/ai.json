@@ -3,6 +3,13 @@
     "title": "Trợ lý AI",
     "subtitle": "Đặt câu hỏi về tài chính của bạn bằng ngôn ngữ tự nhiên"
   },
+  "bubble": {
+    "launcherAriaLabel": "Mở trợ lý AI",
+    "title": "Trợ lý AI",
+    "expand": "Mở rộng toàn màn hình",
+    "collapse": "Thu gọn về bảng",
+    "close": "Đóng"
+  },
   "chat": {
     "conversationSaved": "Cuộc trò chuyện được lưu trong trình duyệt của bạn",
     "clearConversation": "Xóa cuộc trò chuyện",

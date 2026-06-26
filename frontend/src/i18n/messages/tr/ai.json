@@ -3,6 +3,13 @@
     "title": "Yapay Zeka Asistanı",
     "subtitle": "Finanslarınız hakkında doğal dilde sorular sorun"
   },
+  "bubble": {
+    "launcherAriaLabel": "Yapay zeka asistanını aç",
+    "title": "Yapay Zeka Asistanı",
+    "expand": "Tam ekrana genişlet",
+    "collapse": "Panele küçült",
+    "close": "Kapat"
+  },
   "chat": {
     "conversationSaved": "Konuşma tarayıcınıza kaydedildi",
     "clearConversation": "Konuşmayı temizle",
