@@ -252,6 +252,52 @@ describe('aiChatStore', () => {
       }
     });
 
+    it('renders a confirmation card delivered via pickup after the stream gave up', async () => {
+      // #793: the agent composed a large write slowly, the turn idle-timed-out,
+      // and the card was buffered. The pickup must surface it (then the answer).
+      vi.useFakeTimers();
+      try {
+        const card = {
+          actionId: 'act-late',
+          type: 'create_transaction',
+          preview: {},
+          descriptor: { type: 'create_transaction' },
+          signature: 'sig',
+          expiresAt: Date.now() + 60000,
+        };
+        mockGetRelayResponse
+          .mockResolvedValueOnce({ text: null, pendingActions: [card] })
+          .mockResolvedValueOnce({
+            text: 'Card ready to review.',
+            pendingActions: [],
+          });
+        useAiChatStore.getState().submit('Bulk edit', undefined, { relay: true });
+
+        capturedCallbacks?.onEvent({ type: 'prompt_id', promptId: 'p-card' });
+        capturedCallbacks?.onEvent({ type: 'error', message: 'went quiet' });
+
+        // First pickup returns the buffered card (no answer yet): the card shows
+        // and the disconnect placeholder is cleared.
+        await vi.advanceTimersByTimeAsync(0);
+        let message = useAiChatStore.getState().messages[1];
+        expect(message.pendingActions).toHaveLength(1);
+        expect(message.pendingActions![0]).toMatchObject({
+          actionId: 'act-late',
+          status: 'pending',
+        });
+        expect(message.error).toBeUndefined();
+
+        // The answer arrives on a later poll; the card is preserved alongside it.
+        await vi.advanceTimersByTimeAsync(4000);
+        message = useAiChatStore.getState().messages[1];
+        expect(message.content).toBe('Card ready to review.');
+        expect(message.pendingActions).toHaveLength(1);
+        expect(useAiChatStore.getState().isLoading).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('stops polling for a late answer once a new prompt is submitted', async () => {
       vi.useFakeTimers();
       try {

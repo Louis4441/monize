@@ -239,18 +239,54 @@ export const useAiChatStore = create<AiChatState>()(
         };
 
         // Render a late relay answer as a normal assistant message, replacing
-        // any disconnect placeholder.
+        // any disconnect placeholder. Keeps any confirmation cards already
+        // picked up so a buffered card is not dropped when the answer arrives.
         const deliverLateAnswer = (text: string): void => {
           set((state) => ({
             messages: [
               ...state.messages.filter((m) => m.id !== assistantMsgId),
-              { id: assistantMsgId, role: 'assistant', content: text },
+              {
+                id: assistantMsgId,
+                role: 'assistant',
+                content: text,
+                ...(pendingActions.length > 0
+                  ? { pendingActions: [...pendingActions] }
+                  : {}),
+              },
             ],
             isLoading: false,
             thinking: IDLE_THINKING,
             _abortController: null,
             _activeAssistantId: null,
             _relayPollCancel: null,
+          }));
+        };
+
+        // Render confirmation cards picked up after the stream gave up (the
+        // agent composed them slowly and the turn idle-timed-out, #793). New
+        // cards (by actionId) are added to the assistant message, replacing any
+        // disconnect placeholder; the pickup loop keeps polling for the answer.
+        const deliverLateActions = (
+          incoming: Omit<PendingAction, 'status'>[],
+        ): void => {
+          let added = false;
+          for (const action of incoming) {
+            if (!pendingActions.some((p) => p.actionId === action.actionId)) {
+              pendingActions.push({ ...action, status: 'pending' });
+              added = true;
+            }
+          }
+          if (!added) return;
+          set((state) => ({
+            messages: [
+              ...state.messages.filter((m) => m.id !== assistantMsgId),
+              {
+                id: assistantMsgId,
+                role: 'assistant',
+                content: '',
+                pendingActions: [...pendingActions],
+              },
+            ],
           }));
         };
 
@@ -291,10 +327,16 @@ export const useAiChatStore = create<AiChatState>()(
             // Poll immediately, then on each interval until answered/deadline.
             while (!cancelled && Date.now() < deadline) {
               try {
-                const { text } = await aiApi.getRelayResponse(promptId);
+                const { text, pendingActions: latePending } =
+                  await aiApi.getRelayResponse(promptId);
                 // cancel()/clear()/a new prompt flips `cancelled`, so a late
                 // answer never resurrects a turn the user has moved on from.
                 if (cancelled) return;
+                // Show any confirmation cards as soon as they arrive; the answer
+                // (post_response) may still be a poll or two behind them.
+                if (latePending && latePending.length > 0) {
+                  deliverLateActions(latePending);
+                }
                 if (text) {
                   deliverLateAnswer(text);
                   return;
