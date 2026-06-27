@@ -209,12 +209,15 @@ export function BalanceHistoryChart({
               axisLine={{ stroke: chartColors.grid }}
               tickFormatter={(value: string) => formatChartDate(value, 'MMM')}
             />
+            {/* width="auto" lets recharts size the axis to its widest tick
+                label so long localized currency values (e.g. "1.234.567 €")
+                are never clipped. */}
             <YAxis
               tick={{ fill: chartColors.axis, fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatAxis}
-              width={45}
+              width="auto"
               domain={['auto', 'auto']}
             />
             <Tooltip content={<BalanceTooltip formatCurrency={formatCurrency} />} />
