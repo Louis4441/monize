@@ -1,0 +1,83 @@
+name: GHCR Untagged Cleanup
+
+# Prunes orphaned, untagged GHCR manifests left behind when the moving tags
+# (`:latest`, `:beta`, `:pr-<n>`) are re-pointed at new digests. Per-PR builds
+# and the `:beta` tag generate these by the dozen; GHCR never collects them.
+#
+# The heavy lifting -- and the safety logic that preserves every digest a live
+# tag still references (platform children, provenance/SBOM attestations) -- is
+# in scripts/prune-ghcr-untagged.sh. See that file's header for the algorithm.
+#
+# SAFE ROLLOUT: this workflow only deletes when the repository variable
+# GHCR_PRUNE_ENABLED is set to the string "true". Until then (and for any
+# workflow_dispatch left at its default), it runs in dry-run mode and only logs
+# what it WOULD delete. Review a dry run, then set the variable to arm it.
+
+on:
+  schedule:
+    # 05:00 UTC Mondays -- after the 04:00 nightly ZAP scan, so the two
+    # scheduled jobs never contend for the runner.
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Log only, delete nothing'
+        type: boolean
+        default: true
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+# Read-only at the workflow level; the job opts into packages:write so the
+# script can delete package versions via the REST API.
+permissions:
+  contents: read
+
+jobs:
+  prune:
+    name: Prune untagged manifests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # to delete orphaned GHCR container versions
+    steps:
+      - uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
+        with:
+          persist-credentials: false
+
+      # Resolve dry-run. A manual run honours its input; a scheduled run deletes
+      # for real -- but ONLY once GHCR_PRUNE_ENABLED is "true". Absent the
+      # variable, every run is forced to dry-run so merging this workflow can
+      # never delete anything until an operator explicitly arms it.
+      - name: Resolve dry-run mode
+        id: mode
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          ENABLE: ${{ vars.GHCR_PRUNE_ENABLED }}
+        run: |
+          if [ "${EVENT}" = "workflow_dispatch" ]; then
+            DRY="${INPUT_DRY_RUN}"
+          else
+            DRY="false"
+          fi
+          if [ "${ENABLE}" != "true" ]; then
+            echo "GHCR_PRUNE_ENABLED is not 'true'; forcing dry-run."
+            DRY="true"
+          fi
+          echo "dry_run=${DRY}" >>"${GITHUB_OUTPUT}"
+
+      - name: Prune untagged GHCR manifests
+        env:
+          OWNER: ${{ github.repository_owner }}
+          PACKAGES: monize-backend monize-frontend
+          GRACE_DAYS: '7'
+          DRY_RUN: ${{ steps.mode.outputs.dry_run }}
+          # Deletion needs a token with delete rights on the packages. The
+          # default GITHUB_TOKEN works for repo-linked packages; if it 403s,
+          # provide a PAT with `delete:packages` as the GHCR_CLEANUP_TOKEN
+          # secret and it is used instead.
+          GH_API_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN || secrets.GITHUB_TOKEN }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/prune-ghcr-untagged.sh
