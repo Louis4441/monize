@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ReactElement } from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@/test/render';
 import { AutoMergePayeesDialog } from './AutoMergePayeesDialog';
 import { payeesApi } from '@/lib/payees';
@@ -35,6 +36,7 @@ vi.mock('@/lib/payees', () => ({
       aliasesCreated: 0,
       skippedAliases: 0,
       transactionsBackfilled: 0,
+      skippedAliasDetails: [],
       failures: [],
     }),
   },
@@ -290,6 +292,7 @@ describe('AutoMergePayeesDialog', () => {
       aliasesCreated: 1,
       skippedAliases: 0,
       transactionsBackfilled: 0,
+      skippedAliasDetails: [],
       failures: [],
     });
     render(<AutoMergePayeesDialog isOpen onClose={onClose} onSuccess={onSuccess} />);
@@ -342,6 +345,7 @@ describe('AutoMergePayeesDialog', () => {
       aliasesCreated: 1,
       skippedAliases: 0,
       transactionsBackfilled: 0,
+      skippedAliasDetails: [],
       failures: [],
     });
     render(<AutoMergePayeesDialog isOpen onClose={onClose} onSuccess={onSuccess} />);
@@ -414,6 +418,7 @@ describe('AutoMergePayeesDialog', () => {
       aliasesCreated: 1,
       skippedAliases: 0,
       transactionsBackfilled: 0,
+      skippedAliasDetails: [],
       failures: [],
     });
     render(<AutoMergePayeesDialog isOpen onClose={onClose} onSuccess={onSuccess} />);
@@ -490,6 +495,7 @@ describe('AutoMergePayeesDialog', () => {
       aliasesCreated: 1,
       skippedAliases: 0,
       transactionsBackfilled: 0,
+      skippedAliasDetails: [],
       failures: [],
     });
     render(
@@ -568,6 +574,7 @@ describe('AutoMergePayeesDialog', () => {
       aliasesCreated: 1,
       skippedAliases: 0,
       transactionsBackfilled: 8,
+      skippedAliasDetails: [],
       failures: [],
     });
     render(
@@ -607,5 +614,48 @@ describe('AutoMergePayeesDialog', () => {
       }),
     ]);
     expect(toast.success).toHaveBeenCalledWith('Categorized 8 transactions');
+  });
+
+  it('shows a persistent conflict toast naming the skipped alias', async () => {
+    mockPreview.mockResolvedValue([lidlGroup]);
+    mockApply.mockResolvedValue({
+      groupsMerged: 1,
+      payeesMerged: 1,
+      transactionsMigrated: 2,
+      aliasesCreated: 0,
+      skippedAliases: 1,
+      transactionsBackfilled: 0,
+      skippedAliasDetails: [
+        { canonicalPayeeId: 'p1', canonicalName: 'Lidl', alias: '*LIDL*' },
+      ],
+      failures: [],
+    });
+    render(
+      <AutoMergePayeesDialog
+        isOpen
+        onClose={onClose}
+        onSuccess={onSuccess}
+        categories={categories}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByText('Preview Groups'));
+    });
+    await waitFor(() => expect(screen.getByDisplayValue('Lidl')).toBeInTheDocument());
+    await selectAllGroups();
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Merge 1 Group/));
+    });
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    const [message, options] = vi.mocked(toast.error).mock.calls[0];
+    // The conflict notice must not auto-dismiss, so the user has time to read it.
+    expect(options).toEqual({ duration: Infinity });
+    // ...and it must name the specific alias that conflicted, not just a count.
+    const messageFn = message as (t: { id: string }) => ReactElement;
+    const { container } = render(messageFn({ id: 't1' }));
+    expect(container).toHaveTextContent('*LIDL*');
+    expect(container).toHaveTextContent(/skipped/i);
   });
 });

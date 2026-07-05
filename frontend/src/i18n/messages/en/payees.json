@@ -196,7 +196,7 @@
       "selectAtLeastOne": "Please select at least one group to merge",
       "applied": "Merged {groups, plural, one {# group} other {# groups}} ({payees} payees combined)",
       "backfilled": "{count, plural, one {Categorized # transaction} other {Categorized # transactions}}",
-      "aliasesSkipped": "{count, plural, one {# alias was skipped due to a conflict} other {# aliases were skipped due to conflicts}}",
+      "aliasesSkipped": "{count, plural, one {# alias was skipped due to a conflict} other {# aliases were skipped due to conflicts}}: {aliases}",
       "loadFailed": "Failed to load merge groups",
       "applyFailed": "Failed to merge payees",
       "someGroupsFailed": "{count, plural, one {# group could not be merged} other {# groups could not be merged}}: {reason}"

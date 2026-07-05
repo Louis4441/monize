@@ -100,6 +100,15 @@ export interface ApplyAutoMergeFailure {
   reason: string;
 }
 
+export interface ApplyAutoMergeSkippedAlias {
+  canonicalPayeeId: string;
+  canonicalName: string;
+  // The wildcard alias that was not created because it is already in use
+  // (by the canonical, another payee, or the DB unique constraint). The merge
+  // itself still succeeded; only this alias was skipped.
+  alias: string;
+}
+
 export interface ApplyAutoMergeResult {
   groupsMerged: number;
   payeesMerged: number;
@@ -107,6 +116,9 @@ export interface ApplyAutoMergeResult {
   aliasesCreated: number;
   skippedAliases: number;
   transactionsBackfilled: number;
+  // Which aliases were skipped and on which group, so the UI can say exactly
+  // what conflicted instead of only a count.
+  skippedAliasDetails: ApplyAutoMergeSkippedAlias[];
   // Groups that could not be merged. The successful groups are already
   // committed (each runs in its own transaction), so a partial batch still
   // reports what got through and what did not, and why.
@@ -635,6 +647,7 @@ export class PayeeAutoMergeService {
       aliasesCreated: 0,
       skippedAliases: 0,
       transactionsBackfilled: 0,
+      skippedAliasDetails: [],
       failures: [],
     };
 
@@ -650,7 +663,15 @@ export class PayeeAutoMergeService {
         result.payeesMerged += groupResult.payeesMerged;
         result.transactionsMigrated += groupResult.transactionsMigrated;
         result.aliasesCreated += groupResult.aliasCreated ? 1 : 0;
-        result.skippedAliases += groupResult.aliasSkipped ? 1 : 0;
+        if (groupResult.aliasSkipped) {
+          result.skippedAliases += 1;
+          result.skippedAliasDetails.push({
+            canonicalPayeeId: group.canonicalPayeeId,
+            canonicalName:
+              group.canonicalName?.trim() || group.canonicalPayeeId,
+            alias: group.alias?.trim() ?? "",
+          });
+        }
         result.transactionsBackfilled += groupResult.transactionsBackfilled;
       } catch (error) {
         result.failures.push(this.describeGroupFailure(group, error));

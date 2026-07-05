@@ -585,6 +585,7 @@ describe("PayeeAutoMergeService", () => {
         aliasesCreated: 1,
         skippedAliases: 0,
         transactionsBackfilled: 0,
+        skippedAliasDetails: [],
         failures: [],
       });
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
@@ -747,6 +748,9 @@ describe("PayeeAutoMergeService", () => {
 
       expect(result.aliasesCreated).toBe(0);
       expect(result.skippedAliases).toBe(1);
+      expect(result.skippedAliasDetails).toEqual([
+        { canonicalPayeeId: "p1", canonicalName: "p1", alias: "*LIDL*" },
+      ]);
       expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
     });
 
