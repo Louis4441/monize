@@ -26,6 +26,8 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
   const defaultCurrency = preferences?.defaultCurrency || 'CAD';
   const [reordering, setReordering] = useState(false);
   const [localOrder, setLocalOrder] = useState<{ accounts: Account[]; order: Account[] } | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
 
   // Invalidate local order when parent accounts reference changes
   const effectiveLocalOrder = localOrder?.accounts === accounts ? localOrder.order : null;
@@ -46,19 +48,18 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
     return formatted;
   };
 
-  const moveAccount = useCallback(
-    async (index: number, direction: -1 | 1) => {
-      const newIndex = index + direction;
+  const applyReorder = useCallback(
+    async (from: number, to: number) => {
       const current = effectiveLocalOrder ??
         [...accounts]
           .filter((a) => a.isFavourite && !a.isClosed)
           .sort((a, b) => a.favouriteSortOrder - b.favouriteSortOrder);
 
-      if (newIndex < 0 || newIndex >= current.length) return;
+      if (from === to || to < 0 || to >= current.length) return;
 
       const reordered = [...current];
-      const [moved] = reordered.splice(index, 1);
-      reordered.splice(newIndex, 0, moved);
+      const [moved] = reordered.splice(from, 1);
+      reordered.splice(to, 0, moved);
 
       setLocalOrder({ accounts, order: reordered });
 
@@ -70,6 +71,19 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
     },
     [accounts, effectiveLocalOrder],
   );
+
+  const moveAccount = useCallback(
+    (index: number, direction: -1 | 1) => applyReorder(index, index + direction),
+    [applyReorder],
+  );
+
+  const handleDrop = (targetIndex: number) => {
+    setOverIndex(null);
+    const from = dragIndex;
+    setDragIndex(null);
+    if (from === null) return;
+    applyReorder(from, targetIndex);
+  };
 
   if (isLoading) {
     return (
@@ -119,9 +133,55 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
           </button>
         )}
       </div>
+      {reordering && (
+        <p className="-mt-2 mb-3 text-xs text-gray-500 dark:text-gray-400">
+          {t('favouriteAccounts.dragToReorder')}
+        </p>
+      )}
       <div className="space-y-2 sm:space-y-3">
         {favouriteAccounts.map((account, index) => (
-          <div key={account.id} className="flex items-center gap-1">
+          <div
+            key={account.id}
+            data-testid={`favourite-account-row-${account.id}`}
+            draggable={reordering}
+            onDragStart={reordering ? () => setDragIndex(index) : undefined}
+            onDragOver={
+              reordering
+                ? (e) => {
+                    e.preventDefault();
+                    if (overIndex !== index) setOverIndex(index);
+                  }
+                : undefined
+            }
+            onDrop={
+              reordering
+                ? (e) => {
+                    e.preventDefault();
+                    handleDrop(index);
+                  }
+                : undefined
+            }
+            onDragEnd={
+              reordering
+                ? () => {
+                    setDragIndex(null);
+                    setOverIndex(null);
+                  }
+                : undefined
+            }
+            className={`flex items-center gap-1 rounded-lg ${
+              reordering ? 'cursor-grab' : ''
+            } ${dragIndex === index ? 'opacity-50' : ''} ${
+              overIndex === index && dragIndex !== null && dragIndex !== index
+                ? 'bg-blue-50 dark:bg-blue-900/20'
+                : ''
+            }`}
+          >
+            {reordering && (
+              <span aria-hidden="true" className="select-none text-gray-400 flex-shrink-0">
+                ⠿
+              </span>
+            )}
             {reordering && (
               <div className="flex flex-col gap-0.5 flex-shrink-0">
                 <button

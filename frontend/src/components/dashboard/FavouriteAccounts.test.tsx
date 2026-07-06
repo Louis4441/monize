@@ -407,6 +407,56 @@ describe("FavouriteAccounts", () => {
       expect(mockPush).not.toHaveBeenCalled();
     });
 
+    it("calls reorderFavourites API when dragging an account onto another", async () => {
+      render(<FavouriteAccounts accounts={orderedAccounts} isLoading={false} />);
+
+      fireEvent.click(screen.getByText("Reorder"));
+
+      // Sorted display order is Alpha (acc-a), Bravo (acc-b), Charlie (acc-c);
+      // drag Charlie onto Alpha to move it to the top.
+      fireEvent.dragStart(screen.getByTestId("favourite-account-row-acc-c"));
+      fireEvent.dragOver(screen.getByTestId("favourite-account-row-acc-a"));
+      await act(async () => {
+        fireEvent.drop(screen.getByTestId("favourite-account-row-acc-a"));
+      });
+
+      expect(accountsApi.reorderFavourites).toHaveBeenCalledWith([
+        "acc-c",
+        "acc-a",
+        "acc-b",
+      ]);
+    });
+
+    it("dropping an account onto itself does not call the API", async () => {
+      render(<FavouriteAccounts accounts={orderedAccounts} isLoading={false} />);
+
+      fireEvent.click(screen.getByText("Reorder"));
+
+      fireEvent.dragStart(screen.getByTestId("favourite-account-row-acc-a"));
+      await act(async () => {
+        fireEvent.drop(screen.getByTestId("favourite-account-row-acc-a"));
+      });
+
+      expect(accountsApi.reorderFavourites).not.toHaveBeenCalled();
+    });
+
+    it("rows are only draggable in reorder mode", () => {
+      render(<FavouriteAccounts accounts={orderedAccounts} isLoading={false} />);
+
+      expect(screen.getByTestId("favourite-account-row-acc-a")).toHaveAttribute(
+        "draggable",
+        "false",
+      );
+
+      fireEvent.click(screen.getByText("Reorder"));
+
+      expect(screen.getByTestId("favourite-account-row-acc-a")).toHaveAttribute(
+        "draggable",
+        "true",
+      );
+      expect(screen.getByText(/Drag accounts to reorder/)).toBeInTheDocument();
+    });
+
     it("hides arrows and shows Reorder button when Done is clicked", () => {
       render(<FavouriteAccounts accounts={orderedAccounts} isLoading={false} />);
 

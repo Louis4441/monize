@@ -8,6 +8,7 @@
     "title": "Favourite Accounts",
     "empty": "No favourite accounts yet. Mark accounts as favourites to see them here.",
     "reorder": "Reorder",
+    "dragToReorder": "Drag accounts to reorder them, or use the arrow buttons.",
     "done": "Done",
     "moveUp": "Move up",
     "moveDown": "Move down",
