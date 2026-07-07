@@ -8,6 +8,7 @@
     "title": "Favourite Accounts",
     "empty": "No favourite accounts yet. Mark accounts as favourites to see them here.",
     "reorder": "Reorder",
+    "dragToReorder": "Drag accounts to reorder them, or use the arrow buttons.",
     "done": "Done",
     "moveUp": "Move up",
     "moveDown": "Move down",
@@ -132,5 +133,26 @@
     "income": "Income",
     "expenses": "Expenses",
     "net": "Net"
+  },
+  "customize": {
+    "button": "Customize",
+    "title": "Customize dashboard",
+    "description": "The layout below mirrors your dashboard: widgets flow left to right, two per row on large screens.",
+    "moveEarlier": "Move {name} earlier",
+    "moveLater": "Move {name} later",
+    "dragToReorder": "Drag widgets to rearrange them, or use the arrow buttons.",
+    "hiddenWidgets": "Hidden widgets",
+    "hide": "Hide {name}",
+    "show": "Show {name}",
+    "atLeastOne": "Select at least one widget to show on the dashboard.",
+    "reset": "Reset to default",
+    "toasts": {
+      "saveFailed": "Failed to save dashboard layout"
+    }
+  },
+  "favouriteReports": {
+    "title": "Favourite Reports",
+    "empty": "No favourite reports yet. Star reports on the Reports page to see them here.",
+    "browseReports": "Browse reports"
   }
 }

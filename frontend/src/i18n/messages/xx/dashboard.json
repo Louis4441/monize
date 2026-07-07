@@ -8,6 +8,7 @@
     "title": "[XX-Favourite Accounts-XX]",
     "empty": "[XX-No favourite accounts yet. Mark accounts as favourites to see them here.-XX]",
     "reorder": "[XX-Reorder-XX]",
+    "dragToReorder": "[XX-Drag accounts to reorder them, or use the arrow buttons.-XX]",
     "done": "[XX-Done-XX]",
     "moveUp": "[XX-Move up-XX]",
     "moveDown": "[XX-Move down-XX]",
@@ -132,5 +133,26 @@
     "income": "[XX-Income-XX]",
     "expenses": "[XX-Expenses-XX]",
     "net": "[XX-Net-XX]"
+  },
+  "customize": {
+    "button": "[XX-Customize-XX]",
+    "title": "[XX-Customize dashboard-XX]",
+    "description": "[XX-The layout below mirrors your dashboard: widgets flow left to right, two per row on large screens.-XX]",
+    "moveEarlier": "[XX-Move {name} earlier-XX]",
+    "moveLater": "[XX-Move {name} later-XX]",
+    "dragToReorder": "[XX-Drag widgets to rearrange them, or use the arrow buttons.-XX]",
+    "hiddenWidgets": "[XX-Hidden widgets-XX]",
+    "hide": "[XX-Hide {name}-XX]",
+    "show": "[XX-Show {name}-XX]",
+    "atLeastOne": "[XX-Select at least one widget to show on the dashboard.-XX]",
+    "reset": "[XX-Reset to default-XX]",
+    "toasts": {
+      "saveFailed": "[XX-Failed to save dashboard layout-XX]"
+    }
+  },
+  "favouriteReports": {
+    "title": "[XX-Favourite Reports-XX]",
+    "empty": "[XX-No favourite reports yet. Star reports on the Reports page to see them here.-XX]",
+    "browseReports": "[XX-Browse reports-XX]"
   }
 }
