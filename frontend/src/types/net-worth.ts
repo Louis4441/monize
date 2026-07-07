@@ -42,3 +42,27 @@ export interface InvestmentBreakdown {
   series: InvestmentBreakdownSeries[];
   points: InvestmentBreakdownPoint[];
 }
+
+/**
+ * Per-security intraday breakdown (1D / 1W / 1M ranges). Same band shape as
+ * the daily/monthly breakdown, but points are keyed by timestamp and the
+ * response carries the intraday availability metadata so the report applies the
+ * same fallback handling as the total intraday series.
+ */
+export interface IntradayBreakdownPoint {
+  timestamp: string;
+  total: number;
+  values: Record<string, number>;
+}
+
+export interface IntradayBreakdown {
+  series: InvestmentBreakdownSeries[];
+  points: IntradayBreakdownPoint[];
+  interval: '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '90m';
+  currency: string;
+  range: '1d' | '1w' | '1m';
+  fetchedAt: string;
+  skippedSymbols: string[];
+  failedSymbols: string[];
+  fallbackToDaily: boolean;
+}

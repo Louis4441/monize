@@ -135,6 +135,7 @@ const mockGetInvestmentsBreakdown = vi.fn();
 const mockGetPortfolioSummary = vi.fn();
 const mockGetInvestmentAccounts = vi.fn();
 const mockGetIntradayValue = vi.fn();
+const mockGetIntradayBreakdown = vi.fn();
 
 vi.mock('@/lib/net-worth', () => ({
   netWorthApi: {
@@ -149,6 +150,7 @@ vi.mock('@/lib/investments', () => ({
     getPortfolioSummary: (...args: any[]) => mockGetPortfolioSummary(...args),
     getInvestmentAccounts: (...args: any[]) => mockGetInvestmentAccounts(...args),
     getIntradayValue: (...args: any[]) => mockGetIntradayValue(...args),
+    getIntradayBreakdown: (...args: any[]) => mockGetIntradayBreakdown(...args),
   },
 }));
 
@@ -866,27 +868,84 @@ describe('PortfolioValueReport', () => {
     await act(async () => { fireEvent.click(screen.getByTestId('export-csv')); });
   });
 
-  it('disables the By security toggle and skips the breakdown for the 1d range', async () => {
+  const intradayBreakdownFixture = {
+    series: [
+      { key: 'sec-1', type: 'security' as const, symbol: 'AAPL', name: 'Apple Inc.' },
+      { key: 'cash', type: 'cash' as const, symbol: null, name: '' },
+    ],
+    points: [
+      { timestamp: '2024-06-01T13:30:00.000Z', total: 1500, values: { 'sec-1': 1000, cash: 500 } },
+      { timestamp: '2024-06-01T13:31:00.000Z', total: 1600, values: { 'sec-1': 1100, cash: 500 } },
+    ],
+    interval: '1m' as const,
+    currency: 'CAD',
+    range: '1d' as const,
+    fetchedAt: new Date().toISOString(),
+    skippedSymbols: [],
+    failedSymbols: [],
+    fallbackToDaily: false,
+  };
+
+  it('renders the intraday per-security breakdown for the 1d range', async () => {
     mockSeriesMode = 'securities';
     mockDateRangeValue = '1d';
-    mockGetIntradayValue.mockResolvedValue({
-      points: [{ timestamp: '2024-06-01T10:00:00Z', value: 50000 }],
-      interval: '5m',
-      currency: 'CAD',
-      range: '1d',
-      fetchedAt: new Date().toISOString(),
-      skippedSymbols: [],
-      fallbackToDaily: false,
-    });
+    mockGetIntradayBreakdown.mockResolvedValue(intradayBreakdownFixture);
     mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
     mockGetInvestmentAccounts.mockResolvedValue([]);
     render(<PortfolioValueReport />);
     await waitFor(() => {
       expect(screen.getByTestId('area-chart')).toBeInTheDocument();
     });
-    // The 1d range falls back to the intraday total path, not the breakdown.
+    expect(mockGetIntradayBreakdown).toHaveBeenCalledWith(
+      expect.objectContaining({ range: '1d' }),
+    );
+    // The daily/monthly breakdown endpoint is not used for an intraday range.
     expect(mockGetInvestmentsBreakdown).not.toHaveBeenCalled();
-    const securitiesBtn = screen.getByRole('button', { name: 'By security' });
-    expect(securitiesBtn).toBeDisabled();
+    // The By security toggle is now available on every range, including 1d.
+    expect(screen.getByRole('button', { name: 'By security' })).not.toBeDisabled();
+  });
+
+  it('shows the intraday-unavailable note when the 1d breakdown falls back', async () => {
+    mockSeriesMode = 'securities';
+    mockDateRangeValue = '1d';
+    mockGetIntradayBreakdown.mockResolvedValue({
+      ...intradayBreakdownFixture,
+      series: [],
+      points: [],
+      skippedSymbols: ['MSFT'],
+      fallbackToDaily: true,
+    });
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    render(<PortfolioValueReport />);
+    await waitFor(() => {
+      expect(screen.getByText(/Intraday view unavailable/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/MSFT/)).toBeInTheDocument();
+  });
+
+  it('falls back to the daily breakdown with a warning for the 1w range', async () => {
+    mockSeriesMode = 'securities';
+    mockDateRangeValue = '1w';
+    mockGetIntradayBreakdown.mockResolvedValue({
+      ...intradayBreakdownFixture,
+      series: [],
+      points: [],
+      range: '1w',
+      interval: '5m',
+      skippedSymbols: ['VFV'],
+      fallbackToDaily: true,
+    });
+    mockGetInvestmentsBreakdown.mockResolvedValue({ ...breakdownFixture, granularity: 'daily' });
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([]);
+    render(<PortfolioValueReport />);
+    await waitFor(() => {
+      expect(screen.getByTestId('report-intraday-fallback-warning')).toBeInTheDocument();
+    });
+    // 1W fell back to the daily-snapshot breakdown.
+    expect(mockGetInvestmentsBreakdown).toHaveBeenCalledWith(
+      expect.objectContaining({ granularity: 'daily' }),
+    );
   });
 });

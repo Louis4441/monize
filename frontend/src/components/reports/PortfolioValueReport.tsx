@@ -18,7 +18,7 @@ import { chartColors, chartSeriesColor } from '@/lib/chart-colors';
 import { netWorthApi } from '@/lib/net-worth';
 import { investmentsApi } from '@/lib/investments';
 import { PortfolioSummary } from '@/types/investment';
-import { InvestmentBreakdown, InvestmentBreakdownSeries } from '@/types/net-worth';
+import { InvestmentBreakdownSeries } from '@/types/net-worth';
 import { Account } from '@/types/account';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -38,6 +38,16 @@ import { createLogger } from '@/lib/logger';
 
 type PortfolioBreakdownSortField = 'account' | 'holdings' | 'cash' | 'total' | 'gainLoss';
 type PortfolioChartSortField = 'name' | 'value';
+
+// Normalized per-security breakdown ready to render. Point `name` is already
+// the display label (daily/monthly date or intraday time), so the chart, table
+// and CSV render the same way regardless of which endpoint produced it. `kind`
+// drives x-axis label shortening.
+type SecuritiesBreakdown = {
+  series: InvestmentBreakdownSeries[];
+  points: Array<{ name: string; total: number; values: Record<string, number> }>;
+  kind: 'daily' | 'monthly' | 'intraday';
+};
 import {
   INTRADAY_RANGES,
   buildIntradayCacheKey,
@@ -123,7 +133,7 @@ export function PortfolioValueReport() {
     'monize-reports-portfolio-value-series-mode',
     'total',
   );
-  const [breakdown, setBreakdown] = useState<InvestmentBreakdown | null>(null);
+  const [breakdown, setBreakdown] = useState<SecuritiesBreakdown | null>(null);
   // High/low value bubbles the user has temporarily dismissed, keyed by the
   // value they marked so a later data change with a new extreme shows the
   // bubble again. Component-local (not persisted), so it resets on navigation.
@@ -167,18 +177,21 @@ export function PortfolioValueReport() {
   const isIntraday = INTRADAY_RANGES.has(dateRange);
   const useDaily = !isIntraday && DAILY_RANGES.has(dateRange);
 
-  // Per-security stacked view. Not offered for the single-day (1D) range, which
-  // would collapse to a single point. It always reads the daily/monthly
-  // breakdown endpoint (never intraday), so pick the point resolution to match
-  // the selected range: daily for the shorter ranges, monthly for 2y/5y/all.
-  const securitiesActive = seriesMode === 'securities' && dateRange !== '1d';
+  // Per-security stacked view. Available on every range: intraday ranges pull
+  // the live per-security intraday series, the rest use the daily/monthly
+  // breakdown (daily for the shorter ranges, monthly for 2y/5y/all).
+  const securitiesActive = seriesMode === 'securities';
   const breakdownGranularity: 'daily' | 'monthly' =
     isIntraday || useDaily ? 'daily' : 'monthly';
-  // X-axis label formatting must follow the data actually plotted. The
-  // securities view never plots intraday bars, so drive the axis off the
-  // breakdown granularity rather than the range's intraday/daily flags.
-  const axisIntraday = securitiesActive ? false : isIntraday;
-  const axisDaily = securitiesActive ? breakdownGranularity === 'daily' : useDaily;
+  // X-axis label formatting must follow the data actually plotted. In the
+  // securities view drive it off the loaded breakdown's kind (which reflects
+  // any intraday->daily fallback) rather than the range's own flags.
+  const axisIntraday = securitiesActive
+    ? breakdown?.kind === 'intraday'
+    : isIntraday;
+  const axisDaily = securitiesActive
+    ? breakdown?.kind === 'daily'
+    : useDaily;
 
   const selectedAccount = isSingleAccount
     ? accounts.find((a) => a.id === selectedAccountIds[0])
@@ -258,26 +271,70 @@ export function PortfolioValueReport() {
       }
     };
 
-    const loadBreakdown = async () => {
+    // Daily/monthly per-security breakdown. Also the fallback target when a
+    // 1W/1M intraday breakdown has no intraday data for the account mix.
+    const loadDailyMonthlyBreakdown = async (
+      granularity: 'daily' | 'monthly',
+    ) => {
       const { start, end } = resolvedRange;
       const data = await netWorthApi.getInvestmentsBreakdown({
-        granularity: breakdownGranularity,
+        granularity,
         startDate: start,
         endDate: end,
         accountIds: accountIdsCsv,
         displayCurrency: foreignCurrency || undefined,
       });
       if (loadSeqRef.current !== seq) return;
-      setBreakdown(data);
-      setChartPoints(
-        data.points.map((p) => ({
-          name:
-            breakdownGranularity === 'monthly'
-              ? formatChartDate(p.date, 'MMM yyyy')
-              : formatChartDate(p.date, 'MMM d, yyyy'),
-          Value: p.total,
-        })),
-      );
+      const points = data.points.map((p) => ({
+        name:
+          granularity === 'monthly'
+            ? formatChartDate(p.date, 'MMM yyyy')
+            : formatChartDate(p.date, 'MMM d, yyyy'),
+        total: p.total,
+        values: p.values,
+      }));
+      setBreakdown({ series: data.series, points, kind: granularity });
+      setChartPoints(points.map((p) => ({ name: p.name, Value: p.total })));
+    };
+
+    // Per-security intraday breakdown (1D/1W/1M). Mirrors the total intraday
+    // chart's fallback handling: 1D shows an "unavailable" note, 1W/1M silently
+    // fall back to the daily-snapshot breakdown with a small warning icon.
+    const loadIntradayBreakdown = async () => {
+      let data;
+      try {
+        data = await investmentsApi.getIntradayBreakdown({
+          range: dateRange as '1d' | '1w' | '1m',
+          accountIds: accountIdsCsv,
+          displayCurrency: foreignCurrency || undefined,
+        });
+      } catch (error) {
+        logger.error('Failed to load intraday breakdown:', error);
+        if (loadSeqRef.current !== seq) return;
+        await loadDailyMonthlyBreakdown('daily');
+        return;
+      }
+      if (loadSeqRef.current !== seq) return;
+
+      if (data.fallbackToDaily) {
+        if (dateRange === '1d') {
+          setBreakdown(null);
+          setChartPoints([]);
+          setIntradayUnavailable({ skipped: data.skippedSymbols });
+        } else {
+          setIntradayFallbackNotice({ skipped: data.skippedSymbols });
+          await loadDailyMonthlyBreakdown('daily');
+        }
+        return;
+      }
+
+      const points = data.points.map((p) => ({
+        name: formatIntradayLabel(p.timestamp, dateRange),
+        total: p.total,
+        values: p.values,
+      }));
+      setBreakdown({ series: data.series, points, kind: 'intraday' });
+      setChartPoints(points.map((p) => ({ name: p.name, Value: p.total })));
     };
 
     const loadData = async () => {
@@ -300,7 +357,11 @@ export function PortfolioValueReport() {
         });
 
         if (securitiesActive) {
-          await loadBreakdown();
+          if (isIntraday) {
+            await loadIntradayBreakdown();
+          } else {
+            await loadDailyMonthlyBreakdown(breakdownGranularity);
+          }
         } else if (isIntraday) {
           setBreakdown(null);
           const cacheKey = buildIntradayCacheKey(
@@ -478,24 +539,19 @@ export function PortfolioValueReport() {
 
   const stackedChartData = useMemo(() => {
     if (!breakdown) return [] as Array<Record<string, number | string>>;
+    // Point names are pre-formatted at load time (date or intraday time).
     return breakdown.points.map((p) => ({
-      name:
-        breakdownGranularity === 'monthly'
-          ? formatChartDate(p.date, 'MMM yyyy')
-          : formatChartDate(p.date, 'MMM d, yyyy'),
+      name: p.name,
       total: p.total,
       ...p.values,
     }));
-  }, [breakdown, breakdownGranularity, formatChartDate]);
+  }, [breakdown]);
 
   const sortedBreakdownRows = useMemo(() => {
     if (!breakdown) return [];
     const rows = breakdown.points.map((p, idx) => ({
       index: idx,
-      name:
-        breakdownGranularity === 'monthly'
-          ? formatChartDate(p.date, 'MMM yyyy')
-          : formatChartDate(p.date, 'MMM d, yyyy'),
+      name: p.name,
       total: p.total,
       values: p.values,
     }));
@@ -507,11 +563,11 @@ export function PortfolioValueReport() {
       return chartTableSort.sortDirection === 'asc' ? comparison : -comparison;
     });
     return rows;
-  }, [breakdown, breakdownGranularity, formatChartDate, chartTableSort.sortField, chartTableSort.sortDirection]);
+  }, [breakdown, chartTableSort.sortField, chartTableSort.sortDirection]);
 
   // Shared x-axis label formatter for the total and stacked charts. Driven by
-  // the axis granularity flags so the securities view (which never plots
-  // intraday bars) labels correctly regardless of the range's intraday flag.
+  // the axis granularity flags so the securities view labels correctly whether
+  // it loaded intraday, daily or monthly data.
   const formatXAxisTick = useCallback(
     (value: string) => {
       if (axisIntraday) return value;
@@ -662,25 +718,21 @@ export function PortfolioValueReport() {
             />
           </div>
           <div className="flex items-center gap-3">
-            {/* Total vs. per-security stacked view. Disabled for the 1D range,
-                which has too few points for a meaningful breakdown. */}
+            {/* Total vs. per-security stacked view, available on every range. */}
             <div className="inline-flex rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
               {(['total', 'securities'] as const).map((mode) => {
                 const isActive = (securitiesActive ? 'securities' : 'total') === mode;
-                const disabled = mode === 'securities' && dateRange === '1d';
                 return (
                   <button
                     key={mode}
                     type="button"
                     onClick={() => setSeriesMode(mode)}
-                    disabled={disabled}
                     aria-pressed={isActive}
-                    title={disabled ? t('portfolioValue.securitiesRangeHint') : undefined}
                     className={`px-3 py-1.5 text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-emerald-600 text-white'
                         : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                    } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    }`}
                   >
                     {mode === 'total'
                       ? t('portfolioValue.viewTotal')
