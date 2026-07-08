@@ -14,9 +14,11 @@ import { AmortizationScheduleTable } from '@/components/accounts/loan-detail/Amo
 import { OverpaymentSimulator } from '@/components/accounts/loan-detail/OverpaymentSimulator';
 import { PayoffComparisonChart } from '@/components/accounts/loan-detail/PayoffComparisonChart';
 import { ComparisonSummaryCards } from '@/components/accounts/loan-detail/ComparisonSummaryCards';
+import { SavedScenariosPanel } from '@/components/accounts/loan-detail/SavedScenariosPanel';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { accountsApi } from '@/lib/accounts';
+import { loanScenariosApi } from '@/lib/loan-scenarios';
 import { deriveLoanPaymentHistory, fetchAllAccountTransactions } from '@/lib/loan-history';
 import {
   OverpaymentPlan,
@@ -29,6 +31,7 @@ import { formatAccountType } from '@/lib/account-utils';
 import { getErrorMessage } from '@/lib/errors';
 import type { Account, AccountType } from '@/types/account';
 import type { Transaction } from '@/types/transaction';
+import type { LoanScenario } from '@/types/loan-scenario';
 
 const LOAN_ACCOUNT_TYPES: AccountType[] = ['LOAN', 'MORTGAGE', 'LINE_OF_CREDIT'];
 
@@ -52,17 +55,23 @@ function AccountDetailContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<OverpaymentPlan | null>(null);
+  const [scenarios, setScenarios] = useState<LoanScenario[]>([]);
+  const [loadedPlan, setLoadedPlan] = useState<OverpaymentPlan | null>(null);
+  const [loadedPlanVersion, setLoadedPlanVersion] = useState(0);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [accountData, transactionsData] = await Promise.all([
+      const [accountData, transactionsData, scenariosData] = await Promise.all([
         accountsApi.getById(accountId),
         fetchAllAccountTransactions(accountId),
+        // Non-loan accounts reject scenarios; the page redirects them anyway
+        loanScenariosApi.getAll(accountId).catch(() => [] as LoanScenario[]),
       ]);
       setAccount(accountData);
       setTransactions(transactionsData);
+      setScenarios(scenariosData);
     } catch (err) {
       const message = getErrorMessage(err, t('loanDetail.loadFailed'));
       setError(message);
@@ -78,6 +87,20 @@ function AccountDetailContent() {
 
   useOnUndoRedo(loadData);
   useOnAiAction(loadData);
+
+  const reloadScenarios = useCallback(async () => {
+    try {
+      setScenarios(await loanScenariosApi.getAll(accountId));
+    } catch {
+      // The list stays as-is; individual actions already surfaced their error
+    }
+  }, [accountId]);
+
+  const handleLoadScenario = useCallback((loaded: OverpaymentPlan | null) => {
+    setPlan(loaded);
+    setLoadedPlan(loaded);
+    setLoadedPlanVersion((version) => version + 1);
+  }, []);
 
   const isLoanAccount = !account || LOAN_ACCOUNT_TYPES.includes(account.accountType);
 
@@ -201,7 +224,22 @@ function AccountDetailContent() {
           />
 
           {projectionInput && (
-            <OverpaymentSimulator accountId={account.id} onPlanChange={setPlan} />
+            <OverpaymentSimulator
+              accountId={account.id}
+              onPlanChange={setPlan}
+              loadedPlan={loadedPlan}
+              loadedPlanVersion={loadedPlanVersion}
+            />
+          )}
+
+          {projectionInput && (
+            <SavedScenariosPanel
+              accountId={account.id}
+              scenarios={scenarios}
+              activePlan={plan}
+              onLoad={handleLoadScenario}
+              onScenariosChanged={reloadScenarios}
+            />
           )}
 
           {comparison && (

@@ -389,6 +389,27 @@
       "seriesScenario": "With Overpayments",
       "today": "Today",
       "scenarioNote": "The overpayment scenario is a simulation and does not change your scheduled payments."
+    },
+    "scenarios": {
+      "title": "Saved Scenarios",
+      "saveCurrent": "Save current scenario",
+      "empty": "No saved scenarios yet. Set up an overpayment above and save it to compare plans over time.",
+      "load": "Load",
+      "rename": "Rename",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saveTitle": "Save Scenario",
+      "renameTitle": "Rename Scenario",
+      "nameLabel": "Scenario name",
+      "recurringSummary": "{amount} extra per payment",
+      "lumpSumSummary": "{count, plural, one {# lump sum} other {# lump sums}}",
+      "emptyScenario": "No overpayments",
+      "savedToast": "Scenario \"{name}\" saved",
+      "renamedToast": "Scenario renamed to \"{name}\"",
+      "deletedToast": "Scenario \"{name}\" deleted",
+      "saveFailed": "Failed to save scenario",
+      "deleteFailed": "Failed to delete scenario"
     }
   }
 }

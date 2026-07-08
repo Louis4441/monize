@@ -47,6 +47,7 @@ import { McpModule } from "./mcp/mcp.module";
 import { OAuthModule } from "./oauth/oauth.module";
 import { BudgetsModule } from "./budgets/budgets.module";
 import { TagsModule } from "./tags/tags.module";
+import { LoanScenariosModule } from "./loan-scenarios/loan-scenarios.module";
 import { BackupModule } from "./backup/backup.module";
 import { ActionHistoryModule } from "./action-history/action-history.module";
 import { UpdatesModule } from "./updates/updates.module";
@@ -137,6 +138,7 @@ import { I18nModule } from "./i18n/i18n.module";
     OAuthModule,
     BudgetsModule,
     TagsModule,
+    LoanScenariosModule,
     BackupModule,
     ActionHistoryModule,
     UpdatesModule,

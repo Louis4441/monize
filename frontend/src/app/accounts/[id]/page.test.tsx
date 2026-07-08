@@ -60,6 +60,20 @@ vi.mock('@/lib/transactions', () => ({
   },
 }));
 
+const mockGetAllScenarios = vi.fn();
+vi.mock('@/lib/loan-scenarios', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/lib/loan-scenarios')>();
+  return {
+    ...original,
+    loanScenariosApi: {
+      getAll: (...args: unknown[]) => mockGetAllScenarios(...args),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
+});
+
 vi.mock('@/components/layout/PageLayout', () => ({
   PageLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
@@ -106,6 +120,7 @@ async function renderPage() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockDetectLoanPayments.mockResolvedValue(null);
+  mockGetAllScenarios.mockResolvedValue([]);
   mockGetAllTransactions.mockResolvedValue({
     data: [
       {
