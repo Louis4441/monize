@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { DateInput } from '@/components/ui/DateInput';
 import { OverpaymentPlan } from '@/lib/loan-schedule';
 import { accountsApi } from '@/lib/accounts';
+import { getCurrencySymbol } from '@/lib/format';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { createLogger } from '@/lib/logger';
 
@@ -17,18 +18,18 @@ const MAX_LUMP_SUMS = 50;
 interface LumpSumFormRow {
   id: number;
   date: string;
-  amount: string;
+  amount: number | undefined;
 }
 
 interface SimulatorFormState {
-  recurringAmount: string;
+  recurringAmount: number | undefined;
   recurringStart: string;
   recurringEnd: string;
   lumpSums: LumpSumFormRow[];
 }
 
 const EMPTY_FORM: SimulatorFormState = {
-  recurringAmount: '',
+  recurringAmount: undefined,
   recurringStart: '',
   recurringEnd: '',
   lumpSums: [],
@@ -36,6 +37,8 @@ const EMPTY_FORM: SimulatorFormState = {
 
 interface OverpaymentSimulatorProps {
   accountId: string;
+  /** Account currency, for the amount inputs' symbol. */
+  currencyCode: string;
   onPlanChange: (plan: OverpaymentPlan | null) => void;
   /** Externally loaded plan (e.g. a saved scenario); applied when version changes */
   loadedPlan?: OverpaymentPlan | null;
@@ -47,21 +50,21 @@ interface OverpaymentSimulatorProps {
 function planToForm(plan: OverpaymentPlan | null): SimulatorFormState {
   if (!plan) return EMPTY_FORM;
   return {
-    recurringAmount: plan.recurringExtra ? String(plan.recurringExtra.amount) : '',
+    recurringAmount: plan.recurringExtra ? plan.recurringExtra.amount : undefined,
     recurringStart: plan.recurringExtra?.startDate ?? '',
     recurringEnd: plan.recurringExtra?.endDate ?? '',
     lumpSums: (plan.lumpSums ?? []).map((lumpSum, index) => ({
       id: index,
       date: lumpSum.date,
-      amount: String(lumpSum.amount),
+      amount: lumpSum.amount,
     })),
   };
 }
 
 function formToPlan(form: SimulatorFormState): OverpaymentPlan | null {
-  const recurringAmount = parseFloat(form.recurringAmount);
+  const recurringAmount = form.recurringAmount;
   const recurringExtra =
-    Number.isFinite(recurringAmount) && recurringAmount > 0
+    recurringAmount !== undefined && recurringAmount > 0
       ? {
           amount: recurringAmount,
           ...(form.recurringStart ? { startDate: form.recurringStart } : {}),
@@ -70,8 +73,11 @@ function formToPlan(form: SimulatorFormState): OverpaymentPlan | null {
       : undefined;
 
   const lumpSums = form.lumpSums
-    .map((row) => ({ date: row.date, amount: parseFloat(row.amount) }))
-    .filter((lumpSum) => lumpSum.date && Number.isFinite(lumpSum.amount) && lumpSum.amount > 0);
+    .map((row) => ({ date: row.date, amount: row.amount }))
+    .filter(
+      (lumpSum): lumpSum is { date: string; amount: number } =>
+        !!lumpSum.date && lumpSum.amount !== undefined && lumpSum.amount > 0,
+    );
 
   if (!recurringExtra && lumpSums.length === 0) return null;
   return {
@@ -88,6 +94,7 @@ function formToPlan(form: SimulatorFormState): OverpaymentPlan | null {
  */
 export function OverpaymentSimulator({
   accountId,
+  currencyCode,
   onPlanChange,
   loadedPlan = null,
   loadedPlanVersion = 0,
@@ -95,6 +102,7 @@ export function OverpaymentSimulator({
 }: OverpaymentSimulatorProps) {
   const t = useTranslations('accounts');
   const { formatCurrency } = useNumberFormat();
+  const currencySymbol = getCurrencySymbol(currencyCode);
 
   const [form, setForm] = useState<SimulatorFormState>(EMPTY_FORM);
   const [nextLumpSumId, setNextLumpSumId] = useState(0);
@@ -138,7 +146,7 @@ export function OverpaymentSimulator({
     if (form.lumpSums.length >= MAX_LUMP_SUMS) return;
     update({
       ...form,
-      lumpSums: [...form.lumpSums, { id: nextLumpSumId, date: '', amount: '' }],
+      lumpSums: [...form.lumpSums, { id: nextLumpSumId, date: '', amount: undefined }],
     });
     setNextLumpSumId(nextLumpSumId + 1);
   };
@@ -159,7 +167,10 @@ export function OverpaymentSimulator({
   };
 
   const hasInput =
-    form.recurringAmount !== '' || form.recurringStart !== '' || form.recurringEnd !== '' || form.lumpSums.length > 0;
+    form.recurringAmount !== undefined ||
+    form.recurringStart !== '' ||
+    form.recurringEnd !== '' ||
+    form.lumpSums.length > 0;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
@@ -180,7 +191,7 @@ export function OverpaymentSimulator({
         {t('loanDetail.simulator.description')}
       </p>
 
-      {detectedExtra !== null && !form.recurringAmount && (
+      {detectedExtra !== null && form.recurringAmount === undefined && (
         <div className="mb-4 flex flex-wrap items-center gap-2 rounded-md bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-sm text-blue-800 dark:text-blue-200">
           <span>
             {t('loanDetail.simulator.detectedExtraHint', {
@@ -190,7 +201,7 @@ export function OverpaymentSimulator({
           <button
             type="button"
             className="font-medium underline hover:no-underline"
-            onClick={() => update({ ...form, recurringAmount: String(detectedExtra) })}
+            onClick={() => update({ ...form, recurringAmount: detectedExtra })}
           >
             {t('loanDetail.simulator.applyDetected')}
           </button>
@@ -198,15 +209,12 @@ export function OverpaymentSimulator({
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Input
-          type="number"
-          min="0"
-          step="10"
-          prefix="$"
+        <CurrencyInput
+          prefix={currencySymbol}
+          allowNegative={false}
           label={t('loanDetail.simulator.recurringAmount')}
           value={form.recurringAmount}
-          onChange={(e) => update({ ...form, recurringAmount: e.target.value })}
-          placeholder="0"
+          onChange={(value) => update({ ...form, recurringAmount: value })}
         />
         <DateInput
           label={t('loanDetail.simulator.recurringStart')}
@@ -242,24 +250,21 @@ export function OverpaymentSimulator({
         ) : (
           <div className="space-y-2">
             {form.lumpSums.map((row) => (
-              <div key={row.id} className="flex flex-wrap items-end gap-2">
-                <div className="w-40">
+              <div key={row.id} className="flex flex-wrap items-end gap-3">
+                <div className="w-full sm:w-52">
                   <DateInput
                     label={t('loanDetail.simulator.lumpSumDate')}
                     value={row.date}
                     onDateChange={(date) => updateLumpSum(row.id, { date })}
                   />
                 </div>
-                <div className="w-36">
-                  <Input
-                    type="number"
-                    min="0"
-                    step="100"
-                    prefix="$"
+                <div className="w-full sm:w-44">
+                  <CurrencyInput
+                    prefix={currencySymbol}
+                    allowNegative={false}
                     label={t('loanDetail.simulator.lumpSumAmount')}
                     value={row.amount}
-                    onChange={(e) => updateLumpSum(row.id, { amount: e.target.value })}
-                    placeholder="0"
+                    onChange={(value) => updateLumpSum(row.id, { amount: value })}
                   />
                 </div>
                 <Button

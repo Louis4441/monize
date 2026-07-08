@@ -21,7 +21,12 @@ async function renderSimulator(props: Partial<React.ComponentProps<typeof Overpa
   let result: ReturnType<typeof render>;
   await act(async () => {
     result = render(
-      <OverpaymentSimulator accountId="loan-1" onPlanChange={onPlanChange} {...props} />,
+      <OverpaymentSimulator
+        accountId="loan-1"
+        currencyCode="USD"
+        onPlanChange={onPlanChange}
+        {...props}
+      />,
     );
   });
   return { result: result!, onPlanChange: props.onPlanChange ?? onPlanChange };
@@ -106,7 +111,7 @@ describe('OverpaymentSimulator', () => {
     });
 
     expect(onPlanChange).toHaveBeenLastCalledWith(null);
-    expect(screen.getByLabelText('Extra per payment')).toHaveValue(null);
+    expect(screen.getByLabelText('Extra per payment')).toHaveValue('');
   });
 
   it('offers the detected extra principal as a pre-fill', async () => {
@@ -153,6 +158,7 @@ describe('OverpaymentSimulator', () => {
       result.rerender(
         <OverpaymentSimulator
           accountId="loan-1"
+          currencyCode="USD"
           onPlanChange={vi.fn()}
           loadedPlan={loaded}
           loadedPlanVersion={1}
@@ -160,8 +166,8 @@ describe('OverpaymentSimulator', () => {
       );
     });
 
-    expect(screen.getByLabelText('Extra per payment')).toHaveValue(300);
+    expect(screen.getByLabelText('Extra per payment')).toHaveValue('300.00');
     expect(screen.getByLabelText('Date')).toHaveValue('2026-06-01');
-    expect(screen.getByLabelText('Amount')).toHaveValue(5000);
+    expect(screen.getByLabelText('Amount')).toHaveValue('5,000.00');
   });
 });
