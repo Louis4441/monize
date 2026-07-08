@@ -55,8 +55,25 @@ const MONTH_ABBREVS = [
   "dec",
 ];
 
-function escapeRegex(input: string): string {
-  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Splits `input` on any of the given separator characters. Used instead of a
+ * character-class regex so no regular expression is built from runtime data.
+ * Adjacent/leading/trailing separators yield empty segments, exactly as a
+ * regex split would -- callers reject those via the digit check.
+ */
+function splitOnChars(input: string, separators: Set<string>): string[] {
+  const segments: string[] = [];
+  let current = "";
+  for (const ch of input) {
+    if (separators.has(ch)) {
+      segments.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  segments.push(current);
+  return segments;
 }
 
 /**
@@ -126,8 +143,7 @@ function parseAmountWithConvention(
     intPart = "0";
   }
 
-  const groupClass = [...groupChars].map(escapeRegex).join("");
-  const segments = intPart.split(new RegExp(`[${groupClass}]`));
+  const segments = splitOnChars(intPart, groupChars);
   if (segments.some((seg) => !/^\d+$/.test(seg))) return null;
   if (segments.length > 1) {
     if (segments[0].length < 1 || segments[0].length > 3) return null;
@@ -172,59 +188,120 @@ function buildIsoDate(year: string, month: string, day: string): string | null {
   return `${pad(y, 4)}-${pad(m, 2)}-${pad(d, 2)}`;
 }
 
+type DateToken =
+  | { kind: "literal"; text: string }
+  | { kind: "field"; field: "Y" | "M" | "D" | "m" };
+
+/**
+ * Splits a date pattern into ordered literal and field tokens. `YYYY`, `MMM`,
+ * `MM` and `DD` are fields (longer tokens tested first so `MMM` wins over
+ * `MM`); every other run of characters is a literal separator.
+ */
+function tokenizeDatePattern(pattern: string): DateToken[] {
+  const tokens: DateToken[] = [];
+  let literal = "";
+  const flushLiteral = () => {
+    if (literal !== "") {
+      tokens.push({ kind: "literal", text: literal });
+      literal = "";
+    }
+  };
+
+  let i = 0;
+  while (i < pattern.length) {
+    if (pattern.startsWith("YYYY", i)) {
+      flushLiteral();
+      tokens.push({ kind: "field", field: "Y" });
+      i += 4;
+    } else if (pattern.startsWith("MMM", i)) {
+      flushLiteral();
+      tokens.push({ kind: "field", field: "m" });
+      i += 3;
+    } else if (pattern.startsWith("MM", i)) {
+      flushLiteral();
+      tokens.push({ kind: "field", field: "M" });
+      i += 2;
+    } else if (pattern.startsWith("DD", i)) {
+      flushLiteral();
+      tokens.push({ kind: "field", field: "D" });
+      i += 2;
+    } else {
+      literal += pattern[i];
+      i += 1;
+    }
+  }
+  flushLiteral();
+  return tokens;
+}
+
+/** Consumes between `min` and `max` consecutive digits from `input` at `pos`. */
+function takeDigits(
+  input: string,
+  pos: number,
+  min: number,
+  max: number,
+): string | null {
+  let end = pos;
+  while (end < input.length && end - pos < max) {
+    const ch = input[end];
+    if (ch < "0" || ch > "9") break;
+    end += 1;
+  }
+  return end - pos >= min ? input.slice(pos, end) : null;
+}
+
+function isAlpha(input: string): boolean {
+  for (const ch of input) {
+    const lower = ch.toLowerCase();
+    if (lower < "a" || lower > "z") return false;
+  }
+  return true;
+}
+
 /**
  * Parses `input` against a token-based date pattern (YYYY / MM / DD / MMM with
- * arbitrary literal separators). Returns ISO "yyyy-MM-dd" or null.
+ * arbitrary literal separators). Returns ISO "yyyy-MM-dd" or null. Walks the
+ * pattern and input in lockstep -- no regex is built from the pattern, so a
+ * user-supplied date format can never inject a pathological expression.
  */
 function parseDateWithPattern(input: string, pattern: string): string | null {
-  const tokenRe = /YYYY|MMM|MM|DD/g;
-  let regexStr = "^";
-  const order: string[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+  const tokens = tokenizeDatePattern(pattern);
+  if (!tokens.some((token) => token.kind === "field")) return null;
 
-  while ((match = tokenRe.exec(pattern)) !== null) {
-    regexStr += escapeRegex(pattern.slice(lastIndex, match.index));
-    const token = match[0];
-    if (token === "YYYY") {
-      regexStr += "(\\d{4})";
-      order.push("Y");
-    } else if (token === "MMM") {
-      regexStr += "([A-Za-z]{3})";
-      order.push("m");
-    } else if (token === "MM") {
-      regexStr += "(\\d{1,2})";
-      order.push("M");
-    } else {
-      regexStr += "(\\d{1,2})";
-      order.push("D");
-    }
-    lastIndex = match.index + token.length;
-  }
-  regexStr += escapeRegex(pattern.slice(lastIndex)) + "$";
-
-  if (order.length === 0) return null;
-
-  const m = input.match(new RegExp(regexStr));
-  if (!m) return null;
-
+  let pos = 0;
   let year = "";
   let month = "";
   let day = "";
-  order.forEach((key, i) => {
-    const value = m[i + 1];
-    if (key === "Y") {
-      year = value;
-    } else if (key === "M") {
-      month = value;
-    } else if (key === "D") {
-      day = value;
-    } else {
-      const idx = MONTH_ABBREVS.indexOf(value.toLowerCase());
-      if (idx !== -1) month = String(idx + 1);
-    }
-  });
 
+  for (const token of tokens) {
+    if (token.kind === "literal") {
+      if (input.slice(pos, pos + token.text.length) !== token.text) return null;
+      pos += token.text.length;
+      continue;
+    }
+
+    if (token.field === "Y") {
+      const value = takeDigits(input, pos, 4, 4);
+      if (value === null) return null;
+      year = value;
+      pos += value.length;
+    } else if (token.field === "m") {
+      const abbrev = input.slice(pos, pos + 3);
+      if (abbrev.length !== 3 || !isAlpha(abbrev)) return null;
+      const idx = MONTH_ABBREVS.indexOf(abbrev.toLowerCase());
+      if (idx === -1) return null;
+      month = String(idx + 1);
+      pos += 3;
+    } else {
+      const value = takeDigits(input, pos, 1, 2);
+      if (value === null) return null;
+      if (token.field === "M") month = value;
+      else day = value;
+      pos += value.length;
+    }
+  }
+
+  if (pos !== input.length) return null;
   if (!year || !month || !day) return null;
   return buildIsoDate(year, month, day);
 }
