@@ -73,6 +73,9 @@ export function AccountInfoWidget({
   const isLiability = ['CREDIT_CARD', 'LOAN', 'MORTGAGE', 'LINE_OF_CREDIT'].includes(
     account.accountType,
   );
+  const hasLoanDetails = ['LOAN', 'MORTGAGE', 'LINE_OF_CREDIT'].includes(
+    account.accountType,
+  );
   const balance = currentBalance ?? (Number(account.currentBalance) || 0);
   // Prefer the linked institution's canonical name; fall back to the legacy
   // free-text field stored on the account.
@@ -290,6 +293,16 @@ export function AccountInfoWidget({
         <p className="mt-4 text-sm text-gray-500 dark:text-gray-400 break-words">
           {account.description}
         </p>
+      )}
+
+      {hasLoanDetails && (
+        <button
+          type="button"
+          onClick={() => router.push(`/accounts/${account.id}`)}
+          className="mt-4 w-full rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
+        >
+          {t('accountWidget.loanDetails')}
+        </button>
       )}
     </div>
   );
