@@ -77,7 +77,8 @@
       "closeTitleDisabled": "Account must have zero balance to close",
       "closeTitleEnabled": "Close account",
       "balanceMustBeZero": "Balance must be zero",
-      "closedPrefix": " — Closed"
+      "closedPrefix": " — Closed",
+      "loanDetails": "Loan Details"
     }
   },
   "contextMenu": {
@@ -312,5 +313,128 @@
     "paymentStartDateRequired": "First payment date is required",
     "paymentAccountRequired": "Payment account is required",
     "amortizationRequired": "Amortization period is required"
+  },
+  "loanDetail": {
+    "backToAccounts": "Back to Accounts",
+    "viewTransactions": "View Transactions",
+    "notFound": "Account not found",
+    "loadFailed": "Failed to load account details",
+    "frequency": {
+      "WEEKLY": "Weekly",
+      "BIWEEKLY": "Bi-Weekly",
+      "SEMI_MONTHLY": "Semi-Monthly",
+      "MONTHLY": "Monthly",
+      "QUARTERLY": "Quarterly",
+      "YEARLY": "Yearly",
+      "ACCELERATED_BIWEEKLY": "Accelerated Bi-Weekly",
+      "ACCELERATED_WEEKLY": "Accelerated Weekly"
+    },
+    "summary": {
+      "currentBalance": "Current Balance",
+      "originalAmount": "Original Amount",
+      "interestRate": "Interest Rate",
+      "effectiveRate": "{rate}% effective",
+      "payment": "Payment",
+      "estPayoff": "Est. Payoff",
+      "estRemainingInterest": "Est. Remaining Interest",
+      "notSet": "Not set",
+      "notAvailable": "N/A",
+      "paidOff": "Paid off"
+    },
+    "schedule": {
+      "title": "Installment Schedule",
+      "subtitle": "{historical, plural, one {# payment made} other {# payments made}}, {projected, plural, one {# projected} other {# projected}}",
+      "colNumber": "#",
+      "colDate": "Date",
+      "colPayment": "Payment",
+      "colPrincipal": "Principal",
+      "colInterest": "Interest",
+      "colExtra": "Extra Principal",
+      "colBalance": "Balance",
+      "projectedFuturePayments": "Projected Future Payments",
+      "showAll": "Show all {count} payments",
+      "showLess": "Show less",
+      "noPayments": "No payments found"
+    },
+    "simulator": {
+      "title": "Overpayment Simulator",
+      "description": "Model extra payments to see how much sooner the loan could be paid off and how much interest you would save. Simulations do not change your real payments.",
+      "reset": "Reset",
+      "detectedExtraHint": "Your payment history shows an average of {amount} in extra principal per payment.",
+      "applyDetected": "Use it",
+      "recurringAmount": "Extra per payment",
+      "recurringStart": "Starting (optional)",
+      "recurringEnd": "Until (optional)",
+      "lumpSums": "One-off lump sums",
+      "addLumpSum": "Add lump sum",
+      "noLumpSums": "No lump sums added.",
+      "lumpSumDate": "Date",
+      "lumpSumAmount": "Amount",
+      "removeLumpSum": "Remove"
+    },
+    "comparison": {
+      "newPayoff": "New Payoff Date",
+      "timeSaved": "Time Saved",
+      "monthsSaved": "{count, plural, one {# month} other {# months}}",
+      "paymentsSaved": "{count, plural, one {# payment} other {# payments}}",
+      "interestSaved": "Interest Saved",
+      "totalExtraContributed": "Total Extra Contributed",
+      "beyondProjection": "Beyond projection"
+    },
+    "chart": {
+      "title": "Payoff Timeline",
+      "empty": "No payment history or projection available.",
+      "seriesHistorical": "Actual Balance",
+      "seriesBaseline": "Current Projection",
+      "seriesScenario": "With Overpayments",
+      "today": "Today",
+      "scenarioNote": "The overpayment scenario is a simulation and does not change your scheduled payments."
+    },
+    "scenarios": {
+      "title": "Saved Scenarios",
+      "saveCurrent": "Save current scenario",
+      "empty": "No saved scenarios yet. Set up an overpayment above and save it to compare plans over time.",
+      "load": "Load",
+      "rename": "Rename",
+      "delete": "Delete",
+      "cancel": "Cancel",
+      "save": "Save",
+      "saveTitle": "Save Scenario",
+      "renameTitle": "Rename Scenario",
+      "nameLabel": "Scenario name",
+      "recurringSummary": "{amount} extra per payment",
+      "lumpSumSummary": "{count, plural, one {# lump sum} other {# lump sums}}",
+      "emptyScenario": "No overpayments",
+      "savedToast": "Scenario \"{name}\" saved",
+      "renamedToast": "Scenario renamed to \"{name}\"",
+      "deletedToast": "Scenario \"{name}\" deleted",
+      "saveFailed": "Failed to save scenario",
+      "deleteFailed": "Failed to delete scenario"
+    },
+    "pastImpact": {
+      "title": "Impact of Overpayments Made",
+      "description": "How the payments you have already made compare against the original contractual schedule.",
+      "extraPrincipalPaid": "Extra Principal Paid",
+      "extraPrincipalNote": "How far ahead of the original schedule you are",
+      "missingData": "To see how your overpayments have shortened this loan, set the original principal and first payment date on the account.",
+      "monthsAlreadySaved": "Time Already Saved",
+      "monthsValue": "{count, plural, one {# month} other {# months}}",
+      "payoffComparison": "Originally {original}, now {current}",
+      "interestAlreadySaved": "Interest Already Saved",
+      "vsOriginalInterest": "vs {amount} originally projected",
+      "seriesOriginal": "Original Schedule",
+      "seriesActual": "Actual Balance",
+      "seriesCurrent": "Current Projection",
+      "unknown": "Unknown"
+    },
+    "lineOfCredit": {
+      "currentBalance": "Current Balance",
+      "creditLimit": "Credit Limit",
+      "available": "Available Credit",
+      "peakBalance": "Highest Balance",
+      "utilization": "Utilization",
+      "balanceHistory": "Balance History",
+      "noHistory": "No balance history available."
+    }
   }
 }

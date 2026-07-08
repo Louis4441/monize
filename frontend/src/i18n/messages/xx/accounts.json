@@ -77,7 +77,8 @@
       "closeTitleDisabled": "[XX-Account must have zero balance to close-XX]",
       "closeTitleEnabled": "[XX-Close account-XX]",
       "balanceMustBeZero": "[XX-Balance must be zero-XX]",
-      "closedPrefix": "[XX- — Closed-XX]"
+      "closedPrefix": "[XX- — Closed-XX]",
+      "loanDetails": "[XX-Loan Details-XX]"
     }
   },
   "contextMenu": {
@@ -312,5 +313,128 @@
     "paymentStartDateRequired": "[XX-First payment date is required-XX]",
     "paymentAccountRequired": "[XX-Payment account is required-XX]",
     "amortizationRequired": "[XX-Amortization period is required-XX]"
+  },
+  "loanDetail": {
+    "backToAccounts": "[XX-Back to Accounts-XX]",
+    "viewTransactions": "[XX-View Transactions-XX]",
+    "notFound": "[XX-Account not found-XX]",
+    "loadFailed": "[XX-Failed to load account details-XX]",
+    "frequency": {
+      "WEEKLY": "[XX-Weekly-XX]",
+      "BIWEEKLY": "[XX-Bi-Weekly-XX]",
+      "SEMI_MONTHLY": "[XX-Semi-Monthly-XX]",
+      "MONTHLY": "[XX-Monthly-XX]",
+      "QUARTERLY": "[XX-Quarterly-XX]",
+      "YEARLY": "[XX-Yearly-XX]",
+      "ACCELERATED_BIWEEKLY": "[XX-Accelerated Bi-Weekly-XX]",
+      "ACCELERATED_WEEKLY": "[XX-Accelerated Weekly-XX]"
+    },
+    "summary": {
+      "currentBalance": "[XX-Current Balance-XX]",
+      "originalAmount": "[XX-Original Amount-XX]",
+      "interestRate": "[XX-Interest Rate-XX]",
+      "effectiveRate": "[XX-{rate}% effective-XX]",
+      "payment": "[XX-Payment-XX]",
+      "estPayoff": "[XX-Est. Payoff-XX]",
+      "estRemainingInterest": "[XX-Est. Remaining Interest-XX]",
+      "notSet": "[XX-Not set-XX]",
+      "notAvailable": "[XX-N/A-XX]",
+      "paidOff": "[XX-Paid off-XX]"
+    },
+    "schedule": {
+      "title": "[XX-Installment Schedule-XX]",
+      "subtitle": "[XX-{historical, plural, one {# payment made} other {# payments made}}, {projected, plural, one {# projected} other {# projected}}-XX]",
+      "colNumber": "[XX-#-XX]",
+      "colDate": "[XX-Date-XX]",
+      "colPayment": "[XX-Payment-XX]",
+      "colPrincipal": "[XX-Principal-XX]",
+      "colInterest": "[XX-Interest-XX]",
+      "colExtra": "[XX-Extra Principal-XX]",
+      "colBalance": "[XX-Balance-XX]",
+      "projectedFuturePayments": "[XX-Projected Future Payments-XX]",
+      "showAll": "[XX-Show all {count} payments-XX]",
+      "showLess": "[XX-Show less-XX]",
+      "noPayments": "[XX-No payments found-XX]"
+    },
+    "simulator": {
+      "title": "[XX-Overpayment Simulator-XX]",
+      "description": "[XX-Model extra payments to see how much sooner the loan could be paid off and how much interest you would save. Simulations do not change your real payments.-XX]",
+      "reset": "[XX-Reset-XX]",
+      "detectedExtraHint": "[XX-Your payment history shows an average of {amount} in extra principal per payment.-XX]",
+      "applyDetected": "[XX-Use it-XX]",
+      "recurringAmount": "[XX-Extra per payment-XX]",
+      "recurringStart": "[XX-Starting (optional)-XX]",
+      "recurringEnd": "[XX-Until (optional)-XX]",
+      "lumpSums": "[XX-One-off lump sums-XX]",
+      "addLumpSum": "[XX-Add lump sum-XX]",
+      "noLumpSums": "[XX-No lump sums added.-XX]",
+      "lumpSumDate": "[XX-Date-XX]",
+      "lumpSumAmount": "[XX-Amount-XX]",
+      "removeLumpSum": "[XX-Remove-XX]"
+    },
+    "comparison": {
+      "newPayoff": "[XX-New Payoff Date-XX]",
+      "timeSaved": "[XX-Time Saved-XX]",
+      "monthsSaved": "[XX-{count, plural, one {# month} other {# months}}-XX]",
+      "paymentsSaved": "[XX-{count, plural, one {# payment} other {# payments}}-XX]",
+      "interestSaved": "[XX-Interest Saved-XX]",
+      "totalExtraContributed": "[XX-Total Extra Contributed-XX]",
+      "beyondProjection": "[XX-Beyond projection-XX]"
+    },
+    "chart": {
+      "title": "[XX-Payoff Timeline-XX]",
+      "empty": "[XX-No payment history or projection available.-XX]",
+      "seriesHistorical": "[XX-Actual Balance-XX]",
+      "seriesBaseline": "[XX-Current Projection-XX]",
+      "seriesScenario": "[XX-With Overpayments-XX]",
+      "today": "[XX-Today-XX]",
+      "scenarioNote": "[XX-The overpayment scenario is a simulation and does not change your scheduled payments.-XX]"
+    },
+    "scenarios": {
+      "title": "[XX-Saved Scenarios-XX]",
+      "saveCurrent": "[XX-Save current scenario-XX]",
+      "empty": "[XX-No saved scenarios yet. Set up an overpayment above and save it to compare plans over time.-XX]",
+      "load": "[XX-Load-XX]",
+      "rename": "[XX-Rename-XX]",
+      "delete": "[XX-Delete-XX]",
+      "cancel": "[XX-Cancel-XX]",
+      "save": "[XX-Save-XX]",
+      "saveTitle": "[XX-Save Scenario-XX]",
+      "renameTitle": "[XX-Rename Scenario-XX]",
+      "nameLabel": "[XX-Scenario name-XX]",
+      "recurringSummary": "[XX-{amount} extra per payment-XX]",
+      "lumpSumSummary": "[XX-{count, plural, one {# lump sum} other {# lump sums}}-XX]",
+      "emptyScenario": "[XX-No overpayments-XX]",
+      "savedToast": "[XX-Scenario \"{name}\" saved-XX]",
+      "renamedToast": "[XX-Scenario renamed to \"{name}\"-XX]",
+      "deletedToast": "[XX-Scenario \"{name}\" deleted-XX]",
+      "saveFailed": "[XX-Failed to save scenario-XX]",
+      "deleteFailed": "[XX-Failed to delete scenario-XX]"
+    },
+    "pastImpact": {
+      "title": "[XX-Impact of Overpayments Made-XX]",
+      "description": "[XX-How the payments you have already made compare against the original contractual schedule.-XX]",
+      "extraPrincipalPaid": "[XX-Extra Principal Paid-XX]",
+      "extraPrincipalNote": "[XX-How far ahead of the original schedule you are-XX]",
+      "missingData": "[XX-To see how your overpayments have shortened this loan, set the original principal and first payment date on the account.-XX]",
+      "monthsAlreadySaved": "[XX-Time Already Saved-XX]",
+      "monthsValue": "[XX-{count, plural, one {# month} other {# months}}-XX]",
+      "payoffComparison": "[XX-Originally {original}, now {current}-XX]",
+      "interestAlreadySaved": "[XX-Interest Already Saved-XX]",
+      "vsOriginalInterest": "[XX-vs {amount} originally projected-XX]",
+      "seriesOriginal": "[XX-Original Schedule-XX]",
+      "seriesActual": "[XX-Actual Balance-XX]",
+      "seriesCurrent": "[XX-Current Projection-XX]",
+      "unknown": "[XX-Unknown-XX]"
+    },
+    "lineOfCredit": {
+      "currentBalance": "[XX-Current Balance-XX]",
+      "creditLimit": "[XX-Credit Limit-XX]",
+      "available": "[XX-Available Credit-XX]",
+      "peakBalance": "[XX-Highest Balance-XX]",
+      "utilization": "[XX-Utilization-XX]",
+      "balanceHistory": "[XX-Balance History-XX]",
+      "noHistory": "[XX-No balance history available.-XX]"
+    }
   }
 }

@@ -1250,3 +1250,25 @@ CREATE TABLE monte_carlo_cash_flows (
 );
 
 CREATE INDEX idx_monte_carlo_cash_flows_scenario ON monte_carlo_cash_flows(scenario_id);
+
+-- ============================================================
+-- LOAN SCENARIOS (saved overpayment simulations)
+-- ============================================================
+
+CREATE TABLE loan_scenarios (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    recurring_extra_amount DECIMAL(20,4),
+    recurring_extra_start_date DATE,
+    recurring_extra_end_date DATE,
+    lump_sums JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_loan_scenarios_user ON loan_scenarios(user_id);
+CREATE INDEX idx_loan_scenarios_account ON loan_scenarios(account_id);
+CREATE UNIQUE INDEX idx_loan_scenarios_account_name
+    ON loan_scenarios(user_id, account_id, LOWER(name));

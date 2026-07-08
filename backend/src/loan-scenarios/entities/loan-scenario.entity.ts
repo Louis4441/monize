@@ -1,0 +1,76 @@
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
+import { Account } from "../../accounts/entities/account.entity";
+
+const numericTransformer = {
+  to: (value: number | null): number | null => value,
+  from: (value: string | null): number | null =>
+    value === null ? null : Number(value),
+};
+
+export interface LoanScenarioLumpSum {
+  /** ISO date (yyyy-MM-dd) */
+  date: string;
+  amount: number;
+}
+
+/**
+ * A saved overpayment simulation for a loan/mortgage account. Only the
+ * inputs are persisted; schedules are recomputed client-side from the
+ * account's current balance and rate so results never go stale.
+ */
+@Entity("loan_scenarios")
+export class LoanScenario {
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
+
+  @Column({ type: "uuid", name: "user_id" })
+  userId: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "user_id" })
+  user?: User;
+
+  @Column({ type: "uuid", name: "account_id" })
+  accountId: string;
+
+  @ManyToOne(() => Account)
+  @JoinColumn({ name: "account_id" })
+  account?: Account;
+
+  @Column({ type: "varchar", length: 100 })
+  name: string;
+
+  @Column({
+    type: "decimal",
+    precision: 20,
+    scale: 4,
+    name: "recurring_extra_amount",
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  recurringExtraAmount: number | null;
+
+  @Column({ type: "date", name: "recurring_extra_start_date", nullable: true })
+  recurringExtraStartDate: string | null;
+
+  @Column({ type: "date", name: "recurring_extra_end_date", nullable: true })
+  recurringExtraEndDate: string | null;
+
+  @Column({ type: "jsonb", name: "lump_sums", default: () => "'[]'" })
+  lumpSums: LoanScenarioLumpSum[];
+
+  @CreateDateColumn({ name: "created_at" })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: "updated_at" })
+  updatedAt: Date;
+}

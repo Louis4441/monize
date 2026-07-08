@@ -449,5 +449,10 @@
     "deleteLastAdmin": "[XX-Cannot delete the last admin account. Promote another user first.-XX]",
     "oidcReauthRequiredForDataDelete": "[XX-OIDC re-authentication is required to confirm data deletion-XX]",
     "passwordRequiredForDataDelete": "[XX-Password is required to confirm data deletion-XX]"
+  },
+  "loanScenarios": {
+    "notFound": "[XX-Loan scenario with ID {{ id }} not found-XX]",
+    "nameConflict": "[XX-A scenario named \"{{ name }}\" already exists for this account-XX]",
+    "notLoanAccount": "[XX-Loan scenarios are only available for loan, mortgage, and line of credit accounts-XX]"
   }
 }

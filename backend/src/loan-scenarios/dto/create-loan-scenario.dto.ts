@@ -1,0 +1,67 @@
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsDateString,
+  IsArray,
+  MaxLength,
+  Min,
+  Max,
+  ArrayMaxSize,
+  ValidateNested,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
+
+const MAX_AMOUNT = 100_000_000;
+
+export class LumpSumDto {
+  @ApiProperty({ description: "ISO date (yyyy-MM-dd) the lump sum is paid" })
+  @IsDateString()
+  date: string;
+
+  @ApiProperty({ description: "Lump sum amount" })
+  @IsNumber()
+  @Min(0.01)
+  @Max(MAX_AMOUNT)
+  amount: number;
+}
+
+export class CreateLoanScenarioDto {
+  @ApiProperty({ description: "Scenario name" })
+  @IsString()
+  @MaxLength(100)
+  @SanitizeHtml()
+  name: string;
+
+  @ApiPropertyOptional({ description: "Recurring extra amount per payment" })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(MAX_AMOUNT)
+  recurringExtraAmount?: number | null;
+
+  @ApiPropertyOptional({
+    description: "First date the recurring extra applies",
+  })
+  @IsOptional()
+  @IsDateString()
+  recurringExtraStartDate?: string | null;
+
+  @ApiPropertyOptional({ description: "Last date the recurring extra applies" })
+  @IsOptional()
+  @IsDateString()
+  recurringExtraEndDate?: string | null;
+
+  @ApiPropertyOptional({
+    description: "One-off lump sum payments",
+    type: [LumpSumDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => LumpSumDto)
+  lumpSums?: LumpSumDto[];
+}

@@ -94,6 +94,29 @@ describe('AccountInfoWidget', () => {
     expect(onCollapse).toHaveBeenCalledTimes(1);
   });
 
+  it('links to the loan detail page for a loan account', () => {
+    render(
+      <AccountInfoWidget
+        account={makeAccount({ id: 'loan-9', accountType: 'MORTGAGE' })}
+        onEdit={vi.fn()}
+        onCollapse={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByText('View Loan Details'));
+    expect(mockPush).toHaveBeenCalledWith('/accounts/loan-9');
+  });
+
+  it('does not show the loan details link for a non-loan account', () => {
+    render(
+      <AccountInfoWidget
+        account={makeAccount({ accountType: 'CHEQUING' })}
+        onEdit={vi.fn()}
+        onCollapse={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('View Loan Details')).not.toBeInTheDocument();
+  });
+
   it('renders optional fields and a closed badge when present', () => {
     render(
       <AccountInfoWidget
