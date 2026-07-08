@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Effect van gedane extra aflossingen",
       "description": "Hoe de betalingen die u al hebt gedaan zich verhouden tot het oorspronkelijke contractuele schema.",
+      "extraPrincipalPaid": "Extra afgeloste hoofdsom",
+      "extraPrincipalNote": "Hoever u voorloopt op het oorspronkelijke schema",
       "missingData": "Om te zien hoeveel uw extra aflossingen deze lening hebben verkort, stelt u de oorspronkelijke hoofdsom en de eerste betaaldatum in op de rekening.",
       "monthsAlreadySaved": "Reeds bespaarde tijd",
       "monthsValue": "{count, plural, one {# maand} other {# maanden}}",

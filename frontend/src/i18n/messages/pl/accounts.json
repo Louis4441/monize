@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Wpływ dokonanych nadpłat",
       "description": "Jak dokonane już płatności wypadają na tle pierwotnego harmonogramu umownego.",
+      "extraPrincipalPaid": "Zapłacony dodatkowy kapitał",
+      "extraPrincipalNote": "O ile wyprzedzasz pierwotny harmonogram",
       "missingData": "Aby zobaczyć, o ile Twoje nadpłaty skróciły ten kredyt, ustaw pierwotny kapitał i datę pierwszej raty na koncie.",
       "monthsAlreadySaved": "Już zaoszczędzony czas",
       "monthsValue": "{count, plural, one {# miesiąc} few {# miesiące} many {# miesięcy} other {# miesiąca}}",

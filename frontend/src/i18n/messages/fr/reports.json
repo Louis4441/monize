@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "Sélectionner un compte de prêt",
+    "viewTransactions": "Voir les transactions",
     "empty": "Aucun compte de prêt, d'hypothèque ou de marge de crédit trouvé."
   }
 }

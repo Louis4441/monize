@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "Seleziona conto di prestito",
+    "viewTransactions": "Vedi transazioni",
     "empty": "Nessun conto di prestito, mutuo o linea di credito trovato."
   }
 }

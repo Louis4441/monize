@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "ローン勘定科目を選択",
+    "viewTransactions": "取引を表示",
     "empty": "ローン、住宅ローン、与信枠の勘定科目が見つかりません。"
   }
 }

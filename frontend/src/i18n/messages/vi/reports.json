@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "Chọn tài khoản khoản vay",
+    "viewTransactions": "Xem giao dịch",
     "empty": "Không tìm thấy tài khoản khoản vay, thế chấp hoặc hạn mức tín dụng."
   }
 }

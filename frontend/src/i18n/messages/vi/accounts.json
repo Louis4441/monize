@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Tác động của các khoản trả trước hạn đã thực hiện",
       "description": "So sánh các khoản bạn đã trả với lịch trả nợ theo hợp đồng ban đầu.",
+      "extraPrincipalPaid": "Gốc trả thêm",
+      "extraPrincipalNote": "Bạn đang vượt trước lịch ban đầu bao nhiêu",
       "missingData": "Để xem các khoản trả trước hạn đã rút ngắn khoản vay này bao nhiêu, hãy đặt số tiền gốc ban đầu và ngày trả đầu tiên trên tài khoản.",
       "monthsAlreadySaved": "Thời gian đã tiết kiệm",
       "monthsValue": "{count, plural, one {# tháng} other {# tháng}}",

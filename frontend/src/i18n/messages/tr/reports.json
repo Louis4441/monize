@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "Kredi Hesabı Seç",
+    "viewTransactions": "İşlemleri Görüntüle",
     "empty": "Kredi, ipotek veya kredi limiti hesabı bulunamadı."
   }
 }

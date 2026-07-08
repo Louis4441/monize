@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "选择贷款账户",
+    "viewTransactions": "查看交易",
     "empty": "未找到贷款、抵押贷款或信用额度账户。"
   }
 }

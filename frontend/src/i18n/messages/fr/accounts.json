@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Impact des remboursements anticipés effectués",
       "description": "Comment les versements que vous avez déjà effectués se comparent au calendrier contractuel initial.",
+      "extraPrincipalPaid": "Capital supplémentaire payé",
+      "extraPrincipalNote": "De combien vous êtes en avance sur le calendrier initial",
       "missingData": "Pour voir comment vos remboursements anticipés ont raccourci ce prêt, définissez le capital initial et la date du premier versement sur le compte.",
       "monthsAlreadySaved": "Temps déjà économisé",
       "monthsValue": "{count, plural, one {# mois} other {# mois}}",

@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "ऋण खाता चुनें",
+    "viewTransactions": "लेन-देन देखें",
     "empty": "कोई ऋण, बंधक या क्रेडिट लाइन खाता नहीं मिला।"
   }
 }

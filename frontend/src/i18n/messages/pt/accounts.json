@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Impacto das amortizações antecipadas efetuadas",
       "description": "Como os pagamentos que já efetuou se comparam com o plano contratual original.",
+      "extraPrincipalPaid": "Capital extra pago",
+      "extraPrincipalNote": "Quanto está adiantado em relação ao plano original",
       "missingData": "Para ver quanto as suas amortizações antecipadas encurtaram este empréstimo, defina o capital original e a data da primeira prestação na conta.",
       "monthsAlreadySaved": "Tempo já poupado",
       "monthsValue": "{count, plural, one {# mês} other {# meses}}",

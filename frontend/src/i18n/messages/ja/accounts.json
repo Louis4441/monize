@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "これまでの繰上返済の効果",
       "description": "これまでの返済が当初の契約スケジュールと比べてどう推移しているかを示します。",
+      "extraPrincipalPaid": "追加で支払った元金",
+      "extraPrincipalNote": "当初スケジュールよりどれだけ前倒しか",
       "missingData": "繰上返済によってこのローンがどれだけ短縮されたかを見るには、勘定科目に当初借入額と初回返済日を設定してください。",
       "monthsAlreadySaved": "すでに短縮された期間",
       "monthsValue": "{count, plural, one {# か月} other {# か月}}",

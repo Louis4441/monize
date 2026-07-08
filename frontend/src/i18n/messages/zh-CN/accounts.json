@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "已还提前还款的影响",
       "description": "您已完成的还款与原始合同还款计划的对比。",
+      "extraPrincipalPaid": "额外偿还本金",
+      "extraPrincipalNote": "您比原计划提前了多少",
       "missingData": "要查看提前还款为这笔贷款缩短了多少时间，请在账户中设置原始本金和首次还款日期。",
       "monthsAlreadySaved": "已节省的时间",
       "monthsValue": "{count, plural, one {# 个月} other {# 个月}}",

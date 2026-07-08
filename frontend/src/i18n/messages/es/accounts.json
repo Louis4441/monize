@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Impacto de los pagos anticipados realizados",
       "description": "Cómo se comparan los pagos que ya ha realizado con el calendario contractual original.",
+      "extraPrincipalPaid": "Capital adicional pagado",
+      "extraPrincipalNote": "Cuánto se adelanta al calendario original",
       "missingData": "Para ver cuánto han acortado este préstamo sus pagos anticipados, defina el capital original y la fecha del primer pago en la cuenta.",
       "monthsAlreadySaved": "Tiempo ya ahorrado",
       "monthsValue": "{count, plural, one {# mes} other {# meses}}",

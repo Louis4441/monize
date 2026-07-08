@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "Leningrekening selecteren",
+    "viewTransactions": "Transacties bekijken",
     "empty": "Geen lening-, hypotheek- of kredietlijnrekeningen gevonden."
   }
 }

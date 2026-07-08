@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "지금까지의 조기 상환 효과",
       "description": "지금까지의 납부가 최초 계약 일정과 어떻게 비교되는지 보여줍니다.",
+      "extraPrincipalPaid": "추가 상환 원금",
+      "extraPrincipalNote": "원래 일정보다 얼마나 앞서 있는지",
       "missingData": "조기 상환으로 이 대출이 얼마나 단축되었는지 보려면 계좌에 최초 원금과 첫 납부일을 설정하세요.",
       "monthsAlreadySaved": "이미 단축된 기간",
       "monthsValue": "{count, plural, one {#개월} other {#개월}}",

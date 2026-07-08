@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Impacto das amortizações extras realizadas",
       "description": "Como os pagamentos que você já fez se comparam com a tabela contratual original.",
+      "extraPrincipalPaid": "Principal extra pago",
+      "extraPrincipalNote": "Quanto você está adiantado em relação à tabela original",
       "missingData": "Para ver quanto suas amortizações extras encurtaram este empréstimo, defina o principal original e a data da primeira parcela na conta.",
       "monthsAlreadySaved": "Tempo já economizado",
       "monthsValue": "{count, plural, one {# mês} other {# meses}}",

@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "대출 계좌 선택",
+    "viewTransactions": "거래 보기",
     "empty": "대출, 주택담보대출 또는 신용한도 계좌를 찾을 수 없습니다."
   }
 }

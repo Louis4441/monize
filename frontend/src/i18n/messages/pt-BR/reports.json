@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "Selecionar conta de empréstimo",
+    "viewTransactions": "Ver transações",
     "empty": "Nenhuma conta de empréstimo, hipoteca ou linha de crédito encontrada."
   }
 }

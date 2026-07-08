@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Impatto dei rimborsi anticipati effettuati",
       "description": "Come i pagamenti già effettuati si confrontano con il piano contrattuale originario.",
+      "extraPrincipalPaid": "Capitale extra versato",
+      "extraPrincipalNote": "Quanto sei in anticipo sul piano originario",
       "missingData": "Per vedere quanto i tuoi rimborsi anticipati hanno accorciato questo prestito, imposta il capitale originario e la data della prima rata sul conto.",
       "monthsAlreadySaved": "Tempo già risparmiato",
       "monthsValue": "{count, plural, one {# mese} other {# mesi}}",

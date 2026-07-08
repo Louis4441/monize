@@ -51,6 +51,7 @@
     "currentBalance": "Saldo Atual",
     "nextPayment": "Próximo Pagamento",
     "viewBills": "Ver em Faturas e Depósitos",
+    "loanDetails": "Ver detalhes do empréstimo",
     "type": "Tipo",
     "accountNumber": "Número de Conta",
     "currency": "Moeda",

@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "Pilih Akun Pinjaman",
+    "viewTransactions": "Lihat Transaksi",
     "empty": "Tidak ada akun pinjaman, hipotek, atau jalur kredit yang ditemukan."
   }
 }

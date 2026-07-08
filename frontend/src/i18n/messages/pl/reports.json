@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "Wybierz konto kredytu",
+    "viewTransactions": "Zobacz transakcje",
     "empty": "Nie znaleziono kont kredytów, hipotek ani linii kredytowych."
   }
 }

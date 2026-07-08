@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Yapılan Erken Ödemelerin Etkisi",
       "description": "Şimdiye kadar yaptığınız ödemelerin orijinal sözleşme planıyla karşılaştırması.",
+      "extraPrincipalPaid": "Ödenen Ek Anapara",
+      "extraPrincipalNote": "Orijinal planın ne kadar önündesiniz",
       "missingData": "Erken ödemelerinizin bu krediyi ne kadar kısalttığını görmek için hesapta başlangıç anaparasını ve ilk ödeme tarihini ayarlayın.",
       "monthsAlreadySaved": "Şimdiden Kazanılan Süre",
       "monthsValue": "{count, plural, one {# ay} other {# ay}}",

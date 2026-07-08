@@ -1675,6 +1675,7 @@
   },
   "loanOverpayment": {
     "labelSelectAccount": "[XX-Select Loan Account-XX]",
+    "viewTransactions": "[XX-View Transactions-XX]",
     "empty": "[XX-No loan, mortgage, or line of credit accounts found.-XX]"
   }
 }

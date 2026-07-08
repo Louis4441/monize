@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Dampak Pembayaran Tambahan yang Sudah Dilakukan",
       "description": "Bagaimana pembayaran yang sudah Anda lakukan dibandingkan dengan jadwal kontrak awal.",
+      "extraPrincipalPaid": "Pokok Tambahan Dibayar",
+      "extraPrincipalNote": "Seberapa jauh Anda mendahului jadwal awal",
       "missingData": "Untuk melihat seberapa besar pembayaran tambahan Anda mempersingkat pinjaman ini, atur pokok awal dan tanggal pembayaran pertama pada akun.",
       "monthsAlreadySaved": "Waktu yang Sudah Dihemat",
       "monthsValue": "{count, plural, one {# bulan} other {# bulan}}",

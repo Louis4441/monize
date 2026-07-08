@@ -414,6 +414,8 @@
     "pastImpact": {
       "title": "Wirkung bisheriger Sondertilgungen",
       "description": "Wie sich Ihre bereits geleisteten Zahlungen im Vergleich zum ursprünglichen vertraglichen Tilgungsplan auswirken.",
+      "extraPrincipalPaid": "Zusätzliche Tilgung",
+      "extraPrincipalNote": "Wie weit Sie dem ursprünglichen Plan voraus sind",
       "missingData": "Um zu sehen, wie Ihre Sondertilgungen diesen Kredit verkürzt haben, legen Sie den ursprünglichen Kreditbetrag und das erste Zahlungsdatum im Konto fest.",
       "monthsAlreadySaved": "Bereits gesparte Zeit",
       "monthsValue": "{count, plural, one {# Monat} other {# Monate}}",
