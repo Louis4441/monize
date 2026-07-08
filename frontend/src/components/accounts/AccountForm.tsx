@@ -746,6 +746,7 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           paymentStartDate={watchedPaymentStartDate}
           isCanadianMortgage={watchedIsCanadianMortgage}
           isVariableRate={watchedIsVariableRate}
+          accountId={account?.id}
           termMonths={watchedTermMonths}
           amortizationMonths={watchedAmortizationMonths}
           mortgagePaymentFrequency={watchedMortgagePaymentFrequency}

@@ -176,7 +176,7 @@ export function RateHistoryPanel({ account, rateChanges, onChanged }: RateHistor
       : t('loanDetail.rateHistory.paymentUnchanged');
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
+    <div id="rate-history" className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6 scroll-mt-4">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
