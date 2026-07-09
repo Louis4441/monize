@@ -1,9 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, waitFor } from '@/test/render';
+import { render, screen, act, waitFor, fireEvent } from '@/test/render';
 import { RecurringChargesPanel } from './RecurringChargesPanel';
 
 vi.mock('@/hooks/useNumberFormat', () => ({
   useNumberFormat: () => ({ formatCurrency: (a: number) => `$${a.toFixed(2)}` }),
+}));
+vi.mock('@/hooks/useDateFormat', () => ({
+  useDateFormat: () => ({ formatDate: (d: string) => d }),
+}));
+
+// The lazily-loaded scheduled-bill form is replaced with a stub that echoes the
+// template it was given and can fire onSuccess.
+const mockFormProps = vi.fn();
+vi.mock('@/components/scheduled-transactions/ScheduledTransactionForm', () => ({
+  ScheduledTransactionForm: (props: { templateTransaction?: unknown; onSuccess?: () => void }) => {
+    mockFormProps(props.templateTransaction);
+    return (
+      <div data-testid="scheduled-form">
+        <button type="button" onClick={() => props.onSuccess?.()}>
+          save-bill
+        </button>
+      </div>
+    );
+  },
 }));
 
 const mockGetAll = vi.fn();
@@ -15,15 +34,40 @@ vi.mock('@/lib/transactions', () => ({
   },
 }));
 
+const mockGetScheduled = vi.fn();
+vi.mock('@/lib/scheduled-transactions', () => ({
+  scheduledTransactionsApi: {
+    getAll: (...a: unknown[]) => mockGetScheduled(...a),
+  },
+}));
+
 function charge(overrides: Record<string, unknown> = {}) {
   return {
     payeeName: 'Netflix',
-    amounts: [-15],
-    dates: ['2026-05-01', '2026-06-01'],
+    payeeId: 'pay-netflix',
+    amounts: [15],
+    dates: ['2026-04-01', '2026-05-01', '2026-06-01'],
     frequency: 'monthly',
-    currentAmount: -15,
-    previousAmount: -15,
+    currentAmount: 15,
+    previousAmount: 15,
     categoryName: 'Streaming',
+    categoryId: 'cat-streaming',
+    ...overrides,
+  };
+}
+
+function schedule(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'st-1',
+    accountId: 'acc-1',
+    name: 'Rent',
+    payeeName: 'Landlord',
+    payeeId: 'pay-landlord',
+    amount: -1200,
+    currencyCode: 'CAD',
+    frequency: 'MONTHLY',
+    nextDueDate: '2026-07-01',
+    isActive: true,
     ...overrides,
   };
 }
@@ -32,12 +76,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetAll.mockResolvedValue({
     data: [
-      { id: 't1', payeeId: 'p1', payeeName: 'Netflix' },
+      { id: 't1', payeeId: 'pay-netflix', payeeName: 'Netflix' },
       { id: 't2', payeeId: null, payeeName: null },
     ],
     pagination: { hasMore: false },
   });
   mockGetRecurringCharges.mockResolvedValue([charge()]);
+  mockGetScheduled.mockResolvedValue([schedule()]);
 });
 
 async function renderPanel() {
@@ -47,18 +92,45 @@ async function renderPanel() {
 }
 
 describe('RecurringChargesPanel', () => {
-  it('derives payees then lists detected subscriptions', async () => {
+  it('lists scheduled bills for the account', async () => {
+    await renderPanel();
+    await waitFor(() => expect(screen.getByText('Landlord')).toBeInTheDocument());
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+    expect(screen.getByText('$1200.00')).toBeInTheDocument();
+    expect(screen.getByText(/Next due 2026-07-01/)).toBeInTheDocument();
+  });
+
+  it('flags detected charges not already scheduled', async () => {
     await renderPanel();
     await waitFor(() => expect(screen.getByText('Netflix')).toBeInTheDocument());
-    expect(screen.getByText(/Monthly/)).toBeInTheDocument();
+    expect(screen.getByText('Possible recurring charges')).toBeInTheDocument();
     expect(screen.getByText('$15.00')).toBeInTheDocument();
     expect(mockGetRecurringCharges).toHaveBeenCalledWith(
-      expect.objectContaining({ payeeIds: ['p1'] }),
+      expect.objectContaining({ payeeIds: ['pay-netflix'] }),
     );
+  });
+
+  it('does not flag a detected charge that matches a scheduled bill by payee', async () => {
+    mockGetScheduled.mockResolvedValue([
+      schedule({ id: 'st-2', payeeId: 'pay-netflix', payeeName: 'Netflix' }),
+    ]);
+    await renderPanel();
+    await waitFor(() => expect(screen.getByText('Netflix')).toBeInTheDocument());
+    // Netflix appears only as the scheduled bill, never as a "possible" charge.
+    expect(screen.queryByText('Possible recurring charges')).not.toBeInTheDocument();
+  });
+
+  it('excludes scheduled bills from other accounts', async () => {
+    mockGetScheduled.mockResolvedValue([schedule({ accountId: 'other-acc' })]);
+    await renderPanel();
+    await waitFor(() => expect(screen.getByText('Netflix')).toBeInTheDocument());
+    expect(screen.queryByText('Landlord')).not.toBeInTheDocument();
+    expect(screen.queryByText('Scheduled')).not.toBeInTheDocument();
   });
 
   it('filters out irregular cadences', async () => {
     mockGetRecurringCharges.mockResolvedValue([charge({ frequency: 'irregular' })]);
+    mockGetScheduled.mockResolvedValue([]);
     await renderPanel();
     await waitFor(() =>
       expect(
@@ -69,6 +141,7 @@ describe('RecurringChargesPanel', () => {
 
   it('skips the recurring lookup when there are no payees', async () => {
     mockGetAll.mockResolvedValue({ data: [], pagination: {} });
+    mockGetScheduled.mockResolvedValue([]);
     await renderPanel();
     await waitFor(() =>
       expect(
@@ -76,5 +149,28 @@ describe('RecurringChargesPanel', () => {
       ).toBeInTheDocument(),
     );
     expect(mockGetRecurringCharges).not.toHaveBeenCalled();
+  });
+
+  it('opens the pre-filled bill form for a detected charge and reloads on success', async () => {
+    await renderPanel();
+    await waitFor(() => expect(screen.getByText('Netflix')).toBeInTheDocument());
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Create a scheduled bill for Netflix'));
+    });
+    await waitFor(() => expect(screen.getByTestId('scheduled-form')).toBeInTheDocument());
+    // The form is seeded with a negative (expense) amount and the charge's payee.
+    expect(mockFormProps).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'acc-1', payeeId: 'pay-netflix', amount: -15 }),
+    );
+
+    // Saving closes the modal and re-fetches (scheduled + transactions again).
+    const scheduledCallsBefore = mockGetScheduled.mock.calls.length;
+    await act(async () => {
+      fireEvent.click(screen.getByText('save-bill'));
+    });
+    await waitFor(() =>
+      expect(mockGetScheduled.mock.calls.length).toBeGreaterThan(scheduledCallsBefore),
+    );
   });
 });

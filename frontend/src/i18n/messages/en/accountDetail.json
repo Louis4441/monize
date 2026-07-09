@@ -12,8 +12,15 @@
   },
   "recurring": {
     "title": "Recurring Charges",
-    "subtitle": "Subscriptions on this account",
+    "subtitle": "Scheduled bills on this account, plus possible subscriptions found in its transactions",
     "empty": "No recurring charges detected on this account",
+    "scheduledTitle": "Scheduled",
+    "detectedTitle": "Possible recurring charges",
+    "detectedSubtitle": "Found in your transaction history but not yet scheduled",
+    "nextDue": "Next due {date}",
+    "createBill": "Create bill",
+    "createBillAria": "Create a scheduled bill for {payee}",
+    "createTitle": "New Scheduled Bill",
     "frequency": {
       "weekly": "Weekly",
       "biweekly": "Every 2 weeks",
