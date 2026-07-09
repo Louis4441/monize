@@ -168,7 +168,7 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
     id: 'favourite-securities',
     titleSection: 'favouriteSecurities',
     iconType: 'table',
-    defaultEnabled: true,
+    defaultEnabled: false,
     shouldRender: (ctx) => ctx.isLoading || ctx.hasSecurities,
     render: (ctx) => (
       <FavouriteSecurities
@@ -178,6 +178,16 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
         isRefreshing={ctx.isRefreshing}
       />
     ),
+  },
+  // Part of the default layout: the portfolio value chart occupies the slot
+  // Favourite Securities used to hold. Hidden until the user has investments.
+  {
+    id: 'portfolio-value',
+    titleSection: 'portfolioValue',
+    iconType: 'line',
+    defaultEnabled: true,
+    shouldRender: (ctx) => ctx.isLoading || ctx.hasInvestments,
+    render: (ctx) => <PortfolioValueWidget accounts={ctx.accounts} isLoading={ctx.isLoading} />,
   },
   {
     id: 'net-worth',
@@ -237,16 +247,8 @@ export const DASHBOARD_WIDGETS: DashboardWidgetDefinition[] = [
     defaultEnabled: false,
     render: (ctx) => <FavouriteReportsWidget isLoading={ctx.isLoading} />,
   },
-  // Report-derived chart widgets: all opt-in, each with its own persisted
+  // Report-derived chart widgets: opt-in, each with its own persisted
   // settings. Investment widgets are hidden unless the user has investments.
-  {
-    id: 'portfolio-value',
-    titleSection: 'portfolioValue',
-    iconType: 'line',
-    defaultEnabled: false,
-    shouldRender: (ctx) => ctx.isLoading || ctx.hasInvestments,
-    render: (ctx) => <PortfolioValueWidget accounts={ctx.accounts} isLoading={ctx.isLoading} />,
-  },
   {
     id: 'spending-by-payee',
     titleSection: 'spendingByPayee',

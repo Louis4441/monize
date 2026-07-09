@@ -293,7 +293,7 @@ describe('CustomizeDashboardModal', () => {
     expect(within(tile('expenses-pie')).getByTestId('widget-type-icon-pie')).toBeInTheDocument();
     expect(within(tile('income-expenses')).getByTestId('widget-type-icon-bar')).toBeInTheDocument();
     // Hidden chips carry their type icon too.
-    const chip = screen.getByTestId('widget-hidden-portfolio-value');
+    const chip = screen.getByTestId('widget-hidden-monthly-spending-trend');
     expect(within(chip).getByTestId('widget-type-icon-line')).toBeInTheDocument();
   });
 
