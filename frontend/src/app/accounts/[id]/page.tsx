@@ -193,7 +193,7 @@ function AccountDetailContent() {
           onBack={() => router.push('/accounts')}
         >
           {detailView === 'creditCard' ? (
-            <CreditCardDetailView account={account} />
+            <CreditCardDetailView account={account} onAccountChanged={loadData} />
           ) : isRevolving ? (
             <LineOfCreditView account={account} />
           ) : (

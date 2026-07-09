@@ -47,5 +47,42 @@
     "neverPaysOff": "[XX-At this payment the balance never clears -- it does not cover the monthly interest.-XX]",
     "noBalance": "[XX-This card has no balance to pay off.-XX]"
   },
+  "payment": {
+    "open": "[XX-Make a Payment-XX]",
+    "title": "[XX-Make a Payment-XX]",
+    "amountType": "[XX-Amount-XX]",
+    "statementBalance": "[XX-Statement balance-XX]",
+    "fullBalance": "[XX-Full balance-XX]",
+    "custom": "[XX-Custom-XX]",
+    "fromAccount": "[XX-From account-XX]",
+    "selectAccount": "[XX-Select an account-XX]",
+    "noFundingAccounts": "[XX-No same-currency chequing, savings, or cash account is available to pay from.-XX]",
+    "date": "[XX-Payment date-XX]",
+    "mode": "[XX-When-XX]",
+    "recordNow": "[XX-Record now-XX]",
+    "scheduleMonthly": "[XX-Schedule monthly-XX]",
+    "cancel": "[XX-Cancel-XX]",
+    "submitRecord": "[XX-Record Payment-XX]",
+    "submitSchedule": "[XX-Schedule Payment-XX]",
+    "submitting": "[XX-Submitting...-XX]",
+    "recordName": "[XX-Payment to {name}-XX]",
+    "toastRecorded": "[XX-Payment recorded-XX]",
+    "toastScheduled": "[XX-Monthly payment scheduled-XX]",
+    "toastFailed": "[XX-Failed to submit payment-XX]",
+    "fillRequired": "[XX-Choose an amount, a funding account, and a date-XX]"
+  },
+  "recurring": {
+    "title": "[XX-Recurring Charges-XX]",
+    "subtitle": "[XX-Subscriptions on this card-XX]",
+    "empty": "[XX-No recurring charges detected on this card-XX]",
+    "frequency": {
+      "weekly": "[XX-Weekly-XX]",
+      "biweekly": "[XX-Every 2 weeks-XX]",
+      "monthly": "[XX-Monthly-XX]",
+      "quarterly": "[XX-Quarterly-XX]",
+      "yearly": "[XX-Yearly-XX]",
+      "irregular": "[XX-Irregular-XX]"
+    }
+  },
   "loadFailed": "[XX-Failed to load credit card details-XX]"
 }

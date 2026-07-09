@@ -25,8 +25,14 @@ vi.mock('@/lib/accounts', () => ({
 }));
 
 const mockGetGroupedTotals = vi.fn();
+const mockGetAll = vi.fn();
+const mockGetRecurringCharges = vi.fn();
 vi.mock('@/lib/transactions', () => ({
-  transactionsApi: { getGroupedTotals: (...a: unknown[]) => mockGetGroupedTotals(...a) },
+  transactionsApi: {
+    getGroupedTotals: (...a: unknown[]) => mockGetGroupedTotals(...a),
+    getAll: (...a: unknown[]) => mockGetAll(...a),
+    getRecurringCharges: (...a: unknown[]) => mockGetRecurringCharges(...a),
+  },
 }));
 
 function makeAccount(overrides: Partial<Account> = {}): Account {
@@ -65,6 +71,21 @@ beforeEach(() => {
   mockGetGroupedTotals.mockResolvedValue([
     { id: 'c1', name: 'Groceries', currencyCode: 'CAD', total: -450, count: 5 },
     { id: 'c2', name: 'Gas', currencyCode: 'CAD', total: -200, count: 2 },
+  ]);
+  mockGetAll.mockResolvedValue({
+    data: [{ id: 'tx1', payeeId: 'p1', payeeName: 'Netflix' }],
+    pagination: { hasMore: false },
+  });
+  mockGetRecurringCharges.mockResolvedValue([
+    {
+      payeeName: 'Netflix',
+      amounts: [-15],
+      dates: ['2026-05-01', '2026-06-01'],
+      frequency: 'monthly',
+      currentAmount: -15,
+      previousAmount: -15,
+      categoryName: 'Streaming',
+    },
   ]);
 });
 
@@ -108,6 +129,22 @@ describe('CreditCardDetailView', () => {
   it('shows the payoff calculator for a carried balance', async () => {
     await renderView();
     expect(screen.getByText('Payoff Calculator')).toBeInTheDocument();
+  });
+
+  it('shows recurring charges detected on the card', async () => {
+    await renderView();
+    await waitFor(() => expect(screen.getByText('Netflix')).toBeInTheDocument());
+    expect(mockGetAll).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'cc-1' }),
+    );
+    expect(mockGetRecurringCharges).toHaveBeenCalledWith(
+      expect.objectContaining({ payeeIds: ['p1'] }),
+    );
+  });
+
+  it('offers a make-a-payment action', async () => {
+    await renderView();
+    expect(screen.getByRole('button', { name: 'Make a Payment' })).toBeInTheDocument();
   });
 
   it('shows the unavailable hint when no settlement day is configured', async () => {
