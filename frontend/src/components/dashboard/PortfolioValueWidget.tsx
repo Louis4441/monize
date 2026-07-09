@@ -129,14 +129,14 @@ export function PortfolioValueWidget({ accounts, isLoading }: PortfolioValueWidg
       widgetId={WIDGET_ID}
       headerRight={
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {t(`widgets.rangeLabels.${config.range}` as Parameters<typeof t>[0])}
-          </span>
           {!loading && latestValue > 0 && (
             <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
               {formatCurrency(latestValue, defaultCurrency)}
             </span>
           )}
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {t(`widgets.rangeLabels.${config.range}` as Parameters<typeof t>[0])}
+          </span>
         </div>
       }
       configControls={configControls}

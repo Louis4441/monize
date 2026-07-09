@@ -53,7 +53,7 @@ describe('PortfolioValueWidget', () => {
       { month: '2026-06', value: 10000 },
     ]);
     await renderWidget();
-    expect(screen.getByText('Portfolio Value')).toBeInTheDocument();
+    expect(screen.getByText('Portfolio Value over Time')).toBeInTheDocument();
     expect(screen.getByText('1Y')).toBeInTheDocument();
     expect(getInvestmentsMonthly).toHaveBeenCalled();
     expect(getInvestmentsDaily).not.toHaveBeenCalled();
