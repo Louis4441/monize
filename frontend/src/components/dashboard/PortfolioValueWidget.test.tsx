@@ -54,6 +54,7 @@ describe('PortfolioValueWidget', () => {
     ]);
     await renderWidget();
     expect(screen.getByText('Portfolio Value')).toBeInTheDocument();
+    expect(screen.getByText('1Y')).toBeInTheDocument();
     expect(getInvestmentsMonthly).toHaveBeenCalled();
     expect(getInvestmentsDaily).not.toHaveBeenCalled();
     expect(screen.getByText('$10000')).toBeInTheDocument();
