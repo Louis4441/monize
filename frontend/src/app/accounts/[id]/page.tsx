@@ -12,6 +12,7 @@ import { AccountDetailShell } from '@/components/accounts/shared/AccountDetailSh
 import { LoanDetailView } from '@/components/accounts/loan-detail/LoanDetailView';
 import { LineOfCreditView } from '@/components/accounts/loan-detail/LineOfCreditView';
 import { CreditCardDetailView } from '@/components/accounts/credit-card-detail/CreditCardDetailView';
+import { BankingDetailView } from '@/components/accounts/banking-detail/BankingDetailView';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { accountsApi } from '@/lib/accounts';
@@ -30,13 +31,16 @@ import type { LoanRateChange } from '@/types/loan-rate-change';
  * here. A type absent from the registry has no dedicated page yet and
  * redirects to its transaction register.
  */
-type DetailViewKind = 'loan' | 'lineOfCredit' | 'creditCard';
+type DetailViewKind = 'loan' | 'lineOfCredit' | 'creditCard' | 'banking';
 
 const DETAIL_VIEW_REGISTRY: Partial<Record<AccountType, DetailViewKind>> = {
   LOAN: 'loan',
   MORTGAGE: 'loan',
   LINE_OF_CREDIT: 'lineOfCredit',
   CREDIT_CARD: 'creditCard',
+  CHEQUING: 'banking',
+  SAVINGS: 'banking',
+  CASH: 'banking',
 };
 
 function resolveDetailView(type: AccountType): DetailViewKind | null {
@@ -186,7 +190,7 @@ function AccountDetailContent() {
           account={account}
           onViewTransactions={() => router.push(`/transactions?accountId=${account.id}`)}
           onReconcile={
-            detailView === 'creditCard'
+            detailView === 'creditCard' || detailView === 'banking'
               ? () => router.push(`/reconcile?accountId=${account.id}`)
               : undefined
           }
@@ -194,6 +198,8 @@ function AccountDetailContent() {
         >
           {detailView === 'creditCard' ? (
             <CreditCardDetailView account={account} onAccountChanged={loadData} />
+          ) : detailView === 'banking' ? (
+            <BankingDetailView account={account} />
           ) : isRevolving ? (
             <LineOfCreditView account={account} />
           ) : (

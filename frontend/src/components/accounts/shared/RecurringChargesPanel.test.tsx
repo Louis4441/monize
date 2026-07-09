@@ -42,7 +42,7 @@ beforeEach(() => {
 
 async function renderPanel() {
   await act(async () => {
-    render(<RecurringChargesPanel accountId="cc-1" currencyCode="CAD" />);
+    render(<RecurringChargesPanel accountId="acc-1" currencyCode="CAD" />);
   });
 }
 
@@ -52,7 +52,6 @@ describe('RecurringChargesPanel', () => {
     await waitFor(() => expect(screen.getByText('Netflix')).toBeInTheDocument());
     expect(screen.getByText(/Monthly/)).toBeInTheDocument();
     expect(screen.getByText('$15.00')).toBeInTheDocument();
-    // Only non-null payee ids are passed through.
     expect(mockGetRecurringCharges).toHaveBeenCalledWith(
       expect.objectContaining({ payeeIds: ['p1'] }),
     );
@@ -62,15 +61,19 @@ describe('RecurringChargesPanel', () => {
     mockGetRecurringCharges.mockResolvedValue([charge({ frequency: 'irregular' })]);
     await renderPanel();
     await waitFor(() =>
-      expect(screen.getByText('No recurring charges detected on this card')).toBeInTheDocument(),
+      expect(
+        screen.getByText('No recurring charges detected on this account'),
+      ).toBeInTheDocument(),
     );
   });
 
-  it('skips the recurring lookup when the card has no payees', async () => {
+  it('skips the recurring lookup when there are no payees', async () => {
     mockGetAll.mockResolvedValue({ data: [], pagination: {} });
     await renderPanel();
     await waitFor(() =>
-      expect(screen.getByText('No recurring charges detected on this card')).toBeInTheDocument(),
+      expect(
+        screen.getByText('No recurring charges detected on this account'),
+      ).toBeInTheDocument(),
     );
     expect(mockGetRecurringCharges).not.toHaveBeenCalled();
   });

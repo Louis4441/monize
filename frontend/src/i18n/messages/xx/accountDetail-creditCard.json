@@ -71,18 +71,5 @@
     "toastFailed": "[XX-Failed to submit payment-XX]",
     "fillRequired": "[XX-Choose an amount, a funding account, and a date-XX]"
   },
-  "recurring": {
-    "title": "[XX-Recurring Charges-XX]",
-    "subtitle": "[XX-Subscriptions on this card-XX]",
-    "empty": "[XX-No recurring charges detected on this card-XX]",
-    "frequency": {
-      "weekly": "[XX-Weekly-XX]",
-      "biweekly": "[XX-Every 2 weeks-XX]",
-      "monthly": "[XX-Monthly-XX]",
-      "quarterly": "[XX-Quarterly-XX]",
-      "yearly": "[XX-Yearly-XX]",
-      "irregular": "[XX-Irregular-XX]"
-    }
-  },
   "loadFailed": "[XX-Failed to load credit card details-XX]"
 }

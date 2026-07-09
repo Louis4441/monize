@@ -40,6 +40,9 @@ export const DETAIL_ACCOUNT_TYPES: AccountType[] = [
   'MORTGAGE',
   'LINE_OF_CREDIT',
   'CREDIT_CARD',
+  'CHEQUING',
+  'SAVINGS',
+  'CASH',
 ];
 
 /**

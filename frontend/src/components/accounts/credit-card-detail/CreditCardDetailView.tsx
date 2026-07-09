@@ -13,7 +13,7 @@ import { CreditCardSummaryCards } from './CreditCardSummaryCards';
 import { StatementPanel } from './StatementPanel';
 import { SpendingBreakdown } from './SpendingBreakdown';
 import { InterestAndFeesPanel } from './InterestAndFeesPanel';
-import { RecurringChargesPanel } from './RecurringChargesPanel';
+import { RecurringChargesPanel } from '@/components/accounts/shared/RecurringChargesPanel';
 import { PayoffCalculator } from './PayoffCalculator';
 import { PaymentSetupDialog } from './PaymentSetupDialog';
 import type { Account } from '@/types/account';

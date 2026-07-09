@@ -62,9 +62,17 @@ vi.mock('@/components/transactions/BalanceHistoryChart', () => ({
 }));
 
 const mockGetAllTransactions = vi.fn();
+const mockGetSummary = vi.fn();
+const mockGetMonthlyTotals = vi.fn();
+const mockGetGroupedTotals = vi.fn();
+const mockGetRecurringCharges = vi.fn();
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: {
     getAll: (...args: unknown[]) => mockGetAllTransactions(...args),
+    getSummary: (...args: unknown[]) => mockGetSummary(...args),
+    getMonthlyTotals: (...args: unknown[]) => mockGetMonthlyTotals(...args),
+    getGroupedTotals: (...args: unknown[]) => mockGetGroupedTotals(...args),
+    getRecurringCharges: (...args: unknown[]) => mockGetRecurringCharges(...args),
   },
 }));
 
@@ -154,6 +162,10 @@ beforeEach(() => {
     ],
     pagination: { hasMore: false },
   });
+  mockGetSummary.mockResolvedValue({ totalIncome: 100, totalExpenses: 40, netCashFlow: 60, transactionCount: 3 });
+  mockGetMonthlyTotals.mockResolvedValue([]);
+  mockGetGroupedTotals.mockResolvedValue([]);
+  mockGetRecurringCharges.mockResolvedValue([]);
 });
 
 describe('AccountDetailPage', () => {
@@ -179,12 +191,24 @@ describe('AccountDetailPage', () => {
     expect(screen.getByText('Est. Payoff')).toBeInTheDocument();
   });
 
-  it('redirects non-loan accounts to their transaction register', async () => {
-    mockGetById.mockResolvedValue(makeAccount({ accountType: 'CHEQUING' }));
+  it('redirects account types without a detail view to their register', async () => {
+    mockGetById.mockResolvedValue(makeAccount({ accountType: 'OTHER' }));
 
     await renderPage();
 
     expect(mockReplace).toHaveBeenCalledWith('/transactions?accountId=loan-1');
+  });
+
+  it('renders the banking detail view for a chequing account', async () => {
+    mockGetById.mockResolvedValue(makeAccount({ accountType: 'CHEQUING', name: 'Everyday Chequing' }));
+
+    await renderPage();
+
+    expect(screen.getByText('Everyday Chequing')).toBeInTheDocument();
+    expect(screen.getByText('Cash Flow')).toBeInTheDocument();
+    expect(mockReplace).not.toHaveBeenCalled();
+    // Banking uses its own analytics, not the loan transaction history.
+    expect(mockGetAllScenarios).not.toHaveBeenCalled();
   });
 
   it('shows the revolving balance-history view for a line of credit', async () => {

@@ -19,12 +19,13 @@ interface RecurringChargesPanelProps {
 }
 
 /**
- * Recurring charges ("subscriptions") that live on this card. The
- * recurring-charges endpoint is payee-scoped, so this derives the card's payees
- * from its recent transactions first, then classifies their cadence.
+ * Recurring charges ("subscriptions") that live on an account. The
+ * recurring-charges endpoint is payee-scoped, so this derives the account's
+ * payees from its recent transactions first, then classifies their cadence.
+ * Shared by the credit-card and banking detail views.
  */
 export function RecurringChargesPanel({ accountId, currencyCode }: RecurringChargesPanelProps) {
-  const t = useTranslations('accountDetail-creditCard');
+  const t = useTranslations('accountDetail');
   const { formatCurrency } = useNumberFormat();
 
   const [charges, setCharges] = useState<RecurringChargeInfo[]>([]);

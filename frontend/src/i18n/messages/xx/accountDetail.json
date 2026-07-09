@@ -9,5 +9,18 @@
   "loading": "[XX-Loading account details...-XX]",
   "error": {
     "retry": "[XX-Retry-XX]"
+  },
+  "recurring": {
+    "title": "[XX-Recurring Charges-XX]",
+    "subtitle": "[XX-Subscriptions on this account-XX]",
+    "empty": "[XX-No recurring charges detected on this account-XX]",
+    "frequency": {
+      "weekly": "[XX-Weekly-XX]",
+      "biweekly": "[XX-Every 2 weeks-XX]",
+      "monthly": "[XX-Monthly-XX]",
+      "quarterly": "[XX-Quarterly-XX]",
+      "yearly": "[XX-Yearly-XX]",
+      "irregular": "[XX-Irregular-XX]"
+    }
   }
 }
