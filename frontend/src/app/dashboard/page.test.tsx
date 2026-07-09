@@ -180,6 +180,12 @@ vi.mock('@/components/dashboard/FavouriteSecurities', () => ({
   ),
 }));
 
+vi.mock('@/components/dashboard/PortfolioValueWidget', () => ({
+  PortfolioValueWidget: ({ isLoading }: any) => (
+    <div data-testid="portfolio-value-widget">{isLoading ? 'loading' : 'loaded'}</div>
+  ),
+}));
+
 vi.mock('@/components/dashboard/InsightsWidget', () => ({
   InsightsWidget: ({ isLoading }: any) => <div data-testid="insights-widget">{isLoading ? 'loading' : 'loaded'}</div>,
 }));
@@ -371,6 +377,8 @@ describe('DashboardPage', () => {
   });
 
   it('renders the AssetsVsLiabilities and FavouriteSecurities widgets', async () => {
+    // Favourite Securities is opt-in (not part of the default layout), so add it.
+    prefsState.current.dashboardWidgets = ['assets-liabilities', 'favourite-securities'];
     render(<DashboardPage />);
     await waitFor(() => {
       expect(screen.getByTestId('assets-vs-liabilities')).toBeInTheDocument();
@@ -379,6 +387,7 @@ describe('DashboardPage', () => {
   });
 
   it('passes loaded favourite securities to the widget', async () => {
+    prefsState.current.dashboardWidgets = ['favourite-securities'];
     mockGetFavouriteSecurities.mockResolvedValue([
       { securityId: '1', symbol: 'AAPL', name: 'Apple', currencyCode: 'USD', currentPrice: 1, previousPrice: 1, dailyChange: 0, dailyChangePercent: 0 },
     ]);
@@ -389,10 +398,11 @@ describe('DashboardPage', () => {
   });
 
   it('hides Top Movers and Favourite Securities when there are no securities', async () => {
+    prefsState.current.dashboardWidgets = ['top-movers', 'favourite-securities', 'assets-liabilities'];
     mockGetSecurities.mockResolvedValue([]);
     render(<DashboardPage />);
     await waitFor(() => {
-      // Net worth row still renders, so the dashboard has finished loading.
+      // Assets row still renders, so the dashboard has finished loading.
       expect(screen.getByTestId('assets-vs-liabilities')).toBeInTheDocument();
     });
     expect(screen.queryByTestId('top-movers')).not.toBeInTheDocument();
@@ -400,6 +410,7 @@ describe('DashboardPage', () => {
   });
 
   it('shows Top Movers and Favourite Securities when securities exist', async () => {
+    prefsState.current.dashboardWidgets = ['top-movers', 'favourite-securities'];
     mockGetSecurities.mockResolvedValue([{ id: 'sec-1', symbol: 'AAPL' }]);
     render(<DashboardPage />);
     await waitFor(() => {

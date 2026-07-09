@@ -12,7 +12,7 @@ describe('widget-registry', () => {
       'favourite-accounts',
       'upcoming-bills',
       'top-movers',
-      'favourite-securities',
+      'portfolio-value',
       'net-worth',
       'assets-liabilities',
       'expenses-pie',
@@ -109,7 +109,6 @@ describe('widget-registry', () => {
 
   it('registers all report-derived widgets as opt-in (not in the default layout)', () => {
     const reportWidgetIds = [
-      'portfolio-value',
       'spending-by-payee',
       'monthly-spending-trend',
       'income-by-source',
