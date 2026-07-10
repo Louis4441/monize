@@ -482,7 +482,7 @@
       "title": "[XX-Impact of Overpayments Made-XX]",
       "description": "[XX-How the payments you have already made compare against the original contractual schedule.-XX]",
       "extraPrincipalPaid": "[XX-Extra Principal Paid-XX]",
-      "extraPrincipalNote": "[XX-How far ahead of the original schedule you are-XX]",
+      "extraPrincipalNote": "[XX-Total extra principal paid on top of your scheduled payments-XX]",
       "missingData": "[XX-To see how your overpayments have shortened this loan, this account needs an interest rate, a payment frequency, and some recorded payments to reconstruct its original schedule.-XX]",
       "monthsAlreadySaved": "[XX-Time Already Saved-XX]",
       "monthsValue": "[XX-{count, plural, one {# month} other {# months}}-XX]",
