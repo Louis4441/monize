@@ -71,6 +71,16 @@ export function StatementPanel({ cycle, isLoading }: StatementPanelProps) {
       }),
     },
     {
+      label: t('statement.paymentDue'),
+      value: cycle.paymentDueDate
+        ? formatDate(toLocalDate(cycle.paymentDueDate))
+        : t('statement.noDueDate'),
+      note:
+        cycle.daysUntilPaymentDue != null
+          ? t('statement.dueIn', { days: cycle.daysUntilPaymentDue })
+          : undefined,
+    },
+    {
       label: t('statement.expensesSinceStatement'),
       value: formatCurrency(cycle.expensesSinceStatement, currency),
       valueClass: 'text-red-600 dark:text-red-400',
@@ -80,16 +90,6 @@ export function StatementPanel({ cycle, isLoading }: StatementPanelProps) {
       label: t('statement.amountPaid'),
       value: formatCurrency(cycle.amountPaidSinceStatement, currency),
       valueClass: 'text-green-600 dark:text-green-400',
-    },
-    {
-      label: t('statement.paymentDue'),
-      value: cycle.paymentDueDate
-        ? formatDate(toLocalDate(cycle.paymentDueDate))
-        : t('statement.noDueDate'),
-      note:
-        cycle.daysUntilPaymentDue != null
-          ? t('statement.dueIn', { days: cycle.daysUntilPaymentDue })
-          : undefined,
     },
     {
       label: t('statement.settlement'),
