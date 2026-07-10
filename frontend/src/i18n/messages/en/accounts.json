@@ -394,7 +394,15 @@
       "detectTitle": "Detect Rate Changes",
       "detectMessage": "This analyzes your payment history and replaces previously detected entries. Entries you added or edited yourself are kept.",
       "detectedToast": "{count, plural, =0 {No new rate changes detected} one {# rate change detected} other {# rate changes detected}}",
-      "detectFailed": "Could not detect rate changes from the payment history"
+      "detectFailed": "Could not detect rate changes from the payment history",
+      "scheduledUpdateTitle": "Update scheduled payment?",
+      "scheduledUpdateMessage": "The scheduled bill payment \"{name}\" can be updated to match the new rate: {payment} total, split into {principal} principal and {interest} interest. Update it now?",
+      "scheduledUpdateDefaultName": "this mortgage",
+      "scheduledUpdateConfirm": "Update payment",
+      "scheduledUpdateSkip": "Leave as-is",
+      "scheduledUpdateAppliedToast": "Scheduled payment updated",
+      "scheduledUpdateSkippedToast": "Scheduled payment left unchanged",
+      "scheduledUpdateFailed": "Could not update the scheduled payment"
     },
     "overpaymentCategory": {
       "title": "Overpayment Detection",
