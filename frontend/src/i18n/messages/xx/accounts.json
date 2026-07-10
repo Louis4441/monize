@@ -405,6 +405,16 @@
       "scheduledUpdateSkippedToast": "[XX-Scheduled payment left unchanged-XX]",
       "scheduledUpdateFailed": "[XX-Could not update the scheduled payment-XX]"
     },
+    "recognitionSettings": {
+      "title": "[XX-Payment recognition-XX]"
+    },
+    "interestCategory": {
+      "title": "[XX-Interest category-XX]",
+      "description": "[XX-Where this loan's interest is recorded. When interest is booked as a separate transaction rather than a split of the payment, naming its category lets the schedule show real interest and lets \"Detect from history\" find enough interest to work.-XX]",
+      "label": "[XX-Interest category-XX]",
+      "placeholder": "[XX-Select interest category-XX]",
+      "saveError": "[XX-Failed to save the interest category-XX]"
+    },
     "overpaymentCategory": {
       "title": "[XX-Overpayment Detection-XX]",
       "description": "[XX-Recognize standalone overpayments by category, by memo text, or both. Either match counts a payment as 100% principal, so the schedule flags it instead of treating it as a regular installment.-XX]",
