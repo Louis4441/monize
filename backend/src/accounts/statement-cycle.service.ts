@@ -25,6 +25,12 @@ export interface StatementCycleResult {
   statementBalance: number;
   /** Total payments/credits applied since the last settlement (positive). */
   amountPaidSinceStatement: number;
+  /**
+   * Total expenses (charges) incurred since the last settlement (positive
+   * magnitude). Includes charges dated before the settlement that are not yet
+   * reconciled onto a statement, since they still belong to the current cycle.
+   */
+  expensesSinceStatement: number;
   /** The account's current balance (same sign convention). */
   currentBalance: number;
 }
@@ -98,14 +104,24 @@ export class StatementCycleService {
       todayYMD(),
     );
 
-    const rows: { statement_balance: string; amount_paid: string }[] =
-      await this.dataSource.query(
-        `SELECT
+    const rows: {
+      statement_balance: string;
+      amount_paid: string;
+      expenses_since_statement: string;
+    }[] = await this.dataSource.query(
+      `SELECT
            COALESCE(a.opening_balance, 0)
              + COALESCE(SUM(CASE WHEN t.transaction_date <= $3 THEN t.amount ELSE 0 END), 0)
              AS statement_balance,
            COALESCE(SUM(CASE WHEN t.transaction_date > $3 AND t.amount > 0 THEN t.amount ELSE 0 END), 0)
-             AS amount_paid
+             AS amount_paid,
+           COALESCE(SUM(CASE
+             WHEN t.amount < 0
+               AND (t.transaction_date > $3
+                 OR t.status IS NULL
+                 OR t.status NOT IN ('RECONCILED', 'VOID'))
+             THEN -t.amount ELSE 0 END), 0)
+             AS expenses_since_statement
          FROM accounts a
          LEFT JOIN transactions t ON t.account_id = a.id
            AND t.user_id = $2
@@ -131,6 +147,9 @@ export class StatementCycleService {
         Number(row?.statement_balance ?? account.openingBalance),
       ),
       amountPaidSinceStatement: roundMoney(Number(row?.amount_paid ?? 0)),
+      expensesSinceStatement: roundMoney(
+        Number(row?.expenses_since_statement ?? 0),
+      ),
       currentBalance: roundMoney(Number(account.currentBalance)),
     };
   }

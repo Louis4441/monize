@@ -48,7 +48,11 @@ describe("StatementCycleService", () => {
     it("returns the cycle window and statement figures", async () => {
       repo.findOne.mockResolvedValue(makeCard());
       dataSource.query.mockResolvedValue([
-        { statement_balance: "-1200", amount_paid: "300" },
+        {
+          statement_balance: "-1200",
+          amount_paid: "300",
+          expenses_since_statement: "450",
+        },
       ]);
 
       const result = await service.getStatementCycle("user-1", "cc-1");
@@ -65,6 +69,7 @@ describe("StatementCycleService", () => {
         daysUntilPaymentDue: 7,
         statementBalance: -1200,
         amountPaidSinceStatement: 300,
+        expensesSinceStatement: 450,
         currentBalance: -1500,
       });
       // The balance query is parameterised on the last settlement date.
@@ -98,6 +103,7 @@ describe("StatementCycleService", () => {
 
       expect(result.statementBalance).toBe(-50);
       expect(result.amountPaidSinceStatement).toBe(0);
+      expect(result.expensesSinceStatement).toBe(0);
     });
 
     it("throws NotFound when the account is not owned", async () => {

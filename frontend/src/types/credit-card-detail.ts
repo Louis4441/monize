@@ -13,6 +13,11 @@ export interface StatementCycle {
   statementBalance: number;
   /** Payments/credits applied since the last settlement (positive). */
   amountPaidSinceStatement: number;
+  /**
+   * Expenses (charges) incurred since the last statement (positive magnitude),
+   * including not-yet-reconciled charges dated before the statement.
+   */
+  expensesSinceStatement: number;
   currentBalance: number;
 }
 

@@ -67,6 +67,12 @@ export function StatementPanel({ cycle, isLoading }: StatementPanelProps) {
       }),
     },
     {
+      label: t('statement.expensesSinceStatement'),
+      value: formatCurrency(cycle.expensesSinceStatement, currency),
+      valueClass: 'text-red-600 dark:text-red-400',
+      note: t('statement.expensesSinceStatementNote'),
+    },
+    {
       label: t('statement.amountPaid'),
       value: formatCurrency(cycle.amountPaidSinceStatement, currency),
       valueClass: 'text-green-600 dark:text-green-400',
@@ -99,7 +105,7 @@ export function StatementPanel({ cycle, isLoading }: StatementPanelProps) {
           end: formatDate(toLocalDate(cycle.cycleEnd)),
         })}
       </p>
-      <SummaryCardGrid cards={cards} className="grid grid-cols-2 lg:grid-cols-4 gap-4" />
+      <SummaryCardGrid cards={cards} className="grid grid-cols-2 lg:grid-cols-5 gap-4" />
     </section>
   );
 }
