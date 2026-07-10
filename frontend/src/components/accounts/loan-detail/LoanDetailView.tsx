@@ -10,8 +10,9 @@ import { ComparisonSummaryCards } from '@/components/accounts/loan-detail/Compar
 import { SavedScenariosPanel } from '@/components/accounts/loan-detail/SavedScenariosPanel';
 import { PastImpactSection } from '@/components/accounts/loan-detail/PastImpactSection';
 import { RateHistoryPanel } from '@/components/accounts/loan-detail/RateHistoryPanel';
-import { deriveLoanPaymentHistory } from '@/lib/loan-history';
+import { deriveCurrentInstallment, deriveLoanPaymentHistory } from '@/lib/loan-history';
 import {
+  OverpaymentMode,
   OverpaymentPlan,
   ScheduleFrequency,
   advanceDate,
@@ -50,8 +51,29 @@ export function LoanDetailView({
   onRateChangesChanged,
 }: LoanDetailViewProps) {
   const [plan, setPlan] = useState<OverpaymentPlan | null>(null);
+  const [mode, setMode] = useState<OverpaymentMode>('SHORTEN_TERM');
   const [loadedPlan, setLoadedPlan] = useState<OverpaymentPlan | null>(null);
   const [loadedPlanVersion, setLoadedPlanVersion] = useState(0);
+
+  // Local, immediately-reactive copy of the overpayment category so selecting
+  // one reclassifies the schedule without waiting for a full account reload.
+  // Reset when the account changes (info-from-previous-render pattern).
+  const [overpaymentCategoryId, setOverpaymentCategoryId] = useState(
+    account.overpaymentCategoryId,
+  );
+  const [trackedAccountId, setTrackedAccountId] = useState(account.id);
+  if (trackedAccountId !== account.id) {
+    setTrackedAccountId(account.id);
+    setOverpaymentCategoryId(account.overpaymentCategoryId);
+  }
+
+  const effectiveAccount = useMemo(
+    () =>
+      account.overpaymentCategoryId === overpaymentCategoryId
+        ? account
+        : { ...account, overpaymentCategoryId },
+    [account, overpaymentCategoryId],
+  );
 
   const handleLoadScenario = useCallback((loaded: OverpaymentPlan | null) => {
     setPlan(loaded);
@@ -60,8 +82,8 @@ export function LoanDetailView({
   }, []);
 
   const history = useMemo(
-    () => deriveLoanPaymentHistory(account, transactions),
-    [account, transactions],
+    () => deriveLoanPaymentHistory(effectiveAccount, transactions),
+    [effectiveAccount, transactions],
   );
 
   const projectionInput = useMemo(() => {
@@ -78,10 +100,17 @@ export function LoanDetailView({
     // from the rate history bend the projection ahead.
     const today = format(new Date(), 'yyyy-MM-dd');
     const futureTimeline = buildRateTimeline(rateChanges, today, account.interestRate!);
+    // Seed the projection from the installment actually in effect (the latest
+    // recorded payment change), not the original contractual paymentAmount --
+    // otherwise a loan whose installment the lender lowered (PL obniżenie raty)
+    // projects too high a payment and too short a remaining term.
+    const currentPayment =
+      futureTimeline.startingPaymentAmount ??
+      deriveCurrentInstallment(history, account.paymentAmount!);
     return {
       startingBalance: history.currentBalance,
       annualRate: account.interestRate!,
-      paymentAmount: account.paymentAmount!,
+      paymentAmount: currentPayment,
       frequency,
       isCanadian: account.isCanadianMortgage || false,
       isVariableRate: account.isVariableRate || false,
@@ -98,9 +127,13 @@ export function LoanDetailView({
   const scenario = useMemo(
     () =>
       projectionInput && plan
-        ? generateLoanSchedule({ ...projectionInput, overpayments: plan })
+        ? generateLoanSchedule({
+            ...projectionInput,
+            overpayments: plan,
+            overpaymentMode: mode,
+          })
         : null,
-    [projectionInput, plan],
+    [projectionInput, plan, mode],
   );
 
   const comparison = useMemo(
@@ -121,6 +154,8 @@ export function LoanDetailView({
           accountId={account.id}
           currencyCode={account.currencyCode}
           onPlanChange={setPlan}
+          mode={mode}
+          onModeChange={setMode}
           loadedPlan={loadedPlan}
           loadedPlanVersion={loadedPlanVersion}
         />
@@ -146,7 +181,13 @@ export function LoanDetailView({
         scenario={scenario}
       />
 
-      <PastImpactSection account={account} history={history} rateChanges={rateChanges} />
+      <PastImpactSection
+        account={account}
+        history={history}
+        rateChanges={rateChanges}
+        overpaymentCategoryId={overpaymentCategoryId}
+        onOverpaymentCategoryChange={setOverpaymentCategoryId}
+      />
 
       <AmortizationScheduleTable
         historyEvents={history.events}

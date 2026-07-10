@@ -26,6 +26,7 @@ function makeHistoryEvents(count: number): LoanPaymentEvent[] {
     balance: 10000 - 450 * (i + 1),
     cumulativePrincipal: 450 * (i + 1),
     cumulativeInterest: 50 * (i + 1),
+    type: 'REGULAR' as const,
   }));
 }
 
@@ -96,7 +97,7 @@ describe('AmortizationScheduleTable', () => {
     expect(screen.getAllByText('$200.00').length).toBeGreaterThan(0);
   });
 
-  it('collapses to 24 rows and expands with the show-all toggle', () => {
+  it('collapses to 10 rows and expands with the show-all toggle', () => {
     const projection = makeProjection();
     render(
       <AmortizationScheduleTable
@@ -107,7 +108,7 @@ describe('AmortizationScheduleTable', () => {
     );
 
     const totalRows = 12 + projection.rows.length;
-    expect(totalRows).toBeGreaterThan(24);
+    expect(totalRows).toBeGreaterThan(10);
     const showAll = screen.getByText(`Show all ${totalRows} payments`);
     expect(showAll).toBeInTheDocument();
 
