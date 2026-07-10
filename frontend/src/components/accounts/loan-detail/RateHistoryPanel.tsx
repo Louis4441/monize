@@ -61,8 +61,9 @@ export function RateHistoryPanel({ account, rateChanges, onChanged }: RateHistor
   const [scheduledPreview, setScheduledPreview] = useState<ScheduledPaymentPreview | null>(null);
 
   const isMortgage = account.accountType === 'MORTGAGE';
+  // Earliest to latest, matching the installment schedule's ordering.
   const sortedChanges = [...rateChanges].sort((a, b) =>
-    b.effectiveDate.localeCompare(a.effectiveDate),
+    a.effectiveDate.localeCompare(b.effectiveDate),
   );
 
   const openAdd = () => {
