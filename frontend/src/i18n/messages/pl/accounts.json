@@ -268,9 +268,9 @@
     "interestCategory": "Kategoria odsetek",
     "interestBookingMode": {
       "label": "Jak księgowane są odsetki?",
-      "help": "Aby wykrywanie stóp czytało je poprawnie. Automatycznie pasuje w większości.",
+      "help": "Aby wykrywanie oprocentowania czytało je poprawnie. Automatycznie pasuje w większości.",
       "AUTO": "Automatycznie (zalecane)",
-      "SPLIT": "Noga splitu w płatności",
+      "SPLIT": "Rozbicie płatności (kapitał + odsetki)",
       "SEPARATE": "Osobny wydatek (kapitał to przelew)"
     },
     "bookingHelp": {
@@ -281,8 +281,7 @@
       "interestTitle": "Odsetki to wydatek.",
       "interestBody": "To realny koszt kredytu. Zaksięguj je jako wydatek i przypisz kategorię (np. „Kredyty”).",
       "avoid": "Unikaj: nie wrzucaj całej raty jako jednego wydatku. Zawyży to Twoje koszty (realny koszt to same odsetki), a dług na koncie kredytu w ogóle się nie zmniejszy.",
-      "overpayments": "Nadpłaty działają jak kapitał: przelew na konto kredytu, bez kategorii. Jeśli bank doliczył do nadpłaty odsetki, wydziel tę część jako osobny wydatek.",
-      "tip": "Wskazówka: załóż w Monize konto typu kredyt/hipoteka — to ono pokazuje pozostały dług, a przelewy kapitału go pomniejszają."
+      "overpayments": "Nadpłaty działają jak kapitał: przelew na konto kredytu, bez kategorii. Jeśli bank doliczył do nadpłaty odsetki, wydziel tę część jako osobny wydatek."
     },
     "selectFrequency": "Wybierz częstotliwość...",
     "selectAccount": "Wybierz konto...",

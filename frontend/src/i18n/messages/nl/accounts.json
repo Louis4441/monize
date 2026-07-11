@@ -281,8 +281,7 @@
       "interestTitle": "Rente is een uitgave.",
       "interestBody": "Dit is de echte kost van de lening. Boek ze als uitgave met een categorie (bijvoorbeeld \"Leningen\").",
       "avoid": "Vermijd: boek niet de hele termijn als één uitgave. Dat overdrijft je kosten en het leningsaldo daalt nooit.",
-      "overpayments": "Extra aflossingen werken als aflossing: een overboeking naar de leningrekening, zonder categorie. Voegde de bank rente toe, splits dat deel dan af als aparte uitgave.",
-      "tip": "Tip: maak in Monize een lening- of hypotheekrekening aan — die volgt de restschuld, en aflossingsoverboekingen bouwen die af."
+      "overpayments": "Extra aflossingen werken als aflossing: een overboeking naar de leningrekening, zonder categorie. Voegde de bank rente toe, splits dat deel dan af als aparte uitgave."
     },
     "selectFrequency": "Selecteer frequentie...",
     "selectAccount": "Selecteer rekening...",

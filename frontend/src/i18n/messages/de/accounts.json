@@ -281,8 +281,7 @@
       "interestTitle": "Zinsen sind ein Aufwand.",
       "interestBody": "Sie sind die echten Kosten des Kredits. Erfassen Sie sie als Ausgabe mit Kategorie (z. B. „Kredite“).",
       "avoid": "Vermeiden: Erfassen Sie nicht die ganze Rate als eine Ausgabe. Das überzeichnet die Kosten und der Kreditsaldo sinkt nie.",
-      "overpayments": "Sondertilgungen wie Tilgung behandeln: Umbuchung aufs Kreditkonto, ohne Kategorie. Rechnete die Bank Zinsen hinzu, trennen Sie diesen Teil als eigene Ausgabe ab.",
-      "tip": "Tipp: Legen Sie in Monize ein Kredit-/Hypothekenkonto an — es zeigt die Restschuld, und Tilgungsumbuchungen bauen sie ab."
+      "overpayments": "Sondertilgungen wie Tilgung behandeln: Umbuchung aufs Kreditkonto, ohne Kategorie. Rechnete die Bank Zinsen hinzu, trennen Sie diesen Teil als eigene Ausgabe ab."
     },
     "selectFrequency": "Intervall auswählen...",
     "selectAccount": "Konto auswählen...",

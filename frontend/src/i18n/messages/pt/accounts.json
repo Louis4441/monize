@@ -281,8 +281,7 @@
       "interestTitle": "Os juros são uma despesa.",
       "interestBody": "São o custo real do empréstimo. Registe-os como despesa com uma categoria (por exemplo, \"Empréstimos\").",
       "avoid": "Evite: não registe a prestação inteira como uma única despesa. Inflaciona os custos e o saldo do empréstimo nunca desce.",
-      "overpayments": "Os pagamentos antecipados funcionam como o capital: uma transferência para a conta do empréstimo, sem categoria. Se o banco somou juros, separe essa parte como despesa à parte.",
-      "tip": "Dica: crie uma conta de empréstimo ou hipoteca no Monize — acompanha a dívida restante, e as transferências de capital reduzem-na."
+      "overpayments": "Os pagamentos antecipados funcionam como o capital: uma transferência para a conta do empréstimo, sem categoria. Se o banco somou juros, separe essa parte como despesa à parte."
     },
     "selectFrequency": "Selecionar frequência...",
     "selectAccount": "Selecionar conta...",

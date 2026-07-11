@@ -32,7 +32,6 @@ export function LoanBookingHelp() {
         </p>
         <p>{b('avoid')}</p>
         <p>{b('overpayments')}</p>
-        <p className="italic text-gray-500 dark:text-gray-400">{b('tip')}</p>
       </div>
     </details>
   );

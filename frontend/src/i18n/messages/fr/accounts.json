@@ -281,8 +281,7 @@
       "interestTitle": "Les intérêts sont une dépense.",
       "interestBody": "Ils sont le coût réel du prêt. Enregistrez-les en dépense avec une catégorie (par exemple « Prêts »).",
       "avoid": "À éviter : n'enregistrez pas toute l'échéance en une seule dépense. Cela gonfle vos coûts et le solde du prêt ne diminue jamais.",
-      "overpayments": "Les remboursements anticipés fonctionnent comme le capital : un virement vers le compte de prêt, sans catégorie. Si la banque a ajouté des intérêts, isolez cette part en dépense séparée.",
-      "tip": "Astuce : créez un compte de prêt ou d'hypothèque dans Monize — il suit la dette restante, et les virements de capital la réduisent."
+      "overpayments": "Les remboursements anticipés fonctionnent comme le capital : un virement vers le compte de prêt, sans catégorie. Si la banque a ajouté des intérêts, isolez cette part en dépense séparée."
     },
     "selectFrequency": "Sélectionner la fréquence…",
     "selectAccount": "Sélectionner un compte…",

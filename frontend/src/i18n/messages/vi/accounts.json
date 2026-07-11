@@ -281,8 +281,7 @@
       "interestTitle": "Lãi là một khoản chi.",
       "interestBody": "Đây là chi phí thực của khoản vay. Ghi dưới dạng chi tiêu kèm danh mục (ví dụ \"Khoản vay\").",
       "avoid": "Tránh: đừng ghi toàn bộ kỳ trả thành một khoản chi. Nó thổi phồng chi phí và dư nợ vay không bao giờ giảm.",
-      "overpayments": "Trả trước hoạt động như gốc: chuyển khoản vào tài khoản vay, không danh mục. Nếu ngân hàng cộng thêm lãi, tách phần đó thành khoản chi riêng.",
-      "tip": "Mẹo: tạo tài khoản vay/thế chấp trong Monize — nó theo dõi dư nợ còn lại, và các khoản chuyển gốc sẽ trừ dần."
+      "overpayments": "Trả trước hoạt động như gốc: chuyển khoản vào tài khoản vay, không danh mục. Nếu ngân hàng cộng thêm lãi, tách phần đó thành khoản chi riêng."
     },
     "selectFrequency": "Chọn tần suất...",
     "selectAccount": "Chọn tài khoản...",

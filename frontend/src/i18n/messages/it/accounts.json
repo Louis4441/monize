@@ -281,8 +281,7 @@
       "interestTitle": "Gli interessi sono una spesa.",
       "interestBody": "Sono il costo reale del prestito. Registrali come spesa con una categoria (ad esempio \"Prestiti\").",
       "avoid": "Da evitare: non registrare l'intera rata come un'unica spesa. Gonfia i costi e il saldo del prestito non scende mai.",
-      "overpayments": "Le estinzioni anticipate funzionano come il capitale: un trasferimento al conto del prestito, senza categoria. Se la banca ha aggiunto interessi, separa quella parte come spesa a sé.",
-      "tip": "Suggerimento: crea un conto prestito o mutuo in Monize — tiene traccia del debito residuo e i trasferimenti di capitale lo riducono."
+      "overpayments": "Le estinzioni anticipate funzionano come il capitale: un trasferimento al conto del prestito, senza categoria. Se la banca ha aggiunto interessi, separa quella parte come spesa a sé."
     },
     "selectFrequency": "Seleziona frequenza...",
     "selectAccount": "Seleziona conto...",

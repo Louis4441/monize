@@ -281,8 +281,7 @@
       "interestTitle": "Interest is an expense.",
       "interestBody": "It is the real cost of the loan. Record it as an expense with a category (for example \"Loans\").",
       "avoid": "Avoid: don't record the whole installment as a single expense. It overstates your costs (the real cost is only the interest) and the debt on the loan account never goes down.",
-      "overpayments": "Overpayments work like principal: a transfer to the loan account, uncategorized. If the bank added interest to an overpayment, split that part out as a separate expense.",
-      "tip": "Tip: create a loan or mortgage account in Monize -- it tracks the remaining debt, and principal transfers pay it down."
+      "overpayments": "Overpayments work like principal: a transfer to the loan account, uncategorized. If the bank added interest to an overpayment, split that part out as a separate expense."
     },
     "selectFrequency": "Select frequency...",
     "selectAccount": "Select account...",

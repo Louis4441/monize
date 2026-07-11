@@ -281,8 +281,7 @@
       "interestTitle": "Os juros são uma despesa.",
       "interestBody": "São o custo real do empréstimo. Registre-os como despesa com uma categoria (por exemplo, \"Empréstimos\").",
       "avoid": "Evite: não registre a parcela inteira como uma única despesa. Isso infla os custos e o saldo do empréstimo nunca diminui.",
-      "overpayments": "As amortizações funcionam como o principal: uma transferência para a conta do empréstimo, sem categoria. Se o banco somou juros, separe essa parte como despesa à parte.",
-      "tip": "Dica: crie uma conta de empréstimo ou financiamento no Monize — ela acompanha a dívida restante, e as transferências de principal a reduzem."
+      "overpayments": "As amortizações funcionam como o principal: uma transferência para a conta do empréstimo, sem categoria. Se o banco somou juros, separe essa parte como despesa à parte."
     },
     "selectFrequency": "Selecionar frequência...",
     "selectAccount": "Selecionar conta...",

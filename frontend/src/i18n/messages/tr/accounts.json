@@ -281,8 +281,7 @@
       "interestTitle": "Faiz bir giderdir.",
       "interestBody": "Kredinin gerçek maliyetidir. Bir kategoriyle (örneğin \"Krediler\") gider olarak kaydedin.",
       "avoid": "Kaçının: taksidin tamamını tek bir gider olarak kaydetmeyin. Maliyetleri şişirir ve kredi bakiyesi hiç azalmaz.",
-      "overpayments": "Erken ödemeler anapara gibidir: kredi hesabına transfer, kategorisiz. Banka faiz eklediyse o kısmı ayrı gider olarak ayırın.",
-      "tip": "İpucu: Monize'de bir kredi/konut kredisi hesabı oluşturun — kalan borcu izler ve anapara transferleri onu azaltır."
+      "overpayments": "Erken ödemeler anapara gibidir: kredi hesabına transfer, kategorisiz. Banka faiz eklediyse o kısmı ayrı gider olarak ayırın."
     },
     "selectFrequency": "Sıklık seçin...",
     "selectAccount": "Hesap seçin...",
