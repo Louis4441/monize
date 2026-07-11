@@ -32,10 +32,6 @@ vi.mock('@/hooks/useChartDateFormat', () => ({
   useChartDateFormat: () => (date: string) => date.slice(0, 7),
 }));
 
-vi.mock('./OverpaymentSettingsControl', () => ({
-  OverpaymentSettingsControl: () => <div data-testid="overpayment-settings-control" />,
-}));
-
 function makeAccount(overrides: Partial<Account> = {}): Account {
   return {
     id: 'loan-1',
@@ -76,12 +72,6 @@ describe('PastImpactSection', () => {
       <PastImpactSection
         account={account}
         history={makeHistory(account)}
-        overpaymentCategoryId={null}
-        overpaymentMemo={null}
-        interestCategoryId={null}
-        onOverpaymentCategoryChange={() => {}}
-        onOverpaymentMemoChange={() => {}}
-        onInterestCategoryChange={() => {}}
       />,
     );
 
@@ -105,12 +95,6 @@ describe('PastImpactSection', () => {
       <PastImpactSection
         account={account}
         history={makeHistory(account)}
-        overpaymentCategoryId={null}
-        overpaymentMemo={null}
-        interestCategoryId={null}
-        onOverpaymentCategoryChange={() => {}}
-        onOverpaymentMemoChange={() => {}}
-        onInterestCategoryChange={() => {}}
       />,
     );
 
@@ -127,12 +111,6 @@ describe('PastImpactSection', () => {
       <PastImpactSection
         account={account}
         history={makeHistory(account)}
-        overpaymentCategoryId={null}
-        overpaymentMemo={null}
-        interestCategoryId={null}
-        onOverpaymentCategoryChange={() => {}}
-        onOverpaymentMemoChange={() => {}}
-        onInterestCategoryChange={() => {}}
       />,
     );
 

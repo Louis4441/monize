@@ -126,6 +126,10 @@ describe('MortgageFields', () => {
     isEditing: false,
     selectedInterestCategoryId: '',
     handleInterestCategoryChange: vi.fn(),
+    selectedOverpaymentCategoryId: '',
+    handleOverpaymentCategoryChange: vi.fn(),
+    selectedOverpaymentPayeeId: '',
+    handleOverpaymentPayeeChange: vi.fn(),
   };
 
   beforeEach(() => {

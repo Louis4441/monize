@@ -14,6 +14,7 @@ import { accountsApi } from '@/lib/accounts';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import { createLogger } from '@/lib/logger';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { OverpaymentRecognitionFields } from './OverpaymentRecognitionFields';
 
 const logger = createLogger('LoanFields');
 
@@ -33,6 +34,10 @@ interface LoanFieldsProps {
   formatCurrency: (amount: number, currency?: string) => string;
   selectedInterestCategoryId: string;
   handleInterestCategoryChange: (categoryId: string) => void;
+  selectedOverpaymentCategoryId: string;
+  handleOverpaymentCategoryChange: (categoryId: string) => void;
+  selectedOverpaymentPayeeId: string;
+  handleOverpaymentPayeeChange: (payeeId: string) => void;
 }
 
 export function LoanFields({
@@ -51,6 +56,10 @@ export function LoanFields({
   formatCurrency,
   selectedInterestCategoryId,
   handleInterestCategoryChange,
+  selectedOverpaymentCategoryId,
+  handleOverpaymentCategoryChange,
+  selectedOverpaymentPayeeId,
+  handleOverpaymentPayeeChange,
 }: LoanFieldsProps) {
   const t = useTranslations('accounts');
   const { formatDate } = useDateFormat();
@@ -174,6 +183,16 @@ export function LoanFields({
         initialDisplayValue={initialInterestCategoryName}
         onChange={handleInterestCategoryChange}
         error={errors.interestCategoryId?.message as string | undefined}
+      />
+
+      <OverpaymentRecognitionFields
+        categories={categories}
+        selectedOverpaymentCategoryId={selectedOverpaymentCategoryId}
+        onOverpaymentCategoryChange={handleOverpaymentCategoryChange}
+        selectedOverpaymentPayeeId={selectedOverpaymentPayeeId}
+        onOverpaymentPayeeChange={handleOverpaymentPayeeChange}
+        register={register}
+        errors={errors}
       />
 
       {amortizationPreview && (

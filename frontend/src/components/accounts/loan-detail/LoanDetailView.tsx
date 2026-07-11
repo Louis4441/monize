@@ -55,47 +55,17 @@ export function LoanDetailView({
   const [loadedPlan, setLoadedPlan] = useState<OverpaymentPlan | null>(null);
   const [loadedPlanVersion, setLoadedPlanVersion] = useState(0);
 
-  // Local, immediately-reactive copies of the overpayment settings so changing
-  // either reclassifies the schedule without waiting for a full account reload.
-  // Reset when the account changes (info-from-previous-render pattern).
-  const [overpaymentCategoryId, setOverpaymentCategoryId] = useState(
-    account.overpaymentCategoryId,
-  );
-  const [overpaymentMemo, setOverpaymentMemo] = useState(
-    account.overpaymentMemo,
-  );
-  // The designated interest category feeds backend rate detection (it does not
-  // change the client schedule); keep a reactive copy so the gear menu shows the
-  // latest saved value without a full account reload.
-  const [interestCategoryId, setInterestCategoryId] = useState(
-    account.interestCategoryId,
-  );
-  const [trackedAccountId, setTrackedAccountId] = useState(account.id);
-  if (trackedAccountId !== account.id) {
-    setTrackedAccountId(account.id);
-    setOverpaymentCategoryId(account.overpaymentCategoryId);
-    setOverpaymentMemo(account.overpaymentMemo);
-    setInterestCategoryId(account.interestCategoryId);
-  }
-
-  const effectiveAccount = useMemo(
-    () =>
-      account.overpaymentCategoryId === overpaymentCategoryId &&
-      account.overpaymentMemo === overpaymentMemo
-        ? account
-        : { ...account, overpaymentCategoryId, overpaymentMemo },
-    [account, overpaymentCategoryId, overpaymentMemo],
-  );
-
   const handleLoadScenario = useCallback((loaded: OverpaymentPlan | null) => {
     setPlan(loaded);
     setLoadedPlan(loaded);
     setLoadedPlanVersion((version) => version + 1);
   }, []);
 
+  // Overpayment recognition settings (category / memo / payee) now live in the
+  // account edit form, so the `account` prop always carries the saved values.
   const history = useMemo(
-    () => deriveLoanPaymentHistory(effectiveAccount, transactions),
-    [effectiveAccount, transactions],
+    () => deriveLoanPaymentHistory(account, transactions),
+    [account, transactions],
   );
 
   const projectionInput = useMemo(() => {
@@ -197,12 +167,6 @@ export function LoanDetailView({
         account={account}
         history={history}
         rateChanges={rateChanges}
-        overpaymentCategoryId={overpaymentCategoryId}
-        overpaymentMemo={overpaymentMemo}
-        interestCategoryId={interestCategoryId}
-        onOverpaymentCategoryChange={setOverpaymentCategoryId}
-        onOverpaymentMemoChange={setOverpaymentMemo}
-        onInterestCategoryChange={setInterestCategoryId}
       />
 
       <AmortizationScheduleTable

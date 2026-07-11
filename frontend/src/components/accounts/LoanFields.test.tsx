@@ -102,6 +102,10 @@ describe('LoanFields', () => {
     formatCurrency: mockFormatCurrency,
     selectedInterestCategoryId: '',
     handleInterestCategoryChange: vi.fn(),
+    selectedOverpaymentCategoryId: '',
+    handleOverpaymentCategoryChange: vi.fn(),
+    selectedOverpaymentPayeeId: '',
+    handleOverpaymentPayeeChange: vi.fn(),
   };
 
   beforeEach(() => {

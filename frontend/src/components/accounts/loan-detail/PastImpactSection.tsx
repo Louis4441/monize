@@ -18,7 +18,6 @@ import { LoanHistoryResult } from '@/lib/loan-history';
 import { LoanRateChange } from '@/types/loan-rate-change';
 import { computePastImpact } from '@/lib/loan-past-impact';
 import { buildPayoffComparisonSeries } from './PayoffComparisonChart';
-import { OverpaymentSettingsControl } from './OverpaymentSettingsControl';
 import { chartColors } from '@/lib/chart-colors';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
@@ -28,18 +27,6 @@ interface PastImpactSectionProps {
   history: LoanHistoryResult;
   /** Persisted rate history; the baseline applies these steps as they happened */
   rateChanges?: LoanRateChange[];
-  /** Current overpayment category (reactive copy held by the parent) */
-  overpaymentCategoryId: string | null;
-  /** Current overpayment memo text (reactive copy held by the parent) */
-  overpaymentMemo: string | null;
-  /** Current designated interest category (reactive copy held by the parent) */
-  interestCategoryId: string | null;
-  /** Called after the overpayment category is changed via the gear menu */
-  onOverpaymentCategoryChange: (categoryId: string | null) => void;
-  /** Called after the overpayment memo is changed via the gear menu */
-  onOverpaymentMemoChange: (memo: string | null) => void;
-  /** Called after the interest category is changed via the gear menu */
-  onInterestCategoryChange: (categoryId: string | null) => void;
 }
 
 /**
@@ -53,28 +40,10 @@ export function PastImpactSection({
   account,
   history,
   rateChanges = [],
-  overpaymentCategoryId,
-  overpaymentMemo,
-  interestCategoryId,
-  onOverpaymentCategoryChange,
-  onOverpaymentMemoChange,
-  onInterestCategoryChange,
 }: PastImpactSectionProps) {
   const t = useTranslations('accounts');
   const formatChartDate = useChartDateFormat();
   const { formatCurrency, formatCurrencyCompact, formatCurrencyAxis } = useNumberFormat();
-
-  const gear = (
-    <OverpaymentSettingsControl
-      accountId={account.id}
-      categoryValue={overpaymentCategoryId}
-      memoValue={overpaymentMemo}
-      interestCategoryValue={interestCategoryId}
-      onCategoryChange={onOverpaymentCategoryChange}
-      onMemoChange={onOverpaymentMemoChange}
-      onInterestCategoryChange={onInterestCategoryChange}
-    />
-  );
 
   const impact = useMemo(
     () => computePastImpact(account, history, undefined, rateChanges),
@@ -99,12 +68,9 @@ export function PastImpactSection({
   if (!impact) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {t('loanDetail.pastImpact.title')}
-          </h3>
-          {gear}
-        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          {t('loanDetail.pastImpact.title')}
+        </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {t('loanDetail.pastImpact.missingData')}
         </p>
@@ -117,12 +83,9 @@ export function PastImpactSection({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 px-2 py-4 sm:p-6">
-      <div className="flex items-start justify-between gap-2 mb-1 px-4 sm:px-0">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {t('loanDetail.pastImpact.title')}
-        </h3>
-        {gear}
-      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 px-4 sm:px-0">
+        {t('loanDetail.pastImpact.title')}
+      </h3>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 px-4 sm:px-0">
         {t('loanDetail.pastImpact.description')}
       </p>

@@ -11,6 +11,7 @@ import { Account, MortgageAmortizationPreview, MortgagePaymentFrequency } from '
 import { Category } from '@/types/category';
 import { buildCategoryTree } from '@/lib/categoryUtils';
 import { accountsApi } from '@/lib/accounts';
+import { OverpaymentRecognitionFields } from './OverpaymentRecognitionFields';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import { createLogger } from '@/lib/logger';
 import { useDateFormat } from '@/hooks/useDateFormat';
@@ -37,6 +38,10 @@ interface MortgageFieldsProps {
   isEditing: boolean;
   selectedInterestCategoryId: string;
   handleInterestCategoryChange: (categoryId: string) => void;
+  selectedOverpaymentCategoryId: string;
+  handleOverpaymentCategoryChange: (categoryId: string) => void;
+  selectedOverpaymentPayeeId: string;
+  handleOverpaymentPayeeChange: (payeeId: string) => void;
 }
 
 export function MortgageFields({
@@ -59,6 +64,10 @@ export function MortgageFields({
   isEditing,
   selectedInterestCategoryId,
   handleInterestCategoryChange,
+  selectedOverpaymentCategoryId,
+  handleOverpaymentCategoryChange,
+  selectedOverpaymentPayeeId,
+  handleOverpaymentPayeeChange,
 }: MortgageFieldsProps) {
   const t = useTranslations('accounts');
   const { formatDate } = useDateFormat();
@@ -383,6 +392,16 @@ export function MortgageFields({
               error={errors.interestCategoryId?.message as string | undefined}
             />
           </div>
+
+          <OverpaymentRecognitionFields
+            categories={categories}
+            selectedOverpaymentCategoryId={selectedOverpaymentCategoryId}
+            onOverpaymentCategoryChange={handleOverpaymentCategoryChange}
+            selectedOverpaymentPayeeId={selectedOverpaymentPayeeId}
+            onOverpaymentPayeeChange={handleOverpaymentPayeeChange}
+            register={register}
+            errors={errors}
+          />
 
           {/* Mortgage Amortization Preview */}
           {mortgagePreview && (

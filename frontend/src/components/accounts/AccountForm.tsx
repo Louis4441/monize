@@ -111,6 +111,9 @@ const buildAccountSchema = (t: (key: string) => string, isEditing: boolean) => z
   paymentStartDate: z.string().optional(),
   sourceAccountId: z.string().optional(),
   interestCategoryId: z.string().optional(),
+  overpaymentCategoryId: z.string().optional(),
+  overpaymentMemo: z.string().max(255).optional(),
+  overpaymentPayeeId: z.string().optional(),
   // Asset-specific fields
   assetCategoryId: z.string().optional(),
   dateAcquired: z.string().optional(),
@@ -197,6 +200,8 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
   const [selectedAssetCategoryId, setSelectedAssetCategoryId] = useState<string>(account?.assetCategoryId || '');
   const [assetCategoryName, setAssetCategoryName] = useState<string>('');
   const [selectedInterestCategoryId, setSelectedInterestCategoryId] = useState<string>(account?.interestCategoryId || '');
+  const [selectedOverpaymentCategoryId, setSelectedOverpaymentCategoryId] = useState<string>(account?.overpaymentCategoryId || '');
+  const [selectedOverpaymentPayeeId, setSelectedOverpaymentPayeeId] = useState<string>(account?.overpaymentPayeeId || '');
   const [showLoanSetupDialog, setShowLoanSetupDialog] = useState(false);
   const [hasScheduledPayment, setHasScheduledPayment] = useState(!!account?.scheduledTransactionId);
   // Currency becomes locked once the account has any transactions so existing
@@ -245,6 +250,9 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           paymentStartDate: account.paymentStartDate?.split('T')[0] || undefined,
           sourceAccountId: account.sourceAccountId || undefined,
           interestCategoryId: account.interestCategoryId || undefined,
+          overpaymentCategoryId: account.overpaymentCategoryId || undefined,
+          overpaymentMemo: account.overpaymentMemo || undefined,
+          overpaymentPayeeId: account.overpaymentPayeeId || undefined,
           assetCategoryId: account.assetCategoryId || undefined,
           dateAcquired: account.dateAcquired?.split('T')[0] || undefined,
           isCanadianMortgage: account.isCanadianMortgage || false,
@@ -504,6 +512,18 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
     setValue('interestCategoryId', categoryId || '', { shouldDirty: true, shouldValidate: true });
   };
 
+  // Overpayment recognition: category and payee that mark a payment as a
+  // standalone overpayment (100% principal). Saved with the account on submit.
+  const handleOverpaymentCategoryChange = (categoryId: string) => {
+    setSelectedOverpaymentCategoryId(categoryId);
+    setValue('overpaymentCategoryId', categoryId || '', { shouldDirty: true, shouldValidate: true });
+  };
+
+  const handleOverpaymentPayeeChange = (payeeId: string) => {
+    setSelectedOverpaymentPayeeId(payeeId);
+    setValue('overpaymentPayeeId', payeeId || '', { shouldDirty: true, shouldValidate: true });
+  };
+
   // Handle asset category selection
   const handleAssetCategoryChange = (categoryId: string, name: string) => {
     setAssetCategoryName(name);
@@ -748,6 +768,10 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           formatCurrency={formatCurrency}
           selectedInterestCategoryId={selectedInterestCategoryId}
           handleInterestCategoryChange={handleInterestCategoryChange}
+          selectedOverpaymentCategoryId={selectedOverpaymentCategoryId}
+          handleOverpaymentCategoryChange={handleOverpaymentCategoryChange}
+          selectedOverpaymentPayeeId={selectedOverpaymentPayeeId}
+          handleOverpaymentPayeeChange={handleOverpaymentPayeeChange}
         />
       )}
 
@@ -772,6 +796,10 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           isEditing={!!account}
           selectedInterestCategoryId={selectedInterestCategoryId}
           handleInterestCategoryChange={handleInterestCategoryChange}
+          selectedOverpaymentCategoryId={selectedOverpaymentCategoryId}
+          handleOverpaymentCategoryChange={handleOverpaymentCategoryChange}
+          selectedOverpaymentPayeeId={selectedOverpaymentPayeeId}
+          handleOverpaymentPayeeChange={handleOverpaymentPayeeChange}
         />
       )}
 

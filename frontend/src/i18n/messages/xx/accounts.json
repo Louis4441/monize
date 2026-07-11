@@ -269,6 +269,16 @@
     "selectFrequency": "[XX-Select frequency...-XX]",
     "selectAccount": "[XX-Select account...-XX]",
     "selectCategory": "[XX-Select category...-XX]",
+    "overpaymentRecognition": {
+      "title": "[XX-Overpayment recognition-XX]",
+      "description": "[XX-How the schedule tells a standalone overpayment (100% principal) apart from a regular installment. A payment matching any one of these counts as an overpayment.-XX]",
+      "categoryLabel": "[XX-Overpayment category-XX]",
+      "payeeLabel": "[XX-Overpayment payee-XX]",
+      "payeePlaceholder": "[XX-Select payee...-XX]",
+      "memoLabel": "[XX-Overpayment memo text-XX]",
+      "memoPlaceholder": "[XX-e.g. overpayment-XX]",
+      "memoHelp": "[XX-Case-insensitive substring match against the payment's memo, its source transaction's memo, or a split memo.-XX]"
+    },
     "previewTitle": "[XX-Amortization Preview-XX]",
     "previewPaymentAmount": "[XX-Payment Amount:-XX]",
     "previewEffectiveRate": "[XX-Effective Rate:-XX]",
