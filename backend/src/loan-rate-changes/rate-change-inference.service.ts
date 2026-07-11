@@ -95,6 +95,7 @@ export class RateChangeInferenceService {
       transactions,
     );
     const consolidated = this.detector.consolidatePaymentsByDate(rawPayments);
+    const hadSplitInterest = consolidated.some((p) => p.interestAmount != null);
     // Recover interest booked as a separate categorized expense (not a split
     // leg) so those payments yield a rate observation instead of being dropped
     // as "no interest details". Skipped in SPLIT mode, where interest is only
@@ -107,6 +108,12 @@ export class RateChangeInferenceService {
             account,
             consolidated,
           );
+    // When interest is a separate expense, the payment amounts are principal
+    // only (not the full installment), so they must not be recorded as the
+    // rate rows' payment.
+    const interestBookedSeparately =
+      account.interestBookingMode === "SEPARATE" ||
+      (!hadSplitInterest && payments.some((p) => p.interestAmount != null));
     const balanceMap = this.detector.buildRunningBalanceMap(
       account,
       transactions,
@@ -144,7 +151,13 @@ export class RateChangeInferenceService {
       );
     }
 
-    return this.persistSegments(userId, account, segments, warnings);
+    return this.persistSegments(
+      userId,
+      account,
+      segments,
+      warnings,
+      interestBookedSeparately,
+    );
   }
 
   /**
@@ -354,6 +367,11 @@ export class RateChangeInferenceService {
     account: Account,
     segments: RateSegment[],
     warnings: string[],
+    // When interest is booked separately, the observed payment amount is
+    // principal-only (not the full installment), so it must not be recorded as
+    // the row's payment -- doing so would seed the forward projection with a
+    // non-amortizing payment.
+    interestBookedSeparately: boolean,
   ): Promise<DetectRateChangesResult> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -394,13 +412,15 @@ export class RateChangeInferenceService {
           accountId: account.id,
           effectiveDate,
           annualRate: segment.medianRate,
-          newPaymentAmount: isFirst
-            ? segment.paymentAmount != null
-              ? roundMoney(segment.paymentAmount)
-              : null
-            : paymentStepped
-              ? roundMoney(segment.paymentAmount!)
-              : null,
+          newPaymentAmount: interestBookedSeparately
+            ? null
+            : isFirst
+              ? segment.paymentAmount != null
+                ? roundMoney(segment.paymentAmount)
+                : null
+              : paymentStepped
+                ? roundMoney(segment.paymentAmount!)
+                : null,
           source: isFirst ? ("initial" as const) : ("inferred" as const),
           note: null,
         });

@@ -183,20 +183,16 @@ function debtMagnitude(signedBalance: number): number {
 }
 
 /**
- * The installment to seed a forward projection with, given the payment history.
- * Returns the most recent regular installment (principal + interest) when the
- * lender has demonstrably lowered it below the stored contractual payment (PL
- * *obniżenie raty*); otherwise the contractual payment. Only a genuine
- * reduction is trusted -- a figure above the contractual usually reflects
- * analytic interest on a payment recorded without an interest split rather than
- * a real raise, so it is ignored to avoid projecting too high a payment.
- *
- * Crucially, only an installment whose interest was actually *recorded* (a real
- * split) is trusted: without a recorded interest leg, `principal + interest` is
- * principal plus at most an analytic estimate -- often below the period's true
- * interest -- which would seed the projection with a payment that never
- * amortizes (payoff "beyond forecast", 0 months saved). In that case we fall
- * back to the contractual payment, which does amortize.
+ * The installment to seed a forward projection with, given the payment history:
+ * the most recent regular payment's full amount, `principal + interest`. With
+ * interest now taken from the rate timeline (or a recorded split), this is the
+ * borrower's real current installment -- and it always covers the period's
+ * interest, since the principal portion is positive, so the projection
+ * amortizes. Falls back to the stored contractual payment only when there is no
+ * usable regular payment yet (e.g. an interest-only grace period). The stored
+ * payment is not preferred even when it is lower: for loans whose interest is
+ * booked separately it often holds only the principal part and would seed a
+ * non-amortizing payment.
  */
 export function deriveCurrentInstallment(
   history: LoanHistoryResult,
@@ -204,13 +200,11 @@ export function deriveCurrentInstallment(
 ): number {
   const lastRegular = [...history.events]
     .reverse()
-    .find((event) => event.type === 'REGULAR' && event.interestRecorded);
+    .find((event) => event.type === 'REGULAR');
   if (!lastRegular) return contractualPayment;
   const observed =
     Math.round((lastRegular.principal + lastRegular.interest) * 100) / 100;
-  return observed > 0 && observed < contractualPayment
-    ? observed
-    : contractualPayment;
+  return observed > 0 ? observed : contractualPayment;
 }
 
 /**

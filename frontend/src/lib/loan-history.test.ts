@@ -430,12 +430,14 @@ describe('deriveCurrentInstallment', () => {
     expect(result).toBe(918);
   });
 
-  it('ignores the last regular installment when it exceeds contractual', () => {
+  it('uses the last regular installment even when it exceeds the stored payment', () => {
+    // The stored contractual payment can be stale or principal-only, so the most
+    // recent real installment (principal + interest) is preferred.
     const result = deriveCurrentInstallment(
       history([{ principal: 765, interest: 700, type: 'REGULAR' }]),
       1279,
     );
-    expect(result).toBe(1279);
+    expect(result).toBe(1465);
   });
 
   it('skips overpayment rows when finding the last regular installment', () => {
@@ -453,11 +455,12 @@ describe('deriveCurrentInstallment', () => {
     expect(deriveCurrentInstallment(history([]), 1279)).toBe(1279);
   });
 
-  it('falls back to contractual when interest was not recorded (separate booking)', () => {
-    // Regression: interest booked as a separate transaction leaves regular rows
-    // with analytic/partial interest, so principal + interest is not a real
-    // installment. Trusting it would seed a payment below the period interest
-    // and the projection would never pay off (payoff "beyond forecast").
+  it('uses principal + interest for separately-booked interest', () => {
+    // Interest booked as a separate transaction leaves regular rows with interest
+    // derived from the rate timeline; principal + interest is then the real
+    // installment and always covers the period interest (the principal portion is
+    // positive), so it is used directly rather than the possibly principal-only
+    // stored payment.
     const result = deriveCurrentInstallment(
       history([
         { principal: 300, interest: 300, type: 'REGULAR', interestRecorded: false },
@@ -465,7 +468,7 @@ describe('deriveCurrentInstallment', () => {
       ]),
       1279,
     );
-    expect(result).toBe(1279);
+    expect(result).toBe(600);
   });
 });
 
