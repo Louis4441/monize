@@ -101,25 +101,6 @@ export function ScheduleTableRow({
                 {t('loanDetail.schedule.overpaymentBadge')}
               </span>
             )}
-            {row.change?.source === 'inferred' && (
-              <span className="ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                {t('loanDetail.rateHistory.badgeInferred')}
-              </span>
-            )}
-            {row.change?.source === 'initial' && (
-              <span className="ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                {t('loanDetail.rateHistory.badgeInitial')}
-              </span>
-            )}
-            {editing && row.change && (
-              <button
-                type="button"
-                onClick={() => editing.openEdit(row.change!)}
-                className="ml-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                {t('loanDetail.rateHistory.edit')}
-              </button>
-            )}
             {row.rateChange && (
               <span className="ml-1.5 inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
                 {t('loanDetail.schedule.rateChangeBadge', {

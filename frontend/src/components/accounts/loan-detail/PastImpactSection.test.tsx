@@ -55,7 +55,6 @@ describe('PastImpactSection', () => {
     const impact = computePastImpact(account, makeHistory(account));
     render(<PastImpactSection account={account} impact={impact} />);
 
-    expect(screen.getByText('Impact of Overpayments Made')).toBeInTheDocument();
     expect(screen.getByText('Extra Principal Paid')).toBeInTheDocument();
     expect(
       screen.getByText('Total extra principal paid on top of your scheduled payments'),
@@ -78,11 +77,12 @@ describe('PastImpactSection', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows a data hint when the impact cannot be computed', () => {
-    render(<PastImpactSection account={makeAccount()} impact={null} />);
+  it('renders nothing when the impact cannot be computed', () => {
+    const { container } = render(
+      <PastImpactSection account={makeAccount()} impact={null} />,
+    );
 
-    expect(
-      screen.getByText(/needs an interest rate, a payment frequency/),
-    ).toBeInTheDocument();
+    expect(screen.queryByText('Extra Principal Paid')).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 });

@@ -180,16 +180,27 @@ export function LoanDetailView({
       <PastImpactSection account={account} impact={impact} />
 
       {projectionInput && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <OverpaymentSimulator
-            accountId={account.id}
-            currencyCode={account.currencyCode}
-            onPlanChange={setPlan}
-            mode={mode}
-            onModeChange={setMode}
-            loadedPlan={loadedPlan}
-            loadedPlanVersion={loadedPlanVersion}
-            footer={
+        <OverpaymentSimulator
+          accountId={account.id}
+          currencyCode={account.currencyCode}
+          onPlanChange={setPlan}
+          mode={mode}
+          onModeChange={setMode}
+          loadedPlan={loadedPlan}
+          loadedPlanVersion={loadedPlanVersion}
+          footer={
+            <>
+              {comparison && (
+                <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700">
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                    {t('loanDetail.comparison.title')}
+                  </h4>
+                  <ComparisonSummaryCards
+                    comparison={comparison}
+                    currencyCode={account.currencyCode}
+                  />
+                </div>
+              )}
               <SavedScenariosPanel
                 accountId={account.id}
                 scenarios={scenarios}
@@ -197,25 +208,9 @@ export function LoanDetailView({
                 onLoad={handleLoadScenario}
                 onScenariosChanged={onScenariosChanged}
               />
-            }
-          />
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-              {t('loanDetail.comparison.title')}
-            </h3>
-            {comparison ? (
-              <ComparisonSummaryCards
-                comparison={comparison}
-                currencyCode={account.currencyCode}
-              />
-            ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {t('loanDetail.comparison.placeholder')}
-              </p>
-            )}
-          </div>
-        </div>
+            </>
+          }
+        />
       )}
 
       <PayoffComparisonChart

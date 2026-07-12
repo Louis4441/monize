@@ -658,6 +658,32 @@ describe('deriveLoanPaymentHistory with paired separate interest expenses', () =
     expect(events[1].annualRate).toBeCloseTo(5.5, 1);
   });
 
+  it('caps the accrual span at one interval after a payment-holiday gap', () => {
+    // A four-month gap (payment holiday) precedes an installment whose interest
+    // is only one month's worth. Dividing that interest across the whole gap
+    // would report ~1.5%; capping the span at one interval recovers the ~6%.
+    const account = makeAccount({
+      accountType: 'MORTGAGE',
+      openingBalance: -200000,
+      currentBalance: -199500,
+      interestRate: 6,
+    });
+    const balanceBeforeSecond = 200000 - 250;
+    const oneMonthInterest = (balanceBeforeSecond * 0.06) / 12;
+    const transactions = [
+      makeTransaction({ transactionDate: '2022-10-05', amount: 250 }),
+      makeTransaction({ transactionDate: '2023-02-05', amount: 250 }),
+    ];
+    const interestTransactions = [
+      { transactionDate: '2022-10-05', amount: -1000, isTransfer: false } as Transaction,
+      { transactionDate: '2023-02-05', amount: -oneMonthInterest, isTransfer: false } as Transaction,
+    ];
+
+    const { events } = deriveLoanPaymentHistory(account, transactions, [], interestTransactions);
+
+    expect(events[1].annualRate).toBeCloseTo(6, 1);
+  });
+
   it('does not let a zero-interest overpayment inflate the next rate', () => {
     // A pure-principal overpayment (no interest) six days before a regular
     // installment must not reset the accrual clock: the installment's interest

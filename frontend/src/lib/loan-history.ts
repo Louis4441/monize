@@ -616,15 +616,19 @@ function nearestDateKey(
  * debt the interest accrued on.
  */
 function assignObservedRates(events: LoanPaymentEvent[], periodsPerYear: number): void {
-  const fallbackDays = 365 / periodsPerYear;
+  const periodDays = 365 / periodsPerYear;
   let lastInterestDateKey: string | null = null;
   for (const event of events) {
     const balanceBefore = event.balance + event.principal;
     const dateKey = event.date.split('T')[0];
-    const days =
-      lastInterestDateKey !== null
-        ? daysBetween(lastInterestDateKey, dateKey)
-        : fallbackDays;
+    const gap =
+      lastInterestDateKey !== null ? daysBetween(lastInterestDateKey, dateKey) : periodDays;
+    // A gap much longer than one payment interval means payments were skipped
+    // (e.g. a payment holiday): the interest still covers a single billing
+    // period, so cap the accrual span at one interval rather than dividing one
+    // month of interest across the whole gap. Shorter gaps (an overpayment that
+    // settled interest mid-cycle) keep their actual span.
+    const days = gap > periodDays * 1.5 ? periodDays : gap;
     event.annualRate =
       event.interest > 0 && balanceBefore > 0 && days > 0
         ? (event.interest / balanceBefore) * (365 / days) * 100
