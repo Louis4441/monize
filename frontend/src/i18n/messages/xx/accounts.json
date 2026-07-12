@@ -382,6 +382,7 @@
       "colRate": "[XX-Rate-XX]",
       "colBalance": "[XX-Balance-XX]",
       "projectedFuturePayments": "[XX-Projected Future Payments-XX]",
+      "total": "[XX-Total-XX]",
       "rateChangeBadge": "[XX-{from}% → {to}%-XX]",
       "overpaymentBadge": "[XX-Overpayment-XX]",
       "editRateLabel": "[XX-Edit interest rate for {date}-XX]",

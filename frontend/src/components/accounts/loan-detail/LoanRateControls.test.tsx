@@ -10,7 +10,6 @@ vi.mock('@/lib/loan-rate-changes', () => ({
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
-    detect: vi.fn(),
     applyScheduledPayment: vi.fn(),
   },
 }));
@@ -79,24 +78,6 @@ describe('LoanRateControls + useLoanRateEditing', () => {
 
     await waitFor(() =>
       expect(loanRateChangesApi.applyScheduledPayment).toHaveBeenCalledWith('loan-1'),
-    );
-  });
-
-  it('detects rate changes from history on confirm', async () => {
-    (loanRateChangesApi.detect as ReturnType<typeof vi.fn>).mockResolvedValue({
-      created: [],
-      replacedCount: 0,
-      warnings: [],
-    });
-    render(<Harness onChanged={vi.fn()} />);
-
-    fireEvent.click(screen.getByText('Detect from history'));
-    // Confirm dialog -> confirm
-    const confirmButtons = screen.getAllByText('Detect from history');
-    fireEvent.click(confirmButtons[confirmButtons.length - 1]);
-
-    await waitFor(() =>
-      expect(loanRateChangesApi.detect).toHaveBeenCalledWith('loan-1'),
     );
   });
 });

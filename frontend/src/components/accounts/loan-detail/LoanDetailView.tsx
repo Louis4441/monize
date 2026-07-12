@@ -210,7 +210,6 @@ export function LoanDetailView({
         projectionRows={(scenario ?? baseline)?.rows ?? []}
         currencyCode={account.currencyCode}
         rateChanges={rateChanges}
-        fallbackAnnualRate={account.interestRate}
         editing={rateEditing}
       />
     </div>

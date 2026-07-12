@@ -3,27 +3,12 @@ import { render, screen, fireEvent } from '@/test/render';
 import { AmortizationScheduleTable } from './AmortizationScheduleTable';
 import { generateLoanSchedule } from '@/lib/loan-schedule';
 import { LoanPaymentEvent } from '@/lib/loan-history';
-import type { LoanRateChange } from '@/types/loan-rate-change';
 import type { LoanRateEditing } from './useLoanRateEditing';
 
 // Stub the rate controls (modals) so these tests focus on the table + rate cell.
 vi.mock('./LoanRateControls', () => ({
   LoanRateControls: () => <div data-testid="rate-controls" />,
 }));
-
-const makeRateChange = (overrides: Partial<LoanRateChange> = {}): LoanRateChange =>
-  ({
-    id: 'rc-1',
-    accountId: 'loan-1',
-    effectiveDate: '2025-01-05',
-    annualRate: 5.5,
-    newPaymentAmount: null,
-    source: 'inferred',
-    note: null,
-    createdAt: '',
-    updatedAt: '',
-    ...overrides,
-  }) as LoanRateChange;
 
 vi.mock('@/hooks/useNumberFormat', () => ({
   useNumberFormat: () => ({
@@ -39,7 +24,7 @@ vi.mock('@/hooks/useDateFormat', async () => {
   };
 });
 
-function makeHistoryEvents(count: number): LoanPaymentEvent[] {
+function makeHistoryEvents(count: number, annualRate: number | null = null): LoanPaymentEvent[] {
   return Array.from({ length: count }, (_, i) => ({
     date: `2025-${String(i + 1).padStart(2, '0')}-15`,
     principal: 450,
@@ -49,6 +34,7 @@ function makeHistoryEvents(count: number): LoanPaymentEvent[] {
     cumulativeInterest: 50 * (i + 1),
     type: 'REGULAR' as const,
     interestRecorded: true,
+    annualRate,
   }));
 }
 
@@ -131,6 +117,7 @@ describe('AmortizationScheduleTable', () => {
         cumulativeInterest: 50,
         type: 'OVERPAYMENT' as const,
         interestRecorded: false,
+        annualRate: null,
       },
     ];
     render(
@@ -197,25 +184,46 @@ describe('AmortizationScheduleTable', () => {
     expect(screen.getByText('No payments found')).toBeInTheDocument();
   });
 
-  it('shows a read-only Rate column from the timeline when not editable', () => {
+  it('shows a read-only observed Rate column for historical rows', () => {
     render(
       <AmortizationScheduleTable
-        historyEvents={makeHistoryEvents(1)}
+        historyEvents={makeHistoryEvents(1, 5.5)}
         projectionRows={[]}
         currencyCode="CAD"
-        rateChanges={[makeRateChange({ effectiveDate: '2024-12-01', annualRate: 5.5 })]}
-        fallbackAnnualRate={5.5}
       />,
     );
 
     expect(screen.getByText('Rate')).toBeInTheDocument();
+    // Historical rate is the rate observed from the interest charged, shown
+    // read-only -- there is no editable cell or controls without `editing`.
     expect(screen.getByText('5.50%')).toBeInTheDocument();
-    // No controls and no editable button when `editing` is absent.
     expect(screen.queryByTestId('rate-controls')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Edit interest rate/)).not.toBeInTheDocument();
   });
 
-  it('edits a rate inline and reports the row date, rate, and change id', () => {
+  it('keeps historical rows read-only even when editing is enabled', () => {
+    const editing = {
+      savingDate: null,
+      commitInlineRate: vi.fn(),
+      openEdit: vi.fn(),
+    } as unknown as LoanRateEditing;
+
+    render(
+      <AmortizationScheduleTable
+        historyEvents={makeHistoryEvents(1, 5.5)}
+        projectionRows={[]}
+        currencyCode="CAD"
+        editing={editing}
+      />,
+    );
+
+    // Controls are shown, but the historical row's rate is observed, not
+    // editable -- only future (projected) rates can be changed.
+    expect(screen.getByTestId('rate-controls')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Edit interest rate/)).not.toBeInTheDocument();
+  });
+
+  it('edits a projected rate inline and reports the row date and rate', () => {
     const commitInlineRate = vi.fn();
     const editing = {
       savingDate: null,
@@ -223,24 +231,24 @@ describe('AmortizationScheduleTable', () => {
       openEdit: vi.fn(),
     } as unknown as LoanRateEditing;
 
+    const projection = makeProjection();
     render(
       <AmortizationScheduleTable
-        historyEvents={makeHistoryEvents(1)}
-        projectionRows={[]}
+        historyEvents={[]}
+        projectionRows={projection.rows}
         currencyCode="CAD"
-        rateChanges={[makeRateChange({ effectiveDate: '2024-12-01', annualRate: 5.5 })]}
-        fallbackAnnualRate={5.5}
         editing={editing}
       />,
     );
 
     expect(screen.getByTestId('rate-controls')).toBeInTheDocument();
-    // The single historical row is dated 2025-01-15 (no exact change on it).
-    fireEvent.click(screen.getByLabelText(/Edit interest rate/));
-    const input = screen.getByLabelText(/Edit interest rate/);
+    // The first projected row is dated 2026-08-15; its rate is editable.
+    // Clicking the cell's button swaps it for an input, so re-query after.
+    fireEvent.click(screen.getAllByLabelText(/Edit interest rate/)[0]);
+    const input = screen.getAllByLabelText(/Edit interest rate/)[0];
     fireEvent.change(input, { target: { value: '6.1' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    expect(commitInlineRate).toHaveBeenCalledWith('2025-01-15', 6.1, undefined);
+    expect(commitInlineRate).toHaveBeenCalledWith('2026-08-15', 6.1, undefined);
   });
 });

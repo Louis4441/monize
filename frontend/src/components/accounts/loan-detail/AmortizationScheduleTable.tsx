@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { LoanPaymentEvent } from '@/lib/loan-history';
-import { ScheduleRow, effectiveAnnualRateOn } from '@/lib/loan-schedule';
+import { ScheduleRow } from '@/lib/loan-schedule';
 import { LoanRateChange } from '@/types/loan-rate-change';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
@@ -18,11 +18,9 @@ interface AmortizationScheduleTableProps {
   historyEvents: LoanPaymentEvent[];
   projectionRows: ScheduleRow[];
   currencyCode: string;
-  /** The rate timeline; drives the per-row Rate column and change-point edits. */
+  /** Future rate changes; drives change-point edits on projected rows. */
   rateChanges?: LoanRateChange[];
-  /** Account rate used where the timeline has no earlier row (historical rows). */
-  fallbackAnnualRate?: number | null;
-  /** When provided, the Rate column is inline-editable and controls are shown. */
+  /** When provided, projected rows' rate is inline-editable and controls shown. */
   editing?: LoanRateEditing;
 }
 
@@ -58,7 +56,6 @@ export function AmortizationScheduleTable({
   projectionRows,
   currencyCode,
   rateChanges = [],
-  fallbackAnnualRate = null,
   editing,
 }: AmortizationScheduleTableProps) {
   const t = useTranslations('accounts');
@@ -70,14 +67,6 @@ export function AmortizationScheduleTable({
     () => new Map(rateChanges.map((change) => [change.effectiveDate, change])),
     [rateChanges],
   );
-
-  const rateOn = useMemo(() => {
-    const hasRate = rateChanges.length > 0 || fallbackAnnualRate != null;
-    return (date: string): number | null =>
-      hasRate
-        ? effectiveAnnualRateOn(rateChanges, date, fallbackAnnualRate ?? 0)
-        : null;
-  }, [rateChanges, fallbackAnnualRate]);
 
   const rows = useMemo((): DisplayRow[] => {
     const historical = historyEvents.map((event, index) => {
@@ -95,7 +84,7 @@ export function AmortizationScheduleTable({
         balance: event.balance,
         isProjected: false,
         isOverpayment,
-        annualRate: rateOn(event.date),
+        annualRate: event.annualRate ?? null,
         change: changeByDate.get(event.date),
       };
     });
@@ -118,7 +107,7 @@ export function AmortizationScheduleTable({
       };
     });
     return [...historical, ...projected];
-  }, [historyEvents, projectionRows, rateOn, changeByDate]);
+  }, [historyEvents, projectionRows, changeByDate]);
 
   const showExtraColumn = useMemo(
     () =>
@@ -144,6 +133,26 @@ export function AmortizationScheduleTable({
   const hasHiddenRows = displayedRows.length < rows.length;
   // Nr, Date, Payment, Principal, Interest, [Extra], Rate, Balance
   const columnCount = showExtraColumn ? 8 : 7;
+
+  // Whole-loan column totals (every row, not just the visible window), summed
+  // in integer ten-thousandths to avoid floating-point drift.
+  const totals = useMemo(() => {
+    const cents = rows.reduce(
+      (acc, row) => ({
+        payment: acc.payment + Math.round(row.payment * 10000),
+        principal: acc.principal + Math.round(row.principal * 10000),
+        interest: acc.interest + Math.round(row.interest * 10000),
+        extra: acc.extra + Math.round(row.extraPrincipal * 10000),
+      }),
+      { payment: 0, principal: 0, interest: 0, extra: 0 },
+    );
+    return {
+      payment: cents.payment / 10000,
+      principal: cents.principal / 10000,
+      interest: cents.interest / 10000,
+      extra: cents.extra / 10000,
+    };
+  }, [rows]);
 
   const headerClass =
     'px-4 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider';
@@ -266,7 +275,7 @@ export function AmortizationScheduleTable({
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
                           <RateCell
                             annualRate={row.annualRate}
-                            editable={!!editing}
+                            editable={!!editing && row.isProjected}
                             saving={editing?.savingDate === row.date}
                             onCommit={(rate) =>
                               editing?.commitInlineRate(row.date, rate, row.change?.id)
@@ -284,6 +293,29 @@ export function AmortizationScheduleTable({
                   );
                 })}
               </tbody>
+              <tfoot className="bg-gray-50 dark:bg-gray-900/50 border-t-2 border-gray-200 dark:border-gray-700">
+                <tr className="font-semibold text-gray-900 dark:text-gray-100">
+                  <td colSpan={2} className="px-4 py-3 text-left text-sm">
+                    {t('loanDetail.schedule.total')}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
+                    {formatCurrency(totals.payment, currencyCode)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-green-600 dark:text-green-400">
+                    {formatCurrency(totals.principal, currencyCode)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-orange-600 dark:text-orange-400">
+                    {formatCurrency(totals.interest, currencyCode)}
+                  </td>
+                  {showExtraColumn && (
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-blue-600 dark:text-blue-400">
+                      {totals.extra > 0 ? formatCurrency(totals.extra, currencyCode) : '—'}
+                    </td>
+                  )}
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3" />
+                </tr>
+              </tfoot>
             </table>
           </div>
 

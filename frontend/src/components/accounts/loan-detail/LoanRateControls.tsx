@@ -13,10 +13,11 @@ interface LoanRateControlsProps {
 }
 
 /**
- * The Loan Schedule's rate-timeline controls: header buttons to detect rate
- * changes from history or add one manually, plus the add/edit modal, the delete
- * and detect confirmations, and the scheduled-payment permission prompt. All
- * behaviour lives in `useLoanRateEditing`; this component only renders it.
+ * The Loan Schedule's rate-timeline controls: a header button to add a future
+ * rate change manually, plus the add/edit modal, the delete confirmation, and
+ * the scheduled-payment permission prompt. Historical rates are derived from
+ * the interest actually charged, so there is no "detect" step. All behaviour
+ * lives in `useLoanRateEditing`; this component only renders it.
  */
 export function LoanRateControls({ editing }: LoanRateControlsProps) {
   const t = useTranslations('accounts');
@@ -25,14 +26,6 @@ export function LoanRateControls({ editing }: LoanRateControlsProps) {
 
   return (
     <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={editing.openDetect}
-        isLoading={editing.isDetecting}
-      >
-        {t('loanDetail.rateHistory.detect')}
-      </Button>
       <Button size="sm" onClick={editing.openAdd}>
         {t('loanDetail.rateHistory.add')}
       </Button>
@@ -153,16 +146,6 @@ export function LoanRateControls({ editing }: LoanRateControlsProps) {
         variant="danger"
         onConfirm={editing.confirmDelete}
         onCancel={editing.cancelDelete}
-      />
-
-      <ConfirmDialog
-        isOpen={editing.showDetectConfirm}
-        title={t('loanDetail.rateHistory.detectTitle')}
-        message={t('loanDetail.rateHistory.detectMessage')}
-        confirmLabel={t('loanDetail.rateHistory.detect')}
-        cancelLabel={t('loanDetail.rateHistory.cancel')}
-        onConfirm={editing.runDetect}
-        onCancel={editing.cancelDetect}
       />
 
       <ConfirmDialog

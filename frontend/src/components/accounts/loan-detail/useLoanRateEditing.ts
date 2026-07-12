@@ -29,9 +29,10 @@ const emptyForm = (): RateFormState => ({
 
 /**
  * The rate-timeline editing behaviour shared by the Loan Schedule table's
- * inline rate cells and its rate controls (Detect / Add / per-change edit +
- * delete): all the create/update/delete/detect mutations plus the
- * scheduled-payment "ask permission" prompt. Kept out of the table component so
+ * inline rate cells and its rate controls (Add / per-change edit + delete):
+ * the create/update/delete mutations plus the scheduled-payment "ask
+ * permission" prompt. Historical rates are observed from the interest actually
+ * charged, so there is no detection step. Kept out of the table component so
  * both the inline cell and the modal UI can drive the same logic.
  */
 export function useLoanRateEditing(account: Account, onChanged: () => void) {
@@ -44,8 +45,6 @@ export function useLoanRateEditing(account: Account, onChanged: () => void) {
   const [form, setForm] = useState<RateFormState>(emptyForm());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [changeToDelete, setChangeToDelete] = useState<LoanRateChange | null>(null);
-  const [showDetectConfirm, setShowDetectConfirm] = useState(false);
-  const [isDetecting, setIsDetecting] = useState(false);
   const [scheduledPreview, setScheduledPreview] =
     useState<ScheduledPaymentPreview | null>(null);
   // The effective date of the row whose rate is currently being saved inline.
@@ -213,27 +212,6 @@ export function useLoanRateEditing(account: Account, onChanged: () => void) {
       })
     : '';
 
-  const openDetect = () => setShowDetectConfirm(true);
-  const cancelDetect = () => setShowDetectConfirm(false);
-  const runDetect = async () => {
-    setShowDetectConfirm(false);
-    setIsDetecting(true);
-    try {
-      const result = await loanRateChangesApi.detect(account.id);
-      toast.success(
-        t('loanDetail.rateHistory.detectedToast', { count: result.created.length }),
-      );
-      for (const warning of result.warnings) {
-        toast(warning, { icon: '⚠️' });
-      }
-      onChanged();
-    } catch (err) {
-      toast.error(getErrorMessage(err, t('loanDetail.rateHistory.detectFailed')));
-    } finally {
-      setIsDetecting(false);
-    }
-  };
-
   return {
     isMortgage,
     // inline rate cell
@@ -241,8 +219,6 @@ export function useLoanRateEditing(account: Account, onChanged: () => void) {
     savingDate,
     // header actions
     openAdd,
-    openDetect,
-    isDetecting,
     // per-change actions
     openEdit,
     requestDelete,
@@ -258,10 +234,6 @@ export function useLoanRateEditing(account: Account, onChanged: () => void) {
     changeToDelete,
     confirmDelete,
     cancelDelete,
-    // detect confirm
-    showDetectConfirm,
-    runDetect,
-    cancelDetect,
     // scheduled-payment prompt
     scheduledPreview,
     scheduledUpdateMessage,

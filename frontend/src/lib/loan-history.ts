@@ -52,6 +52,16 @@ export interface LoanPaymentEvent {
    * as a separate transaction), where the sum is not a reliable installment.
    */
   interestRecorded: boolean;
+  /**
+   * The annual interest rate (percentage) observed for this installment,
+   * inferred from the interest actually charged: `interest / balanceBefore x
+   * periodsPerYear`. Null for overpayments and rows with no interest or no
+   * outstanding balance. This is the real rate that produced the row's
+   * interest, so it always matches the lender without any detection step.
+   * Always populated by `deriveLoanPaymentHistory`; optional only so test
+   * fixtures that build events by hand need not supply it.
+   */
+  annualRate?: number | null;
 }
 
 export interface LoanHistoryResult {
@@ -120,6 +130,22 @@ export function deriveLoanPaymentHistory(
   const usedInterestDates = new Set<string>();
   const events: LoanPaymentEvent[] = [];
 
+  // The rate actually charged on a row, inferred from its interest:
+  // `interest / balanceBefore x periodsPerYear`. This is the real rate that
+  // produced the interest, so it matches the lender without any detection.
+  // Only meaningful for a regular installment against an outstanding balance.
+  const periodsPerYear = account.paymentFrequency
+    ? getPeriodsPerYear(account.paymentFrequency as ScheduleFrequency)
+    : 12;
+  const observedRate = (
+    type: LoanPaymentType,
+    interest: number,
+    balanceBefore: number,
+  ): number | null =>
+    type === 'REGULAR' && balanceBefore > 0 && interest > 0
+      ? (interest / balanceBefore) * periodsPerYear * 100
+      : null;
+
   if (useReconstruction) {
     // Legacy path: monotonic amortizing loan, balance decreasing from the
     // reconstructed principal by each repayment.
@@ -136,6 +162,7 @@ export function deriveLoanPaymentHistory(
         separateInterestByDate,
         usedInterestDates,
       );
+      const balanceBefore = runningBalance;
       runningBalance = Math.max(0, runningBalance - principal);
       cumulativePrincipal += principal;
       cumulativeInterest += interest;
@@ -148,6 +175,7 @@ export function deriveLoanPaymentHistory(
         cumulativeInterest,
         type,
         interestRecorded,
+        annualRate: observedRate(type, interest, balanceBefore),
       });
     }
   } else {
@@ -181,6 +209,7 @@ export function deriveLoanPaymentHistory(
         cumulativeInterest,
         type,
         interestRecorded,
+        annualRate: observedRate(type, interest, balanceBefore),
       });
     }
   }
@@ -208,6 +237,8 @@ export function deriveLoanPaymentHistory(
     cumulativeInterest: 0,
     type: 'REGULAR' as const,
     interestRecorded: true,
+    // Set below, once the re-walk fixes the balance this interest accrued on.
+    annualRate: null,
   }));
   const merged = [...events, ...orphanEvents].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
@@ -224,8 +255,10 @@ export function deriveLoanPaymentHistory(
       // A principal payment already carries its post-payment balance.
       lastBalance = event.balance;
     } else {
-      // Interest-only row: the debt is whatever it was at that point.
+      // Interest-only row: the debt is whatever it was at that point, so its
+      // rate is the interest charged against that outstanding balance.
       event.balance = lastBalance;
+      event.annualRate = observedRate(event.type, event.interest, lastBalance);
     }
   }
 
