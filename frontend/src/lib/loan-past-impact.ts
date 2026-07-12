@@ -1,14 +1,12 @@
 import { Account } from '@/types/account';
-import { LoanHistoryResult, deriveCurrentInstallment } from '@/lib/loan-history';
+import { LoanHistoryResult } from '@/lib/loan-history';
 import {
   LoanScheduleResult,
   RateTimelineRow,
   ScheduleFrequency,
-  advanceDate,
   buildRateTimeline,
   calculateMortgagePaymentAmount,
   generateLoanSchedule,
-  getPeriodicRate,
   getPeriodsPerYear,
 } from '@/lib/loan-schedule';
 
@@ -54,15 +52,16 @@ const ORIGINAL_SCHEDULE_MAX_PAYMENTS = 10000;
  * baseline starts at the origination rate (the timeline's initial row, not
  * the account's current scalar) and applies the recorded steps as they
  * happened -- without overpayments -- so the comparison isolates the pure
- * effect of extra payments even across rate changes. The current projection
- * applies only future-dated steps.
+ * effect of extra payments even across rate changes.
  *
- * `asOf` defaults to now; it is injectable for deterministic tests.
+ * `currentProjection` is the loan detail page's forward projection from today's
+ * balance (the no-overpayment baseline). It is passed in rather than recomputed
+ * here so both views share one projection.
  */
 export function computePastImpact(
   account: Account,
   history: LoanHistoryResult,
-  asOf: Date = new Date(),
+  currentProjection: LoanScheduleResult | null = null,
   rateChanges: RateTimelineRow[] = [],
 ): PastImpactResult | null {
   // The original principal is the configured value, or the loan's opening
@@ -119,14 +118,11 @@ export function computePastImpact(
 
   const periodsPerYear = getPeriodsPerYear(frequency);
 
-  // The borrower's real installment (principal + interest) from history, used
-  // to seed the forward projection when the stored payment is principal-only.
-  const installment = deriveCurrentInstallment(history, account.paymentAmount ?? 0);
-  const amortizes = (payment: number, balance: number, annualRate: number) =>
-    payment > balance * getPeriodicRate(annualRate, periodsPerYear, isCanadian, isVariableRate);
-
-  // The original contractual payment is the PMT for the original principal at
-  // the origination rate over the configured repayment period.
+  // --- The contractual "if I never overpaid" schedule ---
+  // Payment: PMT for the original principal at the origination rate over the
+  // configured term. It seeds the first row; fixedEndPeriod then re-levels the
+  // installment on each recorded rate change so the schedule follows the real
+  // rate history and still amortizes to zero exactly at the term.
   const contractualPayment = calculateMortgagePaymentAmount(
     originalPrincipal,
     timeline.startingAnnualRate,
@@ -137,62 +133,7 @@ export function computePastImpact(
   );
   if (contractualPayment <= 0) return null;
 
-  // The contractual schedule runs for exactly the configured repayment period.
   const configuredTermPeriods = Math.round((configuredTermMonths * periodsPerYear) / 12);
-  // A one-period buffer so a rounding remainder on the final payment is not
-  // clipped by the length cap.
-  const maxOriginalPayments = Math.min(
-    configuredTermPeriods + Math.ceil(periodsPerYear / 12),
-    ORIGINAL_SCHEDULE_MAX_PAYMENTS,
-  );
-
-  // Keep the recorded rate steps (the real variable-rate history) but drop
-  // their payment overrides: those are often principal-only figures that would
-  // stall a fixed-payment schedule. Re-levelling (fixedEndPeriod below) then
-  // adjusts the installment on each rate change, so the schedule follows the
-  // rate history and still amortizes to zero over the term without stalling.
-  const rateStepsOnly = timeline.rateChanges.map((change) => ({
-    ...change,
-    paymentAmount: null,
-  }));
-
-  const isPaidOff = history.currentBalance <= 0.01;
-  // Forward projection: keep the stored payment when it amortizes today's
-  // balance, else use the derived installment.
-  const currentPayment = amortizes(
-    account.paymentAmount ?? 0,
-    history.currentBalance,
-    account.interestRate,
-  )
-    ? account.paymentAmount!
-    : installment;
-  const canProjectCurrent = !isPaidOff && currentPayment > 0;
-
-  // The scalar rate is already current; only future-dated steps apply ahead
-  const futureTimeline = buildRateTimeline(rateChanges, isoDate(asOf), account.interestRate);
-
-  const currentProjection = canProjectCurrent
-    ? generateLoanSchedule({
-        startingBalance: history.currentBalance,
-        annualRate: account.interestRate,
-        paymentAmount: currentPayment,
-        frequency,
-        isCanadian,
-        isVariableRate,
-        firstPaymentDate: advanceDate(asOf, frequency),
-        rateChanges: futureTimeline.rateChanges.map((change) => ({
-          ...change,
-          paymentAmount: null,
-        })),
-      })
-    : null;
-
-  const lastActualPaymentDate =
-    history.events.length > 0 ? history.events[history.events.length - 1].date : null;
-  const currentPayoffDate = isPaidOff
-    ? lastActualPaymentDate
-    : (currentProjection?.payoffDate ?? null);
-
   const originalSchedule = generateLoanSchedule({
     startingBalance: originalPrincipal,
     annualRate: timeline.startingAnnualRate,
@@ -201,10 +142,25 @@ export function computePastImpact(
     isCanadian,
     isVariableRate,
     firstPaymentDate: parseIsoDate(startDate),
-    rateChanges: rateStepsOnly,
+    // Keep the recorded rate steps but drop their payment overrides (often
+    // principal-only figures that would stall a fixed payment); re-levelling
+    // sets the installment instead.
+    rateChanges: timeline.rateChanges.map((change) => ({ ...change, paymentAmount: null })),
     fixedEndPeriod: configuredTermPeriods,
-    maxPayments: maxOriginalPayments,
+    // One-period buffer so a rounding remainder on the final payment is kept.
+    maxPayments: Math.min(
+      configuredTermPeriods + Math.ceil(periodsPerYear / 12),
+      ORIGINAL_SCHEDULE_MAX_PAYMENTS,
+    ),
   });
+
+  // --- Current payoff, from the caller's forward projection ---
+  const isPaidOff = history.currentBalance <= 0.01;
+  const lastActualPaymentDate =
+    history.events.length > 0 ? history.events[history.events.length - 1].date : null;
+  const currentPayoffDate = isPaidOff
+    ? lastActualPaymentDate
+    : (currentProjection?.payoffDate ?? null);
 
   const projectedRemainingInterest = currentProjection?.totalInterest ?? 0;
   const interestAlreadySaved = Math.max(
@@ -249,13 +205,6 @@ function monthsBetween(fromDate: string | null, toDate: string | null): number {
 function parseIsoDate(isoDate: string): Date {
   const [year, month, day] = isoDate.split('-').map(Number);
   return new Date(year, month - 1, day);
-}
-
-/** Local-time yyyy-MM-dd, matching the ISO dates the schedule emits. */
-function isoDate(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate(),
-  ).padStart(2, '0')}`;
 }
 
 function round2(value: number): number {

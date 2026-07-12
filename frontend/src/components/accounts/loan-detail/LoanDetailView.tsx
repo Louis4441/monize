@@ -161,11 +161,13 @@ export function LoanDetailView({
     [baseline, scenario],
   );
 
-  // Past impact of overpayments; its original contractual schedule also feeds
-  // the payoff chart's contractual curve, so the two views stay consistent.
+  // Past impact of overpayments. It reuses the baseline (no-overpayment)
+  // projection as the current projection -- computed once here, not twice --
+  // and its original contractual schedule also feeds the payoff chart's
+  // contractual curve, so the views stay consistent.
   const impact = useMemo(
-    () => computePastImpact(account, history, undefined, rateChanges),
-    [account, history, rateChanges],
+    () => computePastImpact(account, history, baseline, rateChanges),
+    [account, history, baseline, rateChanges],
   );
 
   return (

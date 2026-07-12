@@ -70,7 +70,7 @@ describe('computePastImpact', () => {
     const history = makeHistory(makeAccount(), [1200, 1200, 1200]);
     const rateChanges = [{ effectiveDate: '2020-06-01', annualRate: 6, newPaymentAmount: 285 }];
 
-    const impact = computePastImpact(account, history, new Date(2025, 0, 1), rateChanges);
+    const impact = computePastImpact(account, history, null, rateChanges);
 
     expect(impact).not.toBeNull();
     expect(impact!.originalSchedule.payoffDate).not.toBeNull();
@@ -117,7 +117,7 @@ describe('computePastImpact', () => {
       { effectiveDate: '2022-01-01', annualRate: 6, newPaymentAmount: 300 },
     ];
 
-    const impact = computePastImpact(account, history, new Date(2025, 0, 1), rateChanges)!;
+    const impact = computePastImpact(account, history, null, rateChanges)!;
 
     expect(impact.originalSchedule.paidOff).toBe(true);
     expect(impact.originalSchedule.payoffDate).not.toBeNull();
@@ -227,7 +227,7 @@ describe('computePastImpact', () => {
     ] as Transaction[];
     const history = deriveLoanPaymentHistory(account, transactions);
 
-    const impact = computePastImpact(account, history, new Date(2025, 5, 20))!;
+    const impact = computePastImpact(account, history)!;
 
     expect(impact.extraPrincipalPaid).toBeCloseTo(1500 + 2500, 2);
   });
@@ -236,9 +236,8 @@ describe('computePastImpact', () => {
     // Plain payments with no overpayment category or memo -> nothing classified
     const account = makeAccount({ currentBalance: -5000 });
     const history = makeHistory(account, [500, 500]);
-    const asOf = new Date(2025, 5, 20);
 
-    const impact = computePastImpact(account, history, asOf)!;
+    const impact = computePastImpact(account, history)!;
 
     expect(impact.extraPrincipalPaid).toBe(0);
   });
@@ -268,8 +267,17 @@ describe('computePastImpact', () => {
         }) as Transaction,
     );
     const history = deriveLoanPaymentHistory(account, transactions);
+    // The forward projection from today's remaining 40k -- the loan detail
+    // page's baseline, passed in the way the app now does.
+    const currentProjection = generateLoanSchedule({
+      startingBalance: 40000,
+      annualRate: 6,
+      paymentAmount: 1200,
+      frequency: 'MONTHLY',
+      firstPaymentDate: new Date(2025, 0, 15),
+    });
 
-    const impact = computePastImpact(account, history);
+    const impact = computePastImpact(account, history, currentProjection);
 
     expect(impact).not.toBeNull();
     expect(impact!.originalSchedule.paidOff).toBe(true);
@@ -366,9 +374,8 @@ describe('computePastImpact with rate history', () => {
     const account = makeAccount();
     const history = makeHistory(account, [450, 450]);
 
-    const asOf = new Date(2025, 5, 15);
-    const without = computePastImpact(account, history, asOf);
-    const withEmpty = computePastImpact(account, history, asOf, []);
+    const without = computePastImpact(account, history);
+    const withEmpty = computePastImpact(account, history, null, []);
 
     expect(withEmpty).toEqual(without);
   });
@@ -383,8 +390,7 @@ describe('computePastImpact with rate history', () => {
       { effectiveDate: '2025-03-01', annualRate: 4, newPaymentAmount: null },
     ];
 
-    const asOf = new Date(2025, 5, 15);
-    const impact = computePastImpact(account, history, asOf, rateChanges);
+    const impact = computePastImpact(account, history, null, rateChanges);
 
     expect(impact).not.toBeNull();
     // Rows before the step accrue at 6%, after it at 4%
@@ -401,33 +407,12 @@ describe('computePastImpact with rate history', () => {
       { effectiveDate: '2025-06-01', annualRate: 12, newPaymentAmount: null },
     ];
 
-    const asOf = new Date(2025, 5, 15);
-    const withStep = computePastImpact(account, history, asOf, rateChanges)!;
-    const withoutStep = computePastImpact(account, history, asOf)!;
+    const withStep = computePastImpact(account, history, null, rateChanges)!;
+    const withoutStep = computePastImpact(account, history)!;
 
     // A rate hike in the baseline means more contractual interest
     expect(withStep.originalSchedule.totalInterest).toBeGreaterThan(
       withoutStep.originalSchedule.totalInterest,
     );
-  });
-
-  it('applies only future-dated steps to the current projection', () => {
-    const account = makeAccount();
-    const history = makeHistory(account, [450, 450]);
-    const asOf = new Date(2025, 5, 15);
-    const rateChanges = [
-      // Past step: already reflected in the scalar rate, must not double-apply
-      { effectiveDate: '2025-03-01', annualRate: 6, newPaymentAmount: null },
-      // Future step: the projection should bend at this date
-      { effectiveDate: '2025-09-01', annualRate: 12, newPaymentAmount: null },
-    ];
-
-    const impact = computePastImpact(account, history, asOf, rateChanges)!;
-
-    expect(impact.currentProjection).not.toBeNull();
-    const rows = impact.currentProjection!.rows;
-    expect(rows[0].annualRate).toBe(6);
-    const septemberOn = rows.filter((row) => row.date >= '2025-09-01');
-    expect(septemberOn[0].annualRate).toBe(12);
   });
 });
