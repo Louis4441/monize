@@ -600,6 +600,8 @@ describe('deriveLoanPaymentHistory with paired separate interest expenses', () =
       openingBalance: -200000,
       currentBalance: -199740.87,
       interestRate: 5.5,
+      // Origination (grace start), before the first principal payment.
+      paymentStartDate: '2019-08-01',
     });
     // One principal payment; interest-only grace expenses long before it.
     const transactions = [
@@ -629,6 +631,39 @@ describe('deriveLoanPaymentHistory with paired separate interest expenses', () =
     expect(events[2].interest).toBeCloseTo(335.92, 2);
     // Grace interest is counted in the running total.
     expect(cumulativeInterest).toBeCloseTo(388.14 + 286.49 + 335.92, 2);
+  });
+
+  it('scopes separate interest to the loan lifetime, ignoring an earlier loan that shares the category', () => {
+    // Sequential refinanced mortgages share the interest category and source
+    // account. A loan that started in 2022 must not show interest-only rows
+    // from a previous mortgage (2012-2021).
+    const account = makeAccount({
+      accountType: 'MORTGAGE',
+      openingBalance: -300000,
+      currentBalance: -299000,
+      interestRate: 5,
+      paymentStartDate: '2022-08-01',
+    });
+    const transactions = [
+      makeTransaction({ transactionDate: '2022-08-05', amount: 500 }),
+      makeTransaction({ transactionDate: '2022-09-05', amount: 500 }),
+    ];
+    const interestTransactions = [
+      // Previous mortgage on the same category/source, years earlier:
+      { transactionDate: '2012-06-05', amount: -900, isTransfer: false } as Transaction,
+      { transactionDate: '2020-06-05', amount: -800, isTransfer: false } as Transaction,
+      // This loan's interest:
+      { transactionDate: '2022-08-05', amount: -1250, isTransfer: false } as Transaction,
+      { transactionDate: '2022-09-05', amount: -1245, isTransfer: false } as Transaction,
+    ];
+
+    const { events } = deriveLoanPaymentHistory(account, transactions, [], interestTransactions);
+
+    // Only this loan's two payments -- no phantom rows from 2012-2020.
+    expect(events).toHaveLength(2);
+    expect(events.every((e) => e.date >= '2022-08-01')).toBe(true);
+    // This loan's own interest is still attributed.
+    expect(events[0].interest).toBeCloseTo(1250, 0);
   });
 
   it('derives the observed rate from the actual days between payments', () => {

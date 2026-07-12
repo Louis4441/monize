@@ -115,6 +115,31 @@ export function deriveLoanPaymentHistory(
   let cumulativePrincipal = 0;
   let cumulativeInterest = 0;
 
+  // Scope separately-booked interest to this loan's own lifetime. Sequential
+  // refinanced mortgages often share one interest category and source account
+  // (e.g. Canadian mortgages re-financed every few years), so an unrelated
+  // earlier or later loan's interest would otherwise be pulled in and shown as
+  // phantom interest-only rows. Bound it below by the configured first-payment
+  // date -- the loan's origination, which precedes the first principal payment
+  // during an interest-only grace period -- and above by the final payment once
+  // the loan is paid off (an active loan still accrues interest to today).
+  const originationDate =
+    account.paymentStartDate ||
+    (sortedTransactions.length > 0
+      ? sortedTransactions[0].transactionDate.split('T')[0]
+      : null);
+  const lastTransactionDate =
+    sortedTransactions.length > 0
+      ? sortedTransactions[sortedTransactions.length - 1].transactionDate.split('T')[0]
+      : null;
+  const loanPaidOff = currentBalance <= 0.01;
+  const scopedInterestTransactions = interestTransactions.filter((tx) => {
+    const date = tx.transactionDate.split('T')[0];
+    if (originationDate && date < originationDate) return false;
+    if (loanPaidOff && lastTransactionDate && date > lastTransactionDate) return false;
+    return true;
+  });
+
   // A source-account payment covering multiple loan transfers (e.g. regular +
   // extra principal) carries one interest split; count it once.
   const processedParentIds = new Set<string>();
@@ -124,7 +149,7 @@ export function deriveLoanPaymentHistory(
   // rows below.
   const { byDate: separateInterestByDate, orphans: orphanInterest } =
     pairSeparateInterestByDate(
-      interestTransactions,
+      scopedInterestTransactions,
       repayments.map((t) => t.transactionDate.split('T')[0]),
     );
   const usedInterestDates = new Set<string>();
