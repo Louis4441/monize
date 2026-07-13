@@ -50,6 +50,8 @@ describe("Backup export/restore round-trip (integration)", () => {
     splitParentTxId: string;
     transferOutTxId: string;
     transferInTxId: string;
+    invTransferOutId: string;
+    invTransferInId: string;
   }
 
   beforeAll(async () => {
@@ -100,6 +102,7 @@ describe("Backup export/restore round-trip (integration)", () => {
       "accounts",
       "transactions",
       "scheduled_transactions",
+      "investment_transactions",
     ]) {
       await dataSource.query(
         `CREATE OR REPLACE TRIGGER update_${table}_updated_at
@@ -145,6 +148,8 @@ describe("Backup export/restore round-trip (integration)", () => {
       splitParentTxId: randomUUID(),
       transferOutTxId: randomUUID(),
       transferInTxId: randomUUID(),
+      invTransferOutId: randomUUID(),
+      invTransferInId: randomUUID(),
     };
 
     await dataSource.query(
@@ -285,6 +290,31 @@ describe("Backup export/restore round-trip (integration)", () => {
       [ids.transferInTxId, ids.transferOutTxId],
     );
 
+    // Linked investment transfer pair (the two legs of a security transfer),
+    // each pointing at the other via the self-referential linked_transaction_id.
+    // Whichever leg is inserted first is a forward reference to the other, so
+    // this exercises the deferred-FK handling for investment_transactions.
+    await dataSource.query(
+      `INSERT INTO investment_transactions (id, user_id, account_id, security_id,
+                                            action, transaction_date, quantity, price, total_amount)
+       VALUES ($1, $2, $3, $4, 'TRANSFER_OUT', '2026-01-18', 1300, 80.965331, 0)`,
+      [ids.invTransferOutId, userId, ids.accountId, ids.securityId],
+    );
+    await dataSource.query(
+      `INSERT INTO investment_transactions (id, user_id, account_id, security_id,
+                                            action, transaction_date, quantity, price, total_amount)
+       VALUES ($1, $2, $3, $4, 'TRANSFER_IN', '2026-01-18', 1300, 80.965331, 0)`,
+      [ids.invTransferInId, userId, ids.savingsAccountId, ids.securityId],
+    );
+    await dataSource.query(
+      `UPDATE investment_transactions SET linked_transaction_id = $2 WHERE id = $1`,
+      [ids.invTransferOutId, ids.invTransferInId],
+    );
+    await dataSource.query(
+      `UPDATE investment_transactions SET linked_transaction_id = $2 WHERE id = $1`,
+      [ids.invTransferInId, ids.invTransferOutId],
+    );
+
     return ids;
   }
 
@@ -395,6 +425,25 @@ describe("Backup export/restore round-trip (integration)", () => {
     expect(transfers[0].linked_user_id).toBe(userB.id);
     expect(Number(transfers[0].amount)).toBe(-100);
     expect(Number(transfers[0].linked_amount)).toBe(100);
+
+    // Deferred FK: the investment transfer pair's self-referential
+    // linked_transaction_id is restored in Phase 3 and each leg points at its
+    // paired leg, both owned by B. (A forward reference here used to violate
+    // investment_transactions_linked_transaction_id_fkey during insert.)
+    expect(await countRows("investment_transactions", userB.id)).toBe(2);
+    const invTransfers = await dataSource.query(
+      `SELECT it.action, linked.user_id AS linked_user_id, linked.action AS linked_action
+       FROM investment_transactions it
+       JOIN investment_transactions linked ON it.linked_transaction_id = linked.id
+       WHERE it.user_id = $1 ORDER BY it.action`,
+      [userB.id],
+    );
+    expect(invTransfers).toHaveLength(2);
+    expect(invTransfers[0].action).toBe("TRANSFER_IN");
+    expect(invTransfers[0].linked_user_id).toBe(userB.id);
+    expect(invTransfers[0].linked_action).toBe("TRANSFER_OUT");
+    expect(invTransfers[1].action).toBe("TRANSFER_OUT");
+    expect(invTransfers[1].linked_action).toBe("TRANSFER_IN");
 
     // Split transaction restored with both split rows summing to the parent.
     const splits = await dataSource.query(

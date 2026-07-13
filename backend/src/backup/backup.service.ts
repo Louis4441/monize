@@ -1278,6 +1278,11 @@ export class BackupService {
         column: "parent_transaction_id",
       },
       {
+        table: "investment_transactions",
+        rows: data.investment_transactions,
+        column: "linked_transaction_id",
+      },
+      {
         table: "payees",
         rows: data.payees,
         column: "default_category_id",
@@ -1301,6 +1306,7 @@ export class BackupService {
       "accounts",
       "transactions",
       "scheduled_transactions",
+      "investment_transactions",
     ]);
 
     // Collect tables that will actually be updated AND have the trigger
@@ -1487,6 +1493,11 @@ export class BackupService {
       // forward reference to securities(id) is deferred to Phase 3.
       scheduled_transactions: ["investment_security_id"],
       scheduled_transaction_splits: ["investment_security_id"],
+      // Self-referential FK linking the two legs of a security transfer
+      // (TRANSFER_OUT <-> TRANSFER_IN). A row may reference another
+      // investment_transactions row that appears later in the insert batch, so
+      // defer it to Phase 3 once every row exists.
+      investment_transactions: ["linked_transaction_id"],
     };
     const columnsToDefer = deferredFkColumns[table] ?? [];
 
