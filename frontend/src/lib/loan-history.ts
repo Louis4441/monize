@@ -139,11 +139,6 @@ export function deriveLoanPaymentHistory(
     if (loanPaidOff && lastTransactionDate && date > lastTransactionDate) return false;
     return true;
   });
-  // Whether this loan books interest as separate expenses. When it does, a
-  // payment with no paired interest carried none of its own (the interest for
-  // its date is already represented by the booked expenses), so it must not
-  // receive an analytic estimate -- see classifyPayment.
-  const hasSeparateInterest = scopedInterestTransactions.length > 0;
 
   // A source-account payment covering multiple loan transfers (e.g. regular +
   // extra principal) carries one interest split; count it once.
@@ -157,6 +152,15 @@ export function deriveLoanPaymentHistory(
       scopedInterestTransactions,
       repayments.map((t) => t.transactionDate.split('T')[0]),
     );
+  // Whether this loan books interest as separate expenses. When it does, a
+  // payment with no paired interest carried none of its own (the interest for
+  // its date is already represented by the booked expenses), so it must not
+  // receive an analytic estimate -- see classifyPayment. Derived from the
+  // pairing output (not the raw list) so all-transfer / zero-amount inputs,
+  // which pairSeparateInterestByDate discards, don't falsely disable the
+  // analytic fallback.
+  const hasSeparateInterest =
+    separateInterestByDate.size > 0 || orphanInterest.length > 0;
   const usedInterestDates = new Set<string>();
   const events: LoanPaymentEvent[] = [];
 
