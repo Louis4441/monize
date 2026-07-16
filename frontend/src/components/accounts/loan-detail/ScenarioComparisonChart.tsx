@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import toast from 'react-hot-toast';
 import {
   CartesianGrid,
   Legend,
@@ -13,6 +14,9 @@ import {
   YAxis,
 } from 'recharts';
 import { chartColors, chartSeriesColor } from '@/lib/chart-colors';
+import { captureSvgAsImage } from '@/lib/pdf-export-charts';
+import { sanitizeFilename } from '@/lib/export-filename';
+import { ExportIconButton } from '@/components/ui/ExportIconButton';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 
@@ -57,8 +61,50 @@ export function ScenarioComparisonChart({
   currencyCode,
 }: ScenarioComparisonChartProps) {
   const t = useTranslations('accounts');
+  const tc = useTranslations('common');
   const formatChartDate = useChartDateFormat();
   const { formatCurrency, formatCurrencyCompact, formatCurrencyAxis } = useNumberFormat();
+  const chartRef = useRef<HTMLDivElement>(null);
+
+  // Legend entries toggle their line on click; hovering a line (or a legend
+  // entry) emphasizes that series and its legend name.
+  const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  const legendKeyOf = (entry: unknown): string | null => {
+    const key = (entry as { dataKey?: unknown }).dataKey;
+    return typeof key === 'string' ? key : null;
+  };
+  const toggleKey = (entry: unknown) => {
+    const key = legendKeyOf(entry);
+    if (!key) return;
+    setHiddenKeys((keys) =>
+      keys.includes(key) ? keys.filter((k) => k !== key) : [...keys, key],
+    );
+  };
+
+  const chartTitle = t('loanDetail.scenarioChart.title');
+
+  // Same PNG capture as PayoffComparisonChart, so both loan charts export
+  // identically.
+  async function handleExportPng() {
+    if (!chartRef.current) return;
+    try {
+      const captured = await captureSvgAsImage(chartRef.current);
+      if (!captured) {
+        toast.error(tc('chartDownload.unableToCapture'));
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = captured.dataUrl;
+      link.download = `${sanitizeFilename(chartTitle, 'chart')}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      toast.error(tc('chartDownload.failedToDownload'));
+    }
+  }
 
   const payoffLabel = (payoffDate: string | null): string =>
     payoffDate
@@ -161,10 +207,16 @@ export function ScenarioComparisonChart({
 
   return (
     <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        {t('loanDetail.scenarioChart.description')}
-      </p>
-      <div className="h-80">
+      <div className="flex items-start justify-between gap-2 mb-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {t('loanDetail.scenarioChart.description')}
+        </p>
+        <ExportIconButton
+          onExport={handleExportPng}
+          title={tc('chartDownload.downloadAsPng', { filename: chartTitle })}
+        />
+      </div>
+      <div className="h-80" ref={chartRef}>
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
@@ -193,14 +245,36 @@ export function ScenarioComparisonChart({
                 );
               }}
             />
-            <Legend />
+            <Legend
+              onClick={toggleKey}
+              onMouseEnter={(entry) => setHoveredKey(legendKeyOf(entry))}
+              onMouseLeave={() => setHoveredKey(null)}
+              formatter={(value, entry) => {
+                const key = legendKeyOf(entry);
+                const hidden = key !== null && hiddenKeys.includes(key);
+                const hovered = key !== null && hoveredKey === key;
+                return (
+                  <span
+                    className={`cursor-pointer select-none ${
+                      hidden ? 'line-through opacity-50' : ''
+                    } ${hovered ? 'font-semibold' : ''}`}
+                  >
+                    {value}
+                  </span>
+                );
+              }}
+            />
             {baselineIndex !== null && (
               <Line
                 dataKey="baseline"
                 stroke={chartColors.axis}
-                strokeWidth={2}
+                strokeWidth={hoveredKey === 'baseline' ? 3 : 2}
+                strokeOpacity={hoveredKey !== null && hoveredKey !== 'baseline' ? 0.35 : 1}
                 strokeDasharray="2 4"
                 dot={false}
+                hide={hiddenKeys.includes('baseline')}
+                onMouseEnter={() => setHoveredKey('baseline')}
+                onMouseLeave={() => setHoveredKey(null)}
                 name={t('loanDetail.scenarioChart.baselineMarker', {
                   date: payoffLabel(baseline.payoffDate),
                 })}
@@ -212,9 +286,13 @@ export function ScenarioComparisonChart({
                 type="monotone"
                 dataKey={s.id}
                 stroke={s.color}
-                strokeWidth={2}
+                strokeWidth={hoveredKey === s.id ? 3.5 : 2}
+                strokeOpacity={hoveredKey !== null && hoveredKey !== s.id ? 0.35 : 1}
                 strokeDasharray={s.payoffDate ? undefined : '6 4'}
                 dot={false}
+                hide={hiddenKeys.includes(s.id)}
+                onMouseEnter={() => setHoveredKey(s.id)}
+                onMouseLeave={() => setHoveredKey(null)}
                 name={
                   s.payoffDate
                     ? `${s.name} · ${overpaymentLabel(s)}`

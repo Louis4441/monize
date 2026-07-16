@@ -1,18 +1,49 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { ReactNode } from 'react';
-import { render, screen } from '@/test/render';
+import { render, screen, fireEvent, act, waitFor } from '@/test/render';
+import { captureSvgAsImage } from '@/lib/pdf-export-charts';
 import { ScenarioComparisonChart, ScenarioOutcome } from './ScenarioComparisonChart';
 
+vi.mock('@/lib/pdf-export-charts', () => ({
+  captureSvgAsImage: vi.fn(),
+}));
+
 // Recharts needs a real layout; stub it so the chart renders deterministically
-// in jsdom. Lines expose their legend name so the arcs are countable.
+// in jsdom. Lines expose their legend name and hide flag; the Legend stub
+// exercises the formatter/click/hover contract for the first scenario series.
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   LineChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  Line: ({ name }: { name: string }) => <div data-testid="chart-line">{name}</div>,
+  Line: ({ name, dataKey, hide }: { name: string; dataKey: string; hide?: boolean }) => (
+    <div data-testid="chart-line" data-key={dataKey} data-hidden={hide ? 'true' : 'false'}>
+      {name}
+    </div>
+  ),
   XAxis: () => null,
   YAxis: () => null,
   CartesianGrid: () => null,
-  Legend: () => null,
+  Legend: ({
+    onClick,
+    onMouseEnter,
+    formatter,
+  }: {
+    onClick?: (entry: unknown) => void;
+    onMouseEnter?: (entry: unknown) => void;
+    formatter?: (value: string, entry: unknown) => ReactNode;
+  }) => (
+    <div>
+      <button data-testid="legend-s1" onClick={() => onClick?.({ dataKey: 's1' })}>
+        toggle-s1
+      </button>
+      <button
+        data-testid="legend-hover-s1"
+        onMouseEnter={() => onMouseEnter?.({ dataKey: 's1' })}
+      >
+        hover-s1
+      </button>
+      <span data-testid="legend-label-s1">{formatter?.('Label', { dataKey: 's1' })}</span>
+    </div>
+  ),
   Tooltip: ({ content }: { content: (props: unknown) => ReactNode }) => (
     <div data-testid="tooltip">
       {content({
@@ -46,15 +77,22 @@ const outcomes: ScenarioOutcome[] = [
 
 const baseline = { payoffDate: '2040-01-15' };
 
+function renderChart(
+  overrides: Partial<Parameters<typeof ScenarioComparisonChart>[0]> = {},
+) {
+  return render(
+    <ScenarioComparisonChart
+      outcomes={outcomes}
+      baseline={baseline}
+      currencyCode="PLN"
+      {...overrides}
+    />,
+  );
+}
+
 describe('ScenarioComparisonChart', () => {
   it('draws a baseline marker and an arc per scenario, named with the overpayment', () => {
-    render(
-      <ScenarioComparisonChart
-        outcomes={outcomes}
-        baseline={baseline}
-        currencyCode="PLN"
-      />,
-    );
+    renderChart();
 
     const lines = screen.getAllByTestId('chart-line');
     // Baseline zero-line + one parabola per scenario
@@ -67,13 +105,7 @@ describe('ScenarioComparisonChart', () => {
   });
 
   it('shows the real interest saved and payoff date in the tooltip', () => {
-    render(
-      <ScenarioComparisonChart
-        outcomes={outcomes}
-        baseline={baseline}
-        currencyCode="PLN"
-      />,
-    );
+    renderChart();
 
     // The tooltip lists only the hovered series (s1) with its true figures,
     // not the interpolated arc height.
@@ -85,14 +117,59 @@ describe('ScenarioComparisonChart', () => {
   });
 
   it('labels a scenario that never pays off within the projection', () => {
-    render(
-      <ScenarioComparisonChart
-        outcomes={[{ ...outcomes[0], payoffDate: null }]}
-        baseline={baseline}
-        currencyCode="PLN"
-      />,
-    );
+    renderChart({ outcomes: [{ ...outcomes[0], payoffDate: null }] });
 
     expect(screen.getByTestId('tooltip')).toHaveTextContent('Beyond projection');
+  });
+
+  it('toggles a line via a legend click and strikes its legend label through', async () => {
+    renderChart();
+
+    const lineOf = (key: string) =>
+      screen.getAllByTestId('chart-line').find((l) => l.dataset.key === key)!;
+    expect(lineOf('s1').dataset.hidden).toBe('false');
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('legend-s1'));
+    });
+    expect(lineOf('s1').dataset.hidden).toBe('true');
+    expect(
+      screen.getByTestId('legend-label-s1').querySelector('.line-through'),
+    ).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('legend-s1'));
+    });
+    expect(lineOf('s1').dataset.hidden).toBe('false');
+  });
+
+  it('emphasizes the hovered series in the legend', async () => {
+    renderChart();
+
+    expect(
+      screen.getByTestId('legend-label-s1').querySelector('.font-semibold'),
+    ).toBeNull();
+    await act(async () => {
+      fireEvent.mouseEnter(screen.getByTestId('legend-hover-s1'));
+    });
+    expect(
+      screen.getByTestId('legend-label-s1').querySelector('.font-semibold'),
+    ).toBeTruthy();
+  });
+
+  it('exports the chart as PNG like the payoff chart', async () => {
+    vi.mocked(captureSvgAsImage).mockResolvedValue({
+      dataUrl: 'data:image/png;base64,x',
+      width: 100,
+      height: 50,
+    });
+    renderChart();
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: /Download Scenario comparison as PNG/i }),
+      );
+    });
+    await waitFor(() => expect(captureSvgAsImage).toHaveBeenCalledTimes(1));
   });
 });
