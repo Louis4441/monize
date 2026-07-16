@@ -46,6 +46,7 @@ vi.mock('recharts', () => ({
 
 const mockGetAllAccounts = vi.fn();
 const mockGetAllTransactions = vi.fn();
+const mockGetAllPages = vi.fn();
 
 vi.mock('@/lib/accounts', () => ({
   accountsApi: {
@@ -56,6 +57,7 @@ vi.mock('@/lib/accounts', () => ({
 vi.mock('@/lib/transactions', () => ({
   transactionsApi: {
     getAll: (...args: any[]) => mockGetAllTransactions(...args),
+    getAllPages: (...args: any[]) => mockGetAllPages(...args),
   },
 }));
 
@@ -95,6 +97,38 @@ describe('DebtPayoffTimelineReport', () => {
     await waitFor(() => {
       expect(screen.getByText(/No debt accounts found/)).toBeInTheDocument();
     });
+  });
+
+  it('fetches the loan\'s separately-booked interest expenses (issue #893)', async () => {
+    mockGetAllAccounts.mockResolvedValue([
+      {
+        id: 'loan-1',
+        name: 'Mortgage',
+        accountType: 'MORTGAGE',
+        currentBalance: -100000,
+        openingBalance: -120000,
+        interestRate: 5.0,
+        paymentAmount: 800,
+        paymentFrequency: 'MONTHLY',
+        interestCategoryId: 'cat-int',
+        sourceAccountId: 'src-1',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      },
+    ]);
+    mockGetAllPages.mockResolvedValue([
+      { id: 'i1', transactionDate: '2024-06-01', amount: -300, categoryId: 'cat-int', isTransfer: false },
+    ]);
+
+    render(<DebtPayoffTimelineReport />);
+
+    await waitFor(() =>
+      expect(mockGetAllPages).toHaveBeenCalledWith({
+        categoryIds: ['cat-int'],
+        accountIds: ['src-1'],
+      }),
+    );
   });
 
   it('renders controls with account selector when accounts exist', async () => {

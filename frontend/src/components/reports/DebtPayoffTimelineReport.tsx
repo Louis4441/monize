@@ -22,6 +22,7 @@ import {
   buildLoanProjectionInput,
   deriveLoanPaymentHistory,
   fetchAllAccountTransactions,
+  fetchLoanInterestTransactions,
 } from '@/lib/loan-history';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
@@ -93,6 +94,19 @@ export function DebtPayoffTimelineReport() {
   );
 
   const transactions = useMemo<Transaction[]>(() => transactionsData ?? [], [transactionsData]);
+
+  // The loan's separately-booked interest expenses, so derived interest matches
+  // the loan detail page (see #893).
+  const { data: interestData } = useReportData(
+    async () => {
+      const account = accounts.find((a) => a.id === selectedAccountId);
+      if (!account) return [] as Transaction[];
+      return fetchLoanInterestTransactions(account);
+    },
+    [selectedAccountId, accounts],
+  );
+  const interestTransactions = useMemo<Transaction[]>(() => interestData ?? [], [interestData]);
+
   const isLoading = accountsLoading || transactionsLoading;
   const error = accountsError || transactionsError;
   const reload = () => {
@@ -108,7 +122,7 @@ export function DebtPayoffTimelineReport() {
     if (!selectedAccount) return { payoffSchedule: [], projectionStartLabel: null };
 
     // --- Historical payments from actual transactions ---
-    const history = deriveLoanPaymentHistory(selectedAccount, transactions);
+    const history = deriveLoanPaymentHistory(selectedAccount, transactions, [], interestTransactions);
     const schedule: PayoffScheduleItem[] = history.events.map((event) => ({
       date: event.date,
       label: formatChartDate(event.date, 'MMM yyyy'),
@@ -199,7 +213,7 @@ export function DebtPayoffTimelineReport() {
     }
 
     return { payoffSchedule: monthlySchedule, projectionStartLabel: startLabel };
-  }, [selectedAccount, transactions, formatChartDate]);
+  }, [selectedAccount, transactions, interestTransactions, formatChartDate]);
 
   const summary = useMemo(() => {
     if (payoffSchedule.length === 0 || !selectedAccount) return null;
