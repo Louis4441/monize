@@ -235,8 +235,13 @@ export function ScenarioComparisonChart({
                       {label}
                     </p>
                     {shown.map((s) => (
-                      <p key={s.id} className="text-sm" style={{ color: s.color }}>
-                        {s.name}: {formatCurrencyCompact(Math.max(0, s.interestSaved))}
+                      <p
+                        key={s.id}
+                        className={`text-sm ${hoveredKey === s.id ? 'font-semibold' : ''}`}
+                        style={{ color: s.color }}
+                      >
+                        {s.name} · {overpaymentLabel(s)}:{' '}
+                        {formatCurrencyCompact(Math.max(0, s.interestSaved))}
                         {' · '}
                         {payoffLabel(s.payoffDate)}
                       </p>
@@ -298,6 +303,26 @@ export function ScenarioComparisonChart({
                     ? `${s.name} · ${overpaymentLabel(s)}`
                     : `${s.name} · ${overpaymentLabel(s)} · ${t('loanDetail.comparison.beyondProjection')}`
                 }
+              />
+            ))}
+            {/* Invisible wide twin of each arc: a 2px stroke is nearly
+                impossible to hit while the tooltip layer is active, so these
+                carry the hover detection that emphasizes the series and bolds
+                its name in the tooltip and legend. */}
+            {series.map((s) => (
+              <Line
+                key={`${s.id}-hit`}
+                type="monotone"
+                dataKey={s.id}
+                stroke="transparent"
+                strokeWidth={18}
+                dot={false}
+                activeDot={false}
+                legendType="none"
+                tooltipType="none"
+                hide={hiddenKeys.includes(s.id)}
+                onMouseEnter={() => setHoveredKey(s.id)}
+                onMouseLeave={() => setHoveredKey(null)}
               />
             ))}
           </LineChart>

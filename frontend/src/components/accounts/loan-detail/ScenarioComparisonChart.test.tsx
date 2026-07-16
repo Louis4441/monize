@@ -14,8 +14,29 @@ vi.mock('@/lib/pdf-export-charts', () => ({
 vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   LineChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  Line: ({ name, dataKey, hide }: { name: string; dataKey: string; hide?: boolean }) => (
-    <div data-testid="chart-line" data-key={dataKey} data-hidden={hide ? 'true' : 'false'}>
+  Line: ({
+    name,
+    dataKey,
+    hide,
+    legendType,
+    onMouseEnter,
+    onMouseLeave,
+  }: {
+    name?: string;
+    dataKey: string;
+    hide?: boolean;
+    legendType?: string;
+    onMouseEnter?: () => void;
+    onMouseLeave?: () => void;
+  }) => (
+    <div
+      data-testid="chart-line"
+      data-key={dataKey}
+      data-hidden={hide ? 'true' : 'false'}
+      data-legend={legendType ?? 'line'}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       {name}
     </div>
   ),
@@ -94,14 +115,16 @@ describe('ScenarioComparisonChart', () => {
   it('draws a baseline marker and an arc per scenario, named with the overpayment', () => {
     renderChart();
 
-    const lines = screen.getAllByTestId('chart-line');
-    // Baseline zero-line + one parabola per scenario
+    // Baseline zero-line + one parabola per scenario (the transparent hover
+    // hit-lines are excluded from the legend)
+    const lines = screen
+      .getAllByTestId('chart-line')
+      .filter((l) => l.dataset.legend !== 'none');
     expect(lines).toHaveLength(3);
-    expect(lines.map((l) => l.textContent).join('|')).toMatch(/No overpayments/);
-    expect(screen.getByText(/Aggressive · \+.*1,500.*\/ payment/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Moderate · \+.*500.*\/ payment \+ 2 lump sums/),
-    ).toBeInTheDocument();
+    const legendNames = lines.map((l) => l.textContent).join('|');
+    expect(legendNames).toMatch(/No overpayments/);
+    expect(legendNames).toMatch(/Aggressive · \+.*1,500.*\/ payment/);
+    expect(legendNames).toMatch(/Moderate · \+.*500.*\/ payment \+ 2 lump sums/);
   });
 
   it('shows the real interest saved and payoff date in the tooltip', () => {
@@ -111,9 +134,32 @@ describe('ScenarioComparisonChart', () => {
     // not the interpolated arc height.
     const tooltip = screen.getByTestId('tooltip');
     expect(tooltip).toHaveTextContent(/Aggressive/);
+    expect(tooltip).toHaveTextContent(/1,500/); // the monthly extra
     expect(tooltip).toHaveTextContent(/30,000/);
     expect(tooltip).toHaveTextContent('Jun 2030');
     expect(tooltip).not.toHaveTextContent(/Moderate/);
+  });
+
+  it('bolds the hovered line in the tooltip via its wide hit-line twin', async () => {
+    renderChart();
+
+    const tooltip = screen.getByTestId('tooltip');
+    expect(tooltip.querySelector('.font-semibold')).toBeNull();
+
+    const hitLine = screen
+      .getAllByTestId('chart-line')
+      .find((l) => l.dataset.key === 's1' && l.dataset.legend === 'none')!;
+    await act(async () => {
+      fireEvent.mouseEnter(hitLine);
+    });
+    const bolded = tooltip.querySelector('.font-semibold');
+    expect(bolded).toBeTruthy();
+    expect(bolded).toHaveTextContent(/Aggressive/);
+
+    await act(async () => {
+      fireEvent.mouseLeave(hitLine);
+    });
+    expect(tooltip.querySelector('.font-semibold')).toBeNull();
   });
 
   it('labels a scenario that never pays off within the projection', () => {
