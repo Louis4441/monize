@@ -72,7 +72,7 @@ export function SelectAccountStep({
     return buildAccountDropdownOptions(
       accounts,
       (a) => isInvestment ? isInvestmentBrokerageAccount(a) : !isInvestmentBrokerageAccount(a),
-      (a) => `${a.name} (${formatAccountType(a.accountType)})`,
+      (a) => `${a.name} (${formatAccountType(a.accountType, tc)})`,
     );
   };
 
