@@ -1,9 +1,8 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
-import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { InstitutionLogo, InstitutionLogoData } from '@/components/institutions/InstitutionLogo';
 import { formatAccountType } from '@/lib/account-utils';
@@ -55,31 +54,47 @@ export function AccountDetailShell({
 }: AccountDetailShellProps) {
   const t = useTranslations('accountDetail');
   const tc = useTranslations('common');
+  const [isExporting, setIsExporting] = useState(false);
 
-  // "Back to Accounts" leads the action row, set off from the page-specific
-  // actions by a minimalist vertical divider.
-  const hasTrailingActions = !!(
-    headerActions ||
+  const handleExport = async () => {
+    if (!onExport) return;
+    setIsExporting(true);
+    try {
+      await onExport();
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Export PDF leads the action row, set off from the navigation actions by a
+  // minimalist vertical divider. Every action is the same outline Button so the
+  // row reads as one consistent set.
+  const hasNavActions = !!(
+    onBack ||
     onViewTransactions ||
     onReconcile ||
     onEdit ||
-    onExport
+    headerActions
   );
 
   const actions = (
     <>
-      {onBack && (
-        <Button variant="outline" onClick={onBack}>
-          {t('header.back')}
+      {onExport && (
+        <Button variant="outline" onClick={handleExport} isLoading={isExporting}>
+          {tc('exportDropdown.exportPdf')}
         </Button>
       )}
-      {onBack && hasTrailingActions && (
+      {onExport && hasNavActions && (
         <span
           aria-hidden="true"
           className="hidden sm:block h-6 border-l border-gray-300 dark:border-gray-600"
         />
       )}
-      {headerActions}
+      {onBack && (
+        <Button variant="outline" onClick={onBack}>
+          {t('header.back')}
+        </Button>
+      )}
       {onViewTransactions && (
         <Button variant="outline" onClick={onViewTransactions}>
           {t('header.viewTransactions')}
@@ -95,7 +110,7 @@ export function AccountDetailShell({
           {t('header.edit')}
         </Button>
       )}
-      {onExport && <ExportDropdown onExportPdf={onExport} />}
+      {headerActions}
     </>
   );
 
