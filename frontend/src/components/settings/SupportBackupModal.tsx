@@ -264,6 +264,9 @@ export function SupportBackupModal({ isOpen, onClose }: SupportBackupModalProps)
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {t('multiplierHint')}
           </p>
+          <p className="mt-1 text-xs font-bold text-amber-700 dark:text-amber-400">
+            {t('multiplierWarning')}
+          </p>
         </div>
 
         {/* Encryption password: required, pre-filled random, editable */}
