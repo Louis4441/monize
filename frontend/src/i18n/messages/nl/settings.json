@@ -255,7 +255,7 @@
     "dateFromLabel": "Van",
     "dateToLabel": "Tot",
     "multiplierLabel": "Bedragvermenigvuldiger",
-    "multiplierHint": "Elk privébedrag wordt hiermee vermenigvuldigd. Elk niet-geheel getal groter dan 1 werkt; „Opnieuw genereren\" kiest een nieuwe willekeurige waarde.",
+    "multiplierHint": "Elk privébedrag wordt met dit getal vermenigvuldigd om de echte waarden te verbergen terwijl alles consistent blijft. Deel de vermenigvuldiger met niemand — het is de sleutel die de verborgen bedragen terugrekent. Elk niet-geheel getal groter dan 1 werkt; „Opnieuw genereren\" kiest een nieuwe.",
     "multiplierInvalid": "Voer een niet-geheel getal groter dan 1 in.",
     "regenerate": "Opnieuw genereren",
     "passwordLabel": "Versleutelingswachtwoord",

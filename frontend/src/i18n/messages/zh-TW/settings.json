@@ -255,7 +255,7 @@
     "dateFromLabel": "從",
     "dateToLabel": "至",
     "multiplierLabel": "金額乘數",
-    "multiplierHint": "每筆私人金額都會乘以該值。任何大於 1 的非整數皆可;「重新產生」會隨機選取新值。",
+    "multiplierHint": "每筆私人金額都會乘以該數字,以在保持一致性的同時隱藏真實數值。請勿將乘數分享給任何人——它是還原隱藏金額的密鑰。任何大於 1 的非整數皆可;「重新產生」會選取新值。",
     "multiplierInvalid": "請輸入大於 1 的非整數。",
     "regenerate": "重新產生",
     "passwordLabel": "加密密碼",

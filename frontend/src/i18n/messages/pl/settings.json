@@ -255,7 +255,7 @@
     "dateFromLabel": "Od",
     "dateToLabel": "Do",
     "multiplierLabel": "Mnożnik kwot",
-    "multiplierHint": "Każda prywatna kwota jest przez niego mnożona. Zadziała dowolna liczba niecałkowita większa od 1; „Wygeneruj ponownie\" losuje nową wartość.",
+    "multiplierHint": "Każda prywatna kwota jest mnożona przez tę liczbę, aby ukryć rzeczywiste wartości przy zachowaniu spójności. Nie udostępniaj nikomu mnożnika — to on odwraca ukryte kwoty. Zadziała dowolna liczba niecałkowita większa od 1; „Wygeneruj ponownie\" losuje nową.",
     "multiplierInvalid": "Podaj liczbę niecałkowitą większą od 1.",
     "regenerate": "Wygeneruj ponownie",
     "passwordLabel": "Hasło szyfrowania",

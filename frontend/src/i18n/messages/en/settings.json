@@ -255,7 +255,7 @@
     "dateFromLabel": "From",
     "dateToLabel": "To",
     "multiplierLabel": "Amount multiplier",
-    "multiplierHint": "Every private amount is multiplied by this. Any non-integer greater than 1 works; Regenerate picks a new random value.",
+    "multiplierHint": "Every private amount is multiplied by this number to hide the actual value while keeping everything consistent. Do not share the multiplier with anyone — it is the key that reverses the hidden amounts. Any non-integer greater than 1 works; Regenerate picks a new one.",
     "multiplierInvalid": "Enter a non-integer greater than 1.",
     "regenerate": "Regenerate",
     "passwordLabel": "Encryption password",

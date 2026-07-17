@@ -255,7 +255,7 @@
     "dateFromLabel": "Başlangıç",
     "dateToLabel": "Bitiş",
     "multiplierLabel": "Tutar çarpanı",
-    "multiplierHint": "Her özel tutar bununla çarpılır. 1’den büyük, tam sayı olmayan herhangi bir sayı olur; “Yeniden üret” yeni bir rastgele değer seçer.",
+    "multiplierHint": "Her özel tutar, gerçek değerleri gizlemek ve tutarlılığı korumak için bu sayıyla çarpılır. Çarpanı kimseyle paylaşmayın — gizlenen tutarları geri çeviren anahtar odur. 1’den büyük, tam sayı olmayan herhangi bir sayı olur; “Yeniden üret” yenisini seçer.",
     "multiplierInvalid": "1’den büyük, tam sayı olmayan bir sayı girin.",
     "regenerate": "Yeniden üret",
     "passwordLabel": "Şifreleme parolası",

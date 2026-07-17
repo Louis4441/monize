@@ -481,6 +481,24 @@ describe("SupportBackupService.generate", () => {
     // encrypted output is not raw gzip
     expect(() => gunzipSync(buffer)).toThrow();
   });
+
+  it("encrypts without AI_ENCRYPTION_KEY (file encryption derives its key from the password, not the AI key)", async () => {
+    // The service takes no AiEncryptionService dependency and encryptBackup
+    // derives its AES key from the user's password via scrypt, so an unset
+    // AI_ENCRYPTION_KEY cannot affect a support backup. Prove the encrypted
+    // path works with no AI key present in the environment.
+    const previous = process.env.AI_ENCRYPTION_KEY;
+    delete process.env.AI_ENCRYPTION_KEY;
+    try {
+      const { encrypted } = await makeService().generate(USER, {
+        multiplier: 2.5,
+        password: "correct-horse-battery-staple",
+      });
+      expect(encrypted).toBe(true);
+    } finally {
+      if (previous !== undefined) process.env.AI_ENCRYPTION_KEY = previous;
+    }
+  });
 });
 
 describe("SupportBackupService.preview", () => {

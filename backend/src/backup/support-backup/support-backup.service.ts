@@ -114,6 +114,9 @@ export class SupportBackupService {
       ...remapped,
     };
     const gzipped = gzipSync(Buffer.from(JSON.stringify(payload), "utf-8"));
+    // encryptBackup derives its AES-256-GCM key from the user's password
+    // (scrypt), not from AI_ENCRYPTION_KEY, so a support backup encrypts fine
+    // regardless of whether that env var is configured.
     return options.password
       ? { buffer: encryptBackup(gzipped, options.password), encrypted: true }
       : { buffer: gzipped, encrypted: false };

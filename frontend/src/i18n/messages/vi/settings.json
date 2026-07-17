@@ -255,7 +255,7 @@
     "dateFromLabel": "Từ",
     "dateToLabel": "Đến",
     "multiplierLabel": "Hệ số nhân số tiền",
-    "multiplierHint": "Mọi số tiền riêng tư đều được nhân với giá trị này. Bất kỳ số không nguyên lớn hơn 1 nào cũng được; “Tạo lại” chọn một giá trị ngẫu nhiên mới.",
+    "multiplierHint": "Mọi số tiền riêng tư được nhân với số này để ẩn giá trị thật trong khi vẫn giữ tính nhất quán. Đừng chia sẻ hệ số nhân với bất kỳ ai — đó là chìa khoá đảo ngược các số tiền đã ẩn. Bất kỳ số không nguyên lớn hơn 1 nào cũng được; “Tạo lại” chọn số mới.",
     "multiplierInvalid": "Nhập một số không nguyên lớn hơn 1.",
     "regenerate": "Tạo lại",
     "passwordLabel": "Mật khẩu mã hoá",

@@ -255,7 +255,7 @@
     "dateFromLabel": "Du",
     "dateToLabel": "Au",
     "multiplierLabel": "Multiplicateur des montants",
-    "multiplierHint": "Chaque montant privé est multiplié par cette valeur. Tout nombre non entier supérieur à 1 convient ; « Régénérer » en tire un nouveau au hasard.",
+    "multiplierHint": "Chaque montant privé est multiplié par ce nombre pour masquer les vraies valeurs tout en gardant la cohérence. Ne communiquez le multiplicateur à personne — c'est la clé qui inverse les montants masqués. Tout nombre non entier supérieur à 1 convient ; « Régénérer » en choisit un nouveau.",
     "multiplierInvalid": "Saisissez un nombre non entier supérieur à 1.",
     "regenerate": "Régénérer",
     "passwordLabel": "Mot de passe de chiffrement",
