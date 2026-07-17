@@ -471,7 +471,6 @@
       "title": "Kịch bản đã lưu",
       "saveCurrent": "Lưu kịch bản hiện tại",
       "empty": "Chưa có kịch bản nào được lưu. Thiết lập khoản trả trước hạn ở trên và lưu lại để so sánh các kế hoạch theo thời gian.",
-      "load": "Tải",
       "rename": "Đổi tên",
       "delete": "Xóa",
       "cancel": "Hủy",
@@ -492,7 +491,8 @@
       "deleteMessage": "Xóa kịch bản \"{name}\"? Không thể hoàn tác thao tác này.",
       "loadFailed": "Không thể tải các kịch bản đã lưu. Chúng vẫn được lưu trữ — tải lại trang để thử lại.",
       "colOverpayment": "Trả thêm",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "Tải kịch bản \"{name}\""
     },
     "scenarioChart": {
       "title": "So sánh kịch bản",

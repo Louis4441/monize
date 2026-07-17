@@ -471,7 +471,6 @@
       "title": "Opgeslagen scenario's",
       "saveCurrent": "Huidig scenario opslaan",
       "empty": "Nog geen opgeslagen scenario's. Stel hierboven een extra aflossing in en sla deze op om plannen in de loop van de tijd te vergelijken.",
-      "load": "Laden",
       "rename": "Hernoemen",
       "delete": "Verwijderen",
       "cancel": "Annuleren",
@@ -492,7 +491,8 @@
       "deleteMessage": "Het scenario \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt.",
       "loadFailed": "De opgeslagen scenario's konden niet worden geladen. Ze zijn nog opgeslagen — herlaad de pagina om het opnieuw te proberen.",
       "colOverpayment": "Extra aflossing",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "Scenario \"{name}\" laden"
     },
     "scenarioChart": {
       "title": "Scenariovergelijking",

@@ -471,7 +471,6 @@
       "title": "Scenari salvati",
       "saveCurrent": "Salva scenario attuale",
       "empty": "Nessuno scenario salvato. Configura un rimborso anticipato qui sopra e salvalo per confrontare i piani nel tempo.",
-      "load": "Carica",
       "rename": "Rinomina",
       "delete": "Elimina",
       "cancel": "Annulla",
@@ -492,7 +491,8 @@
       "deleteMessage": "Eliminare lo scenario \"{name}\"? Questa operazione non può essere annullata.",
       "loadFailed": "Impossibile caricare gli scenari salvati. Sono ancora memorizzati: ricarica la pagina per riprovare.",
       "colOverpayment": "Versamento extra",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "Carica lo scenario \"{name}\""
     },
     "scenarioChart": {
       "title": "Confronto scenari",

@@ -471,7 +471,6 @@
       "title": "Kayıtlı Senaryolar",
       "saveCurrent": "Mevcut senaryoyu kaydet",
       "empty": "Henüz kayıtlı senaryo yok. Yukarıda bir erken ödeme ayarlayın ve planları zaman içinde karşılaştırmak için kaydedin.",
-      "load": "Yükle",
       "rename": "Yeniden adlandır",
       "delete": "Sil",
       "cancel": "İptal",
@@ -492,7 +491,8 @@
       "deleteMessage": "\"{name}\" senaryosu silinsin mi? Bu işlem geri alınamaz.",
       "loadFailed": "Kayıtlı senaryolar yüklenemedi. Hâlâ kayıtlılar — tekrar denemek için sayfayı yenileyin.",
       "colOverpayment": "Ek ödeme",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "\"{name}\" senaryosunu yükle"
     },
     "scenarioChart": {
       "title": "Senaryo karşılaştırması",

@@ -127,15 +127,24 @@ describe('SavedScenariosPanel', () => {
     expect(screen.getByText('Save current scenario')).toBeDisabled();
   });
 
-  it('loads a scenario back into the simulator', () => {
+  it('loads a scenario when its row is clicked', () => {
     const { props } = renderPanel();
 
-    fireEvent.click(screen.getByText('Load'));
+    // No dedicated Load button: clicking anywhere on the row loads it.
+    fireEvent.click(screen.getByText('Extra 200'));
 
     expect(props.onLoad).toHaveBeenCalledWith(
       { recurringExtra: { amount: 200 }, lumpSums: [{ date: '2026-06-01', amount: 5000 }] },
       expect.objectContaining({ id: 'scenario-1' }),
     );
+  });
+
+  it('does not load when a row action button is clicked', () => {
+    const { props } = renderPanel();
+
+    fireEvent.click(screen.getByText('Rename'));
+
+    expect(props.onLoad).not.toHaveBeenCalled();
   });
 
   it('saves the active plan under a name', async () => {

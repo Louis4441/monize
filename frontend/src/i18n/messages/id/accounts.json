@@ -471,7 +471,6 @@
       "title": "Skenario Tersimpan",
       "saveCurrent": "Simpan skenario saat ini",
       "empty": "Belum ada skenario tersimpan. Atur pembayaran tambahan di atas dan simpan untuk membandingkan rencana dari waktu ke waktu.",
-      "load": "Muat",
       "rename": "Ganti nama",
       "delete": "Hapus",
       "cancel": "Batal",
@@ -492,7 +491,8 @@
       "deleteMessage": "Hapus skenario \"{name}\"? Tindakan ini tidak dapat dibatalkan.",
       "loadFailed": "Tidak dapat memuat skenario tersimpan. Skenario masih tersimpan — muat ulang halaman untuk mencoba lagi.",
       "colOverpayment": "Pembayaran ekstra",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "Muat skenario \"{name}\""
     },
     "scenarioChart": {
       "title": "Perbandingan skenario",

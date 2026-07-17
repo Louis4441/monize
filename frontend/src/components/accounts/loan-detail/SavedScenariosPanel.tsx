@@ -176,8 +176,22 @@ export function SavedScenariosPanel({
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {scenarios.map((scenario) => {
                 const comparison = comparisons.get(scenario.id) ?? null;
+                const load = () => onLoad(scenarioToPlan(scenario), scenario);
                 return (
-                  <tr key={scenario.id}>
+                  <tr
+                    key={scenario.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t('loanDetail.scenarios.loadAria', { name: scenario.name })}
+                    onClick={load}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        load();
+                      }
+                    }}
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
+                  >
                     <td className="px-3 py-2 align-top">
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                         {scenario.name}
@@ -199,21 +213,26 @@ export function SavedScenariosPanel({
                       {interestSavedLabel(comparison)}
                     </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {/* Row-level actions stop propagation so they don't also
+                          load the scenario (the row's own click does that). */}
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => onLoad(scenarioToPlan(scenario), scenario)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openRename(scenario);
+                          }}
                         >
-                          {t('loanDetail.scenarios.load')}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => openRename(scenario)}>
                           {t('loanDetail.scenarios.rename')}
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setScenarioToDelete(scenario)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setScenarioToDelete(scenario);
+                          }}
                         >
                           {t('loanDetail.scenarios.delete')}
                         </Button>

@@ -471,7 +471,6 @@
       "title": "Escenarios guardados",
       "saveCurrent": "Guardar escenario actual",
       "empty": "Aún no hay escenarios guardados. Configure un pago anticipado arriba y guárdelo para comparar planes a lo largo del tiempo.",
-      "load": "Cargar",
       "rename": "Renombrar",
       "delete": "Eliminar",
       "cancel": "Cancelar",
@@ -492,7 +491,8 @@
       "deleteMessage": "¿Eliminar el escenario \"{name}\"? Esta acción no se puede deshacer.",
       "loadFailed": "No se pudieron cargar los escenarios guardados. Siguen almacenados: recargue la página para volver a intentarlo.",
       "colOverpayment": "Amortización",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "Cargar escenario «{name}»"
     },
     "scenarioChart": {
       "title": "Comparación de escenarios",

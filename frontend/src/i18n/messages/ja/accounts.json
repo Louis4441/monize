@@ -471,7 +471,6 @@
       "title": "保存済みシナリオ",
       "saveCurrent": "現在のシナリオを保存",
       "empty": "保存済みのシナリオはまだありません。上で繰上返済を設定して保存すると、プランを比較できます。",
-      "load": "読み込む",
       "rename": "名前を変更",
       "delete": "削除",
       "cancel": "キャンセル",
@@ -492,7 +491,8 @@
       "deleteMessage": "シナリオ \"{name}\" を削除しますか？この操作は元に戻せません。",
       "loadFailed": "保存済みシナリオを読み込めませんでした。データは保存されています。ページを再読み込みして再試行してください。",
       "colOverpayment": "繰上返済",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "シナリオ「{name}」を読み込む"
     },
     "scenarioChart": {
       "title": "シナリオ比較",

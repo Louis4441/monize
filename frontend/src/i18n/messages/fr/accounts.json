@@ -471,7 +471,6 @@
       "title": "Scénarios enregistrés",
       "saveCurrent": "Enregistrer le scénario actuel",
       "empty": "Aucun scénario enregistré pour l'instant. Configurez un remboursement anticipé ci-dessus et enregistrez-le pour comparer vos plans au fil du temps.",
-      "load": "Charger",
       "rename": "Renommer",
       "delete": "Supprimer",
       "cancel": "Annuler",
@@ -492,7 +491,8 @@
       "deleteMessage": "Supprimer le scénario \"{name}\" ? Cette action est irréversible.",
       "loadFailed": "Impossible de charger les scénarios enregistrés. Ils sont toujours stockés — rechargez la page pour réessayer.",
       "colOverpayment": "Remboursement",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "Charger le scénario « {name} »"
     },
     "scenarioChart": {
       "title": "Comparaison des scénarios",

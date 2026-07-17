@@ -471,7 +471,6 @@
       "title": "已儲存的情境",
       "saveCurrent": "儲存目前情境",
       "empty": "尚無已儲存的情境。在上方設定提前還款並儲存，以便長期比較不同計畫。",
-      "load": "載入",
       "rename": "重新命名",
       "delete": "刪除",
       "cancel": "取消",
@@ -492,7 +491,8 @@
       "deleteMessage": "刪除情境 \"{name}\"？此操作無法復原。",
       "loadFailed": "無法載入已儲存的方案。它們仍然保存著——請重新載入頁面重試。",
       "colOverpayment": "額外還款",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "載入方案「{name}」"
     },
     "scenarioChart": {
       "title": "方案比較",

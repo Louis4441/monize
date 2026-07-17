@@ -471,7 +471,6 @@
       "title": "Gespeicherte Szenarien",
       "saveCurrent": "Aktuelles Szenario speichern",
       "empty": "Noch keine gespeicherten Szenarien. Richten Sie oben eine Sondertilgung ein und speichern Sie sie, um Pläne im Zeitverlauf zu vergleichen.",
-      "load": "Laden",
       "rename": "Umbenennen",
       "delete": "Löschen",
       "cancel": "Abbrechen",
@@ -492,7 +491,8 @@
       "deleteMessage": "Das Szenario \"{name}\" löschen? Dies kann nicht rückgängig gemacht werden.",
       "loadFailed": "Die gespeicherten Szenarien konnten nicht geladen werden. Sie sind weiterhin gespeichert — laden Sie die Seite neu, um es erneut zu versuchen.",
       "colOverpayment": "Sondertilgung",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "Szenario „{name}“ laden"
     },
     "scenarioChart": {
       "title": "Szenariovergleich",

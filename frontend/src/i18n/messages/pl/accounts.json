@@ -471,7 +471,6 @@
       "title": "Zapisane scenariusze",
       "saveCurrent": "Zapisz bieżący scenariusz",
       "empty": "Brak zapisanych scenariuszy. Skonfiguruj nadpłatę powyżej i zapisz ją, aby porównywać plany w czasie.",
-      "load": "Wczytaj",
       "rename": "Zmień nazwę",
       "delete": "Usuń",
       "cancel": "Anuluj",
@@ -492,7 +491,8 @@
       "deleteMessage": "Usunąć scenariusz \"{name}\"? Tej operacji nie można cofnąć.",
       "loadFailed": "Nie udało się wczytać zapisanych scenariuszy. Nadal są zapisane — odśwież stronę, aby spróbować ponownie.",
       "colOverpayment": "Nadpłata",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "Wczytaj scenariusz „{name}“"
     },
     "scenarioChart": {
       "title": "Porównanie scenariuszy",

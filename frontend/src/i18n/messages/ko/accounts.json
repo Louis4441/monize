@@ -471,7 +471,6 @@
       "title": "저장된 시나리오",
       "saveCurrent": "현재 시나리오 저장",
       "empty": "저장된 시나리오가 아직 없습니다. 위에서 조기 상환을 설정하고 저장하여 계획을 비교해 보세요.",
-      "load": "불러오기",
       "rename": "이름 변경",
       "delete": "삭제",
       "cancel": "취소",
@@ -492,7 +491,8 @@
       "deleteMessage": "시나리오 \"{name}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
       "loadFailed": "저장된 시나리오를 불러오지 못했습니다. 데이터는 그대로 저장되어 있습니다. 페이지를 새로고침하여 다시 시도하세요.",
       "colOverpayment": "추가 상환",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "시나리오 \"{name}\" 불러오기"
     },
     "scenarioChart": {
       "title": "시나리오 비교",

@@ -471,7 +471,6 @@
       "title": "已保存的方案",
       "saveCurrent": "保存当前方案",
       "empty": "尚无已保存的方案。在上方设置提前还款并保存，以便长期比较不同计划。",
-      "load": "加载",
       "rename": "重命名",
       "delete": "删除",
       "cancel": "取消",
@@ -492,7 +491,8 @@
       "deleteMessage": "删除方案 \"{name}\"？此操作无法撤销。",
       "loadFailed": "无法加载已保存的方案。它们仍然保存着——请重新加载页面重试。",
       "colOverpayment": "额外还款",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "加载方案“{name}”"
     },
     "scenarioChart": {
       "title": "方案对比",

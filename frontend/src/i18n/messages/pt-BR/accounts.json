@@ -471,7 +471,6 @@
       "title": "Cenários salvos",
       "saveCurrent": "Salvar cenário atual",
       "empty": "Nenhum cenário salvo ainda. Configure uma amortização extra acima e salve-a para comparar planos ao longo do tempo.",
-      "load": "Carregar",
       "rename": "Renomear",
       "delete": "Excluir",
       "cancel": "Cancelar",
@@ -492,7 +491,8 @@
       "deleteMessage": "Excluir o cenário \"{name}\"? Esta ação não pode ser desfeita.",
       "loadFailed": "Não foi possível carregar os cenários salvos. Eles continuam armazenados — recarregue a página para tentar novamente.",
       "colOverpayment": "Pagamento extra",
-      "overpaymentWithFrequency": "{amount} ({frequency})"
+      "overpaymentWithFrequency": "{amount} ({frequency})",
+      "loadAria": "Carregar cenário \"{name}\""
     },
     "scenarioChart": {
       "title": "Comparação de cenários",

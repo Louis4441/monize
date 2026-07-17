@@ -553,7 +553,6 @@
       "title": "[XX-Saved Scenarios-XX]",
       "saveCurrent": "[XX-Save current scenario-XX]",
       "empty": "[XX-No saved scenarios yet. Set up an overpayment above and save it to compare plans over time.-XX]",
-      "load": "[XX-Load-XX]",
       "rename": "[XX-Rename-XX]",
       "delete": "[XX-Delete-XX]",
       "cancel": "[XX-Cancel-XX]",
@@ -574,7 +573,8 @@
       "deleteMessage": "[XX-Delete the scenario \"{name}\"? This cannot be undone.-XX]",
       "loadFailed": "[XX-Couldn't load the saved scenarios. They are still stored — reload the page to try again.-XX]",
       "colOverpayment": "[XX-Overpayment-XX]",
-      "overpaymentWithFrequency": "[XX-{amount} ({frequency})-XX]"
+      "overpaymentWithFrequency": "[XX-{amount} ({frequency})-XX]",
+      "loadAria": "[XX-Load scenario \"{name}\"-XX]"
     },
     "pastImpact": {
       "title": "[XX-Impact of Overpayments Made-XX]",
