@@ -343,41 +343,28 @@ export function BalanceHistoryChart({
         </ResponsiveContainer>
       </div>
 
-      {/* Summary footer */}
+      {/* Summary footer. With a fourth (Ending) figure the row still fits on a
+          single line on wider cards (grid-cols-4) and only falls back to two
+          rows when the width can't hold all four (grid-cols-2). Every figure
+          is coloured green/red by sign so the +/- state reads at a glance. */}
       {summary && (
-        <div className={`mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 grid ${summary.hasFutureData ? 'grid-cols-2' : 'grid-cols-3'} gap-4 text-center`}>
+        <div className={`mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 grid ${summary.hasFutureData ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-4 text-center`}>
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">{t('charts.balanceHistory.starting')}</div>
-            <div
-              className={`font-semibold ${
-                summary.startBalance >= 0
-                  ? 'text-gray-900 dark:text-gray-100'
-                  : 'text-red-600 dark:text-red-400'
-              }`}
-            >
+            <div className={`font-semibold ${gainLossColor(summary.startBalance)}`}>
               {formatCurrency(summary.startBalance)}
             </div>
           </div>
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">{t('charts.balanceHistory.current')}</div>
-            <div
-              className={`font-semibold ${
-                gainLossColor(summary.currentBalance)
-              }`}
-            >
+            <div className={`font-semibold ${gainLossColor(summary.currentBalance)}`}>
               {formatCurrency(summary.currentBalance)}
             </div>
           </div>
           {summary.hasFutureData && (
             <div>
               <div className="text-sm text-gray-500 dark:text-gray-400">{t('charts.balanceHistory.ending')}</div>
-              <div
-                className={`font-semibold ${
-                  summary.endBalance >= 0
-                    ? 'text-blue-600 dark:text-blue-400'
-                    : 'text-red-600 dark:text-red-400'
-                }`}
-              >
+              <div className={`font-semibold ${gainLossColor(summary.endBalance)}`}>
                 {formatCurrency(summary.endBalance)}
               </div>
             </div>
@@ -385,19 +372,14 @@ export function BalanceHistoryChart({
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">
               {/* For liability accounts a negative balance is expected, so this
-                  stays the neutral "Minimum balance" -- never the "Lowest"
-                  alarm phrasing reserved for an unexpectedly negative asset. */}
+                  stays the neutral "Min Balance" label -- never the "Lowest"
+                  alarm phrasing (or "!" marker) reserved for an unexpectedly
+                  negative asset. The value itself is still coloured by sign. */}
               {summary.goesNegative && !isLiability
                 ? t('charts.balanceHistory.lowest')
                 : t('charts.balanceHistory.minBalance')}
             </div>
-            <div
-              className={`font-semibold ${
-                summary.minBalance >= 0 || isLiability
-                  ? 'text-gray-900 dark:text-gray-100'
-                  : 'text-red-600 dark:text-red-400'
-              }`}
-            >
+            <div className={`font-semibold ${gainLossColor(summary.minBalance)}`}>
               {formatCurrency(summary.minBalance)}
               {summary.goesNegative && !isLiability && (
                 <span className="ml-1 text-xs text-red-500">!</span>
