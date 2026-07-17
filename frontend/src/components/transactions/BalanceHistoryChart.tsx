@@ -33,6 +33,13 @@ interface BalanceHistoryChartProps {
   currencyCode?: string;
   /** Account name to append to the download filename, e.g. "Checking". */
   accountName?: string;
+  /**
+   * True when the balance belongs to a liability account (credit card, loan,
+   * mortgage, line of credit). A negative balance is the normal, expected
+   * state for these, so the footer drops the "Lowest" alarm styling -- no red
+   * value, no warning marker.
+   */
+  isLiability?: boolean;
 }
 
 interface ChartPoint {
@@ -75,6 +82,7 @@ export function BalanceHistoryChart({
   isLoading,
   currencyCode,
   accountName,
+  isLiability = false,
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
@@ -299,7 +307,7 @@ export function BalanceHistoryChart({
             {summary && summary.minBalance !== summary.startBalance && (
               <ReferenceLine
                 y={summary.minBalance}
-                stroke={summary.minBalance < 0 ? chartColors.expense : chartColors.warning}
+                stroke={summary.minBalance < 0 && !isLiability ? chartColors.expense : chartColors.warning}
                 strokeDasharray="3 3"
                 strokeOpacity={0.4}
               />
@@ -376,17 +384,22 @@ export function BalanceHistoryChart({
           )}
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              {summary.goesNegative ? t('charts.balanceHistory.lowest') : t('charts.balanceHistory.minBalance')}
+              {/* For liability accounts a negative balance is expected, so this
+                  stays the neutral "Minimum balance" -- never the "Lowest"
+                  alarm phrasing reserved for an unexpectedly negative asset. */}
+              {summary.goesNegative && !isLiability
+                ? t('charts.balanceHistory.lowest')
+                : t('charts.balanceHistory.minBalance')}
             </div>
             <div
               className={`font-semibold ${
-                summary.minBalance >= 0
+                summary.minBalance >= 0 || isLiability
                   ? 'text-gray-900 dark:text-gray-100'
                   : 'text-red-600 dark:text-red-400'
               }`}
             >
               {formatCurrency(summary.minBalance)}
-              {summary.goesNegative && (
+              {summary.goesNegative && !isLiability && (
                 <span className="ml-1 text-xs text-red-500">!</span>
               )}
             </div>

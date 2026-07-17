@@ -153,6 +153,25 @@ describe('BalanceHistoryChart', () => {
     expect(screen.getByText('!')).toBeInTheDocument();
   });
 
+  it('omits the "Lowest" alarm styling for liability accounts with a negative balance', () => {
+    render(
+      <BalanceHistoryChart
+        data={[
+          { date: '2025-01-01', balance: -100 },
+          { date: '2025-01-02', balance: -250 },
+        ]}
+        isLoading={false}
+        isLiability
+      />
+    );
+
+    // A negative balance is expected for a credit card / loan, so the footer
+    // keeps the neutral "Minimum balance" label and shows no warning marker.
+    expect(screen.getByText('Min Balance')).toBeInTheDocument();
+    expect(screen.queryByText('Lowest')).not.toBeInTheDocument();
+    expect(screen.queryByText('!')).not.toBeInTheDocument();
+  });
+
   it('shows Ending balance when future transactions exist', () => {
     // Lock "today" so the data points after it stay in the future forever;
     // with a real clock this test started failing the day the last hardcoded
