@@ -36,12 +36,81 @@ export interface LumpSum {
   mode?: OverpaymentMode;
 }
 
+/**
+ * How often a recurring overpayment is made. ONE_OFF is a single dated payment
+ * (modelled as a lump sum, not a RecurringExtra); the rest recur. When an
+ * overpayment cadence differs from the loan's own payment cadence, the extra is
+ * approximated as an equivalent amount spread across every loan payment (e.g. a
+ * weekly extra on a monthly loan is applied as extra * 52/12 each month).
+ */
+export type OverpaymentFrequency =
+  | 'ONE_OFF'
+  | 'WEEKLY'
+  | 'BIWEEKLY'
+  | 'MONTHLY'
+  | 'QUARTERLY'
+  | 'ANNUALLY';
+
+/** Overpayments per year for each recurring frequency (ONE_OFF is not recurring). */
+export function overpaymentsPerYear(frequency: OverpaymentFrequency): number {
+  switch (frequency) {
+    case 'WEEKLY':
+      return 52;
+    case 'BIWEEKLY':
+      return 26;
+    case 'MONTHLY':
+      return 12;
+    case 'QUARTERLY':
+      return 4;
+    case 'ANNUALLY':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * The equivalent extra applied on every loan payment for a recurring
+ * overpayment made `amount` per `frequency` (approximate model: the cadence is
+ * levelled across the loan's payment periods).
+ */
+export function perPaymentExtraAmount(
+  amount: number,
+  frequency: OverpaymentFrequency,
+  loanFrequency: ScheduleFrequency,
+): number {
+  const per = overpaymentsPerYear(frequency);
+  if (per <= 0) return 0;
+  return (amount * per) / getPeriodsPerYear(loanFrequency);
+}
+
+/** Inverse of perPaymentExtraAmount: the per-frequency amount that yields a
+ *  given per-payment extra. Used to render a solved (per-payment) result back in
+ *  the user's chosen cadence. */
+export function frequencyAmountFromPerPayment(
+  perPayment: number,
+  frequency: OverpaymentFrequency,
+  loanFrequency: ScheduleFrequency,
+): number {
+  const per = overpaymentsPerYear(frequency);
+  if (per <= 0) return 0;
+  return (perPayment * getPeriodsPerYear(loanFrequency)) / per;
+}
+
 export interface RecurringExtra {
+  /** Amount per `frequency` (levelled across loan payments during projection). */
   amount: number;
   /** ISO date (yyyy-MM-dd); applies from the first payment when omitted */
   startDate?: string;
   /** ISO date (yyyy-MM-dd); applies until payoff when omitted */
   endDate?: string;
+  /**
+   * Cadence of the overpayment. Omitted means the amount is applied on every
+   * loan payment as-is (legacy "extra per payment"); a set frequency levels the
+   * amount across payments (e.g. QUARTERLY spreads a quarterly amount over the
+   * quarter's payments).
+   */
+  frequency?: OverpaymentFrequency;
   /**
    * Whether this overpayment shortens the term or lowers the installment.
    * Defaults to SHORTEN_TERM when omitted.
@@ -411,6 +480,13 @@ export function generateLoanSchedule(input: LoanScheduleInput): LoanScheduleResu
   let rateChangeIndex = 0;
 
   const recurringExtra = overpayments?.recurringExtra;
+  // Extra applied on each loan payment: the amount as-is when no cadence is
+  // set, otherwise the per-frequency amount levelled across loan payments.
+  const recurringPerPayment = recurringExtra
+    ? recurringExtra.frequency
+      ? perPaymentExtraAmount(recurringExtra.amount, recurringExtra.frequency, frequency)
+      : recurringExtra.amount
+    : 0;
   const lumpSums = [...(overpayments?.lumpSums ?? [])].sort((a, b) =>
     a.date.localeCompare(b.date),
   );
@@ -490,11 +566,11 @@ export function generateLoanSchedule(input: LoanScheduleInput): LoanScheduleResu
     let lowerApplied = false;
     if (
       recurringExtra &&
-      recurringExtra.amount > 0 &&
+      recurringPerPayment > 0 &&
       (!recurringExtra.startDate || recurringExtra.startDate <= rowDate) &&
       (!recurringExtra.endDate || rowDate <= recurringExtra.endDate)
     ) {
-      extraPrincipal += recurringExtra.amount;
+      extraPrincipal += recurringPerPayment;
       if (modeOf(recurringExtra.mode) === 'LOWER_INSTALLMENT') lowerApplied = true;
     }
     // Lump sums land on the first payment on or after their date (sums dated

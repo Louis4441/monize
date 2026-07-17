@@ -78,6 +78,13 @@ export function ComparisonSummaryCards({
         label={t('loanDetail.comparison.monthlyPayment')}
         value={formatCurrency(monthlyPayment, currencyCode)}
         valueClass="text-gray-900 dark:text-gray-100"
+        subvalue={
+          !isLowerInstallment && recurringExtra > 0
+            ? t('loanDetail.comparison.monthlyPaymentExtra', {
+                amount: formatCurrency(recurringExtra, currencyCode),
+              })
+            : undefined
+        }
       />
       <Card
         label={t('loanDetail.comparison.totalExtraContributed')}
@@ -92,15 +99,22 @@ function Card({
   label,
   value,
   valueClass,
+  subvalue,
 }: {
   label: string;
   value: string;
   valueClass: string;
+  subvalue?: string;
 }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
       <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
       <div className={`text-lg font-bold ${valueClass}`}>{value}</div>
+      {subvalue && (
+        <div className="mt-1 text-xs font-medium text-green-600 dark:text-green-400">
+          {subvalue}
+        </div>
+      )}
     </div>
   );
 }

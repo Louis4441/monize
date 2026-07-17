@@ -688,3 +688,34 @@ describe('effectiveAnnualRateOn', () => {
     expect(effectiveAnnualRateOn([], '2024-01-01', 5.5)).toBe(5.5);
   });
 });
+
+describe('recurring extra frequency', () => {
+  it('levels a quarterly extra across a monthly loan (approximate cadence)', () => {
+    const base = baseInput({ startingBalance: 100000, paymentAmount: 600 });
+    // A quarterly 300 spreads to 100 per month; equal to a monthly 100.
+    const quarterly = generateLoanSchedule({
+      ...base,
+      overpayments: { recurringExtra: { amount: 300, frequency: 'QUARTERLY' } },
+    });
+    const monthlyEquivalent = generateLoanSchedule({
+      ...base,
+      overpayments: { recurringExtra: { amount: 100, frequency: 'MONTHLY' } },
+    });
+    expect(quarterly.totalInterest).toBeCloseTo(monthlyEquivalent.totalInterest, 2);
+    expect(quarterly.payoffDate).toBe(monthlyEquivalent.payoffDate);
+  });
+
+  it('treats an omitted frequency as a per-payment amount (legacy behaviour)', () => {
+    const base = baseInput({ startingBalance: 100000, paymentAmount: 600 });
+    const legacy = generateLoanSchedule({
+      ...base,
+      overpayments: { recurringExtra: { amount: 100 } },
+    });
+    const monthly = generateLoanSchedule({
+      ...base,
+      overpayments: { recurringExtra: { amount: 100, frequency: 'MONTHLY' } },
+    });
+    // On a monthly loan, "monthly" and "per payment" coincide.
+    expect(legacy.totalInterest).toBeCloseTo(monthly.totalInterest, 2);
+  });
+});
