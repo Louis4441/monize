@@ -32,6 +32,10 @@ import { ChartDownloadButton } from '@/components/ui/ChartDownloadButton';
 // currency labels start to overlap.
 const DESKTOP_CROWDED_THRESHOLD = 20;
 
+// Above this many bars the value labels are unreadable even when vertical, so
+// drop them entirely and let the axis and tooltip carry the numbers.
+const MAX_LABELED_BARS = 60;
+
 // 'auto' follows the data span; the fixed modes let the user override it.
 type GranularityMode = 'auto' | Granularity;
 const GRANULARITY_MODES: readonly GranularityMode[] = [
@@ -179,6 +183,7 @@ export function CategoryPayeeBarChart({
 
   const isCrowded = chartData.length > DESKTOP_CROWDED_THRESHOLD;
   const verticalLabels = isMobile || isCrowded;
+  const showBarLabels = chartData.length <= MAX_LABELED_BARS;
 
   const summary = useMemo(() => {
     if (chartData.length === 0) return null;
@@ -315,24 +320,26 @@ export function CategoryPayeeBarChart({
                   fill={entry.total >= 0 ? '#22c55e' : '#ef4444'}
                 />
               ))}
-              <LabelList
-                dataKey="total"
-                position="top"
-                angle={verticalLabels ? -90 : 0}
-                offset={verticalLabels ? (isMobile ? 8 : 6) : 5}
-                textAnchor={verticalLabels ? 'start' : 'middle'}
-                formatter={(value: unknown) =>
-                  isMobile
-                    ? formatCurrencyAxis(Number(value))
-                    : formatCurrency(Number(value))
-                }
-                style={{
-                  fill: '#6b7280',
-                  fontSize: isMobile ? 10 : 11,
-                  fontWeight: 500,
-                  ...(verticalLabels && { dominantBaseline: 'central' as const }),
-                }}
-              />
+              {showBarLabels && (
+                <LabelList
+                  dataKey="total"
+                  position="top"
+                  angle={verticalLabels ? -90 : 0}
+                  offset={verticalLabels ? (isMobile ? 8 : 6) : 5}
+                  textAnchor={verticalLabels ? 'start' : 'middle'}
+                  formatter={(value: unknown) =>
+                    isMobile
+                      ? formatCurrencyAxis(Number(value))
+                      : formatCurrency(Number(value))
+                  }
+                  style={{
+                    fill: '#6b7280',
+                    fontSize: isMobile ? 10 : 11,
+                    fontWeight: 500,
+                    ...(verticalLabels && { dominantBaseline: 'central' as const }),
+                  }}
+                />
+              )}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

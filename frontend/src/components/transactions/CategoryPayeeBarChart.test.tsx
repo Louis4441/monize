@@ -292,6 +292,24 @@ describe('CategoryPayeeBarChart', () => {
       render(<CategoryPayeeBarChart data={buildMonths(6)} isLoading={false} />);
       expect(capturedProps.barChart.margin.top).toBe(20);
     });
+
+    it('still renders bar-top labels at the maximum labeled bar count', () => {
+      render(<CategoryPayeeBarChart data={buildMonths(60)} isLoading={false} />);
+      capturedProps.labelList = null;
+      forceMonth();
+      expect(capturedProps.barChart.data).toHaveLength(60);
+      expect(capturedProps.labelList).not.toBeNull();
+    });
+
+    it('drops bar-top labels entirely once there are more than 60 bars', () => {
+      render(<CategoryPayeeBarChart data={buildMonths(61)} isLoading={false} />);
+      // Clear the capture from the initial (auto, quarterly) render so we only
+      // observe whether the forced-monthly render emits a LabelList.
+      capturedProps.labelList = null;
+      forceMonth();
+      expect(capturedProps.barChart.data).toHaveLength(61);
+      expect(capturedProps.labelList).toBeNull();
+    });
   });
 
   describe('adaptive granularity', () => {
