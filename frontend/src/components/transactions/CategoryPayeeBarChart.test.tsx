@@ -251,15 +251,15 @@ describe('CategoryPayeeBarChart', () => {
     });
 
     it('keeps desktop bar-top labels horizontal at exactly the density threshold', () => {
-      render(<CategoryPayeeBarChart data={buildMonths(10)} isLoading={false} />);
-      expect(capturedProps.barChart.data).toHaveLength(10);
+      render(<CategoryPayeeBarChart data={buildMonths(20)} isLoading={false} />);
+      expect(capturedProps.barChart.data).toHaveLength(20);
       expect(capturedProps.labelList.angle).toBe(0);
     });
 
     it('rotates desktop bar-top labels vertical once the bars get dense and anchors them to sit above the bar', () => {
-      // 11 monthly bars crosses the desktop density threshold.
-      render(<CategoryPayeeBarChart data={buildMonths(11)} isLoading={false} />);
-      expect(capturedProps.barChart.data).toHaveLength(11);
+      // 21 monthly bars crosses the desktop density threshold.
+      render(<CategoryPayeeBarChart data={buildMonths(21)} isLoading={false} />);
+      expect(capturedProps.barChart.data).toHaveLength(21);
       expect(capturedProps.labelList.angle).toBe(-90);
       // textAnchor='start' (with angle -90) makes rotated text extend upward
       // from the anchor, so values never overlap the bar they label.

@@ -28,11 +28,9 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { ChartDownloadButton } from '@/components/ui/ChartDownloadButton';
 
 // Desktop switches the bar-top value labels to vertical (and widens the top
-// margin) once there are more than this many bars. Kept low because full
-// currency labels are wide and overlap while still horizontal well before the
-// bars themselves look crowded -- especially when the info widget narrows the
-// chart to ~75% width.
-const DESKTOP_CROWDED_THRESHOLD = 10;
+// margin) once there are more than this many bars, before wide horizontal
+// currency labels start to overlap.
+const DESKTOP_CROWDED_THRESHOLD = 20;
 
 // 'auto' follows the data span; the fixed modes let the user override it.
 type GranularityMode = 'auto' | Granularity;
