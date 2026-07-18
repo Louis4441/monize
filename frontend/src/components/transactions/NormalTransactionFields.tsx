@@ -116,6 +116,7 @@ export function NormalTransactionFields({
               onChange={handlePayeeChange}
               onCreateNew={handlePayeeCreate}
               allowCustomValue={true}
+              valueIsId
               error={errors.payeeName?.message as string | undefined}
             />
           </div>
@@ -177,6 +178,7 @@ export function NormalTransactionFields({
                 onChange={handleCategoryChange}
                 onCreateNew={handleCategoryCreate}
                 allowCustomValue={true}
+                valueIsId
                 error={errors.categoryId?.message as string | undefined}
               />
             </div>

@@ -440,6 +440,7 @@ export function LoanPaymentSetupDialog({
                   options={payeeOptions}
                   placeholder={t('loanPaymentSetup.selectOrCreatePayee')}
                   allowCustomValue={true}
+                  valueIsId
                 />
               </div>
 

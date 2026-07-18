@@ -708,6 +708,7 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           onChange={handleInstitutionChange}
           onCreateNew={handleInstitutionCreate}
           allowCustomValue
+          valueIsId
           usePortal
           alwaysShowSubtitle
           error={errors.institutionId?.message}

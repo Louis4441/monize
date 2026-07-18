@@ -102,6 +102,7 @@ export function SplitTransactionFields({
               onChange={handlePayeeChange}
               onCreateNew={handlePayeeCreate}
               allowCustomValue={true}
+              valueIsId
               error={errors.payeeName?.message as string | undefined}
             />
           </div>
