@@ -1143,6 +1143,81 @@ describe('Combobox', () => {
 
       expect(screen.getByRole('textbox')).toHaveValue('LSE');
     });
+
+    it('shows initialDisplayValue instead of the raw id while options are still loading', () => {
+      const uuid = 'a1b2c3d4-0000-0000-0000-000000000000';
+      const { rerender } = render(
+        <Combobox
+          options={[]}
+          onChange={onChange}
+          value={uuid}
+          initialDisplayValue="Groceries"
+          allowCustomValue
+        />,
+      );
+
+      // The id must never flash in the input while the options list loads
+      expect(screen.getByRole('textbox')).toHaveValue('Groceries');
+
+      rerender(
+        <Combobox
+          options={[{ value: uuid, label: 'Groceries: Weekly' }]}
+          onChange={onChange}
+          value={uuid}
+          initialDisplayValue="Groceries"
+          allowCustomValue
+        />,
+      );
+
+      expect(screen.getByRole('textbox')).toHaveValue('Groceries: Weekly');
+    });
+
+    it('valueIsId keeps the input blank for an unresolved id, then shows the label once options load', () => {
+      const uuid = 'a1b2c3d4-0000-0000-0000-000000000000';
+      const { rerender } = render(
+        <Combobox
+          options={[]}
+          onChange={onChange}
+          value={uuid}
+          allowCustomValue
+          valueIsId
+        />,
+      );
+
+      // No display name available: blank beats showing the raw id
+      expect(screen.getByRole('textbox')).toHaveValue('');
+
+      rerender(
+        <Combobox
+          options={[{ value: uuid, label: 'Groceries' }]}
+          onChange={onChange}
+          value={uuid}
+          allowCustomValue
+          valueIsId
+        />,
+      );
+
+      expect(screen.getByRole('textbox')).toHaveValue('Groceries');
+    });
+
+    it('valueIsId still allows typing and committing a custom value', () => {
+      render(
+        <Combobox
+          options={options}
+          onChange={onChange}
+          value=""
+          allowCustomValue
+          valueIsId
+        />,
+      );
+
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'My Custom Payee' } });
+      expect(input).toHaveValue('My Custom Payee');
+
+      fireEvent.mouseDown(document.body);
+      expect(onChange).toHaveBeenCalledWith('', 'My Custom Payee');
+    });
   });
 
   describe('usePortal', () => {
