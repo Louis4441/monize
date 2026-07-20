@@ -116,6 +116,9 @@ describe("AccountsService", () => {
       findLoanCategories: jest.fn().mockResolvedValue({
         interestCategory: { id: "interest-cat-1" },
       }),
+      findOne: jest
+        .fn()
+        .mockResolvedValue({ id: "fee-cat-1", userId: "user-1" }),
     };
 
     netWorthService = {
@@ -286,6 +289,52 @@ describe("AccountsService", () => {
       const createCall = accountsRepository.create.mock.calls[0][0];
       expect(createCall.openingBalance).toBe(0);
       expect(createCall.currentBalance).toBe(0);
+    });
+
+    it("creates an account with a foreign-transaction fee", async () => {
+      await service.create("user-1", {
+        name: "Travel Card",
+        accountType: AccountType.CREDIT_CARD,
+        currencyCode: "USD",
+        fxFeePercent: 2.5,
+        fxFeeCategoryId: "fee-cat-1",
+      } as any);
+
+      expect(categoriesService.findOne).toHaveBeenCalledWith(
+        "user-1",
+        "fee-cat-1",
+      );
+      const createCall = accountsRepository.create.mock.calls[0][0];
+      expect(createCall.fxFeePercent).toBe(2.5);
+      expect(createCall.fxFeeCategoryId).toBe("fee-cat-1");
+    });
+
+    it("rejects a fee percent set without a fee category", async () => {
+      await expect(
+        service.create("user-1", {
+          name: "Travel Card",
+          accountType: AccountType.CREDIT_CARD,
+          currencyCode: "USD",
+          fxFeePercent: 2.5,
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(accountsRepository.save).not.toHaveBeenCalled();
+    });
+
+    it("rejects a fee category that does not belong to the user", async () => {
+      categoriesService.findOne.mockRejectedValueOnce(
+        new BadRequestException("Category not found"),
+      );
+
+      await expect(
+        service.create("user-1", {
+          name: "Travel Card",
+          accountType: AccountType.CREDIT_CARD,
+          currencyCode: "USD",
+          fxFeePercent: 2.5,
+          fxFeeCategoryId: "someone-elses-cat",
+        } as any),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it("creates a credit card account with statement date fields", async () => {

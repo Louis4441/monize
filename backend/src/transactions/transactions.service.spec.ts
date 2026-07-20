@@ -850,6 +850,103 @@ describe("TransactionsService", () => {
     });
   });
 
+  describe("foreign-currency entry (create)", () => {
+    beforeEach(() => {
+      transactionsRepository.findOne.mockResolvedValue({
+        id: "tx-1",
+        userId: "user-1",
+        accountId: "account-1",
+        amount: -50,
+        status: TransactionStatus.UNRECONCILED,
+        splits: [],
+      });
+    });
+
+    it("persists original amount/currency and keeps the account-currency amount for the balance", async () => {
+      // Account is USD; user entered EUR 100 -> USD 145.23 at rate 1.4523.
+      await service.create("user-1", {
+        accountId: "account-1",
+        transactionDate: "2026-01-15",
+        amount: -145.23,
+        currencyCode: "USD",
+        originalAmount: -100,
+        originalCurrencyCode: "EUR",
+        exchangeRate: 1.4523,
+      } as any);
+
+      expect(transactionsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          originalAmount: -100,
+          originalCurrencyCode: "EUR",
+        }),
+      );
+      // Balance moves by the account-currency amount, not the original amount.
+      expect(accountsService.updateBalance).toHaveBeenCalledWith(
+        "account-1",
+        -145.23,
+        expect.anything(),
+      );
+    });
+
+    it("strips the foreign fields when the entered currency equals the account currency", async () => {
+      await service.create("user-1", {
+        accountId: "account-1",
+        transactionDate: "2026-01-15",
+        amount: -50,
+        currencyCode: "USD",
+        originalAmount: -50,
+        originalCurrencyCode: "USD",
+        exchangeRate: 1,
+      } as any);
+
+      expect(transactionsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          originalAmount: null,
+          originalCurrencyCode: null,
+        }),
+      );
+    });
+
+    it("rejects a foreign entry with only one of the two fields", async () => {
+      await expect(
+        service.create("user-1", {
+          accountId: "account-1",
+          transactionDate: "2026-01-15",
+          amount: -50,
+          currencyCode: "USD",
+          originalAmount: -100,
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("rejects a foreign entry without a positive exchange rate", async () => {
+      await expect(
+        service.create("user-1", {
+          accountId: "account-1",
+          transactionDate: "2026-01-15",
+          amount: -145.23,
+          currencyCode: "USD",
+          originalAmount: -100,
+          originalCurrencyCode: "EUR",
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("rejects a foreign entry whose original amount sign differs from the amount", async () => {
+      await expect(
+        service.create("user-1", {
+          accountId: "account-1",
+          transactionDate: "2026-01-15",
+          amount: -145.23,
+          currencyCode: "USD",
+          originalAmount: 100,
+          originalCurrencyCode: "EUR",
+          exchangeRate: 1.4523,
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
   describe("update", () => {
     const mockTx = {
       id: "tx-1",
@@ -874,6 +971,59 @@ describe("TransactionsService", () => {
         Transaction,
         "tx-1",
         expect.objectContaining({ amount: -80 }),
+      );
+    });
+
+    it("sets foreign-currency fields on update", async () => {
+      transactionsRepository.findOne.mockResolvedValue({
+        ...mockTx,
+        currencyCode: "USD",
+        exchangeRate: 1,
+      });
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({
+        ...mockTx,
+        amount: -145.23,
+      });
+
+      await service.update("user-1", "tx-1", {
+        amount: -145.23,
+        originalAmount: -100,
+        originalCurrencyCode: "EUR",
+        exchangeRate: 1.4523,
+      } as any);
+
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+        Transaction,
+        "tx-1",
+        expect.objectContaining({
+          originalAmount: -100,
+          originalCurrencyCode: "EUR",
+        }),
+      );
+    });
+
+    it("clears foreign-currency fields when passed null", async () => {
+      transactionsRepository.findOne.mockResolvedValue({
+        ...mockTx,
+        currencyCode: "USD",
+        exchangeRate: 1.4523,
+        originalAmount: -100,
+        originalCurrencyCode: "EUR",
+      });
+      mockQueryRunner.manager.findOne.mockResolvedValueOnce({ ...mockTx });
+
+      await service.update("user-1", "tx-1", {
+        originalAmount: null,
+        originalCurrencyCode: null,
+      } as any);
+
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+        Transaction,
+        "tx-1",
+        expect.objectContaining({
+          originalAmount: null,
+          originalCurrencyCode: null,
+        }),
       );
     });
 
@@ -1574,6 +1724,40 @@ describe("TransactionsService", () => {
         },
         startingBalance: undefined,
       });
+    });
+
+    it("filters by originalCurrencyCodes when provided", async () => {
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
+      transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
+      investmentTxRepository.find.mockResolvedValue([]);
+
+      await service.findAll(
+        "user-1",
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        1,
+        50,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "date",
+        "DESC",
+        undefined,
+        ["EUR", "GBP"],
+      );
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        "transaction.original_currency_code IN (:...originalCurrencyCodes)",
+        { originalCurrencyCodes: ["EUR", "GBP"] },
+      );
     });
 
     it("applies pagination with page and limit", async () => {
@@ -5808,6 +5992,54 @@ describe("TransactionsService", () => {
   });
 
   describe("getLlmTransactionRows", () => {
+    it("emits foreign-currency metadata only for foreign-entered rows", async () => {
+      jest.spyOn(service, "findAll").mockResolvedValue({
+        data: [
+          {
+            id: "t-foreign",
+            transactionDate: "2025-01-15",
+            payeeName: "Cafe Paris",
+            category: { name: "Dining" },
+            amount: -145.23,
+            account: { name: "Checking" },
+            description: null,
+            status: "cleared",
+            isSplit: false,
+            originalAmount: -100,
+            originalCurrencyCode: "EUR",
+            exchangeRate: 1.4523,
+          },
+          {
+            id: "t-plain",
+            transactionDate: "2025-01-14",
+            payeeName: "Coffee",
+            category: { name: "Dining" },
+            amount: -5,
+            account: { name: "Checking" },
+            description: null,
+            status: "cleared",
+            isSplit: false,
+            originalAmount: null,
+            originalCurrencyCode: null,
+            exchangeRate: 1,
+          },
+        ],
+        pagination: { total: 2, hasMore: false },
+      } as any);
+
+      const result = await service.getLlmTransactionRows("user-1", {});
+
+      const foreign = result.transactions.find((r) => r.id === "t-foreign");
+      expect(foreign).toMatchObject({
+        originalAmount: -100,
+        originalCurrencyCode: "EUR",
+        exchangeRate: 1.4523,
+      });
+      const plain = result.transactions.find((r) => r.id === "t-plain");
+      expect(plain).not.toHaveProperty("originalCurrencyCode");
+      expect(plain).not.toHaveProperty("originalAmount");
+    });
+
     it("expands split transactions into per-split rows with their real category", async () => {
       jest.spyOn(service, "findAll").mockResolvedValue({
         data: [
