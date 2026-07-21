@@ -270,33 +270,6 @@ describe("TransactionSplitService", () => {
       expect(() => service.validateSplits(splits, 100)).not.toThrow();
     });
 
-    it("accepts a single foreign-transaction fee split alongside the purchase", () => {
-      const splits = [
-        { amount: -100, categoryId: "cat-1" },
-        { amount: -2.5, categoryId: "fee-cat", isFxFee: true },
-      ];
-      expect(() => service.validateSplits(splits, -102.5)).not.toThrow();
-    });
-
-    it("rejects more than one foreign-transaction fee split", () => {
-      const splits = [
-        { amount: -50, categoryId: "cat-1", isFxFee: true },
-        { amount: -50, categoryId: "cat-2", isFxFee: true },
-      ];
-      expect(() => service.validateSplits(splits, -100)).toThrow(
-        BadRequestException,
-      );
-    });
-
-    it("rejects a foreign-transaction fee split that is not a category split", () => {
-      const splits = [
-        { amount: -100, categoryId: "cat-1" },
-        { amount: -2.5, transferAccountId: "account-2", isFxFee: true },
-      ];
-      expect(() => service.validateSplits(splits, -102.5)).toThrow(
-        BadRequestException,
-      );
-    });
   });
 
   describe("createSplits", () => {

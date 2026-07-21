@@ -447,9 +447,7 @@
     "tagKeyRequired": "Kunci tag (1-100 karakter) diperlukan",
     "fxFieldsIncomplete": "originalAmount dan originalCurrencyCode harus diberikan bersama",
     "fxRateRequired": "Nilai tukar positif diperlukan untuk transaksi mata uang asing",
-    "fxSignMismatch": "originalAmount dan amount harus memiliki tanda yang sama",
-    "multipleFxFeeSplits": "Sebuah transaksi hanya boleh memiliki paling banyak satu pembagian biaya transaksi asing",
-    "fxFeeSplitMustBeCategory": "Pembagian biaya transaksi asing harus berupa pembagian kategori"
+    "fxSignMismatch": "originalAmount dan amount harus memiliki tanda yang sama"
   },
   "users": {
     "userNotFound": "Pengguna tidak ditemukan",

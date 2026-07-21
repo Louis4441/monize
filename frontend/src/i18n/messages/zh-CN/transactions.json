@@ -417,7 +417,6 @@
         "original": "原币种"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "包含 {percent}% 境外交易手续费（{fee}）。",
       "totalInCurrency": "以 {currency} 计的总额"
     }

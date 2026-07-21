@@ -417,7 +417,6 @@
         "original": "Oryginał"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "Zawiera opłatę za transakcję zagraniczną {percent}% ({fee}).",
       "totalInCurrency": "Razem w {currency}"
     }

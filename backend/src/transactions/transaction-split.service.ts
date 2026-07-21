@@ -76,29 +76,6 @@ export class TransactionSplitService {
       },
     });
 
-    // Foreign-transaction fee split: at most one per transaction, and it must be
-    // a plain category split (never a transfer or investment).
-    const feeSplits = splits.filter((s) => s.isFxFee);
-    if (feeSplits.length > 1) {
-      throw new BadRequestException(
-        tr(
-          "errors.transactions.multipleFxFeeSplits",
-          "A transaction can have at most one foreign-transaction fee split",
-        ),
-      );
-    }
-    if (
-      feeSplits.length === 1 &&
-      inferSplitKind(feeSplits[0]) !== SplitKind.CATEGORY
-    ) {
-      throw new BadRequestException(
-        tr(
-          "errors.transactions.fxFeeSplitMustBeCategory",
-          "The foreign-transaction fee split must be a category split",
-        ),
-      );
-    }
-
     for (const split of splits) {
       const kind = inferSplitKind(split);
       if (kind !== SplitKind.INVESTMENT) continue;

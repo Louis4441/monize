@@ -417,7 +417,6 @@
         "original": "元の通貨"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "{percent}% の外貨取引手数料（{fee}）が含まれます。",
       "totalInCurrency": "{currency} での合計"
     }

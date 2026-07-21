@@ -447,9 +447,7 @@
     "tagKeyRequired": "Cần có khóa thẻ (1-100 ký tự)",
     "fxFieldsIncomplete": "originalAmount và originalCurrencyCode phải được cung cấp cùng nhau",
     "fxRateRequired": "Cần một tỷ giá hối đoái dương cho giao dịch bằng ngoại tệ",
-    "fxSignMismatch": "originalAmount và amount phải cùng dấu",
-    "multipleFxFeeSplits": "Một giao dịch chỉ có thể có tối đa một phần tách phí giao dịch nước ngoài",
-    "fxFeeSplitMustBeCategory": "Phần tách phí giao dịch nước ngoài phải là phần tách theo danh mục"
+    "fxSignMismatch": "originalAmount và amount phải cùng dấu"
   },
   "users": {
     "userNotFound": "Không tìm thấy người dùng",

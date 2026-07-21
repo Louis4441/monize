@@ -447,9 +447,7 @@
     "tagKeyRequired": "Bir etiket anahtarı (1-100 karakter) gereklidir",
     "fxFieldsIncomplete": "originalAmount ve originalCurrencyCode birlikte sağlanmalıdır",
     "fxRateRequired": "Yabancı para birimi işlemi için pozitif bir döviz kuru gereklidir",
-    "fxSignMismatch": "originalAmount ve amount aynı işarete sahip olmalıdır",
-    "multipleFxFeeSplits": "Bir işlemde en fazla bir yurt dışı işlem ücreti bölümü olabilir",
-    "fxFeeSplitMustBeCategory": "Yurt dışı işlem ücreti bölümü bir kategori bölümü olmalıdır"
+    "fxSignMismatch": "originalAmount ve amount aynı işarete sahip olmalıdır"
   },
   "users": {
     "userNotFound": "Kullanıcı bulunamadı",

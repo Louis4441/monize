@@ -417,7 +417,6 @@
         "original": "Оригинал"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "Включает комиссию за зарубежную операцию {percent}% ({fee}).",
       "totalInCurrency": "Итого в {currency}"
     }

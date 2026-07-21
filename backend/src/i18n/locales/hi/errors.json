@@ -447,9 +447,7 @@
     "tagKeyRequired": "एक टैग कुंजी (1-100 अक्षर) आवश्यक है",
     "fxFieldsIncomplete": "originalAmount और originalCurrencyCode एक साथ दिए जाने चाहिए",
     "fxRateRequired": "विदेशी मुद्रा लेनदेन के लिए एक धनात्मक विनिमय दर आवश्यक है",
-    "fxSignMismatch": "originalAmount और amount का चिह्न समान होना चाहिए",
-    "multipleFxFeeSplits": "एक लेनदेन में अधिकतम एक विदेशी-लेनदेन शुल्क विभाजन हो सकता है",
-    "fxFeeSplitMustBeCategory": "विदेशी-लेनदेन शुल्क विभाजन एक श्रेणी विभाजन होना चाहिए"
+    "fxSignMismatch": "originalAmount और amount का चिह्न समान होना चाहिए"
   },
   "users": {
     "userNotFound": "उपयोगकर्ता नहीं मिला",

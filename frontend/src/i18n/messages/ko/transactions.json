@@ -417,7 +417,6 @@
         "original": "원 통화"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "{percent}% 해외 거래 수수료({fee})가 포함됩니다.",
       "totalInCurrency": "{currency} 기준 총액"
     }

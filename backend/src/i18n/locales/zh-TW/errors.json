@@ -447,9 +447,7 @@
     "tagKeyRequired": "需要標籤鍵（1-100 個字元）",
     "fxFieldsIncomplete": "originalAmount 和 originalCurrencyCode 必須同時提供",
     "fxRateRequired": "外幣交易需要一個正的匯率",
-    "fxSignMismatch": "originalAmount 和 amount 的符號必須相同",
-    "multipleFxFeeSplits": "一筆交易最多只能有一個境外交易手續費拆分",
-    "fxFeeSplitMustBeCategory": "境外交易手續費拆分必須是類別拆分"
+    "fxSignMismatch": "originalAmount 和 amount 的符號必須相同"
   },
   "users": {
     "userNotFound": "找不到使用者",
