@@ -104,6 +104,9 @@
       "refNumber": "参照番号",
       "tags": "タグ",
       "amount": "金額",
+      "currency": "通貨",
+      "paidAmount": "支払金額",
+      "feePaid": "支払手数料",
       "balance": "残高",
       "status": "状態",
       "actions": "操作"
@@ -414,7 +417,6 @@
         "original": "元の通貨"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "{percent}% の外貨取引手数料（{fee}）が含まれます。",
       "totalInCurrency": "{currency} での合計"
     }

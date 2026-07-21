@@ -116,6 +116,7 @@ export function AssetDetailView({ account, onAccountChanged }: AssetDetailViewPr
               isLoading={isLoading}
               currencyCode={currency}
               accountName={account.name}
+              hideTitle
             />
           )}
         </div>

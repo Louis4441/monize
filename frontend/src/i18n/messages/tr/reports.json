@@ -65,6 +65,7 @@
       "spending-anomalies": "Harcama Anomalileri",
       "weekend-weekday-spending": "Hafta Sonu - Hafta İçi Harcama",
       "monthly-comparison": "Aylık Karşılaştırma",
+      "foreign-currency-fees": "Yabancı Para Birimi İşlem Ücretleri",
       "uncategorized-transactions": "Kategorisiz İşlemler",
       "duplicate-transactions": "Mükerrer İşlem Bulucu",
       "upcoming-bills": "Yaklaşan Faturalar Takvimi",
@@ -111,6 +112,7 @@
       "spending-anomalies": "Dikkat gerektiren olağandışı büyük işlemleri ve harcama artışlarını tespit edin.",
       "weekend-weekday-spending": "Alışkanlıkları anlamak için haftanın gününe göre harcama kalıplarınızı analiz edin.",
       "monthly-comparison": "Herhangi bir ayı önceki ayla gelir, gider, net değer ve yatırımlar açısından karşılaştırın.",
+      "foreign-currency-fees": "Dönüştürme ücreti uygulayan hesaplarda tahsil edilen yurt dışı işlem ücretlerini takip edin.",
       "uncategorized-transactions": "Kategori eksik işlemleri bulun ve kategorilendirin.",
       "duplicate-transactions": "İnceleme veya silme gerektirebilecek olası mükerrer kayıtları belirleyin.",
       "upcoming-bills": "Zamanlanmış işlemlerin ve yaklaşan fatura ödeme tarihlerinin görsel takvimi.",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "Rapor verileri yüklenemedi. Lütfen tekrar deneyin.",
     "retry": "Tekrar dene"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "Hiçbir hesapta yapılandırılmış yurt dışı işlem ücreti yok. Yabancı para birimi ücretlerini burada takip etmek için bir hesaba ücret yüzdesi ayarlayın."
   },
   "accountBalances": {
     "totalAssets": "Toplam Varlıklar",

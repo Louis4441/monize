@@ -104,6 +104,9 @@
       "refNumber": "संदर्भ #",
       "tags": "टैग",
       "amount": "राशि",
+      "currency": "मुद्रा",
+      "paidAmount": "भुगतान की गई राशि",
+      "feePaid": "भुगतान किया गया शुल्क",
       "balance": "शेष",
       "status": "स्थिति",
       "actions": "क्रियाएं"
@@ -414,7 +417,6 @@
         "original": "मूल"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "इसमें {percent}% विदेशी लेनदेन शुल्क ({fee}) शामिल है।",
       "totalInCurrency": "{currency} में कुल"
     }

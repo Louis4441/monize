@@ -104,6 +104,9 @@
       "refNumber": "Rif. #",
       "tags": "Etichette",
       "amount": "Importo",
+      "currency": "Valuta",
+      "paidAmount": "Importo pagato",
+      "feePaid": "Commissione pagata",
       "balance": "Saldo",
       "status": "Stato",
       "actions": "Azioni"
@@ -414,7 +417,6 @@
         "original": "Originale"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "Include una commissione per transazione estera del {percent}% ({fee}).",
       "totalInCurrency": "Totale in {currency}"
     }

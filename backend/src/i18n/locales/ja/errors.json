@@ -447,9 +447,7 @@
     "tagKeyRequired": "タグキー（1〜100文字）が必要です",
     "fxFieldsIncomplete": "originalAmount と originalCurrencyCode は一緒に指定する必要があります",
     "fxRateRequired": "外貨取引には正の為替レートが必要です",
-    "fxSignMismatch": "originalAmount と amount は同じ符号である必要があります",
-    "multipleFxFeeSplits": "1 件の取引に含められる外貨手数料の分割は 1 つまでです",
-    "fxFeeSplitMustBeCategory": "外貨手数料の分割はカテゴリ分割である必要があります"
+    "fxSignMismatch": "originalAmount と amount は同じ符号である必要があります"
   },
   "users": {
     "userNotFound": "ユーザーが見つかりません",

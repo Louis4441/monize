@@ -65,6 +65,7 @@
       "spending-anomalies": "Anomali Pengeluaran",
       "weekend-weekday-spending": "Pengeluaran Akhir Pekan vs Hari Kerja",
       "monthly-comparison": "Perbandingan Bulanan",
+      "foreign-currency-fees": "Biaya Transaksi Mata Uang Asing",
       "uncategorized-transactions": "Transaksi Belum Dikategorikan",
       "duplicate-transactions": "Pencari Transaksi Duplikat",
       "upcoming-bills": "Kalender Tagihan yang Akan Datang",
@@ -111,6 +112,7 @@
       "spending-anomalies": "Deteksi transaksi yang sangat besar dan lonjakan pengeluaran yang perlu diperhatikan.",
       "weekend-weekday-spending": "Analisis pola pengeluaran Anda berdasarkan hari dalam seminggu untuk memahami kebiasaan.",
       "monthly-comparison": "Bandingkan bulan apa pun dengan bulan sebelumnya di seluruh pendapatan, pengeluaran, nilai bersih, dan investasi.",
+      "foreign-currency-fees": "Lacak biaya transaksi luar negeri yang dikenakan di seluruh akun yang menerapkan biaya konversi.",
       "uncategorized-transactions": "Temukan dan kategorikan transaksi yang tidak memiliki kategori.",
       "duplicate-transactions": "Identifikasi entri duplikat potensial yang mungkin perlu ditinjau atau dihapus.",
       "upcoming-bills": "Kalender visual transaksi terjadwal dan tanggal jatuh tempo tagihan yang akan datang.",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "Gagal memuat data laporan. Silakan coba lagi.",
     "retry": "Coba lagi"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "Tidak ada akun yang memiliki biaya transaksi luar negeri yang dikonfigurasi. Tetapkan persentase biaya pada akun untuk melacak biaya mata uang asingnya di sini."
   },
   "accountBalances": {
     "totalAssets": "Total Aset",

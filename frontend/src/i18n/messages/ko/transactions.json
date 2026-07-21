@@ -104,6 +104,9 @@
       "refNumber": "참조 번호",
       "tags": "태그",
       "amount": "금액",
+      "currency": "통화",
+      "paidAmount": "결제 금액",
+      "feePaid": "부과된 수수료",
       "balance": "잔액",
       "status": "상태",
       "actions": "작업"
@@ -414,7 +417,6 @@
         "original": "원 통화"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "{percent}% 해외 거래 수수료({fee})가 포함됩니다.",
       "totalInCurrency": "{currency} 기준 총액"
     }

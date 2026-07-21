@@ -149,6 +149,7 @@ export function EquityPanel({
                 isLoading={isLoading}
                 currencyCode={currency}
                 accountName={account.name}
+                hideTitle
               />
             </div>
           </>

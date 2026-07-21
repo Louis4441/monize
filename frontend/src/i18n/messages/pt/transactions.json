@@ -104,6 +104,9 @@
       "refNumber": "Ref. #",
       "tags": "Etiquetas",
       "amount": "Montante",
+      "currency": "Moeda",
+      "paidAmount": "Montante Pago",
+      "feePaid": "Comissão Paga",
       "balance": "Saldo",
       "status": "Estado",
       "actions": "Ações"
@@ -414,7 +417,6 @@
         "original": "Original"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "Inclui uma comissão de transação estrangeira de {percent}% ({fee}).",
       "totalInCurrency": "Total em {currency}"
     }

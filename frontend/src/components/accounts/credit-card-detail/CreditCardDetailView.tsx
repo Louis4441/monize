@@ -149,6 +149,7 @@ export function CreditCardDetailView({ account }: CreditCardDetailViewProps) {
               currencyCode={currency}
               accountName={account.name}
               isLiability
+              hideTitle
             />
           )}
         </div>

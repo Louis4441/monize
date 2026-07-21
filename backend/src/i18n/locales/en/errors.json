@@ -447,9 +447,7 @@
     "payeeNotFound": "Payee not found",
     "fxFieldsIncomplete": "originalAmount and originalCurrencyCode must be provided together",
     "fxRateRequired": "A positive exchange rate is required for a foreign-currency transaction",
-    "fxSignMismatch": "originalAmount and amount must have the same sign",
-    "multipleFxFeeSplits": "A transaction can have at most one foreign-transaction fee split",
-    "fxFeeSplitMustBeCategory": "The foreign-transaction fee split must be a category split"
+    "fxSignMismatch": "originalAmount and amount must have the same sign"
   },
   "users": {
     "userNotFound": "User not found",

@@ -10,6 +10,7 @@ import { CategoryBudgetStatus } from '@/types/budget';
 import { DensityLevel } from '@/hooks/useTableDensity';
 import { HIGHLIGHT_FLASH, HIGHLIGHT_FLASH_CELL } from '@/hooks/useHighlightTarget';
 import { formatAmountWithCommas, getDecimalPlacesForCurrency } from '@/lib/format';
+import { foreignTransactionFee } from '@/lib/fx-fees';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 
 const INVESTMENT_ACTION_LABELS: Record<string, string> = {
@@ -169,6 +170,8 @@ export interface TransactionRowProps {
   isFuture?: boolean;
   /** Flash and scroll to this row (e.g. when arriving from a deep link). */
   isHighlighted?: boolean;
+  /** Render the foreign-currency columns (paid currency, paid amount, fee paid). */
+  showFxColumns?: boolean;
 }
 
 export const TransactionRow = memo(function TransactionRow({
@@ -206,6 +209,7 @@ export const TransactionRow = memo(function TransactionRow({
   budgetStatusMap,
   isFuture,
   isHighlighted,
+  showFxColumns = false,
 }: TransactionRowProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
@@ -224,6 +228,10 @@ export const TransactionRow = memo(function TransactionRow({
   // so a transaction that has only payeeId set (e.g. created via the REST API
   // without payeeName) still shows the payee instead of a dash.
   const payeeLabel = transaction.payeeName || transaction.payee?.name || null;
+
+  // Fee paid, as a positive cost in the account currency. 0 means no fee
+  // applied (e.g. recorded before the account's fee percentage was configured).
+  const fxFeePaid = showFxColumns ? foreignTransactionFee(transaction) : 0;
   const categoryColor = transaction.category
     ? (categoryColorMap?.get(transaction.category.id) ?? transaction.category.color)
     : null;
@@ -527,7 +535,8 @@ export const TransactionRow = memo(function TransactionRow({
         ) : (
           formatAmount(transaction.amount, transaction.currencyCode)
         )}
-        {transaction.originalCurrencyCode &&
+        {!showFxColumns &&
+          transaction.originalCurrencyCode &&
           transaction.originalAmount !== null && (
             <div className="text-xs font-normal text-gray-500 dark:text-gray-400">
               {transaction.originalCurrencyCode}{' '}
@@ -538,6 +547,30 @@ export const TransactionRow = memo(function TransactionRow({
             </div>
           )}
       </td>
+      {showFxColumns && (
+        <>
+          <td className={`${cellPadding} whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 ${isVoid ? 'line-through' : ''}`}>
+            {transaction.originalCurrencyCode || '-'}
+          </td>
+          <td className={`${cellPadding} whitespace-nowrap text-sm font-medium text-right ${isVoid ? 'line-through' : ''}`}>
+            {transaction.originalCurrencyCode && transaction.originalAmount !== null
+              ? formatAmount(
+                  Number(transaction.originalAmount),
+                  transaction.originalCurrencyCode,
+                )
+              : '-'}
+          </td>
+          <td className={`${cellPadding} whitespace-nowrap text-sm font-medium text-right ${isVoid ? 'line-through' : ''}`}>
+            {fxFeePaid !== 0 ? (
+              <span className={fxFeePaid > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>
+                {formatCurrency(fxFeePaid, transaction.currencyCode)}
+              </span>
+            ) : (
+              <span className="text-gray-400 dark:text-gray-500">-</span>
+            )}
+          </td>
+        </>
+      )}
       {showRunningBalance && (
         <td className={`${cellPadding} whitespace-nowrap text-sm font-medium text-right`}>
           {runningBalance !== undefined

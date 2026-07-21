@@ -104,6 +104,9 @@
       "refNumber": "Реф. №",
       "tags": "Теги",
       "amount": "Сума",
+      "currency": "Валюта",
+      "paidAmount": "Сплачена сума",
+      "feePaid": "Сплачена комісія",
       "balance": "Баланс",
       "status": "Статус",
       "actions": "Дії"
@@ -414,7 +417,6 @@
         "original": "Оригінал"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "Включає комісію за закордонну операцію {percent}% ({fee}).",
       "totalInCurrency": "Разом у {currency}"
     }

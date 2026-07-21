@@ -447,9 +447,7 @@
     "tagKeyRequired": "Требуется ключ тега (1–100 символов)",
     "fxFieldsIncomplete": "originalAmount и originalCurrencyCode должны указываться вместе",
     "fxRateRequired": "Для операции в иностранной валюте требуется положительный курс обмена",
-    "fxSignMismatch": "originalAmount и amount должны иметь одинаковый знак",
-    "multipleFxFeeSplits": "Операция может содержать не более одной части с комиссией за зарубежную операцию",
-    "fxFeeSplitMustBeCategory": "Часть с комиссией за зарубежную операцию должна быть частью по категории"
+    "fxSignMismatch": "originalAmount и amount должны иметь одинаковый знак"
   },
   "users": {
     "userNotFound": "Пользователь не найден",

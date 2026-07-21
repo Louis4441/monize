@@ -34,8 +34,6 @@ export interface TransactionSplit {
   linkedTransactionId: string | null;
   amount: number;
   memo: string | null;
-  /** Marks the auto-generated foreign-transaction fee split (read-only in the UI). */
-  isFxFee?: boolean;
   tags?: Tag[];
   /** Present when kind === 'investment' */
   investmentTransaction?: {
@@ -101,7 +99,6 @@ export interface CreateSplitData {
   investment?: InvestmentSplitDetails;
   amount: number;
   memo?: string;
-  isFxFee?: boolean;
   tagIds?: string[];
 }
 
@@ -171,6 +168,18 @@ export interface RecurringChargeInfo {
 export interface MonthlyTotal {
   month: string;
   total: number;
+  count: number;
+}
+
+/**
+ * Monthly foreign-transaction fee totals for one account, per paid currency.
+ * feeTotal is positive, in the account currency; count is the number of
+ * foreign-entered transactions that month (fee split or not).
+ */
+export interface FxFeeMonthlyTotal {
+  month: string;
+  currencyCode: string;
+  feeTotal: number;
   count: number;
 }
 

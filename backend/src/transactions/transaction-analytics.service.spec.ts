@@ -45,6 +45,7 @@ describe("TransactionAnalyticsService", () => {
       addGroupBy: jest.fn().mockReturnValue(mockQueryBuilder),
       having: jest.fn().mockReturnValue(mockQueryBuilder),
       orderBy: jest.fn().mockReturnValue(mockQueryBuilder),
+      addOrderBy: jest.fn().mockReturnValue(mockQueryBuilder),
       limit: jest.fn().mockReturnValue(mockQueryBuilder),
       setParameter: jest.fn().mockReturnValue(mockQueryBuilder),
       setParameters: jest.fn().mockReturnValue(mockQueryBuilder),
@@ -2703,6 +2704,79 @@ describe("TransactionAnalyticsService", () => {
         "LOWER(TRIM(SPLIT_PART(brkTag.name, ':', 1))) = LOWER(:brkKey)",
         { brkKey: "Country" },
       );
+    });
+  });
+
+  describe("getFxFeeSummary", () => {
+    it("returns empty array when the account has no foreign transactions", async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValue([]);
+
+      const result = await service.getFxFeeSummary(userId, "acc-1");
+
+      expect(result).toEqual([]);
+    });
+
+    it("maps monthly rows per paid currency with numeric fee totals", async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValue([
+        { month: "2026-01", currencyCode: "EUR", feeTotal: "12.5", count: "3" },
+        { month: "2026-01", currencyCode: "USD", feeTotal: "0", count: "2" },
+        { month: "2026-02", currencyCode: "EUR", feeTotal: "4.25", count: "1" },
+      ]);
+
+      const result = await service.getFxFeeSummary(userId, "acc-1");
+
+      expect(result).toEqual([
+        { month: "2026-01", currencyCode: "EUR", feeTotal: 12.5, count: 3 },
+        { month: "2026-01", currencyCode: "USD", feeTotal: 0, count: 2 },
+        { month: "2026-02", currencyCode: "EUR", feeTotal: 4.25, count: 1 },
+      ]);
+    });
+
+    it("scopes to the user and account and excludes void and child rows", async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValue([]);
+
+      await service.getFxFeeSummary(userId, "acc-1");
+
+      expect(mockQueryBuilder.where).toHaveBeenCalledWith(
+        "transaction.userId = :userId",
+        { userId },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        "transaction.accountId = :accountId",
+        { accountId: "acc-1" },
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        "transaction.originalCurrencyCode IS NOT NULL",
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        "transaction.parentTransactionId IS NULL",
+      );
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        "transaction.status != :voidStatus",
+        { voidStatus: "VOID" },
+      );
+      expect(mockQueryBuilder.addGroupBy).toHaveBeenCalledWith(
+        "transaction.originalCurrencyCode",
+      );
+    });
+
+    it("derives the fee from the folded-in amount for every foreign entry", async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValue([]);
+
+      await service.getFxFeeSummary(userId, "acc-1");
+
+      const feeSelect = mockQueryBuilder.addSelect.mock.calls.find(
+        ([, alias]) => alias === "feeTotal",
+      );
+      expect(feeSelect).toBeDefined();
+      const expr = feeSelect[0] as string;
+      // The fee is folded into amount for both ordinary and split entries.
+      expect(expr).toContain(
+        "ROUND(transaction.originalAmount * transaction.exchangeRate, 2) - transaction.amount",
+      );
+      // No dependency on any fee-split join.
+      expect(expr).not.toContain("fxFeeSplit");
+      expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalled();
     });
   });
 });

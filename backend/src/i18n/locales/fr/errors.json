@@ -447,9 +447,7 @@
     "tagKeyRequired": "Une clé d'étiquette (1 à 100 caractères) est requise",
     "fxFieldsIncomplete": "originalAmount et originalCurrencyCode doivent être fournis ensemble",
     "fxRateRequired": "Un taux de change positif est requis pour une transaction en devise étrangère",
-    "fxSignMismatch": "originalAmount et amount doivent avoir le même signe",
-    "multipleFxFeeSplits": "Une transaction ne peut avoir qu'une seule ventilation de frais de change",
-    "fxFeeSplitMustBeCategory": "La ventilation des frais de change doit être une ventilation par catégorie"
+    "fxSignMismatch": "originalAmount et amount doivent avoir le même signe"
   },
   "users": {
     "userNotFound": "Utilisateur introuvable",

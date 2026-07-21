@@ -104,6 +104,9 @@
       "refNumber": "參考 #",
       "tags": "標籤",
       "amount": "金額",
+      "currency": "幣別",
+      "paidAmount": "支付金額",
+      "feePaid": "已付手續費",
       "balance": "結餘",
       "status": "狀態",
       "actions": "動作"
@@ -414,7 +417,6 @@
         "original": "原幣別"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "包含 {percent}% 境外交易手續費（{fee}）。",
       "totalInCurrency": "以 {currency} 計的總額"
     }

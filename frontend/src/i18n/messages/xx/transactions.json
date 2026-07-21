@@ -104,6 +104,9 @@
       "refNumber": "[XX-Ref #-XX]",
       "tags": "[XX-Tags-XX]",
       "amount": "[XX-Amount-XX]",
+      "currency": "[XX-Currency-XX]",
+      "paidAmount": "[XX-Paid Amount-XX]",
+      "feePaid": "[XX-Fee Paid-XX]",
       "balance": "[XX-Balance-XX]",
       "status": "[XX-Status-XX]",
       "actions": "[XX-Actions-XX]"
@@ -411,7 +414,6 @@
       "rateCaption": "[XX-1 {from} = {rate} {to} ({date})-XX]",
       "noRateWarning": "[XX-No exchange rate found for {from} to {to} on {date}. Enter the converted amount manually.-XX]",
       "usingLatestRateHint": "[XX-Using the latest available rate (not dated {date}).-XX]",
-      "feeAutoBadge": "[XX-auto-XX]",
       "displayToggle": {
         "account": "[XX-Account-XX]",
         "original": "[XX-Original-XX]"

@@ -40,6 +40,12 @@ interface BalanceHistoryChartProps {
    * value, no warning marker.
    */
   isLiability?: boolean;
+  /**
+   * Hide the in-card title. Set where the chart sits under a section heading
+   * that already names it (the account-detail pages), so the name is not shown
+   * twice. The download filename still uses the title.
+   */
+  hideTitle?: boolean;
 }
 
 interface ChartPoint {
@@ -83,6 +89,7 @@ export function BalanceHistoryChart({
   currencyCode,
   accountName,
   isLiability = false,
+  hideTitle = false,
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
@@ -200,9 +207,11 @@ export function BalanceHistoryChart({
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          {chartTitle}
-        </h3>
+        {!hideTitle && (
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            {chartTitle}
+          </h3>
+        )}
         <div className="h-72 flex items-center justify-center">
           <Skeleton className="w-full h-full" />
         </div>
@@ -213,9 +222,11 @@ export function BalanceHistoryChart({
   if (chartData.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          {chartTitle}
-        </h3>
+        {!hideTitle && (
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            {chartTitle}
+          </h3>
+        )}
         <div className="h-72 flex items-center justify-center text-gray-500 dark:text-gray-400">
           <p>{t('charts.balanceHistory.noData')}</p>
         </div>
@@ -234,9 +245,11 @@ export function BalanceHistoryChart({
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {chartTitle}
-          </h3>
+          {!hideTitle && (
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {chartTitle}
+            </h3>
+          )}
           {rangeLabel && (
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
               {rangeLabel}

@@ -447,9 +447,7 @@
     "tagKeyRequired": "Een tagsleutel (1-100 tekens) is vereist",
     "fxFieldsIncomplete": "originalAmount en originalCurrencyCode moeten samen worden opgegeven",
     "fxRateRequired": "Een positieve wisselkoers is vereist voor een transactie in vreemde valuta",
-    "fxSignMismatch": "originalAmount en amount moeten hetzelfde teken hebben",
-    "multipleFxFeeSplits": "Een transactie mag hoogstens één splitsing voor buitenlandse transactiekosten hebben",
-    "fxFeeSplitMustBeCategory": "De splitsing voor buitenlandse transactiekosten moet een categoriesplitsing zijn"
+    "fxSignMismatch": "originalAmount en amount moeten hetzelfde teken hebben"
   },
   "users": {
     "userNotFound": "Gebruiker niet gevonden",

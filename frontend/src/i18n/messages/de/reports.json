@@ -65,6 +65,7 @@
       "spending-anomalies": "Ausgabenanomalien",
       "weekend-weekday-spending": "Wochenend- vs. Wochentagsausgaben",
       "monthly-comparison": "Monatsvergleich",
+      "foreign-currency-fees": "Fremdwährungs-Transaktionsgebühren",
       "uncategorized-transactions": "Nicht kategorisierte Buchungen",
       "duplicate-transactions": "Doppelte Buchungen finden",
       "upcoming-bills": "Rechnungskalender",
@@ -111,6 +112,7 @@
       "spending-anomalies": "Ungewöhnlich hohe Buchungen und Ausgabenspitzen erkennen, die Aufmerksamkeit erfordern.",
       "weekend-weekday-spending": "Analysieren Sie Ihre Ausgabenmuster nach Wochentag, um Gewohnheiten zu verstehen.",
       "monthly-comparison": "Vergleichen Sie jeden Monat mit dem Vormonat für Einnahmen, Ausgaben, Reinvermögen und Investitionen.",
+      "foreign-currency-fees": "Verfolgen Sie die Fremdwährungsgebühren, die auf Konten mit einer Umrechnungsgebühr berechnet werden.",
       "uncategorized-transactions": "Buchungen ohne Kategorie finden und kategorisieren.",
       "duplicate-transactions": "Potenzielle Doppeleinträge identifizieren, die überprüft oder gelöscht werden müssen.",
       "upcoming-bills": "Visueller Kalender terminierter Buchungen und bevorstehender Fälligkeitsdaten.",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "Berichtsdaten konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
     "retry": "Erneut versuchen"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "Für kein Konto ist eine Fremdwährungsgebühr konfiguriert. Legen Sie einen Gebührensatz für ein Konto fest, um dessen Fremdwährungsgebühren hier zu verfolgen."
   },
   "accountBalances": {
     "totalAssets": "Gesamte Aktiva",

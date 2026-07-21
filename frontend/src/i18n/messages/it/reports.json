@@ -65,6 +65,7 @@
       "spending-anomalies": "Anomalie nelle uscite",
       "weekend-weekday-spending": "Uscite weekend vs giorni feriali",
       "monthly-comparison": "Confronto mensile",
+      "foreign-currency-fees": "Commissioni per transazioni in valuta estera",
       "uncategorized-transactions": "Transazioni senza categoria",
       "duplicate-transactions": "Ricerca transazioni duplicate",
       "upcoming-bills": "Calendario fatture in scadenza",
@@ -111,6 +112,7 @@
       "spending-anomalies": "Rileva transazioni insolitamente elevate e picchi di spesa che richiedono attenzione.",
       "weekend-weekday-spending": "Analizza gli schemi di spesa in base al giorno della settimana per comprendere le abitudini.",
       "monthly-comparison": "Confronta qualsiasi mese con quello precedente su entrate, uscite, patrimonio netto e investimenti.",
+      "foreign-currency-fees": "Monitora le commissioni per transazioni estere addebitate sui conti che applicano una commissione di conversione.",
       "uncategorized-transactions": "Trova e categorizza le transazioni senza categoria.",
       "duplicate-transactions": "Identifica potenziali voci duplicate che potrebbero richiedere revisione o eliminazione.",
       "upcoming-bills": "Calendario visivo delle transazioni pianificate e delle scadenze delle fatture.",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "Caricamento dati del report non riuscito. Riprova.",
     "retry": "Riprova"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "Nessun conto ha una commissione per transazioni estere configurata. Imposta una percentuale di commissione su un conto per monitorare qui le sue commissioni in valuta estera."
   },
   "accountBalances": {
     "totalAssets": "Totale attività",

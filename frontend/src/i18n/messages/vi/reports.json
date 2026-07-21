@@ -65,6 +65,7 @@
       "spending-anomalies": "Bất thường chi tiêu",
       "weekend-weekday-spending": "Chi tiêu cuối tuần so với ngày thường",
       "monthly-comparison": "So sánh hàng tháng",
+      "foreign-currency-fees": "Phí giao tác ngoại tệ",
       "uncategorized-transactions": "Giao tác chưa phân loại",
       "duplicate-transactions": "Tìm giao tác trùng lặp",
       "upcoming-bills": "Lịch hóa đơn sắp tới",
@@ -111,6 +112,7 @@
       "spending-anomalies": "Phát hiện các giao tác bất thường lớn và đột biến chi tiêu cần chú ý.",
       "weekend-weekday-spending": "Phân tích mô hình chi tiêu của bạn dựa trên ngày trong tuần để hiểu thói quen.",
       "monthly-comparison": "So sánh bất kỳ tháng nào với tháng trước về thu nhập, chi phí, giá trị ròng và đầu tư.",
+      "foreign-currency-fees": "Theo dõi phí giao dịch nước ngoài được tính trên các tài khoản áp dụng phí quy đổi.",
       "uncategorized-transactions": "Tìm và phân loại các giao tác bị thiếu danh mục.",
       "duplicate-transactions": "Xác định các mục có thể trùng lặp cần xem xét hoặc xóa.",
       "upcoming-bills": "Lịch trực quan của các giao tác theo lịch và ngày đến hạn hóa đơn sắp tới.",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "Không thể tải dữ liệu báo cáo. Vui lòng thử lại.",
     "retry": "Thử lại"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "Không có tài khoản nào được cấu hình phí giao dịch nước ngoài. Đặt tỷ lệ phí phần trăm cho một tài khoản để theo dõi phí ngoại tệ của tài khoản đó tại đây."
   },
   "accountBalances": {
     "totalAssets": "Tổng tài sản",

@@ -447,9 +447,7 @@
     "tagKeyRequired": "É necessária uma chave de etiqueta (1-100 caracteres)",
     "fxFieldsIncomplete": "originalAmount e originalCurrencyCode devem ser fornecidos em conjunto",
     "fxRateRequired": "É necessária uma taxa de câmbio positiva para uma transação em moeda estrangeira",
-    "fxSignMismatch": "originalAmount e amount devem ter o mesmo sinal",
-    "multipleFxFeeSplits": "Uma transação pode ter no máximo uma divisão de comissão de moeda estrangeira",
-    "fxFeeSplitMustBeCategory": "A divisão da comissão de moeda estrangeira deve ser uma divisão por categoria"
+    "fxSignMismatch": "originalAmount e amount devem ter o mesmo sinal"
   },
   "users": {
     "userNotFound": "Utilizador não encontrado",

@@ -104,6 +104,9 @@
       "refNumber": "Ref #",
       "tags": "Tag",
       "amount": "Jumlah",
+      "currency": "Mata uang",
+      "paidAmount": "Jumlah Dibayar",
+      "feePaid": "Biaya Dibayar",
       "balance": "Saldo",
       "status": "Status",
       "actions": "Aksi"
@@ -414,7 +417,6 @@
         "original": "Asli"
       },
       "rateCaption": "1 {from} = {rate} {to} ({date})",
-      "feeAutoBadge": "auto",
       "feeCaption": "Termasuk biaya transaksi luar negeri {percent}% ({fee}).",
       "totalInCurrency": "Total dalam {currency}"
     }

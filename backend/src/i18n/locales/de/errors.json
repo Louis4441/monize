@@ -447,9 +447,7 @@
     "tagKeyRequired": "Ein Tag-Schlüssel (1–100 Zeichen) ist erforderlich",
     "fxFieldsIncomplete": "originalAmount und originalCurrencyCode müssen zusammen angegeben werden",
     "fxRateRequired": "Für eine Fremdwährungstransaktion ist ein positiver Wechselkurs erforderlich",
-    "fxSignMismatch": "originalAmount und amount müssen dasselbe Vorzeichen haben",
-    "multipleFxFeeSplits": "Eine Transaktion darf höchstens eine Fremdwährungsgebühren-Aufteilung haben",
-    "fxFeeSplitMustBeCategory": "Die Fremdwährungsgebühren-Aufteilung muss eine Kategorie-Aufteilung sein"
+    "fxSignMismatch": "originalAmount und amount müssen dasselbe Vorzeichen haben"
   },
   "users": {
     "userNotFound": "Benutzer nicht gefunden",
