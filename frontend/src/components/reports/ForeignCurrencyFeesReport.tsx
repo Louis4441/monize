@@ -16,6 +16,7 @@ import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { ForeignCurrencyFeeChart } from '@/components/accounts/shared/ForeignCurrencyFeeChart';
+import { CurrencyFilterChips } from '@/components/accounts/shared/CurrencyFilterChips';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import type { Account } from '@/types/account';
 import type {
@@ -337,6 +338,10 @@ export function ForeignCurrencyFeesReport() {
               disabled={currencyOptions.length === 0}
             />
           </div>
+          <CurrencyFilterChips
+            selected={selectedCurrencies}
+            onChange={handleCurrencyFilterChange}
+          />
         </div>
       </div>
 

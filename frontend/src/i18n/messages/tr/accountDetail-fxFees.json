@@ -1,6 +1,10 @@
 {
   "title": "Yabancı Para Birimi İşlem Ücretleri",
-  "currencyFilter": { "label": "Para Birimleri", "placeholder": "Tüm para birimleri" },
+  "currencyFilter": {
+    "label": "Para Birimleri",
+    "placeholder": "Tüm para birimleri",
+    "remove": "{code} filtresini kaldır"
+  },
   "chart": {
     "title": "Zaman İçinde Ücretler",
     "noData": "Henüz yabancı para birimi işlemi yok",
@@ -13,7 +17,12 @@
     "quarterLabel": "Ç{quarter} {year}",
     "quarterTick": "Ç{quarter} {year}",
     "granularityLabel": "Gruplama",
-    "granularity": { "auto": "Otomatik", "month": "Ay", "quarter": "Çeyrek", "year": "Yıl" },
+    "granularity": {
+      "auto": "Otomatik",
+      "month": "Ay",
+      "quarter": "Çeyrek",
+      "year": "Yıl"
+    },
     "granularityAutoTitle": "Otomatik ({granularity})",
     "granularityTitle": "{label} görünümü"
   },

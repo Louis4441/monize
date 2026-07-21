@@ -1,6 +1,10 @@
 {
   "title": "Phí giao tác ngoại tệ",
-  "currencyFilter": { "label": "Tiền tệ", "placeholder": "Tất cả tiền tệ" },
+  "currencyFilter": {
+    "label": "Tiền tệ",
+    "placeholder": "Tất cả tiền tệ",
+    "remove": "Xóa bộ lọc {code}"
+  },
   "chart": {
     "title": "Phí theo thời gian",
     "noData": "Chưa có giao tác ngoại tệ nào",
@@ -13,7 +17,12 @@
     "quarterLabel": "Q{quarter} {year}",
     "quarterTick": "Q{quarter} {year}",
     "granularityLabel": "Nhóm theo",
-    "granularity": { "auto": "Tự động", "month": "Tháng", "quarter": "Quý", "year": "Năm" },
+    "granularity": {
+      "auto": "Tự động",
+      "month": "Tháng",
+      "quarter": "Quý",
+      "year": "Năm"
+    },
     "granularityAutoTitle": "Tự động ({granularity})",
     "granularityTitle": "Xem theo {label}"
   },

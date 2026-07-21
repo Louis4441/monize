@@ -1,6 +1,10 @@
 {
   "title": "Комісії за транзакції в іноземній валюті",
-  "currencyFilter": { "label": "Валюти", "placeholder": "Всі валюти" },
+  "currencyFilter": {
+    "label": "Валюти",
+    "placeholder": "Всі валюти",
+    "remove": "Видалити фільтр {code}"
+  },
   "chart": {
     "title": "Комісії з плином часу",
     "noData": "Ще немає транзакцій в іноземній валюті",
@@ -13,7 +17,12 @@
     "quarterLabel": "{quarter} кв. {year}",
     "quarterTick": "{quarter} кв. {year}",
     "granularityLabel": "Групування",
-    "granularity": { "auto": "Авто", "month": "Місяць", "quarter": "Квартал", "year": "Рік" },
+    "granularity": {
+      "auto": "Авто",
+      "month": "Місяць",
+      "quarter": "Квартал",
+      "year": "Рік"
+    },
     "granularityAutoTitle": "Авто ({granularity})",
     "granularityTitle": "Вигляд: {label}"
   },

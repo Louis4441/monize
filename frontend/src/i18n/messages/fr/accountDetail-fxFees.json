@@ -1,6 +1,10 @@
 {
   "title": "Frais de transaction à l'étranger",
-  "currencyFilter": { "label": "Devises", "placeholder": "Toutes les devises" },
+  "currencyFilter": {
+    "label": "Devises",
+    "placeholder": "Toutes les devises",
+    "remove": "Retirer le filtre {code}"
+  },
   "chart": {
     "title": "Frais au fil du temps",
     "noData": "Aucune transaction en devise étrangère pour le moment",
@@ -13,7 +17,12 @@
     "quarterLabel": "T{quarter} {year}",
     "quarterTick": "T{quarter} {year}",
     "granularityLabel": "Regroupement",
-    "granularity": { "auto": "Auto", "month": "Mois", "quarter": "Trimestre", "year": "Année" },
+    "granularity": {
+      "auto": "Auto",
+      "month": "Mois",
+      "quarter": "Trimestre",
+      "year": "Année"
+    },
     "granularityAutoTitle": "Auto ({granularity})",
     "granularityTitle": "Vue par {label}"
   },
