@@ -156,7 +156,10 @@
       "other": "기타"
     },
     "statementDueDayPlaceholder": "예: 15",
-    "statementSettlementDayPlaceholder": "예: 25"
+    "statementSettlementDayPlaceholder": "예: 25",
+    "fxFeeTitle": "외화 환전 수수료 (선택)",
+    "fxFeePercent": "수수료 비율",
+    "fxFeePercentPlaceholder": "예: 2.5"
   },
   "exportModal": {
     "title": "{name} 내보내기",

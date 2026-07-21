@@ -156,7 +156,10 @@
       "other": "Sonstiges"
     },
     "statementDueDayPlaceholder": "z. B. 15",
-    "statementSettlementDayPlaceholder": "z. B. 25"
+    "statementSettlementDayPlaceholder": "z. B. 25",
+    "fxFeeTitle": "Fremdwährungsumrechnungsgebühr (optional)",
+    "fxFeePercent": "Gebührensatz",
+    "fxFeePercentPlaceholder": "z. B. 2,5"
   },
   "exportModal": {
     "title": "{name} exportieren",

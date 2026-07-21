@@ -156,7 +156,10 @@
       "other": "Overig"
     },
     "statementDueDayPlaceholder": "bijv. 15",
-    "statementSettlementDayPlaceholder": "bijv. 25"
+    "statementSettlementDayPlaceholder": "bijv. 25",
+    "fxFeeTitle": "Kosten voor omrekening van vreemde valuta (optioneel)",
+    "fxFeePercent": "Kostenpercentage",
+    "fxFeePercentPlaceholder": "bijv. 2,5"
   },
   "exportModal": {
     "title": "{name} exporteren",

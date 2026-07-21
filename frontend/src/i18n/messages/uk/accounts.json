@@ -156,7 +156,10 @@
       "other": "Інший"
     },
     "statementDueDayPlaceholder": "напр. 15",
-    "statementSettlementDayPlaceholder": "напр. 25"
+    "statementSettlementDayPlaceholder": "напр. 25",
+    "fxFeeTitle": "Комісія за конвертацію валюти (необов'язково)",
+    "fxFeePercent": "Відсоток комісії",
+    "fxFeePercentPlaceholder": "напр. 2,5"
   },
   "exportModal": {
     "title": "Експорт {name}",

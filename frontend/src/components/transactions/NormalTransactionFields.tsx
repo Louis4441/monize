@@ -40,6 +40,20 @@ interface NormalTransactionFieldsProps {
   onQuickFill?: (transaction: Transaction) => void;
   transaction?: Transaction;
   createdAtSlot?: ReactNode;
+  /** Foreign-currency entry: button placed left of the Amount input. */
+  currencyPickerSlot?: ReactNode;
+  /** Foreign-currency entry: the converted account-currency amount input, placed
+   *  beside the Amount input (equal width). When set, the Amount row switches to
+   *  a two-column layout and Reference Number moves to its own row. */
+  convertedAmountSlot?: ReactNode;
+  /** Foreign-currency entry: rate/fee captions rendered below the Amount row. */
+  fxCaptionSlot?: ReactNode;
+  /** Overrides the Amount input's value (the foreign total, when entering in a
+   *  foreign currency). Defaults to watchedAmount (the account-currency amount). */
+  amountValue?: number;
+  /** Overrides the currency whose symbol prefixes the Amount input. Defaults to
+   *  watchedCurrencyCode (the account currency). */
+  amountCurrencyCode?: string;
 }
 
 export function NormalTransactionFields({
@@ -65,6 +79,11 @@ export function NormalTransactionFields({
   onQuickFill,
   transaction,
   createdAtSlot,
+  currencyPickerSlot,
+  convertedAmountSlot,
+  fxCaptionSlot,
+  amountValue,
+  amountCurrencyCode,
 }: NormalTransactionFieldsProps) {
   const t = useTranslations('transactions');
   const historyButtonRef = useRef<HTMLButtonElement>(null);
@@ -201,24 +220,51 @@ export function NormalTransactionFields({
         </div>
       </div>
 
-      {/* Row 3: Amount and Reference Number */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <CurrencyInput
-          label={t('form.fields.amount')}
-          prefix={getCurrencySymbol(watchedCurrencyCode)}
-          value={watchedAmount}
-          onChange={handleAmountChange}
-          allowSignToggle
-          error={errors.amount?.message as string | undefined}
-        />
-        <Input
-          label={t('form.fields.referenceNumber')}
-          type="text"
-          placeholder={t('form.placeholders.referenceNumber')}
-          error={errors.referenceNumber?.message as string | undefined}
-          {...register('referenceNumber')}
-        />
-      </div>
+      {/* Row 3: Amount (+ converted amount when entering a foreign currency) and
+          Reference Number. In foreign mode the converted amount sits beside the
+          Amount at equal width, and Reference Number drops to its own row. */}
+      {(() => {
+        const amountInput = (
+          <CurrencyInput
+            label={t('form.fields.amount')}
+            prefix={getCurrencySymbol(amountCurrencyCode || watchedCurrencyCode)}
+            value={amountValue !== undefined ? amountValue : watchedAmount}
+            onChange={handleAmountChange}
+            allowSignToggle
+            error={errors.amount?.message as string | undefined}
+          />
+        );
+        const referenceInput = (
+          <Input
+            label={t('form.fields.referenceNumber')}
+            type="text"
+            placeholder={t('form.placeholders.referenceNumber')}
+            error={errors.referenceNumber?.message as string | undefined}
+            {...register('referenceNumber')}
+          />
+        );
+        return convertedAmountSlot ? (
+          <div>
+            <div className="flex items-stretch space-x-2">
+              {currencyPickerSlot}
+              <div className="grid grid-cols-3 gap-4 flex-1 min-w-0">
+                {amountInput}
+                {convertedAmountSlot}
+                {referenceInput}
+              </div>
+            </div>
+            {fxCaptionSlot}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-stretch space-x-2">
+              {currencyPickerSlot}
+              <div className="flex-1 min-w-0">{amountInput}</div>
+            </div>
+            {referenceInput}
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -156,7 +156,10 @@
       "other": "其他"
     },
     "statementDueDayPlaceholder": "例如 15",
-    "statementSettlementDayPlaceholder": "例如 25"
+    "statementSettlementDayPlaceholder": "例如 25",
+    "fxFeeTitle": "外幣兌換手續費 （選填）",
+    "fxFeePercent": "手續費百分比",
+    "fxFeePercentPlaceholder": "例如 2.5"
   },
   "exportModal": {
     "title": "匯出 {name}",

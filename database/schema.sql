@@ -141,6 +141,9 @@ CREATE TABLE accounts (
     overpayment_category_id UUID, -- category tagging standalone overpayments/extra principal (FK added after categories table)
     overpayment_memo VARCHAR(255), -- memo text marking a payment as a standalone overpayment (case-insensitive substring match)
     overpayment_payee_id UUID, -- payee whose payments count as standalone overpayments/extra principal (FK added after payees table)
+    -- Foreign-transaction fee: the bank's FX conversion fee (a percentage) folded
+    -- into the converted amount on foreign-entered transactions.
+    fx_fee_percent NUMERIC(8, 4), -- foreign-currency conversion fee as a percentage
     scheduled_transaction_id UUID, -- linked scheduled transaction for payments (FK added after scheduled_transactions table)
     -- Asset-specific fields
     asset_category_id UUID, -- category for tracking value changes on asset accounts (FK added after categories table)
@@ -259,7 +262,11 @@ CREATE TABLE transactions (
     category_id UUID REFERENCES categories(id) ON DELETE SET NULL, -- category for non-split transactions
     amount NUMERIC(20, 4) NOT NULL, -- positive for income/deposits, negative for expenses
     currency_code VARCHAR(3) NOT NULL REFERENCES currencies(code),
-    exchange_rate NUMERIC(20, 10) DEFAULT 1, -- rate at transaction time
+    exchange_rate NUMERIC(20, 10) DEFAULT 1, -- rate at transaction time (account-currency units per 1 unit of original currency for foreign entry)
+    -- Foreign-currency entry: amount actually paid, stored alongside the
+    -- account-currency amount. NULL for ordinary transactions.
+    original_amount NUMERIC(20, 4), -- amount as typed in the original currency
+    original_currency_code VARCHAR(3) CONSTRAINT fk_transactions_original_currency REFERENCES currencies(code), -- currency actually paid in
     description TEXT,
     reference_number VARCHAR(100), -- check number, confirmation number, etc
     is_cleared BOOLEAN DEFAULT false, -- LEGACY: replaced by status field
@@ -281,6 +288,7 @@ CREATE INDEX idx_transactions_payee ON transactions(payee_id);
 CREATE INDEX idx_transactions_category ON transactions(category_id);
 CREATE INDEX idx_transactions_parent ON transactions(parent_transaction_id);
 CREATE INDEX idx_transactions_linked ON transactions(linked_transaction_id);
+CREATE INDEX idx_transactions_original_currency ON transactions(original_currency_code);
 CREATE INDEX idx_transactions_cleared ON transactions(is_cleared); -- LEGACY
 CREATE INDEX idx_transactions_reconciled ON transactions(is_reconciled); -- LEGACY
 CREATE INDEX idx_transactions_user_cleared ON transactions(user_id, is_cleared); -- LEGACY
@@ -298,6 +306,7 @@ CREATE TABLE transaction_splits (
     linked_transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL, -- linked transaction in target account
     amount NUMERIC(20, 4) NOT NULL,
     memo TEXT,
+    is_fx_fee BOOLEAN NOT NULL DEFAULT false, -- marks the auto-generated foreign-transaction fee split
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_split_kind_exclusive CHECK (
         (kind = 'category'   AND transfer_account_id IS NULL) OR

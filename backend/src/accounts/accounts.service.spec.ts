@@ -288,6 +288,18 @@ describe("AccountsService", () => {
       expect(createCall.currentBalance).toBe(0);
     });
 
+    it("creates an account with a foreign-transaction fee percentage", async () => {
+      await service.create("user-1", {
+        name: "Travel Card",
+        accountType: AccountType.CREDIT_CARD,
+        currencyCode: "USD",
+        fxFeePercent: 2.5,
+      } as any);
+
+      const createCall = accountsRepository.create.mock.calls[0][0];
+      expect(createCall.fxFeePercent).toBe(2.5);
+    });
+
     it("creates a credit card account with statement date fields", async () => {
       await service.create("user-1", {
         name: "Visa Card",

@@ -156,7 +156,10 @@
       "other": "Inne"
     },
     "statementDueDayPlaceholder": "np. 15",
-    "statementSettlementDayPlaceholder": "np. 25"
+    "statementSettlementDayPlaceholder": "np. 25",
+    "fxFeeTitle": "Opłata za przewalutowanie (opcjonalnie)",
+    "fxFeePercent": "Procent opłaty",
+    "fxFeePercentPlaceholder": "np. 2,5"
   },
   "exportModal": {
     "title": "Eksportuj {name}",

@@ -156,7 +156,10 @@
       "other": "その他"
     },
     "statementDueDayPlaceholder": "例：15",
-    "statementSettlementDayPlaceholder": "例：25"
+    "statementSettlementDayPlaceholder": "例：25",
+    "fxFeeTitle": "外貨換算手数料 （任意）",
+    "fxFeePercent": "手数料率",
+    "fxFeePercentPlaceholder": "例: 2.5"
   },
   "exportModal": {
     "title": "{name} をエクスポート",

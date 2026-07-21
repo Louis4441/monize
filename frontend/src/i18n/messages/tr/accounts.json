@@ -156,7 +156,10 @@
       "other": "Diğer"
     },
     "statementDueDayPlaceholder": "ör. 15",
-    "statementSettlementDayPlaceholder": "ör. 25"
+    "statementSettlementDayPlaceholder": "ör. 25",
+    "fxFeeTitle": "Yabancı para dönüştürme ücreti (isteğe bağlı)",
+    "fxFeePercent": "Ücret yüzdesi",
+    "fxFeePercentPlaceholder": "örn. 2,5"
   },
   "exportModal": {
     "title": "{name} Dışa Aktar",

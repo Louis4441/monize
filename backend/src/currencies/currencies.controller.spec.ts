@@ -18,6 +18,7 @@ describe("CurrenciesController", () => {
       getCurrencies: jest.fn(),
       getLatestRates: jest.fn(),
       getRateHistory: jest.fn(),
+      getRateForDate: jest.fn(),
       getLastUpdateTime: jest.fn(),
       refreshAllRates: jest.fn(),
       backfillHistoricalRates: jest.fn(),
@@ -94,6 +95,44 @@ describe("CurrenciesController", () => {
 
       expect(result).toEqual(lookupResult);
       expect(mockCurrenciesService.lookupCurrency).toHaveBeenCalledWith("EUR");
+    });
+  });
+
+  describe("getRateForDate()", () => {
+    it("returns the rate for a valid pair and date", async () => {
+      mockExchangeRateService.getRateForDate!.mockResolvedValue(1.4523);
+
+      const result = await controller.getRateForDate(
+        "EUR",
+        "USD",
+        "2026-07-20",
+      );
+
+      expect(result).toEqual({ rate: 1.4523 });
+      expect(mockExchangeRateService.getRateForDate).toHaveBeenCalledWith(
+        "EUR",
+        "USD",
+        "2026-07-20",
+      );
+    });
+
+    it("returns null when no rate can be determined", async () => {
+      mockExchangeRateService.getRateForDate!.mockResolvedValue(null);
+
+      const result = await controller.getRateForDate(
+        "EUR",
+        "USD",
+        "2026-07-20",
+      );
+
+      expect(result).toEqual({ rate: null });
+    });
+
+    it("throws for a malformed date", async () => {
+      await expect(
+        controller.getRateForDate("EUR", "USD", "07/20/2026"),
+      ).rejects.toThrow();
+      expect(mockExchangeRateService.getRateForDate).not.toHaveBeenCalled();
     });
   });
 

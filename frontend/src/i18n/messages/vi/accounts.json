@@ -156,7 +156,10 @@
       "other": "Khác"
     },
     "statementDueDayPlaceholder": "vd. 15",
-    "statementSettlementDayPlaceholder": "vd. 25"
+    "statementSettlementDayPlaceholder": "vd. 25",
+    "fxFeeTitle": "Phí chuyển đổi ngoại tệ (tùy chọn)",
+    "fxFeePercent": "Phần trăm phí",
+    "fxFeePercentPlaceholder": "vd. 2,5"
   },
   "exportModal": {
     "title": "Xuất {name}",

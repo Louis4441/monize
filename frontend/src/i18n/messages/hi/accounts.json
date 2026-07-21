@@ -156,7 +156,10 @@
       "other": "अन्य"
     },
     "statementDueDayPlaceholder": "उदा. 15",
-    "statementSettlementDayPlaceholder": "उदा. 25"
+    "statementSettlementDayPlaceholder": "उदा. 25",
+    "fxFeeTitle": "विदेशी मुद्रा रूपांतरण शुल्क (वैकल्पिक)",
+    "fxFeePercent": "शुल्क प्रतिशत",
+    "fxFeePercentPlaceholder": "उदा. 2.5"
   },
   "exportModal": {
     "title": "{name} निर्यात करें",

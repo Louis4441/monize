@@ -11,6 +11,14 @@ import { Select } from '@/components/ui/Select';
 import { SplitEditor, SplitRow, createEmptySplits, toSplitRows, toCreateSplitData } from './SplitEditor';
 import { NormalTransactionFields } from './NormalTransactionFields';
 import { SplitTransactionFields } from './SplitTransactionFields';
+import { CurrencyPickerButton } from './CurrencyPickerButton';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
+import { exchangeRatesApi } from '@/lib/exchange-rates';
+import { getCurrencySymbol, roundToCents } from '@/lib/format';
+import {
+  getRememberedTransactionCurrency,
+  rememberTransactionCurrency,
+} from '@/lib/lastTransactionCurrency';
 import { TransferTransactionFields } from './TransferTransactionFields';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Modal } from '@/components/ui/Modal';
@@ -62,6 +70,25 @@ const buildTransactionSchema = (t: (key: string) => string) => z.object({
 type TransactionFormData = z.infer<ReturnType<typeof buildTransactionSchema>>;
 
 /**
+ * Sign a freshly entered amount magnitude according to a category: an income
+ * category makes it positive, an expense category negative. An explicit sign
+ * toggle -- the magnitude is unchanged from `reference`, so the user just
+ * flipped the sign -- is preserved so a manual override is respected. Shared by
+ * the account-currency and foreign-currency amount inputs so both behave
+ * identically. With no category (or no reference), the value is returned as-is.
+ */
+function signAmountByCategory(
+  value: number,
+  reference: number | undefined,
+  category: Category | undefined,
+): number {
+  const referenceAbs = reference !== undefined ? Math.abs(reference) : 0;
+  const isJustSignChange = referenceAbs === Math.abs(value) && referenceAbs !== 0;
+  if (isJustSignChange || !category) return value;
+  return category.isIncome ? Math.abs(value) : -Math.abs(value);
+}
+
+/**
  * A reconciled transaction was matched against a statement during
  * reconciliation. Only the date and amount feed that match, so editing other
  * fields (payee, category, notes, reference) leaves the reconciliation intact
@@ -101,7 +128,7 @@ type TransactionMode = 'normal' | 'split' | 'transfer';
 
 export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, defaultCategoryId, onSuccess, onCancel, onDirtyChange, submitRef }: TransactionFormProps) {
   const t = useTranslations('transactions');
-  const { defaultCurrency } = useNumberFormat();
+  const { defaultCurrency, formatCurrency } = useNumberFormat();
   const showCreatedAt = usePreferencesStore((s) => s.preferences?.showCreatedAt ?? false);
   const timeFormat = usePreferencesStore((s) => s.preferences?.timeFormat ?? '24h');
   const timezonePref = usePreferencesStore((s) => s.preferences?.timezone);
@@ -197,6 +224,26 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
     initSource?.isTransfer ? (initSource.payeeName || '') : '',
   );
 
+  // Foreign-currency entry state. `entryCurrency` is the currency the user is
+  // typing the amount in ('' means the account currency -- an ordinary
+  // transaction). `foreignAmount` is that typed amount; `fxRate` is the rate
+  // (account-currency units per 1 unit of entryCurrency). On a new transaction
+  // the entry currency is seeded from the sticky remembered currency; when
+  // editing/duplicating a foreign transaction it comes from the source.
+  const [entryCurrency, setEntryCurrency] = useState<string>(
+    initSource?.originalCurrencyCode || (initSource ? '' : getRememberedTransactionCurrency()),
+  );
+  const [foreignAmount, setForeignAmount] = useState<number | undefined>(
+    initSource?.originalAmount != null ? Number(initSource.originalAmount) : undefined,
+  );
+  const [fxRate, setFxRate] = useState<number | null>(
+    initSource?.originalCurrencyCode ? Number(initSource.exchangeRate) : null,
+  );
+  // Starts true when editing an existing foreign transaction so a later date fix
+  // does not clobber the bank's stored rate.
+  const rateOverriddenRef = useRef<boolean>(!!initSource?.originalCurrencyCode);
+  const [fxRateLoading, setFxRateLoading] = useState(false);
+
   // Note: CurrencyInput components manage their own display state internally
 
   const {
@@ -242,6 +289,18 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
   const watchedAmount = watch('amount');
   const watchedCurrencyCode = watch('currencyCode');
   const watchedPayeeName = watch('payeeName');
+  const watchedDate = watch('transactionDate');
+
+  // Foreign-currency entry is active only for non-transfer transactions whose
+  // entry currency differs from the account currency. Transfers already have
+  // their own cross-currency handling, so the picker is hidden there.
+  const selectedAccount = accounts.find((a) => a.id === watchedAccountId);
+  const accountCurrency =
+    selectedAccount?.currencyCode || watchedCurrencyCode || defaultCurrency;
+  const isForeign =
+    mode !== 'transfer' &&
+    !!entryCurrency &&
+    entryCurrency.toUpperCase() !== accountCurrency.toUpperCase();
 
   // Auto-set currencyCode from the selected account, and pre-fill the
   // asset value change category when an ASSET account is selected.
@@ -458,14 +517,11 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         setValue('categoryId', payee.defaultCategoryId, { shouldDirty: true });
         categoryWasAutoSetRef.current = false;
 
-        // Adjust amount sign based on default category type
+        // Adjust amount sign based on default category type (re-signs the
+        // foreign amount too when entering a foreign currency).
         const category = categories.find(c => c.id === payee.defaultCategoryId);
-        if (category && watchedAmount !== undefined && watchedAmount !== 0) {
-          const absAmount = Math.abs(watchedAmount);
-          const newAmount = category.isIncome ? absAmount : -absAmount;
-          if (newAmount !== watchedAmount) {
-            setValue('amount', newAmount, { shouldDirty: true });
-          }
+        if (category) {
+          resignActiveAmount(category);
         }
       }
     } else {
@@ -561,19 +617,11 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
       // as a positive number (the legs' signs are derived on save), so an
       // expense category must not flip it negative or the transfer fails the
       // "amount must be positive" check. Mirrors the mode guard in
-      // handleAmountChange.
+      // handleAmountChange. Re-signs the foreign amount when entering a foreign
+      // currency, so the behaviour matches account-currency entry.
       const category = categories.find(c => c.id === categoryId);
-      if (
-        category &&
-        mode === 'normal' &&
-        watchedAmount !== undefined &&
-        watchedAmount !== 0
-      ) {
-        const absAmount = Math.abs(watchedAmount);
-        const newAmount = category.isIncome ? absAmount : -absAmount;
-        if (newAmount !== watchedAmount) {
-          setValue('amount', newAmount, { shouldDirty: true, shouldValidate: true });
-        }
+      if (category && mode === 'normal') {
+        resignActiveAmount(category);
       }
     } else {
       // Custom value being typed - don't create yet, just track the name
@@ -583,6 +631,19 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
     }
   };
 
+  // The category whose income/expense flag drives the amount sign: the selected
+  // category in normal mode, the first split's category in split mode.
+  const activeSigningCategory = (): Category | undefined => {
+    if (mode === 'split') {
+      return splits.length > 0 && splits[0].categoryId
+        ? categories.find((c) => c.id === splits[0].categoryId)
+        : undefined;
+    }
+    return selectedCategoryId
+      ? categories.find((c) => c.id === selectedCategoryId)
+      : undefined;
+  };
+
   // Handle amount change - adjust sign based on selected category
   // Only auto-adjust when the absolute value changes, not when user explicitly changes sign
   const handleAmountChange = (value: number | undefined) => {
@@ -590,31 +651,10 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
       setValue('amount', value ?? 0, { shouldValidate: true });
       return;
     }
-
-    // Check if user is just changing the sign (same absolute value)
-    const currentAbsAmount = watchedAmount !== undefined ? Math.abs(watchedAmount) : 0;
-    const newAbsAmount = Math.abs(value);
-    const isJustSignChange = currentAbsAmount === newAbsAmount && currentAbsAmount !== 0;
-
-    // If user explicitly changed the sign, respect their choice
-    if (isJustSignChange) {
-      setValue('amount', value, { shouldValidate: true });
-      return;
-    }
-
-    // If a category is selected, adjust sign based on category type
-    if (selectedCategoryId && mode === 'normal') {
-      const category = categories.find(c => c.id === selectedCategoryId);
-      if (category) {
-        const absAmount = Math.abs(value);
-        const newAmount = category.isIncome ? absAmount : -absAmount;
-        setValue('amount', newAmount, { shouldValidate: true });
-        return;
-      }
-    }
-
-    // No category selected or not normal mode, use value as-is
-    setValue('amount', value, { shouldValidate: true });
+    const category = mode === 'normal' ? activeSigningCategory() : undefined;
+    setValue('amount', signAmountByCategory(value, watchedAmount, category), {
+      shouldValidate: true,
+    });
   };
 
   // Handle split total amount change - same pattern as handleAmountChange
@@ -624,32 +664,174 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
       setValue('amount', value ?? 0, { shouldValidate: true });
       return;
     }
+    const category =
+      splits.length > 0 && splits[0].categoryId
+        ? categories.find((c) => c.id === splits[0].categoryId)
+        : undefined;
+    setValue('amount', signAmountByCategory(value, watchedAmount, category), {
+      shouldValidate: true,
+    });
+  };
 
-    // Check if user is just changing the sign (same absolute value)
-    const currentAbsAmount = watchedAmount !== undefined ? Math.abs(watchedAmount) : 0;
-    const newAbsAmount = Math.abs(value);
-    const isJustSignChange = currentAbsAmount === newAbsAmount && currentAbsAmount !== 0;
+  // ── Foreign-currency entry helpers ──────────────────────────────────────
+  //
+  // When a foreign currency is chosen, the Amount input edits the foreign total
+  // (`foreignAmount`); the account-currency `amount` is derived from it and the
+  // fetched rate. When the account has a foreign-transaction fee configured, that
+  // fee is folded into the amount (no split is created):
+  //   base = round(foreignAmount x rate)
+  //   fee  = -round(|base| x feePercent / 100)
+  //   amount = base + fee
 
-    // If user explicitly changed the sign, respect their choice
-    if (isJustSignChange) {
-      setValue('amount', value, { shouldValidate: true });
+  // The converted account-currency base shown in the FX panel (before fee), the
+  // fee itself, and the resulting total charged to the account.
+  const convertedBase =
+    isForeign && foreignAmount !== undefined && fxRate != null
+      ? roundToCents(foreignAmount * fxRate)
+      : undefined;
+  const fxFeePercent = selectedAccount?.fxFeePercent ?? undefined;
+  const fxFeeApplies =
+    isForeign && convertedBase !== undefined && !!fxFeePercent && fxFeePercent > 0;
+  const fxFeeAmount = fxFeeApplies
+    ? -roundToCents((Math.abs(convertedBase as number) * (fxFeePercent as number)) / 100)
+    : 0;
+  const fxTotal =
+    convertedBase !== undefined
+      ? roundToCents(convertedBase + fxFeeAmount)
+      : undefined;
+
+  // Recompute the account-currency `amount` from the foreign amount and rate.
+  // The bank's foreign-transaction fee (when the account has one) is folded into
+  // the amount; no split is created. `overrideBase` forces the converted base
+  // (used when the user edits the converted-base field directly).
+  const recomputeFx = (
+    fAmount: number | undefined,
+    rate: number | null,
+    overrideBase?: number,
+  ) => {
+    if (fAmount === undefined || rate == null) return;
+    const base =
+      overrideBase !== undefined ? overrideBase : roundToCents(fAmount * rate);
+    const feePercent = selectedAccount?.fxFeePercent;
+    const fee =
+      feePercent && feePercent > 0
+        ? -roundToCents((Math.abs(base) * feePercent) / 100)
+        : 0;
+    setValue('amount', roundToCents(base + fee), {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
+  // Amount input change while entering in a foreign currency. The foreign amount
+  // is signed by the active category exactly as the account-currency input does
+  // (income positive, expense negative, explicit sign toggle preserved), then
+  // the converted account-currency amount is derived from it.
+  const handleForeignAmountChange = (value: number | undefined) => {
+    if (value === undefined || value === 0) {
+      setForeignAmount(value);
+      recomputeFx(value, fxRate);
       return;
     }
-
-    // Infer sign from first split's category
-    if (splits.length > 0 && splits[0].categoryId) {
-      const category = categories.find(c => c.id === splits[0].categoryId);
-      if (category) {
-        const absAmount = Math.abs(value);
-        const newAmount = category.isIncome ? absAmount : -absAmount;
-        setValue('amount', newAmount, { shouldValidate: true });
-        return;
-      }
-    }
-
-    // No category on first split, use value as-is
-    setValue('amount', value, { shouldValidate: true });
+    const category = mode === 'transfer' ? undefined : activeSigningCategory();
+    const signed = signAmountByCategory(value, foreignAmount, category);
+    setForeignAmount(signed);
+    recomputeFx(signed, fxRate);
   };
+
+  // Re-sign the amount already entered when the category changes, so choosing an
+  // expense category flips it negative (income positive). Operates on the
+  // foreign amount when entering a foreign currency (and re-derives the
+  // converted amount), otherwise on the account-currency amount. Mirrors the
+  // sign adjustment the account-currency flow applies on category change.
+  const resignActiveAmount = (category: Category) => {
+    if (isForeign) {
+      if (foreignAmount === undefined || foreignAmount === 0) return;
+      const signed = category.isIncome
+        ? Math.abs(foreignAmount)
+        : -Math.abs(foreignAmount);
+      if (signed !== foreignAmount) {
+        setForeignAmount(signed);
+        recomputeFx(signed, fxRate);
+      }
+      return;
+    }
+    if (watchedAmount === undefined || watchedAmount === 0) return;
+    const signed = category.isIncome
+      ? Math.abs(watchedAmount)
+      : -Math.abs(watchedAmount);
+    if (signed !== watchedAmount) {
+      setValue('amount', signed, { shouldDirty: true, shouldValidate: true });
+    }
+  };
+
+  // User edited the converted account-currency total (fee included) directly ->
+  // back the fee out to the pre-fee base, derive the rate (10 dp) so it
+  // round-trips, mark the rate overridden, and recompute.
+  const handleConvertedTotalOverride = (total: number | undefined) => {
+    if (total === undefined || !foreignAmount) return;
+    const feePercent = selectedAccount?.fxFeePercent;
+    let base = total;
+    if (feePercent && feePercent > 0) {
+      // total = base - |base| * p; solve for base by its (matching) sign.
+      const p = feePercent / 100;
+      base = roundToCents(total >= 0 ? total / (1 - p) : total / (1 + p));
+    }
+    const newRate = Math.round((base / foreignAmount) * 1e10) / 1e10;
+    rateOverriddenRef.current = true;
+    setFxRate(newRate);
+    recomputeFx(foreignAmount, newRate, base);
+  };
+
+  // Currency picker selection. '' (or the account currency) resets to an
+  // ordinary account-currency transaction, clearing the FX fields.
+  const handleEntryCurrencyChange = (code: string) => {
+    rateOverriddenRef.current = false;
+    if (!code || code.toUpperCase() === accountCurrency.toUpperCase()) {
+      setEntryCurrency('');
+      setForeignAmount(undefined);
+      setFxRate(null);
+      return;
+    }
+    setEntryCurrency(code);
+    // Seed the foreign amount from whatever is currently in the amount field so
+    // the converted base has something to compute from before the user types.
+    if (foreignAmount === undefined && watchedAmount) {
+      setForeignAmount(watchedAmount);
+    }
+    // The rate-fetch effect fires on the entryCurrency change.
+  };
+
+  // Fetch the rate for (entryCurrency -> account currency) on the transaction
+  // date, debounced. Skipped while the rate is user-overridden so a date tweak
+  // does not discard the bank's stored rate.
+  useEffect(() => {
+    if (!isForeign || rateOverriddenRef.current || !watchedDate) return;
+    let cancelled = false;
+    const handle = setTimeout(() => {
+      setFxRateLoading(true);
+      exchangeRatesApi
+        .getRateForDate(entryCurrency, accountCurrency, watchedDate)
+        .then((rate) => {
+          if (cancelled) return;
+          setFxRate(rate);
+          setFxRateLoading(false);
+          recomputeFx(foreignAmount, rate);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setFxRate(null);
+          setFxRateLoading(false);
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+    // recomputeFx/foreignAmount are intentionally read fresh inside the callback;
+    // amount edits recompute synchronously via handleForeignAmountChange.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isForeign, entryCurrency, accountCurrency, watchedDate]);
 
   // Convert string to title case (capitalize first letter of each word)
   const toTitleCase = (str: string): string => {
@@ -847,8 +1029,29 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         }
       }
 
+      // Foreign-currency entry: require a rate (fetched or user-overridden) so we
+      // never persist a foreign transaction with a silent 1.0 conversion.
+      if (isForeign && (fxRate == null || foreignAmount === undefined)) {
+        toast.error(t('form.toasts.fxRateRequired'));
+        setIsLoading(false);
+        return;
+      }
+
+      // FX fields flow onto the transaction. When editing away from a foreign
+      // entry, send explicit nulls so the stored metadata is cleared.
+      const fxFields = isForeign
+        ? {
+            originalAmount: foreignAmount,
+            originalCurrencyCode: entryCurrency,
+            exchangeRate: fxRate ?? undefined,
+          }
+        : transaction?.originalCurrencyCode
+          ? { originalAmount: null, originalCurrencyCode: null }
+          : {};
+
       const payload = {
         ...data,
+        ...fxFields,
         splits: splitsData,
         tagIds: selectedTagIds.length > 0 ? selectedTagIds : [],
         // Clear categoryId for split transactions. For non-split transactions
@@ -881,6 +1084,9 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         await transactionsApi.create(payload);
         toast.success(t('form.toasts.transactionCreated'));
         rememberTransactionDate(LAST_TRANSACTION_DATE_KEY, data.transactionDate);
+        // Remember the entry currency so the next new transaction pre-selects it
+        // ('' when the account currency was used, which clears the stickiness).
+        rememberTransactionCurrency(isForeign ? entryCurrency : '');
       }
       onSuccess?.();
     } catch (error) {
@@ -943,6 +1149,62 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-blue-400 dark:focus:ring-blue-400"
       />
     </div>
+  ) : undefined;
+
+  // Currency picker button, placed left of the Amount input (normal/split only).
+  const currencyPickerSlot =
+    mode !== 'transfer' ? (
+      <CurrencyPickerButton
+        value={entryCurrency}
+        accountCurrencyCode={accountCurrency}
+        onChange={handleEntryCurrencyChange}
+        disabled={isLoading}
+      />
+    ) : undefined;
+
+  // While entering a foreign currency, the converted account-currency amount
+  // (fee included) sits directly beside the Amount input (same width). The rate
+  // and fee text render together on one line below, spanning both columns.
+  const convertedAmountSlot = isForeign ? (
+    <CurrencyInput
+      label={t('form.fx.convertedAmount', { currency: accountCurrency })}
+      prefix={getCurrencySymbol(accountCurrency)}
+      value={fxTotal}
+      onChange={handleConvertedTotalOverride}
+      allowSignToggle
+    />
+  ) : undefined;
+
+  const fxCaptionSlot = isForeign ? (
+    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      {fxRate != null ? (
+        <span>
+          {t('form.fx.rateCaption', {
+            from: entryCurrency,
+            rate: fxRate.toFixed(4),
+            to: accountCurrency,
+            date: watchedDate,
+          })}
+        </span>
+      ) : !fxRateLoading ? (
+        <span className="text-amber-600 dark:text-amber-400">
+          {t('form.fx.noRateWarning', {
+            from: entryCurrency,
+            to: accountCurrency,
+            date: watchedDate,
+          })}
+        </span>
+      ) : null}
+      {fxFeeApplies && fxTotal !== undefined && (
+        <span>
+          {' '}
+          {t('form.fx.feeCaption', {
+            percent: fxFeePercent as number,
+            fee: formatCurrency(Math.abs(fxFeeAmount), accountCurrency),
+          })}
+        </span>
+      )}
+    </p>
   ) : undefined;
 
   return (
@@ -1017,11 +1279,16 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           handlePayeeCreate={handlePayeeCreate}
           handleCategoryChange={handleCategoryChange}
           handleCategoryCreate={handleCategoryCreate}
-          handleAmountChange={handleAmountChange}
+          handleAmountChange={isForeign ? handleForeignAmountChange : handleAmountChange}
           handleModeChange={handleModeChange}
           onQuickFill={!transaction && !duplicateFrom ? handleQuickFill : undefined}
           transaction={transaction}
           createdAtSlot={createdAtSlot}
+          currencyPickerSlot={currencyPickerSlot}
+          convertedAmountSlot={convertedAmountSlot}
+          fxCaptionSlot={fxCaptionSlot}
+          amountValue={isForeign ? foreignAmount : undefined}
+          amountCurrencyCode={isForeign ? entryCurrency : undefined}
         />
       )}
 
@@ -1039,10 +1306,15 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           payees={payees}
           handlePayeeChange={handlePayeeChange}
           handlePayeeCreate={handlePayeeCreate}
-          handleAmountChange={handleSplitTotalChange}
+          handleAmountChange={isForeign ? handleForeignAmountChange : handleSplitTotalChange}
           onQuickFill={!transaction && !duplicateFrom ? handleQuickFill : undefined}
           transaction={transaction}
           createdAtSlot={createdAtSlot}
+          currencyPickerSlot={currencyPickerSlot}
+          convertedAmountSlot={convertedAmountSlot}
+          fxCaptionSlot={fxCaptionSlot}
+          amountValue={isForeign ? foreignAmount : undefined}
+          amountCurrencyCode={isForeign ? entryCurrency : undefined}
         />
       )}
 

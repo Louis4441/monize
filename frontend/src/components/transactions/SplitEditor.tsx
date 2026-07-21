@@ -44,6 +44,14 @@ interface SplitEditorProps {
    * The remaining split must be a category split for this to be offered.
    */
   onConvertToRegular?: (categoryId: string | undefined) => void;
+  /**
+   * Foreign-currency display (presentational only). When set, split amounts are
+   * additionally shown converted into `displayCurrencyCode` using `displayRate`
+   * (account-currency units per 1 unit of the display currency) as read-only
+   * secondary text. Editing always happens in the account currency.
+   */
+  displayCurrencyCode?: string;
+  displayRate?: number;
 }
 
 export function SplitEditor({
@@ -59,9 +67,14 @@ export function SplitEditor({
   onTransactionAmountChange,
   currencyCode = 'CAD',
   onConvertToRegular,
+  displayCurrencyCode,
+  displayRate,
 }: SplitEditorProps) {
   const t = useTranslations('transactions');
   const investmentSplitsEnabled = parentAccountSubType === 'INVESTMENT_CASH';
+  // The auto-generated foreign-transaction fee split is read-only in the editor:
+  // it is recomputed by the parent form and must not be hand-edited or deleted.
+  const isFeeRow = (s: SplitRow) => !!s.isFxFee;
   const currencySymbol = getCurrencySymbol(currencyCode);
   const decimals = getDecimalPlacesForCurrency(currencyCode);
   const [localSplits, setLocalSplits] = useState<SplitRow[]>(splits);
@@ -246,6 +259,9 @@ export function SplitEditor({
   // convert the transaction back to a regular one -- i.e. the parent provided
   // `onConvertToRegular` and the split that would remain is a category split.
   const canRemoveRow = (index: number) => {
+    // The foreign-transaction fee row is managed by the parent form, not deleted
+    // here (removing the foreign entry clears it automatically).
+    if (isFeeRow(localSplits[index])) return false;
     if (localSplits.length > 2) return true;
     if (localSplits.length === 2 && onConvertToRegular) {
       const remaining = localSplits[index === 0 ? 1 : 0];
@@ -277,15 +293,27 @@ export function SplitEditor({
   const distributeEvenly = () => {
     if (localSplits.length === 0) return;
 
-    const totalAmount = Number(transactionAmount);
-    // Round each split to 2 decimal places (cents)
-    const amountPerSplit = Math.round((totalAmount / localSplits.length) * 100) / 100;
+    // The fee row keeps its computed amount; distribute the rest across the
+    // remaining (editable) rows so base + fee still sums to the transaction total.
+    const feeTotal = localSplits.reduce(
+      (sum, s) => sum + (isFeeRow(s) ? Number(s.amount) || 0 : 0),
+      0,
+    );
+    const editable = localSplits.filter((s) => !isFeeRow(s));
+    if (editable.length === 0) return;
 
-    // Distribute evenly, put remainder on last split
-    const newSplits = localSplits.map((split, index) => {
-      if (index === localSplits.length - 1) {
-        // Last split gets remainder to ensure exact sum
-        const otherSplitsTotal = Math.round(amountPerSplit * (localSplits.length - 1) * 100) / 100;
+    const totalAmount = Math.round((Number(transactionAmount) - feeTotal) * 100) / 100;
+    // Round each editable split to 2 decimal places (cents)
+    const amountPerSplit = Math.round((totalAmount / editable.length) * 100) / 100;
+
+    let editableSeen = 0;
+    // Distribute evenly across editable rows, put remainder on the last editable one
+    const newSplits = localSplits.map((split) => {
+      if (isFeeRow(split)) return split;
+      editableSeen += 1;
+      if (editableSeen === editable.length) {
+        // Last editable split gets remainder to ensure exact sum
+        const otherSplitsTotal = Math.round(amountPerSplit * (editable.length - 1) * 100) / 100;
         const lastAmount = Math.round((totalAmount - otherSplitsTotal) * 100) / 100;
         return { ...split, amount: lastAmount };
       }
@@ -307,19 +335,28 @@ export function SplitEditor({
     onChange(newSplits);
   };
 
-  // Distribute remaining amount proportionally across all splits based on their current amounts
+  // Distribute remaining amount proportionally across the editable splits based
+  // on their current amounts (the foreign-transaction fee row is left untouched;
+  // `remaining` already accounts for its amount).
   const distributeProportionally = () => {
     if (localSplits.length === 0 || Math.abs(remaining) < 0.01) return;
 
-    const absTotal = localSplits.reduce((sum, s) => sum + Math.abs(Number(s.amount) || 0), 0);
+    const editable = localSplits.filter((s) => !isFeeRow(s));
+    if (editable.length === 0) return;
 
-    // If all splits are zero, fall back to equal distribution
+    const absTotal = editable.reduce((sum, s) => sum + Math.abs(Number(s.amount) || 0), 0);
+    const lastEditable = editable[editable.length - 1];
+
+    // If all editable splits are zero, fall back to equal distribution.
     if (absTotal < 0.01) {
-      const perSplit = Math.round((remaining / localSplits.length) * 100) / 100;
-      const newSplits = localSplits.map((split, index) => {
+      const perSplit = Math.round((remaining / editable.length) * 100) / 100;
+      let seen = 0;
+      const newSplits = localSplits.map((split) => {
+        if (isFeeRow(split)) return split;
+        seen += 1;
         const currentAmount = Number(split.amount) || 0;
-        if (index === localSplits.length - 1) {
-          const distributed = Math.round(perSplit * (localSplits.length - 1) * 100) / 100;
+        if (seen === editable.length) {
+          const distributed = Math.round(perSplit * (editable.length - 1) * 100) / 100;
           const lastPortion = Math.round((remaining - distributed) * 100) / 100;
           return { ...split, amount: Math.round((currentAmount + lastPortion) * 100) / 100 };
         }
@@ -331,12 +368,13 @@ export function SplitEditor({
     }
 
     let distributedSoFar = 0;
-    const newSplits = localSplits.map((split, index) => {
+    const newSplits = localSplits.map((split) => {
+      if (isFeeRow(split)) return split;
       const currentAmount = Number(split.amount) || 0;
       const proportion = Math.abs(currentAmount) / absTotal;
 
-      if (index === localSplits.length - 1) {
-        // Last split absorbs rounding remainder
+      if (split === lastEditable) {
+        // Last editable split absorbs rounding remainder
         const lastPortion = Math.round((remaining - distributedSoFar) * 100) / 100;
         return { ...split, amount: Math.round((currentAmount + lastPortion) * 100) / 100 };
       }
@@ -391,16 +429,24 @@ export function SplitEditor({
             const currentCategory = split.categoryId
               ? categories.find(c => c.id === split.categoryId)
               : null;
+            const feeRow = isFeeRow(split);
 
             return (
               <div key={split.id} className="p-3 space-y-2 bg-white dark:bg-gray-900">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('splitEditor.splitLabel', { number: index + 1 })}</span>
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                    {t('splitEditor.splitLabel', { number: index + 1 })}
+                    {feeRow && (
+                      <span className="inline-flex items-center rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        {t('form.fx.feeAutoBadge')}
+                      </span>
+                    )}
+                  </span>
                   <div className="flex space-x-1">
                     <button
                       type="button"
                       onClick={() => addRemainingToSplit(index)}
-                      disabled={disabled || Math.abs(remaining) < 0.01}
+                      disabled={disabled || feeRow || Math.abs(remaining) < 0.01}
                       className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       title={Math.abs(remaining) < 0.01 ? t('splitEditor.noUnassigned') : t('splitEditor.addRemaining')}
                     >
@@ -432,7 +478,7 @@ export function SplitEditor({
                     ]}
                     value={split.splitType}
                     onChange={(e) => handleSplitChange(index, 'splitType', e.target.value)}
-                    disabled={disabled}
+                    disabled={disabled || feeRow}
                     className="w-full"
                   />
                 )}
@@ -454,7 +500,7 @@ export function SplitEditor({
                     onChange={(categoryId) =>
                       handleSplitChange(index, 'categoryId', categoryId || undefined)
                     }
-                    disabled={disabled}
+                    disabled={disabled || feeRow}
                   />
                 ) : (
                   <Select
@@ -476,7 +522,7 @@ export function SplitEditor({
                     value={split.amount}
                     onChange={(value) => handleSplitChange(index, 'amount', roundToCents(value ?? 0))}
                     allowSignToggle
-                    disabled={disabled}
+                    disabled={disabled || feeRow}
                     className="w-full"
                   />
                   <Input
@@ -484,7 +530,7 @@ export function SplitEditor({
                     value={split.memo || ''}
                     onChange={(e) => handleSplitChange(index, 'memo', e.target.value)}
                     placeholder={t('splitEditor.mobileMemoPlaceholder')}
-                    disabled={disabled}
+                    disabled={disabled || feeRow}
                     className="w-full"
                   />
                 </div>
@@ -494,7 +540,7 @@ export function SplitEditor({
                     value={split.tagIds || []}
                     onChange={(values) => handleSplitChange(index, 'tagIds', values)}
                     placeholder={t('splitEditor.tagsPlaceholder')}
-                    disabled={disabled}
+                    disabled={disabled || feeRow}
                   />
                 )}
               </div>
@@ -577,6 +623,7 @@ export function SplitEditor({
               const currentCategory = split.categoryId
                 ? categories.find(c => c.id === split.categoryId)
                 : null;
+              const feeRow = isFeeRow(split);
 
               return (
               <tr key={split.id}>
@@ -592,7 +639,7 @@ export function SplitEditor({
                       ]}
                       value={split.splitType}
                       onChange={(e) => handleSplitChange(index, 'splitType', e.target.value)}
-                      disabled={disabled}
+                      disabled={disabled || feeRow}
                       className="w-full"
                     />
                   </td>
@@ -616,7 +663,7 @@ export function SplitEditor({
                       onChange={(categoryId) =>
                         handleSplitChange(index, 'categoryId', categoryId || undefined)
                       }
-                      disabled={disabled}
+                      disabled={disabled || feeRow}
                     />
                   ) : (
                     <Select
@@ -639,9 +686,14 @@ export function SplitEditor({
                     value={split.amount}
                     onChange={(value) => handleSplitChange(index, 'amount', roundToCents(value ?? 0))}
                     allowSignToggle
-                    disabled={disabled}
+                    disabled={disabled || feeRow}
                     className="w-full"
                   />
+                  {feeRow && (
+                    <span className="mt-0.5 inline-flex items-center rounded bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {t('form.fx.feeAutoBadge')}
+                    </span>
+                  )}
                 </td>
                 <td className="px-1 py-2">
                   <Input
@@ -649,7 +701,7 @@ export function SplitEditor({
                     value={split.memo || ''}
                     onChange={(e) => handleSplitChange(index, 'memo', e.target.value)}
                     placeholder={t('splitEditor.memoPlaceholder')}
-                    disabled={disabled}
+                    disabled={disabled || feeRow}
                     className="w-full"
                   />
                 </td>
@@ -660,7 +712,7 @@ export function SplitEditor({
                       value={split.tagIds || []}
                       onChange={(values) => handleSplitChange(index, 'tagIds', values)}
                       placeholder={t('splitEditor.tagsPlaceholder')}
-                      disabled={disabled}
+                      disabled={disabled || feeRow}
                     />
                   </td>
                 )}
@@ -669,7 +721,7 @@ export function SplitEditor({
                     <button
                       type="button"
                       onClick={() => addRemainingToSplit(index)}
-                      disabled={disabled || Math.abs(remaining) < 0.01}
+                      disabled={disabled || feeRow || Math.abs(remaining) < 0.01}
                       className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       title={Math.abs(remaining) < 0.01 ? t('splitEditor.noUnassigned') : t('splitEditor.addRemaining')}
                     >
@@ -834,6 +886,7 @@ export function toSplitRows(splits: {
     commission?: number;
     exchangeRate?: number;
   };
+  isFxFee?: boolean;
 }[]): SplitRow[] {
   return splits.map((split, index) => {
     const kind: SplitType =
@@ -884,6 +937,7 @@ export function toSplitRows(splits: {
       amount: Number(split.amount),
       memo: split.memo || '',
       tagIds: split.tags?.map(t => t.id) || [],
+      isFxFee: split.isFxFee || false,
     };
   });
 }
@@ -898,5 +952,6 @@ export function toCreateSplitData(splits: SplitRow[]): CreateSplitData[] {
     amount: split.amount,
     memo: split.memo || undefined,
     tagIds: split.tagIds && split.tagIds.length > 0 ? split.tagIds : undefined,
+    isFxFee: split.isFxFee || undefined,
   }));
 }

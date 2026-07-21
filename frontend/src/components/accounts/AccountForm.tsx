@@ -115,6 +115,8 @@ const buildAccountSchema = (t: (key: string) => string, isEditing: boolean) => z
   overpaymentCategoryId: z.string().optional(),
   overpaymentMemo: z.string().max(255).optional(),
   overpaymentPayeeId: z.string().optional(),
+  // Foreign-transaction fee (percentage)
+  fxFeePercent: optionalNumberWithRange(0, 100),
   // Asset-specific fields
   assetCategoryId: z.string().optional(),
   dateAcquired: z.string().optional(),
@@ -256,6 +258,7 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           overpaymentCategoryId: account.overpaymentCategoryId || undefined,
           overpaymentMemo: account.overpaymentMemo || undefined,
           overpaymentPayeeId: account.overpaymentPayeeId || undefined,
+          fxFeePercent: account.fxFeePercent ?? undefined,
           assetCategoryId: account.assetCategoryId || undefined,
           dateAcquired: account.dateAcquired?.split('T')[0] || undefined,
           isCanadianMortgage: account.isCanadianMortgage || false,
@@ -433,26 +436,26 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
     }));
   }, [currencies, defaultCurrency]);
 
-  // Load accounts and categories when LOAN, MORTGAGE, LINE_OF_CREDIT, or ASSET type is selected
-  // For assets: always (to allow editing the value change category)
-  // For loans/mortgages: for new creation or when editing accounts that need payment setup
+  // Load accounts and categories when LOAN, MORTGAGE, LINE_OF_CREDIT, or ASSET
+  // type is selected (for the source-account and value-change/interest category
+  // pickers). Other account types don't need them.
   const isLineOfCreditAccount = watchedAccountType === 'LINE_OF_CREDIT';
   useEffect(() => {
-    const shouldLoadForLoan = isLoanAccount;
-    const shouldLoadForMortgage = isMortgageAccount;
-    const shouldLoadForLineOfCredit = isLineOfCreditAccount;
-    const shouldLoadForAsset = isAssetAccount;
+    const needData =
+      isLoanAccount || isMortgageAccount || isLineOfCreditAccount || isAssetAccount;
+    if (!needData) return;
 
-    if (shouldLoadForLoan || shouldLoadForMortgage || shouldLoadForLineOfCredit || shouldLoadForAsset) {
-      const loadData = async () => {
-        try {
-          const [accountsData, categoriesData] = await Promise.all([
-            accountsApi.getAll(false),
-            categoriesApi.getAll(),
-          ]);
+    const loadData = async () => {
+      try {
+        const [categoriesData, accountsData] = await Promise.all([
+          categoriesApi.getAll(),
+          accountsApi.getAll(false),
+        ]);
+        setCategories(categoriesData);
+        if (accountsData) {
           // Filter out loan and mortgage accounts from source account options
           setAccounts(accountsData.filter(a => a.accountType !== 'LOAN' && a.accountType !== 'MORTGAGE'));
-          setCategories(categoriesData);
+        }
 
           if (isLoanAccount && !account) {
             // Find default loan interest category
@@ -488,12 +491,11 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
               }
             }
           }
-        } catch (error) {
-          logger.error('Failed to load accounts/categories:', error);
-        }
-      };
-      loadData();
-    }
+      } catch (error) {
+        logger.error('Failed to load accounts/categories:', error);
+      }
+    };
+    loadData();
   }, [isLoanAccount, isMortgageAccount, isLineOfCreditAccount, isAssetAccount, account, setValue, getValues]);
 
   const toggleFavourite = () => {
@@ -778,6 +780,26 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           </div>
         </div>
       )}
+
+      {/* Foreign Currency Conversion Fee: the bank's FX fee (a percentage),
+          folded into the converted amount on foreign-entered transactions. */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {t('form.fxFeeTitle')}
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label={`${t('form.fxFeePercent')} (%)`}
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            placeholder={t('form.fxFeePercentPlaceholder')}
+            error={errors.fxFeePercent?.message}
+            {...register('fxFeePercent', { valueAsNumber: true })}
+          />
+        </div>
+      </div>
 
       {isLoanAccount && !account && (
         <LoanFields

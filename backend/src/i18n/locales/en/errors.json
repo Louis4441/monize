@@ -219,14 +219,16 @@
     "csrfInvalid": "Invalid CSRF token",
     "demoModeRestricted": "This action is not available in demo mode.",
     "serviceNotReady": "Service not ready",
-    "oauthProviderNotInitialized": "OAuth provider not initialized"
+    "oauthProviderNotInitialized": "OAuth provider not initialized",
+    "invalidCurrencyCode": "Invalid currency code: {{ code }}"
   },
   "currencies": {
     "alreadyInList": "Currency \"{{ code }}\" is already in your list",
     "notFound": "Currency \"{{ code }}\" not found",
     "cannotModifySystem": "Cannot modify system currency metadata",
     "cannotModifyOther": "Cannot modify another user's currency",
-    "inUse": "Currency \"{{ code }}\" is in use by your accounts, securities, or other records. Deactivate it instead."
+    "inUse": "Currency \"{{ code }}\" is in use by your accounts, securities, or other records. Deactivate it instead.",
+    "invalidRateDate": "date must be in YYYY-MM-DD format"
   },
   "delegation": {
     "delegatedAccessInvalid": "Delegated access is no longer valid",
@@ -441,7 +443,12 @@
     "splitTransferLegAccountLocked": "This transfer is part of a split transaction. Change its accounts by editing the split on the source transaction instead.",
     "notFoundById": "Transaction with ID {{ id }} not found",
     "bulkUpdateNoFields": "At least one update field must be provided",
-    "payeeNotFound": "Payee not found"
+    "payeeNotFound": "Payee not found",
+    "fxFieldsIncomplete": "originalAmount and originalCurrencyCode must be provided together",
+    "fxRateRequired": "A positive exchange rate is required for a foreign-currency transaction",
+    "fxSignMismatch": "originalAmount and amount must have the same sign",
+    "multipleFxFeeSplits": "A transaction can have at most one foreign-transaction fee split",
+    "fxFeeSplitMustBeCategory": "The foreign-transaction fee split must be a category split"
   },
   "users": {
     "userNotFound": "User not found",

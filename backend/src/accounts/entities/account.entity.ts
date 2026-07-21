@@ -252,6 +252,19 @@ export class Account {
   @JoinColumn({ name: "overpayment_payee_id" })
   overpaymentPayee: Payee | null;
 
+  // Foreign-transaction fee: the bank's foreign-currency conversion fee, applied
+  // as a percentage of a foreign-entered transaction's converted amount and
+  // folded into the account-currency amount. Optional, per-account.
+  @Column({
+    type: "decimal",
+    precision: 8,
+    scale: 4,
+    name: "fx_fee_percent",
+    nullable: true,
+    transformer: numericTransformer,
+  })
+  fxFeePercent: number | null;
+
   // Asset-specific fields
   @Column({ type: "uuid", name: "asset_category_id", nullable: true })
   assetCategoryId: string | null;

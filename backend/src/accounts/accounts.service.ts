@@ -18,7 +18,6 @@ import { InvestmentTransaction } from "../securities/entities/investment-transac
 import { Institution } from "../institutions/entities/institution.entity";
 import { CreateAccountDto } from "./dto/create-account.dto";
 import { UpdateAccountDto } from "./dto/update-account.dto";
-import { CategoriesService } from "../categories/categories.service";
 import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { PortfolioService } from "../securities/portfolio.service";
@@ -54,8 +53,6 @@ export class AccountsService {
     private investmentTransactionRepository: Repository<InvestmentTransaction>,
     @InjectRepository(Institution)
     private institutionsRepository: Repository<Institution>,
-    @Inject(forwardRef(() => CategoriesService))
-    private categoriesService: CategoriesService,
     @Inject(forwardRef(() => ScheduledTransactionsService))
     private scheduledTransactionsService: ScheduledTransactionsService,
     @Inject(forwardRef(() => NetWorthService))
@@ -739,6 +736,8 @@ export class AccountsService {
           : null;
       if (updateAccountDto.overpaymentPayeeId !== undefined)
         account.overpaymentPayeeId = updateAccountDto.overpaymentPayeeId;
+      if (updateAccountDto.fxFeePercent !== undefined)
+        account.fxFeePercent = updateAccountDto.fxFeePercent;
       if (updateAccountDto.assetCategoryId !== undefined)
         account.assetCategoryId = updateAccountDto.assetCategoryId;
       if (updateAccountDto.dateAcquired !== undefined)

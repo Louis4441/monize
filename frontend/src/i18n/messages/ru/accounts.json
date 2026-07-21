@@ -156,7 +156,10 @@
       "other": "Прочее"
     },
     "statementDueDayPlaceholder": "например, 15",
-    "statementSettlementDayPlaceholder": "например, 25"
+    "statementSettlementDayPlaceholder": "например, 25",
+    "fxFeeTitle": "Комиссия за конвертацию валюты (необязательно)",
+    "fxFeePercent": "Процент комиссии",
+    "fxFeePercentPlaceholder": "напр. 2,5"
   },
   "exportModal": {
     "title": "Экспорт {name}",

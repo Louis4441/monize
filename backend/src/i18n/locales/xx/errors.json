@@ -219,14 +219,16 @@
     "csrfInvalid": "[XX-Invalid CSRF token-XX]",
     "demoModeRestricted": "[XX-This action is not available in demo mode.-XX]",
     "serviceNotReady": "[XX-Service not ready-XX]",
-    "oauthProviderNotInitialized": "[XX-OAuth provider not initialized-XX]"
+    "oauthProviderNotInitialized": "[XX-OAuth provider not initialized-XX]",
+    "invalidCurrencyCode": "[XX-Invalid currency code: {{ code }}-XX]"
   },
   "currencies": {
     "alreadyInList": "[XX-Currency \"{{ code }}\" is already in your list-XX]",
     "notFound": "[XX-Currency \"{{ code }}\" not found-XX]",
     "cannotModifySystem": "[XX-Cannot modify system currency metadata-XX]",
     "cannotModifyOther": "[XX-Cannot modify another user's currency-XX]",
-    "inUse": "[XX-Currency \"{{ code }}\" is in use by your accounts, securities, or other records. Deactivate it instead.-XX]"
+    "inUse": "[XX-Currency \"{{ code }}\" is in use by your accounts, securities, or other records. Deactivate it instead.-XX]",
+    "invalidRateDate": "[XX-date must be in YYYY-MM-DD format-XX]"
   },
   "delegation": {
     "delegatedAccessInvalid": "[XX-Delegated access is no longer valid-XX]",
@@ -441,7 +443,12 @@
     "splitTransferLegAccountLocked": "[XX-This transfer is part of a split transaction. Change its accounts by editing the split on the source transaction instead.-XX]",
     "notFoundById": "[XX-Transaction with ID {{ id }} not found-XX]",
     "bulkUpdateNoFields": "[XX-At least one update field must be provided-XX]",
-    "payeeNotFound": "[XX-Payee not found-XX]"
+    "payeeNotFound": "[XX-Payee not found-XX]",
+    "fxFieldsIncomplete": "[XX-originalAmount and originalCurrencyCode must be provided together-XX]",
+    "fxRateRequired": "[XX-A positive exchange rate is required for a foreign-currency transaction-XX]",
+    "fxSignMismatch": "[XX-originalAmount and amount must have the same sign-XX]",
+    "multipleFxFeeSplits": "[XX-A transaction can have at most one foreign-transaction fee split-XX]",
+    "fxFeeSplitMustBeCategory": "[XX-The foreign-transaction fee split must be a category split-XX]"
   },
   "users": {
     "userNotFound": "[XX-User not found-XX]",

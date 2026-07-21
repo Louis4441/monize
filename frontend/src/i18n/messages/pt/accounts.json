@@ -156,7 +156,10 @@
       "other": "Outro"
     },
     "statementDueDayPlaceholder": "ex.: 15",
-    "statementSettlementDayPlaceholder": "ex.: 25"
+    "statementSettlementDayPlaceholder": "ex.: 25",
+    "fxFeeTitle": "Comissão de conversão de moeda estrangeira (opcional)",
+    "fxFeePercent": "Percentagem da comissão",
+    "fxFeePercentPlaceholder": "ex.: 2,5"
   },
   "exportModal": {
     "title": "Exportar {name}",
