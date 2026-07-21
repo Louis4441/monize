@@ -141,11 +141,9 @@ CREATE TABLE accounts (
     overpayment_category_id UUID, -- category tagging standalone overpayments/extra principal (FK added after categories table)
     overpayment_memo VARCHAR(255), -- memo text marking a payment as a standalone overpayment (case-insensitive substring match)
     overpayment_payee_id UUID, -- payee whose payments count as standalone overpayments/extra principal (FK added after payees table)
-    -- Foreign-transaction fee: bank's FX conversion fee booked as an expense split
-    -- on foreign-entered transactions. fx_fee_percent is only meaningful with a
-    -- category set (enforced in the service layer).
+    -- Foreign-transaction fee: the bank's FX conversion fee (a percentage) folded
+    -- into the converted amount on foreign-entered transactions.
     fx_fee_percent NUMERIC(8, 4), -- foreign-currency conversion fee as a percentage
-    fx_fee_category_id UUID, -- category for the auto-booked FX fee split (FK added after categories table)
     scheduled_transaction_id UUID, -- linked scheduled transaction for payments (FK added after scheduled_transactions table)
     -- Asset-specific fields
     asset_category_id UUID, -- category for tracking value changes on asset accounts (FK added after categories table)
@@ -181,7 +179,6 @@ CREATE INDEX idx_accounts_interest_category ON accounts(interest_category_id);
 CREATE INDEX idx_accounts_principal_category ON accounts(principal_category_id);
 CREATE INDEX idx_accounts_overpayment_category ON accounts(overpayment_category_id);
 CREATE INDEX idx_accounts_overpayment_payee ON accounts(overpayment_payee_id);
-CREATE INDEX idx_accounts_fx_fee_category ON accounts(fx_fee_category_id);
 CREATE INDEX idx_accounts_scheduled_transaction ON accounts(scheduled_transaction_id);
 CREATE INDEX idx_accounts_source_account ON accounts(source_account_id);
 CREATE INDEX idx_accounts_institution ON accounts(institution_id);
@@ -497,8 +494,6 @@ ALTER TABLE accounts ADD CONSTRAINT fk_accounts_interest_category
     FOREIGN KEY (interest_category_id) REFERENCES categories(id) ON DELETE SET NULL;
 ALTER TABLE accounts ADD CONSTRAINT fk_accounts_overpayment_category
     FOREIGN KEY (overpayment_category_id) REFERENCES categories(id) ON DELETE SET NULL;
-ALTER TABLE accounts ADD CONSTRAINT fk_accounts_fx_fee_category
-    FOREIGN KEY (fx_fee_category_id) REFERENCES categories(id) ON DELETE SET NULL;
 ALTER TABLE accounts ADD CONSTRAINT fk_accounts_overpayment_payee
     FOREIGN KEY (overpayment_payee_id) REFERENCES payees(id) ON DELETE SET NULL;
 ALTER TABLE accounts ADD CONSTRAINT fk_accounts_scheduled_transaction

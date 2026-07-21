@@ -408,7 +408,6 @@
       "convertedAmount": "Jumlah terkonversi ({currency})",
       "noRateWarning": "Tidak ada nilai tukar untuk {from} ke {to} pada {date}. Masukkan jumlah terkonversi secara manual.",
       "usingLatestRateHint": "Menggunakan nilai tukar terbaru yang tersedia (bukan tertanggal {date}).",
-      "feeSplitMemo": "Biaya transaksi luar negeri",
       "displayToggle": {
         "account": "Akun",
         "original": "Asli"

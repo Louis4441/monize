@@ -34,8 +34,7 @@
     "ambiguousBrokerage": "「{{ query }}」符合多個券商帳戶：{{ list }}。請使用準確的帳戶名稱。",
     "unknownInvestmentAccount": "未知帳戶：{{ name }}。請使用使用者帳戶清單中的準確名稱。",
     "notACreditCard": "對帳單週期僅適用於信用卡科目",
-    "noStatementSettlementDay": "此信用卡未設定對帳單結算日",
-    "fxFeeCategoryRequired": "設定手續費百分比時需要境外交易手續費類別"
+    "noStatementSettlementDay": "此信用卡未設定對帳單結算日"
   },
   "actionHistory": {
     "nothingToUndo": "沒有可復原的操作",

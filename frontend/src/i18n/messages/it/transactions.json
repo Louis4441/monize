@@ -408,7 +408,6 @@
       "convertedAmount": "Importo convertito ({currency})",
       "noRateWarning": "Nessun tasso di cambio trovato da {from} a {to} il {date}. Inserisci manualmente l'importo convertito.",
       "usingLatestRateHint": "Viene usato l'ultimo tasso disponibile (non alla data {date}).",
-      "feeSplitMemo": "Commissione per transazione estera",
       "displayToggle": {
         "account": "Conto",
         "original": "Originale"

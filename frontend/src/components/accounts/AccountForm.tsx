@@ -22,7 +22,6 @@ import { Account, PaymentFrequency, InterestBookingMode } from '@/types/account'
 import { Category } from '@/types/category';
 import { accountsApi } from '@/lib/accounts';
 import { categoriesApi } from '@/lib/categories';
-import { buildCategoryTree } from '@/lib/categoryUtils';
 import { exchangeRatesApi, CurrencyInfo } from '@/lib/exchange-rates';
 import { getCurrencySymbol } from '@/lib/format';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -116,9 +115,8 @@ const buildAccountSchema = (t: (key: string) => string, isEditing: boolean) => z
   overpaymentCategoryId: z.string().optional(),
   overpaymentMemo: z.string().max(255).optional(),
   overpaymentPayeeId: z.string().optional(),
-  // Foreign-transaction fee fields
+  // Foreign-transaction fee (percentage)
   fxFeePercent: optionalNumberWithRange(0, 100),
-  fxFeeCategoryId: z.string().optional(),
   // Asset-specific fields
   assetCategoryId: z.string().optional(),
   dateAcquired: z.string().optional(),
@@ -129,20 +127,6 @@ const buildAccountSchema = (t: (key: string) => string, isEditing: boolean) => z
   amortizationMonths: optionalNumber,
   mortgagePaymentFrequency: optionalEnum(mortgagePaymentFrequencies),
 }).superRefine((data, ctx) => {
-  // A foreign-transaction fee percent needs a category to book the fee against.
-  // Enforced on both create and edit (mirrors the backend assertFxFeeConfig).
-  if (
-    data.fxFeePercent !== undefined &&
-    data.fxFeePercent > 0 &&
-    !data.fxFeeCategoryId
-  ) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['fxFeeCategoryId'],
-      message: t('validation.fxFeeCategoryRequired'),
-    });
-  }
-
   // Loan and mortgage payment setup is only collected when creating the account
   // (the payment fields are hidden while editing), so only enforce these on
   // create. The backend rejects the same gaps, but validating here gives clean,
@@ -218,8 +202,6 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
   }>({ principalId: null, interestId: null });
   const [selectedAssetCategoryId, setSelectedAssetCategoryId] = useState<string>(account?.assetCategoryId || '');
   const [assetCategoryName, setAssetCategoryName] = useState<string>('');
-  const [selectedFxFeeCategoryId, setSelectedFxFeeCategoryId] = useState<string>(account?.fxFeeCategoryId || '');
-  const [fxFeeCategoryName, setFxFeeCategoryName] = useState<string>('');
   const [selectedInterestCategoryId, setSelectedInterestCategoryId] = useState<string>(account?.interestCategoryId || '');
   const [interestBookingMode, setInterestBookingMode] = useState<InterestBookingMode>(account?.interestBookingMode || 'AUTO');
   const [selectedOverpaymentCategoryId, setSelectedOverpaymentCategoryId] = useState<string>(account?.overpaymentCategoryId || '');
@@ -277,7 +259,6 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           overpaymentMemo: account.overpaymentMemo || undefined,
           overpaymentPayeeId: account.overpaymentPayeeId || undefined,
           fxFeePercent: account.fxFeePercent ?? undefined,
-          fxFeeCategoryId: account.fxFeeCategoryId || undefined,
           assetCategoryId: account.assetCategoryId || undefined,
           dateAcquired: account.dateAcquired?.split('T')[0] || undefined,
           isCanadianMortgage: account.isCanadianMortgage || false,
@@ -455,38 +436,20 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
     }));
   }, [currencies, defaultCurrency]);
 
-  // Category options built the same way as the Transactions screen (hierarchical
-  // tree order, "Parent: Child" labels), so the fee-category picker matches it.
-  const categoryOptions = useMemo(
-    () =>
-      buildCategoryTree(categories).map(({ category }) => {
-        const parentCategory = category.parentId
-          ? categories.find((c) => c.id === category.parentId)
-          : null;
-        return {
-          value: category.id,
-          label: parentCategory
-            ? `${parentCategory.name}: ${category.name}`
-            : category.name,
-        };
-      }),
-    [categories],
-  );
-
-  // Categories are always loaded so the foreign-transaction fee category picker
-  // has options for every account type. Source accounts (and the loan/mortgage
-  // default-category logic) are only needed for LOAN, MORTGAGE, LINE_OF_CREDIT,
-  // or ASSET accounts, so that heavier fetch stays gated.
+  // Load accounts and categories when LOAN, MORTGAGE, LINE_OF_CREDIT, or ASSET
+  // type is selected (for the source-account and value-change/interest category
+  // pickers). Other account types don't need them.
   const isLineOfCreditAccount = watchedAccountType === 'LINE_OF_CREDIT';
   useEffect(() => {
-    const needAccounts =
+    const needData =
       isLoanAccount || isMortgageAccount || isLineOfCreditAccount || isAssetAccount;
+    if (!needData) return;
 
     const loadData = async () => {
       try {
         const [categoriesData, accountsData] = await Promise.all([
           categoriesApi.getAll(),
-          needAccounts ? accountsApi.getAll(false) : Promise.resolve(null),
+          accountsApi.getAll(false),
         ]);
         setCategories(categoriesData);
         if (accountsData) {
@@ -663,62 +626,6 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
     }
   };
 
-  // Foreign-transaction fee category: where the auto-booked FX fee split lands.
-  const handleFxFeeCategoryChange = (categoryId: string, name: string) => {
-    setFxFeeCategoryName(name);
-    setSelectedFxFeeCategoryId(categoryId);
-    setValue('fxFeeCategoryId', categoryId || '', { shouldDirty: true, shouldValidate: true });
-  };
-
-  // Inline create for the fee category, cloned from handleAssetCategoryCreate
-  // (supports the "Parent: Child" format).
-  const handleFxFeeCategoryCreate = async (name: string) => {
-    if (!name.trim()) return;
-    try {
-      let categoryName = toTitleCase(name.trim());
-      let parentId: string | undefined;
-      let parentName: string | undefined;
-
-      if (categoryName.includes(':')) {
-        const parts = categoryName.split(':').map((p) => p.trim());
-        if (parts.length === 2 && parts[0] && parts[1]) {
-          parentName = toTitleCase(parts[0]);
-          const childName = toTitleCase(parts[1]);
-          let parentCategory = categories.find(
-            (c) => c.name.toLowerCase() === parentName!.toLowerCase() && !c.parentId,
-          );
-          if (!parentCategory) {
-            const newParent = await categoriesApi.create({ name: parentName });
-            setCategories((prev) => [...prev, newParent]);
-            parentCategory = newParent;
-          }
-          parentId = parentCategory.id;
-          parentName = parentCategory.name;
-          categoryName = childName;
-        }
-      }
-
-      const newCategory = await categoriesApi.create({
-        name: categoryName,
-        parentId,
-        isIncome: false,
-      });
-      setCategories((prev) => [...prev, newCategory]);
-      setSelectedFxFeeCategoryId(newCategory.id);
-      setFxFeeCategoryName(parentName ? `${parentName}: ${categoryName}` : categoryName);
-      setValue('fxFeeCategoryId', newCategory.id, { shouldDirty: true, shouldValidate: true });
-
-      if (parentId && parentName) {
-        toast.success(t('toasts.categoryCreatedNested', { parent: parentName, name: categoryName }));
-      } else {
-        toast.success(t('toasts.categoryCreated', { name: categoryName }));
-      }
-    } catch (error) {
-      logger.error('Failed to create category:', error);
-      toast.error(getErrorMessage(error, t('toasts.categoryCreateFailed')));
-    }
-  };
-
   return (
     <form onSubmit={handleSubmit(handleValidatedSubmit)} className="space-y-4">
       <Input
@@ -874,17 +781,12 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
         </div>
       )}
 
-      {/* Foreign Currency Conversion Fee: the bank's FX fee, auto-booked as an
-          expense split under the chosen category on foreign-entered transactions. */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-        <div>
-          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-            {t('form.fxFeeTitle')}
-          </h3>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {t('form.fxFeeHelp')}
-          </p>
-        </div>
+      {/* Foreign Currency Conversion Fee: the bank's FX fee (a percentage),
+          folded into the converted amount on foreign-entered transactions. */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {t('form.fxFeeTitle')}
+        </h3>
         <div className="grid grid-cols-2 gap-4">
           <Input
             label={`${t('form.fxFeePercent')} (%)`}
@@ -895,23 +797,6 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
             placeholder={t('form.fxFeePercentPlaceholder')}
             error={errors.fxFeePercent?.message}
             {...register('fxFeePercent', { valueAsNumber: true })}
-          />
-          <Combobox
-            label={t('form.fxFeeCategory')}
-            placeholder={t('form.fxFeeCategoryPlaceholder')}
-            options={categoryOptions}
-            value={selectedFxFeeCategoryId}
-            initialDisplayValue={
-              fxFeeCategoryName ||
-              (account?.fxFeeCategoryId
-                ? categories.find((c) => c.id === account.fxFeeCategoryId)?.name || ''
-                : '')
-            }
-            onChange={handleFxFeeCategoryChange}
-            onCreateNew={handleFxFeeCategoryCreate}
-            allowCustomValue
-            valueIsId
-            error={errors.fxFeeCategoryId?.message}
           />
         </div>
       </div>

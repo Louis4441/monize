@@ -265,25 +265,17 @@ export class CreateAccountDto {
   @IsUUID()
   overpaymentPayeeId?: string;
 
-  // Foreign-transaction fee fields
+  // Foreign-transaction fee
   @ApiPropertyOptional({
     example: 2.5,
     description:
-      "Foreign-currency conversion fee as a percentage (0-100). Applied to foreign-entered transactions and booked as an expense split under fxFeeCategoryId. Requires fxFeeCategoryId when set.",
+      "Foreign-currency conversion fee as a percentage (0-100), folded into the converted amount on foreign-entered transactions.",
   })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 4 })
   @Min(0)
   @Max(100)
   fxFeePercent?: number;
-
-  @ApiPropertyOptional({
-    description:
-      "Category ID for the auto-booked foreign-transaction fee split. Required when fxFeePercent is set.",
-  })
-  @IsOptional()
-  @IsUUID()
-  fxFeeCategoryId?: string;
 
   // Asset-specific fields
   @ApiPropertyOptional({

@@ -408,7 +408,6 @@
       "convertedAmount": "換算後の金額（{currency}）",
       "noRateWarning": "{date} の {from} から {to} への為替レートが見つかりません。換算後の金額を手動で入力してください。",
       "usingLatestRateHint": "最新の利用可能なレートを使用しています（{date} 時点ではありません）。",
-      "feeSplitMemo": "外貨取引手数料",
       "displayToggle": {
         "account": "口座",
         "original": "元の通貨"

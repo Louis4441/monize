@@ -3607,7 +3607,7 @@ describe('TransactionForm', () => {
 
     it('folds the bank fee into the amount without creating a split', async () => {
       // acc-1 configured with a 2.5% foreign-transaction fee.
-      const feeAccount = { ...mockAccounts[0], fxFeePercent: 2.5, fxFeeCategoryId: 'cat-1' };
+      const feeAccount = { ...mockAccounts[0], fxFeePercent: 2.5 };
       mockAccountsGetAll.mockResolvedValue([feeAccount, ...mockAccounts.slice(1)]);
 
       render(

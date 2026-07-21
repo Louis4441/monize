@@ -34,8 +34,7 @@
     "ambiguousBrokerage": "\"{{ query }}\" 匹配多个经纪账户：{{ list }}。请使用准确的账户名称。",
     "unknownInvestmentAccount": "未知账户：{{ name }}。请使用用户账户列表中的准确名称。",
     "notACreditCard": "账单周期仅适用于信用卡账户",
-    "noStatementSettlementDay": "此信用卡未配置账单结算日",
-    "fxFeeCategoryRequired": "设置手续费百分比时需要境外交易手续费类别"
+    "noStatementSettlementDay": "此信用卡未配置账单结算日"
   },
   "actionHistory": {
     "nothingToUndo": "没有可撤销的操作",

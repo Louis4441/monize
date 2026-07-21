@@ -157,12 +157,9 @@
     },
     "statementDueDayPlaceholder": "例：15",
     "statementSettlementDayPlaceholder": "例：25",
-    "fxFeeTitle": "外貨換算手数料",
+    "fxFeeTitle": "外貨換算手数料 （任意）",
     "fxFeePercent": "手数料率",
-    "fxFeeCategory": "手数料カテゴリ",
-    "fxFeePercentPlaceholder": "例: 2.5",
-    "fxFeeHelp": "海外での購入を換算する際の銀行の手数料です。設定すると、この口座の外貨取引では手数料が自動的に選択したカテゴリの支出として計上されます。",
-    "fxFeeCategoryPlaceholder": "カテゴリを選択または作成"
+    "fxFeePercentPlaceholder": "例: 2.5"
   },
   "exportModal": {
     "title": "{name} をエクスポート",
@@ -347,8 +344,7 @@
     "paymentFrequencyRequired": "支払い頻度は必須です",
     "paymentStartDateRequired": "初回支払日は必須です",
     "paymentAccountRequired": "支払い元勘定科目は必須です",
-    "amortizationRequired": "償却期間は必須です",
-    "fxFeeCategoryRequired": "手数料率を設定する場合は手数料カテゴリが必要です"
+    "amortizationRequired": "償却期間は必須です"
   },
   "loanDetail": {
     "backToAccounts": "勘定科目一覧に戻る",

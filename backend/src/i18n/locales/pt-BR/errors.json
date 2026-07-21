@@ -34,8 +34,7 @@
     "ambiguousBrokerage": "\"{{ query }}\" corresponde a várias contas de corretagem: {{ list }}. Use o nome exato da conta.",
     "unknownInvestmentAccount": "Conta desconhecida: {{ name }}. Use um nome exato da lista de contas do usuário.",
     "notACreditCard": "Os ciclos de fatura só estão disponíveis para contas de cartão de crédito",
-    "noStatementSettlementDay": "Este cartão de crédito não tem um dia de liquidação da fatura configurado",
-    "fxFeeCategoryRequired": "É necessária uma categoria de taxa de moeda estrangeira quando um percentual de taxa está definido"
+    "noStatementSettlementDay": "Este cartão de crédito não tem um dia de liquidação da fatura configurado"
   },
   "actionHistory": {
     "nothingToUndo": "Nada para desfazer",

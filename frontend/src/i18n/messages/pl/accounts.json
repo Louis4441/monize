@@ -157,12 +157,9 @@
     },
     "statementDueDayPlaceholder": "np. 15",
     "statementSettlementDayPlaceholder": "np. 25",
-    "fxFeeTitle": "Opłata za przewalutowanie",
+    "fxFeeTitle": "Opłata za przewalutowanie (opcjonalnie)",
     "fxFeePercent": "Procent opłaty",
-    "fxFeeCategory": "Kategoria opłaty",
-    "fxFeePercentPlaceholder": "np. 2,5",
-    "fxFeeHelp": "Opłata Twojego banku za przeliczanie zakupów zagranicznych. Po ustawieniu transakcja w obcej walucie na tym koncie automatycznie księguje opłatę jako wydatek w wybranej kategorii.",
-    "fxFeeCategoryPlaceholder": "Wybierz lub utwórz kategorię"
+    "fxFeePercentPlaceholder": "np. 2,5"
   },
   "exportModal": {
     "title": "Eksportuj {name}",
@@ -347,8 +344,7 @@
     "paymentFrequencyRequired": "Częstotliwość płatności jest wymagana",
     "paymentStartDateRequired": "Data pierwszej płatności jest wymagana",
     "paymentAccountRequired": "Konto płatności jest wymagane",
-    "amortizationRequired": "Okres spłaty jest wymagany",
-    "fxFeeCategoryRequired": "Kategoria opłaty jest wymagana, gdy ustawiono procent opłaty"
+    "amortizationRequired": "Okres spłaty jest wymagany"
   },
   "loanDetail": {
     "backToAccounts": "Powrót do kont",

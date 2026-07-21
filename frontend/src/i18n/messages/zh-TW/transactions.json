@@ -408,7 +408,6 @@
       "convertedAmount": "換算後金額（{currency}）",
       "noRateWarning": "找不到 {date} 從 {from} 到 {to} 的匯率。請手動輸入換算後的金額。",
       "usingLatestRateHint": "正在使用最新可用匯率（非 {date} 當天）。",
-      "feeSplitMemo": "境外交易手續費",
       "displayToggle": {
         "account": "帳戶",
         "original": "原幣別"

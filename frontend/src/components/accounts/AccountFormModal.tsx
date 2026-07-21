@@ -108,7 +108,7 @@ export function AccountFormModal({ formModal, onSaved }: AccountFormModalProps) 
           }
         }
 
-        // Foreign-transaction fee fields: an emptied value on edit must reach the
+        // Foreign-transaction fee: an emptied value on edit must reach the
         // backend as null so a previously configured fee is cleared rather than
         // silently retained (null survives the strip-empties cleanup below).
         const feePercentEmpty =
@@ -118,13 +118,6 @@ export function AccountFormModal({ formModal, onSaved }: AccountFormModalProps) 
             isNaN(cleanedData.fxFeePercent));
         if (feePercentEmpty && editingItem.fxFeePercent != null) {
           cleanedData.fxFeePercent = null;
-        }
-        if (
-          (cleanedData.fxFeeCategoryId === undefined ||
-            cleanedData.fxFeeCategoryId === '') &&
-          editingItem.fxFeeCategoryId
-        ) {
-          cleanedData.fxFeeCategoryId = null;
         }
       }
 

@@ -157,12 +157,9 @@
     },
     "statementDueDayPlaceholder": "ör. 15",
     "statementSettlementDayPlaceholder": "ör. 25",
-    "fxFeeTitle": "Yabancı para dönüştürme ücreti",
+    "fxFeeTitle": "Yabancı para dönüştürme ücreti (isteğe bağlı)",
     "fxFeePercent": "Ücret yüzdesi",
-    "fxFeeCategory": "Ücret kategorisi",
-    "fxFeePercentPlaceholder": "örn. 2,5",
-    "fxFeeHelp": "Bankanızın yurt dışı alışverişleri dönüştürme ücreti. Ayarlandığında, bu hesaptaki yabancı para işlemi ücreti otomatik olarak seçilen kategoride gider olarak kaydeder.",
-    "fxFeeCategoryPlaceholder": "Kategori seçin veya oluşturun"
+    "fxFeePercentPlaceholder": "örn. 2,5"
   },
   "exportModal": {
     "title": "{name} Dışa Aktar",
@@ -347,8 +344,7 @@
     "paymentFrequencyRequired": "Ödeme sıklığı zorunludur",
     "paymentStartDateRequired": "İlk ödeme tarihi zorunludur",
     "paymentAccountRequired": "Ödeme hesabı zorunludur",
-    "amortizationRequired": "Amortisman süresi zorunludur",
-    "fxFeeCategoryRequired": "Ücret yüzdesi ayarlandığında bir ücret kategorisi gereklidir"
+    "amortizationRequired": "Amortisman süresi zorunludur"
   },
   "loanDetail": {
     "backToAccounts": "Hesaplara Dön",

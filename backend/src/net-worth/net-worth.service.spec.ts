@@ -80,8 +80,6 @@ describe("NetWorthService", () => {
     overpaymentPayeeId: null,
     overpaymentPayee: null,
     fxFeePercent: null,
-    fxFeeCategoryId: null,
-    fxFeeCategory: null,
     assetCategoryId: null,
     assetCategory: null,
     dateAcquired: null,

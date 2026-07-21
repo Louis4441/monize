@@ -257,11 +257,11 @@ export class UpdateAccountDto {
   @IsUUID()
   overpaymentPayeeId?: string | null;
 
-  // Foreign-transaction fee fields
+  // Foreign-transaction fee
   @ApiPropertyOptional({
     example: 2.5,
     description:
-      "Foreign-currency conversion fee as a percentage (0-100). Requires fxFeeCategoryId when set. Pass null to clear.",
+      "Foreign-currency conversion fee as a percentage (0-100), folded into the converted amount on foreign-entered transactions. Pass null to clear.",
   })
   @IsOptional()
   @ValidateIf((o) => o.fxFeePercent !== null)
@@ -269,15 +269,6 @@ export class UpdateAccountDto {
   @Min(0)
   @Max(100)
   fxFeePercent?: number | null;
-
-  @ApiPropertyOptional({
-    description:
-      "Category ID for the auto-booked foreign-transaction fee split. Required when fxFeePercent is set. Pass null to clear.",
-  })
-  @IsOptional()
-  @ValidateIf((o) => o.fxFeeCategoryId !== null)
-  @IsUUID()
-  fxFeeCategoryId?: string | null;
 
   // Asset-specific fields
   @ApiPropertyOptional({

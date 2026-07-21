@@ -254,8 +254,7 @@ export class Account {
 
   // Foreign-transaction fee: the bank's foreign-currency conversion fee, applied
   // as a percentage of a foreign-entered transaction's converted amount and
-  // booked as an expense split under fxFeeCategory. Only meaningful when a
-  // category is also set (enforced in the service layer). Optional, per-account.
+  // folded into the account-currency amount. Optional, per-account.
   @Column({
     type: "decimal",
     precision: 8,
@@ -265,13 +264,6 @@ export class Account {
     transformer: numericTransformer,
   })
   fxFeePercent: number | null;
-
-  @Column({ type: "uuid", name: "fx_fee_category_id", nullable: true })
-  fxFeeCategoryId: string | null;
-
-  @ManyToOne(() => Category, { nullable: true })
-  @JoinColumn({ name: "fx_fee_category_id" })
-  fxFeeCategory: Category | null;
 
   // Asset-specific fields
   @Column({ type: "uuid", name: "asset_category_id", nullable: true })

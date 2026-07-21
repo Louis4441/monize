@@ -157,12 +157,9 @@
     },
     "statementDueDayPlaceholder": "mis. 15",
     "statementSettlementDayPlaceholder": "mis. 25",
-    "fxFeeTitle": "Biaya konversi mata uang asing",
+    "fxFeeTitle": "Biaya konversi mata uang asing (opsional)",
     "fxFeePercent": "Persentase biaya",
-    "fxFeeCategory": "Kategori biaya",
-    "fxFeePercentPlaceholder": "mis. 2,5",
-    "fxFeeHelp": "Biaya bank Anda untuk mengonversi pembelian di luar negeri. Bila diatur, transaksi mata uang asing pada akun ini otomatis mencatat biaya tersebut sebagai pengeluaran pada kategori yang dipilih.",
-    "fxFeeCategoryPlaceholder": "Pilih atau buat kategori"
+    "fxFeePercentPlaceholder": "mis. 2,5"
   },
   "exportModal": {
     "title": "Ekspor {name}",
@@ -347,8 +344,7 @@
     "paymentFrequencyRequired": "Frekuensi pembayaran wajib dipilih",
     "paymentStartDateRequired": "Tanggal pembayaran pertama wajib diisi",
     "paymentAccountRequired": "Akun pembayaran wajib dipilih",
-    "amortizationRequired": "Periode amortisasi wajib diisi",
-    "fxFeeCategoryRequired": "Kategori biaya wajib diisi bila persentase biaya diatur"
+    "amortizationRequired": "Periode amortisasi wajib diisi"
   },
   "loanDetail": {
     "backToAccounts": "Kembali ke Akun",

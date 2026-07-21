@@ -408,7 +408,6 @@
       "convertedAmount": "Конвертированная сумма ({currency})",
       "noRateWarning": "Не найден курс обмена {from} в {to} на {date}. Введите конвертированную сумму вручную.",
       "usingLatestRateHint": "Используется последний доступный курс (не на дату {date}).",
-      "feeSplitMemo": "Комиссия за зарубежную операцию",
       "displayToggle": {
         "account": "Счёт",
         "original": "Оригинал"

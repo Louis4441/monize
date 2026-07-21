@@ -408,7 +408,6 @@
       "convertedAmount": "Số tiền đã quy đổi ({currency})",
       "noRateWarning": "Không tìm thấy tỷ giá từ {from} sang {to} vào {date}. Vui lòng nhập số tiền đã quy đổi theo cách thủ công.",
       "usingLatestRateHint": "Đang dùng tỷ giá mới nhất hiện có (không phải ngày {date}).",
-      "feeSplitMemo": "Phí giao dịch nước ngoài",
       "displayToggle": {
         "account": "Tài khoản",
         "original": "Gốc"

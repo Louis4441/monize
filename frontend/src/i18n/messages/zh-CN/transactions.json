@@ -408,7 +408,6 @@
       "convertedAmount": "换算后的金额（{currency}）",
       "noRateWarning": "未找到 {date} 从 {from} 到 {to} 的汇率。请手动输入换算后的金额。",
       "usingLatestRateHint": "正在使用最新可用汇率（非 {date} 当天）。",
-      "feeSplitMemo": "境外交易手续费",
       "displayToggle": {
         "account": "账户",
         "original": "原币种"

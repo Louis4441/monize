@@ -34,8 +34,7 @@
     "ambiguousBrokerage": "„{{ query }}\" pasuje do wielu kont maklerskich: {{ list }}. Użyj dokładnej nazwy konta.",
     "unknownInvestmentAccount": "Nieznane konto: {{ name }}. Użyj dokładnej nazwy z listy kont użytkownika.",
     "notACreditCard": "Cykle rozliczeniowe są dostępne tylko dla kont kart kredytowych",
-    "noStatementSettlementDay": "Ta karta kredytowa nie ma skonfigurowanego dnia rozliczenia wyciągu",
-    "fxFeeCategoryRequired": "Kategoria opłaty za transakcję zagraniczną jest wymagana, gdy ustawiono procent opłaty"
+    "noStatementSettlementDay": "Ta karta kredytowa nie ma skonfigurowanego dnia rozliczenia wyciągu"
   },
   "actionHistory": {
     "nothingToUndo": "Nie ma nic do cofnięcia",

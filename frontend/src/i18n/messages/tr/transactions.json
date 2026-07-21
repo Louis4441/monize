@@ -408,7 +408,6 @@
       "convertedAmount": "Dönüştürülen tutar ({currency})",
       "noRateWarning": "{date} tarihinde {from} biriminden {to} birimine döviz kuru bulunamadı. Dönüştürülen tutarı elle girin.",
       "usingLatestRateHint": "Mevcut en son kur kullanılıyor ({date} tarihli değil).",
-      "feeSplitMemo": "Yurt dışı işlem ücreti",
       "displayToggle": {
         "account": "Hesap",
         "original": "Orijinal"

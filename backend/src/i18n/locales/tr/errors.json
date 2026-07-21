@@ -34,8 +34,7 @@
     "ambiguousBrokerage": "\"{{ query }}\" birden fazla aracı kurum hesabıyla eşleşiyor: {{ list }}. Tam hesap adını kullanın.",
     "unknownInvestmentAccount": "Bilinmeyen hesap: {{ name }}. Kullanıcının hesap listesinden tam bir ad kullanın.",
     "notACreditCard": "Ekstre dönemleri yalnızca kredi kartı hesapları için kullanılabilir",
-    "noStatementSettlementDay": "Bu kredi kartı için yapılandırılmış bir ekstre kesim günü yok",
-    "fxFeeCategoryRequired": "Ücret yüzdesi ayarlandığında bir yurt dışı işlem ücreti kategorisi gereklidir"
+    "noStatementSettlementDay": "Bu kredi kartı için yapılandırılmış bir ekstre kesim günü yok"
   },
   "actionHistory": {
     "nothingToUndo": "Geri alınacak işlem yok",

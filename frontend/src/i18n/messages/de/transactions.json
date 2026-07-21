@@ -408,7 +408,6 @@
       "convertedAmount": "Umgerechneter Betrag ({currency})",
       "noRateWarning": "Kein Wechselkurs für {from} zu {to} am {date} gefunden. Bitte den umgerechneten Betrag manuell eingeben.",
       "usingLatestRateHint": "Es wird der neueste verfügbare Kurs verwendet (nicht vom {date}).",
-      "feeSplitMemo": "Fremdwährungsgebühr",
       "displayToggle": {
         "account": "Konto",
         "original": "Original"

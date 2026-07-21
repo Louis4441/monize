@@ -408,7 +408,6 @@
       "convertedAmount": "Montante convertido ({currency})",
       "noRateWarning": "Não foi encontrada uma taxa de câmbio de {from} para {to} em {date}. Introduza o montante convertido manualmente.",
       "usingLatestRateHint": "A usar a taxa mais recente disponível (não com data {date}).",
-      "feeSplitMemo": "Comissão de transação estrangeira",
       "displayToggle": {
         "account": "Conta",
         "original": "Original"

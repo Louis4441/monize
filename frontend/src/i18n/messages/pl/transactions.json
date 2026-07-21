@@ -408,7 +408,6 @@
       "convertedAmount": "Kwota przeliczona ({currency})",
       "noRateWarning": "Nie znaleziono kursu wymiany z {from} na {to} w dniu {date}. Wprowadź przeliczoną kwotę ręcznie.",
       "usingLatestRateHint": "Używany jest najnowszy dostępny kurs (nie z dnia {date}).",
-      "feeSplitMemo": "Opłata za transakcję zagraniczną",
       "displayToggle": {
         "account": "Konto",
         "original": "Oryginał"

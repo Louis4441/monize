@@ -408,7 +408,6 @@
       "convertedAmount": "환산 금액 ({currency})",
       "noRateWarning": "{date}에 {from}에서 {to}로의 환율을 찾을 수 없습니다. 환산 금액을 직접 입력하세요.",
       "usingLatestRateHint": "사용 가능한 최신 환율을 사용 중입니다({date} 기준 아님).",
-      "feeSplitMemo": "해외 거래 수수료",
       "displayToggle": {
         "account": "계좌",
         "original": "원 통화"

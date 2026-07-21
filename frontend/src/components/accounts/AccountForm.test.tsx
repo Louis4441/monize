@@ -214,7 +214,7 @@ function createExistingAccount(overrides: Partial<Account> = {}): Account {
     principalCategoryId: null,
     interestCategoryId: null,
     interestBookingMode: 'AUTO',
-    overpaymentCategoryId: null, overpaymentMemo: null, overpaymentPayeeId: null, fxFeePercent: null, fxFeeCategoryId: null,
+    overpaymentCategoryId: null, overpaymentMemo: null, overpaymentPayeeId: null, fxFeePercent: null,
     scheduledTransactionId: null,
     assetCategoryId: null,
     dateAcquired: null,
@@ -246,18 +246,6 @@ describe('AccountForm', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Account Name')).toBeInTheDocument();
-    });
-  });
-
-  it('loads categories on mount for any account type (so the fee-category picker has options)', async () => {
-    // Default new account is CHEQUING (not loan/mortgage/asset); the FX fee
-    // category dropdown still needs the category list.
-    render(
-      <AccountForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />
-    );
-
-    await waitFor(() => {
-      expect(categoriesApi.getAll).toHaveBeenCalled();
     });
   });
 
@@ -1489,7 +1477,7 @@ describe('AccountForm', () => {
       accountType: 'LOAN',
       interestCategoryId: 'loan-int',
       interestBookingMode: 'AUTO',
-      overpaymentCategoryId: null, overpaymentMemo: null, overpaymentPayeeId: null, fxFeePercent: null, fxFeeCategoryId: null,
+      overpaymentCategoryId: null, overpaymentMemo: null, overpaymentPayeeId: null, fxFeePercent: null,
     });
     render(<AccountForm account={existingLoan} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
     await waitFor(() => {

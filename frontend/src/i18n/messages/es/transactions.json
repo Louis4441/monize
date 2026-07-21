@@ -408,7 +408,6 @@
       "convertedAmount": "Importe convertido ({currency})",
       "noRateWarning": "No se encontró un tipo de cambio de {from} a {to} el {date}. Introduce el importe convertido manualmente.",
       "usingLatestRateHint": "Se usa el último tipo disponible (no con fecha {date}).",
-      "feeSplitMemo": "Comisión por transacción en el extranjero",
       "displayToggle": {
         "account": "Cuenta",
         "original": "Original"

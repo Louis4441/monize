@@ -408,7 +408,6 @@
       "convertedAmount": "Конвертована сума ({currency})",
       "noRateWarning": "Не знайдено курс обміну {from} на {to} на {date}. Введіть конвертовану суму вручну.",
       "usingLatestRateHint": "Використовується останній доступний курс (не на дату {date}).",
-      "feeSplitMemo": "Комісія за закордонну операцію",
       "displayToggle": {
         "account": "Рахунок",
         "original": "Оригінал"

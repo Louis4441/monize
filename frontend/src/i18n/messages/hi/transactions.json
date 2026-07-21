@@ -408,7 +408,6 @@
       "convertedAmount": "रूपांतरित राशि ({currency})",
       "noRateWarning": "{date} को {from} से {to} के लिए कोई विनिमय दर नहीं मिली। रूपांतरित राशि मैन्युअल रूप से दर्ज करें।",
       "usingLatestRateHint": "नवीनतम उपलब्ध दर का उपयोग किया जा रहा है ({date} की नहीं)।",
-      "feeSplitMemo": "विदेशी लेनदेन शुल्क",
       "displayToggle": {
         "account": "खाता",
         "original": "मूल"
