@@ -22,6 +22,7 @@ import { Account, PaymentFrequency, InterestBookingMode } from '@/types/account'
 import { Category } from '@/types/category';
 import { accountsApi } from '@/lib/accounts';
 import { categoriesApi } from '@/lib/categories';
+import { buildCategoryTree } from '@/lib/categoryUtils';
 import { exchangeRatesApi, CurrencyInfo } from '@/lib/exchange-rates';
 import { getCurrencySymbol } from '@/lib/format';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -454,6 +455,24 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
     }));
   }, [currencies, defaultCurrency]);
 
+  // Category options built the same way as the Transactions screen (hierarchical
+  // tree order, "Parent: Child" labels), so the fee-category picker matches it.
+  const categoryOptions = useMemo(
+    () =>
+      buildCategoryTree(categories).map(({ category }) => {
+        const parentCategory = category.parentId
+          ? categories.find((c) => c.id === category.parentId)
+          : null;
+        return {
+          value: category.id,
+          label: parentCategory
+            ? `${parentCategory.name}: ${category.name}`
+            : category.name,
+        };
+      }),
+    [categories],
+  );
+
   // Load accounts and categories when LOAN, MORTGAGE, LINE_OF_CREDIT, or ASSET type is selected
   // For assets: always (to allow editing the value change category)
   // For loans/mortgages: for new creation or when editing accounts that need payment setup
@@ -769,55 +788,6 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
         />
       </div>
 
-      {/* Foreign Currency Conversion Fee: the bank's FX fee, auto-booked as an
-          expense split under the chosen category on foreign-entered transactions. */}
-      <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-        <div>
-          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-            {t('form.fxFeeTitle')}
-          </h3>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {t('form.fxFeeHelp')}
-          </p>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <Input
-            label={`${t('form.fxFeePercent')} (%)`}
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            placeholder={t('form.fxFeePercentPlaceholder')}
-            error={errors.fxFeePercent?.message}
-            {...register('fxFeePercent')}
-          />
-          <Combobox
-            label={t('form.fxFeeCategory')}
-            placeholder={t('form.fxFeeCategoryPlaceholder')}
-            options={categories
-              .map((c) => ({
-                value: c.id,
-                label: c.parentId
-                  ? `${categories.find((p) => p.id === c.parentId)?.name || ''}: ${c.name}`
-                  : c.name,
-              }))
-              .sort((a, b) => a.label.localeCompare(b.label))}
-            value={selectedFxFeeCategoryId}
-            initialDisplayValue={
-              fxFeeCategoryName ||
-              (account?.fxFeeCategoryId
-                ? categories.find((c) => c.id === account.fxFeeCategoryId)?.name || ''
-                : '')
-            }
-            onChange={handleFxFeeCategoryChange}
-            onCreateNew={handleFxFeeCategoryCreate}
-            allowCustomValue
-            valueIsId
-            error={errors.fxFeeCategoryId?.message}
-          />
-        </div>
-      </div>
-
       <div className="grid grid-cols-2 gap-4">
         <Input
           label={t('form.accountNumber')}
@@ -904,6 +874,48 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           </div>
         </div>
       )}
+
+      {/* Foreign Currency Conversion Fee: the bank's FX fee, auto-booked as an
+          expense split under the chosen category on foreign-entered transactions. */}
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+        <div>
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            {t('form.fxFeeTitle')}
+          </h3>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t('form.fxFeeHelp')}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label={`${t('form.fxFeePercent')} (%)`}
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            placeholder={t('form.fxFeePercentPlaceholder')}
+            error={errors.fxFeePercent?.message}
+            {...register('fxFeePercent')}
+          />
+          <Combobox
+            label={t('form.fxFeeCategory')}
+            placeholder={t('form.fxFeeCategoryPlaceholder')}
+            options={categoryOptions}
+            value={selectedFxFeeCategoryId}
+            initialDisplayValue={
+              fxFeeCategoryName ||
+              (account?.fxFeeCategoryId
+                ? categories.find((c) => c.id === account.fxFeeCategoryId)?.name || ''
+                : '')
+            }
+            onChange={handleFxFeeCategoryChange}
+            onCreateNew={handleFxFeeCategoryCreate}
+            allowCustomValue
+            valueIsId
+            error={errors.fxFeeCategoryId?.message}
+          />
+        </div>
+      </div>
 
       {isLoanAccount && !account && (
         <LoanFields
