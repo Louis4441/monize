@@ -269,7 +269,6 @@ describe("TransactionSplitService", () => {
       ];
       expect(() => service.validateSplits(splits, 100)).not.toThrow();
     });
-
   });
 
   describe("createSplits", () => {
@@ -295,26 +294,7 @@ describe("TransactionSplitService", () => {
           transferAccountId: null,
           amount: -60,
           memo: "Food",
-          isFxFee: false,
         },
-      );
-    });
-
-    it("persists isFxFee on the foreign-transaction fee split", async () => {
-      const splits = [
-        { amount: -60, categoryId: "cat-1", memo: "Purchase" },
-        { amount: -2.5, categoryId: "fee-cat", memo: "Fee", isFxFee: true },
-      ];
-
-      await service.createSplits("tx-1", splits);
-
-      expect(mockQueryRunner.manager.create).toHaveBeenCalledWith(
-        TransactionSplit,
-        expect.objectContaining({
-          categoryId: "fee-cat",
-          amount: -2.5,
-          isFxFee: true,
-        }),
       );
     });
 
@@ -477,7 +457,6 @@ describe("TransactionSplitService", () => {
           transferAccountId: null,
           amount: -60,
           memo: null,
-          isFxFee: false,
         },
       );
     });
@@ -728,7 +707,6 @@ describe("TransactionSplitService", () => {
         transferAccountId: null,
         amount: -10,
         memo: null,
-        isFxFee: false,
       });
       expect(result.id).toBe("new-split-id");
     });

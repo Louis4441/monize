@@ -218,7 +218,6 @@ export const RULES: Record<string, TableRules> = {
     linked_transaction_id: keep,
     amount: scale,
     memo: drop,
-    is_fx_fee: keep,
     created_at: keep,
   },
   transaction_tags: { transaction_id: keep, tag_id: keep },

@@ -34,8 +34,6 @@ export interface TransactionSplit {
   linkedTransactionId: string | null;
   amount: number;
   memo: string | null;
-  /** Marks the auto-generated foreign-transaction fee split (read-only in the UI). */
-  isFxFee?: boolean;
   tags?: Tag[];
   /** Present when kind === 'investment' */
   investmentTransaction?: {
@@ -101,7 +99,6 @@ export interface CreateSplitData {
   investment?: InvestmentSplitDetails;
   amount: number;
   memo?: string;
-  isFxFee?: boolean;
   tagIds?: string[];
 }
 

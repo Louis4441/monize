@@ -918,7 +918,6 @@ export function toSplitRows(splits: {
     commission?: number;
     exchangeRate?: number;
   };
-  isFxFee?: boolean;
 }[]): SplitRow[] {
   return splits.map((split, index) => {
     const kind: SplitType =
@@ -969,7 +968,6 @@ export function toSplitRows(splits: {
       amount: Number(split.amount),
       memo: split.memo || '',
       tagIds: split.tags?.map(t => t.id) || [],
-      isFxFee: split.isFxFee || false,
     };
   });
 }
@@ -984,6 +982,5 @@ export function toCreateSplitData(splits: SplitRow[]): CreateSplitData[] {
     amount: split.amount,
     memo: split.memo || undefined,
     tagIds: split.tagIds && split.tagIds.length > 0 ? split.tagIds : undefined,
-    isFxFee: split.isFxFee || undefined,
   }));
 }

@@ -312,7 +312,6 @@ export class TransactionSplitService {
           transferAccountId: split.transferAccountId || null,
           amount: split.amount,
           memo: split.memo || null,
-          isFxFee: split.isFxFee || false,
         });
       });
       const batchSaved = await queryRunner.manager.save(regularEntities);
@@ -656,7 +655,6 @@ export class TransactionSplitService {
         transferAccountId: splitDto.transferAccountId || null,
         amount: splitDto.amount,
         memo: splitDto.memo || null,
-        isFxFee: splitDto.isFxFee || false,
       });
 
       const savedSplit = await queryRunner.manager.save(split);

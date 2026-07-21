@@ -2774,7 +2774,7 @@ describe("TransactionAnalyticsService", () => {
       expect(expr).toContain(
         "ROUND(transaction.originalAmount * transaction.exchangeRate, 2) - transaction.amount",
       );
-      // No dependency on the dormant is_fx_fee split mechanism.
+      // No dependency on any fee-split join.
       expect(expr).not.toContain("fxFeeSplit");
       expect(mockQueryBuilder.leftJoin).not.toHaveBeenCalled();
     });
