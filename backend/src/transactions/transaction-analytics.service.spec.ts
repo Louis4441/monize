@@ -2765,5 +2765,24 @@ describe("TransactionAnalyticsService", () => {
         "transaction.originalCurrencyCode",
       );
     });
+
+    it("derives the fee from the folded-in amount for ordinary entries and the is_fx_fee split for split transactions", async () => {
+      mockQueryBuilder.getRawMany.mockResolvedValue([]);
+
+      await service.getFxFeeSummary(userId, "acc-1");
+
+      const feeSelect = mockQueryBuilder.addSelect.mock.calls.find(
+        ([, alias]) => alias === "feeTotal",
+      );
+      expect(feeSelect).toBeDefined();
+      const expr = feeSelect[0] as string;
+      // Ordinary foreign entry: fee folded into amount.
+      expect(expr).toContain(
+        "ROUND(transaction.originalAmount * transaction.exchangeRate, 2) - transaction.amount",
+      );
+      // Split transaction: explicit is_fx_fee split.
+      expect(expr).toContain("COALESCE(-fxFeeSplit.amount, 0)");
+      expect(expr).toContain("transaction.isSplit = true");
+    });
   });
 });

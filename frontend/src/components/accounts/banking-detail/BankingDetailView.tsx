@@ -208,6 +208,7 @@ export function BankingDetailView({ account }: BankingDetailViewProps) {
               isLoading={isLoading}
               currencyCode={currency}
               accountName={account.name}
+              hideTitle
             />
           )}
         </div>

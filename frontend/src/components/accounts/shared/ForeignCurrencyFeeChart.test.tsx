@@ -174,6 +174,22 @@ describe('ForeignCurrencyFeeChart', () => {
     expect(capturedProps.labelList.textAnchor).toBe('start');
   });
 
+  it('hides the in-card title when hideTitle is set but keeps the chart', () => {
+    render(
+      <ForeignCurrencyFeeChart
+        data={[{ month: '2025-01', total: 10, count: 1 }]}
+        isLoading={false}
+        currencyCode="CAD"
+        hideTitle
+      />,
+    );
+
+    expect(screen.queryByText('Fees Over Time')).not.toBeInTheDocument();
+    expect(screen.getByTestId('bar-chart')).toBeInTheDocument();
+    // The resolution selector and download button remain.
+    expect(screen.getByRole('button', { name: 'Month' })).toBeInTheDocument();
+  });
+
   it('renders a download button named after the chart and account', () => {
     render(
       <ForeignCurrencyFeeChart

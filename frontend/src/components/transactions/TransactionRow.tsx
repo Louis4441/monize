@@ -10,6 +10,7 @@ import { CategoryBudgetStatus } from '@/types/budget';
 import { DensityLevel } from '@/hooks/useTableDensity';
 import { HIGHLIGHT_FLASH, HIGHLIGHT_FLASH_CELL } from '@/hooks/useHighlightTarget';
 import { formatAmountWithCommas, getDecimalPlacesForCurrency } from '@/lib/format';
+import { foreignTransactionFee } from '@/lib/fx-fees';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 
 const INVESTMENT_ACTION_LABELS: Record<string, string> = {
@@ -228,17 +229,9 @@ export const TransactionRow = memo(function TransactionRow({
   // without payeeName) still shows the payee instead of a dash.
   const payeeLabel = transaction.payeeName || transaction.payee?.name || null;
 
-  // Fee paid: the auto-generated foreign-transaction fee split(s), summed in
-  // integer ten-thousandths to avoid float drift. Stored negative for a charge;
-  // shown as a positive cost. 0 means no fee split (e.g. recorded before the
-  // account's fee percentage was configured).
-  const fxFeePaid = showFxColumns
-    ? (transaction.splits ?? []).reduce(
-        (sum, split) =>
-          split.isFxFee ? sum + Math.round(Number(split.amount) * 10000) : sum,
-        0,
-      ) / -10000
-    : 0;
+  // Fee paid, as a positive cost in the account currency. 0 means no fee
+  // applied (e.g. recorded before the account's fee percentage was configured).
+  const fxFeePaid = showFxColumns ? foreignTransactionFee(transaction) : 0;
   const categoryColor = transaction.category
     ? (categoryColorMap?.get(transaction.category.id) ?? transaction.category.color)
     : null;

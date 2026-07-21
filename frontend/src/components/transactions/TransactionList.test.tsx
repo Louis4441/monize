@@ -2832,7 +2832,19 @@ describe('TransactionList', () => {
   });
 
   describe('foreign-currency columns (showFxColumns)', () => {
-    const foreignTransaction = () =>
+    // Ordinary foreign entry: the fee is folded into `amount`, not a split.
+    // base = round(100 EUR x 1.38) = 138; amount = -141.45 => fee = 3.45.
+    const foldedFeeTransaction = () =>
+      createTransaction({
+        amount: -141.45,
+        currencyCode: 'CAD',
+        exchangeRate: 1.38,
+        originalAmount: -100.0,
+        originalCurrencyCode: 'EUR',
+      });
+
+    // A split foreign transaction carries the fee as an explicit is_fx_fee split.
+    const splitFeeTransaction = () =>
       createTransaction({
         amount: -138.0,
         currencyCode: 'CAD',
@@ -2871,7 +2883,7 @@ describe('TransactionList', () => {
     it('hides the FX columns by default', async () => {
       render(
         <TransactionList
-          transactions={[foreignTransaction()]}
+          transactions={[foldedFeeTransaction()]}
           onEdit={mockOnEdit}
           onRefresh={mockOnRefresh}
         />
@@ -2884,10 +2896,10 @@ describe('TransactionList', () => {
       expect(screen.queryByText('Fee Paid')).not.toBeInTheDocument();
     });
 
-    it('renders paid currency, paid amount, and the fee split amount', async () => {
+    it('derives the fee folded into amount for an ordinary foreign entry', async () => {
       render(
         <TransactionList
-          transactions={[foreignTransaction()]}
+          transactions={[foldedFeeTransaction()]}
           onEdit={mockOnEdit}
           onRefresh={mockOnRefresh}
           showFxColumns
@@ -2902,14 +2914,33 @@ describe('TransactionList', () => {
       expect(screen.getByText('EUR')).toBeInTheDocument();
       // Paid amount: -100 EUR through the +/- formatter.
       expect(screen.getByText(/-\$100\.00/)).toBeInTheDocument();
+      // Fee: base 138 - amount 141.45 = 3.45, shown as a positive cost.
+      expect(screen.getByText('$3.45')).toBeInTheDocument();
+    });
+
+    it('uses the is_fx_fee split amount for a split foreign transaction', async () => {
+      render(
+        <TransactionList
+          transactions={[splitFeeTransaction()]}
+          onEdit={mockOnEdit}
+          onRefresh={mockOnRefresh}
+          showFxColumns
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('EUR')).toBeInTheDocument();
+      });
       // Fee: the -3.50 fee split shown as a positive cost.
       expect(screen.getByText('$3.50')).toBeInTheDocument();
     });
 
-    it('shows a dash in the fee column when a foreign transaction has no fee split', async () => {
+    it('shows a dash in the fee column when a foreign transaction has no fee', async () => {
+      // amount equals the converted base (100 EUR x 1.38), so no fee applies.
       const noFee = createTransaction({
         amount: -138.0,
         originalAmount: -100.0,
+        exchangeRate: 1.38,
         originalCurrencyCode: 'EUR',
       });
 

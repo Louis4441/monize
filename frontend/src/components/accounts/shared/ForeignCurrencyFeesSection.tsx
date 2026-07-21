@@ -225,6 +225,7 @@ export function ForeignCurrencyFeesSection({ account }: ForeignCurrencyFeesSecti
             isLoading={isSummaryLoading}
             currencyCode={account.currencyCode}
             accountName={account.name}
+            hideTitle
           />
         </div>
 

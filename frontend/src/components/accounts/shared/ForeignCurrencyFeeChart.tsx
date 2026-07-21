@@ -70,6 +70,12 @@ interface ForeignCurrencyFeeChartProps {
   currencyCode: string;
   /** Account name appended to the download filename. */
   accountName?: string;
+  /**
+   * Hide the in-card title when the surrounding section heading already names
+   * the chart, so the name is not shown twice. The download filename still
+   * uses the title.
+   */
+  hideTitle?: boolean;
 }
 
 interface ChartDataPoint extends BucketedPoint {
@@ -117,6 +123,7 @@ export function ForeignCurrencyFeeChart({
   isLoading,
   currencyCode,
   accountName,
+  hideTitle = false,
 }: ForeignCurrencyFeeChartProps) {
   const t = useTranslations('accountDetail-fxFees');
   const chartTitle = t('chart.title');
@@ -202,9 +209,11 @@ export function ForeignCurrencyFeeChart({
   if (isLoading) {
     return (
       <div className="min-h-[420px]">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          {chartTitle}
-        </h3>
+        {!hideTitle && (
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            {chartTitle}
+          </h3>
+        )}
         <div className="h-72 flex items-center justify-center">
           <Skeleton className="w-full h-full" />
         </div>
@@ -215,9 +224,11 @@ export function ForeignCurrencyFeeChart({
   if (chartData.length === 0) {
     return (
       <div className="min-h-[420px]">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          {chartTitle}
-        </h3>
+        {!hideTitle && (
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+            {chartTitle}
+          </h3>
+        )}
         <div className="h-72 flex items-center justify-center text-gray-500 dark:text-gray-400">
           <p>{t('chart.noData')}</p>
         </div>
@@ -227,10 +238,12 @@ export function ForeignCurrencyFeeChart({
 
   return (
     <div className="min-h-[420px]">
-      <div className="flex items-center justify-between mb-4 gap-2">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {chartTitle}
-        </h3>
+      <div className={`flex items-center mb-4 gap-2 ${hideTitle ? 'justify-end' : 'justify-between'}`}>
+        {!hideTitle && (
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {chartTitle}
+          </h3>
+        )}
         <div className="flex items-center gap-2">
           <div
             className="flex gap-1"

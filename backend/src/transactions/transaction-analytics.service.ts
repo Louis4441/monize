@@ -858,16 +858,27 @@ export class TransactionAnalyticsService {
   /**
    * Per-month foreign-transaction fee totals for one account, grouped by the
    * currency the transaction was paid in. Rows cover every non-void
-   * foreign-entered transaction on the account (original_currency_code set);
-   * the fee itself comes from the auto-generated is_fx_fee split, so a month
-   * whose transactions predate the account's configured fee percentage sums
-   * to 0 rather than being dropped. Fee amounts are returned positive in the
-   * account currency (the stored fee split amount is negative for a charge).
+   * foreign-entered transaction on the account (original_currency_code set).
+   *
+   * The fee is recovered per transaction: for an ordinary foreign entry the
+   * bank's fee is folded into `amount` (amount = round(originalAmount x
+   * exchangeRate) + fee, with fee <= 0), so the fee is
+   * round(originalAmount x exchangeRate) - amount. A split transaction instead
+   * carries the fee as its explicit is_fx_fee split. Either way a month whose
+   * transactions predate the account's fee percentage sums to 0 rather than
+   * being dropped. Fee amounts are returned positive in the account currency.
    */
   async getFxFeeSummary(
     userId: string,
     accountId: string,
   ): Promise<FxFeeMonthlySummaryRow[]> {
+    const feeExpr =
+      "CASE WHEN transaction.isSplit = true " +
+      "THEN COALESCE(-fxFeeSplit.amount, 0) " +
+      "WHEN transaction.originalAmount IS NULL THEN 0 " +
+      "ELSE ROUND(transaction.originalAmount * transaction.exchangeRate, 2) - transaction.amount " +
+      "END";
+
     const rows = await this.transactionsRepository
       .createQueryBuilder("transaction")
       .leftJoin(
@@ -885,7 +896,7 @@ export class TransactionAnalyticsService {
       })
       .select("TO_CHAR(transaction.transactionDate, 'YYYY-MM')", "month")
       .addSelect("transaction.originalCurrencyCode", "currencyCode")
-      .addSelect("COALESCE(SUM(-fxFeeSplit.amount), 0)", "feeTotal")
+      .addSelect(`COALESCE(SUM(${feeExpr}), 0)`, "feeTotal")
       .addSelect("COUNT(DISTINCT transaction.id)", "count")
       .groupBy("month")
       .addGroupBy("transaction.originalCurrencyCode")
