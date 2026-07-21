@@ -42,8 +42,12 @@ interface NormalTransactionFieldsProps {
   createdAtSlot?: ReactNode;
   /** Foreign-currency entry: button placed left of the Amount input. */
   currencyPickerSlot?: ReactNode;
-  /** Foreign-currency entry: panel rendered directly beneath the Amount input. */
-  fxPanelSlot?: ReactNode;
+  /** Foreign-currency entry: the converted account-currency amount input, placed
+   *  beside the Amount input (equal width). When set, the Amount row switches to
+   *  a two-column layout and Reference Number moves to its own row. */
+  convertedAmountSlot?: ReactNode;
+  /** Foreign-currency entry: rate/fee captions rendered below the Amount row. */
+  fxCaptionSlot?: ReactNode;
   /** Overrides the Amount input's value (the foreign total, when entering in a
    *  foreign currency). Defaults to watchedAmount (the account-currency amount). */
   amountValue?: number;
@@ -76,7 +80,8 @@ export function NormalTransactionFields({
   transaction,
   createdAtSlot,
   currencyPickerSlot,
-  fxPanelSlot,
+  convertedAmountSlot,
+  fxCaptionSlot,
   amountValue,
   amountCurrencyCode,
 }: NormalTransactionFieldsProps) {
@@ -215,32 +220,55 @@ export function NormalTransactionFields({
         </div>
       </div>
 
-      {/* Row 3: Amount and Reference Number */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <div className="flex items-stretch space-x-2">
-            {currencyPickerSlot}
-            <div className="flex-1 min-w-0">
-              <CurrencyInput
-                label={t('form.fields.amount')}
-                prefix={getCurrencySymbol(amountCurrencyCode || watchedCurrencyCode)}
-                value={amountValue !== undefined ? amountValue : watchedAmount}
-                onChange={handleAmountChange}
-                allowSignToggle
-                error={errors.amount?.message as string | undefined}
-              />
+      {/* Row 3: Amount (+ converted amount when entering a foreign currency) and
+          Reference Number. In foreign mode the converted amount sits beside the
+          Amount at equal width, and Reference Number drops to its own row. */}
+      {(() => {
+        const amountInput = (
+          <CurrencyInput
+            label={t('form.fields.amount')}
+            prefix={getCurrencySymbol(amountCurrencyCode || watchedCurrencyCode)}
+            value={amountValue !== undefined ? amountValue : watchedAmount}
+            onChange={handleAmountChange}
+            allowSignToggle
+            error={errors.amount?.message as string | undefined}
+          />
+        );
+        const referenceInput = (
+          <Input
+            label={t('form.fields.referenceNumber')}
+            type="text"
+            placeholder={t('form.placeholders.referenceNumber')}
+            error={errors.referenceNumber?.message as string | undefined}
+            {...register('referenceNumber')}
+          />
+        );
+        return convertedAmountSlot ? (
+          <>
+            <div>
+              <div className="flex items-stretch space-x-2">
+                {currencyPickerSlot}
+                <div className="grid grid-cols-2 gap-4 flex-1 min-w-0">
+                  {amountInput}
+                  {convertedAmountSlot}
+                </div>
+              </div>
+              {fxCaptionSlot}
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {referenceInput}
+            </div>
+          </>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-stretch space-x-2">
+              {currencyPickerSlot}
+              <div className="flex-1 min-w-0">{amountInput}</div>
+            </div>
+            {referenceInput}
           </div>
-          {fxPanelSlot}
-        </div>
-        <Input
-          label={t('form.fields.referenceNumber')}
-          type="text"
-          placeholder={t('form.placeholders.referenceNumber')}
-          error={errors.referenceNumber?.message as string | undefined}
-          {...register('referenceNumber')}
-        />
-      </div>
+        );
+      })()}
     </div>
   );
 }

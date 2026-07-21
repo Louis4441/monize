@@ -35,8 +35,11 @@ interface SplitTransactionFieldsProps {
   createdAtSlot?: ReactNode;
   /** Foreign-currency entry: button placed left of the Total Amount input. */
   currencyPickerSlot?: ReactNode;
-  /** Foreign-currency entry: panel rendered directly beneath the Total Amount input. */
-  fxPanelSlot?: ReactNode;
+  /** Foreign-currency entry: the converted account-currency amount input, placed
+   *  beside the Total Amount input (equal width). */
+  convertedAmountSlot?: ReactNode;
+  /** Foreign-currency entry: rate/fee captions rendered below the Total Amount. */
+  fxCaptionSlot?: ReactNode;
   /** Overrides the Total Amount input's value (the foreign total). */
   amountValue?: number;
   /** Overrides the currency whose symbol prefixes the Total Amount input. */
@@ -61,7 +64,8 @@ export function SplitTransactionFields({
   transaction,
   createdAtSlot,
   currencyPickerSlot,
-  fxPanelSlot,
+  convertedAmountSlot,
+  fxCaptionSlot,
   amountValue,
   amountCurrencyCode,
 }: SplitTransactionFieldsProps) {
@@ -164,17 +168,29 @@ export function SplitTransactionFields({
         <div>
           <div className="flex items-stretch space-x-2">
             {currencyPickerSlot}
-            <div className="flex-1 min-w-0">
-              <CurrencyInput
-                label={t('form.fields.totalAmount')}
-                prefix={getCurrencySymbol(amountCurrencyCode || watchedCurrencyCode)}
-                value={amountValue !== undefined ? amountValue : watchedAmount}
-                onChange={handleAmountChange}
-                error={errors.amount?.message as string | undefined}
-              />
-            </div>
+            {(() => {
+              const totalInput = (
+                <CurrencyInput
+                  label={t('form.fields.totalAmount')}
+                  prefix={getCurrencySymbol(amountCurrencyCode || watchedCurrencyCode)}
+                  value={amountValue !== undefined ? amountValue : watchedAmount}
+                  onChange={handleAmountChange}
+                  error={errors.amount?.message as string | undefined}
+                />
+              );
+              // In foreign mode the converted amount sits beside the total at
+              // equal width; otherwise the total fills the column.
+              return convertedAmountSlot ? (
+                <div className="grid grid-cols-2 gap-4 flex-1 min-w-0">
+                  {totalInput}
+                  {convertedAmountSlot}
+                </div>
+              ) : (
+                <div className="flex-1 min-w-0">{totalInput}</div>
+              );
+            })()}
           </div>
-          {fxPanelSlot}
+          {fxCaptionSlot}
         </div>
       </div>
 

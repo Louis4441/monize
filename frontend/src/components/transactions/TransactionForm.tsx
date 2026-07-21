@@ -1136,19 +1136,21 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
       />
     ) : undefined;
 
-  // FX panel shown beneath the Amount input while entering a foreign currency:
-  // the editable converted account-currency base, the rate caption, a no-rate
-  // warning when the pair/date could not be resolved, and -- when the account
-  // has a foreign-transaction fee -- the fee and resulting total.
-  const fxPanelSlot = isForeign ? (
-    <div className="mt-2 space-y-1">
-      <CurrencyInput
-        label={t('form.fx.convertedAmount', { currency: accountCurrency })}
-        prefix={getCurrencySymbol(accountCurrency)}
-        value={convertedBase}
-        onChange={handleConvertedBaseOverride}
-        allowSignToggle
-      />
+  // While entering a foreign currency, the converted account-currency amount sits
+  // directly beside the Amount input (same width), with the rate/fee captions
+  // rendered on their own line below the pair.
+  const convertedAmountSlot = isForeign ? (
+    <CurrencyInput
+      label={t('form.fx.convertedAmount', { currency: accountCurrency })}
+      prefix={getCurrencySymbol(accountCurrency)}
+      value={convertedBase}
+      onChange={handleConvertedBaseOverride}
+      allowSignToggle
+    />
+  ) : undefined;
+
+  const fxCaptionSlot = isForeign ? (
+    <div className="mt-1 space-y-1">
       {fxRate != null ? (
         <p className="text-xs text-gray-500 dark:text-gray-400">
           {t('form.fx.rateCaption', {
@@ -1257,7 +1259,8 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           transaction={transaction}
           createdAtSlot={createdAtSlot}
           currencyPickerSlot={currencyPickerSlot}
-          fxPanelSlot={fxPanelSlot}
+          convertedAmountSlot={convertedAmountSlot}
+          fxCaptionSlot={fxCaptionSlot}
           amountValue={isForeign ? foreignAmount : undefined}
           amountCurrencyCode={isForeign ? entryCurrency : undefined}
         />
@@ -1282,7 +1285,8 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           transaction={transaction}
           createdAtSlot={createdAtSlot}
           currencyPickerSlot={currencyPickerSlot}
-          fxPanelSlot={fxPanelSlot}
+          convertedAmountSlot={convertedAmountSlot}
+          fxCaptionSlot={fxCaptionSlot}
           amountValue={isForeign ? foreignAmount : undefined}
           amountCurrencyCode={isForeign ? entryCurrency : undefined}
         />
