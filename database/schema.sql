@@ -306,7 +306,6 @@ CREATE TABLE transaction_splits (
     linked_transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL, -- linked transaction in target account
     amount NUMERIC(20, 4) NOT NULL,
     memo TEXT,
-    is_fx_fee BOOLEAN NOT NULL DEFAULT false, -- marks the auto-generated foreign-transaction fee split
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_split_kind_exclusive CHECK (
         (kind = 'category'   AND transfer_account_id IS NULL) OR
