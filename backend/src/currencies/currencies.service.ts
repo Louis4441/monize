@@ -113,6 +113,21 @@ export class CurrenciesService {
         where: { userId, currencyCode: code },
       });
       if (existingPref) {
+        // Distinguish an already-active currency from one the user previously
+        // deactivated: the inactive case ships a machine-readable `errorCode`
+        // so the UI can offer to reactivate it instead of leaving the user
+        // stuck (the currency is hidden from their active list).
+        if (!existingPref.isActive) {
+          throw new ConflictException({
+            message: tr(
+              "errors.currencies.alreadyInListInactive",
+              `Currency "${code}" is already in your list but currently inactive. Reactivate it to use it.`,
+              { code },
+            ),
+            errorCode: "CURRENCY_INACTIVE",
+            currencyCode: code,
+          });
+        }
         throw new ConflictException(
           tr(
             "errors.currencies.alreadyInList",

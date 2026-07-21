@@ -3586,9 +3586,9 @@ describe('TransactionForm', () => {
       await act(async () => {
         fireEvent.click(screen.getByLabelText('Change entry currency'));
       });
-      await waitFor(() => expect(screen.getByText(/EUR Euro/)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Euro \(EUR\)/)).toBeInTheDocument());
       await act(async () => {
-        fireEvent.click(screen.getByText(/EUR Euro/));
+        fireEvent.click(screen.getByText(/Euro \(EUR\)/));
       });
 
       // The rate is fetched for EUR -> account currency (CAD), and the FX panel
@@ -3625,9 +3625,9 @@ describe('TransactionForm', () => {
       await act(async () => {
         fireEvent.click(screen.getByLabelText('Change entry currency'));
       });
-      await waitFor(() => expect(screen.getByText(/EUR Euro/)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Euro \(EUR\)/)).toBeInTheDocument());
       await act(async () => {
-        fireEvent.click(screen.getByText(/EUR Euro/));
+        fireEvent.click(screen.getByText(/Euro \(EUR\)/));
       });
       await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
 
@@ -3661,9 +3661,9 @@ describe('TransactionForm', () => {
       await act(async () => {
         fireEvent.click(screen.getByLabelText('Change entry currency'));
       });
-      await waitFor(() => expect(screen.getByText(/EUR Euro/)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Euro \(EUR\)/)).toBeInTheDocument());
       await act(async () => {
-        fireEvent.click(screen.getByText(/EUR Euro/));
+        fireEvent.click(screen.getByText(/Euro \(EUR\)/));
       });
       await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
 
@@ -3699,9 +3699,9 @@ describe('TransactionForm', () => {
       await act(async () => {
         fireEvent.click(screen.getByLabelText('Change entry currency'));
       });
-      await waitFor(() => expect(screen.getByText(/EUR Euro/)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/Euro \(EUR\)/)).toBeInTheDocument());
       await act(async () => {
-        fireEvent.click(screen.getByText(/EUR Euro/));
+        fireEvent.click(screen.getByText(/Euro \(EUR\)/));
       });
       await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
 

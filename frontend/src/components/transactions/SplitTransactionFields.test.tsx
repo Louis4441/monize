@@ -182,17 +182,17 @@ describe('SplitTransactionFields', () => {
       />,
     );
 
-    // The converted amount slot is wrapped with its conversion note; that
-    // wrapper sits in the amount grid, which stacks on mobile (grid-cols-1) and
-    // only pairs the two currency fields from md up (md:grid-cols-2).
-    const grid = screen.getByTestId('converted-slot').parentElement?.parentElement;
+    // The converted amount slot is a direct child of the amount grid, which
+    // stacks on mobile (grid-cols-1) and only pairs the two currency fields
+    // from md up (md:grid-cols-2).
+    const grid = screen.getByTestId('converted-slot').parentElement;
     expect(grid?.className).toContain('grid-cols-1');
     expect(grid?.className).toContain('md:grid-cols-2');
     expect(grid).toHaveTextContent('Total in USD');
     expect(grid).toHaveTextContent('Total in CAD');
   });
 
-  it('renders the conversion note grouped directly below the converted amount field', () => {
+  it('renders the conversion note below both currency fields so it spans them', () => {
     render(
       <SplitTransactionFields
         {...defaultProps}
@@ -202,10 +202,13 @@ describe('SplitTransactionFields', () => {
       />,
     );
 
-    // The note shares the converted amount field's wrapper, so it sits directly
-    // beneath it rather than below the whole amount row.
-    const wrapper = screen.getByTestId('converted-slot').parentElement;
-    expect(wrapper).toContainElement(screen.getByTestId('fx-caption'));
+    // The note sits outside (below) the two-column amount grid, so it spans the
+    // full width beneath both currency fields rather than under just one.
+    const grid = screen.getByTestId('converted-slot').parentElement;
+    expect(grid?.className).toContain('md:grid-cols-2');
+    expect(grid).not.toContainElement(screen.getByTestId('fx-caption'));
+    // They share the amount block wrapper (the note is the grid's sibling).
+    expect(grid?.parentElement).toContainElement(screen.getByTestId('fx-caption'));
   });
 
   it('renders Reference Number input', () => {

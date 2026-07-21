@@ -402,7 +402,9 @@
       "title": "[XX-Enter amount in-XX]",
       "accountCurrency": "[XX-Account currency ({code})-XX]",
       "addCurrency": "[XX-Add currency...-XX]",
-      "optionLabel": "[XX-{symbol} -- {code} {name}-XX]"
+      "optionLabel": "[XX-{symbol} - {name} ({code})-XX]",
+      "createFailed": "[XX-Failed to add currency-XX]",
+      "reactivated": "[XX-Reactivated {code}-XX]"
     },
     "fx": {
       "totalInCurrency": "[XX-Total in {currency}-XX]",

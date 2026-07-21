@@ -210,7 +210,7 @@ describe('NormalTransactionFields', () => {
     expect(grid).toHaveTextContent('Reference Number');
   });
 
-  it('renders the conversion note grouped directly below the converted amount field', () => {
+  it('renders the conversion note spanning both currency fields on desktop', () => {
     render(
       <NormalTransactionFields
         {...defaultProps}
@@ -220,10 +220,14 @@ describe('NormalTransactionFields', () => {
       />,
     );
 
-    // The note shares the converted amount field's wrapper, so it sits directly
-    // beneath it rather than below the whole amount row.
-    const wrapper = screen.getByTestId('converted-slot').parentElement;
-    expect(wrapper).toContainElement(screen.getByTestId('fx-caption'));
+    // The note's wrapper spans both currency columns (md:col-span-2), and it
+    // lives in the same currency group as the converted field (below the pair),
+    // separate from the Reference Number column.
+    const noteWrapper = screen.getByTestId('fx-caption').parentElement;
+    expect(noteWrapper?.className).toContain('md:col-span-2');
+    const group = screen.getByTestId('converted-slot').parentElement;
+    expect(group).toContainElement(screen.getByTestId('fx-caption'));
+    expect(group?.className).toContain('md:grid-cols-2');
   });
 
   // --- New tests below ---

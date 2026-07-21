@@ -117,6 +117,28 @@ describe("CurrenciesService", () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    it("throws a CURRENCY_INACTIVE conflict when the currency is present but inactive", async () => {
+      mockCurrencyRepo.findOne!.mockResolvedValue(mockCurrency);
+      mockPrefRepo.findOne!.mockResolvedValue({
+        userId,
+        currencyCode: "CAD",
+        isActive: false,
+      });
+
+      expect.assertions(3);
+      try {
+        await service.create(userId, { code: "CAD", name: "Test", symbol: "$" });
+      } catch (err) {
+        expect(err).toBeInstanceOf(ConflictException);
+        const response = (err as ConflictException).getResponse() as Record<
+          string,
+          unknown
+        >;
+        expect(response.errorCode).toBe("CURRENCY_INACTIVE");
+        expect(response.currencyCode).toBe("CAD");
+      }
+    });
+
     it("adds preference row if currency exists but user doesn't have it", async () => {
       mockCurrencyRepo.findOne!.mockResolvedValue(mockCurrency);
       mockPrefRepo.findOne!.mockResolvedValue(null);

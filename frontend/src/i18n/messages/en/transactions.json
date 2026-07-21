@@ -402,7 +402,9 @@
       "title": "Enter amount in",
       "accountCurrency": "Account currency ({code})",
       "addCurrency": "Add currency...",
-      "optionLabel": "{symbol} -- {code} {name}"
+      "optionLabel": "{symbol} - {name} ({code})",
+      "createFailed": "Failed to add currency",
+      "reactivated": "Reactivated {code}"
     },
     "fx": {
       "totalInCurrency": "Total in {currency}",
