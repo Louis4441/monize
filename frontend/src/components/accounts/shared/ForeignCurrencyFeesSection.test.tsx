@@ -29,7 +29,8 @@ const chartProps: { current: any } = { current: null };
 vi.mock('./ForeignCurrencyFeeChart', () => ({
   ForeignCurrencyFeeChart: (props: any) => {
     chartProps.current = props;
-    return <div data-testid="fee-chart" />;
+    // Render leftControls (the currency filter) so filter interactions work.
+    return <div data-testid="fee-chart">{props.leftControls}</div>;
   },
 }));
 

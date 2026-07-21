@@ -190,6 +190,22 @@ describe('ForeignCurrencyFeeChart', () => {
     expect(screen.getByRole('button', { name: 'Month' })).toBeInTheDocument();
   });
 
+  it('renders leftControls opposite the resolution selector', () => {
+    render(
+      <ForeignCurrencyFeeChart
+        data={[{ month: '2025-01', total: 10, count: 1 }]}
+        isLoading={false}
+        currencyCode="CAD"
+        hideTitle
+        leftControls={<div data-testid="left-controls">filter</div>}
+      />,
+    );
+
+    expect(screen.getByTestId('left-controls')).toBeInTheDocument();
+    // The resolution selector is still present on the same header.
+    expect(screen.getByRole('button', { name: 'Month' })).toBeInTheDocument();
+  });
+
   it('renders a download button named after the chart and account', () => {
     render(
       <ForeignCurrencyFeeChart

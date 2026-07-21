@@ -208,24 +208,24 @@ export function ForeignCurrencyFeesSection({ account }: ForeignCurrencyFeesSecti
       </h2>
       <div className="space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6">
-          <div className="flex justify-end mb-4">
-            <div className="w-full sm:w-64">
-              <MultiSelect
-                label={t('currencyFilter.label')}
-                options={currencyOptions}
-                value={selectedCurrencies}
-                onChange={handleCurrencyFilterChange}
-                placeholder={t('currencyFilter.placeholder')}
-                disabled={currencyOptions.length === 0}
-              />
-            </div>
-          </div>
           <ForeignCurrencyFeeChart
             data={monthlyFees}
             isLoading={isSummaryLoading}
             currencyCode={account.currencyCode}
             accountName={account.name}
             hideTitle
+            leftControls={
+              <div className="w-52 max-w-full">
+                <MultiSelect
+                  ariaLabel={t('currencyFilter.label')}
+                  options={currencyOptions}
+                  value={selectedCurrencies}
+                  onChange={handleCurrencyFilterChange}
+                  placeholder={t('currencyFilter.placeholder')}
+                  disabled={currencyOptions.length === 0}
+                />
+              </div>
+            }
           />
         </div>
 

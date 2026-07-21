@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { sumMoney } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
@@ -76,6 +76,12 @@ interface ForeignCurrencyFeeChartProps {
    * uses the title.
    */
   hideTitle?: boolean;
+  /**
+   * Controls rendered on the left of the header row, opposite the resolution
+   * selector (e.g. the currency filter). Only shown alongside the chart, not
+   * in the loading or empty states.
+   */
+  leftControls?: ReactNode;
 }
 
 interface ChartDataPoint extends BucketedPoint {
@@ -124,6 +130,7 @@ export function ForeignCurrencyFeeChart({
   currencyCode,
   accountName,
   hideTitle = false,
+  leftControls,
 }: ForeignCurrencyFeeChartProps) {
   const t = useTranslations('accountDetail-fxFees');
   const chartTitle = t('chart.title');
@@ -196,6 +203,7 @@ export function ForeignCurrencyFeeChart({
   const isCrowded = chartData.length > DESKTOP_CROWDED_THRESHOLD;
   const verticalLabels = isMobile || isCrowded;
   const showBarLabels = chartData.length <= MAX_LABELED_BARS;
+  const hasLeftContent = !hideTitle || leftControls != null;
 
   const summary = useMemo(() => {
     if (chartData.length === 0) return null;
@@ -238,13 +246,18 @@ export function ForeignCurrencyFeeChart({
 
   return (
     <div className="min-h-[420px]">
-      <div className={`flex items-center mb-4 gap-2 ${hideTitle ? 'justify-end' : 'justify-between'}`}>
-        {!hideTitle && (
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {chartTitle}
-          </h3>
+      <div className={`flex flex-wrap items-center mb-4 gap-2 ${hasLeftContent ? 'justify-between' : 'justify-end'}`}>
+        {hasLeftContent && (
+          <div className="flex items-center gap-2 min-w-0">
+            {!hideTitle && (
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {chartTitle}
+              </h3>
+            )}
+            {leftControls}
+          </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <div
             className="flex gap-1"
             role="group"
