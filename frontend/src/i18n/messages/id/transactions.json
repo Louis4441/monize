@@ -104,6 +104,9 @@
       "refNumber": "Ref #",
       "tags": "Tag",
       "amount": "Jumlah",
+      "currency": "Mata uang",
+      "paidAmount": "Jumlah Dibayar",
+      "feePaid": "Biaya Dibayar",
       "balance": "Saldo",
       "status": "Status",
       "actions": "Aksi"

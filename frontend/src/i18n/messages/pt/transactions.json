@@ -104,6 +104,9 @@
       "refNumber": "Ref. #",
       "tags": "Etiquetas",
       "amount": "Montante",
+      "currency": "Moeda",
+      "paidAmount": "Montante Pago",
+      "feePaid": "Comissão Paga",
       "balance": "Saldo",
       "status": "Estado",
       "actions": "Ações"

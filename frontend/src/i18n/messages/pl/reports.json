@@ -65,6 +65,7 @@
       "spending-anomalies": "Anomalie wydatków",
       "weekend-weekday-spending": "Wydatki w weekend a w dni robocze",
       "monthly-comparison": "Porównanie miesięczne",
+      "foreign-currency-fees": "Opłaty za transakcje w obcej walucie",
       "uncategorized-transactions": "Transakcje bez kategorii",
       "duplicate-transactions": "Wyszukiwarka zduplikowanych transakcji",
       "upcoming-bills": "Kalendarz nadchodzących rachunków",
@@ -111,6 +112,7 @@
       "spending-anomalies": "Wykrywaj nietypowo duże transakcje i skoki wydatków wymagające uwagi.",
       "weekend-weekday-spending": "Analizuj swoje wzorce wydatków w zależności od dnia tygodnia, aby zrozumieć nawyki.",
       "monthly-comparison": "Porównaj dowolny miesiąc z poprzednim pod względem przychodów, wydatków, wartości netto i inwestycji.",
+      "foreign-currency-fees": "Śledź opłaty za transakcje zagraniczne pobierane na kontach, które stosują opłatę za przewalutowanie.",
       "uncategorized-transactions": "Znajdź i skategoryzuj transakcje, którym brakuje kategorii.",
       "duplicate-transactions": "Rozpoznawaj potencjalne zduplikowane wpisy, które mogą wymagać przeglądu lub usunięcia.",
       "upcoming-bills": "Wizualny kalendarz zaplanowanych transakcji i nadchodzących terminów płatności rachunków.",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "Nie udało się załadować danych raportu. Spróbuj ponownie.",
     "retry": "Spróbuj ponownie"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "Żadne konto nie ma skonfigurowanej opłaty za transakcje zagraniczne. Ustaw procent opłaty na koncie, aby śledzić tutaj jego opłaty za transakcje w obcej walucie."
   },
   "accountBalances": {
     "totalAssets": "Aktywa razem",

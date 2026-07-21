@@ -104,6 +104,9 @@
       "refNumber": "Nr ref.",
       "tags": "Tagi",
       "amount": "Kwota",
+      "currency": "Waluta",
+      "paidAmount": "Kwota zapłacona",
+      "feePaid": "Pobrana opłata",
       "balance": "Saldo",
       "status": "Status",
       "actions": "Akcje"

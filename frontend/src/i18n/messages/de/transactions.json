@@ -104,6 +104,9 @@
       "refNumber": "Ref.-Nr.",
       "tags": "Tags",
       "amount": "Betrag",
+      "currency": "Währung",
+      "paidAmount": "Gezahlter Betrag",
+      "feePaid": "Gezahlte Gebühr",
       "balance": "Saldo",
       "status": "Status",
       "actions": "Aktionen"

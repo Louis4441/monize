@@ -65,6 +65,7 @@
       "spending-anomalies": "Uitgavenafwijkingen",
       "weekend-weekday-spending": "Weekend- vs. weekdaguitgaven",
       "monthly-comparison": "Maandvergelijking",
+      "foreign-currency-fees": "Transactiekosten in vreemde valuta",
       "uncategorized-transactions": "Niet-gecategoriseerde transacties",
       "duplicate-transactions": "Zoeker dubbele transacties",
       "upcoming-bills": "Kalender aankomende rekeningen",
@@ -111,6 +112,7 @@
       "spending-anomalies": "Detecteer ongewoon grote transacties en uitgavenpieken die aandacht vereisen.",
       "weekend-weekday-spending": "Analyseer jouw uitgavenpatronen per dag van de week om gewoonten te begrijpen.",
       "monthly-comparison": "Vergelijk een willekeurige maand met de vorige maand op inkomsten, uitgaven, nettowaarde en beleggingen.",
+      "foreign-currency-fees": "Houd de transactiekosten voor vreemde valuta bij die in rekening worden gebracht op rekeningen die omrekeningskosten toepassen.",
       "uncategorized-transactions": "Zoek en categoriseer transacties zonder categorie.",
       "duplicate-transactions": "Identificeer mogelijke dubbele vermeldingen die mogelijk herziening of verwijdering vereisen.",
       "upcoming-bills": "Visuele kalender van geplande transacties en aankomende vervaldatums van rekeningen.",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "Rapportgegevens konden niet worden geladen. Probeer het opnieuw.",
     "retry": "Opnieuw proberen"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "Voor geen enkele rekening zijn transactiekosten voor vreemde valuta geconfigureerd. Stel een kostenpercentage in op een rekening om hier de transactiekosten voor vreemde valuta bij te houden."
   },
   "accountBalances": {
     "totalAssets": "Totale activa",

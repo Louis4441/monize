@@ -104,6 +104,9 @@
       "refNumber": "参考编号",
       "tags": "标签",
       "amount": "金额",
+      "currency": "币种",
+      "paidAmount": "支付金额",
+      "feePaid": "已付手续费",
       "balance": "余额",
       "status": "状态",
       "actions": "操作"

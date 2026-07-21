@@ -104,6 +104,9 @@
       "refNumber": "Réf. #",
       "tags": "Étiquettes",
       "amount": "Montant",
+      "currency": "Devise",
+      "paidAmount": "Montant payé",
+      "feePaid": "Frais payés",
       "balance": "Solde",
       "status": "Statut",
       "actions": "Actions"

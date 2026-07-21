@@ -65,6 +65,7 @@
       "spending-anomalies": "支出异常",
       "weekend-weekday-spending": "周末与工作日支出",
       "monthly-comparison": "月度对比",
+      "foreign-currency-fees": "境外交易手续费",
       "uncategorized-transactions": "未分类交易",
       "duplicate-transactions": "重复交易查找器",
       "upcoming-bills": "即将到期账单日历",
@@ -111,6 +112,7 @@
       "spending-anomalies": "检测需要关注的异常大额交易和支出峰值。",
       "weekend-weekday-spending": "按星期分析支出模式，了解消费习惯。",
       "monthly-comparison": "对比当月与上月在收入、支出、资产净值和投资方面的情况。",
+      "foreign-currency-fees": "追踪在收取换算手续费的各账户中产生的境外交易手续费。",
       "uncategorized-transactions": "查找并分类缺少分类的交易。",
       "duplicate-transactions": "识别可能需要审查或删除的潜在重复条目。",
       "upcoming-bills": "计划交易和即将到期账单的可视化日历。",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "加载报告数据失败。请重试。",
     "retry": "重试"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "没有账户配置了境外交易手续费。在账户上设置手续费百分比，即可在此追踪其外币手续费。"
   },
   "accountBalances": {
     "totalAssets": "总资产",

@@ -104,6 +104,9 @@
       "refNumber": "Ref. #",
       "tags": "Etiquetas",
       "amount": "Valor",
+      "currency": "Moeda",
+      "paidAmount": "Valor Pago",
+      "feePaid": "Taxa Paga",
       "balance": "Saldo",
       "status": "Status",
       "actions": "Ações"

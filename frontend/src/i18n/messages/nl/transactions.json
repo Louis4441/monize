@@ -104,6 +104,9 @@
       "refNumber": "Ref #",
       "tags": "Labels",
       "amount": "Bedrag",
+      "currency": "Valuta",
+      "paidAmount": "Betaald bedrag",
+      "feePaid": "Betaalde kosten",
       "balance": "Saldo",
       "status": "Status",
       "actions": "Acties"

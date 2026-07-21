@@ -104,6 +104,9 @@
       "refNumber": "Số tham chiếu",
       "tags": "Thẻ",
       "amount": "Số tiền",
+      "currency": "Tiền tệ",
+      "paidAmount": "Số tiền đã trả",
+      "feePaid": "Phí đã trả",
       "balance": "Số tiền còn lại",
       "status": "Trạng thái",
       "actions": "Hành động"

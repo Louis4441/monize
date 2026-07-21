@@ -104,6 +104,9 @@
       "refNumber": "Реф. №",
       "tags": "Теги",
       "amount": "Сумма",
+      "currency": "Валюта",
+      "paidAmount": "Оплаченная сумма",
+      "feePaid": "Уплаченная комиссия",
       "balance": "Остаток",
       "status": "Статус",
       "actions": "Действия"

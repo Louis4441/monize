@@ -65,6 +65,7 @@
       "spending-anomalies": "Anomalies de dépenses",
       "weekend-weekday-spending": "Dépenses week-end vs semaine",
       "monthly-comparison": "Comparaison mensuelle",
+      "foreign-currency-fees": "Frais de transaction à l'étranger",
       "uncategorized-transactions": "Transactions non catégorisées",
       "duplicate-transactions": "Détecteur de doublons",
       "upcoming-bills": "Calendrier des factures à venir",
@@ -111,6 +112,7 @@
       "spending-anomalies": "Détectez les transactions inhabituellement importantes et les pics de dépenses qui méritent attention.",
       "weekend-weekday-spending": "Analysez vos habitudes de dépenses selon le jour de la semaine pour mieux vous connaître.",
       "monthly-comparison": "Comparez n'importe quel mois au mois précédent en termes de revenus, dépenses, valeur nette et investissements.",
+      "foreign-currency-fees": "Suivez les frais de transaction à l'étranger facturés sur les comptes qui appliquent des frais de conversion.",
       "uncategorized-transactions": "Trouvez et catégorisez les transactions auxquelles il manque une catégorie.",
       "duplicate-transactions": "Identifiez les éventuels doublons qui pourraient nécessiter une vérification ou une suppression.",
       "upcoming-bills": "Calendrier visuel des transactions récurrentes et des échéances de factures à venir.",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "Impossible de charger les données du rapport. Veuillez réessayer.",
     "retry": "Réessayer"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "Aucun compte n'a de frais de transaction à l'étranger configurés. Définissez un pourcentage de frais sur un compte pour suivre ici ses frais de transaction à l'étranger."
   },
   "accountBalances": {
     "totalAssets": "Total des actifs",

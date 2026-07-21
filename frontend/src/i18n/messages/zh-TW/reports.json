@@ -65,6 +65,7 @@
       "spending-anomalies": "支出異常",
       "weekend-weekday-spending": "假日與平日支出比較",
       "monthly-comparison": "月度比較",
+      "foreign-currency-fees": "境外交易手續費",
       "uncategorized-transactions": "未分類交易",
       "duplicate-transactions": "重複交易查找",
       "upcoming-bills": "即將到期帳單日曆",
@@ -111,6 +112,7 @@
       "spending-anomalies": "偵測需要關注的異常大額交易及支出激增。",
       "weekend-weekday-spending": "依星期幾分析消費模式以了解消費習慣。",
       "monthly-comparison": "比較當月與上月的收入、支出、資產淨值及投資。",
+      "foreign-currency-fees": "追蹤在收取換算手續費的各科目中產生的境外交易手續費。",
       "uncategorized-transactions": "找出並分類缺少類別的交易。",
       "duplicate-transactions": "識別可能需要審閱或刪除的重複記錄。",
       "upcoming-bills": "排程交易及即將到期帳單的視覺化日曆。",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "載入報表資料失敗。請再試一次。",
     "retry": "再試一次"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "沒有科目設定境外交易手續費。在科目上設定手續費百分比，即可在此追蹤其外幣手續費。"
   },
   "accountBalances": {
     "totalAssets": "總資產",

@@ -65,6 +65,7 @@
       "spending-anomalies": "Anomalias de Despesas",
       "weekend-weekday-spending": "Despesas: Fim de Semana vs Dia de Semana",
       "monthly-comparison": "Comparação Mensal",
+      "foreign-currency-fees": "Comissões de transação em moeda estrangeira",
       "uncategorized-transactions": "Transações Não Categorizadas",
       "duplicate-transactions": "Localizador de Transações Duplicadas",
       "upcoming-bills": "Calendário de Faturas Futuras",
@@ -111,6 +112,7 @@
       "spending-anomalies": "Detete transações invulgarmente grandes e picos de despesas que requerem atenção.",
       "weekend-weekday-spending": "Analise os seus padrões de despesa por dia da semana para compreender os seus hábitos.",
       "monthly-comparison": "Compare qualquer mês com o mês anterior nas dimensões de receitas, despesas, valor líquido e investimentos.",
+      "foreign-currency-fees": "Acompanhe as comissões de transação estrangeira cobradas nas contas que aplicam uma comissão de conversão.",
       "uncategorized-transactions": "Encontre e categorize transações sem categoria.",
       "duplicate-transactions": "Identifique possíveis entradas duplicadas que possam necessitar de revisão ou eliminação.",
       "upcoming-bills": "Calendário visual de transações agendadas e datas de vencimento de faturas.",
@@ -134,6 +136,9 @@
   "error": {
     "defaultMessage": "Falha ao carregar dados do relatório. Tente novamente.",
     "retry": "Tentar novamente"
+  },
+  "foreignCurrencyFees": {
+    "noEligibleAccounts": "Nenhuma conta tem uma comissão de transação estrangeira configurada. Defina uma percentagem de comissão numa conta para acompanhar aqui as suas comissões em moeda estrangeira."
   },
   "accountBalances": {
     "totalAssets": "Total de Ativos",

@@ -104,6 +104,9 @@
       "refNumber": "संदर्भ #",
       "tags": "टैग",
       "amount": "राशि",
+      "currency": "मुद्रा",
+      "paidAmount": "भुगतान की गई राशि",
+      "feePaid": "भुगतान किया गया शुल्क",
       "balance": "शेष",
       "status": "स्थिति",
       "actions": "क्रियाएं"

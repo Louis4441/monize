@@ -104,6 +104,9 @@
       "refNumber": "Rif. #",
       "tags": "Etichette",
       "amount": "Importo",
+      "currency": "Valuta",
+      "paidAmount": "Importo pagato",
+      "feePaid": "Commissione pagata",
       "balance": "Saldo",
       "status": "Stato",
       "actions": "Azioni"

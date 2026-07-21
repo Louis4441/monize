@@ -104,6 +104,9 @@
       "refNumber": "Ref #",
       "tags": "Etiketler",
       "amount": "Miktar",
+      "currency": "Para birimi",
+      "paidAmount": "Ödenen Tutar",
+      "feePaid": "Ödenen Ücret",
       "balance": "Bakiye",
       "status": "Durum",
       "actions": "İşlemler"
