@@ -182,14 +182,30 @@ describe('SplitTransactionFields', () => {
       />,
     );
 
-    // The converted amount slot is a direct child of the amount grid, which
-    // stacks on mobile (grid-cols-1) and only pairs the two currency fields
-    // from md up (md:grid-cols-2).
-    const grid = screen.getByTestId('converted-slot').parentElement;
+    // The converted amount slot is wrapped with its conversion note; that
+    // wrapper sits in the amount grid, which stacks on mobile (grid-cols-1) and
+    // only pairs the two currency fields from md up (md:grid-cols-2).
+    const grid = screen.getByTestId('converted-slot').parentElement?.parentElement;
     expect(grid?.className).toContain('grid-cols-1');
     expect(grid?.className).toContain('md:grid-cols-2');
     expect(grid).toHaveTextContent('Total in USD');
     expect(grid).toHaveTextContent('Total in CAD');
+  });
+
+  it('renders the conversion note grouped directly below the converted amount field', () => {
+    render(
+      <SplitTransactionFields
+        {...defaultProps}
+        amountLabel="Total in USD"
+        convertedAmountSlot={<div data-testid="converted-slot">Total in CAD</div>}
+        fxCaptionSlot={<p data-testid="fx-caption">1 USD = 1.35 CAD</p>}
+      />,
+    );
+
+    // The note shares the converted amount field's wrapper, so it sits directly
+    // beneath it rather than below the whole amount row.
+    const wrapper = screen.getByTestId('converted-slot').parentElement;
+    expect(wrapper).toContainElement(screen.getByTestId('fx-caption'));
   });
 
   it('renders Reference Number input', () => {

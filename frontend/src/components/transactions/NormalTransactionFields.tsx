@@ -248,19 +248,20 @@ export function NormalTransactionFields({
           />
         );
         return convertedAmountSlot ? (
-          <div>
-            {/* On mobile each currency field and Reference Number sits on its
-                own line; on md+ all three share a single row. The currency
-                picker stays attached to the primary amount input. */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-stretch space-x-2">
-                {currencyPickerSlot}
-                <div className="flex-1 min-w-0">{amountInput}</div>
-              </div>
-              {convertedAmountSlot}
-              {referenceInput}
+          // On mobile each currency field and Reference Number sits on its own
+          // line; on md+ all three share a single row. The currency picker
+          // stays attached to the primary amount input, and the conversion note
+          // renders immediately below the converted amount field.
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-stretch space-x-2">
+              {currencyPickerSlot}
+              <div className="flex-1 min-w-0">{amountInput}</div>
             </div>
-            {fxCaptionSlot}
+            <div>
+              {convertedAmountSlot}
+              {fxCaptionSlot}
+            </div>
+            {referenceInput}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -210,6 +210,22 @@ describe('NormalTransactionFields', () => {
     expect(grid).toHaveTextContent('Reference Number');
   });
 
+  it('renders the conversion note grouped directly below the converted amount field', () => {
+    render(
+      <NormalTransactionFields
+        {...defaultProps}
+        amountLabel="Total in EUR"
+        convertedAmountSlot={<div data-testid="converted-slot">Total in CAD</div>}
+        fxCaptionSlot={<p data-testid="fx-caption">1 EUR = 1.45 CAD</p>}
+      />,
+    );
+
+    // The note shares the converted amount field's wrapper, so it sits directly
+    // beneath it rather than below the whole amount row.
+    const wrapper = screen.getByTestId('converted-slot').parentElement;
+    expect(wrapper).toContainElement(screen.getByTestId('fx-caption'));
+  });
+
   // --- New tests below ---
 
   it('filters out investment brokerage accounts from the Account dropdown', () => {

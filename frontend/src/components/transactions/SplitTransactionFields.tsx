@@ -188,18 +188,21 @@ export function SplitTransactionFields({
               </div>
             );
             // In foreign mode the total and converted amount each sit on their
-            // own line on mobile and share a row from md up; otherwise the
-            // total fills the column.
+            // own line on mobile and share a row from md up, with the
+            // conversion note immediately below the converted amount field;
+            // otherwise the total fills the column.
             return convertedAmountSlot ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {pickerAndTotal}
-                {convertedAmountSlot}
+                <div>
+                  {convertedAmountSlot}
+                  {fxCaptionSlot}
+                </div>
               </div>
             ) : (
               pickerAndTotal
             );
           })()}
-          {fxCaptionSlot}
         </div>
       </div>
 
