@@ -261,6 +261,7 @@
     "passwordBreached": "Esta senha foi encontrada em uma violação de dados. Escolha uma senha diferente."
   },
   "http": {
+    "forbidden": "Acesso negado",
     "tooManyRequests": "Requisições excessivas. Aguarde alguns minutos e tente novamente.",
     "duplicateRecord": "Já existe um registro com este valor",
     "referencedRecord": "O registro referenciado não existe ou não pode ser removido",

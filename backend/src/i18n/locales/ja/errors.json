@@ -261,6 +261,7 @@
     "passwordBreached": "このパスワードはデータ侵害で発見されています。別のパスワードを選択してください。"
   },
   "http": {
+    "forbidden": "アクセスが拒否されました",
     "tooManyRequests": "リクエストが多すぎます。数分待ってから再試行してください。",
     "duplicateRecord": "この値を持つレコードはすでに存在します",
     "referencedRecord": "参照レコードが存在しないか、削除できません",

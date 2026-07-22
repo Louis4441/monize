@@ -261,6 +261,7 @@
     "passwordBreached": "Questa password è stata trovata in una violazione dei dati. Scegli una password diversa."
   },
   "http": {
+    "forbidden": "Accesso negato",
     "tooManyRequests": "Troppe richieste. Attendi qualche minuto e riprova.",
     "duplicateRecord": "Esiste già un record con questo valore",
     "referencedRecord": "Il record di riferimento non esiste o non può essere rimosso",

@@ -261,6 +261,7 @@
     "passwordBreached": "Kata sandi ini ditemukan dalam kebocoran data. Pilih kata sandi yang berbeda."
   },
   "http": {
+    "forbidden": "Akses ditolak",
     "tooManyRequests": "Terlalu banyak permintaan. Tunggu beberapa menit dan coba lagi.",
     "duplicateRecord": "Catatan dengan nilai ini sudah ada",
     "referencedRecord": "Catatan yang direferensikan tidak ada atau tidak dapat dihapus",

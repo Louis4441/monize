@@ -261,6 +261,7 @@
     "passwordBreached": "Esta contraseña se encontró en una filtración de datos. Elige una contraseña diferente."
   },
   "http": {
+    "forbidden": "Acceso denegado",
     "tooManyRequests": "Demasiadas solicitudes. Espera unos minutos e inténtalo de nuevo.",
     "duplicateRecord": "Ya existe un registro con este valor",
     "referencedRecord": "El registro referenciado no existe o no se puede eliminar",

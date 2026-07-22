@@ -261,6 +261,7 @@
     "passwordBreached": "Bu şifre bir veri ihlalinde bulundu. Lütfen farklı bir şifre seçin."
   },
   "http": {
+    "forbidden": "Erişim reddedildi",
     "tooManyRequests": "Çok fazla istek. Lütfen birkaç dakika bekleyip tekrar deneyin.",
     "duplicateRecord": "Bu değere sahip bir kayıt zaten mevcut",
     "referencedRecord": "Başvurulan kayıt mevcut değil veya kaldırılamıyor",

@@ -261,6 +261,7 @@
     "passwordBreached": "此密码已在数据泄露中被发现。请选择其他密码。"
   },
   "http": {
+    "forbidden": "访问被拒绝",
     "tooManyRequests": "请求过多。请等待几分钟后再试。",
     "duplicateRecord": "具有此值的记录已存在",
     "referencedRecord": "引用的记录不存在或无法移除",
