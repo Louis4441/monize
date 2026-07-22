@@ -689,6 +689,178 @@ describe('effectiveAnnualRateOn', () => {
   });
 });
 
+describe('generateBudgetSchedule (fixed monthly budget)', () => {
+  const budgetInput = () => {
+    const installment = calculateMortgagePaymentAmount(200000, 4, 300, 'MONTHLY', false, false);
+    return baseInput({
+      startingBalance: 200000,
+      annualRate: 4,
+      paymentAmount: installment, // contractual installment -> ~300-month term
+      frequency: 'MONTHLY',
+      firstPaymentDate: new Date('2025-01-15'),
+    });
+  };
+
+  it('lower-installment: shrinking installment, growing overpayment, constant total', () => {
+    const budget = 4000;
+    const result = generateLoanSchedule({
+      ...budgetInput(),
+      overpayments: { targetMonthlyPayment: budget, targetMonthlyPaymentMode: 'LOWER_INSTALLMENT' },
+    });
+
+    expect(result.paidOff).toBe(true);
+    // Paying 4000/mo on a 200k loan clears it in well under the 300-month term.
+    expect(result.numPayments).toBeLessThan(70);
+
+    // Every non-final period spends exactly the budget = installment + overpayment.
+    for (const row of result.rows.slice(0, -1)) {
+      expect(row.payment + row.extraPrincipal).toBeCloseTo(budget, 1);
+      expect(row.extraPrincipal).toBeGreaterThan(0);
+    }
+
+    // The installment steps down and the overpayment grows to fill the budget.
+    const first = result.rows[0];
+    const later = result.rows[result.rows.length - 5];
+    expect(later.payment).toBeLessThan(first.payment);
+    expect(later.extraPrincipal).toBeGreaterThan(first.extraPrincipal);
+  });
+
+  it('shorten-term: fixed installment, constant overpayment, same payoff as lower-installment', () => {
+    const budget = 4000;
+    const base = budgetInput();
+    const shorten = generateLoanSchedule({
+      ...base,
+      overpayments: { targetMonthlyPayment: budget, targetMonthlyPaymentMode: 'SHORTEN_TERM' },
+    });
+    const lower = generateLoanSchedule({
+      ...base,
+      overpayments: { targetMonthlyPayment: budget, targetMonthlyPaymentMode: 'LOWER_INSTALLMENT' },
+    });
+
+    // Both modes pay the same total each period, so the schedule is identical.
+    expect(shorten.numPayments).toBe(lower.numPayments);
+    expect(shorten.totalInterest).toBeCloseTo(lower.totalInterest, 2);
+
+    // Shorten-term keeps the contractual installment fixed and the overpayment
+    // constant (only the split differs from lower-installment).
+    const nonFinal = shorten.rows.slice(0, -1);
+    for (const row of nonFinal) {
+      expect(row.payment).toBeCloseTo(base.paymentAmount, 1);
+      expect(row.payment + row.extraPrincipal).toBeCloseTo(budget, 1);
+    }
+    expect(nonFinal[0].extraPrincipal).toBeCloseTo(nonFinal[nonFinal.length - 1].extraPrincipal, 1);
+  });
+
+  it('reports the level installment as finalPaymentAmount, never the payoff residual', () => {
+    const budget = 4000;
+    const base = budgetInput();
+    const shorten = generateLoanSchedule({
+      ...base,
+      overpayments: { targetMonthlyPayment: budget, targetMonthlyPaymentMode: 'SHORTEN_TERM' },
+    });
+    // Shorten-term never re-amortizes: the comparison table must see the
+    // contractual installment, not the final row's small catch-up total.
+    expect(shorten.finalPaymentAmount).toBeCloseTo(base.paymentAmount, 2);
+
+    const lower = generateLoanSchedule({
+      ...base,
+      overpayments: { targetMonthlyPayment: budget, targetMonthlyPaymentMode: 'LOWER_INSTALLMENT' },
+    });
+    // Lower-installment reports the last re-amortized installment -- the same
+    // uncapped level the second-to-last row shows, not the payoff-capped split.
+    const secondToLast = lower.rows[lower.rows.length - 2];
+    expect(lower.finalPaymentAmount).toBeLessThanOrEqual(secondToLast.payment);
+    expect(lower.finalPaymentAmount).toBeGreaterThan(0);
+  });
+
+  it('defaults the mode to lower-installment when the plan omits it', () => {
+    const base = budgetInput();
+    const omitted = generateLoanSchedule({
+      ...base,
+      overpayments: { targetMonthlyPayment: 4000 },
+    });
+    const lower = generateLoanSchedule({
+      ...base,
+      overpayments: { targetMonthlyPayment: 4000, targetMonthlyPaymentMode: 'LOWER_INSTALLMENT' },
+    });
+    // The omitted-mode split matches lower-installment (the product default),
+    // not shorten-term's fixed contractual installment.
+    expect(omitted.rows[5].payment).toBeCloseTo(lower.rows[5].payment, 2);
+    expect(omitted.rows[5].payment).toBeLessThan(base.paymentAmount);
+  });
+
+  it('never lets the total exceed the budget and pays off on the last row', () => {
+    const budget = 3000;
+    const result = generateLoanSchedule({
+      ...budgetInput(),
+      overpayments: { targetMonthlyPayment: budget },
+    });
+    for (const row of result.rows) {
+      expect(row.payment + row.extraPrincipal).toBeLessThanOrEqual(budget + 0.01);
+    }
+    expect(result.rows[result.rows.length - 1].balance).toBe(0);
+  });
+
+  it('applies the budget only within its date window', () => {
+    const result = generateLoanSchedule({
+      ...budgetInput(),
+      overpayments: {
+        targetMonthlyPayment: 4000,
+        targetMonthlyPaymentMode: 'SHORTEN_TERM',
+        targetMonthlyPaymentStart: '2025-04-01',
+        targetMonthlyPaymentEnd: '2025-12-31',
+      },
+    });
+
+    // Before the window (Jan-Mar): only the installment, no overpayment.
+    const early = result.rows.filter((r) => r.date < '2025-04-01');
+    expect(early.length).toBeGreaterThan(0);
+    for (const r of early) expect(r.extraPrincipal).toBe(0);
+
+    // Within the window: the budget tops up (overpayment > 0).
+    const inWindow = result.rows.filter((r) => r.date >= '2025-04-01' && r.date <= '2025-12-31');
+    expect(inWindow.length).toBeGreaterThan(0);
+    for (const r of inWindow) expect(r.extraPrincipal).toBeGreaterThan(0);
+
+    // After the window: back to just the installment.
+    const after = result.rows.filter((r) => r.date > '2025-12-31');
+    expect(after.length).toBeGreaterThan(0);
+    for (const r of after) expect(r.extraPrincipal).toBe(0);
+  });
+
+  it('never counts unpaid interest as principal when the installment is below the interest', () => {
+    // Contractual installment (100) deliberately below the period interest, as a
+    // sharp rate rise on a fixed installment would cause; the budget still
+    // covers the interest.
+    const result = generateLoanSchedule({
+      startingBalance: 200000,
+      annualRate: 8,
+      paymentAmount: 100,
+      frequency: 'MONTHLY',
+      firstPaymentDate: new Date('2025-01-15'),
+      overpayments: { targetMonthlyPayment: 4000, targetMonthlyPaymentMode: 'SHORTEN_TERM' },
+    });
+
+    const first = result.rows[0];
+    const interest0 = (200000 * 8) / 100 / 12; // 1333.33
+    // Total paid is the budget, and the balance drops by exactly budget minus
+    // interest -- not by more (which the old split would have done).
+    expect(first.payment + first.extraPrincipal).toBeCloseTo(4000, 1);
+    expect(200000 - first.balance).toBeCloseTo(4000 - interest0, 1);
+    expect(first.interest).toBeCloseTo(interest0, 1);
+  });
+
+  it('does not amortize when the budget cannot cover the first period interest', () => {
+    const result = generateLoanSchedule({
+      ...budgetInput(),
+      // 200k at 4% -> ~667/mo interest; a 500 budget never amortizes.
+      overpayments: { targetMonthlyPayment: 500 },
+    });
+    expect(result.paidOff).toBe(false);
+    expect(result.numPayments).toBe(0);
+  });
+});
+
 describe('recurring extra frequency', () => {
   it('lands a sparse cadence as a real overpayment every Nth payment', () => {
     const base = baseInput({ startingBalance: 100000, paymentAmount: 600 });

@@ -442,7 +442,11 @@
       "frequencyMonthly": "Mensuel",
       "frequencyQuarterly": "Trimestriel",
       "frequencyAnnually": "Annuel",
-      "oneOffDateLabel": "Date"
+      "oneOffDateLabel": "Date",
+      "budgetLabel": "Paiement mensuel total",
+      "budgetHint": "Consacrez chaque mois un total fixe au prêt ; le remboursement anticipé est ce qui reste après la mensualité. Quand la mensualité baisse, le remboursement augmente pour garder le même total.",
+      "budgetBelowInstallment": "C'est inférieur à la mensualité actuelle ({amount}) ; augmentez-le pour rembourser par anticipation.",
+      "windowInverted": "La date de début est postérieure à la date de fin, ce plan ne s'applique donc jamais."
     },
     "comparison": {
       "newPayoff": "Nouvelle date de remboursement",
@@ -495,7 +499,8 @@
       "loadFailed": "Impossible de charger les scénarios enregistrés. Ils sont toujours stockés — rechargez la page pour réessayer.",
       "colOverpayment": "Remboursement",
       "overpaymentWithFrequency": "{amount} ({frequency})",
-      "loadAria": "Charger le scénario « {name} »"
+      "loadAria": "Charger le scénario « {name} »",
+      "budgetSummary": "Budget {amount}/mois"
     },
     "scenarioChart": {
       "title": "Comparaison des scénarios",

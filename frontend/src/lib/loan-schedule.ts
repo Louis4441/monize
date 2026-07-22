@@ -108,6 +108,28 @@ export interface RecurringExtra {
 export interface OverpaymentPlan {
   recurringExtra?: RecurringExtra;
   lumpSums?: LumpSum[];
+  /**
+   * A fixed total to spend on the loan each period (installment + overpayment).
+   * Modelled in the lower-installment style: every period the installment is
+   * recomputed over the remaining contractual term, and the rest of the budget
+   * is overpaid -- so as the installment falls the overpayment grows to keep the
+   * total constant. When set, recurringExtra and lumpSums are ignored.
+   */
+  targetMonthlyPayment?: number;
+  /**
+   * How the budget's installment/overpayment split is shown. LOWER_INSTALLMENT
+   * (default, matching how banks apply overpayments) re-amortizes the
+   * installment each period (it shrinks, the overpayment grows); SHORTEN_TERM
+   * keeps the contractual installment fixed and the overpayment constant. The
+   * balance and payoff are identical either way -- only the split differs.
+   */
+  targetMonthlyPaymentMode?: OverpaymentMode;
+  /** ISO date (yyyy-MM-dd); the budget applies from the first payment when
+   *  omitted. Before it, only the regular installment is paid. */
+  targetMonthlyPaymentStart?: string;
+  /** ISO date (yyyy-MM-dd); the budget applies until payoff when omitted. After
+   *  it, the loan reverts to the regular installment. */
+  targetMonthlyPaymentEnd?: string;
 }
 
 /**
@@ -398,12 +420,185 @@ function solvePayment(principal: number, periodicRate: number, totalPayments: nu
 }
 
 /**
+ * Fixed-total-payment ("monthly budget") schedule. Every period the whole
+ * `budget` goes to the loan: the installment is recomputed over the remaining
+ * contractual term (the lower-installment behaviour), and the rest of the budget
+ * is overpaid. As the balance falls the installment shrinks, so the overpayment
+ * grows and the total stays constant -- exactly the borrower's "I spend X per
+ * month on the loan" plan. The row's `payment` is the recomputed installment and
+ * `extraPrincipal` is that period's overpayment, so installment + overpayment =
+ * budget. Rate steps are honoured; the loan pays off when the balance clears.
+ */
+export function generateBudgetSchedule(
+  input: LoanScheduleInput,
+  budget: number,
+  mode: OverpaymentMode = 'LOWER_INSTALLMENT',
+  window: { startDate?: string; endDate?: string } = {},
+): LoanScheduleResult {
+  const {
+    startingBalance,
+    annualRate,
+    paymentAmount,
+    frequency,
+    isCanadian = false,
+    isVariableRate = false,
+    firstPaymentDate,
+    maxPayments,
+    initialCumulativePrincipal = 0,
+    initialCumulativeInterest = 0,
+  } = input;
+
+  const periodsPerYear = getPeriodsPerYear(frequency);
+  const cap = Math.min(maxPayments ?? DEFAULT_MAX_PAYMENTS, HARD_MAX_PAYMENTS);
+
+  // LOWER_INSTALLMENT re-amortizes the installment over the remaining
+  // contractual term (it steps down as the balance falls); SHORTEN_TERM keeps
+  // the contractual installment fixed and the overpayment constant. Either way
+  // the total paid is the budget, so the balance/payoff are identical.
+  const lowerInstallment = mode === 'LOWER_INSTALLMENT';
+  const contractualPeriods = lowerInstallment
+    ? Math.max(1, generateLoanSchedule({ ...input, overpayments: undefined }).numPayments)
+    : 0;
+
+  const rateChanges = [...(input.rateChanges ?? [])].sort((a, b) =>
+    a.effectiveDate.localeCompare(b.effectiveDate),
+  );
+
+  let balance = startingBalance;
+  let cumulativePrincipal = initialCumulativePrincipal;
+  let cumulativeInterest = initialCumulativeInterest;
+  let totalPaid = 0;
+  let totalExtraPrincipal = 0;
+  let coveredInterest = true;
+  let currentAnnualRate = annualRate;
+  let currentPeriodicRate = getPeriodicRate(
+    currentAnnualRate,
+    periodsPerYear,
+    isCanadian,
+    isVariableRate,
+  );
+  let rateChangeIndex = 0;
+  let lastInstallment = 0;
+
+  const rows: ScheduleRow[] = [];
+  let currentDate = new Date(firstPaymentDate);
+  let paymentNumber = 0;
+
+  while (balance > PAYOFF_EPSILON && paymentNumber < cap) {
+    const rowDate = format(currentDate, 'yyyy-MM-dd');
+    while (
+      rateChangeIndex < rateChanges.length &&
+      rateChanges[rateChangeIndex].effectiveDate <= rowDate
+    ) {
+      currentAnnualRate = rateChanges[rateChangeIndex].annualRate;
+      currentPeriodicRate = getPeriodicRate(
+        currentAnnualRate,
+        periodsPerYear,
+        isCanadian,
+        isVariableRate,
+      );
+      rateChangeIndex++;
+    }
+
+    const interest = balance * currentPeriodicRate;
+
+    // The installment for the split: re-amortized over the remaining
+    // contractual term (LOWER_INSTALLMENT) or the fixed contractual installment
+    // (SHORTEN_TERM). The overpayment is whatever is left of the budget.
+    const installment = lowerInstallment
+      ? calculatePaymentForTerm(
+          balance,
+          currentAnnualRate,
+          Math.max(1, contractualPeriods - paymentNumber),
+          frequency,
+          isCanadian,
+          isVariableRate,
+        )
+      : paymentAmount;
+
+    // The budget only tops up within its window; outside it (before the start
+    // or after the end) the loan pays just the regular installment.
+    const budgetActive =
+      (!window.startDate || window.startDate <= rowDate) &&
+      (!window.endDate || rowDate <= window.endDate);
+    // Total cash this period: the budget while active, else the installment --
+    // capped at the payoff amount on the final period.
+    const totalDue = balance + interest;
+    const payment = Math.min(budgetActive ? budget : installment, totalDue);
+    // A payment that can't cover the interest never amortizes.
+    if (payment <= interest) {
+      coveredInterest = false;
+      break;
+    }
+    // The installment can't exceed the total actually paid this period. When
+    // the installment is below the period's interest (e.g. a sharp rate rise on
+    // a fixed installment), it covers no principal -- interest is settled first
+    // from the total, and only what's left over is principal overpayment, so
+    // unpaid interest is never miscounted as principal.
+    const regularInstallment = Math.min(installment, payment);
+    const regularPrincipal = Math.max(0, regularInstallment - interest);
+    const overpayment = Math.max(0, payment - interest - regularPrincipal);
+
+    balance = Math.max(0, balance - (regularPrincipal + overpayment));
+    cumulativePrincipal += regularPrincipal + overpayment;
+    cumulativeInterest += interest;
+    totalPaid += payment;
+    totalExtraPrincipal += overpayment;
+    // Track the level installment (contractual for SHORTEN_TERM, re-amortized
+    // for LOWER_INSTALLMENT) rather than the payoff-capped split, so
+    // finalPaymentAmount matches the normal loop's semantics and the
+    // comparison table never reports the residual catch-up as "the payment".
+    lastInstallment = installment;
+    paymentNumber++;
+
+    rows.push({
+      paymentNumber,
+      date: rowDate,
+      payment: round2(regularPrincipal + interest),
+      principal: round2(regularPrincipal),
+      interest: round2(interest),
+      extraPrincipal: round2(overpayment),
+      balance: round2(balance),
+      annualRate: round4(currentAnnualRate),
+      cumulativePrincipal: round2(cumulativePrincipal),
+      cumulativeInterest: round2(cumulativeInterest),
+    });
+
+    currentDate = advanceDate(currentDate, frequency);
+  }
+
+  const paidOff = coveredInterest && balance <= PAYOFF_EPSILON;
+  return {
+    rows,
+    payoffDate: paidOff && rows.length > 0 ? rows[rows.length - 1].date : null,
+    totalInterest: round2(cumulativeInterest - initialCumulativeInterest),
+    totalPaid: round2(totalPaid),
+    totalExtraPrincipal: round2(totalExtraPrincipal),
+    numPayments: rows.length,
+    paidOff,
+    finalPaymentAmount: round2(lastInstallment),
+  };
+}
+
+/**
  * Generate a period-by-period schedule. With no overpayments this reproduces
  * the reports' projection loop exactly; with a plan, extra principal is
  * applied after the regular payment each period (capped at the remaining
  * balance), shortening the schedule.
  */
 export function generateLoanSchedule(input: LoanScheduleInput): LoanScheduleResult {
+  const budget = input.overpayments?.targetMonthlyPayment;
+  if (budget && budget > 0) {
+    return generateBudgetSchedule(
+      input,
+      budget,
+      input.overpayments?.targetMonthlyPaymentMode ?? 'LOWER_INSTALLMENT',
+      {
+        startDate: input.overpayments?.targetMonthlyPaymentStart,
+        endDate: input.overpayments?.targetMonthlyPaymentEnd,
+      },
+    );
+  }
   const {
     startingBalance,
     annualRate,

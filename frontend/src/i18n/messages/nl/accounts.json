@@ -442,7 +442,11 @@
       "frequencyMonthly": "Maandelijks",
       "frequencyQuarterly": "Per kwartaal",
       "frequencyAnnually": "Jaarlijks",
-      "oneOffDateLabel": "Datum"
+      "oneOffDateLabel": "Datum",
+      "budgetLabel": "Totale maandelijkse betaling",
+      "budgetHint": "Besteed elke maand een vast totaal aan de lening; de extra aflossing is wat er na de termijn overblijft. Daalt de termijn, dan groeit de extra aflossing zodat het totaal gelijk blijft.",
+      "budgetBelowInstallment": "Dat is lager dan de huidige termijn ({amount}); verhoog het om extra af te lossen.",
+      "windowInverted": "De startdatum ligt na de einddatum, dus dit plan wordt nooit toegepast."
     },
     "comparison": {
       "newPayoff": "Nieuwe aflossingsdatum",
@@ -495,7 +499,8 @@
       "loadFailed": "De opgeslagen scenario's konden niet worden geladen. Ze zijn nog opgeslagen — herlaad de pagina om het opnieuw te proberen.",
       "colOverpayment": "Extra aflossing",
       "overpaymentWithFrequency": "{amount} ({frequency})",
-      "loadAria": "Scenario \"{name}\" laden"
+      "loadAria": "Scenario \"{name}\" laden",
+      "budgetSummary": "Budget {amount}/maand"
     },
     "scenarioChart": {
       "title": "Scenariovergelijking",

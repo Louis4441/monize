@@ -28,8 +28,9 @@ const DEFAULT_MODE: OverpaymentMode = 'SHORTEN_TERM';
 const DEFAULT_FREQUENCY: OverpaymentFrequency = 'MONTHLY';
 
 /** How the overpayment is specified. AMOUNT is entered directly; INTEREST and
- *  PAYOFF are goal-seek targets that solve the required amount. */
-type SimulationType = 'AMOUNT' | 'INTEREST' | 'PAYOFF';
+ *  PAYOFF are goal-seek targets that solve the required amount; BUDGET is a fixed
+ *  total monthly spend (installment + overpayment). */
+type SimulationType = 'AMOUNT' | 'INTEREST' | 'PAYOFF' | 'BUDGET';
 
 const FREQUENCIES: OverpaymentFrequency[] = [
   'ONE_OFF',
@@ -49,6 +50,8 @@ interface SimulatorFormState {
   goalInterest: number | undefined;
   /** PAYOFF goal target (yyyy-MM-dd). */
   goalDate: string;
+  /** BUDGET: total spent on the loan each period (installment + overpayment). */
+  budget: number | undefined;
   /** The date of a one-off overpayment (required when frequency is ONE_OFF). */
   oneOffDate: string;
   /** Recurring window (ignored for one-off). */
@@ -63,6 +66,7 @@ const EMPTY_FORM: SimulatorFormState = {
   amount: undefined,
   goalInterest: undefined,
   goalDate: '',
+  budget: undefined,
   oneOffDate: '',
   startDate: '',
   endDate: '',
@@ -101,6 +105,16 @@ function planToForm(plan: OverpaymentPlan | null): SimulatorFormState {
   }
   // A saved one-off is stored as a single lump sum (legacy multi-entry plans
   // collapse to their first entry).
+  if (plan.targetMonthlyPayment && plan.targetMonthlyPayment > 0) {
+    return {
+      ...EMPTY_FORM,
+      simType: 'BUDGET',
+      budget: plan.targetMonthlyPayment,
+      mode: plan.targetMonthlyPaymentMode ?? 'LOWER_INSTALLMENT',
+      startDate: plan.targetMonthlyPaymentStart ?? '',
+      endDate: plan.targetMonthlyPaymentEnd ?? '',
+    };
+  }
   const first = plan.lumpSums?.[0];
   if (first) {
     return {
@@ -142,7 +156,9 @@ export function OverpaymentSimulator({
   const [goalStatus, setGoalStatus] = useState<SolveStatus | null>(null);
 
   const isOneOff = form.frequency === 'ONE_OFF';
-  const canGoalSeek = !!projectionInput;
+  const isBudget = form.simType === 'BUDGET';
+  // Goal-seeking and the budget simulation both need a projection to work from.
+  const hasProjection = !!projectionInput;
 
   // Apply an externally loaded plan when its version changes (info-from-
   // previous-render pattern; no setState in effect)
@@ -181,7 +197,17 @@ export function OverpaymentSimulator({
     let status: SolveStatus | null = null;
     let plan: OverpaymentPlan | null = null;
 
-    if (next.frequency === 'ONE_OFF') {
+    if (next.simType === 'BUDGET') {
+      plan =
+        next.budget !== undefined && next.budget > 0
+          ? {
+              targetMonthlyPayment: next.budget,
+              targetMonthlyPaymentMode: next.mode,
+              ...(next.startDate ? { targetMonthlyPaymentStart: next.startDate } : {}),
+              ...(next.endDate ? { targetMonthlyPaymentEnd: next.endDate } : {}),
+            }
+          : null;
+    } else if (next.frequency === 'ONE_OFF') {
       plan =
         next.amount !== undefined && next.amount > 0 && next.oneOffDate
           ? { lumpSums: [{ date: next.oneOffDate, amount: next.amount, mode: next.mode }] }
@@ -232,7 +258,20 @@ export function OverpaymentSimulator({
   };
 
   const handleSimTypeChange = (simType: SimulationType) =>
-    apply({ ...form, simType, mode: simType === 'PAYOFF' ? 'SHORTEN_TERM' : form.mode });
+    apply({
+      ...form,
+      simType,
+      // A payoff goal only makes sense as shorten-term; a budget defaults to
+      // lower-installment (the installment shrinks as the balance falls, which
+      // is how banks apply overpayments -- and what makes the total-budget view
+      // interesting). Both stay switchable.
+      mode:
+        simType === 'PAYOFF'
+          ? 'SHORTEN_TERM'
+          : simType === 'BUDGET'
+            ? 'LOWER_INSTALLMENT'
+            : form.mode,
+    });
 
   const handleFrequencyChange = (frequency: OverpaymentFrequency) =>
     // One-off cannot be goal-sought (there is no recurring amount to solve),
@@ -240,6 +279,7 @@ export function OverpaymentSimulator({
     apply({ ...form, frequency, simType: frequency === 'ONE_OFF' ? 'AMOUNT' : form.simType });
 
   const handleAmountChange = (amount: number | undefined) => apply({ ...form, amount });
+  const handleBudgetChange = (budget: number | undefined) => apply({ ...form, budget });
   const handleInterestChange = (goalInterest: number | undefined) =>
     apply({ ...form, goalInterest });
   const handleDateChange = (goalDate: string) => apply({ ...form, goalDate });
@@ -257,9 +297,23 @@ export function OverpaymentSimulator({
     form.amount !== undefined ||
     form.goalInterest !== undefined ||
     form.goalDate !== '' ||
+    form.budget !== undefined ||
     form.oneOffDate !== '' ||
     form.startDate !== '' ||
     form.endDate !== '';
+
+  // A budget below the current installment leaves nothing to overpay; warn.
+  const budgetBelowInstallment =
+    isBudget &&
+    form.budget !== undefined &&
+    form.budget > 0 &&
+    projectionInput != null &&
+    form.budget < projectionInput.paymentAmount;
+
+  // An inverted window (start after end) is never true, so the plan would
+  // silently do nothing; warn instead of leaving the chart unchanged.
+  const windowInverted =
+    form.startDate !== '' && form.endDate !== '' && form.startDate > form.endDate;
 
   const showDetectedHint =
     detectedExtra !== null &&
@@ -272,7 +326,15 @@ export function OverpaymentSimulator({
   // The morphing value field: a money input for a direct amount or an interest
   // target, a date input for a payoff-month target.
   const valueField =
-    form.simType === 'PAYOFF' ? (
+    form.simType === 'BUDGET' ? (
+      <CurrencyInput
+        prefix={currencySymbol}
+        allowNegative={false}
+        label={t('loanDetail.simulator.budgetLabel')}
+        value={form.budget}
+        onChange={handleBudgetChange}
+      />
+    ) : form.simType === 'PAYOFF' ? (
       <DateInput
         label={t('loanDetail.simulator.goalSeek.targetDateLabel')}
         value={form.goalDate}
@@ -341,21 +403,26 @@ export function OverpaymentSimulator({
             label={t('loanDetail.simulator.simulationTypeLabel')}
             value={form.simType}
             onChange={handleSimTypeChange}
-            goalSeekAvailable={canGoalSeek && !isOneOff}
+            goalSeekAvailable={hasProjection && !isOneOff}
+            budgetAvailable={hasProjection}
           />
         </div>
 
         <div className={fieldClass}>{valueField}</div>
 
-        <div className={fieldClass}>
-          <FrequencySelect
-            label={t('loanDetail.simulator.frequencyLabel')}
-            value={form.frequency}
-            onChange={handleFrequencyChange}
-          />
-        </div>
+        {/* A budget hides the cadence and one-off date (it is a single monthly
+            total), but keeps the optional window and the mode. */}
+        {!isBudget && (
+          <div className={fieldClass}>
+            <FrequencySelect
+              label={t('loanDetail.simulator.frequencyLabel')}
+              value={form.frequency}
+              onChange={handleFrequencyChange}
+            />
+          </div>
+        )}
 
-        {isOneOff ? (
+        {!isBudget && isOneOff && (
           <div className={fieldClass}>
             <DateInput
               label={t('loanDetail.simulator.oneOffDateLabel')}
@@ -363,7 +430,9 @@ export function OverpaymentSimulator({
               onDateChange={handleOneOffDateChange}
             />
           </div>
-        ) : (
+        )}
+
+        {(isBudget || !isOneOff) && (
           <>
             <div className={fieldClass}>
               <DateInput
@@ -392,6 +461,24 @@ export function OverpaymentSimulator({
         </div>
       </div>
 
+      {isBudget && (
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          {t('loanDetail.simulator.budgetHint')}
+        </p>
+      )}
+      {budgetBelowInstallment && projectionInput && (
+        <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">
+          {t('loanDetail.simulator.budgetBelowInstallment', {
+            amount: formatCurrency(projectionInput.paymentAmount, currencyCode),
+          })}
+        </p>
+      )}
+      {windowInverted && (
+        <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">
+          {t('loanDetail.simulator.windowInverted')}
+        </p>
+      )}
+
       {goalStatus === 'unreachable' && (
         <p className="mt-2 text-sm text-amber-700 dark:text-amber-400">
           {t(
@@ -418,6 +505,7 @@ function SimulationTypeSelect({
   value,
   onChange,
   goalSeekAvailable,
+  budgetAvailable,
 }: {
   label: string;
   value: SimulationType;
@@ -425,6 +513,8 @@ function SimulationTypeSelect({
   /** Whether the interest/payoff goal options can be chosen (needs a projection
    *  and a recurring cadence). */
   goalSeekAvailable: boolean;
+  /** Whether the fixed-budget option can be chosen (needs a projection). */
+  budgetAvailable: boolean;
 }) {
   const t = useTranslations('accounts');
   return (
@@ -444,6 +534,9 @@ function SimulationTypeSelect({
         </option>
         <option value="PAYOFF" disabled={!goalSeekAvailable}>
           {t('loanDetail.simulator.goalSeek.targetDateLabel')}
+        </option>
+        <option value="BUDGET" disabled={!budgetAvailable}>
+          {t('loanDetail.simulator.budgetLabel')}
         </option>
       </select>
     </div>

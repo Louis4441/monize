@@ -442,7 +442,11 @@
       "frequencyMonthly": "Aylık",
       "frequencyQuarterly": "Üç aylık",
       "frequencyAnnually": "Yıllık",
-      "oneOffDateLabel": "Tarih"
+      "oneOffDateLabel": "Tarih",
+      "budgetLabel": "Toplam aylık ödeme",
+      "budgetHint": "Her ay krediye sabit bir toplam ayırın; fazladan ödeme, taksitten sonra kalan tutardır. Taksit düştükçe toplam aynı kalsın diye fazladan ödeme artar.",
+      "budgetBelowInstallment": "Bu, mevcut taksitin ({amount}) altında; fazladan ödeme için artırın.",
+      "windowInverted": "Başlangıç tarihi bitiş tarihinden sonra olduğundan bu plan hiçbir zaman uygulanmaz."
     },
     "comparison": {
       "newPayoff": "Yeni Kapanış Tarihi",
@@ -495,7 +499,8 @@
       "loadFailed": "Kayıtlı senaryolar yüklenemedi. Hâlâ kayıtlılar — tekrar denemek için sayfayı yenileyin.",
       "colOverpayment": "Ek ödeme",
       "overpaymentWithFrequency": "{amount} ({frequency})",
-      "loadAria": "\"{name}\" senaryosunu yükle"
+      "loadAria": "\"{name}\" senaryosunu yükle",
+      "budgetSummary": "Bütçe {amount}/ay"
     },
     "scenarioChart": {
       "title": "Senaryo karşılaştırması",

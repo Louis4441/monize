@@ -264,4 +264,64 @@ describe('OverpaymentSimulator', () => {
     expect(screen.getByLabelText('Overpayment amount')).toHaveValue('5,000.00');
     expect(screen.getByLabelText('Date')).toHaveValue('2026-06-01');
   });
+
+  it('emits a fixed monthly budget plan and hides the cadence/window', async () => {
+    const { onPlanChange } = await renderSimulator({ projectionInput });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Simulation type'), { target: { value: 'BUDGET' } });
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Total monthly payment'), { target: { value: '4000' } });
+    });
+
+    expect(onPlanChange).toHaveBeenLastCalledWith({
+      targetMonthlyPayment: 4000,
+      // A budget defaults to lower-installment (the installment shrinks).
+      targetMonthlyPaymentMode: 'LOWER_INSTALLMENT',
+    });
+    // A budget hides the cadence and the window (but keeps the mode).
+    expect(screen.queryByLabelText('Frequency')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('After an overpayment')).toBeInTheDocument();
+  });
+
+  it('carries the budget mode (shorten vs lower installment)', async () => {
+    const { onPlanChange } = await renderSimulator({ projectionInput });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Simulation type'), { target: { value: 'BUDGET' } });
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Total monthly payment'), { target: { value: '4000' } });
+      fireEvent.change(screen.getByLabelText('After an overpayment'), {
+        target: { value: 'SHORTEN_TERM' },
+      });
+    });
+
+    expect(onPlanChange).toHaveBeenLastCalledWith({
+      targetMonthlyPayment: 4000,
+      targetMonthlyPaymentMode: 'SHORTEN_TERM',
+    });
+  });
+
+  it('warns when the window is inverted (start after end)', async () => {
+    await renderSimulator({ projectionInput });
+
+    const warning = 'The starting date is after the until date, so this plan never applies.';
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Simulation type'), { target: { value: 'BUDGET' } });
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Total monthly payment'), { target: { value: '4000' } });
+      fireEvent.change(screen.getByLabelText('Starting (optional)'), { target: { value: '2027-08-01' } });
+      fireEvent.change(screen.getByLabelText('Until (optional)'), { target: { value: '2026-08-01' } });
+    });
+    expect(screen.getByText(warning)).toBeInTheDocument();
+
+    // Fixing the order clears the warning.
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Until (optional)'), { target: { value: '2027-12-01' } });
+    });
+    expect(screen.queryByText(warning)).not.toBeInTheDocument();
+  });
 });
