@@ -261,6 +261,7 @@
     "passwordBreached": "Esta palavra-passe foi encontrada numa fuga de dados. Escolha uma palavra-passe diferente."
   },
   "http": {
+    "forbidden": "Acesso negado",
     "tooManyRequests": "Demasiados pedidos. Aguarde alguns minutos e tente novamente.",
     "duplicateRecord": "Já existe um registo com este valor",
     "referencedRecord": "O registo referenciado não existe ou não pode ser removido",

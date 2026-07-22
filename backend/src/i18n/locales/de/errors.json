@@ -261,6 +261,7 @@
     "passwordBreached": "Dieses Passwort wurde in einem Datenleck gefunden. Bitte wählen Sie ein anderes Passwort."
   },
   "http": {
+    "forbidden": "Zugriff verweigert",
     "tooManyRequests": "Zu viele Anfragen. Bitte warten Sie einige Minuten und versuchen Sie es erneut.",
     "duplicateRecord": "Ein Eintrag mit diesem Wert existiert bereits",
     "referencedRecord": "Referenzierter Eintrag existiert nicht oder kann nicht entfernt werden",

@@ -261,6 +261,7 @@
     "passwordBreached": "Mật khẩu này đã bị phát hiện trong một vụ rò rỉ dữ liệu. Vui lòng chọn mật khẩu khác."
   },
   "http": {
+    "forbidden": "Truy cập bị từ chối",
     "tooManyRequests": "Quá nhiều yêu cầu. Vui lòng đợi vài phút và thử lại.",
     "duplicateRecord": "Bản ghi với giá trị này đã tồn tại",
     "referencedRecord": "Bản ghi được tham chiếu không tồn tại hoặc không thể xóa",

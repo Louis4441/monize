@@ -71,9 +71,16 @@ export class RequestContextInterceptor implements NestInterceptor {
     }
 
     const request = context.switchToHttp().getRequest<Request>();
-    const userId: string | undefined = (
-      request as unknown as { user?: { id?: string } }
-    ).user?.id;
+    const user = (
+      request as unknown as {
+        user?: { id?: string; realUserId?: string };
+      }
+    ).user;
+    const userId: string | undefined = user?.id;
+    // Authenticated identity (the delegate's own id while acting); defaults to
+    // the effective user outside delegation. Seeded so tenantTx can emit
+    // app.real_user_id for delegate-keyed rows. jwt.strategy resolves it.
+    const realUserId: string | undefined = user?.realUserId ?? userId;
 
     if (userId) {
       this.touchLastActivity(userId);
@@ -89,7 +96,7 @@ export class RequestContextInterceptor implements NestInterceptor {
       switchMap(
         (timezone) =>
           new Observable<unknown>((subscriber) => {
-            requestContextStorage.run({ userId, timezone }, () => {
+            requestContextStorage.run({ userId, realUserId, timezone }, () => {
               next.handle().subscribe({
                 next: (value) => subscriber.next(value),
                 error: (err) => subscriber.error(err),

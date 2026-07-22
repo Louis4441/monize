@@ -11,7 +11,7 @@ describe("RequestContextInterceptor", () => {
   function makeContext(opts: {
     type?: "http" | "rpc";
     headers?: Record<string, string | string[] | undefined>;
-    user?: { id?: string };
+    user?: { id?: string; realUserId?: string };
   }) {
     const request = {
       headers: opts.headers ?? {},
@@ -70,9 +70,40 @@ describe("RequestContextInterceptor", () => {
     const obs$ = (await interceptor.intercept(ctx, next as any)) as any;
     await firstValueFrom(obs$);
 
-    expect(captured).toEqual({ userId: "user-1", timezone: "America/Toronto" });
+    expect(captured).toEqual({
+      userId: "user-1",
+      realUserId: "user-1",
+      timezone: "America/Toronto",
+    });
     expect(preferencesRepository.findOne).toHaveBeenCalledWith({
       where: { userId: "user-1" },
+    });
+  });
+
+  it("seeds realUserId from the delegate's own id while acting as an owner", async () => {
+    preferencesRepository.findOne.mockResolvedValue({
+      timezone: "America/Toronto",
+    });
+    const next = makeNext();
+    // Delegation: jwt.strategy has rewritten `id` to the owner and kept the
+    // delegate's own id in `realUserId`.
+    const ctx = makeContext({
+      user: { id: "owner-1", realUserId: "delegate-9" },
+    });
+
+    let captured: RequestContext | undefined;
+    next.handle.mockImplementation(() => {
+      captured = getRequestContext();
+      return of("ok");
+    });
+
+    const obs$ = (await interceptor.intercept(ctx, next as any)) as any;
+    await firstValueFrom(obs$);
+
+    expect(captured).toEqual({
+      userId: "owner-1",
+      realUserId: "delegate-9",
+      timezone: "America/Toronto",
     });
   });
 

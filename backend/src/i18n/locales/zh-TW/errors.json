@@ -261,6 +261,7 @@
     "passwordBreached": "此密碼已出現在資料外洩事件中。請選擇其他密碼。"
   },
   "http": {
+    "forbidden": "存取遭拒",
     "tooManyRequests": "請求過於頻繁。請稍等幾分鐘後再試。",
     "duplicateRecord": "已有相同值的記錄存在",
     "referencedRecord": "參照的記錄不存在或無法移除",

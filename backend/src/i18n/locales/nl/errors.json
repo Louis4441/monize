@@ -261,6 +261,7 @@
     "passwordBreached": "Dit wachtwoord is aangetroffen in een datalek. Kies een ander wachtwoord."
   },
   "http": {
+    "forbidden": "Toegang geweigerd",
     "tooManyRequests": "Te veel verzoeken. Wacht een paar minuten en probeer het opnieuw.",
     "duplicateRecord": "Er bestaat al een record met deze waarde",
     "referencedRecord": "Record waarnaar wordt verwezen bestaat niet of kan niet worden verwijderd",

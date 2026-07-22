@@ -261,6 +261,7 @@
     "passwordBreached": "This password has been found in a data breach. Please choose a different password."
   },
   "http": {
+    "forbidden": "Access denied",
     "tooManyRequests": "Too many requests. Please wait a few minutes and try again.",
     "duplicateRecord": "A record with this value already exists",
     "referencedRecord": "Referenced record does not exist or cannot be removed",

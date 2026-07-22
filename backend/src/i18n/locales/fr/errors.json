@@ -261,6 +261,7 @@
     "passwordBreached": "Ce mot de passe a été trouvé dans une fuite de données. Veuillez choisir un mot de passe différent."
   },
   "http": {
+    "forbidden": "Accès refusé",
     "tooManyRequests": "Trop de requêtes. Veuillez patienter quelques minutes et réessayer.",
     "duplicateRecord": "Un enregistrement avec cette valeur existe déjà",
     "referencedRecord": "L'enregistrement référencé n'existe pas ou ne peut pas être supprimé",

@@ -100,7 +100,7 @@ Operator-only steps (not agent tasks — see runbook): shadow flip, staging enfo
 
 ### F1. RLS_MODE flag, role creation, env plumbing
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-foundation-tasks-s8vgu4`)
 
 **Scope:** `backend/src/db-init.ts`, `backend/src/app.module.ts`, `.env.example`, all
 `docker-compose*.yml`, `helm/values.yaml`, `helm/templates/configmap-backend.yaml` (+ document the
@@ -137,7 +137,7 @@ restores it (proves idempotent re-apply). No pool-size configuration added.
 
 ### F2. Request context extension + `tenantTx` + `with-context` helpers
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-foundation-tasks-s8vgu4`)
 
 **Scope:** `backend/src/common/request-context.ts`, new `backend/src/common/db/tenant-tx.ts`, new
 `backend/src/common/db/with-context.ts`, their unit tests. **Do not refactor any service in this task.**

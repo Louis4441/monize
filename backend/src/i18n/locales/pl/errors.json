@@ -261,6 +261,7 @@
     "passwordBreached": "To hasło zostało znalezione w wycieku danych. Wybierz inne hasło."
   },
   "http": {
+    "forbidden": "Odmowa dostępu",
     "tooManyRequests": "Zbyt wiele żądań. Odczekaj kilka minut i spróbuj ponownie.",
     "duplicateRecord": "Rekord z tą wartością już istnieje",
     "referencedRecord": "Rekord, do którego się odwołano, nie istnieje lub nie można go usunąć",
