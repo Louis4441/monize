@@ -85,7 +85,7 @@ export class LoanScenario {
 
   @Column({
     type: "varchar",
-    length: 16,
+    length: 64,
     name: "recurring_extra_mode",
     nullable: true,
   })
@@ -120,7 +120,7 @@ export class LoanScenario {
   /** How the budget's installment/overpayment split is shown. */
   @Column({
     type: "varchar",
-    length: 16,
+    length: 64,
     name: "target_monthly_payment_mode",
     nullable: true,
   })
