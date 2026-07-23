@@ -53,7 +53,7 @@ uses four classes:
 | C2 | Cron jobs: system fan-out + per-user bodies wrapped | F2 | inert | not started |
 | C3 | Seeders + demo reset under `withSystemContext` | F2 | inert | not started |
 | C4 | Emergency-access claim + expiry monitor under `withSystemContext`; grantee-side read audit | F2 | inert | not started |
-| C6 | Interceptor restructure: fire-and-forget writes moved inside the ALS scope | F2 | neutral | not started |
+| C6 | Interceptor restructure: fire-and-forget writes moved inside the ALS scope | F2 | neutral | done |
 | R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral | not started |
 | R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral | not started |
 | R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral | not started |
@@ -518,7 +518,16 @@ string left in `backup.service.ts`.
 
 ### C6. Interceptor restructure: fire-and-forget writes into the ALS scope
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-task-status-column-8qqlbm`). Both DB-touching helpers now run
+  under `withUserContext(userId)`: `touchLastActivity`'s `users.update` and `resolveTimezone`'s
+  `user_preferences` read + `lastClientTimezone` write. They run before the interceptor enters its
+  `requestContextStorage.run({ userId, realUserId, timezone })` scope (that scope needs the resolved
+  timezone), and all three accesses are owner-keyed (`users.id` / `user_preferences.userId` = the
+  effective user), so `withUserContext(userId)` is the correct seed. Grep confirmed `request-context`
+  is the only interceptor with DB writes (csrf-refresh sets cookies; the two delegate-mask
+  interceptors only transform response payloads). Unit tests assert each of the three DB calls fires
+  under `{ userId }`; the existing suite's non-UUID fixtures were moved to UUIDs (the wrap validates
+  the id). Behavior at `RLS_MODE=off` unchanged (same rows, same fire-and-forget semantics).
 
 **Scope:** `backend/src/common/interceptors/request-context.interceptor.ts`, any other post-response
 writes found by grep.
