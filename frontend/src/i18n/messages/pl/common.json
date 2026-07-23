@@ -6,15 +6,15 @@
     "releaseNotes": "Zobacz informacje o wydaniu v{version}"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "Co nowego",
+    "versionLabel": "Wersja {version}",
+    "expandAll": "Rozwiń wszystko",
+    "collapseAll": "Zwiń wszystko",
+    "viewFullNotes": "Zobacz pełne informacje o wydaniu",
+    "dontShowAgain": "Nie pokazuj ponownie",
+    "showNextLogin": "Pokaż przy następnym logowaniu",
+    "close": "Zamknij",
+    "unavailable": "Informacje o wydaniu tej wersji są niedostępne."
   },
   "save": "Zapisz",
   "cancel": "Anuluj",

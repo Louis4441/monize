@@ -6,15 +6,15 @@
     "releaseNotes": "v{version} के लिए रिलीज़ नोट्स देखें"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "नया क्या है",
+    "versionLabel": "संस्करण {version}",
+    "expandAll": "सभी विस्तृत करें",
+    "collapseAll": "सभी संक्षिप्त करें",
+    "viewFullNotes": "पूरे रिलीज़ नोट्स देखें",
+    "dontShowAgain": "इसे दोबारा न दिखाएं",
+    "showNextLogin": "अगली बार साइन इन करने पर दिखाएं",
+    "close": "बंद करें",
+    "unavailable": "इस संस्करण के लिए रिलीज़ नोट्स उपलब्ध नहीं हैं।"
   },
   "save": "सहेजें",
   "cancel": "रद्द करें",

@@ -6,15 +6,15 @@
     "releaseNotes": "v{version} 릴리스 노트 보기"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "새로운 기능",
+    "versionLabel": "버전 {version}",
+    "expandAll": "모두 펼치기",
+    "collapseAll": "모두 접기",
+    "viewFullNotes": "전체 릴리스 노트 보기",
+    "dontShowAgain": "다시 표시하지 않기",
+    "showNextLogin": "다음 로그인 시 표시",
+    "close": "닫기",
+    "unavailable": "이 버전의 릴리스 노트를 사용할 수 없습니다."
   },
   "save": "저장",
   "cancel": "취소",

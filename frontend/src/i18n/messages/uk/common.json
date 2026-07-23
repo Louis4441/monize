@@ -6,15 +6,15 @@
     "releaseNotes": "Переглянути нотатки до версії v{version}"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "Що нового",
+    "versionLabel": "Версія {version}",
+    "expandAll": "Розгорнути все",
+    "collapseAll": "Згорнути все",
+    "viewFullNotes": "Переглянути всі нотатки до версії",
+    "dontShowAgain": "Більше не показувати",
+    "showNextLogin": "Показати під час наступного входу",
+    "close": "Закрити",
+    "unavailable": "Нотатки до цієї версії недоступні."
   },
   "save": "Зберегти",
   "cancel": "Скасувати",

@@ -6,15 +6,15 @@
     "releaseNotes": "查看 v{version} 版本說明"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "更新內容",
+    "versionLabel": "版本 {version}",
+    "expandAll": "全部展開",
+    "collapseAll": "全部收合",
+    "viewFullNotes": "查看完整版本說明",
+    "dontShowAgain": "不再顯示",
+    "showNextLogin": "下次登入時顯示",
+    "close": "關閉",
+    "unavailable": "此版本的版本說明無法使用。"
   },
   "save": "儲存",
   "cancel": "取消",

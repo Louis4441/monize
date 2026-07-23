@@ -6,15 +6,15 @@
     "releaseNotes": "v{version}のリリースノートを見る"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "新着情報",
+    "versionLabel": "バージョン {version}",
+    "expandAll": "すべて展開",
+    "collapseAll": "すべて折りたたむ",
+    "viewFullNotes": "リリースノート全体を表示",
+    "dontShowAgain": "今後表示しない",
+    "showNextLogin": "次回ログイン時に表示",
+    "close": "閉じる",
+    "unavailable": "このバージョンのリリースノートはありません。"
   },
   "save": "保存",
   "cancel": "キャンセル",

@@ -6,15 +6,15 @@
     "releaseNotes": "Lihat catatan rilis untuk v{version}"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "Yang Baru",
+    "versionLabel": "Versi {version}",
+    "expandAll": "Perluas semua",
+    "collapseAll": "Ciutkan semua",
+    "viewFullNotes": "Lihat catatan rilis lengkap",
+    "dontShowAgain": "Jangan tampilkan lagi",
+    "showNextLogin": "Tampilkan saat masuk berikutnya",
+    "close": "Tutup",
+    "unavailable": "Catatan rilis untuk versi ini tidak tersedia."
   },
   "save": "Simpan",
   "cancel": "Batal",

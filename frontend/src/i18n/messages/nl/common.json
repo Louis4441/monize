@@ -6,15 +6,15 @@
     "releaseNotes": "Release-opmerkingen voor v{version} bekijken"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "Wat is er nieuw",
+    "versionLabel": "Versie {version}",
+    "expandAll": "Alles uitklappen",
+    "collapseAll": "Alles inklappen",
+    "viewFullNotes": "Volledige release-opmerkingen bekijken",
+    "dontShowAgain": "Niet meer weergeven",
+    "showNextLogin": "Weergeven bij volgende aanmelding",
+    "close": "Sluiten",
+    "unavailable": "Er zijn geen release-opmerkingen beschikbaar voor deze versie."
   },
   "save": "Opslaan",
   "cancel": "Annuleren",

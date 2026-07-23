@@ -6,15 +6,15 @@
     "releaseNotes": "v{version} sürüm notlarını görüntüle"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "Yenilikler",
+    "versionLabel": "Sürüm {version}",
+    "expandAll": "Tümünü genişlet",
+    "collapseAll": "Tümünü daralt",
+    "viewFullNotes": "Tüm sürüm notlarını görüntüle",
+    "dontShowAgain": "Bir daha gösterme",
+    "showNextLogin": "Sonraki girişte göster",
+    "close": "Kapat",
+    "unavailable": "Bu sürüme ait sürüm notları mevcut değil."
   },
   "save": "Kaydet",
   "cancel": "İptal",

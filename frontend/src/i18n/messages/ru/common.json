@@ -6,15 +6,15 @@
     "releaseNotes": "Просмотреть примечания к выпуску v{version}"
   },
   "whatsNew": {
-    "title": "What's New",
-    "versionLabel": "Version {version}",
-    "expandAll": "Expand all",
-    "collapseAll": "Collapse all",
-    "viewFullNotes": "View full release notes",
-    "dontShowAgain": "Don't show this again",
-    "showNextLogin": "Show at next login",
-    "close": "Close",
-    "unavailable": "Release notes for this version aren't available."
+    "title": "Что нового",
+    "versionLabel": "Версия {version}",
+    "expandAll": "Развернуть все",
+    "collapseAll": "Свернуть все",
+    "viewFullNotes": "Показать все примечания к выпуску",
+    "dontShowAgain": "Больше не показывать",
+    "showNextLogin": "Показать при следующем входе",
+    "close": "Закрыть",
+    "unavailable": "Примечания к этой версии недоступны."
   },
   "save": "Сохранить",
   "cancel": "Отмена",
