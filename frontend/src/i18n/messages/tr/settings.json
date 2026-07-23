@@ -127,7 +127,7 @@
     "showCreatedAtLabel": "İşlem formlarında Oluşturma Tarihini Göster",
     "showCreatedAtTooltip": "İşlem formlarında bir işlemin ilk oluşturulduğu tarih ve saati görüntüler. Bu, işlem tarihinden ayrıdır ve bir kaydın Monize'ye gerçekte ne zaman eklendiğini anlamanıza yardımcı olabilir.",
     "showWhatsNewLabel": "Show What's New after an upgrade",
-    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number here or on the login screen.",
+    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number at the bottom of this page or on the login screen.",
     "timeFormatLabel": "Saat Biçimi",
     "recentTransactionsLabel": "Hızlı doldurma için son işlemler",
     "recentTransactionsHelp": "İşlem formlarında Alacaklı alanı yanındaki geçmiş düğmesi açılır penceresinde gösterilen kayıt sayısı.",

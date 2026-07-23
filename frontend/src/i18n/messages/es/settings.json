@@ -127,7 +127,7 @@
     "showCreatedAtLabel": "Mostrar fecha de creación en formularios de transacciones",
     "showCreatedAtTooltip": "Muestra la fecha y hora en que se creó originalmente una transacción en los formularios. Esto es independiente de la fecha de la transacción y puede ayudarte a saber cuándo se agregó realmente la entrada a Monize.",
     "showWhatsNewLabel": "Show What's New after an upgrade",
-    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number here or on the login screen.",
+    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number at the bottom of this page or on the login screen.",
     "timeFormatLabel": "Formato de hora",
     "recentTransactionsLabel": "Transacciones recientes en completado rápido",
     "recentTransactionsHelp": "Número de entradas mostradas en el historial emergente junto al campo Beneficiario en los formularios de transacciones.",

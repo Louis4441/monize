@@ -127,7 +127,7 @@
     "showCreatedAtLabel": "在交易表单中显示创建日期",
     "showCreatedAtTooltip": "在交易表单中显示交易最初创建的日期和时间。这与交易日期不同，可帮助您了解条目实际添加到 Monize 的时间。",
     "showWhatsNewLabel": "Show What's New after an upgrade",
-    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number here or on the login screen.",
+    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number at the bottom of this page or on the login screen.",
     "timeFormatLabel": "时间格式",
     "recentTransactionsLabel": "快速填充中的近期交易数量",
     "recentTransactionsHelp": "交易表单中收款人字段旁历史按钮弹出框中显示的条目数量。",

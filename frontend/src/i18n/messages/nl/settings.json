@@ -127,7 +127,7 @@
     "showCreatedAtLabel": "Aanmaakdatum weergeven in transactieformulieren",
     "showCreatedAtTooltip": "Toont de datum en tijd waarop een transactie oorspronkelijk is aangemaakt op transactieformulieren. Dit staat los van de transactiedatum en kan helpen bij te houden wanneer een invoer werkelijk aan Monize is toegevoegd.",
     "showWhatsNewLabel": "Show What's New after an upgrade",
-    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number here or on the login screen.",
+    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number at the bottom of this page or on the login screen.",
     "timeFormatLabel": "Tijdnotatie",
     "recentTransactionsLabel": "Recente transacties in snel invullen",
     "recentTransactionsHelp": "Aantal vermeldingen dat wordt weergegeven in de popover van de geschiedenis-knop naast het veld Begunstigde op transactieformulieren.",
