@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "Xem ghi chú phát hành cho v{version}"
   },
+  "whatsNew": {
+    "title": "What's New",
+    "versionLabel": "Version {version}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "viewFullNotes": "View full release notes",
+    "dontShowAgain": "Don't show this again",
+    "showNextLogin": "Show at next login",
+    "close": "Close",
+    "unavailable": "Release notes for this version aren't available."
+  },
   "save": "Lưu",
   "cancel": "Hủy",
   "delete": "Xóa",
@@ -161,10 +172,47 @@
     "length": "Mã phải có đúng 6 chữ số",
     "digits": "Mã phải có 6 chữ số"
   },
-  "monthsShort": ["Th1", "Th2", "Th3", "Th4", "Th5", "Th6", "Th7", "Th8", "Th9", "Th10", "Th11", "Th12"],
-  "weekdaysShort": ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
-  "weekdaysMin": ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
-  "weekdaysNarrow": ["C", "2", "3", "4", "5", "6", "7"],
+  "monthsShort": [
+    "Th1",
+    "Th2",
+    "Th3",
+    "Th4",
+    "Th5",
+    "Th6",
+    "Th7",
+    "Th8",
+    "Th9",
+    "Th10",
+    "Th11",
+    "Th12"
+  ],
+  "weekdaysShort": [
+    "CN",
+    "T2",
+    "T3",
+    "T4",
+    "T5",
+    "T6",
+    "T7"
+  ],
+  "weekdaysMin": [
+    "CN",
+    "T2",
+    "T3",
+    "T4",
+    "T5",
+    "T6",
+    "T7"
+  ],
+  "weekdaysNarrow": [
+    "C",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7"
+  ],
   "dateFormat": {
     "browserAuto": "Dùng ngôn ngữ trình duyệt (tự động nhận dạng: {sample})",
     "custom": "Tùy chỉnh..."

@@ -126,6 +126,8 @@
     "weekStartsOnLabel": "Minggu dimulai pada",
     "showCreatedAtLabel": "Tampilkan Tanggal Dibuat di formulir transaksi",
     "showCreatedAtTooltip": "Menampilkan tanggal dan waktu transaksi pertama kali dibuat pada formulir transaksi. Ini terpisah dari tanggal transaksi dan dapat membantu Anda mengetahui kapan entri sebenarnya ditambahkan ke Monize.",
+    "showWhatsNewLabel": "Show What's New after an upgrade",
+    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number here or on the login screen.",
     "timeFormatLabel": "Format Waktu",
     "recentTransactionsLabel": "Transaksi terbaru dalam isi-cepat",
     "recentTransactionsHelp": "Jumlah entri yang ditampilkan di popover tombol riwayat di samping kolom Penerima pada formulir transaksi.",

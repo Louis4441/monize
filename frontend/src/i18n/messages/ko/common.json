@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "v{version} 릴리스 노트 보기"
   },
+  "whatsNew": {
+    "title": "What's New",
+    "versionLabel": "Version {version}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "viewFullNotes": "View full release notes",
+    "dontShowAgain": "Don't show this again",
+    "showNextLogin": "Show at next login",
+    "close": "Close",
+    "unavailable": "Release notes for this version aren't available."
+  },
   "save": "저장",
   "cancel": "취소",
   "delete": "삭제",
@@ -161,10 +172,47 @@
     "length": "코드는 정확히 6자리여야 합니다",
     "digits": "코드는 6자리 숫자여야 합니다"
   },
-  "monthsShort": ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"],
-  "weekdaysShort": ["일", "월", "화", "수", "목", "금", "토"],
-  "weekdaysMin": ["일", "월", "화", "수", "목", "금", "토"],
-  "weekdaysNarrow": ["일", "월", "화", "수", "목", "금", "토"],
+  "monthsShort": [
+    "1월",
+    "2월",
+    "3월",
+    "4월",
+    "5월",
+    "6월",
+    "7월",
+    "8월",
+    "9월",
+    "10월",
+    "11월",
+    "12월"
+  ],
+  "weekdaysShort": [
+    "일",
+    "월",
+    "화",
+    "수",
+    "목",
+    "금",
+    "토"
+  ],
+  "weekdaysMin": [
+    "일",
+    "월",
+    "화",
+    "수",
+    "목",
+    "금",
+    "토"
+  ],
+  "weekdaysNarrow": [
+    "일",
+    "월",
+    "화",
+    "수",
+    "목",
+    "금",
+    "토"
+  ],
   "dateFormat": {
     "browserAuto": "브라우저 로케일 사용 (자동 감지: {sample})",
     "custom": "사용자 지정..."

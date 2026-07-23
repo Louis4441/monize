@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "v{version}のリリースノートを見る"
   },
+  "whatsNew": {
+    "title": "What's New",
+    "versionLabel": "Version {version}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "viewFullNotes": "View full release notes",
+    "dontShowAgain": "Don't show this again",
+    "showNextLogin": "Show at next login",
+    "close": "Close",
+    "unavailable": "Release notes for this version aren't available."
+  },
   "save": "保存",
   "cancel": "キャンセル",
   "delete": "削除",
@@ -161,10 +172,47 @@
     "length": "コードは正確に6桁である必要があります",
     "digits": "コードは6桁である必要があります"
   },
-  "monthsShort": ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"],
-  "weekdaysShort": ["日", "月", "火", "水", "木", "金", "土"],
-  "weekdaysMin": ["日", "月", "火", "水", "木", "金", "土"],
-  "weekdaysNarrow": ["日", "月", "火", "水", "木", "金", "土"],
+  "monthsShort": [
+    "1月",
+    "2月",
+    "3月",
+    "4月",
+    "5月",
+    "6月",
+    "7月",
+    "8月",
+    "9月",
+    "10月",
+    "11月",
+    "12月"
+  ],
+  "weekdaysShort": [
+    "日",
+    "月",
+    "火",
+    "水",
+    "木",
+    "金",
+    "土"
+  ],
+  "weekdaysMin": [
+    "日",
+    "月",
+    "火",
+    "水",
+    "木",
+    "金",
+    "土"
+  ],
+  "weekdaysNarrow": [
+    "日",
+    "月",
+    "火",
+    "水",
+    "木",
+    "金",
+    "土"
+  ],
   "dateFormat": {
     "browserAuto": "ブラウザのロケールを使用（自動検出: {sample}）",
     "custom": "カスタム..."

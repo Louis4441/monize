@@ -1,0 +1,80 @@
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { UserPreference } from "../users/entities/user-preference.entity";
+import { buildDefaultPreferences } from "../users/user-preference.factory";
+import { currentRequestLocale } from "../i18n/request-locale";
+import { DemoModeService } from "../common/demo-mode.service";
+import { ReleaseNotesService } from "./release-notes.service";
+import { ReleaseNotes } from "./release-notes.parser";
+
+export interface WhatsNewStatus {
+  /** The running app version. */
+  currentVersion: string;
+  /**
+   * Whether the digest should pop up automatically on app load: the user has
+   * the feature enabled, hasn't already acknowledged this version, notes exist,
+   * and this is not a demo instance.
+   */
+  autoShow: boolean;
+  /** The parsed release notes for the current version, or null when none exist. */
+  notes: ReleaseNotes | null;
+}
+
+/**
+ * Per-user "What's New" digest logic, built on top of the shared
+ * ReleaseNotesService. Decides whether the release-notes popup should open
+ * automatically and records when a user acknowledges the current version.
+ */
+@Injectable()
+export class WhatsNewService {
+  constructor(
+    @InjectRepository(UserPreference)
+    private readonly preferencesRepository: Repository<UserPreference>,
+    private readonly releaseNotesService: ReleaseNotesService,
+    private readonly demoModeService: DemoModeService,
+  ) {}
+
+  async getWhatsNew(userId: string): Promise<WhatsNewStatus> {
+    const currentVersion = this.releaseNotesService.currentVersion;
+    const notes = this.releaseNotesService.getForCurrentVersion();
+
+    const prefs = await this.preferencesRepository.findOne({
+      where: { userId },
+    });
+
+    // Default to enabled: a row that predates this column, or no row yet, still
+    // gets the popup. Only an explicit `false` disables it.
+    const enabled = prefs ? prefs.showWhatsNew !== false : true;
+    const alreadySeen = prefs?.lastSeenVersion === currentVersion;
+
+    const autoShow =
+      enabled && !alreadySeen && !this.demoModeService.isDemo && notes !== null;
+
+    return { currentVersion, autoShow, notes };
+  }
+
+  /**
+   * Record that the user has seen the current version's notes ("Don't show this
+   * again"). Stored on user_preferences so it follows the user across devices
+   * and reappears automatically when a newer version ships. Mirrors
+   * UpdatesService.dismiss for the no-row fallback.
+   */
+  async markSeen(userId: string): Promise<{ seen: boolean; version: string }> {
+    const currentVersion = this.releaseNotesService.currentVersion;
+
+    const prefs = await this.preferencesRepository.findOne({
+      where: { userId },
+    });
+    if (prefs) {
+      prefs.lastSeenVersion = currentVersion;
+      await this.preferencesRepository.save(prefs);
+    } else {
+      const created = buildDefaultPreferences(userId, currentRequestLocale());
+      created.lastSeenVersion = currentVersion;
+      await this.preferencesRepository.save(created);
+    }
+
+    return { seen: true, version: currentVersion };
+  }
+}

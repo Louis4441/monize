@@ -82,6 +82,9 @@ services:
       - ./backend:/app
       - ./database:/database:ro
       - ./database/migrations:/app/migrations:ro
+      # Release notes for the What's New digest (the ./backend:/app mount would
+      # otherwise shadow the copy baked into the image).
+      - ./docs/release-notes:/app/release-notes:ro
       - /app/node_modules
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3000}:3000"

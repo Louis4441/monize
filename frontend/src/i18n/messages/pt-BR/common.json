@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "Ver as notas de versão da v{version}"
   },
+  "whatsNew": {
+    "title": "What's New",
+    "versionLabel": "Version {version}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "viewFullNotes": "View full release notes",
+    "dontShowAgain": "Don't show this again",
+    "showNextLogin": "Show at next login",
+    "close": "Close",
+    "unavailable": "Release notes for this version aren't available."
+  },
   "save": "Salvar",
   "cancel": "Cancelar",
   "delete": "Excluir",
@@ -161,10 +172,47 @@
     "length": "O código deve ter exatamente 6 dígitos",
     "digits": "O código deve ter 6 dígitos"
   },
-  "monthsShort": ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"],
-  "weekdaysShort": ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"],
-  "weekdaysMin": ["do", "se", "te", "qu", "qu", "se", "sá"],
-  "weekdaysNarrow": ["D", "S", "T", "Q", "Q", "S", "S"],
+  "monthsShort": [
+    "jan",
+    "fev",
+    "mar",
+    "abr",
+    "mai",
+    "jun",
+    "jul",
+    "ago",
+    "set",
+    "out",
+    "nov",
+    "dez"
+  ],
+  "weekdaysShort": [
+    "dom",
+    "seg",
+    "ter",
+    "qua",
+    "qui",
+    "sex",
+    "sáb"
+  ],
+  "weekdaysMin": [
+    "do",
+    "se",
+    "te",
+    "qu",
+    "qu",
+    "se",
+    "sá"
+  ],
+  "weekdaysNarrow": [
+    "D",
+    "S",
+    "T",
+    "Q",
+    "Q",
+    "S",
+    "S"
+  ],
   "dateFormat": {
     "browserAuto": "Usar locale do navegador (detectado automaticamente como {sample})",
     "custom": "Personalizado..."

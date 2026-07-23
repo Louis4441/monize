@@ -126,6 +126,8 @@
     "weekStartsOnLabel": "Woche beginnt am",
     "showCreatedAtLabel": "Erstellungsdatum in Buchungsformularen anzeigen",
     "showCreatedAtTooltip": "Zeigt in Buchungsformularen das Datum und die Uhrzeit an, zu der eine Buchung ursprünglich erstellt wurde. Dies ist unabhängig vom Buchungsdatum und kann helfen nachzuvollziehen, wann ein Eintrag tatsächlich zu Monize hinzugefügt wurde.",
+    "showWhatsNewLabel": "Show What's New after an upgrade",
+    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number here or on the login screen.",
     "timeFormatLabel": "Zeitformat",
     "recentTransactionsLabel": "Zuletzt verwendete Buchungen in der Schnellausfüllung",
     "recentTransactionsHelp": "Anzahl der Einträge im Verlaufs-Popover neben dem Zahlungsempfänger-Feld in Buchungsformularen.",

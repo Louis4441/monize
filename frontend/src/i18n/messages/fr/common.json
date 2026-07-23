@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "Voir les notes de version de la v{version}"
   },
+  "whatsNew": {
+    "title": "What's New",
+    "versionLabel": "Version {version}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "viewFullNotes": "View full release notes",
+    "dontShowAgain": "Don't show this again",
+    "showNextLogin": "Show at next login",
+    "close": "Close",
+    "unavailable": "Release notes for this version aren't available."
+  },
   "save": "Enregistrer",
   "cancel": "Annuler",
   "delete": "Supprimer",
@@ -161,10 +172,47 @@
     "length": "Le code doit comporter exactement 6 chiffres",
     "digits": "Le code doit comporter 6 chiffres"
   },
-  "monthsShort": ["jan.", "fév.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."],
-  "weekdaysShort": ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"],
-  "weekdaysMin": ["Di", "Lu", "Ma", "Me", "Je", "Ve", "Sa"],
-  "weekdaysNarrow": ["D", "L", "M", "M", "J", "V", "S"],
+  "monthsShort": [
+    "jan.",
+    "fév.",
+    "mars",
+    "avr.",
+    "mai",
+    "juin",
+    "juil.",
+    "août",
+    "sept.",
+    "oct.",
+    "nov.",
+    "déc."
+  ],
+  "weekdaysShort": [
+    "Dim",
+    "Lun",
+    "Mar",
+    "Mer",
+    "Jeu",
+    "Ven",
+    "Sam"
+  ],
+  "weekdaysMin": [
+    "Di",
+    "Lu",
+    "Ma",
+    "Me",
+    "Je",
+    "Ve",
+    "Sa"
+  ],
+  "weekdaysNarrow": [
+    "D",
+    "L",
+    "M",
+    "M",
+    "J",
+    "V",
+    "S"
+  ],
   "dateFormat": {
     "browserAuto": "Utiliser les paramètres régionaux du navigateur (détecté automatiquement : {sample})",
     "custom": "Personnalisé..."

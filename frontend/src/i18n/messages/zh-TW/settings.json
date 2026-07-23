@@ -126,6 +126,8 @@
     "weekStartsOnLabel": "週起始日",
     "showCreatedAtLabel": "在交易表單中顯示建立日期",
     "showCreatedAtTooltip": "在交易表單中顯示交易最初建立的日期和時間。此時間獨立於交易日期，可幫助您了解記錄實際新增至 Monize 的時間。",
+    "showWhatsNewLabel": "Show What's New after an upgrade",
+    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number here or on the login screen.",
     "timeFormatLabel": "時間格式",
     "recentTransactionsLabel": "快速填字中的最近交易",
     "recentTransactionsHelp": "在交易表單收款人欄位旁的歷史按鈕彈出視窗中顯示的記錄數量。",

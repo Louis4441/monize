@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "v{version} के लिए रिलीज़ नोट्स देखें"
   },
+  "whatsNew": {
+    "title": "What's New",
+    "versionLabel": "Version {version}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "viewFullNotes": "View full release notes",
+    "dontShowAgain": "Don't show this again",
+    "showNextLogin": "Show at next login",
+    "close": "Close",
+    "unavailable": "Release notes for this version aren't available."
+  },
   "save": "सहेजें",
   "cancel": "रद्द करें",
   "delete": "हटाएं",
@@ -161,10 +172,47 @@
     "length": "कोड बिल्कुल 6 अंकों का होना चाहिए",
     "digits": "कोड 6 अंकों का होना चाहिए"
   },
-  "monthsShort": ["जन", "फ़र", "मार्च", "अप्रैल", "मई", "जून", "जुल", "अग", "सित", "अक्टू", "नव", "दिस"],
-  "weekdaysShort": ["रवि", "सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि"],
-  "weekdaysMin": ["रव", "सो", "मं", "बु", "गु", "शु", "श"],
-  "weekdaysNarrow": ["र", "स", "म", "ब", "ग", "श", "श"],
+  "monthsShort": [
+    "जन",
+    "फ़र",
+    "मार्च",
+    "अप्रैल",
+    "मई",
+    "जून",
+    "जुल",
+    "अग",
+    "सित",
+    "अक्टू",
+    "नव",
+    "दिस"
+  ],
+  "weekdaysShort": [
+    "रवि",
+    "सोम",
+    "मंगल",
+    "बुध",
+    "गुरु",
+    "शुक्र",
+    "शनि"
+  ],
+  "weekdaysMin": [
+    "रव",
+    "सो",
+    "मं",
+    "बु",
+    "गु",
+    "शु",
+    "श"
+  ],
+  "weekdaysNarrow": [
+    "र",
+    "स",
+    "म",
+    "ब",
+    "ग",
+    "श",
+    "श"
+  ],
   "dateFormat": {
     "browserAuto": "ब्राउज़र लोकेल का उपयोग करें (स्वत:-पहचान {sample})",
     "custom": "कस्टम..."

@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "Versionshinweise für v{version} anzeigen"
   },
+  "whatsNew": {
+    "title": "What's New",
+    "versionLabel": "Version {version}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "viewFullNotes": "View full release notes",
+    "dontShowAgain": "Don't show this again",
+    "showNextLogin": "Show at next login",
+    "close": "Close",
+    "unavailable": "Release notes for this version aren't available."
+  },
   "save": "Speichern",
   "cancel": "Abbrechen",
   "delete": "Löschen",
@@ -161,10 +172,47 @@
     "length": "Der Code muss genau 6 Ziffern lang sein",
     "digits": "Der Code muss 6 Ziffern haben"
   },
-  "monthsShort": ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"],
-  "weekdaysShort": ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
-  "weekdaysMin": ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"],
-  "weekdaysNarrow": ["S", "M", "D", "M", "D", "F", "S"],
+  "monthsShort": [
+    "Jan",
+    "Feb",
+    "Mär",
+    "Apr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Okt",
+    "Nov",
+    "Dez"
+  ],
+  "weekdaysShort": [
+    "So",
+    "Mo",
+    "Di",
+    "Mi",
+    "Do",
+    "Fr",
+    "Sa"
+  ],
+  "weekdaysMin": [
+    "So",
+    "Mo",
+    "Di",
+    "Mi",
+    "Do",
+    "Fr",
+    "Sa"
+  ],
+  "weekdaysNarrow": [
+    "S",
+    "M",
+    "D",
+    "M",
+    "D",
+    "F",
+    "S"
+  ],
   "dateFormat": {
     "browserAuto": "Browser-Gebietsschema verwenden (automatisch erkannt: {sample})",
     "custom": "Benutzerdefiniert..."

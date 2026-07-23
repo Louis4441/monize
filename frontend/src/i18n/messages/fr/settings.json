@@ -126,6 +126,8 @@
     "weekStartsOnLabel": "La semaine commence le",
     "showCreatedAtLabel": "Afficher la date de création dans les formulaires de transaction",
     "showCreatedAtTooltip": "Affiche la date et l'heure à laquelle une transaction a été initialement créée dans les formulaires de transaction. Ceci est distinct de la date de transaction et peut vous aider à savoir quand une entrée a été réellement ajoutée à Monize.",
+    "showWhatsNewLabel": "Show What's New after an upgrade",
+    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number here or on the login screen.",
     "timeFormatLabel": "Format d'heure",
     "recentTransactionsLabel": "Transactions récentes dans la saisie rapide",
     "recentTransactionsHelp": "Nombre d'entrées affichées dans le popover de l'historique à côté du champ Bénéficiaire dans les formulaires de transaction.",

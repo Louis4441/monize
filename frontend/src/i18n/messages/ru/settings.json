@@ -126,6 +126,8 @@
     "weekStartsOnLabel": "Начало недели",
     "showCreatedAtLabel": "Показывать дату создания в формах проводок",
     "showCreatedAtTooltip": "Отображает дату и время первоначального создания проводки в формах. Это отдельно от даты проводки и помогает определить, когда запись была фактически добавлена в Monize.",
+    "showWhatsNewLabel": "Show What's New after an upgrade",
+    "showWhatsNewTooltip": "Shows a summary of the release notes the first time you sign in after Monize updates to a new version. You can always reopen it by clicking the version number here or on the login screen.",
     "timeFormatLabel": "Формат времени",
     "recentTransactionsLabel": "Последние проводки в быстром заполнении",
     "recentTransactionsHelp": "Количество записей, отображаемых во всплывающем окне кнопки истории рядом с полем Получатель в формах проводок.",

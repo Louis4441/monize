@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "Release-opmerkingen voor v{version} bekijken"
   },
+  "whatsNew": {
+    "title": "What's New",
+    "versionLabel": "Version {version}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "viewFullNotes": "View full release notes",
+    "dontShowAgain": "Don't show this again",
+    "showNextLogin": "Show at next login",
+    "close": "Close",
+    "unavailable": "Release notes for this version aren't available."
+  },
   "save": "Opslaan",
   "cancel": "Annuleren",
   "delete": "Verwijderen",
@@ -161,10 +172,47 @@
     "length": "Code moet precies 6 cijfers bevatten",
     "digits": "Code moet 6 cijfers zijn"
   },
-  "monthsShort": ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"],
-  "weekdaysShort": ["zo", "ma", "di", "wo", "do", "vr", "za"],
-  "weekdaysMin": ["zo", "ma", "di", "wo", "do", "vr", "za"],
-  "weekdaysNarrow": ["Z", "M", "D", "W", "D", "V", "Z"],
+  "monthsShort": [
+    "jan",
+    "feb",
+    "mrt",
+    "apr",
+    "mei",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "okt",
+    "nov",
+    "dec"
+  ],
+  "weekdaysShort": [
+    "zo",
+    "ma",
+    "di",
+    "wo",
+    "do",
+    "vr",
+    "za"
+  ],
+  "weekdaysMin": [
+    "zo",
+    "ma",
+    "di",
+    "wo",
+    "do",
+    "vr",
+    "za"
+  ],
+  "weekdaysNarrow": [
+    "Z",
+    "M",
+    "D",
+    "W",
+    "D",
+    "V",
+    "Z"
+  ],
   "dateFormat": {
     "browserAuto": "Browserinstelling gebruiken (automatisch gedetecteerd als {sample})",
     "custom": "Aangepast..."

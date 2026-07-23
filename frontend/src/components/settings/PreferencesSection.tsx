@@ -94,6 +94,7 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
   const [defaultCurrency, setDefaultCurrency] = useState(preferences.defaultCurrency);
   const [weekStartsOn, setWeekStartsOn] = useState(preferences.weekStartsOn ?? 1);
   const [showCreatedAt, setShowCreatedAt] = useState(preferences.showCreatedAt ?? false);
+  const [showWhatsNew, setShowWhatsNew] = useState(preferences.showWhatsNew ?? true);
   const [timeFormat, setTimeFormat] = useState<'24h' | '12h'>(preferences.timeFormat ?? '24h');
   const [preferredExchanges, setPreferredExchanges] = useState<string[]>(
     preferences.preferredExchanges ?? [],
@@ -141,6 +142,7 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
         defaultCurrency,
         weekStartsOn,
         showCreatedAt,
+        showWhatsNew,
         timeFormat,
         preferredExchanges: preferredExchanges.filter(Boolean),
         defaultQuoteProvider,
@@ -313,6 +315,23 @@ export function PreferencesSection({ preferences, onPreferencesUpdated }: Prefer
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
             {t('recentTransactionsHelp')}
           </p>
+        </div>
+
+        <div className="flex items-center">
+          <label
+            htmlFor="showWhatsNew"
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <ToggleSwitch
+              checked={showWhatsNew}
+              onChange={setShowWhatsNew}
+              label={t('showWhatsNewLabel')}
+            />
+            <span className="text-sm text-gray-900 dark:text-gray-100">
+              {t('showWhatsNewLabel')}
+            </span>
+          </label>
+          <InfoTooltip text={t('showWhatsNewTooltip')} />
         </div>
       </div>
 
