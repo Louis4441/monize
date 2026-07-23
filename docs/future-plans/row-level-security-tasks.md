@@ -39,31 +39,31 @@ uses four classes:
 
 ## Task graph
 
-| ID | Task | Depends on | Deploy impact |
-|----|------|-----------|---------------|
-| F1 | RLS_MODE flag, role creation + grants in db-init, env plumbing (compose + helm/k8s) | — | inert |
-| F2 | Request context extension (incl. `realUserId`) + `tenantTx` (re-entrant, both identity GUCs) + `with-context` helpers + exception-filter mapping | F1 | none |
-| F3 | CI ratchet on `@InjectRepository` / `createQueryRunner` counts | F2 | none |
-| M1 | Migration: helper functions + GUC-aware trigger (**no grants — they live in db-init, F1**) | — | inert |
-| M2 | Migrations: direct + indirect + special (users/delegation/emergency) policies (no enable) | M1 | inert |
-| M3 | Migration: `ENABLE ROW LEVEL SECURITY` (authored, **not deployed**) | M2 | **DO NOT DEPLOY** |
-| T1 | Integration harness applies real RLS migrations + role/grants + `updated_at` triggers | M2, F1 | none |
-| T2 | Catalog-driven `rls-enforcement` integration spec (4 buckets) | T1, M3 | none |
-| C1 | Auth wrapping: `jwt.strategy` under `withUserContext(sub)`; PAT + password-reset + OAuth under `withSystemContext`; public-route audit | F2 | inert |
-| C2 | Cron jobs: system fan-out + per-user bodies wrapped | F2 | inert |
-| C3 | Seeders + demo reset under `withSystemContext` | F2 | inert |
-| C4 | Emergency-access claim + expiry monitor under `withSystemContext`; grantee-side read audit | F2 | inert |
-| C6 | Interceptor restructure: fire-and-forget writes moved inside the ALS scope | F2 | neutral |
-| R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral |
-| R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral |
-| R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral |
-| R4 | Refactor: budgets | F3, C1–C4, C6 | neutral |
-| R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral |
-| R6 | Refactor: ai, mcp, import, action-history, currencies, updates, notifications | F3, C1–C4, C6 | neutral |
-| R7 | Refactor: auth, users, delegation, admin, emergency-access, backup, database | F3, C1–C4, C6 | neutral |
-| C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral |
-| L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none |
-| D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none |
+| ID | Task | Depends on | Deploy impact | Status |
+|----|------|-----------|---------------|--------|
+| F1 | RLS_MODE flag, role creation + grants in db-init, env plumbing (compose + helm/k8s) | — | inert | done |
+| F2 | Request context extension (incl. `realUserId`) + `tenantTx` (re-entrant, both identity GUCs) + `with-context` helpers + exception-filter mapping | F1 | none | done |
+| F3 | CI ratchet on `@InjectRepository` / `createQueryRunner` counts | F2 | none | done |
+| M1 | Migration: helper functions + GUC-aware trigger (**no grants — they live in db-init, F1**) | — | inert | not started |
+| M2 | Migrations: direct + indirect + special (users/delegation/emergency) policies (no enable) | M1 | inert | not started |
+| M3 | Migration: `ENABLE ROW LEVEL SECURITY` (authored, **not deployed**) | M2 | **DO NOT DEPLOY** | not started |
+| T1 | Integration harness applies real RLS migrations + role/grants + `updated_at` triggers | M2, F1 | none | not started |
+| T2 | Catalog-driven `rls-enforcement` integration spec (4 buckets) | T1, M3 | none | not started |
+| C1 | Auth wrapping: `jwt.strategy` under `withUserContext(sub)`; PAT + password-reset + OAuth under `withSystemContext`; public-route audit | F2 | inert | done |
+| C2 | Cron jobs: system fan-out + per-user bodies wrapped | F2 | inert | done |
+| C3 | Seeders + demo reset under `withSystemContext` | F2 | inert | done |
+| C4 | Emergency-access claim + expiry monitor under `withSystemContext`; grantee-side read audit | F2 | inert | done |
+| C6 | Interceptor restructure: fire-and-forget writes moved inside the ALS scope | F2 | neutral | done |
+| R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral | not started |
+| R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral | not started |
+| R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral | not started |
+| R4 | Refactor: budgets | F3, C1–C4, C6 | neutral | not started |
+| R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral | not started |
+| R6 | Refactor: ai, mcp, import, action-history, currencies, updates, notifications | F3, C1–C4, C6 | neutral | not started |
+| R7 | Refactor: auth, users, delegation, admin, emergency-access, backup, database | F3, C1–C4, C6 | neutral | not started |
+| C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral | blocked (needs M1, R7) |
+| L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none | not started |
+| D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none | not started |
 
 **Why context wrapping (C1–C4, C6) comes BEFORE the refactors (R1–R7), not after.** `tenantTx` throws
 on missing ambient context in every mode, including `off`. `jwt.strategy` runs in the guard phase —
@@ -381,7 +381,54 @@ Shared instructions for every R task — the per-task list only names the module
 
 ### C1. Auth wrapping + public-route audit (lands BEFORE the refactors)
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-task-status-column-8qqlbm`). Wrapping applied:
+  `jwt.strategy.validate` runs both lookups under `withUserContext(payload.sub)`;
+  `AuthService.{register,login,refreshTokens,verify2FA,findOrCreateOidcUser,confirmOidcLink,generateResetToken,resetPassword,generateVerificationToken,verifyEmail}`
+  under `withSystemContext` (the large bodies extracted to `*WithinContext` privates to keep the
+  wrapper a one-liner); `PatService.validateToken` under `withSystemContext`; the two shared methods
+  reachable on public routes wrapped at their call sites (`generateTokenPair` in the OIDC callback,
+  `revokeRefreshToken` in `logout`, both `withSystemContext`); `OAuthProviderService.findAccount` and
+  `validateAccessToken` read `getUserStateById` under `withUserContext(sub)`;
+  `OAuthInteractionController.resolveCookieUser` reads `getUserById` under
+  `withUserContext(payload.sub)`. Context-assertion unit tests added to the jwt.strategy, auth.service,
+  pat.service, oauth-provider, and oauth-interaction specs; existing specs updated to UUID fixtures
+  (jwt/OAuth subs now flow through `withUserContext`'s UUID validation). Full `npm run test:unit` green
+  (8917), build + lint clean, F3 ratchet unchanged.
+
+**Public-route audit (findings):**
+- **Wrapped in C1 (touch user tables, no `req.user`):** every public `auth.controller` route
+  (`register`, `login`, `oidc/callback`, `forgot/reset-password`, `verify/resend-verification`,
+  `2fa/verify`, `refresh`, `oidc/confirm-link`, `logout`) via the `AuthService` / call-site wraps
+  above; PAT auth (`PatService.validateToken`) and OAuth access-token auth
+  (`OAuthProviderService.validateAccessToken`), both entered from `mcp-http.controller`'s
+  `validatePat` (that controller is R6's file scope — wrapping the two services it calls covers the
+  auth phase); the node-oidc-provider Express mount's one user-table touch (`findAccount`); the OAuth
+  consent pages (`oauth-interaction.controller`).
+- **`jwt.strategy` uses `withUserContext`, never `withSystemContext`** (verified by grep + a unit
+  test) — it is the highest-QPS query in the system, so bypass must never be its steady state.
+- **Exempt (no user data — note only):** `health.controller` (`SELECT 1` connectivity probe only);
+  `oauth-metadata.controller` and the OIDC discovery documents (static config); the node-oidc-provider
+  Express mount's `oauth_payloads` reads/writes (that table is deliberately **RLS-exempt**, see M2).
+- **`oauth_payloads` hardening decision:** keep the `monize_app` DML grants and leave the table
+  RLS-exempt (matches M2's exclusion list) — no owner-DataSource split. `oauth_payloads` is a
+  short-lived opaque token/grant store keyed by random id, never queried per end-user, so an owner
+  policy would add no isolation.
+- **Flagged, NOT wrapped (out of C1's file scope):**
+  - `AccountDelegateGuard` (`backend/src/delegation/guards/account-delegate.guard.ts`) runs in the
+    guard phase *before* `AuthGuard('jwt')` and, **for delegate tokens only**, calls
+    `DelegationService` methods that read `account_delegates` / `account_delegate_grants` / `accounts`
+    / `transactions` / `scheduled_transactions`. It knows the identity (it verifies the token itself:
+    `payload.sub` = delegate, `payload.actingAsUserId` = owner), but correct wrapping needs **both**
+    GUCs (`current` = owner, `real` = delegate), which `withUserContext(userId)` alone cannot seed. It
+    lives in the delegation module (outside C1's `auth/**` + `oauth/**` scope), so it is left for the
+    delegation wrapping/refactor — **must land before R2/R7 convert `DelegationService` to
+    `tenantTx`**, or delegate requests throw at `off`.
+  - `emergency-access-claim.controller` public routes → **C4**.
+  - `RequestContextInterceptor`'s `touchLastActivity` / timezone reads run outside its own scope →
+    **C6**.
+- **L1 note:** the `with-context.ts` import allowlist must include `backend/src/oauth/**` (this task
+  added `withUserContext` imports to `oauth-provider.service.ts` and `oauth-interaction.controller.ts`)
+  in addition to the auth module.
 
 **Scope:** `backend/src/auth/**`, `backend/src/oauth/**`, PAT validation path, password-reset +
 email-verification lookups, plus the audit. Wrapping only — no repository-to-`tenantTx` conversion
@@ -405,7 +452,35 @@ in PR description; grep shows no `withSystemContext` import in `jwt.strategy`.
 
 ### C2. Cron jobs
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-task-status-column-8qqlbm`). All 20 `@Cron` decorators
+  enumerated; the two demo-reset crons are C3's scope and the emergency-access expiry monitor is C4's,
+  leaving 17 wrapped here. Auto-post wrapper-usage test added
+  (`scheduled-transactions.service.spec.ts`) asserting the fan-out runs under `{ system: true }` and
+  each `post()` under `{ userId }`. Non-UUID user-id fixtures across the touched cron specs moved to
+  UUIDs (the per-user wrap validates the id). Full `npm run test:unit` green (8921), build + lint
+  clean, F3 ratchet unchanged.
+
+  **Per-handler wrapping (17 of 20; demo-reset ×2 → C3, emergency-access-monitor → C4):**
+
+  | Handler | File | Wrapping |
+  |---------|------|----------|
+  | `purgeOldUsageLogs` | `ai/ai-usage.service.ts` | system (bulk delete) |
+  | `handleDailyInsightGeneration` | `ai/insights/ai-insights.service.ts` | system (cleanup + active-user fan-out) + `withUserContext` per `generateInsights` |
+  | `purgeExpiredRefreshTokens` | `auth/token.service.ts` | system (bulk delete) |
+  | `scheduledPriceRefresh` | `securities/security-price.service.ts` | system (symbol-grouped refresh + snapshot recalc, irreducibly cross-user) |
+  | `applyMaturedInvestmentHoldings` | `securities/holdings.service.ts` | system (tz + matured-user fan-out) + `withUserContext` per `rebuildFromTransactions` |
+  | `scheduledRefresh` | `updates/updates.service.ts` | **none** — no DB access (GitHub fetch + in-memory cache) |
+  | `cleanupExpiredHistory` | `action-history/action-history.service.ts` | system (bulk delete) |
+  | `sendBillReminders` | `notifications/bill-reminder.service.ts` | system (manual-bill fan-out) + `withUserContext` per user's prefs/user reads |
+  | `processAutoPostTransactions` | `scheduled-transactions/scheduled-transactions.service.ts` | system (tz/candidate fan-out) + `withUserContext` per `post` |
+  | `closeExpiredPeriods` | `budgets/budget-period-cron.service.ts` | system (active-budget fan-out) + `withUserContext` per budget (open-period read + `closePeriod`) and per user (`sendMonthlySummaryForUser`) |
+  | `checkBudgetAlerts` | `budgets/budget-alert.service.ts` | system (fan-out) + `withUserContext` per `processAlerts` |
+  | `sendWeeklyDigest` | `budgets/budget-alert.service.ts` | system (fan-out) + `withUserContext` per `sendDigestForUser` |
+  | `purgeOldAlerts` | `budgets/budget-alert.service.ts` | system (bulk deletes) |
+  | `handleAutoBackupCron` | `backup/auto-backup.service.ts` | system (due-settings fan-out) + `withUserContext` per `exportToFile` + settings save |
+  | `checkMortgageRenewals` | `accounts/mortgage-reminder.service.ts` | system (renewal fan-out) + `withUserContext` per user's prefs/user reads |
+  | `applyDueTransactionBalances` | `accounts/accounts.service.ts` | system (fully cross-user: tz-bucketed bulk reads + single multi-user UPDATE) |
+  | `scheduledRateRefresh` | `currencies/exchange-rate.service.ts` | system (currency-detection read spans all users' policied tables; writes global `exchange_rates`) |
 
 **Scope:** every `@Cron` handler (~17 files / ~20 decorators; grep `@Cron` across `backend/src`).
 Wrapping only, before any R task refactors these services — wrapping is inert pre-refactor.
@@ -422,7 +497,13 @@ in PR; no handler left unwrapped (grep `@Cron` count == enumerated count).
 
 ### C3. Seeders + demo reset
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-task-status-column-8qqlbm`). Whole flows wrapped in
+  `withSystemContext` (bodies extracted to `*WithinContext` privates): `SeedService.seedAll`,
+  `DemoSeedService.seedAll` + `seedDemoData` (the latter also called directly by the daily reset), and
+  both `DemoResetService` crons (`resetDemoData`, `generateIntradayTransactions` -- the two `@Cron`
+  handlers deferred from C2). The `if (!isDemo) return` guards and the opening log lines stay outside
+  the wrapper. A wrapper-usage test asserts `resetDemoData`'s raw SQL runs under `{ system: true }`.
+  Seed/demo-seed/demo-reset specs green (56 + the new assertion), build + lint clean.
 
 **Scope:** `database/seed.service.ts`, `demo-seed.service.ts`, daily demo reset entry. Wrapping only,
 before R7 refactors the database module.
@@ -434,7 +515,26 @@ bypass).
 
 ### C4. Emergency access
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-task-status-column-8qqlbm`). Both public claim handlers
+  (`EmergencyAccessClaimController.preview` / `complete`) wrapped in `withSystemContext` (bodies
+  extracted to `*WithinContext` privates) -- the requester is the grantee/bare token, so every
+  owner-keyed read/write (the token-hash contact lookup, the owner's `users`/`user_preferences`/
+  `trusted_devices`/`refresh_tokens` and the emergency-access tables, in a raw `queryRunner`
+  transaction) runs under bypass. The expiry-monitor cron
+  (`EmergencyAccessMonitorService.runDailyCheck` -- the `@Cron` deferred from C2) wraps its whole
+  cross-user sweep in `withSystemContext` (the SMTP guard stays outside). Wrapper-usage tests assert
+  both `preview` and the sweep run under `{ system: true }`; all emergency-access specs green (82).
+
+  **Grantee-side read audit (result):** **no in-session grantee-side reads exist.** The authenticated
+  surface (`emergency-access.controller.ts`, class-guarded by `AuthGuard('jwt') + StepUpGuard`) is
+  entirely owner-keyed -- every `EmergencyAccessService` call passes `req.user.id` as the owner and
+  every query filters `owner_user_id = :userId` (the `email` filters are duplicate-contact checks
+  *within the owner's own* contact list, still owner-scoped). There is no "who named me as an
+  emergency contact" lookup. So under the owner-only special policies
+  (`emergency_access_settings|contacts → owner_user_id = current`) the authenticated reads work with
+  the normal request context, and **no `withSystemContext` wrapping and no email-match policy arm are
+  required** on that surface. The only grantee-facing path is the public claim controller, wrapped
+  above.
 
 **Scope:** `backend/src/emergency-access/emergency-access-claim.controller.ts` + claim service path,
 expiry monitor. Wrapping only, before R7 refactors these services.
@@ -451,7 +551,11 @@ grantee-side audit result in the PR description.
 
 ### C5. Backup restore
 
-- [ ] Status: not started
+- [ ] Status: **blocked** -- not started. Unlike C1-C4/C6 (which only depend on F2), C5 also depends
+  on **M1** (the GUC-aware `update_updated_at_column()` trigger must be in the DB) and **R7** (the
+  restore path must already be on `tenantTx` to carry the `preserveTimestamps` flag). Both are not
+  started, so C5 cannot begin yet without a scope violation ("never start a task whose dependencies
+  are unmerged").
 
 **Scope:** `backend/src/backup/backup.service.ts` (restore path, ~line 1317).
 
@@ -471,7 +575,16 @@ string left in `backup.service.ts`.
 
 ### C6. Interceptor restructure: fire-and-forget writes into the ALS scope
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-task-status-column-8qqlbm`). Both DB-touching helpers now run
+  under `withUserContext(userId)`: `touchLastActivity`'s `users.update` and `resolveTimezone`'s
+  `user_preferences` read + `lastClientTimezone` write. They run before the interceptor enters its
+  `requestContextStorage.run({ userId, realUserId, timezone })` scope (that scope needs the resolved
+  timezone), and all three accesses are owner-keyed (`users.id` / `user_preferences.userId` = the
+  effective user), so `withUserContext(userId)` is the correct seed. Grep confirmed `request-context`
+  is the only interceptor with DB writes (csrf-refresh sets cookies; the two delegate-mask
+  interceptors only transform response payloads). Unit tests assert each of the three DB calls fires
+  under `{ userId }`; the existing suite's non-UUID fixtures were moved to UUIDs (the wrap validates
+  the id). Behavior at `RLS_MODE=off` unchanged (same rows, same fire-and-forget semantics).
 
 **Scope:** `backend/src/common/interceptors/request-context.interceptor.ts`, any other post-response
 writes found by grep.
