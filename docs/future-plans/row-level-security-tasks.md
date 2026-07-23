@@ -39,31 +39,31 @@ uses four classes:
 
 ## Task graph
 
-| ID | Task | Depends on | Deploy impact |
-|----|------|-----------|---------------|
-| F1 | RLS_MODE flag, role creation + grants in db-init, env plumbing (compose + helm/k8s) | — | inert |
-| F2 | Request context extension (incl. `realUserId`) + `tenantTx` (re-entrant, both identity GUCs) + `with-context` helpers + exception-filter mapping | F1 | none |
-| F3 | CI ratchet on `@InjectRepository` / `createQueryRunner` counts | F2 | none |
-| M1 | Migration: helper functions + GUC-aware trigger (**no grants — they live in db-init, F1**) | — | inert |
-| M2 | Migrations: direct + indirect + special (users/delegation/emergency) policies (no enable) | M1 | inert |
-| M3 | Migration: `ENABLE ROW LEVEL SECURITY` (authored, **not deployed**) | M2 | **DO NOT DEPLOY** |
-| T1 | Integration harness applies real RLS migrations + role/grants + `updated_at` triggers | M2, F1 | none |
-| T2 | Catalog-driven `rls-enforcement` integration spec (4 buckets) | T1, M3 | none |
-| C1 | Auth wrapping: `jwt.strategy` under `withUserContext(sub)`; PAT + password-reset + OAuth under `withSystemContext`; public-route audit | F2 | inert |
-| C2 | Cron jobs: system fan-out + per-user bodies wrapped | F2 | inert |
-| C3 | Seeders + demo reset under `withSystemContext` | F2 | inert |
-| C4 | Emergency-access claim + expiry monitor under `withSystemContext`; grantee-side read audit | F2 | inert |
-| C6 | Interceptor restructure: fire-and-forget writes moved inside the ALS scope | F2 | neutral |
-| R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral |
-| R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral |
-| R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral |
-| R4 | Refactor: budgets | F3, C1–C4, C6 | neutral |
-| R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral |
-| R6 | Refactor: ai, mcp, import, action-history, currencies, updates, notifications | F3, C1–C4, C6 | neutral |
-| R7 | Refactor: auth, users, delegation, admin, emergency-access, backup, database | F3, C1–C4, C6 | neutral |
-| C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral |
-| L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none |
-| D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none |
+| ID | Task | Depends on | Deploy impact | Status |
+|----|------|-----------|---------------|--------|
+| F1 | RLS_MODE flag, role creation + grants in db-init, env plumbing (compose + helm/k8s) | — | inert | done |
+| F2 | Request context extension (incl. `realUserId`) + `tenantTx` (re-entrant, both identity GUCs) + `with-context` helpers + exception-filter mapping | F1 | none | done |
+| F3 | CI ratchet on `@InjectRepository` / `createQueryRunner` counts | F2 | none | done |
+| M1 | Migration: helper functions + GUC-aware trigger (**no grants — they live in db-init, F1**) | — | inert | not started |
+| M2 | Migrations: direct + indirect + special (users/delegation/emergency) policies (no enable) | M1 | inert | not started |
+| M3 | Migration: `ENABLE ROW LEVEL SECURITY` (authored, **not deployed**) | M2 | **DO NOT DEPLOY** | not started |
+| T1 | Integration harness applies real RLS migrations + role/grants + `updated_at` triggers | M2, F1 | none | not started |
+| T2 | Catalog-driven `rls-enforcement` integration spec (4 buckets) | T1, M3 | none | not started |
+| C1 | Auth wrapping: `jwt.strategy` under `withUserContext(sub)`; PAT + password-reset + OAuth under `withSystemContext`; public-route audit | F2 | inert | not started |
+| C2 | Cron jobs: system fan-out + per-user bodies wrapped | F2 | inert | not started |
+| C3 | Seeders + demo reset under `withSystemContext` | F2 | inert | not started |
+| C4 | Emergency-access claim + expiry monitor under `withSystemContext`; grantee-side read audit | F2 | inert | not started |
+| C6 | Interceptor restructure: fire-and-forget writes moved inside the ALS scope | F2 | neutral | not started |
+| R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral | not started |
+| R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral | not started |
+| R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral | not started |
+| R4 | Refactor: budgets | F3, C1–C4, C6 | neutral | not started |
+| R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral | not started |
+| R6 | Refactor: ai, mcp, import, action-history, currencies, updates, notifications | F3, C1–C4, C6 | neutral | not started |
+| R7 | Refactor: auth, users, delegation, admin, emergency-access, backup, database | F3, C1–C4, C6 | neutral | not started |
+| C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral | not started |
+| L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none | not started |
+| D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none | not started |
 
 **Why context wrapping (C1–C4, C6) comes BEFORE the refactors (R1–R7), not after.** `tenantTx` throws
 on missing ambient context in every mode, including `off`. `jwt.strategy` runs in the guard phase —
