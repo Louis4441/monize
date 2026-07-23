@@ -33,6 +33,10 @@ export interface MarkSeenResult {
   version: string;
 }
 
+export interface RemindResult {
+  reminded: boolean;
+}
+
 export const whatsNewApi = {
   /**
    * Public endpoint: the current version's notes with no per-user state. Works
@@ -55,6 +59,17 @@ export const whatsNewApi = {
   markSeen: async (): Promise<MarkSeenResult> => {
     const response = await apiClient.post<MarkSeenResult>(
       '/updates/whats-new/seen',
+    );
+    return response.data;
+  },
+
+  /**
+   * Authenticated: clear the acknowledgement so the digest shows again next
+   * login ("Show at next login") -- the active opposite of markSeen.
+   */
+  remindNextLogin: async (): Promise<RemindResult> => {
+    const response = await apiClient.post<RemindResult>(
+      '/updates/whats-new/remind',
     );
     return response.data;
   },

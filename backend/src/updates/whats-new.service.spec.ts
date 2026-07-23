@@ -136,4 +136,48 @@ describe("WhatsNewService", () => {
       expect(result.seen).toBe(true);
     });
   });
+
+  describe("remindNextLogin", () => {
+    it("clears an existing acknowledgement so the digest shows again", async () => {
+      const existing = prefs({ lastSeenVersion: CURRENT_VERSION });
+      repo.findOne.mockResolvedValue(existing);
+
+      const result = await service.remindNextLogin("user-1");
+
+      expect(existing.lastSeenVersion).toBeNull();
+      expect(repo.save).toHaveBeenCalledWith(existing);
+      expect(result).toEqual({ reminded: true });
+    });
+
+    it("does not write when there is nothing to clear", async () => {
+      repo.findOne.mockResolvedValue(prefs({ lastSeenVersion: null }));
+
+      const result = await service.remindNextLogin("user-1");
+
+      expect(repo.save).not.toHaveBeenCalled();
+      expect(result.reminded).toBe(true);
+    });
+
+    it("is a no-op (still succeeds) when no preferences row exists", async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      const result = await service.remindNextLogin("user-1");
+
+      expect(repo.save).not.toHaveBeenCalled();
+      expect(result.reminded).toBe(true);
+    });
+
+    it("re-enables auto-show after an acknowledgement was cleared", async () => {
+      // Acknowledged -> would not auto-show...
+      repo.findOne.mockResolvedValue(
+        prefs({ lastSeenVersion: CURRENT_VERSION }),
+      );
+      expect((await service.getWhatsNew("user-1")).autoShow).toBe(false);
+
+      // ...clearing it brings the popup back on the next status check.
+      const cleared = prefs({ lastSeenVersion: null });
+      repo.findOne.mockResolvedValue(cleared);
+      expect((await service.getWhatsNew("user-1")).autoShow).toBe(true);
+    });
+  });
 });

@@ -77,4 +77,24 @@ export class WhatsNewService {
 
     return { seen: true, version: currentVersion };
   }
+
+  /**
+   * Clear the acknowledgement for the current version ("Show at next login"), so
+   * the digest auto-shows again on the next load. The active counterpart to
+   * markSeen: the two are true opposites, so this reliably brings the popup back
+   * even if the user (or an earlier session) had already acknowledged it.
+   *
+   * A missing row, or one that carries no acknowledgement, already auto-shows by
+   * default, so there is nothing to clear and no row is created.
+   */
+  async remindNextLogin(userId: string): Promise<{ reminded: boolean }> {
+    const prefs = await this.preferencesRepository.findOne({
+      where: { userId },
+    });
+    if (prefs && prefs.lastSeenVersion !== null) {
+      prefs.lastSeenVersion = null;
+      await this.preferencesRepository.save(prefs);
+    }
+    return { reminded: true };
+  }
 }

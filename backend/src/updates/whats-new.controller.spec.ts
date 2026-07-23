@@ -11,6 +11,7 @@ describe("WhatsNewController", () => {
     mockService = {
       getWhatsNew: jest.fn(),
       markSeen: jest.fn(),
+      remindNextLogin: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -33,5 +34,12 @@ describe("WhatsNewController", () => {
     const result = controller.markSeen(mockReq);
     expect(result).toBe("seen");
     expect(mockService.markSeen).toHaveBeenCalledWith("user-1");
+  });
+
+  it("remindNextLogin delegates to the service with the request user id", () => {
+    mockService.remindNextLogin!.mockReturnValue("reminded");
+    const result = controller.remindNextLogin(mockReq);
+    expect(result).toBe("reminded");
+    expect(mockService.remindNextLogin).toHaveBeenCalledWith("user-1");
   });
 });

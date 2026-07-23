@@ -11,6 +11,7 @@ vi.mock('@/lib/whats-new', () => ({
     getWhatsNew: vi.fn(),
     getReleaseNotes: vi.fn(),
     markSeen: vi.fn(),
+    remindNextLogin: vi.fn(),
   },
 }));
 
@@ -41,6 +42,7 @@ describe('WhatsNewHost', () => {
     });
     mockApi.getReleaseNotes.mockResolvedValue({ version: '1.12.1', notes: NOTES });
     mockApi.markSeen.mockResolvedValue({ seen: true, version: '1.12.1' });
+    mockApi.remindNextLogin.mockResolvedValue({ reminded: true });
   });
 
   it('auto-opens for an authenticated user when the backend says so', async () => {
@@ -98,6 +100,30 @@ describe('WhatsNewHost', () => {
     });
 
     expect(mockApi.markSeen).toHaveBeenCalledTimes(1);
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
+  });
+
+  it('clears the acknowledgement and closes on "Show at next login"', async () => {
+    useAuthStore.setState({ isAuthenticated: true });
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.12.1',
+      autoShow: true,
+      notes: NOTES,
+    });
+
+    await renderHost();
+    await waitFor(() =>
+      expect(screen.getByText('Intro paragraph.')).toBeInTheDocument(),
+    );
+
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Show at next login' }),
+      );
+    });
+
+    expect(mockApi.remindNextLogin).toHaveBeenCalledTimes(1);
+    expect(mockApi.markSeen).not.toHaveBeenCalled();
     expect(useWhatsNewStore.getState().isOpen).toBe(false);
   });
 });

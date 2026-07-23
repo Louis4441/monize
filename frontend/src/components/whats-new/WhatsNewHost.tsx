@@ -63,6 +63,13 @@ export function WhatsNewHost() {
     close();
   };
 
+  const handleShowNextLogin = () => {
+    whatsNewApi.remindNextLogin().catch((error) => {
+      logger.debug('Failed to reset release notes reminder', error);
+    });
+    close();
+  };
+
   return (
     <WhatsNewModal
       isOpen={isOpen}
@@ -70,6 +77,7 @@ export function WhatsNewHost() {
       loading={loading}
       authenticated={isAuthenticated}
       onClose={close}
+      onShowNextLogin={handleShowNextLogin}
       onDontShowAgain={handleDontShowAgain}
     />
   );

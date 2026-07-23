@@ -16,8 +16,13 @@ interface WhatsNewModalProps {
   loading?: boolean;
   /** Whether the viewer is signed in — gates the "seen" actions. */
   authenticated: boolean;
-  /** Close without acknowledging (X, backdrop, "Show at next login"). */
+  /** Close without changing state (X, backdrop, Escape). */
   onClose: () => void;
+  /**
+   * Clear the acknowledgement so the digest shows again next login ("Show at
+   * next login"). Only when authenticated; falls back to a plain close.
+   */
+  onShowNextLogin?: () => void;
   /** Acknowledge the version ("Don't show this again"). Only when authenticated. */
   onDontShowAgain?: () => void;
 }
@@ -48,6 +53,7 @@ export function WhatsNewModal({
   loading = false,
   authenticated,
   onClose,
+  onShowNextLogin,
   onDontShowAgain,
 }: WhatsNewModalProps) {
   const t = useTranslations('common');
@@ -236,7 +242,11 @@ export function WhatsNewModal({
           <div className="flex gap-2">
             {authenticated && onDontShowAgain ? (
               <>
-                <Button variant="outline" size="sm" onClick={onClose}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onShowNextLogin ?? onClose}
+                >
                   {t('whatsNew.showNextLogin')}
                 </Button>
                 <Button variant="primary" size="sm" onClick={onDontShowAgain}>

@@ -36,4 +36,14 @@ export class WhatsNewController {
   markSeen(@Request() req) {
     return this.whatsNewService.markSeen(req.user.id);
   }
+
+  @Post("remind")
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      "Clear the current version's acknowledgement so the digest auto-shows again next login (Show at next login).",
+  })
+  remindNextLogin(@Request() req) {
+    return this.whatsNewService.remindNextLogin(req.user.id);
+  }
 }

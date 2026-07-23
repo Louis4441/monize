@@ -25,6 +25,7 @@ function renderModal(props: Partial<React.ComponentProps<typeof WhatsNewModal>> 
       notes={NOTES}
       authenticated
       onClose={vi.fn()}
+      onShowNextLogin={vi.fn()}
       onDontShowAgain={vi.fn()}
       {...props}
     />,
@@ -87,13 +88,13 @@ describe('WhatsNewModal', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('closes without acknowledging via "Show at next login"', () => {
+  it('requests a reminder via "Show at next login" without acknowledging', () => {
+    const onShowNextLogin = vi.fn();
     const onDontShowAgain = vi.fn();
-    const onClose = vi.fn();
-    renderModal({ onDontShowAgain, onClose });
+    renderModal({ onShowNextLogin, onDontShowAgain });
 
     fireEvent.click(screen.getByRole('button', { name: 'Show at next login' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onShowNextLogin).toHaveBeenCalledTimes(1);
     expect(onDontShowAgain).not.toHaveBeenCalled();
   });
 
