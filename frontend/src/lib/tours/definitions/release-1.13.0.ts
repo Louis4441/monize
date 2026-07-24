@@ -71,6 +71,14 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       advance: { type: 'appear', anchorId: TOUR_ANCHORS.transactionForm },
     },
     {
+      // In-form: the ordinary payee/category/date entry, unchanged by foreign
+      // currency -- fill it in as usual before the currency step.
+      id: 'enterDetails',
+      route: '/transactions',
+      anchorId: TOUR_ANCHORS.transactionFields,
+      placement: 'auto',
+    },
+    {
       // Interactive: spotlight the entry-currency picker and wait until the
       // user actually chooses a foreign currency -- the converted-amount field
       // only mounts once one is set. Its popover carries "Add currency..." for
@@ -79,7 +87,9 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       id: 'entryCurrency',
       route: '/transactions',
       anchorId: TOUR_ANCHORS.transactionCurrencyField,
-      placement: 'auto',
+      // Sit the tooltip above the button so it clears the currency popover,
+      // which opens downward from it.
+      placement: 'top',
       advance: { type: 'appear', anchorId: TOUR_ANCHORS.transactionConvertedAmount },
     },
     {

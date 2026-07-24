@@ -61,6 +61,11 @@ interface ModalProps {
    *  - 'drawer-left': full-height panel pinned to the left edge that slides in.
    *    Intended for mobile navigation. `maxWidth` is ignored in this variant. */
   variant?: 'center' | 'drawer-left';
+  /** Raise the backdrop above the guided-tour overlay (spotlight z-[60]) so a
+   *  modal opened mid-tour stays visible and interactive. Off by default; the
+   *  ordinary z-50 backdrop sits *below* the tour overlay so in-form spotlight
+   *  cutouts work. */
+  elevated?: boolean;
 }
 
 const maxWidthClasses = {
@@ -85,6 +90,7 @@ export function Modal({
   onBeforeClose,
   allowOverflow = false,
   variant = 'center',
+  elevated = false,
 }: ModalProps) {
   // Track whether we have a history entry pushed
   const historyPushedRef = useRef(false);
@@ -296,9 +302,9 @@ export function Modal({
 
   // Backdrop alignment: drawer pins its panel to the left edge; the default
   // centers the card with padding.
-  const backdropClassName = `fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm z-50 flex ${
-    isDrawer ? 'justify-start' : 'items-center justify-center p-4'
-  }`;
+  const backdropClassName = `fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm ${
+    elevated ? 'z-[65]' : 'z-50'
+  } flex ${isDrawer ? 'justify-start' : 'items-center justify-center p-4'}`;
 
   // Panel shape. The drawer is a full-height left sheet that slides in from
   // off-screen via the CSS @starting-style (`starting:`) variant -- no extra

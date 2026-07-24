@@ -63,6 +63,21 @@ describe('Modal', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('uses the default z-50 backdrop', () => {
+    render(<Modal isOpen={true}>Content</Modal>);
+    const backdrop = screen.getByRole('dialog').parentElement!;
+    expect(backdrop.className).toContain('z-50');
+    expect(backdrop.className).not.toContain('z-[65]');
+  });
+
+  it('raises the backdrop above the guided-tour overlay when elevated', () => {
+    render(<Modal isOpen={true} elevated>Content</Modal>);
+    const backdrop = screen.getByRole('dialog').parentElement!;
+    // Above the tour spotlight (z-[60]); still below the tour tooltip (z-[70]).
+    expect(backdrop.className).toContain('z-[65]');
+    expect(backdrop.className).not.toContain('z-50');
+  });
+
   it('stops submit event propagation from modal content', () => {
     const outerSubmitHandler = vi.fn();
     render(

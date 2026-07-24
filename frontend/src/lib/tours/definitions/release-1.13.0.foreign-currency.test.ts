@@ -27,6 +27,7 @@ describe('foreign-currency release tour', () => {
       'fxFeePercent',
       'closeAccountForm',
       'newTransaction',
+      'enterDetails',
       'entryCurrency',
       'closeTransactionForm',
       'openAccountDetail',
@@ -68,6 +69,13 @@ describe('foreign-currency release tour', () => {
       type: 'appear',
       anchorId: TOUR_ANCHORS.transactionForm,
     });
+
+    // The ordinary payee/category entry comes before the currency step.
+    const details = tour.steps.find((s) => s.id === 'enterDetails')!;
+    expect(details.anchorId).toBe(TOUR_ANCHORS.transactionFields);
+    expect(tour.steps.findIndex((s) => s.id === 'enterDetails')).toBeLessThan(
+      tour.steps.findIndex((s) => s.id === 'entryCurrency'),
+    );
 
     const currency = tour.steps.find((s) => s.id === 'entryCurrency')!;
     expect(currency.anchorId).toBe(TOUR_ANCHORS.transactionCurrencyField);

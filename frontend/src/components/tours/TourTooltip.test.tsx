@@ -66,6 +66,16 @@ describe('TourTooltip', () => {
     expect(screen.getByText('2 of 5')).toBeInTheDocument();
   });
 
+  it('emphasizes **bold** segments in the body', () => {
+    setup({ body: 'Choose **Edit** from the menu' });
+    const strong = screen.getByText('Edit');
+    expect(strong.tagName).toBe('STRONG');
+    // The ** markers are consumed, not shown literally.
+    expect(screen.queryByText(/\*\*/)).toBeNull();
+    expect(screen.getByText(/Choose/)).toBeInTheDocument();
+    expect(screen.getByText(/from the menu/)).toBeInTheDocument();
+  });
+
   it('shows Next on a passive non-final step and calls onNext', () => {
     const h = setup();
     fireEvent.click(screen.getByText('Next'));

@@ -116,7 +116,7 @@
           },
           "openAccountEdit": {
             "title": "Start on the card",
-            "body": "Foreign-transaction fees belong to the account. Pick a credit card you use abroad and choose Edit from its row actions -- or long-press the row on mobile -- to open its settings."
+            "body": "Foreign-transaction fees belong to the account. Pick a credit card you use abroad and choose **Edit** from its row actions -- or long-press the row on mobile -- to open its settings."
           },
           "fxFeePercent": {
             "title": "Set the conversion fee",
@@ -129,6 +129,10 @@
           "newTransaction": {
             "title": "Record a foreign purchase",
             "body": "Now log a purchase you made on that card in another currency. Open New Transaction and pick that card as the account."
+          },
+          "enterDetails": {
+            "title": "Enter the details as usual",
+            "body": "Fill in the payee, category, and date just like any other transaction. The foreign-currency part comes next."
           },
           "entryCurrency": {
             "title": "Choose the currency you paid in",

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 import {
@@ -9,6 +9,26 @@ import {
   type Size,
 } from '@/lib/tours/positioning';
 import type { TourPlacement } from '@/lib/tours/types';
+
+/**
+ * Render a tour string, emphasizing **bold** segments. Deliberately tiny -- the
+ * only markup tour copy needs -- so bodies stay plain strings (no next-intl
+ * rich text, and the `**` markers survive pseudo-locale generation untouched).
+ */
+function renderEmphasis(text: string): ReactNode {
+  return text.split(/\*\*(.+?)\*\*/g).map((part, i) =>
+    i % 2 === 1 ? (
+      <strong
+        key={i}
+        className="font-semibold text-gray-900 dark:text-gray-100"
+      >
+        {part}
+      </strong>
+    ) : (
+      <Fragment key={i}>{part}</Fragment>
+    ),
+  );
+}
 
 export interface TourTooltipLabels {
   next: string;
@@ -159,7 +179,9 @@ export function TourTooltip({
       <h2 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">
         {title}
       </h2>
-      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{body}</p>
+      <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+        {renderEmphasis(body)}
+      </p>
       {interactive && (
         <p className="mt-2 text-xs font-medium text-gray-500 dark:text-gray-400">
           {labels.tryIt}

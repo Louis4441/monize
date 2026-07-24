@@ -59,6 +59,16 @@ describe('CurrencyPickerButton', () => {
     expect(screen.queryByText(/OLD Retired/)).not.toBeInTheDocument();
   });
 
+  it('renders the popover above a guided-tour overlay so it stays clickable', async () => {
+    await renderPicker({ accountCurrencyCode: 'CAD' });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button'));
+    });
+    const popover = await screen.findByRole('dialog');
+    // Above the tour spotlight (z-[60]); below the tour tooltip (z-[70]).
+    expect(popover.className).toContain('z-[65]');
+  });
+
   it('calls onChange with the selected currency code', async () => {
     const { onChange } = await renderPicker({ accountCurrencyCode: 'CAD' });
     await act(async () => {
