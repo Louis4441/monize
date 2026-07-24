@@ -27,6 +27,7 @@ describe('foreign-currency release tour', () => {
       'fxFeePercent',
       'closeAccountForm',
       'newTransaction',
+      'chooseAccount',
       'enterDetails',
       'entryCurrency',
       'enterAmount',
@@ -74,6 +75,14 @@ describe('foreign-currency release tour', () => {
       anchorId: TOUR_ANCHORS.transactionForm,
     });
 
+    // The fee lives on the account and the rate is fetched for the date, so
+    // both are confirmed (and editable) before anything currency-specific.
+    const account = tour.steps.find((s) => s.id === 'chooseAccount')!;
+    expect(account.anchorId).toBe(TOUR_ANCHORS.transactionAccountDate);
+    expect(tour.steps.findIndex((s) => s.id === 'chooseAccount')).toBeLessThan(
+      tour.steps.findIndex((s) => s.id === 'entryCurrency'),
+    );
+
     // The ordinary payee/category entry comes before the currency step.
     const details = tour.steps.find((s) => s.id === 'enterDetails')!;
     expect(details.anchorId).toBe(TOUR_ANCHORS.transactionFields);
@@ -113,7 +122,7 @@ describe('foreign-currency release tour', () => {
 
   // Every step that asks the user to type into the spotlit control must keep
   // the cutout clickable; a plain passive step covers it with a click blocker.
-  it.each(['fxFeePercent', 'enterDetails', 'enterAmount'])(
+  it.each(['fxFeePercent', 'chooseAccount', 'enterDetails', 'enterAmount'])(
     'allows input on the "%s" step',
     (id) => {
       const step = tour.steps.find((s) => s.id === id)!;

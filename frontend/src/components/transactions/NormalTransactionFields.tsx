@@ -97,7 +97,10 @@ export function NormalTransactionFields({
   return (
     <div className="space-y-4">
       {/* Row 1: Account, Date, and optionally Create Date */}
-      <div className={`grid grid-cols-1 gap-4 ${createdAtSlot ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+      <div
+        {...tourAnchor(TOUR_ANCHORS.transactionAccountDate)}
+        className={`grid grid-cols-1 gap-4 ${createdAtSlot ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}
+      >
         <Select
           label={t('form.fields.account')}
           error={errors.accountId?.message as string | undefined}

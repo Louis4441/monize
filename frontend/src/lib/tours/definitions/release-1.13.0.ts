@@ -78,7 +78,17 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       advance: { type: 'appear', anchorId: TOUR_ANCHORS.transactionForm },
     },
     {
-      // In-form: the ordinary payee/category/date entry, unchanged by foreign
+      // The fee is a property of the account, and the rate is fetched for the
+      // transaction's date, so both have to be right before the currency step.
+      // allowInteraction so the account select and date picker are usable.
+      id: 'chooseAccount',
+      route: '/transactions',
+      anchorId: TOUR_ANCHORS.transactionAccountDate,
+      placement: 'auto',
+      allowInteraction: true,
+    },
+    {
+      // In-form: the ordinary payee/category entry, unchanged by foreign
       // currency -- fill it in as usual before the currency step.
       // allowInteraction so the fields accept input while the step is shown.
       id: 'enterDetails',

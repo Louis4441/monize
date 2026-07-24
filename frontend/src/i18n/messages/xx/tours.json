@@ -131,9 +131,13 @@
             "title": "[XX-Record a foreign purchase-XX]",
             "body": "[XX-Now log a purchase you made on that card in another currency. Open **New Transaction** and pick that card as the account.-XX]"
           },
+          "chooseAccount": {
+            "title": "[XX-Check the account and date-XX]",
+            "body": "[XX-The conversion fee belongs to the account, so make sure **Account** is the card you just set it on -- change it here if not. Set **Date** to the day of the purchase too: the exchange rate is looked up for that date.-XX]"
+          },
           "enterDetails": {
             "title": "[XX-Enter the details as usual-XX]",
-            "body": "[XX-Fill in the payee, category, and date just like any other transaction. The foreign-currency part comes next.-XX]"
+            "body": "[XX-Fill in the payee and category just like any other transaction. The foreign-currency part comes next.-XX]"
           },
           "entryCurrency": {
             "title": "[XX-Choose the currency you paid in-XX]",

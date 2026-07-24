@@ -33,6 +33,15 @@ interface ActiveTour {
   /** Pathname the engine last pushed to; a matching change is expected, not a
    *  user-initiated dismissal. */
   expectedRoute: string | null;
+  /**
+   * Set while skipping through steps (the user pressed "Skip this step", or a
+   * step's anchor timed out). The next step's anchor gets a much shorter grace
+   * period, so a run of unreachable steps -- skipping "choose a currency"
+   * leaves the following conversion step with nothing to point at -- does not
+   * leave the screen blank for the full timeout each time. Cleared as soon as
+   * a step goes active.
+   */
+  fastForward: boolean;
 }
 
 interface TourState {
@@ -103,6 +112,7 @@ export const useTourStore = create<TourState>((set, get) => ({
         skippedCount: 0,
         showSkippedOutro: false,
         expectedRoute: null,
+        fastForward: false,
       },
     });
   },
@@ -117,6 +127,7 @@ export const useTourStore = create<TourState>((set, get) => ({
         stepIndex: active.stepIndex + 1,
         phase: 'navigating',
         expectedRoute: null,
+        fastForward: false,
       },
     });
   },
@@ -131,6 +142,7 @@ export const useTourStore = create<TourState>((set, get) => ({
         stepIndex: active.stepIndex - 1,
         phase: 'navigating',
         expectedRoute: null,
+        fastForward: false,
       },
     });
   },
@@ -152,6 +164,7 @@ export const useTourStore = create<TourState>((set, get) => ({
         stepIndex: active.stepIndex + 1,
         phase: 'navigating',
         expectedRoute: null,
+        fastForward: true,
       },
     });
   },
@@ -178,7 +191,10 @@ export const useTourStore = create<TourState>((set, get) => ({
   setPhase: (phase) => {
     const { active } = get();
     if (!active) return;
-    set({ active: { ...active, phase } });
+    // Landing on a real step ends the fast-forward: the run of unreachable
+    // steps is over, so later waits get the normal grace period again.
+    const fastForward = phase === 'active' ? false : active.fastForward;
+    set({ active: { ...active, phase, fastForward } });
   },
 
   setExpectedRoute: (route) => {

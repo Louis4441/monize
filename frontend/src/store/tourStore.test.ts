@@ -102,6 +102,37 @@ describe('tourStore', () => {
     expect(saveProgress).toHaveBeenCalledWith('test/basics', 'completed');
   });
 
+  it('fast-forwards while skipping and stops once a step goes active', () => {
+    const store = useTourStore.getState();
+    store.startTour(TOUR);
+    expect(useTourStore.getState().active!.fastForward).toBe(false);
+
+    // Skipping arms the short anchor grace period for the next step...
+    store.skip();
+    expect(useTourStore.getState().active!.fastForward).toBe(true);
+    // ...and it stays armed across a run of unreachable steps.
+    store.skip();
+    expect(useTourStore.getState().active!.fastForward).toBe(true);
+
+    // Landing on a step that resolves ends the fast-forward.
+    useTourStore.getState().setPhase('active');
+    expect(useTourStore.getState().active!.fastForward).toBe(false);
+  });
+
+  it('clears fast-forward when the user drives the tour with Next or Back', () => {
+    const store = useTourStore.getState();
+    store.startTour(TOUR);
+    store.skip();
+    expect(useTourStore.getState().active!.fastForward).toBe(true);
+
+    useTourStore.getState().next();
+    expect(useTourStore.getState().active!.fastForward).toBe(false);
+
+    useTourStore.getState().skip();
+    useTourStore.getState().back();
+    expect(useTourStore.getState().active!.fastForward).toBe(false);
+  });
+
   it('endTour dismissed persists a dismissal', () => {
     const store = useTourStore.getState();
     store.startTour(TOUR);

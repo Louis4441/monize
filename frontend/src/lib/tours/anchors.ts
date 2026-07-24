@@ -35,6 +35,7 @@ export const TOUR_ANCHORS = {
   // Transactions
   transactionsNewButton: 'transactions-new-button',
   transactionForm: 'transaction-form',
+  transactionAccountDate: 'transaction-account-date',
   transactionFields: 'transaction-fields',
   transactionSplit: 'transaction-split',
   transactionCurrencyField: 'transaction-currency-field',

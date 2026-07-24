@@ -17,6 +17,15 @@ const logger = createLogger('Tours');
 
 const DEFAULT_ANCHOR_TIMEOUT = 5000;
 const POST_NAV_ANCHOR_TIMEOUT = 10000;
+/**
+ * Grace period for the step after a skip, when no navigation is involved. The
+ * overlay renders nothing while waiting for an anchor, so a skip into a step
+ * that cannot possibly resolve -- skipping "choose a currency" leaves the
+ * conversion step with nothing to point at -- would otherwise blank the screen
+ * for the full timeout, once per step in the run. The anchor is either already
+ * on the page or a re-render away, so this only has to outlast a paint.
+ */
+const SKIP_ANCHOR_TIMEOUT = 1200;
 /** Interactive appear-waits should not auto-skip; the user drives them. */
 const INTERACTIVE_TIMEOUT = 600000;
 /**
@@ -63,9 +72,16 @@ export function TourHost() {
 
   // --- Anchor resolution for the current step ---------------------------------
   const navigated = !!step && active?.expectedRoute === step.route;
+  // A navigation still gets the long timeout even mid-skip: a cold route load
+  // is slow for honest reasons, and cutting it short would skip a step that
+  // was about to resolve.
   const anchorTimeout =
     step?.anchorTimeoutMs ??
-    (navigated ? POST_NAV_ANCHOR_TIMEOUT : DEFAULT_ANCHOR_TIMEOUT);
+    (navigated
+      ? POST_NAV_ANCHOR_TIMEOUT
+      : active?.fastForward
+        ? SKIP_ANCHOR_TIMEOUT
+        : DEFAULT_ANCHOR_TIMEOUT);
   const anchorEnabled =
     !!active &&
     !showingOutro &&
