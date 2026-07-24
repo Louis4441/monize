@@ -13,6 +13,7 @@ import { NormalTransactionFields } from './NormalTransactionFields';
 import { SplitTransactionFields } from './SplitTransactionFields';
 import { CurrencyPickerButton } from './CurrencyPickerButton';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
+import { useDisableTransactionSplit } from '@/store/tourStore';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { exchangeRatesApi } from '@/lib/exchange-rates';
 import { getCurrencySymbol, roundToCents, roundToDecimals } from '@/lib/format';
@@ -168,6 +169,8 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
 
   // Transaction mode state (normal, split, or transfer)
   const [mode, setMode] = useState<TransactionMode>(getInitialMode());
+  // A tour can grey out Split; false whenever no such tour is running.
+  const splitDisabled = useDisableTransactionSplit();
 
   // Split transaction state
   const [isSplitMode, setIsSplitMode] = useState<boolean>(initSource?.isSplit || false);
@@ -1239,13 +1242,17 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           >
             {t('form.modeTransaction')}
           </button>
+          {/* Greyed out while a tour asks for the simple form, so the
+              walkthrough cannot be derailed into a mode it does not cover. */}
           <button
             type="button"
             onClick={() => handleModeChange('split')}
-            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors ${
+            disabled={splitDisabled}
+            title={splitDisabled ? t('form.splitDisabledDuringTour') : undefined}
+            className={`px-3 py-1.5 text-sm rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               mode === 'split'
                 ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:hover:bg-transparent'
             }`}
           >
             {t('form.modeSplit')}

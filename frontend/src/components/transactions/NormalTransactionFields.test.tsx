@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@/test/render';
 import { NormalTransactionFields } from './NormalTransactionFields';
 import { Account } from '@/types/account';
 import { Payee } from '@/types/payee';
+import { useTourStore } from '@/store/tourStore';
 
 vi.mock('@/lib/format', () => ({
   getCurrencySymbol: (code: string) => (code === 'USD' ? 'US$' : '$'),
@@ -146,6 +147,9 @@ describe('NormalTransactionFields', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // No tour running by default, so a tour started in one test cannot leak
+    // its form constraints into the next.
+    useTourStore.setState({ active: null });
   });
 
   it('renders Account select', () => {
@@ -432,6 +436,38 @@ describe('NormalTransactionFields', () => {
     fireEvent.click(splitButtons[0]);
 
     expect(defaultProps.handleModeChange).toHaveBeenCalledWith('split');
+  });
+
+  it('disables Split while a tour asks for the single-path form', () => {
+    // The Split control sits inside the payee/category row the tour highlights,
+    // and interactive steps deliberately let clicks through so the fields can
+    // be filled in -- so the tour flag is what keeps Split out of reach.
+    useTourStore.getState().startTour({
+      id: 'test/no-split',
+      area: 'transactions',
+      i18nPrefix: 'intro.basics',
+      disableTransactionSplit: true,
+      steps: [{ id: 'fields', route: '/transactions', anchorId: null }],
+    });
+
+    render(<NormalTransactionFields {...defaultProps} />);
+    for (const button of screen.getAllByText('Split Transaction')) {
+      expect(button).toBeDisabled();
+    }
+    fireEvent.click(screen.getAllByText('Split Transaction')[0]);
+    expect(defaultProps.handleModeChange).not.toHaveBeenCalled();
+  });
+
+  it('leaves Split enabled for tours that do not ask for it', () => {
+    useTourStore.getState().startTour({
+      id: 'test/with-split',
+      area: 'intro',
+      i18nPrefix: 'intro.basics',
+      steps: [{ id: 'splits', route: '/transactions', anchorId: null }],
+    });
+
+    render(<NormalTransactionFields {...defaultProps} />);
+    expect(screen.getAllByText('Split Transaction')[0]).toBeEnabled();
   });
 
   it('includes currency code in account labels', () => {

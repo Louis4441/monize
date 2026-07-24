@@ -152,7 +152,15 @@ describe('foreign-currency release tour', () => {
 
   it('ends on the cross-account report card', () => {
     const report = tour.steps.find((s) => s.id === 'report')!;
-    expect(report.route).toBe('/reports');
+    // Forces the listing to the category holding the report, since the filter
+    // is remembered across visits and could otherwise hide it. routeMatch
+    // keeps the engine's route check working (a pathname carries no query).
+    expect(report.route).toBe('/reports?category=insights');
+    expect(report.routeMatch).toBe('/reports');
     expect(report.anchorId).toBe(TOUR_ANCHORS.reportForeignCurrencyFees);
+  });
+
+  it('keeps Split out of reach so the walkthrough has one path', () => {
+    expect(tour.disableTransactionSplit).toBe(true);
   });
 });

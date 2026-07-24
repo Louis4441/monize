@@ -32,6 +32,11 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
   area: 'transactions',
   version: RELEASE_1_13_MINOR,
   i18nPrefix: 'release.v1_13_0.foreignCurrency',
+  // The walkthrough covers one path: a normal, single-category transaction.
+  // Splits support foreign entry too, but stepping into that mode mid-tour
+  // swaps the fields out from under the remaining steps, so Split is greyed
+  // out (not removed) while this tour runs.
+  disableTransactionSplit: true,
   steps: [
     {
       // Route-agnostic welcome: shows wherever the tour was launched, so it
@@ -151,9 +156,14 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       placement: 'auto',
     },
     {
-      // The cross-account report card on the Reports listing.
+      // The cross-account report card on the Reports listing. The category
+      // filter there is remembered across visits, so the report can easily be
+      // filtered out before the tour arrives: `?category=insights` forces the
+      // listing to the group holding it. `routeMatch` keeps the engine's
+      // "am I there yet" check working, since a pathname carries no query.
       id: 'report',
-      route: '/reports',
+      route: '/reports?category=insights',
+      routeMatch: '/reports',
       anchorId: TOUR_ANCHORS.reportForeignCurrencyFees,
       placement: 'auto',
     },

@@ -77,6 +77,13 @@ export interface TourDefinition {
   version?: string;
   /** i18n prefix under the `tours` namespace (e.g. 'intro.basics'). */
   i18nPrefix: string;
+  /**
+   * Disable the transaction form's Split controls while this tour runs, so the
+   * walkthrough keeps to the single path it covers. They stay visible (just
+   * greyed out) so the form does not change shape mid-tour. Off by default --
+   * the introduction tour teaches Split and must keep it usable.
+   */
+  disableTransactionSplit?: boolean;
   steps: readonly TourStep[];
 }
 

@@ -203,3 +203,11 @@ export const useTourStore = create<TourState>((set, get) => ({
     set({ active: { ...active, expectedRoute: route } });
   },
 }));
+
+/**
+ * Whether the running tour asks the transaction form to disable its Split
+ * controls, so the walkthrough keeps to one path. False when no tour is running.
+ */
+export function useDisableTransactionSplit(): boolean {
+  return useTourStore((s) => !!s.active?.tour.disableTransactionSplit);
+}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { PageLayout } from '@/components/layout/PageLayout';
@@ -42,6 +42,29 @@ function ReportsContent() {
   const router = useRouter();
   const [density, setDensity] = useLocalStorage<DensityLevel>('monize-reports-density', 'normal');
   const [categoryFilter, setCategoryFilter] = useLocalStorage<ReportCategory | 'all'>('monize-reports-category', 'all');
+  // `?category=` overrides the remembered filter for this visit, so a link can
+  // guarantee a given report is on screen whatever the user last filtered by
+  // (a guided tour pointing at one uses this). Applied once per param value via
+  // the info-from-previous-render pattern -- never a setState in an effect --
+  // and dropped as soon as the user picks a category themselves.
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams?.get('category') ?? null;
+  const [categoryOverride, setCategoryOverride] = useState<ReportCategory | 'all' | null>(null);
+  const [appliedCategoryParam, setAppliedCategoryParam] = useState<string | null>(null);
+  if (categoryParam !== appliedCategoryParam) {
+    setAppliedCategoryParam(categoryParam);
+    const valid =
+      categoryParam === 'all' ||
+      (!!categoryParam && Object.prototype.hasOwnProperty.call(categoryColors, categoryParam));
+    setCategoryOverride(valid ? (categoryParam as ReportCategory | 'all') : null);
+  }
+  const effectiveCategory = categoryOverride ?? categoryFilter;
+
+  /** Pick a category by hand: clears any `?category=` override so it sticks. */
+  const selectCategory = (category: ReportCategory | 'all') => {
+    setCategoryOverride(null);
+    setCategoryFilter(category);
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [customReports, setCustomReports] = useState<CustomReport[]>([]);
   const [isLoadingCustom, setIsLoadingCustom] = useState(true);
@@ -259,7 +282,7 @@ function ReportsContent() {
     const q = debouncedSearchQuery.toLowerCase();
     return allReports
       .filter(r => {
-        if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
+        if (effectiveCategory !== 'all' && r.category !== effectiveCategory) return false;
         if (debouncedSearchQuery) {
           const name = r.name ?? t(`page.names.${r.id}` as Parameters<typeof t>[0]);
           const desc = r.description ?? t(`page.descriptions.${r.id}` as Parameters<typeof t>[0]);
@@ -268,7 +291,7 @@ function ReportsContent() {
         return true;
       })
       .sort((a, b) => Number(isFavourite(b)) - Number(isFavourite(a)));
-  }, [allReports, categoryFilter, debouncedSearchQuery, favouriteReportIds, t]);
+  }, [allReports, effectiveCategory, debouncedSearchQuery, favouriteReportIds, t]);
 
   const handleReportClick = (reportId: string) => {
     router.push(`/reports/${reportId}`);
@@ -312,9 +335,9 @@ function ReportsContent() {
         {/* Category Filter */}
         <div className="mb-6 flex flex-wrap items-center gap-2">
           <button
-            onClick={() => setCategoryFilter('all')}
+            onClick={() => selectCategory('all')}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              categoryFilter === 'all'
+              effectiveCategory === 'all'
                 ? 'bg-blue-600 text-white'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
             }`}
@@ -324,9 +347,9 @@ function ReportsContent() {
           {(Object.keys(categoryColors) as ReportCategory[]).map((cat) => (
             <button
               key={cat}
-              onClick={() => setCategoryFilter(cat)}
+              onClick={() => selectCategory(cat)}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                categoryFilter === cat
+                effectiveCategory === cat
                   ? 'bg-blue-600 text-white'
                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
               }`}
