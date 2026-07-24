@@ -17,11 +17,7 @@ vi.mock('@/lib/tours-api', () => ({
 }));
 
 const listAccounts = vi.fn().mockResolvedValue([]);
-const listPayees = vi.fn().mockResolvedValue([]);
-const listCategories = vi.fn().mockResolvedValue([]);
 vi.mock('@/lib/accounts', () => ({ accountsApi: { getAll: () => listAccounts() } }));
-vi.mock('@/lib/payees', () => ({ payeesApi: { getAll: () => listPayees() } }));
-vi.mock('@/lib/categories', () => ({ categoriesApi: { getAll: () => listCategories() } }));
 
 import { act, render, screen, waitFor, fireEvent, cleanup } from '@/test/render';
 import { TourHost } from './TourHost';
@@ -72,8 +68,6 @@ beforeEach(() => {
   saveProgress.mockClear();
   setDesktop();
   listAccounts.mockClear().mockResolvedValue([]);
-  listPayees.mockClear().mockResolvedValue([]);
-  listCategories.mockClear().mockResolvedValue([]);
   useTourStore.setState({ active: null, progress: {}, progressLoaded: false });
   useAuthStore.setState({ isAuthenticated: true });
 });
@@ -271,8 +265,8 @@ describe('TourHost', () => {
       ],
     };
 
-    it('omits the step when the user has nothing to record', async () => {
-      // All three lists empty: the form walkthrough would teach nothing.
+    it('omits the step when the user has no account to record against', async () => {
+      // No accounts: the form cannot be submitted, so it would teach nothing.
       await mountHost();
       await start(GATED);
       await waitFor(() =>
@@ -291,10 +285,10 @@ describe('TourHost', () => {
       expect(useTourStore.getState().active?.skippedCount).toBe(0);
     });
 
-    it('shows the step once the user has an account, payee and category', async () => {
+    it('shows the step once the user has an account', async () => {
+      // Payee and category are optional on a transaction and can be created
+      // from inside the form, so an account alone is enough.
       listAccounts.mockResolvedValueOnce([{ id: 'a' }]);
-      listPayees.mockResolvedValueOnce([{ id: 'p' }]);
-      listCategories.mockResolvedValueOnce([{ id: 'c' }]);
 
       await mountHost();
       await start(GATED);

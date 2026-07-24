@@ -29,8 +29,13 @@ export type TourPlacement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 
 /**
  * Data a step needs before it is worth showing.
- * - `transactionEntry` the user has at least one account, payee and category,
- *   so walking them through the New Transaction form makes sense.
+ * - `transactionEntry` the user has at least one account, so walking them
+ *   through the New Transaction form makes sense. Deliberately *only* accounts:
+ *   the account is the one field the form requires and the one thing that
+ *   cannot be created from inside it, while payee and category are optional and
+ *   can be created inline -- which the walkthrough itself teaches. Gating on
+ *   those too would hide the tour's most useful section from exactly the new
+ *   users it is for.
  */
 export type TourRequirement = 'transactionEntry';
 

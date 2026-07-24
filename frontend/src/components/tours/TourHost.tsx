@@ -7,8 +7,6 @@ import { useAuthStore } from '@/store/authStore';
 import { useTourStore } from '@/store/tourStore';
 import { toursApi } from '@/lib/tours-api';
 import { accountsApi } from '@/lib/accounts';
-import { payeesApi } from '@/lib/payees';
-import { categoriesApi } from '@/lib/categories';
 import { createLogger } from '@/lib/logger';
 import { findTourAnchor } from '@/lib/tours/anchors';
 import { useTourAnchor } from '@/hooks/useTourAnchor';
@@ -111,8 +109,8 @@ export function TourHost() {
 
   // --- Step requirements -----------------------------------------------------
   // Some steps are only worth showing when the user has the data they talk
-  // about (the record-a-transaction walkthrough needs an account, payee and
-  // category). Resolved lazily: nothing is fetched unless a running tour
+  // about (the record-a-transaction walkthrough needs an account to record
+  // against). Resolved lazily: nothing is fetched unless a running tour
   // actually has such a step. `null` = not resolved yet, so the step waits
   // rather than being omitted on a guess.
   const [requirements, setRequirements] = useState<Record<
@@ -125,19 +123,17 @@ export function TourHost() {
   useEffect(() => {
     if (!needsRequirements) return;
     let cancelled = false;
-    Promise.all([
-      accountsApi.getAll(false).catch(() => []),
-      payeesApi.getAll().catch(() => []),
-      categoriesApi.getAll().catch(() => []),
-    ])
-      .then(([accounts, payees, categories]) => {
+    accountsApi
+      .getAll(false)
+      .then((accounts) => {
         if (cancelled) return;
-        setRequirements({
-          transactionEntry:
-            accounts.length > 0 && payees.length > 0 && categories.length > 0,
-        });
+        setRequirements({ transactionEntry: accounts.length > 0 });
       })
-      .catch(logger.debug);
+      // A failed lookup must not strand the tour: treat it as "requirement met"
+      // so the steps still show, rather than silently swallowing a section.
+      .catch(() => {
+        if (!cancelled) setRequirements({ transactionEntry: true });
+      });
     return () => {
       cancelled = true;
     };
