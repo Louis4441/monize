@@ -261,8 +261,14 @@ export function NormalTransactionFields({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
             {/* Source + target currency fields, with the conversion note below
                 the pair (a sibling, not a grid row, so only its own small
-                margin separates it) spanning both on desktop (md:col-span-2). */}
-            <div className="md:col-span-2">
+                margin separates it) spanning both on desktop (md:col-span-2).
+                Tour-anchored as one group so a guided tour can spotlight the
+                entered amount, the converted total, and the rate/fee captions
+                together -- it exists only while entering a foreign currency. */}
+            <div
+              {...tourAnchor(TOUR_ANCHORS.transactionFxConversion)}
+              className="md:col-span-2"
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                 <div className="flex items-stretch space-x-2">
                   {currencyPickerSlot}

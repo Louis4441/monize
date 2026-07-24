@@ -163,6 +163,87 @@ describe('TourHost', () => {
     );
   });
 
+  it('keeps the spotlit field clickable on an allowInteraction step', async () => {
+    // A passive step that asks the user to type into the highlighted control:
+    // it still advances with Next, but must not cover the cutout with the
+    // click blocker that ordinary passive steps use.
+    const field = document.createElement('div');
+    field.setAttribute('data-tour-id', TOUR_ANCHORS.transactionFields);
+    document.body.appendChild(field);
+
+    const buildTour = (allowInteraction: boolean): TourDefinition => ({
+      id: `test/allow-${allowInteraction}`,
+      area: 'intro',
+      i18nPrefix: 'intro.basics',
+      steps: [
+        {
+          id: 'fields',
+          route: '/',
+          anchorId: TOUR_ANCHORS.transactionFields,
+          ...(allowInteraction ? { allowInteraction: true } : {}),
+        },
+        // A following step so the one under test is not the final one (whose
+        // primary button reads "Done" rather than "Next").
+        { id: 'finish', route: '/', anchorId: null },
+      ],
+    });
+
+    const spotlightChildren = () =>
+      document.body.querySelector('[aria-hidden="true"].inset-0')!
+        .childElementCount;
+
+    await mountHost();
+
+    await start(buildTour(false));
+    await waitFor(() =>
+      expect(screen.getByText('Payee, category and amount')).toBeInTheDocument(),
+    );
+    const passiveChildren = spotlightChildren();
+
+    await act(async () => {
+      useTourStore.getState().endTour('dismissed');
+    });
+    await start(buildTour(true));
+    await waitFor(() =>
+      expect(screen.getByText('Payee, category and amount')).toBeInTheDocument(),
+    );
+
+    // One fewer child: the hole blocker is gone, so the field accepts input.
+    expect(spotlightChildren()).toBe(passiveChildren - 1);
+    // Still a passive step, so Next drives it (no "Skip this step" affordance).
+    expect(screen.getByText('Next')).toBeInTheDocument();
+    expect(screen.queryByText('Skip this step')).toBeNull();
+  });
+
+  it('renders an unobtrusive step with no dim, parked in the corner', async () => {
+    const tour: TourDefinition = {
+      id: 'test/unobtrusive',
+      area: 'intro',
+      i18nPrefix: 'intro.basics',
+      steps: [
+        { id: 'welcome', route: '/', anchorId: null, unobtrusive: true },
+        { id: 'finish', route: '/', anchorId: null },
+      ],
+    };
+
+    await mountHost();
+    await start(tour);
+    await waitFor(() =>
+      expect(screen.getByText('Welcome to Monize')).toBeInTheDocument(),
+    );
+
+    // No dimming overlay at all: the page behind stays fully visible/usable.
+    expect(document.body.querySelector('.bg-black\\/50')).toBeNull();
+
+    // The next (ordinary centered) step brings the dim back.
+    await act(async () => {
+      fireEvent.click(screen.getByText('Next'));
+    });
+    await waitFor(() =>
+      expect(document.body.querySelector('.bg-black\\/50')).not.toBeNull(),
+    );
+  });
+
   it('shows a route-agnostic first step in place without navigating', async () => {
     // Launched from another page (e.g. the What's New modal on /settings): the
     // welcome step has no route, so it must render where we are and never push.

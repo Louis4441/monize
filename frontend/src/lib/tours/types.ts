@@ -44,6 +44,20 @@ export interface TourStep {
   anchorId: TourAnchorId | null;
   /** Defaults to { type: 'next' }. */
   advance?: TourAdvance;
+  /**
+   * Keep the spotlit control clickable on a passive (Next-advancing) step, so
+   * the user can type into it while reading the explanation. Passive steps
+   * otherwise cover the cutout with a blocker to keep the page inert. Implied
+   * by any interactive `advance`; only set it alongside `{ type: 'next' }`.
+   */
+  allowInteraction?: boolean;
+  /**
+   * Show the step as an unobtrusive coach mark: no dimming overlay, and the
+   * card parked in a screen corner rather than centered. For steps that ask the
+   * user to scan the whole page and act on it (e.g. "find your credit card and
+   * choose Edit"), where dimming and a centered card get in the way.
+   */
+  unobtrusive?: boolean;
   placement?: TourPlacement;
   /** Filtered out at startTour on narrow viewports. */
   skipOnMobile?: boolean;

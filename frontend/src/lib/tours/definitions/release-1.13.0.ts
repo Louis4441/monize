@@ -40,20 +40,25 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: null,
     },
     {
-      // Centered prompt on the accounts list; advances when the account edit
-      // form opens (its fee field mounts), however the user opens it.
+      // Prompt on the accounts list; advances when the account edit form opens
+      // (its fee field mounts), however the user opens it. Unobtrusive: the
+      // user has to read the list and find their card, so no dim and the card
+      // sits in the corner.
       id: 'openAccountEdit',
       route: '/accounts',
       anchorId: null,
+      unobtrusive: true,
       advance: { type: 'appear', anchorId: TOUR_ANCHORS.accountFxFeePercent },
     },
     {
       // In-form: the fee field renders unconditionally, so it is present for
       // every account type; the modal layers over /accounts (no route change).
+      // allowInteraction so the user can actually type the percentage here.
       id: 'fxFeePercent',
       route: '/accounts',
       anchorId: TOUR_ANCHORS.accountFxFeePercent,
       placement: 'auto',
+      allowInteraction: true,
     },
     {
       // Centered: ask the user to save/close; advance once the form is gone.
@@ -73,10 +78,12 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
     {
       // In-form: the ordinary payee/category/date entry, unchanged by foreign
       // currency -- fill it in as usual before the currency step.
+      // allowInteraction so the fields accept input while the step is shown.
       id: 'enterDetails',
       route: '/transactions',
       anchorId: TOUR_ANCHORS.transactionFields,
       placement: 'auto',
+      allowInteraction: true,
     },
     {
       // Interactive: spotlight the entry-currency picker and wait until the
@@ -93,6 +100,18 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       advance: { type: 'appear', anchorId: TOUR_ANCHORS.transactionConvertedAmount },
     },
     {
+      // The payoff: the whole conversion group (entered amount, converted
+      // total, rate and fee captions). Passive so the user reads it at their
+      // own pace, but `allowInteraction` keeps the fields clickable so they can
+      // type the amount and watch the rate and fee fill in live -- a plain
+      // passive step would cover them with the spotlight's click blocker.
+      id: 'enterAmount',
+      route: '/transactions',
+      anchorId: TOUR_ANCHORS.transactionFxConversion,
+      placement: 'auto',
+      allowInteraction: true,
+    },
+    {
       // Centered: close the form; advance when it disappears.
       id: 'closeTransactionForm',
       route: '/transactions',
@@ -100,11 +119,13 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       advance: { type: 'disappear', anchorId: TOUR_ANCHORS.transactionForm },
     },
     {
-      // Centered prompt on the accounts list; advance when the user opens an
-      // account's Details page (any /accounts/<id>).
+      // Prompt on the accounts list; advance when the user opens an account's
+      // Details page (any /accounts/<id>). Unobtrusive for the same reason as
+      // the earlier accounts-list step.
       id: 'openAccountDetail',
       route: '/accounts',
       anchorId: null,
+      unobtrusive: true,
       advance: { type: 'route', route: '/accounts/' },
     },
     {

@@ -52,6 +52,39 @@ describe('TourSpotlight', () => {
     expect(interactiveWrapper.childElementCount).toBe(passiveChildren - 1);
   });
 
+  it('lets clicks through the dimmed panels when passThrough is set', () => {
+    // A field popup (combobox list, date picker) opened from the spotlit
+    // control renders outside the cutout, so the dim must not capture clicks.
+    render(
+      <TourSpotlight
+        rect={RECT}
+        interactive
+        passThrough
+        reducedMotion={false}
+      />,
+    );
+    const panels = [
+      ...document.body.querySelectorAll('.inset-0 > div'),
+    ] as HTMLElement[];
+    const dimPanels = panels.filter((p) => p.className.includes('bg-black/50'));
+    expect(dimPanels.length).toBeGreaterThan(0);
+    for (const panel of dimPanels) {
+      expect(panel.className).not.toContain('pointer-events-auto');
+    }
+  });
+
+  it('keeps the dimmed panels click-swallowing by default', () => {
+    render(
+      <TourSpotlight rect={RECT} interactive={false} reducedMotion={false} />,
+    );
+    const dimPanels = [
+      ...document.body.querySelectorAll('.inset-0 > div'),
+    ].filter((p) => p.className.includes('bg-black/50'));
+    for (const panel of dimPanels) {
+      expect(panel.className).toContain('pointer-events-auto');
+    }
+  });
+
   it('drops the animation classes under reduced motion', () => {
     render(
       <TourSpotlight rect={RECT} interactive={false} reducedMotion={true} />,

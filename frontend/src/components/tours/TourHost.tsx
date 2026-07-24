@@ -247,6 +247,18 @@ export function TourHost() {
 
   const interactive =
     !showingOutro && !!step?.advance && step.advance.type !== 'next';
+  // Whether the spotlit control stays clickable. Interactive steps always are;
+  // a passive step can opt in with `allowInteraction` when it asks the user to
+  // type into the highlighted field but still advances with Next.
+  const clickableAnchor =
+    interactive || (!showingOutro && !!step?.allowInteraction);
+  // Form-filling steps also need the dimmed area to pass clicks through: a
+  // combobox list or date picker opened from the spotlit field renders outside
+  // the cutout and would otherwise be covered by the dim.
+  const passThrough = !showingOutro && !!step?.allowInteraction;
+  // Coach-mark steps drop the dim entirely and park the card out of the way,
+  // so the user can scan and use the whole page.
+  const unobtrusive = !showingOutro && !!step?.unobtrusive;
   const leaveFocusToForm = !!anchorElement?.closest('[role="dialog"]');
   const isLast = showingOutro || active.stepIndex === active.steps.length - 1;
   const canBack = !showingOutro && active.stepIndex > 0;
@@ -266,17 +278,21 @@ export function TourHost() {
 
   return (
     <>
-      <TourSpotlight
-        rect={centered ? null : anchorRect}
-        interactive={interactive}
-        reducedMotion={reducedMotion}
-      />
+      {!unobtrusive && (
+        <TourSpotlight
+          rect={centered ? null : anchorRect}
+          interactive={clickableAnchor}
+          passThrough={passThrough}
+          reducedMotion={reducedMotion}
+        />
+      )}
       <TourTooltip
         rect={centered ? null : anchorRect}
         placement={step?.placement}
         title={title}
         body={body}
         stepLabel={stepLabel}
+        corner={unobtrusive}
         interactive={interactive}
         isLast={isLast}
         canBack={canBack}

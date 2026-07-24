@@ -29,6 +29,7 @@ describe('foreign-currency release tour', () => {
       'newTransaction',
       'enterDetails',
       'entryCurrency',
+      'enterAmount',
       'closeTransactionForm',
       'openAccountDetail',
       'fxSection',
@@ -92,6 +93,40 @@ describe('foreign-currency release tour', () => {
       anchorId: TOUR_ANCHORS.transactionForm,
     });
   });
+
+  it('lets the user type the amount while the conversion step is shown', () => {
+    const amount = tour.steps.find((s) => s.id === 'enterAmount')!;
+    expect(amount.anchorId).toBe(TOUR_ANCHORS.transactionFxConversion);
+    // Passive (Next-advancing) but the spotlit fields stay clickable, so the
+    // amount can be typed and the rate/fee seen filling in live.
+    expect(amount.advance).toBeUndefined();
+    expect(amount.allowInteraction).toBe(true);
+    // It follows the currency choice: the conversion group only exists then.
+    expect(tour.steps.findIndex((s) => s.id === 'enterAmount')).toBeGreaterThan(
+      tour.steps.findIndex((s) => s.id === 'entryCurrency'),
+    );
+  });
+
+  // Every step that asks the user to type into the spotlit control must keep
+  // the cutout clickable; a plain passive step covers it with a click blocker.
+  it.each(['fxFeePercent', 'enterDetails', 'enterAmount'])(
+    'allows input on the "%s" step',
+    (id) => {
+      const step = tour.steps.find((s) => s.id === id)!;
+      expect(step.allowInteraction).toBe(true);
+    },
+  );
+
+  // The accounts-list steps ask the user to find their own card in the table,
+  // so they must not dim it or park a card over the middle of it.
+  it.each(['openAccountEdit', 'openAccountDetail'])(
+    'shows the "%s" step as an unobtrusive coach mark',
+    (id) => {
+      const step = tour.steps.find((s) => s.id === id)!;
+      expect(step.unobtrusive).toBe(true);
+      expect(step.anchorId).toBeNull();
+    },
+  );
 
   it('routes to a dynamic account detail page then highlights its fx section', () => {
     const openDetail = tour.steps.find((s) => s.id === 'openAccountDetail')!;

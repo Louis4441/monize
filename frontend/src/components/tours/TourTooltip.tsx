@@ -49,6 +49,11 @@ interface TourTooltipProps {
   stepLabel: string;
   /** Interactive steps show a "Try it" hint + "Skip this step" instead of Next. */
   interactive: boolean;
+  /** Park an anchorless card in the bottom-right corner instead of centering
+   *  it, so the page behind stays readable and usable. Ignored when `rect` is
+   *  set (anchored cards position against the anchor) and on mobile (where the
+   *  card is a bottom sheet already). */
+  corner?: boolean;
   /** Last step (or the skipped outro): the primary button is Done, not Next. */
   isLast: boolean;
   canBack: boolean;
@@ -98,6 +103,7 @@ export function TourTooltip({
   title,
   body,
   stepLabel,
+  corner = false,
   interactive,
   isLast,
   canBack,
@@ -218,6 +224,10 @@ export function TourTooltip({
     const pos = computeTooltipPosition(rect, tooltipSize, viewport, placement);
     top = pos.top;
     left = pos.left;
+  } else if (corner) {
+    // Parked bottom-right so the page stays readable and usable behind it.
+    top = Math.max(8, viewport.height - tooltipSize.height - 16);
+    left = Math.max(8, viewport.width - tooltipSize.width - 16);
   } else {
     top = Math.max(8, viewport.height / 2 - tooltipSize.height / 2);
     left = Math.max(8, viewport.width / 2 - tooltipSize.width / 2);

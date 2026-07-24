@@ -44,19 +44,19 @@
       "steps": {
         "welcome": {
           "title": "Welcome to Monize",
-          "body": "This quick tour shows you around the core of the app. You can leave anytime by pressing Escape or End tour."
+          "body": "This quick tour shows you around the core of the app. You can leave anytime by pressing **Escape** or **End tour**."
         },
         "dashboard": {
           "title": "Your dashboard",
-          "body": "This is your dashboard. Use the Customize button in the top-right to rearrange or hide widgets so the summaries you care about sit right at the top."
+          "body": "This is your dashboard. Use the **Customize** button in the top-right to rearrange or hide widgets so the summaries you care about sit right at the top."
         },
         "tools": {
           "title": "The Tools menu",
-          "body": "The Tools menu is where you manage the building blocks of your finances -- payees, categories, currencies, tags and more."
+          "body": "The **Tools** menu is where you manage the building blocks of your finances -- payees, categories, currencies, tags and more."
         },
         "accounts": {
           "title": "Your accounts",
-          "body": "Add your bank, credit card, loan, and investment accounts here with Add Account. Every balance and transaction belongs to an account."
+          "body": "Add your bank, credit card, loan, and investment accounts here with **Add Account**. Every balance and transaction belongs to an account."
         },
         "transactions": {
           "title": "Transactions",
@@ -64,7 +64,7 @@
         },
         "createTransaction": {
           "title": "Record a transaction",
-          "body": "Add income or spending with New Transaction. Go ahead and open the form."
+          "body": "Add income or spending with **New Transaction**. Go ahead and open the form."
         },
         "fields": {
           "title": "Payee, category and amount",
@@ -72,7 +72,7 @@
         },
         "splits": {
           "title": "Split a transaction",
-          "body": "One purchase covering several categories? Use Split to divide a single transaction across categories -- groceries and household from one shop, say."
+          "body": "One purchase covering several categories? Use **Split** to divide a single transaction across categories -- groceries and household from one shop, say."
         },
         "currencyField": {
           "title": "Foreign currencies",
@@ -80,7 +80,7 @@
         },
         "closeForm": {
           "title": "Close the form to continue",
-          "body": "Close the transaction form (Cancel or the X) and the tour will move on."
+          "body": "Close the transaction form (**Cancel** or the **X**) and the tour will move on."
         },
         "bills": {
           "title": "Bills & Deposits",
@@ -100,7 +100,7 @@
         },
         "finish": {
           "title": "You're all set",
-          "body": "That's the tour. You can retake it anytime from the Guided tours section in Settings."
+          "body": "That's the tour. You can retake it anytime from the **Guided tours** section in **Settings**."
         }
       }
     }
@@ -112,7 +112,7 @@
         "steps": {
           "welcome": {
             "title": "Track spending in other currencies",
-            "body": "Bought something abroad? This tour sets up a card's foreign-transaction fee, records a purchase in the currency you were charged, and shows where those costs turn up. Leave anytime with Escape or End tour."
+            "body": "Bought something abroad? This tour sets up a card's foreign-transaction fee, records a purchase in the currency you were charged, and shows where those costs turn up. Leave anytime with **Escape** or **End tour**."
           },
           "openAccountEdit": {
             "title": "Start on the card",
@@ -124,11 +124,11 @@
           },
           "closeAccountForm": {
             "title": "Save and close",
-            "body": "Save the account (or close the form) to carry on."
+            "body": "Choose **Update Account** to save the fee -- or **Cancel** to close without saving -- and the tour carries on."
           },
           "newTransaction": {
             "title": "Record a foreign purchase",
-            "body": "Now log a purchase you made on that card in another currency. Open New Transaction and pick that card as the account."
+            "body": "Now log a purchase you made on that card in another currency. Open **New Transaction** and pick that card as the account."
           },
           "enterDetails": {
             "title": "Enter the details as usual",
@@ -136,15 +136,19 @@
           },
           "entryCurrency": {
             "title": "Choose the currency you paid in",
-            "body": "Open this and pick the currency you were charged in. Only your own currency in the list? Choose 'Add currency...' at the bottom to add one -- it's selected for you. Once a foreign currency is set, a converted total and the exchange rate appear beside the amount, both editable to match your bank."
+            "body": "Open this and pick the currency you were charged in. Only your own currency in the list? Choose **Add currency...** at the bottom to add one -- it's selected for you straight away."
+          },
+          "enterAmount": {
+            "title": "Enter the amount you were charged",
+            "body": "Type the total exactly as it appears on your statement. Monize looks up the **exchange rate** for the transaction's date, shows the converted total beside it, and folds in the **foreign-transaction fee** you set on the account -- the caption below spells out both. Bank rounded differently? Edit the rate or the converted total to match to the cent."
           },
           "closeTransactionForm": {
             "title": "Close the form",
-            "body": "Save or close the transaction form and the tour continues."
+            "body": "Save the transaction, or close the form with **Cancel**, and the tour continues."
           },
           "openAccountDetail": {
             "title": "Back to the card",
-            "body": "Open that card's Details page -- choose Details from its row actions -- to see how the foreign activity is summarized."
+            "body": "Open that card's Details page -- choose **Details** from its row actions -- to see how the foreign activity is summarized."
           },
           "fxSection": {
             "title": "Your foreign-currency section",
@@ -152,11 +156,11 @@
           },
           "report": {
             "title": "The Foreign-Currency Fees report",
-            "body": "This report gathers foreign purchases across all your accounts and currencies in one place, so you can see what those \"no foreign fee\" cards really cost. Open it anytime from Reports."
+            "body": "This report gathers foreign purchases across all your accounts and currencies in one place, so you can see what those \"no foreign fee\" cards really cost. Open it anytime from **Reports**."
           },
           "finish": {
             "title": "That's foreign currency in Monize",
-            "body": "Set a fee once, enter purchases as charged, and the fees track themselves. You can retake this tour anytime from the Guided tours section in Settings."
+            "body": "Set a fee once, enter purchases as charged, and the fees track themselves. You can retake this tour anytime from the **Guided tours** section in **Settings**."
           }
         }
       },
@@ -169,7 +173,7 @@
           },
           "appVersion": {
             "title": "Reread the notes",
-            "body": "Click the version label at the bottom of Settings anytime to reopen the release notes."
+            "body": "Click the **version label** at the bottom of **Settings** anytime to reopen the release notes."
           },
           "done": {
             "title": "That's it",
