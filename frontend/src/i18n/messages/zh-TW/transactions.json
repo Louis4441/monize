@@ -374,6 +374,7 @@
     "transferAmountNote": "轉帳金額必須為正數",
     "amountReceivedNote": "貨幣換算後的收到金額",
     "splitTransaction": "分割交易",
+    "splitDisabledDuringTour": "導覽引導期間無法使用",
     "newTagTitle": "新增標籤",
     "toasts": {
       "transferCreated": "轉帳已建立",

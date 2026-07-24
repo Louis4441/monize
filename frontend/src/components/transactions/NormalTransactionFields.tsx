@@ -15,6 +15,7 @@ import { getCurrencySymbol } from '@/lib/format';
 import { buildAccountDropdownOptions } from '@/lib/account-utils';
 import { RecentTransactionsPopover } from './RecentTransactionsPopover';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
+import { useDisableTransactionSplit } from '@/store/tourStore';
 
 interface NormalTransactionFieldsProps {
   register: UseFormRegister<any>;
@@ -93,11 +94,17 @@ export function NormalTransactionFields({
   const t = useTranslations('transactions');
   const historyButtonRef = useRef<HTMLButtonElement>(null);
   const [showRecentPopover, setShowRecentPopover] = useState(false);
+  // A tour can grey out Split so its walkthrough keeps to one path; false
+  // whenever no such tour is running.
+  const splitDisabled = useDisableTransactionSplit();
 
   return (
     <div className="space-y-4">
       {/* Row 1: Account, Date, and optionally Create Date */}
-      <div className={`grid grid-cols-1 gap-4 ${createdAtSlot ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+      <div
+        {...tourAnchor(TOUR_ANCHORS.transactionAccountDate)}
+        className={`grid grid-cols-1 gap-4 ${createdAtSlot ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}
+      >
         <Select
           label={t('form.fields.account')}
           error={errors.accountId?.message as string | undefined}
@@ -144,6 +151,7 @@ export function NormalTransactionFields({
               onCreateNew={handlePayeeCreate}
               allowCustomValue={true}
               valueIsId
+              usePortal
               error={errors.payeeName?.message as string | undefined}
             />
           </div>
@@ -196,6 +204,10 @@ export function NormalTransactionFields({
         <div>
           <div className="flex items-stretch sm:space-x-2">
             <div className="flex-1">
+              {/* usePortal: the list renders at the document root (z-[100]), so
+                  it escapes the modal's scroll clipping and stays above a
+                  guided tour's dimming overlay and card instead of being
+                  dimmed or covered by them. */}
               <Combobox
                 label={t('form.fields.category')}
                 placeholder={t('form.placeholders.selectOrCreateCategory')}
@@ -206,6 +218,7 @@ export function NormalTransactionFields({
                 onCreateNew={handleCategoryCreate}
                 allowCustomValue={true}
                 valueIsId
+                usePortal
                 error={errors.categoryId?.message as string | undefined}
               />
             </div>
@@ -214,7 +227,9 @@ export function NormalTransactionFields({
               {...tourAnchor(TOUR_ANCHORS.transactionSplit)}
               type="button"
               onClick={() => handleModeChange('split')}
-              className="hidden sm:flex items-center justify-center flex-shrink-0 mt-6 px-3 text-sm border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 whitespace-nowrap"
+              disabled={splitDisabled}
+              title={splitDisabled ? t('form.splitDisabledDuringTour') : undefined}
+              className="hidden sm:flex items-center justify-center flex-shrink-0 mt-6 px-3 text-sm border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-700"
             >
               {t('form.splitTransaction')}
             </button>
@@ -222,7 +237,9 @@ export function NormalTransactionFields({
           <button
             type="button"
             onClick={() => handleModeChange('split')}
-            className="sm:hidden mt-2 w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+            disabled={splitDisabled}
+            title={splitDisabled ? t('form.splitDisabledDuringTour') : undefined}
+            className="sm:hidden mt-2 w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-700"
           >
             {t('form.splitTransaction')}
           </button>
@@ -261,8 +278,14 @@ export function NormalTransactionFields({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
             {/* Source + target currency fields, with the conversion note below
                 the pair (a sibling, not a grid row, so only its own small
-                margin separates it) spanning both on desktop (md:col-span-2). */}
-            <div className="md:col-span-2">
+                margin separates it) spanning both on desktop (md:col-span-2).
+                Tour-anchored as one group so a guided tour can spotlight the
+                entered amount, the converted total, and the rate/fee captions
+                together -- it exists only while entering a foreign currency. */}
+            <div
+              {...tourAnchor(TOUR_ANCHORS.transactionFxConversion)}
+              className="md:col-span-2"
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                 <div className="flex items-stretch space-x-2">
                   {currencyPickerSlot}

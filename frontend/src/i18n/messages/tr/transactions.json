@@ -374,6 +374,7 @@
     "transferAmountNote": "Transferler için tutar pozitif olmalıdır",
     "amountReceivedNote": "Para birimi dönüşümünden sonra alınan tutar",
     "splitTransaction": "İşlemi Böl",
+    "splitDisabledDuringTour": "Rehberli tur sırasında kullanılamaz",
     "newTagTitle": "Yeni Etiket",
     "toasts": {
       "transferCreated": "Transfer oluşturuldu",

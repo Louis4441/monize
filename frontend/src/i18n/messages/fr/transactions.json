@@ -374,6 +374,7 @@
     "transferAmountNote": "Le montant doit être positif pour les virements",
     "amountReceivedNote": "Montant reçu après conversion de devise",
     "splitTransaction": "Répartir la transaction",
+    "splitDisabledDuringTour": "Indisponible pendant la visite guidée",
     "newTagTitle": "Nouvelle étiquette",
     "toasts": {
       "transferCreated": "Virement créé",

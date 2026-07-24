@@ -8,7 +8,8 @@
     "skipStep": "Diesen Schritt überspringen",
     "stepCounter": "{current} von {total}",
     "skippedTitle": "Tour beendet",
-    "skippedBody": "Einige Schritte wurden übersprungen, weil ihr Bildschirm oder Element nicht verfügbar war. Sie können die Tour jederzeit über die Einstellungen erneut starten."
+    "skippedBody": "Einige Schritte wurden übersprungen, weil ihr Bildschirm oder Element nicht verfügbar war. Sie können die Tour jederzeit über die Einstellungen erneut starten.",
+    "move": "Diese Karte verschieben -- ziehen Sie sie oder bewegen Sie sie mit den Pfeiltasten"
   },
   "offer": {
     "heading": "Machen Sie eine kurze Tour",
@@ -33,7 +34,10 @@
   "settings": {
     "title": "Geführte Touren",
     "description": "Gehen Sie die Funktionen der App Schritt für Schritt durch.",
-    "startIntro": "Einführungstour starten",
+    "start": "Starten",
+    "restart": "Wiederholen",
+    "statusNotViewed": "Nicht angesehen",
+    "statusDismissed": "Vorzeitig beendet",
     "reset": "Tour-Fortschritt zurücksetzen",
     "resetSuccess": "Tour-Fortschritt wurde zurückgesetzt.",
     "resetError": "Der Tour-Fortschritt konnte nicht zurückgesetzt werden. Bitte versuchen Sie es erneut."
@@ -44,19 +48,19 @@
       "steps": {
         "welcome": {
           "title": "Willkommen bei Monize",
-          "body": "Diese kurze Tour zeigt Ihnen die wichtigsten Bereiche der App. Sie können jederzeit über Escape oder Tour beenden aussteigen."
+          "body": "Diese kurze Tour zeigt Ihnen die wichtigsten Bereiche der App. Sie können jederzeit über **Escape** oder **Tour beenden** aussteigen."
         },
         "dashboard": {
           "title": "Ihr Dashboard",
-          "body": "Das ist Ihr Dashboard. Nutzen Sie die Schaltfläche Anpassen oben rechts, um Widgets neu anzuordnen oder auszublenden, damit die für Sie wichtigen Übersichten ganz oben stehen."
+          "body": "Das ist Ihr Dashboard. Nutzen Sie die Schaltfläche **Anpassen** oben rechts, um Widgets neu anzuordnen oder auszublenden, damit die für Sie wichtigen Übersichten ganz oben stehen."
         },
         "tools": {
           "title": "Das Menü Tools",
-          "body": "Im Menü Tools verwalten Sie die Bausteine Ihrer Finanzen -- Zahlungsempfänger, Kategorien, Währungen, Tags und mehr."
+          "body": "Im Menü **Tools** verwalten Sie die Bausteine Ihrer Finanzen -- Zahlungsempfänger, Kategorien, Währungen, Tags und mehr."
         },
         "accounts": {
           "title": "Ihre Konten",
-          "body": "Fügen Sie hier über Konto hinzufügen Ihre Bank-, Kreditkarten-, Kredit- und Anlagekonten hinzu. Jeder Saldo und jede Buchung gehört zu einem Konto."
+          "body": "Fügen Sie hier über **Konto hinzufügen** Ihre Bank-, Kreditkarten-, Kredit- und Anlagekonten hinzu. Jeder Saldo und jede Buchung gehört zu einem Konto."
         },
         "transactions": {
           "title": "Buchungen",
@@ -64,7 +68,7 @@
         },
         "createTransaction": {
           "title": "Eine Buchung erfassen",
-          "body": "Fügen Sie Einnahmen oder Ausgaben über Neue Buchung hinzu. Öffnen Sie ruhig das Formular."
+          "body": "Fügen Sie Einnahmen oder Ausgaben über **Neue Buchung** hinzu. Öffnen Sie ruhig das Formular."
         },
         "fields": {
           "title": "Zahlungsempfänger, Kategorie und Betrag",
@@ -72,7 +76,7 @@
         },
         "splits": {
           "title": "Eine Buchung aufteilen",
-          "body": "Ein Einkauf, der mehrere Kategorien betrifft? Nutzen Sie Buchung aufteilen, um eine einzelne Buchung auf mehrere Kategorien aufzuteilen -- zum Beispiel Lebensmittel und Haushaltswaren aus einem Einkauf."
+          "body": "Ein Einkauf, der mehrere Kategorien betrifft? Nutzen Sie **Buchung aufteilen**, um eine einzelne Buchung auf mehrere Kategorien aufzuteilen -- zum Beispiel Lebensmittel und Haushaltswaren aus einem Einkauf."
         },
         "currencyField": {
           "title": "Fremdwährungen",
@@ -80,7 +84,7 @@
         },
         "closeForm": {
           "title": "Schließen Sie das Formular, um fortzufahren",
-          "body": "Schließen Sie das Buchungsformular (Abbrechen oder das X), und die Tour geht weiter."
+          "body": "Schließen Sie das Buchungsformular (**Abbrechen** oder das X), und die Tour geht weiter."
         },
         "bills": {
           "title": "Rechnungen & Einzahlungen",
@@ -100,27 +104,71 @@
         },
         "finish": {
           "title": "Sie sind startklar",
-          "body": "Das war die Tour. Sie können sie jederzeit über den Bereich Geführte Touren in den Einstellungen erneut starten."
+          "body": "Das war die Tour. Sie können sie jederzeit über den Bereich **Geführte Touren** in den **Einstellungen** erneut starten."
         }
       }
     }
   },
   "release": {
     "v1_13_0": {
-      "accounts": {
-        "title": "Fremdwährungsgebühren",
+      "foreignCurrency": {
+        "title": "Fremdwährungsbuchungen",
         "steps": {
-          "openAccount": {
-            "title": "Ein Konto öffnen",
-            "body": "Öffnen Sie ein Konto mit Fremdwährungsbuchungen, um die Aufschlüsselung der Währungsgebühren zu sehen."
+          "welcome": {
+            "title": "Ausgaben in anderen Währungen verfolgen",
+            "body": "Im Ausland eingekauft? Diese Tour richtet die Fremdwährungsgebühr einer Karte ein, erfasst einen Einkauf in der belasteten Währung und zeigt, wo diese Kosten auftauchen. Sie können jederzeit mit **Esc** oder **Tour beenden** aussteigen."
           },
-          "fxFees": {
-            "title": "Fremdwährungsgebühren",
-            "body": "Dieser Bereich schlüsselt die Gebühren auf, die Sie für Fremdwährungsaktivitäten gezahlt haben, getrennt vom Buchungsregister."
+          "openAccountEdit": {
+            "title": "Beginnen Sie bei der Karte",
+            "body": "Fremdwährungsgebühren gehören zum Konto. Wählen Sie eine Kreditkarte, die Sie im Ausland nutzen, und klicken Sie in ihrer Zeile auf **Bearbeiten** -- oder tippen Sie auf dem Handy lange auf die Zeile -- um ihre Einstellungen zu öffnen."
           },
-          "outro": {
-            "title": "Fremdwährungsgebühren",
-            "body": "Konten mit Fremdwährungsaktivitäten zeigen jetzt auf ihrer Detailseite eine eigene Gebührenaufschlüsselung."
+          "fxFeePercent": {
+            "title": "Umrechnungsgebühr festlegen",
+            "body": "Geben Sie hier die Fremdwährungsgebühr Ihrer Karte als Prozentsatz ein -- etwa 2,5. Monize rechnet sie in den umgerechneten Betrag jeder Fremdwährungsbuchung ein, sodass die Gebühr automatisch erfasst wird."
+          },
+          "closeAccountForm": {
+            "title": "Speichern und schließen",
+            "body": "Zum Abschluss diese Schaltflächen: **Konto aktualisieren** speichert die Gebühr, **Abbrechen** schließt ohne zu speichern. In beiden Fällen geht die Tour weiter."
+          },
+          "newTransaction": {
+            "title": "Einen Auslandseinkauf erfassen",
+            "body": "Erfassen Sie nun einen Einkauf, den Sie mit dieser Karte in einer anderen Währung getätigt haben. Öffnen Sie **Neue Buchung** und wählen Sie diese Karte als Konto."
+          },
+          "chooseAccount": {
+            "title": "Konto und Datum prüfen",
+            "body": "Die Umrechnungsgebühr gehört zum Konto -- achten Sie also darauf, dass unter **Konto** die Karte steht, für die Sie die Gebühr gerade festgelegt haben, und ändern Sie es hier gegebenenfalls. Setzen Sie auch das **Datum** auf den Tag des Einkaufs: Der Wechselkurs wird für dieses Datum abgerufen."
+          },
+          "enterDetails": {
+            "title": "Angaben wie gewohnt eintragen",
+            "body": "Tragen Sie Zahlungsempfänger und Kategorie wie bei jeder anderen Buchung ein. Der Fremdwährungsteil kommt als Nächstes."
+          },
+          "entryCurrency": {
+            "title": "Wählen Sie die Währung, in der Sie bezahlt haben",
+            "body": "Öffnen Sie dies und wählen Sie die Währung, die Ihnen belastet wurde. Steht nur Ihre eigene Währung in der Liste? Wählen Sie unten **Währung hinzufügen...**, um eine anzulegen -- sie wird sofort für Sie ausgewählt."
+          },
+          "enterAmount": {
+            "title": "Geben Sie den belasteten Betrag ein",
+            "body": "Tippen Sie den Gesamtbetrag genau so ein, wie er auf Ihrer Abrechnung steht. Monize ruft den **Wechselkurs** für das Datum der Buchung ab, zeigt daneben den umgerechneten Gesamtbetrag und rechnet die **Fremdwährungsgebühr** ein, die Sie für das Konto festgelegt haben -- die Bildunterschrift darunter führt beides auf. Hat Ihre Bank anders gerundet? Passen Sie den Kurs oder den umgerechneten Betrag centgenau an."
+          },
+          "closeTransactionForm": {
+            "title": "Formular schließen",
+            "body": "Auch hier: Speichern Sie die Buchung über die Schaltfläche zum Speichern oder schließen Sie sie mit **Abbrechen** -- und die Tour geht weiter."
+          },
+          "openAccountDetail": {
+            "title": "Zurück zur Karte",
+            "body": "Öffnen Sie die Detailseite dieser Karte -- wählen Sie **Details** in ihrer Zeile -- um zu sehen, wie die Fremdwährungsaktivität zusammengefasst wird."
+          },
+          "fxSection": {
+            "title": "Ihr Fremdwährungsbereich",
+            "body": "Konten mit Fremdwährungsaktivität erhalten diesen Bereich: die gezahlten Gebühren je Währung, ein Diagramm über die Zeit und die zugehörigen Buchungen, exportierbar als CSV und PNG. Er erscheint, sobald das Konto einen Auslandseinkauf hat."
+          },
+          "report": {
+            "title": "Der Bericht \"Fremdwährungs-Transaktionsgebühren\"",
+            "body": "Dieser Bericht führt Auslandseinkäufe über alle Ihre Konten und Währungen an einer Stelle zusammen, sodass Sie sehen, was Karten \"ohne Auslandsgebühr\" wirklich kosten. Sie können ihn jederzeit über **Berichte** öffnen."
+          },
+          "finish": {
+            "title": "Das war Fremdwährung in Monize",
+            "body": "Einmal eine Gebühr festlegen, Einkäufe wie belastet erfassen -- und die Gebühren führen sich von selbst. Sie können diese Tour jederzeit im Bereich **Geführte Touren** in den **Einstellungen** wiederholen."
           }
         }
       },
@@ -133,7 +181,7 @@
           },
           "appVersion": {
             "title": "Hinweise erneut lesen",
-            "body": "Klicken Sie jederzeit auf die Versionsangabe unten in den Einstellungen, um die Versionshinweise erneut zu öffnen."
+            "body": "Klicken Sie jederzeit auf die Versionsangabe unten in den **Einstellungen**, um die Versionshinweise erneut zu öffnen."
           },
           "done": {
             "title": "Das war's",

@@ -374,6 +374,7 @@
     "transferAmountNote": "Bedrag moet positief zijn voor overboekingen",
     "amountReceivedNote": "Ontvangen bedrag na valutaomrekening",
     "splitTransaction": "Transactie splitsen",
+    "splitDisabledDuringTour": "Niet beschikbaar tijdens de begeleide rondleiding",
     "newTagTitle": "Nieuw label",
     "toasts": {
       "transferCreated": "Overboeking aangemaakt",

@@ -374,6 +374,7 @@
     "transferAmountNote": "Kwota przelewu musi być dodatnia",
     "amountReceivedNote": "Kwota otrzymana po przeliczeniu waluty",
     "splitTransaction": "Podziel transakcję",
+    "splitDisabledDuringTour": "Niedostępne podczas przewodnika",
     "newTagTitle": "Nowy tag",
     "toasts": {
       "transferCreated": "Utworzono przelew",

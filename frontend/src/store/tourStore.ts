@@ -33,6 +33,15 @@ interface ActiveTour {
   /** Pathname the engine last pushed to; a matching change is expected, not a
    *  user-initiated dismissal. */
   expectedRoute: string | null;
+  /**
+   * Set while skipping through steps (the user pressed "Skip this step", or a
+   * step's anchor timed out). The next step's anchor gets a much shorter grace
+   * period, so a run of unreachable steps -- skipping "choose a currency"
+   * leaves the following conversion step with nothing to point at -- does not
+   * leave the screen blank for the full timeout each time. Cleared as soon as
+   * a step goes active.
+   */
+  fastForward: boolean;
 }
 
 interface TourState {
@@ -49,6 +58,12 @@ interface TourState {
   back: () => void;
   /** Graceful skip: the current step's anchor never appeared. */
   skip: () => void;
+  /**
+   * Deliberate omission: the step's `requires` is not met for this user. Unlike
+   * `skip` this is not degradation, so it does not count toward the
+   * "some steps were skipped" outro.
+   */
+  omit: () => void;
   /** Advance the "Done" affordance: may show the skipped outro before completing. */
   finish: () => void;
   endTour: (reason: TourStatus) => void;
@@ -103,6 +118,7 @@ export const useTourStore = create<TourState>((set, get) => ({
         skippedCount: 0,
         showSkippedOutro: false,
         expectedRoute: null,
+        fastForward: false,
       },
     });
   },
@@ -117,6 +133,7 @@ export const useTourStore = create<TourState>((set, get) => ({
         stepIndex: active.stepIndex + 1,
         phase: 'navigating',
         expectedRoute: null,
+        fastForward: false,
       },
     });
   },
@@ -131,6 +148,7 @@ export const useTourStore = create<TourState>((set, get) => ({
         stepIndex: active.stepIndex - 1,
         phase: 'navigating',
         expectedRoute: null,
+        fastForward: false,
       },
     });
   },
@@ -152,6 +170,27 @@ export const useTourStore = create<TourState>((set, get) => ({
         stepIndex: active.stepIndex + 1,
         phase: 'navigating',
         expectedRoute: null,
+        fastForward: true,
+      },
+    });
+  },
+
+  omit: () => {
+    const { active } = get();
+    if (!active || active.showSkippedOutro) return;
+    // Omitting the last step just ends the tour on the normal terms.
+    if (active.stepIndex >= active.steps.length - 1) {
+      get().finish();
+      return;
+    }
+    set({
+      active: {
+        ...active,
+        stepIndex: active.stepIndex + 1,
+        phase: 'navigating',
+        expectedRoute: null,
+        // A run of omitted steps should not each wait out an anchor timeout.
+        fastForward: true,
       },
     });
   },
@@ -178,7 +217,10 @@ export const useTourStore = create<TourState>((set, get) => ({
   setPhase: (phase) => {
     const { active } = get();
     if (!active) return;
-    set({ active: { ...active, phase } });
+    // Landing on a real step ends the fast-forward: the run of unreachable
+    // steps is over, so later waits get the normal grace period again.
+    const fastForward = phase === 'active' ? false : active.fastForward;
+    set({ active: { ...active, phase, fastForward } });
   },
 
   setExpectedRoute: (route) => {
@@ -187,3 +229,23 @@ export const useTourStore = create<TourState>((set, get) => ({
     set({ active: { ...active, expectedRoute: route } });
   },
 }));
+
+/**
+ * Whether the running tour asks the transaction form to disable its Split
+ * controls, so the walkthrough keeps to one path. False when no tour is running.
+ */
+export function useDisableTransactionSplit(): boolean {
+  return useTourStore((s) => !!s.active?.tour.disableTransactionSplit);
+}
+
+/**
+ * Whether the step showing right now wants the header's Tools dropdown open,
+ * so it can describe the menu's contents instead of a closed button.
+ */
+export function useTourOpensToolsMenu(): boolean {
+  return useTourStore((s) => {
+    const active = s.active;
+    if (!active || active.showSkippedOutro) return false;
+    return !!active.steps[active.stepIndex]?.openToolsMenu;
+  });
+}

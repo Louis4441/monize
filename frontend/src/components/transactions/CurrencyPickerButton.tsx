@@ -99,6 +99,7 @@ export function CurrencyPickerButton({
         maxWidth="lg"
         className="p-6"
         pushHistory
+        elevated
       >
         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
           {t('form.currencyPicker.addCurrency')}
@@ -206,7 +207,10 @@ function CurrencyPickerPopover({
       role="dialog"
       aria-label={t('form.currencyPicker.title')}
       style={{ top: position.top, left: position.left, width: POPOVER_WIDTH }}
-      className="fixed z-50 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg"
+      // z-[65] keeps the popover above a guided-tour spotlight overlay (z-[60])
+      // so it stays visible and clickable while a tour highlights the button;
+      // still below the tour tooltip (z-[70]). Harmless outside a tour.
+      className="fixed z-[65] rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg"
     >
       <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
         {t('form.currencyPicker.title')}

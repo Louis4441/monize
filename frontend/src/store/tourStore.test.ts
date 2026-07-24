@@ -102,6 +102,54 @@ describe('tourStore', () => {
     expect(saveProgress).toHaveBeenCalledWith('test/basics', 'completed');
   });
 
+  it('fast-forwards while skipping and stops once a step goes active', () => {
+    const store = useTourStore.getState();
+    store.startTour(TOUR);
+    expect(useTourStore.getState().active!.fastForward).toBe(false);
+
+    // Skipping arms the short anchor grace period for the next step...
+    store.skip();
+    expect(useTourStore.getState().active!.fastForward).toBe(true);
+    // ...and it stays armed across a run of unreachable steps.
+    store.skip();
+    expect(useTourStore.getState().active!.fastForward).toBe(true);
+
+    // Landing on a step that resolves ends the fast-forward.
+    useTourStore.getState().setPhase('active');
+    expect(useTourStore.getState().active!.fastForward).toBe(false);
+  });
+
+  it('clears fast-forward when the user drives the tour with Next or Back', () => {
+    const store = useTourStore.getState();
+    store.startTour(TOUR);
+    store.skip();
+    expect(useTourStore.getState().active!.fastForward).toBe(true);
+
+    useTourStore.getState().next();
+    expect(useTourStore.getState().active!.fastForward).toBe(false);
+
+    useTourStore.getState().skip();
+    useTourStore.getState().back();
+    expect(useTourStore.getState().active!.fastForward).toBe(false);
+  });
+
+  it('omit advances without counting the step as skipped', () => {
+    const store = useTourStore.getState();
+    store.startTour(TOUR);
+    store.omit();
+
+    const active = useTourStore.getState().active!;
+    expect(active.stepIndex).toBe(1);
+    // Deliberate omission, so the tour must not end on the degraded outro.
+    expect(active.skippedCount).toBe(0);
+    // A run of omissions should not each wait out an anchor timeout.
+    expect(active.fastForward).toBe(true);
+
+    useTourStore.getState().finish();
+    expect(useTourStore.getState().active).toBeNull();
+    expect(saveProgress).toHaveBeenCalledWith('test/basics', 'completed');
+  });
+
   it('endTour dismissed persists a dismissal', () => {
     const store = useTourStore.getState();
     store.startTour(TOUR);

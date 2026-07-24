@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/authStore';
 import { useTourStore } from '@/store/tourStore';
 import { toursApi } from '@/lib/tours-api';
+import { accountsApi } from '@/lib/accounts';
 import { createLogger } from '@/lib/logger';
 import { findTourAnchor } from '@/lib/tours/anchors';
 import { useTourAnchor } from '@/hooks/useTourAnchor';
 import { useAnchorRect } from '@/hooks/useAnchorRect';
+import type { TourRequirement } from '@/lib/tours/types';
 import { TourSpotlight } from './TourSpotlight';
 import { TourTooltip } from './TourTooltip';
 
@@ -17,6 +19,15 @@ const logger = createLogger('Tours');
 
 const DEFAULT_ANCHOR_TIMEOUT = 5000;
 const POST_NAV_ANCHOR_TIMEOUT = 10000;
+/**
+ * Grace period for the step after a skip, when no navigation is involved. The
+ * overlay renders nothing while waiting for an anchor, so a skip into a step
+ * that cannot possibly resolve -- skipping "choose a currency" leaves the
+ * conversion step with nothing to point at -- would otherwise blank the screen
+ * for the full timeout, once per step in the run. The anchor is either already
+ * on the page or a re-render away, so this only has to outlast a paint.
+ */
+const SKIP_ANCHOR_TIMEOUT = 1200;
 /** Interactive appear-waits should not auto-skip; the user drives them. */
 const INTERACTIVE_TIMEOUT = 600000;
 /**
@@ -55,6 +66,7 @@ export function TourHost() {
   const next = useTourStore((s) => s.next);
   const back = useTourStore((s) => s.back);
   const skip = useTourStore((s) => s.skip);
+  const omit = useTourStore((s) => s.omit);
   const finish = useTourStore((s) => s.finish);
   const endTour = useTourStore((s) => s.endTour);
 
@@ -63,9 +75,16 @@ export function TourHost() {
 
   // --- Anchor resolution for the current step ---------------------------------
   const navigated = !!step && active?.expectedRoute === step.route;
+  // A navigation still gets the long timeout even mid-skip: a cold route load
+  // is slow for honest reasons, and cutting it short would skip a step that
+  // was about to resolve.
   const anchorTimeout =
     step?.anchorTimeoutMs ??
-    (navigated ? POST_NAV_ANCHOR_TIMEOUT : DEFAULT_ANCHOR_TIMEOUT);
+    (navigated
+      ? POST_NAV_ANCHOR_TIMEOUT
+      : active?.fastForward
+        ? SKIP_ANCHOR_TIMEOUT
+        : DEFAULT_ANCHOR_TIMEOUT);
   const anchorEnabled =
     !!active &&
     !showingOutro &&
@@ -87,6 +106,46 @@ export function TourHost() {
   });
 
   const reducedMotion = prefersReducedMotion();
+
+  // --- Step requirements -----------------------------------------------------
+  // Some steps are only worth showing when the user has the data they talk
+  // about (the record-a-transaction walkthrough needs an account to record
+  // against). Resolved lazily: nothing is fetched unless a running tour
+  // actually has such a step. `null` = not resolved yet, so the step waits
+  // rather than being omitted on a guess.
+  const [requirements, setRequirements] = useState<Record<
+    TourRequirement,
+    boolean
+  > | null>(null);
+  const needsRequirements =
+    !!active && active.steps.some((s) => s.requires) && requirements === null;
+
+  useEffect(() => {
+    if (!needsRequirements) return;
+    let cancelled = false;
+    accountsApi
+      .getAll(false)
+      .then((accounts) => {
+        if (cancelled) return;
+        setRequirements({ transactionEntry: accounts.length > 0 });
+      })
+      // A failed lookup must not strand the tour: treat it as "requirement met"
+      // so the steps still show, rather than silently swallowing a section.
+      .catch(() => {
+        if (!cancelled) setRequirements({ transactionEntry: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsRequirements]);
+
+  // Omit a step whose requirement this user does not meet. Not a "skip": the
+  // omission is deliberate, so it must not trigger the degraded-tour outro.
+  useEffect(() => {
+    if (!active || showingOutro || !requirements) return;
+    const requirement = active.steps[active.stepIndex]?.requires;
+    if (requirement && !requirements[requirement]) omit();
+  }, [active, showingOutro, requirements, omit]);
 
   // Load progress once when authenticated.
   useEffect(() => {
@@ -247,6 +306,18 @@ export function TourHost() {
 
   const interactive =
     !showingOutro && !!step?.advance && step.advance.type !== 'next';
+  // Whether the spotlit control stays clickable. Interactive steps always are;
+  // a passive step can opt in with `allowInteraction` when it asks the user to
+  // type into the highlighted field but still advances with Next.
+  const clickableAnchor =
+    interactive || (!showingOutro && !!step?.allowInteraction);
+  // Form-filling steps also need the dimmed area to pass clicks through: a
+  // combobox list or date picker opened from the spotlit field renders outside
+  // the cutout and would otherwise be covered by the dim.
+  const passThrough = !showingOutro && !!step?.allowInteraction;
+  // Coach-mark steps drop the dim entirely and park the card out of the way,
+  // so the user can scan and use the whole page.
+  const unobtrusive = !showingOutro && !!step?.unobtrusive;
   const leaveFocusToForm = !!anchorElement?.closest('[role="dialog"]');
   const isLast = showingOutro || active.stepIndex === active.steps.length - 1;
   const canBack = !showingOutro && active.stepIndex > 0;
@@ -268,7 +339,9 @@ export function TourHost() {
     <>
       <TourSpotlight
         rect={centered ? null : anchorRect}
-        interactive={interactive}
+        interactive={clickableAnchor}
+        passThrough={passThrough}
+        dim={!unobtrusive}
         reducedMotion={reducedMotion}
       />
       <TourTooltip
@@ -277,6 +350,7 @@ export function TourHost() {
         title={title}
         body={body}
         stepLabel={stepLabel}
+        corner={unobtrusive}
         interactive={interactive}
         isLast={isLast}
         canBack={canBack}
@@ -294,6 +368,7 @@ export function TourHost() {
           endTour: t('controls.endTour'),
           tryIt: t('controls.tryIt'),
           skipStep: t('controls.skipStep'),
+          move: t('controls.move'),
         }}
       />
     </>

@@ -374,6 +374,7 @@
     "transferAmountNote": "ट्रांसफर के लिए राशि सकारात्मक होनी चाहिए",
     "amountReceivedNote": "मुद्रा रूपांतरण के बाद प्राप्त राशि",
     "splitTransaction": "लेन-देन विभाजित करें",
+    "splitDisabledDuringTour": "निर्देशित टूर के दौरान उपलब्ध नहीं",
     "newTagTitle": "नया टैग",
     "toasts": {
       "transferCreated": "ट्रांसफर बनाया गया",

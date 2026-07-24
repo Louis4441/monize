@@ -13,6 +13,7 @@ import { BudgetAlertBadge } from '@/components/budgets/BudgetAlertBadge';
 import { ActionHistoryPanel } from '@/components/layout/ActionHistoryPanel';
 import { MobileNavDrawer } from '@/components/layout/MobileNavDrawer';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
+import { useTourOpensToolsMenu } from '@/store/tourStore';
 import {
   HEADER_SEARCH_EVENT,
   clearTransactionFilterStorage,
@@ -108,6 +109,10 @@ export function AppHeader() {
       })
     : toolsLinks;
   const [toolsOpen, setToolsOpen] = useState(false);
+  // A tour step can ask for the menu to be open so it can describe what is
+  // inside; that wins over local state (and over a click-outside close).
+  const tourOpensTools = useTourOpensToolsMenu();
+  const toolsExpanded = toolsOpen || tourOpensTools;
   const [aiOpen, setAiOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -168,7 +173,7 @@ export function AppHeader() {
   // moving it in lockstep with the scroll position. Keep it pinned while any
   // menu or the search field is open so the open surface never scrolls away.
   const { ref: headerRef, offset: scrollOffset } = useHideOnScroll<HTMLElement>();
-  const anyMenuOpen = mobileMenuOpen || searchOpen || toolsOpen || aiOpen;
+  const anyMenuOpen = mobileMenuOpen || searchOpen || toolsExpanded || aiOpen;
   const headerOffset = anyMenuOpen ? 0 : scrollOffset;
 
   // Publish how far the header is currently slid up so sticky sub-navigation
@@ -349,7 +354,7 @@ export function AppHeader() {
                 >
                   {t('tools')}
                   <svg
-                    className={`w-4 h-4 transition-transform ${toolsOpen ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 transition-transform ${toolsExpanded ? 'rotate-180' : ''}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -358,8 +363,11 @@ export function AppHeader() {
                   </svg>
                 </button>
 
-                {toolsOpen && (
-                  <div className="absolute left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50">
+                {toolsExpanded && (
+                  <div
+                    {...tourAnchor(TOUR_ANCHORS.navToolsMenu)}
+                    className="absolute left-0 mt-1 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg dark:shadow-gray-700/50 border border-gray-200 dark:border-gray-700 z-50"
+                  >
                     <div className="py-1">
                       {visibleToolsLinks.map((link) => (
                         <button

@@ -375,6 +375,7 @@
     "transferCategoryNote": "[XX-Optional. The transfer still won't count as income or expense, but this category lets it appear in the monthly category breakdown (e.g. monthly investment contributions).-XX]",
     "amountReceivedNote": "[XX-Amount received after currency conversion-XX]",
     "splitTransaction": "[XX-Split Transaction-XX]",
+    "splitDisabledDuringTour": "[XX-Not available during the guided tour-XX]",
     "newTagTitle": "[XX-New Tag-XX]",
     "toasts": {
       "transferCreated": "[XX-Transfer created-XX]",

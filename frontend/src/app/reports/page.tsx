@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { PageLayout } from '@/components/layout/PageLayout';
@@ -16,6 +16,7 @@ import { investmentReportsApi } from '@/lib/investment-reports';
 import { InvestmentReport } from '@/types/investment-report';
 import { getIconComponent } from '@/components/ui/IconPicker';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { createLogger } from '@/lib/logger';
 import {
   Report,
@@ -41,6 +42,29 @@ function ReportsContent() {
   const router = useRouter();
   const [density, setDensity] = useLocalStorage<DensityLevel>('monize-reports-density', 'normal');
   const [categoryFilter, setCategoryFilter] = useLocalStorage<ReportCategory | 'all'>('monize-reports-category', 'all');
+  // `?category=` overrides the remembered filter for this visit, so a link can
+  // guarantee a given report is on screen whatever the user last filtered by
+  // (a guided tour pointing at one uses this). Applied once per param value via
+  // the info-from-previous-render pattern -- never a setState in an effect --
+  // and dropped as soon as the user picks a category themselves.
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams?.get('category') ?? null;
+  const [categoryOverride, setCategoryOverride] = useState<ReportCategory | 'all' | null>(null);
+  const [appliedCategoryParam, setAppliedCategoryParam] = useState<string | null>(null);
+  if (categoryParam !== appliedCategoryParam) {
+    setAppliedCategoryParam(categoryParam);
+    const valid =
+      categoryParam === 'all' ||
+      (!!categoryParam && Object.prototype.hasOwnProperty.call(categoryColors, categoryParam));
+    setCategoryOverride(valid ? (categoryParam as ReportCategory | 'all') : null);
+  }
+  const effectiveCategory = categoryOverride ?? categoryFilter;
+
+  /** Pick a category by hand: clears any `?category=` override so it sticks. */
+  const selectCategory = (category: ReportCategory | 'all') => {
+    setCategoryOverride(null);
+    setCategoryFilter(category);
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [customReports, setCustomReports] = useState<CustomReport[]>([]);
   const [isLoadingCustom, setIsLoadingCustom] = useState(true);
@@ -258,7 +282,7 @@ function ReportsContent() {
     const q = debouncedSearchQuery.toLowerCase();
     return allReports
       .filter(r => {
-        if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
+        if (effectiveCategory !== 'all' && r.category !== effectiveCategory) return false;
         if (debouncedSearchQuery) {
           const name = r.name ?? t(`page.names.${r.id}` as Parameters<typeof t>[0]);
           const desc = r.description ?? t(`page.descriptions.${r.id}` as Parameters<typeof t>[0]);
@@ -267,11 +291,20 @@ function ReportsContent() {
         return true;
       })
       .sort((a, b) => Number(isFavourite(b)) - Number(isFavourite(a)));
-  }, [allReports, categoryFilter, debouncedSearchQuery, favouriteReportIds, t]);
+  }, [allReports, effectiveCategory, debouncedSearchQuery, favouriteReportIds, t]);
 
   const handleReportClick = (reportId: string) => {
     router.push(`/reports/${reportId}`);
   };
+
+  // Guided-tour anchor for the Foreign-Currency Fees report card (release 1.13).
+  // Kept as a single tourAnchor() call so the anchor-uniqueness test is happy
+  // across the three density layouts -- only the layout actually rendered mounts
+  // it, so the id is attached in exactly one live element.
+  const reportTourAnchor = (report: Report): { 'data-tour-id'?: string } =>
+    report.id === 'foreign-currency-fees'
+      ? tourAnchor(TOUR_ANCHORS.reportForeignCurrencyFees)
+      : {};
 
   return (
     <PageLayout>
@@ -302,9 +335,9 @@ function ReportsContent() {
         {/* Category Filter */}
         <div className="mb-6 flex flex-wrap items-center gap-2">
           <button
-            onClick={() => setCategoryFilter('all')}
+            onClick={() => selectCategory('all')}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              categoryFilter === 'all'
+              effectiveCategory === 'all'
                 ? 'bg-blue-600 text-white'
                 : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
             }`}
@@ -314,9 +347,9 @@ function ReportsContent() {
           {(Object.keys(categoryColors) as ReportCategory[]).map((cat) => (
             <button
               key={cat}
-              onClick={() => setCategoryFilter(cat)}
+              onClick={() => selectCategory(cat)}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                categoryFilter === cat
+                effectiveCategory === cat
                   ? 'bg-blue-600 text-white'
                   : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600'
               }`}
@@ -346,6 +379,7 @@ function ReportsContent() {
               return (
                 <button
                   key={report.id}
+                  {...reportTourAnchor(report)}
                   onClick={() => handleReportClick(report.id)}
                   className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 overflow-hidden hover:shadow-lg dark:hover:shadow-gray-700/70 transition-shadow text-left group flex flex-col h-full"
                 >
@@ -407,6 +441,7 @@ function ReportsContent() {
               return (
                 <button
                   key={report.id}
+                  {...reportTourAnchor(report)}
                   onClick={() => handleReportClick(report.id)}
                   className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 hover:shadow-md dark:hover:shadow-gray-700/70 transition-shadow text-left flex items-center gap-4 group"
                 >
@@ -479,6 +514,7 @@ function ReportsContent() {
                   return (
                     <tr
                       key={report.id}
+                      {...reportTourAnchor(report)}
                       onClick={() => handleReportClick(report.id)}
                       className="hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
                     >

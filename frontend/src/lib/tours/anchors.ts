@@ -21,6 +21,7 @@ export const TOUR_ANCHORS = {
   navReports: 'nav-reports',
   navSettings: 'nav-settings',
   navTools: 'nav-tools',
+  navToolsMenu: 'nav-tools-menu',
 
   // Dashboard
   dashboardWidgets: 'dashboard-widgets',
@@ -28,14 +29,23 @@ export const TOUR_ANCHORS = {
 
   // Accounts
   accountsAddButton: 'accounts-add-button',
+  accountFxFeePercent: 'account-fx-fee-percent',
+  accountFormActions: 'account-form-actions',
   foreignCurrencyFees: 'account-foreign-currency-fees',
 
   // Transactions
   transactionsNewButton: 'transactions-new-button',
   transactionForm: 'transaction-form',
+  transactionAccountDate: 'transaction-account-date',
   transactionFields: 'transaction-fields',
   transactionSplit: 'transaction-split',
   transactionCurrencyField: 'transaction-currency-field',
+  transactionConvertedAmount: 'transaction-converted-amount',
+  transactionFxConversion: 'transaction-fx-conversion',
+  transactionFormActions: 'transaction-form-actions',
+
+  // Reports
+  reportForeignCurrencyFees: 'report-foreign-currency-fees',
 
   // Settings
   settingsWhatsNewToggle: 'settings-whats-new-toggle',

@@ -374,6 +374,7 @@
     "transferAmountNote": "이체 금액은 양수여야 합니다",
     "amountReceivedNote": "환전 후 수령 금액",
     "splitTransaction": "분할 거래",
+    "splitDisabledDuringTour": "가이드 투어 중에는 사용할 수 없습니다",
     "newTagTitle": "새 태그",
     "toasts": {
       "transferCreated": "이체가 생성되었습니다",

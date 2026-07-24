@@ -16,6 +16,9 @@ vi.mock('@/lib/tours-api', () => ({
   },
 }));
 
+const listAccounts = vi.fn().mockResolvedValue([]);
+vi.mock('@/lib/accounts', () => ({ accountsApi: { getAll: () => listAccounts() } }));
+
 import { act, render, screen, waitFor, fireEvent, cleanup } from '@/test/render';
 import { TourHost } from './TourHost';
 import { useTourStore } from '@/store/tourStore';
@@ -64,6 +67,7 @@ beforeEach(() => {
   getProgress.mockClear();
   saveProgress.mockClear();
   setDesktop();
+  listAccounts.mockClear().mockResolvedValue([]);
   useTourStore.setState({ active: null, progress: {}, progressLoaded: false });
   useAuthStore.setState({ isAuthenticated: true });
 });
@@ -161,6 +165,145 @@ describe('TourHost', () => {
     await waitFor(() =>
       expect(screen.getByText("You're all set")).toBeInTheDocument(),
     );
+  });
+
+  it('keeps the spotlit field clickable on an allowInteraction step', async () => {
+    // A passive step that asks the user to type into the highlighted control:
+    // it still advances with Next, but must not cover the cutout with the
+    // click blocker that ordinary passive steps use.
+    const field = document.createElement('div');
+    field.setAttribute('data-tour-id', TOUR_ANCHORS.transactionFields);
+    document.body.appendChild(field);
+
+    const buildTour = (allowInteraction: boolean): TourDefinition => ({
+      id: `test/allow-${allowInteraction}`,
+      area: 'intro',
+      i18nPrefix: 'intro.basics',
+      steps: [
+        {
+          id: 'fields',
+          route: '/',
+          anchorId: TOUR_ANCHORS.transactionFields,
+          ...(allowInteraction ? { allowInteraction: true } : {}),
+        },
+        // A following step so the one under test is not the final one (whose
+        // primary button reads "Done" rather than "Next").
+        { id: 'finish', route: '/', anchorId: null },
+      ],
+    });
+
+    const spotlightChildren = () =>
+      document.body.querySelector('[aria-hidden="true"].inset-0')!
+        .childElementCount;
+
+    await mountHost();
+
+    await start(buildTour(false));
+    await waitFor(() =>
+      expect(screen.getByText('Payee, category and amount')).toBeInTheDocument(),
+    );
+    const passiveChildren = spotlightChildren();
+
+    await act(async () => {
+      useTourStore.getState().endTour('dismissed');
+    });
+    await start(buildTour(true));
+    await waitFor(() =>
+      expect(screen.getByText('Payee, category and amount')).toBeInTheDocument(),
+    );
+
+    // One fewer child: the hole blocker is gone, so the field accepts input.
+    expect(spotlightChildren()).toBe(passiveChildren - 1);
+    // Still a passive step, so Next drives it (no "Skip this step" affordance).
+    expect(screen.getByText('Next')).toBeInTheDocument();
+    expect(screen.queryByText('Skip this step')).toBeNull();
+  });
+
+  it('renders an unobtrusive step with no dim, parked in the corner', async () => {
+    const tour: TourDefinition = {
+      id: 'test/unobtrusive',
+      area: 'intro',
+      i18nPrefix: 'intro.basics',
+      steps: [
+        { id: 'welcome', route: '/', anchorId: null, unobtrusive: true },
+        { id: 'finish', route: '/', anchorId: null },
+      ],
+    };
+
+    await mountHost();
+    await start(tour);
+    await waitFor(() =>
+      expect(screen.getByText('Welcome to Monize')).toBeInTheDocument(),
+    );
+
+    // No dimming overlay at all: the page behind stays fully visible/usable.
+    expect(document.body.querySelector('.bg-black\\/50')).toBeNull();
+
+    // The next (ordinary centered) step brings the dim back.
+    await act(async () => {
+      fireEvent.click(screen.getByText('Next'));
+    });
+    await waitFor(() =>
+      expect(document.body.querySelector('.bg-black\\/50')).not.toBeNull(),
+    );
+  });
+
+  describe('step requirements', () => {
+    const GATED: TourDefinition = {
+      id: 'test/requires',
+      area: 'intro',
+      i18nPrefix: 'intro.basics',
+      steps: [
+        { id: 'welcome', route: '/', anchorId: null },
+        {
+          id: 'createTransaction',
+          route: '/',
+          anchorId: null,
+          requires: 'transactionEntry',
+        },
+        { id: 'finish', route: '/', anchorId: null },
+      ],
+    };
+
+    it('omits the step when the user has no account to record against', async () => {
+      // No accounts: the form cannot be submitted, so it would teach nothing.
+      await mountHost();
+      await start(GATED);
+      await waitFor(() =>
+        expect(screen.getByText('Welcome to Monize')).toBeInTheDocument(),
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Next'));
+      });
+
+      // Straight past the gated step to the one after it...
+      await waitFor(() =>
+        expect(screen.getByText("You're all set")).toBeInTheDocument(),
+      );
+      // ...and the omission is deliberate, so the tour is not marked degraded.
+      expect(useTourStore.getState().active?.skippedCount).toBe(0);
+    });
+
+    it('shows the step once the user has an account', async () => {
+      // Payee and category are optional on a transaction and can be created
+      // from inside the form, so an account alone is enough.
+      listAccounts.mockResolvedValueOnce([{ id: 'a' }]);
+
+      await mountHost();
+      await start(GATED);
+      await waitFor(() =>
+        expect(screen.getByText('Welcome to Monize')).toBeInTheDocument(),
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Next'));
+      });
+
+      await waitFor(() =>
+        expect(screen.getByText('Record a transaction')).toBeInTheDocument(),
+      );
+    });
   });
 
   it('shows a route-agnostic first step in place without navigating', async () => {

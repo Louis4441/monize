@@ -374,6 +374,7 @@
     "transferAmountNote": "O valor deve ser positivo nas transferências",
     "amountReceivedNote": "Valor recebido após conversão cambial",
     "splitTransaction": "Dividir Transação",
+    "splitDisabledDuringTour": "Indisponível durante o tour guiado",
     "newTagTitle": "Nova Etiqueta",
     "toasts": {
       "transferCreated": "Transferência criada",
