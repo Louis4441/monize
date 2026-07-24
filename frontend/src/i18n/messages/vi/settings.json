@@ -126,6 +126,8 @@
     "weekStartsOnLabel": "Tuần bắt đầu vào",
     "showCreatedAtLabel": "Hiển thị ngày tạo trong biểu mẫu giao tác",
     "showCreatedAtTooltip": "Hiển thị ngày và giờ giao tác được tạo ban đầu trên biểu mẫu giao tác. Điều này khác với ngày giao tác và có thể giúp bạn biết khi nào mục nhập thực sự được thêm vào Monize.",
+    "showWhatsNewLabel": "Hiển thị Có gì mới sau khi nâng cấp",
+    "showWhatsNewTooltip": "Hiển thị bản tóm tắt ghi chú phát hành trong lần đầu tiên bạn đăng nhập sau khi Monize cập nhật lên phiên bản mới. Bạn luôn có thể mở lại bằng cách nhấp vào số phiên bản ở cuối trang này hoặc trên màn hình đăng nhập.",
     "timeFormatLabel": "Định dạng giờ",
     "recentTransactionsLabel": "Giao tác gần đây trong điền nhanh",
     "recentTransactionsHelp": "Số mục được hiển thị trong cửa sổ bật lên lịch sử bên cạnh trường Người nhận trên biểu mẫu giao tác.",

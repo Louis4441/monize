@@ -72,6 +72,8 @@ export const RULES: Record<string, TableRules> = {
     time_format: keep,
     preferred_exchanges: keep,
     dismissed_update_version: keep,
+    last_seen_version: keep,
+    show_whats_new: keep,
     default_quote_provider: keep,
     recent_transactions_limit: keep,
     ai_bubble_enabled: keep,

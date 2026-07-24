@@ -126,6 +126,8 @@
     "weekStartsOnLabel": "Tydzień zaczyna się od",
     "showCreatedAtLabel": "Pokaż datę utworzenia w formularzach transakcji",
     "showCreatedAtTooltip": "Wyświetla datę i godzinę pierwotnego utworzenia transakcji w formularzach. Jest to odrębne od daty transakcji i pomaga ustalić, kiedy wpis faktycznie dodano do Monize.",
+    "showWhatsNewLabel": "Pokaż „Co nowego” po aktualizacji",
+    "showWhatsNewTooltip": "Wyświetla podsumowanie informacji o wydaniu przy pierwszym logowaniu po zaktualizowaniu Monize do nowej wersji. Zawsze możesz otworzyć je ponownie, klikając numer wersji na dole tej strony lub na ekranie logowania.",
     "timeFormatLabel": "Format czasu",
     "recentTransactionsLabel": "Ostatnie transakcje w szybkim uzupełnianiu",
     "recentTransactionsHelp": "Liczba wpisów wyświetlanych w okienku przycisku historii obok pola Odbiorca w formularzach transakcji.",

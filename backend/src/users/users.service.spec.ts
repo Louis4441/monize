@@ -437,6 +437,15 @@ describe("UsersService", () => {
       expect(savedData.gettingStartedDismissed).toBe(true);
     });
 
+    it("updates the showWhatsNew preference", async () => {
+      preferencesRepository.findOne.mockResolvedValue({ ...mockPreferences });
+
+      await service.updatePreferences("user-1", { showWhatsNew: false });
+
+      const savedData = preferencesRepository.save.mock.calls[0][0];
+      expect(savedData.showWhatsNew).toBe(false);
+    });
+
     it("updates favouriteReportIds", async () => {
       preferencesRepository.findOne.mockResolvedValue({ ...mockPreferences });
 

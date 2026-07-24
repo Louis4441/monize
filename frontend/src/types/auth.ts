@@ -112,6 +112,7 @@ export interface UserPreferences {
   defaultQuoteProvider: 'yahoo' | 'msn';
   recentTransactionsLimit: number;
   aiBubbleEnabled: boolean;
+  showWhatsNew: boolean;
   language: string;
   createdAt: string;
   updatedAt: string;
@@ -175,6 +176,7 @@ export interface UpdatePreferencesData {
   defaultQuoteProvider?: 'yahoo' | 'msn';
   recentTransactionsLimit?: number;
   aiBubbleEnabled?: boolean;
+  showWhatsNew?: boolean;
   language?: string;
 }
 

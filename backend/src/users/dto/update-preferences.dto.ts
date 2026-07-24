@@ -124,6 +124,14 @@ export class UpdatePreferencesDto {
   aiBubbleEnabled?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      "Show the What's New release-notes popup automatically after an upgrade",
+  })
+  @IsOptional()
+  @IsBoolean()
+  showWhatsNew?: boolean;
+
+  @ApiPropertyOptional({
     description: "Day the week starts on (0=Sunday, 1=Monday, ..., 6=Saturday)",
     example: 1,
   })

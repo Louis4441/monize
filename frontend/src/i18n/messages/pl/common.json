@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "Zobacz informacje o wydaniu v{version}"
   },
+  "whatsNew": {
+    "title": "Co nowego",
+    "versionLabel": "Wersja {version}",
+    "expandAll": "Rozwiń wszystko",
+    "collapseAll": "Zwiń wszystko",
+    "viewFullNotes": "Zobacz pełne informacje o wydaniu",
+    "dontShowAgain": "Nie pokazuj ponownie",
+    "showNextLogin": "Pokaż przy następnym logowaniu",
+    "close": "Zamknij",
+    "unavailable": "Informacje o wydaniu tej wersji są niedostępne."
+  },
   "save": "Zapisz",
   "cancel": "Anuluj",
   "delete": "Usuń",

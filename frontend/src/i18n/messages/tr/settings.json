@@ -126,6 +126,8 @@
     "weekStartsOnLabel": "Hafta başlangıcı",
     "showCreatedAtLabel": "İşlem formlarında Oluşturma Tarihini Göster",
     "showCreatedAtTooltip": "İşlem formlarında bir işlemin ilk oluşturulduğu tarih ve saati görüntüler. Bu, işlem tarihinden ayrıdır ve bir kaydın Monize'ye gerçekte ne zaman eklendiğini anlamanıza yardımcı olabilir.",
+    "showWhatsNewLabel": "Yükseltmeden sonra Yenilikler'i göster",
+    "showWhatsNewTooltip": "Monize yeni bir sürüme güncellendikten sonra ilk oturum açtığınızda sürüm notlarının bir özetini gösterir. Bu sayfanın altındaki veya oturum açma ekranındaki sürüm numarasına tıklayarak istediğiniz zaman yeniden açabilirsiniz.",
     "timeFormatLabel": "Saat Biçimi",
     "recentTransactionsLabel": "Hızlı doldurma için son işlemler",
     "recentTransactionsHelp": "İşlem formlarında Alacaklı alanı yanındaki geçmiş düğmesi açılır penceresinde gösterilen kayıt sayısı.",

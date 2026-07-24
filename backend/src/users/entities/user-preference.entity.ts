@@ -110,6 +110,25 @@ export class UserPreference {
   })
   dismissedUpdateVersion: string | null;
 
+  // Version whose "What's New" release notes the user acknowledged via
+  // "Don't show this again". The auto-popup is suppressed while this equals
+  // the running version; a newer release makes it reappear. Server-managed
+  // (written only via the What's New "seen" endpoint), so it is excluded from
+  // the user-editable preferences DTO, mirroring dismissedUpdateVersion.
+  @Column({
+    name: "last_seen_version",
+    type: "varchar",
+    length: 50,
+    nullable: true,
+  })
+  lastSeenVersion: string | null;
+
+  // Settings kill-switch for the What's New auto-popup. When false the popup
+  // never opens automatically, though the version labels can still open it
+  // manually.
+  @Column({ name: "show_whats_new", default: true })
+  showWhatsNew: boolean;
+
   @Column({
     name: "default_quote_provider",
     type: "varchar",

@@ -5,6 +5,17 @@
   "appVersion": {
     "releaseNotes": "v{version} sürüm notlarını görüntüle"
   },
+  "whatsNew": {
+    "title": "Yenilikler",
+    "versionLabel": "Sürüm {version}",
+    "expandAll": "Tümünü genişlet",
+    "collapseAll": "Tümünü daralt",
+    "viewFullNotes": "Tüm sürüm notlarını görüntüle",
+    "dontShowAgain": "Bir daha gösterme",
+    "showNextLogin": "Sonraki girişte göster",
+    "close": "Kapat",
+    "unavailable": "Bu sürüme ait sürüm notları mevcut değil."
+  },
   "save": "Kaydet",
   "cancel": "İptal",
   "delete": "Sil",
@@ -161,10 +172,47 @@
     "length": "Kod tam olarak 6 haneli olmalıdır",
     "digits": "Kod 6 haneli olmalıdır"
   },
-  "monthsShort": ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"],
-  "weekdaysShort": ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"],
-  "weekdaysMin": ["Pz", "Pt", "Sa", "Ça", "Pe", "Cu", "Ct"],
-  "weekdaysNarrow": ["P", "P", "S", "Ç", "P", "C", "C"],
+  "monthsShort": [
+    "Oca",
+    "Şub",
+    "Mar",
+    "Nis",
+    "May",
+    "Haz",
+    "Tem",
+    "Ağu",
+    "Eyl",
+    "Eki",
+    "Kas",
+    "Ara"
+  ],
+  "weekdaysShort": [
+    "Paz",
+    "Pzt",
+    "Sal",
+    "Çar",
+    "Per",
+    "Cum",
+    "Cmt"
+  ],
+  "weekdaysMin": [
+    "Pz",
+    "Pt",
+    "Sa",
+    "Ça",
+    "Pe",
+    "Cu",
+    "Ct"
+  ],
+  "weekdaysNarrow": [
+    "P",
+    "P",
+    "S",
+    "Ç",
+    "P",
+    "C",
+    "C"
+  ],
   "dateFormat": {
     "browserAuto": "Tarayıcı yerel ayarını kullan (otomatik algılama: {sample})",
     "custom": "Özel..."
