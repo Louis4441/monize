@@ -13,6 +13,11 @@ import type { TourDefinition } from '../types';
  * Steps anchored on desktop-only header controls (the Tools dropdown) or the
  * desktop Split button are `skipOnMobile`; the page steps use centered cards so
  * they show on every viewport.
+ *
+ * The steps that introduce a whole screen -- Accounts, Transactions, Bills,
+ * Investments, Budgets, Reports -- are `unobtrusive`: dimming would hide the
+ * very page being described. Anchored ones keep their highlight ring, so they
+ * still point at the button they name.
  */
 export const INTRO_TOUR: TourDefinition = {
   id: 'intro/basics',
@@ -45,12 +50,14 @@ export const INTRO_TOUR: TourDefinition = {
       route: '/accounts',
       anchorId: TOUR_ANCHORS.accountsAddButton,
       placement: 'bottom',
+      unobtrusive: true,
     },
     {
       id: 'transactions',
       route: '/transactions',
       anchorId: TOUR_ANCHORS.transactionsNewButton,
       placement: 'bottom',
+      unobtrusive: true,
     },
     {
       // Interactive: clicking New Transaction opens the form; the step advances
@@ -86,28 +93,33 @@ export const INTRO_TOUR: TourDefinition = {
       // Centered: ask the user to close the form; advance when it disappears.
       id: 'closeForm',
       route: '/transactions',
-      anchorId: null,
+      anchorId: TOUR_ANCHORS.transactionFormActions,
+      placement: 'top',
       advance: { type: 'disappear', anchorId: TOUR_ANCHORS.transactionForm },
     },
     {
       id: 'bills',
       route: '/bills',
       anchorId: null,
+      unobtrusive: true,
     },
     {
       id: 'investments',
       route: '/investments',
       anchorId: null,
+      unobtrusive: true,
     },
     {
       id: 'budgets',
       route: '/budgets',
       anchorId: null,
+      unobtrusive: true,
     },
     {
       id: 'reports',
       route: '/reports',
       anchorId: null,
+      unobtrusive: true,
     },
     {
       id: 'finish',

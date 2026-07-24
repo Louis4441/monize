@@ -294,14 +294,13 @@ export function TourHost() {
 
   return (
     <>
-      {!unobtrusive && (
-        <TourSpotlight
-          rect={centered ? null : anchorRect}
-          interactive={clickableAnchor}
-          passThrough={passThrough}
-          reducedMotion={reducedMotion}
-        />
-      )}
+      <TourSpotlight
+        rect={centered ? null : anchorRect}
+        interactive={clickableAnchor}
+        passThrough={passThrough}
+        dim={!unobtrusive}
+        reducedMotion={reducedMotion}
+      />
       <TourTooltip
         rect={centered ? null : anchorRect}
         placement={step?.placement}

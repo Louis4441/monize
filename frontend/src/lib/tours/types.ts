@@ -52,10 +52,12 @@ export interface TourStep {
    */
   allowInteraction?: boolean;
   /**
-   * Show the step as an unobtrusive coach mark: no dimming overlay, and the
-   * card parked in a screen corner rather than centered. For steps that ask the
-   * user to scan the whole page and act on it (e.g. "find your credit card and
-   * choose Edit"), where dimming and a centered card get in the way.
+   * Show the step as an unobtrusive coach mark: no dimming overlay, and (for an
+   * anchorless step) the card parked in a screen corner rather than centered.
+   * An anchored step keeps its highlight ring, so it still points somewhere.
+   * For steps introducing a whole screen, or asking the user to scan the page
+   * and act on it (e.g. "find your credit card and choose Edit"), where dimming
+   * hides the very content the step is about.
    */
   unobtrusive?: boolean;
   placement?: TourPlacement;

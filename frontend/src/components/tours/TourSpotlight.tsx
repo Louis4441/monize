@@ -15,6 +15,12 @@ interface TourSpotlightProps {
    * otherwise sit under the dim and be unclickable.
    */
   passThrough?: boolean;
+  /**
+   * Whether to darken the page at all. `false` keeps just the ring around the
+   * anchor (and renders nothing for an anchorless step), for steps that are
+   * introducing a whole screen the user should be able to read and use.
+   */
+  dim?: boolean;
   /** Disable the cutout animation for reduced-motion users. */
   reducedMotion: boolean;
 }
@@ -38,6 +44,7 @@ export function TourSpotlight({
   rect,
   interactive,
   passThrough = false,
+  dim = true,
   reducedMotion,
 }: TourSpotlightProps) {
   const stop = (e: React.MouseEvent) => e.stopPropagation();
@@ -46,6 +53,27 @@ export function TourSpotlight({
   // pass-through step dims visually only.
   const panelEvents = passThrough ? '' : 'pointer-events-auto';
   const onPanelClick = passThrough ? undefined : stop;
+
+  // Undimmed: ring the anchor so the step still points somewhere, and leave
+  // the page fully visible and usable. An anchorless step has nothing to ring.
+  if (!dim) {
+    if (!rect) return null;
+    const ring = inflateRect(rect, HOLE_PADDING);
+    return createPortal(
+      <div
+        className={`pointer-events-none fixed rounded-md ring-2 ring-blue-500 ${transition}`}
+        style={{
+          top: ring.top,
+          left: ring.left,
+          width: ring.width,
+          height: ring.height,
+          zIndex: 60,
+        }}
+        aria-hidden="true"
+      />,
+      document.body,
+    );
+  }
 
   if (!rect) {
     // Interactive centered steps (e.g. "close the form to continue") must let

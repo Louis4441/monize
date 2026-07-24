@@ -85,6 +85,26 @@ describe('TourSpotlight', () => {
     }
   });
 
+  it('shows only the ring, with no dimming, when dim is off', () => {
+    render(
+      <TourSpotlight rect={RECT} interactive={false} dim={false} reducedMotion={false} />,
+    );
+    // Nothing darkens the page: the step is introducing the page itself.
+    expect(document.body.querySelector('.bg-black\\/50')).toBeNull();
+    // The ring still points at the anchor, and never eats a click.
+    const ring = document.body.querySelector('.ring-2') as HTMLElement;
+    expect(ring).not.toBeNull();
+    expect(ring.className).toContain('pointer-events-none');
+  });
+
+  it('renders nothing for an anchorless step when dim is off', () => {
+    render(
+      <TourSpotlight rect={null} interactive dim={false} reducedMotion={false} />,
+    );
+    expect(document.body.querySelector('.bg-black\\/50')).toBeNull();
+    expect(document.body.querySelector('.ring-2')).toBeNull();
+  });
+
   it('drops the animation classes under reduced motion', () => {
     render(
       <TourSpotlight rect={RECT} interactive={false} reducedMotion={true} />,
