@@ -57,6 +57,9 @@ describe('foreign-currency release tour', () => {
     expect(fee.anchorId).toBe(TOUR_ANCHORS.accountFxFeePercent);
 
     const closeForm = tour.steps.find((s) => s.id === 'closeAccountForm')!;
+    // Spotlights the form's own Cancel/Update pair rather than floating a
+    // centered card, so the user can see what ends the step.
+    expect(closeForm.anchorId).toBe(TOUR_ANCHORS.accountFormActions);
     expect(closeForm.advance).toEqual({
       type: 'disappear',
       anchorId: TOUR_ANCHORS.accountFxFeePercent,
@@ -88,6 +91,7 @@ describe('foreign-currency release tour', () => {
     });
 
     const closeTxn = tour.steps.find((s) => s.id === 'closeTransactionForm')!;
+    expect(closeTxn.anchorId).toBe(TOUR_ANCHORS.transactionFormActions);
     expect(closeTxn.advance).toEqual({
       type: 'disappear',
       anchorId: TOUR_ANCHORS.transactionForm,

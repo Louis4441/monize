@@ -6,6 +6,7 @@
     "endTour": "End tour",
     "tryIt": "Try it -- the tour continues once you do",
     "skipStep": "Skip this step",
+    "move": "Move this card -- drag it, or nudge it with the arrow keys",
     "stepCounter": "{current} of {total}",
     "skippedTitle": "Tour finished",
     "skippedBody": "Some steps were skipped because their screen or control wasn't available. You can retake the tour anytime from Settings."
@@ -124,7 +125,7 @@
           },
           "closeAccountForm": {
             "title": "Save and close",
-            "body": "Choose **Update Account** to save the fee -- or **Cancel** to close without saving -- and the tour carries on."
+            "body": "Use these buttons to finish: **Update Account** saves the fee, **Cancel** closes without saving. Either way the tour carries on."
           },
           "newTransaction": {
             "title": "Record a foreign purchase",
@@ -144,7 +145,7 @@
           },
           "closeTransactionForm": {
             "title": "Close the form",
-            "body": "Save the transaction, or close the form with **Cancel**, and the tour continues."
+            "body": "Same here: save the transaction with the submit button, or close it with **Cancel**, and the tour continues."
           },
           "openAccountDetail": {
             "title": "Back to the card",

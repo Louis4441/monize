@@ -1450,12 +1450,15 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         {...register('status')}
       />
 
-      {/* Actions */}
-      <FormActions
-        onCancel={onCancel}
-        submitLabel={t(transaction ? 'form.submitUpdate' : 'form.submitCreate', { mode: t(mode === 'transfer' ? 'form.modeLabel.transfer' : 'form.modeLabel.transaction') })}
-        isSubmitting={isLoading}
-      />
+      {/* Actions. Wrapped so a guided tour can spotlight the Cancel/Save pair
+          without anchoring the shared FormActions used by every other form. */}
+      <div {...tourAnchor(TOUR_ANCHORS.transactionFormActions)}>
+        <FormActions
+          onCancel={onCancel}
+          submitLabel={t(transaction ? 'form.submitUpdate' : 'form.submitCreate', { mode: t(mode === 'transfer' ? 'form.modeLabel.transfer' : 'form.modeLabel.transaction') })}
+          isSubmitting={isLoading}
+        />
+      </div>
 
       {/* Reactivate Payee Dialog */}
       <ReactivatePayeeDialog

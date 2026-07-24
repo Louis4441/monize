@@ -37,7 +37,13 @@ export interface TourTooltipLabels {
   endTour: string;
   tryIt: string;
   skipStep: string;
+  move: string;
 }
+
+/** Keyboard nudge distance for the move handle, in px. */
+const NUDGE = 24;
+/** Minimum gap kept between the card and the viewport edges. */
+const EDGE = 8;
 
 interface TourTooltipProps {
   /** Anchor rect, or null for a centered card. */
@@ -119,6 +125,26 @@ export function TourTooltip({
   const cardRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const [size, setSize] = useState<Size | null>(null);
+  // Where the user dragged the card, if they moved it. Null = auto-positioned.
+  const [movedTo, setMovedTo] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+  const dragFrom = useRef<{
+    x: number;
+    y: number;
+    top: number;
+    left: number;
+  } | null>(null);
+
+  // A manual position belongs to the step it was set on: the next step points
+  // at something else, so it re-positions itself ("info from previous render",
+  // never a setState in an effect).
+  const stepKey = `${stepLabel}|${title}`;
+  const [prevStepKey, setPrevStepKey] = useState(stepKey);
+  if (stepKey !== prevStepKey) {
+    setPrevStepKey(stepKey);
+    setMovedTo(null);
+  }
 
   // Measure the card after first paint so positioning can center/flip it.
   useEffect(() => {
@@ -233,9 +259,71 @@ export function TourTooltip({
     left = Math.max(8, viewport.width / 2 - tooltipSize.width / 2);
   }
 
+  // A step's auto-position can still land over the very thing the user needs
+  // (an account row, say), so the card is movable. Once moved, the user's
+  // position wins for the rest of the step.
+  const clampToViewport = (nextTop: number, nextLeft: number) => ({
+    top: Math.min(
+      Math.max(EDGE, nextTop),
+      Math.max(EDGE, viewport.height - tooltipSize.height - EDGE),
+    ),
+    left: Math.min(
+      Math.max(EDGE, nextLeft),
+      Math.max(EDGE, viewport.width - tooltipSize.width - EDGE),
+    ),
+  });
+
+  const shownTop = movedTo ? movedTo.top : top;
+  const shownLeft = movedTo ? movedTo.left : left;
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    // Stop the press from selecting text or focusing through to the page.
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    dragFrom.current = {
+      x: e.clientX,
+      y: e.clientY,
+      top: shownTop,
+      left: shownLeft,
+    };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    const from = dragFrom.current;
+    if (!from) return;
+    setMovedTo(
+      clampToViewport(
+        from.top + (e.clientY - from.y),
+        from.left + (e.clientX - from.x),
+      ),
+    );
+  };
+
+  const endDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
+    dragFrom.current = null;
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture?.(e.pointerId);
+    }
+  };
+
+  // Keyboard equivalent: nudge with the arrow keys while the handle is focused.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const deltas: Record<string, [number, number]> = {
+      ArrowUp: [0, -NUDGE],
+      ArrowDown: [0, NUDGE],
+      ArrowLeft: [-NUDGE, 0],
+      ArrowRight: [NUDGE, 0],
+    };
+    const delta = deltas[e.key];
+    if (!delta) return;
+    e.preventDefault();
+    setMovedTo(clampToViewport(shownTop + delta[1], shownLeft + delta[0]));
+  };
+
   // Hide until measured to avoid a first-paint jump (visibility keeps it
   // measurable). Skip the fade for reduced-motion users.
   const measured = size !== null;
+  // Suppress the fade while dragging so the card tracks the pointer exactly.
   const transition = reducedMotion ? '' : 'transition-opacity duration-150';
 
   return createPortal(
@@ -247,8 +335,29 @@ export function TourTooltip({
       className={`fixed z-[70] w-80 max-w-[calc(100vw-16px)] rounded-lg border border-gray-200 bg-white p-4 shadow-xl outline-none dark:border-gray-700 dark:bg-gray-800 ${transition} ${
         measured ? 'opacity-100' : 'opacity-0'
       }`}
-      style={{ top, left }}
+      style={{ top: shownTop, left: shownLeft }}
     >
+      <button
+        type="button"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onKeyDown={handleKeyDown}
+        aria-label={labels.move}
+        title={labels.move}
+        className="absolute right-1.5 top-1.5 cursor-move touch-none rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+      >
+        {/* Six-dot grip */}
+        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <circle cx="7" cy="5" r="1.5" />
+          <circle cx="13" cy="5" r="1.5" />
+          <circle cx="7" cy="10" r="1.5" />
+          <circle cx="13" cy="10" r="1.5" />
+          <circle cx="7" cy="15" r="1.5" />
+          <circle cx="13" cy="15" r="1.5" />
+        </svg>
+      </button>
       {cardBody}
     </div>,
     document.body,

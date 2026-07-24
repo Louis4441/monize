@@ -9,6 +9,7 @@ const LABELS: TourTooltipLabels = {
   endTour: 'End tour',
   tryIt: 'Try it',
   skipStep: 'Skip this step',
+  move: 'Move this card',
 };
 
 const RECT = { top: 100, left: 100, width: 120, height: 40 };
@@ -21,23 +22,25 @@ function setup(props: Partial<React.ComponentProps<typeof TourTooltip>> = {}) {
     onSkip: vi.fn(),
     onEnd: vi.fn(),
   };
-  render(
-    <TourTooltip
-      rect={RECT}
-      title="Step title"
-      body="Step body"
-      stepLabel="2 of 5"
-      interactive={false}
-      isLast={false}
-      canBack
-      reducedMotion={false}
-      leaveFocusToForm={false}
-      labels={LABELS}
-      {...handlers}
-      {...props}
-    />,
-  );
-  return handlers;
+  const baseProps: React.ComponentProps<typeof TourTooltip> = {
+    rect: RECT,
+    title: 'Step title',
+    body: 'Step body',
+    stepLabel: '2 of 5',
+    interactive: false,
+    isLast: false,
+    canBack: true,
+    reducedMotion: false,
+    leaveFocusToForm: false,
+    labels: LABELS,
+    ...handlers,
+    ...props,
+  };
+  const view = render(<TourTooltip {...baseProps} />);
+  /** Re-render as the next step would, keeping the props under test. */
+  const rerender = (next: Partial<React.ComponentProps<typeof TourTooltip>>) =>
+    view.rerender(<TourTooltip {...baseProps} {...next} />);
+  return { ...handlers, rerender };
 }
 
 beforeEach(() => {
@@ -64,6 +67,68 @@ describe('TourTooltip', () => {
     expect(screen.getByText('Step title')).toBeInTheDocument();
     expect(screen.getByText('Step body')).toBeInTheDocument();
     expect(screen.getByText('2 of 5')).toBeInTheDocument();
+  });
+
+  describe('repositioning', () => {
+    const handle = () => screen.getByLabelText('Move this card');
+    const cardPos = () => {
+      const card = screen.getByRole('dialog') as HTMLElement;
+      return { top: card.style.top, left: card.style.left };
+    };
+
+    it('moves the card when the handle is dragged', () => {
+      setup();
+      const before = cardPos();
+
+      fireEvent.pointerDown(handle(), { clientX: 500, clientY: 400, pointerId: 1 });
+      fireEvent.pointerMove(handle(), { clientX: 560, clientY: 450, pointerId: 1 });
+      fireEvent.pointerUp(handle(), { pointerId: 1 });
+
+      const after = cardPos();
+      expect(after).not.toEqual(before);
+      expect(parseFloat(after.left)).toBe(parseFloat(before.left) + 60);
+      expect(parseFloat(after.top)).toBe(parseFloat(before.top) + 50);
+    });
+
+    it('ignores pointer movement that did not start on the handle', () => {
+      setup();
+      const before = cardPos();
+      fireEvent.pointerMove(handle(), { clientX: 900, clientY: 700, pointerId: 1 });
+      expect(cardPos()).toEqual(before);
+    });
+
+    it('nudges the card with the arrow keys for keyboard users', () => {
+      setup();
+      const before = cardPos();
+
+      fireEvent.keyDown(handle(), { key: 'ArrowRight' });
+      expect(parseFloat(cardPos().left)).toBe(parseFloat(before.left) + 24);
+
+      fireEvent.keyDown(handle(), { key: 'ArrowUp' });
+      expect(parseFloat(cardPos().top)).toBe(parseFloat(before.top) - 24);
+    });
+
+    it('keeps the card inside the viewport', () => {
+      setup();
+      // Drag far past the bottom-right corner.
+      fireEvent.pointerDown(handle(), { clientX: 0, clientY: 0, pointerId: 1 });
+      fireEvent.pointerMove(handle(), { clientX: 99999, clientY: 99999, pointerId: 1 });
+      fireEvent.pointerUp(handle(), { pointerId: 1 });
+
+      const { top, left } = cardPos();
+      expect(parseFloat(top)).toBeLessThanOrEqual(window.innerHeight);
+      expect(parseFloat(left)).toBeLessThanOrEqual(window.innerWidth);
+    });
+
+    it('returns to the automatic position on the next step', () => {
+      const { rerender } = setup();
+      fireEvent.keyDown(handle(), { key: 'ArrowRight' });
+      const moved = cardPos();
+
+      // Same anchor, next step: the manual position does not carry over.
+      rerender({ stepLabel: '3 of 5', title: 'Next step title' });
+      expect(parseFloat(cardPos().left)).toBe(parseFloat(moved.left) - 24);
+    });
   });
 
   it('emphasizes **bold** segments in the body', () => {

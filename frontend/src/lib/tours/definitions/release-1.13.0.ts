@@ -61,10 +61,12 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       allowInteraction: true,
     },
     {
-      // Centered: ask the user to save/close; advance once the form is gone.
+      // Spotlight the form's own Cancel/Update pair so the user can see (and
+      // click) exactly what ends the step; advance once the form is gone.
       id: 'closeAccountForm',
       route: '/accounts',
-      anchorId: null,
+      anchorId: TOUR_ANCHORS.accountFormActions,
+      placement: 'top',
       advance: { type: 'disappear', anchorId: TOUR_ANCHORS.accountFxFeePercent },
     },
     {
@@ -112,10 +114,11 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       allowInteraction: true,
     },
     {
-      // Centered: close the form; advance when it disappears.
+      // Spotlight the transaction form's own Cancel/Save pair, as above.
       id: 'closeTransactionForm',
       route: '/transactions',
-      anchorId: null,
+      anchorId: TOUR_ANCHORS.transactionFormActions,
+      placement: 'top',
       advance: { type: 'disappear', anchorId: TOUR_ANCHORS.transactionForm },
     },
     {

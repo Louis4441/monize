@@ -310,6 +310,7 @@ export function TourHost() {
           endTour: t('controls.endTour'),
           tryIt: t('controls.tryIt'),
           skipStep: t('controls.skipStep'),
+          move: t('controls.move'),
         }}
       />
     </>

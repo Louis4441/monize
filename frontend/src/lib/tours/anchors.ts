@@ -29,6 +29,7 @@ export const TOUR_ANCHORS = {
   // Accounts
   accountsAddButton: 'accounts-add-button',
   accountFxFeePercent: 'account-fx-fee-percent',
+  accountFormActions: 'account-form-actions',
   foreignCurrencyFees: 'account-foreign-currency-fees',
 
   // Transactions
@@ -39,6 +40,7 @@ export const TOUR_ANCHORS = {
   transactionCurrencyField: 'transaction-currency-field',
   transactionConvertedAmount: 'transaction-converted-amount',
   transactionFxConversion: 'transaction-fx-conversion',
+  transactionFormActions: 'transaction-form-actions',
 
   // Reports
   reportForeignCurrencyFees: 'report-foreign-currency-fees',

@@ -1015,7 +1015,11 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
         )}
       </div>
 
-      <FormActions onCancel={onCancel} submitLabel={account ? t('form.updateAccount') : t('form.createAccount')} isSubmitting={isSubmitting} />
+      {/* Wrapped so a guided tour can spotlight the Cancel/Save pair without
+          anchoring the shared FormActions used by every other form. */}
+      <div {...tourAnchor(TOUR_ANCHORS.accountFormActions)}>
+        <FormActions onCancel={onCancel} submitLabel={account ? t('form.updateAccount') : t('form.createAccount')} isSubmitting={isSubmitting} />
+      </div>
 
       {account && (
         <AccountExportModal
