@@ -374,6 +374,7 @@
     "transferAmountNote": "振替の金額はプラスである必要があります",
     "amountReceivedNote": "通貨変換後の受取金額",
     "splitTransaction": "取引を分割",
+    "splitDisabledDuringTour": "ガイド付きツアー中は利用できません",
     "newTagTitle": "新しいタグ",
     "toasts": {
       "transferCreated": "振替を作成しました",

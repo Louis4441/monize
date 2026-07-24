@@ -374,6 +374,7 @@
     "transferAmountNote": "Сума для переказів має бути позитивною",
     "amountReceivedNote": "Отримана сума після конвертації валюти",
     "splitTransaction": "Розподілити транзакцію",
+    "splitDisabledDuringTour": "Недоступно під час інтерактивного туру",
     "newTagTitle": "Новий тег",
     "toasts": {
       "transferCreated": "Переказ створено",

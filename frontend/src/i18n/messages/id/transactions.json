@@ -374,6 +374,7 @@
     "transferAmountNote": "Jumlah harus positif untuk transfer",
     "amountReceivedNote": "Jumlah diterima setelah konversi mata uang",
     "splitTransaction": "Transaksi Terbagi",
+    "splitDisabledDuringTour": "Tidak tersedia selama tur berpandu",
     "newTagTitle": "Tag Baru",
     "toasts": {
       "transferCreated": "Transfer dibuat",

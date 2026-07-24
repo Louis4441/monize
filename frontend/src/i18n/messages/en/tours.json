@@ -34,7 +34,10 @@
   "settings": {
     "title": "Guided tours",
     "description": "Walk through the app's features step by step.",
-    "startIntro": "Start introduction tour",
+    "start": "Start",
+    "restart": "Retake",
+    "statusNotViewed": "Not viewed",
+    "statusDismissed": "Left early",
     "reset": "Reset tour progress",
     "resetSuccess": "Tour progress reset.",
     "resetError": "Couldn't reset tour progress. Please try again."

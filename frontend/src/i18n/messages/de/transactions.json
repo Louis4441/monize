@@ -374,6 +374,7 @@
     "transferAmountNote": "Betrag muss bei Überweisungen positiv sein",
     "amountReceivedNote": "Erhaltener Betrag nach Währungsumrechnung",
     "splitTransaction": "Buchung aufteilen",
+    "splitDisabledDuringTour": "Während der geführten Tour nicht verfügbar",
     "newTagTitle": "Neuer Tag",
     "toasts": {
       "transferCreated": "Überweisung erstellt",

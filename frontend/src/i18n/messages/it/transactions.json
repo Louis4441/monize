@@ -374,6 +374,7 @@
     "transferAmountNote": "L'importo deve essere positivo per i trasferimenti",
     "amountReceivedNote": "Importo ricevuto dopo la conversione valuta",
     "splitTransaction": "Suddividi transazione",
+    "splitDisabledDuringTour": "Non disponibile durante il tour guidato",
     "newTagTitle": "Nuova etichetta",
     "toasts": {
       "transferCreated": "Trasferimento creato",

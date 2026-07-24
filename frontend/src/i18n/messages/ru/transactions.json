@@ -374,6 +374,7 @@
     "transferAmountNote": "Сумма для переводов должна быть положительной",
     "amountReceivedNote": "Полученная сумма после конвертации валюты",
     "splitTransaction": "Разделить проводку",
+    "splitDisabledDuringTour": "Недоступно во время обучающего тура",
     "newTagTitle": "Новый тег",
     "toasts": {
       "transferCreated": "Перевод создан",

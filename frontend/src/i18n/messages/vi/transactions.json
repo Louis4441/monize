@@ -374,6 +374,7 @@
     "transferAmountNote": "Số tiền phải là dương cho chuyển khoản",
     "amountReceivedNote": "Số tiền nhận sau khi quy đổi tiền tệ",
     "splitTransaction": "Chia giao tác",
+    "splitDisabledDuringTour": "Không khả dụng trong lúc hướng dẫn",
     "newTagTitle": "Thẻ mới",
     "toasts": {
       "transferCreated": "Chuyển khoản đã được tạo",
