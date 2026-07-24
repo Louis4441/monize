@@ -14,10 +14,14 @@ import type { TourDefinition } from '../types';
  * desktop Split button are `skipOnMobile`; the page steps use centered cards so
  * they show on every viewport.
  *
- * The steps that introduce a whole screen -- Accounts, Transactions, Bills,
- * Investments, Budgets, Reports -- are `unobtrusive`: dimming would hide the
- * very page being described. Anchored ones keep their highlight ring, so they
- * still point at the button they name.
+ * The steps that introduce a whole screen -- Dashboard, Tools, Accounts,
+ * Transactions, Bills, Investments, Budgets, Reports -- are `unobtrusive`:
+ * dimming would hide the very page being described. Anchored ones keep their
+ * highlight ring, so they still point at the control they name.
+ *
+ * The record-a-transaction detour `requires` an account, payee and category:
+ * for a user who has none of those yet, walking through the form teaches
+ * nothing, so the engine omits those five steps entirely.
  */
 export const INTRO_TOUR: TourDefinition = {
   id: 'intro/basics',
@@ -37,12 +41,15 @@ export const INTRO_TOUR: TourDefinition = {
       route: '/dashboard',
       anchorId: TOUR_ANCHORS.dashboardCustomize,
       placement: 'bottom',
+      unobtrusive: true,
     },
     {
       id: 'tools',
       route: '/dashboard',
-      anchorId: TOUR_ANCHORS.navTools,
-      placement: 'bottom',
+      anchorId: TOUR_ANCHORS.navToolsMenu,
+      openToolsMenu: true,
+      unobtrusive: true,
+      placement: 'right',
       skipOnMobile: true,
     },
     {
@@ -63,6 +70,7 @@ export const INTRO_TOUR: TourDefinition = {
       // Interactive: clicking New Transaction opens the form; the step advances
       // once the form panel appears.
       id: 'createTransaction',
+      requires: 'transactionEntry',
       route: '/transactions',
       anchorId: TOUR_ANCHORS.transactionsNewButton,
       placement: 'bottom',
@@ -72,12 +80,14 @@ export const INTRO_TOUR: TourDefinition = {
       // The following steps render while the form modal is open: focus stays
       // with the form (the engine leaves anchors inside a role="dialog" alone).
       id: 'fields',
+      requires: 'transactionEntry',
       route: '/transactions',
       anchorId: TOUR_ANCHORS.transactionFields,
       placement: 'auto',
     },
     {
       id: 'splits',
+      requires: 'transactionEntry',
       route: '/transactions',
       anchorId: TOUR_ANCHORS.transactionSplit,
       placement: 'auto',
@@ -85,13 +95,15 @@ export const INTRO_TOUR: TourDefinition = {
     },
     {
       id: 'currencyField',
+      requires: 'transactionEntry',
       route: '/transactions',
       anchorId: TOUR_ANCHORS.transactionCurrencyField,
       placement: 'auto',
     },
     {
-      // Centered: ask the user to close the form; advance when it disappears.
+      // Spotlights the form's own Cancel/Create pair; advance when it closes.
       id: 'closeForm',
+      requires: 'transactionEntry',
       route: '/transactions',
       anchorId: TOUR_ANCHORS.transactionFormActions,
       placement: 'top',

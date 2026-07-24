@@ -21,6 +21,7 @@ export const TOUR_ANCHORS = {
   navReports: 'nav-reports',
   navSettings: 'nav-settings',
   navTools: 'nav-tools',
+  navToolsMenu: 'nav-tools-menu',
 
   // Dashboard
   dashboardWidgets: 'dashboard-widgets',

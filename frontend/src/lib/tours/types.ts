@@ -27,6 +27,13 @@ export type TourAdvance =
 
 export type TourPlacement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
 
+/**
+ * Data a step needs before it is worth showing.
+ * - `transactionEntry` the user has at least one account, payee and category,
+ *   so walking them through the New Transaction form makes sense.
+ */
+export type TourRequirement = 'transactionEntry';
+
 export interface TourStep {
   /** i18n leaf: tours.<i18nPrefix>.steps.<id>.{title,body}. */
   id: string;
@@ -60,6 +67,18 @@ export interface TourStep {
    * hides the very content the step is about.
    */
   unobtrusive?: boolean;
+  /**
+   * Open the header's Tools dropdown while this step is showing, so the step
+   * can describe what is inside it rather than pointing at a closed menu.
+   */
+  openToolsMenu?: boolean;
+  /**
+   * Data this step needs to be worth showing. The engine omits the step (with
+   * no "steps were skipped" outro -- the omission is deliberate) when the
+   * requirement is not met, e.g. skipping the record-a-transaction walkthrough
+   * for a user who has no accounts yet.
+   */
+  requires?: TourRequirement;
   placement?: TourPlacement;
   /** Filtered out at startTour on narrow viewports. */
   skipOnMobile?: boolean;

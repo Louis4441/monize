@@ -1,15 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/authStore';
 import { useTourStore } from '@/store/tourStore';
 import { toursApi } from '@/lib/tours-api';
+import { accountsApi } from '@/lib/accounts';
+import { payeesApi } from '@/lib/payees';
+import { categoriesApi } from '@/lib/categories';
 import { createLogger } from '@/lib/logger';
 import { findTourAnchor } from '@/lib/tours/anchors';
 import { useTourAnchor } from '@/hooks/useTourAnchor';
 import { useAnchorRect } from '@/hooks/useAnchorRect';
+import type { TourRequirement } from '@/lib/tours/types';
 import { TourSpotlight } from './TourSpotlight';
 import { TourTooltip } from './TourTooltip';
 
@@ -64,6 +68,7 @@ export function TourHost() {
   const next = useTourStore((s) => s.next);
   const back = useTourStore((s) => s.back);
   const skip = useTourStore((s) => s.skip);
+  const omit = useTourStore((s) => s.omit);
   const finish = useTourStore((s) => s.finish);
   const endTour = useTourStore((s) => s.endTour);
 
@@ -103,6 +108,48 @@ export function TourHost() {
   });
 
   const reducedMotion = prefersReducedMotion();
+
+  // --- Step requirements -----------------------------------------------------
+  // Some steps are only worth showing when the user has the data they talk
+  // about (the record-a-transaction walkthrough needs an account, payee and
+  // category). Resolved lazily: nothing is fetched unless a running tour
+  // actually has such a step. `null` = not resolved yet, so the step waits
+  // rather than being omitted on a guess.
+  const [requirements, setRequirements] = useState<Record<
+    TourRequirement,
+    boolean
+  > | null>(null);
+  const needsRequirements =
+    !!active && active.steps.some((s) => s.requires) && requirements === null;
+
+  useEffect(() => {
+    if (!needsRequirements) return;
+    let cancelled = false;
+    Promise.all([
+      accountsApi.getAll(false).catch(() => []),
+      payeesApi.getAll().catch(() => []),
+      categoriesApi.getAll().catch(() => []),
+    ])
+      .then(([accounts, payees, categories]) => {
+        if (cancelled) return;
+        setRequirements({
+          transactionEntry:
+            accounts.length > 0 && payees.length > 0 && categories.length > 0,
+        });
+      })
+      .catch(logger.debug);
+    return () => {
+      cancelled = true;
+    };
+  }, [needsRequirements]);
+
+  // Omit a step whose requirement this user does not meet. Not a "skip": the
+  // omission is deliberate, so it must not trigger the degraded-tour outro.
+  useEffect(() => {
+    if (!active || showingOutro || !requirements) return;
+    const requirement = active.steps[active.stepIndex]?.requires;
+    if (requirement && !requirements[requirement]) omit();
+  }, [active, showingOutro, requirements, omit]);
 
   // Load progress once when authenticated.
   useEffect(() => {

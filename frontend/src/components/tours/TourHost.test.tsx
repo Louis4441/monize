@@ -16,6 +16,13 @@ vi.mock('@/lib/tours-api', () => ({
   },
 }));
 
+const listAccounts = vi.fn().mockResolvedValue([]);
+const listPayees = vi.fn().mockResolvedValue([]);
+const listCategories = vi.fn().mockResolvedValue([]);
+vi.mock('@/lib/accounts', () => ({ accountsApi: { getAll: () => listAccounts() } }));
+vi.mock('@/lib/payees', () => ({ payeesApi: { getAll: () => listPayees() } }));
+vi.mock('@/lib/categories', () => ({ categoriesApi: { getAll: () => listCategories() } }));
+
 import { act, render, screen, waitFor, fireEvent, cleanup } from '@/test/render';
 import { TourHost } from './TourHost';
 import { useTourStore } from '@/store/tourStore';
@@ -64,6 +71,9 @@ beforeEach(() => {
   getProgress.mockClear();
   saveProgress.mockClear();
   setDesktop();
+  listAccounts.mockClear().mockResolvedValue([]);
+  listPayees.mockClear().mockResolvedValue([]);
+  listCategories.mockClear().mockResolvedValue([]);
   useTourStore.setState({ active: null, progress: {}, progressLoaded: false });
   useAuthStore.setState({ isAuthenticated: true });
 });
@@ -242,6 +252,64 @@ describe('TourHost', () => {
     await waitFor(() =>
       expect(document.body.querySelector('.bg-black\\/50')).not.toBeNull(),
     );
+  });
+
+  describe('step requirements', () => {
+    const GATED: TourDefinition = {
+      id: 'test/requires',
+      area: 'intro',
+      i18nPrefix: 'intro.basics',
+      steps: [
+        { id: 'welcome', route: '/', anchorId: null },
+        {
+          id: 'createTransaction',
+          route: '/',
+          anchorId: null,
+          requires: 'transactionEntry',
+        },
+        { id: 'finish', route: '/', anchorId: null },
+      ],
+    };
+
+    it('omits the step when the user has nothing to record', async () => {
+      // All three lists empty: the form walkthrough would teach nothing.
+      await mountHost();
+      await start(GATED);
+      await waitFor(() =>
+        expect(screen.getByText('Welcome to Monize')).toBeInTheDocument(),
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Next'));
+      });
+
+      // Straight past the gated step to the one after it...
+      await waitFor(() =>
+        expect(screen.getByText("You're all set")).toBeInTheDocument(),
+      );
+      // ...and the omission is deliberate, so the tour is not marked degraded.
+      expect(useTourStore.getState().active?.skippedCount).toBe(0);
+    });
+
+    it('shows the step once the user has an account, payee and category', async () => {
+      listAccounts.mockResolvedValueOnce([{ id: 'a' }]);
+      listPayees.mockResolvedValueOnce([{ id: 'p' }]);
+      listCategories.mockResolvedValueOnce([{ id: 'c' }]);
+
+      await mountHost();
+      await start(GATED);
+      await waitFor(() =>
+        expect(screen.getByText('Welcome to Monize')).toBeInTheDocument(),
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Next'));
+      });
+
+      await waitFor(() =>
+        expect(screen.getByText('Record a transaction')).toBeInTheDocument(),
+      );
+    });
   });
 
   it('shows a route-agnostic first step in place without navigating', async () => {

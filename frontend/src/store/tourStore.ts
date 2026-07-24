@@ -58,6 +58,12 @@ interface TourState {
   back: () => void;
   /** Graceful skip: the current step's anchor never appeared. */
   skip: () => void;
+  /**
+   * Deliberate omission: the step's `requires` is not met for this user. Unlike
+   * `skip` this is not degradation, so it does not count toward the
+   * "some steps were skipped" outro.
+   */
+  omit: () => void;
   /** Advance the "Done" affordance: may show the skipped outro before completing. */
   finish: () => void;
   endTour: (reason: TourStatus) => void;
@@ -169,6 +175,26 @@ export const useTourStore = create<TourState>((set, get) => ({
     });
   },
 
+  omit: () => {
+    const { active } = get();
+    if (!active || active.showSkippedOutro) return;
+    // Omitting the last step just ends the tour on the normal terms.
+    if (active.stepIndex >= active.steps.length - 1) {
+      get().finish();
+      return;
+    }
+    set({
+      active: {
+        ...active,
+        stepIndex: active.stepIndex + 1,
+        phase: 'navigating',
+        expectedRoute: null,
+        // A run of omitted steps should not each wait out an anchor timeout.
+        fastForward: true,
+      },
+    });
+  },
+
   finish: () => {
     const { active } = get();
     if (!active) return;
@@ -210,4 +236,16 @@ export const useTourStore = create<TourState>((set, get) => ({
  */
 export function useDisableTransactionSplit(): boolean {
   return useTourStore((s) => !!s.active?.tour.disableTransactionSplit);
+}
+
+/**
+ * Whether the step showing right now wants the header's Tools dropdown open,
+ * so it can describe the menu's contents instead of a closed button.
+ */
+export function useTourOpensToolsMenu(): boolean {
+  return useTourStore((s) => {
+    const active = s.active;
+    if (!active || active.showSkippedOutro) return false;
+    return !!active.steps[active.stepIndex]?.openToolsMenu;
+  });
 }

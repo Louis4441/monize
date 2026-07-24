@@ -133,6 +133,23 @@ describe('tourStore', () => {
     expect(useTourStore.getState().active!.fastForward).toBe(false);
   });
 
+  it('omit advances without counting the step as skipped', () => {
+    const store = useTourStore.getState();
+    store.startTour(TOUR);
+    store.omit();
+
+    const active = useTourStore.getState().active!;
+    expect(active.stepIndex).toBe(1);
+    // Deliberate omission, so the tour must not end on the degraded outro.
+    expect(active.skippedCount).toBe(0);
+    // A run of omissions should not each wait out an anchor timeout.
+    expect(active.fastForward).toBe(true);
+
+    useTourStore.getState().finish();
+    expect(useTourStore.getState().active).toBeNull();
+    expect(saveProgress).toHaveBeenCalledWith('test/basics', 'completed');
+  });
+
   it('endTour dismissed persists a dismissal', () => {
     const store = useTourStore.getState();
     store.startTour(TOUR);
