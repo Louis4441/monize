@@ -185,6 +185,9 @@ describe('AiChatBubble', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  /** The grip in the panel header: drag it, nudge it, or click to snap. */
+  const moveHandle = () => screen.getByLabelText(/Move the panel/);
+
   it('opens the desktop panel at the default bottom-right corner', () => {
     render(<AiChatBubble />);
     fireEvent.click(launcher()!);
@@ -192,14 +195,14 @@ describe('AiChatBubble', () => {
     const dialog = screen.getByRole('dialog');
     expect(dialog.style.left).toBe(DEFAULT_LEFT);
     expect(dialog.style.top).toBe(DEFAULT_TOP);
-    expect(screen.getByLabelText('Move panel to next corner')).toBeInTheDocument();
+    expect(moveHandle()).toBeInTheDocument();
   });
 
   it('cycles the panel through corners and persists the new position', () => {
     render(<AiChatBubble />);
     fireEvent.click(launcher()!);
 
-    const move = screen.getByLabelText('Move panel to next corner');
+    const move = moveHandle();
 
     // bottom-right -> bottom-left: hugs the left edge, keeps the same bottom.
     fireEvent.click(move);
@@ -246,7 +249,7 @@ describe('AiChatBubble', () => {
     expect(dialog.style.top).toBe('');
     expect(dialog.className).toContain('bottom-0');
     expect(
-      screen.queryByLabelText('Move panel to next corner'),
+      screen.queryByLabelText(/Move the panel/),
     ).not.toBeInTheDocument();
   });
 });

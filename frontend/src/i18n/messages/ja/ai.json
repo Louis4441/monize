@@ -9,7 +9,7 @@
     "expand": "全画面に拡大",
     "collapse": "パネルに戻す",
     "close": "閉じる",
-    "moveCorner": "パネルを次の角に移動",
+    "movePanel": "パネルを移動：ドラッグする、矢印キーで動かす、クリックで次の隅へ移す",
     "moveCornerTo": "{corner}に移動",
     "corner": {
       "bottom-right": "右下",

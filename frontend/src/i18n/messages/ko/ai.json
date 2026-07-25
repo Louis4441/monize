@@ -9,7 +9,7 @@
     "expand": "전체 화면으로 확대",
     "collapse": "패널로 축소",
     "close": "닫기",
-    "moveCorner": "패널을 다음 모서리로 이동",
+    "movePanel": "패널 이동: 끌어서 옮기거나 화살표 키로 움직이고, 클릭하면 다음 모서리로 이동합니다",
     "moveCornerTo": "{corner}(으)로 이동",
     "corner": {
       "bottom-right": "오른쪽 아래",

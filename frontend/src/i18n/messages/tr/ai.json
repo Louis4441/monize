@@ -9,7 +9,7 @@
     "expand": "Tam ekrana genişlet",
     "collapse": "Panele küçült",
     "close": "Kapat",
-    "moveCorner": "Paneli sonraki köşeye taşı",
+    "movePanel": "Paneli taşı: sürükleyin, ok tuşlarıyla kaydırın ya da tıklayarak bir sonraki köşeye gönderin",
     "moveCornerTo": "{corner} taşı",
     "corner": {
       "bottom-right": "sağ alt köşeye",

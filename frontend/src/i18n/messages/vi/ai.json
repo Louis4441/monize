@@ -9,7 +9,7 @@
     "expand": "Mở rộng toàn màn hình",
     "collapse": "Thu gọn về bảng",
     "close": "Đóng",
-    "moveCorner": "Di chuyển bảng đến góc tiếp theo",
+    "movePanel": "Di chuyển bảng: kéo nó, dùng các phím mũi tên, hoặc bấm để đưa sang góc tiếp theo",
     "moveCornerTo": "Di chuyển đến {corner}",
     "corner": {
       "bottom-right": "góc dưới bên phải",

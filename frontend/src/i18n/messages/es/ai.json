@@ -9,7 +9,7 @@
     "expand": "Ampliar a pantalla completa",
     "collapse": "Contraer al panel",
     "close": "Cerrar",
-    "moveCorner": "Mover el panel a la siguiente esquina",
+    "movePanel": "Mover el panel: arrástralo, muévelo con las flechas o haz clic para llevarlo a la siguiente esquina",
     "moveCornerTo": "Mover a {corner}",
     "corner": {
       "bottom-right": "abajo a la derecha",
