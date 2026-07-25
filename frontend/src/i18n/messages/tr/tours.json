@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "İçe aktarmadan sonra",
-          "body": "Her bakiyeyi eski yazılımınızla karşılaştırın ve işlemlerde **PENDING IMPORT** notunu arayın — çapraz kurlu transferler kur bilgisi olmadan gelir, çünkü QIF kur taşımaz. Ekran görüntüleri ve sorun giderme içeren tam kılavuz wiki'de, **Importing from Microsoft Money** başlığında."
+          "body": "Her bakiyeyi eski yazılımınızla karşılaştırın ve işlemlerde **PENDING IMPORT** notunu arayın — çapraz kurlu transferler kur bilgisi olmadan gelir, çünkü QIF kur taşımaz. Ekran görüntüleri ve sorun giderme içeren tam kılavuz wiki'de, [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money) başlığında."
         }
       }
     }

@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "Sau khi nhập",
-          "body": "Hãy đối chiếu từng số dư với phần mềm cũ và tìm ghi chú **PENDING IMPORT** trong giao dịch — chuyển khoản khác loại tiền về mà không có tỷ giá, vì QIF không mang theo. Hướng dẫn đầy đủ, kèm ảnh chụp màn hình và cách xử lý sự cố, nằm trong wiki ở mục **Importing from Microsoft Money**."
+          "body": "Hãy đối chiếu từng số dư với phần mềm cũ và tìm ghi chú **PENDING IMPORT** trong giao dịch — chuyển khoản khác loại tiền về mà không có tỷ giá, vì QIF không mang theo. Hướng dẫn đầy đủ, kèm ảnh chụp màn hình và cách xử lý sự cố, nằm trong wiki ở mục [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

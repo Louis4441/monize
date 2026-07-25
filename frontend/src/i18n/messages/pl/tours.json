@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "Po imporcie",
-          "body": "Porównaj salda z poprzednim programem i poszukaj w transakcjach opisu **PENDING IMPORT** — transfery międzywalutowe trafiają bez kursu, bo QIF go nie przenosi. Pełny przewodnik ze zrzutami ekranu i rozwiązywaniem problemów jest na wiki, w **Importing from Microsoft Money**."
+          "body": "Porównaj salda z poprzednim programem i poszukaj w transakcjach opisu **PENDING IMPORT** — transfery międzywalutowe trafiają bez kursu, bo QIF go nie przenosi. Pełny przewodnik ze zrzutami ekranu i rozwiązywaniem problemów jest na wiki, w [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

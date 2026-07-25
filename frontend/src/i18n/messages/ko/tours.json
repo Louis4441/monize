@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "가져온 뒤에",
-          "body": "각 잔액을 이전 프로그램과 비교하고, 거래에서 **PENDING IMPORT** 메모를 검색해 보세요. QIF에는 환율이 없어서 통화가 다른 이체는 환율 없이 들어옵니다. 스크린샷과 문제 해결이 포함된 전체 안내는 위키의 **Importing from Microsoft Money**에 있습니다."
+          "body": "각 잔액을 이전 프로그램과 비교하고, 거래에서 **PENDING IMPORT** 메모를 검색해 보세요. QIF에는 환율이 없어서 통화가 다른 이체는 환율 없이 들어옵니다. 스크린샷과 문제 해결이 포함된 전체 안내는 위키의 [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)에 있습니다."
         }
       }
     }

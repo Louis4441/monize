@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "Nach dem Import",
-          "body": "Vergleichen Sie jeden Saldo mit Ihrer alten Software und suchen Sie in den Buchungen nach dem Vermerk **PENDING IMPORT** — währungsübergreifende Umbuchungen kommen ohne Kurs an, weil QIF keinen mitliefert. Die vollständige Anleitung mit Screenshots und Fehlerbehebung steht im Wiki unter **Importing from Microsoft Money**."
+          "body": "Vergleichen Sie jeden Saldo mit Ihrer alten Software und suchen Sie in den Buchungen nach dem Vermerk **PENDING IMPORT** — währungsübergreifende Umbuchungen kommen ohne Kurs an, weil QIF keinen mitliefert. Die vollständige Anleitung mit Screenshots und Fehlerbehebung steht im Wiki unter [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

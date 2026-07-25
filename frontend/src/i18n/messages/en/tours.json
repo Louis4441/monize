@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "After the import",
-          "body": "Check each balance against your old software, and search transactions for the memo **PENDING IMPORT** — cross-currency transfers arrive without a rate, because QIF carries none. The full guide, with screenshots and troubleshooting, is in the wiki under **Importing from Microsoft Money**."
+          "body": "Check each balance against your old software, and search transactions for the memo **PENDING IMPORT** — cross-currency transfers arrive without a rate, because QIF carries none. The full guide, with screenshots and troubleshooting, is in the wiki under [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

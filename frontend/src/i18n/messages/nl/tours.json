@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "Na de import",
-          "body": "Vergelijk elk saldo met uw oude software en zoek in de transacties op de notitie **PENDING IMPORT** — overboekingen tussen valuta's komen zonder koers binnen, omdat QIF er geen meestuurt. De volledige handleiding, met schermafbeeldingen en probleemoplossing, staat in de wiki onder **Importing from Microsoft Money**."
+          "body": "Vergelijk elk saldo met uw oude software en zoek in de transacties op de notitie **PENDING IMPORT** — overboekingen tussen valuta's komen zonder koers binnen, omdat QIF er geen meestuurt. De volledige handleiding, met schermafbeeldingen en probleemoplossing, staat in de wiki onder [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

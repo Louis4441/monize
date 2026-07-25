@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "Después de importar",
-          "body": "Compara cada saldo con tu programa anterior y busca en las transacciones la nota **PENDING IMPORT** — las transferencias entre monedas llegan sin tipo de cambio, porque el QIF no lo trae. La guía completa, con capturas y solución de problemas, está en la wiki en **Importing from Microsoft Money**."
+          "body": "Compara cada saldo con tu programa anterior y busca en las transacciones la nota **PENDING IMPORT** — las transferencias entre monedas llegan sin tipo de cambio, porque el QIF no lo trae. La guía completa, con capturas y solución de problemas, está en la wiki en [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "Après l'import",
-          "body": "Comparez chaque solde avec votre ancien logiciel et cherchez dans les transactions la note **PENDING IMPORT** — les virements multidevises arrivent sans taux, car le QIF n'en transporte pas. Le guide complet, avec captures d'écran et dépannage, est dans le wiki sous **Importing from Microsoft Money**."
+          "body": "Comparez chaque solde avec votre ancien logiciel et cherchez dans les transactions la note **PENDING IMPORT** — les virements multidevises arrivent sans taux, car le QIF n'en transporte pas. Le guide complet, avec captures d'écran et dépannage, est dans le wiki sous [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

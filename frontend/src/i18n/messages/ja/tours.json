@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "取り込みのあとに",
-          "body": "各残高を以前のソフトと照合し、取引から **PENDING IMPORT** のメモを検索してください。QIF はレートを含まないため、異なる通貨間の振替はレートなしで取り込まれます。スクリーンショットとトラブルシューティングを含む完全な手引きは、Wiki の **Importing from Microsoft Money** にあります。"
+          "body": "各残高を以前のソフトと照合し、取引から **PENDING IMPORT** のメモを検索してください。QIF はレートを含まないため、異なる通貨間の振替はレートなしで取り込まれます。スクリーンショットとトラブルシューティングを含む完全な手引きは、Wiki の [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money) にあります。"
         }
       }
     }

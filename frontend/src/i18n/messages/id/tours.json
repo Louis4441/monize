@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "Setelah impor",
-          "body": "Bandingkan setiap saldo dengan perangkat lunak lama Anda, dan cari catatan **PENDING IMPORT** di transaksi — transfer antar mata uang datang tanpa kurs, karena QIF tidak membawanya. Panduan lengkap dengan tangkapan layar dan pemecahan masalah ada di wiki, di **Importing from Microsoft Money**."
+          "body": "Bandingkan setiap saldo dengan perangkat lunak lama Anda, dan cari catatan **PENDING IMPORT** di transaksi — transfer antar mata uang datang tanpa kurs, karena QIF tidak membawanya. Panduan lengkap dengan tangkapan layar dan pemecahan masalah ada di wiki, di [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

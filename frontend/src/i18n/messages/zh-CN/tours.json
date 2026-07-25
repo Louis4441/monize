@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "导入之后",
-          "body": "把每个账户的余额与旧软件核对，并在交易中搜索备注 **PENDING IMPORT**——跨币种转账进来时没有汇率，因为 QIF 不携带汇率。带截图和故障排查的完整指南在 wiki 的 **Importing from Microsoft Money** 一节。"
+          "body": "把每个账户的余额与旧软件核对，并在交易中搜索备注 **PENDING IMPORT**——跨币种转账进来时没有汇率，因为 QIF 不携带汇率。带截图和故障排查的完整指南在 wiki 的 [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money) 一节。"
         }
       }
     }

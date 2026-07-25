@@ -136,7 +136,7 @@
         },
         "afterwards": {
           "title": "匯入之後",
-          "body": "把每個帳戶的餘額與舊軟體核對，並在交易中搜尋備註 **PENDING IMPORT**——跨幣別轉帳進來時沒有匯率，因為 QIF 不帶匯率。附螢幕擷圖與疑難排解的完整指南在 wiki 的 **Importing from Microsoft Money**。"
+          "body": "把每個帳戶的餘額與舊軟體核對，並在交易中搜尋備註 **PENDING IMPORT**——跨幣別轉帳進來時沒有匯率，因為 QIF 不帶匯率。附螢幕擷圖與疑難排解的完整指南在 wiki 的 [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)。"
         }
       }
     }
