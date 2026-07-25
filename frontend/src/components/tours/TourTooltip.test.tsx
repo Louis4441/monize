@@ -129,6 +129,34 @@ describe('TourTooltip', () => {
       rerender({ stepLabel: '3 of 5', title: 'Next step title' });
       expect(parseFloat(cardPos().left)).toBe(parseFloat(moved.left) - 24);
     });
+
+    it('hides the card until it has been measured for the new step', async () => {
+      const card = () => screen.getByRole('dialog') as HTMLElement;
+      const { rerender } = setup();
+      await waitFor(() => expect(card().className).toContain('opacity-100'));
+
+      // A new step means a new card size, so the old measurement is dropped
+      // and the card stays invisible until it is measured again -- otherwise it
+      // paints at a position derived from the previous step's dimensions and
+      // visibly jumps.
+      rerender({ stepLabel: '3 of 5', title: 'Another step' });
+      expect(card().className).toContain('opacity-0');
+      await waitFor(() => expect(card().className).toContain('opacity-100'));
+    });
+
+    it('keeps a corner-parked card against the resized viewport', () => {
+      setup({ rect: null, corner: true });
+      const before = cardPos();
+
+      window.innerWidth = 800;
+      window.innerHeight = 600;
+      fireEvent(window, new Event('resize'));
+
+      const after = cardPos();
+      expect(after).not.toEqual(before);
+      expect(parseFloat(after.left)).toBeLessThan(800);
+      expect(parseFloat(after.top)).toBeLessThan(600);
+    });
   });
 
   it('emphasizes **bold** segments in the body', () => {
