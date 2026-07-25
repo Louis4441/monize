@@ -203,6 +203,7 @@
     "addPriceSection": "Add Price",
     "editPriceSection": "Edit Price",
     "loading": "Loading prices...",
+    "chartTitle": "Price History",
     "empty": "No price history available",
     "columns": {
       "date": "Date",

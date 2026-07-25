@@ -88,6 +88,7 @@
       "noLosers": "आज कोई हानिकर्ता नहीं।"
     },
     "dailyChange": "दैनिक परिवर्तन",
+    "openPriceHistory": "{symbol} का मूल्य इतिहास",
     "refreshPrices": "मूल्य रीफ्रेश करें",
     "viewPortfolio": "पोर्टफोलियो देखें",
     "filter": {

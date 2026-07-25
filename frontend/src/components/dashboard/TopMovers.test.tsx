@@ -219,6 +219,19 @@ describe('TopMovers', () => {
     expect(screen.getByText('$95.00 EUR')).toBeInTheDocument();
   });
 
+  it('opens the security\'s price history when a row is clicked', () => {
+    const movers = [
+      { securityId: 'sec-1', symbol: 'AAPL', name: 'Apple', currentPrice: 180, dailyChange: 5, dailyChangePercent: 2.8, currencyCode: 'USD' },
+    ] as any[];
+
+    render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Price history for AAPL' }));
+
+    // The same view the securities page opens from its Prices action, reached
+    // by deep link rather than by a second copy of it on the dashboard.
+    expect(mockPush).toHaveBeenCalledWith('/securities?price=sec-1');
+  });
+
   it('does not show currency code for default currency securities', () => {
     const movers = [
       { securityId: '1', symbol: 'AAPL', name: 'Apple', currentPrice: 180, dailyChange: 5, dailyChangePercent: 2.8, currencyCode: 'USD' },

@@ -203,6 +203,7 @@
     "addPriceSection": "Thêm giá",
     "editPriceSection": "Chỉnh sửa giá",
     "loading": "Đang tải giá...",
+    "chartTitle": "Lịch sử giá",
     "empty": "Không có lịch sử giá",
     "columns": {
       "date": "Ngày",

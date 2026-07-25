@@ -203,6 +203,7 @@
     "addPriceSection": "Adicionar Cotação",
     "editPriceSection": "Editar Cotação",
     "loading": "A carregar cotações...",
+    "chartTitle": "Histórico de preços",
     "empty": "Sem histórico de cotações disponível",
     "columns": {
       "date": "Data",

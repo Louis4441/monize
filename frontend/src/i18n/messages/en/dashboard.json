@@ -88,6 +88,7 @@
       "noLosers": "No losers today."
     },
     "dailyChange": "Daily change",
+    "openPriceHistory": "Price history for {symbol}",
     "refreshPrices": "Refresh prices",
     "viewPortfolio": "View portfolio",
     "filter": {

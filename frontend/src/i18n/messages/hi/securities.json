@@ -203,6 +203,7 @@
     "addPriceSection": "मूल्य जोड़ें",
     "editPriceSection": "मूल्य संपादित करें",
     "loading": "मूल्य लोड हो रहे हैं...",
+    "chartTitle": "मूल्य इतिहास",
     "empty": "कोई मूल्य इतिहास उपलब्ध नहीं",
     "columns": {
       "date": "तिथि",

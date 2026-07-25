@@ -203,6 +203,7 @@
     "addPriceSection": "Додати ціну",
     "editPriceSection": "Редагувати ціну",
     "loading": "Завантаження цін...",
+    "chartTitle": "Історія ціни",
     "empty": "Histórico цін відсутня",
     "columns": {
       "date": "Дата",

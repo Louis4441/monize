@@ -203,6 +203,7 @@
     "addPriceSection": "Добавить цену",
     "editPriceSection": "Редактировать цену",
     "loading": "Загрузка цен...",
+    "chartTitle": "История цены",
     "empty": "История цен недоступна",
     "columns": {
       "date": "Дата",

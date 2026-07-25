@@ -203,6 +203,7 @@
     "addPriceSection": "添加价格",
     "editPriceSection": "编辑价格",
     "loading": "正在加载价格...",
+    "chartTitle": "价格历史",
     "empty": "暂无价格历史",
     "columns": {
       "date": "日期",

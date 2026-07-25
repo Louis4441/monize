@@ -203,6 +203,7 @@
     "addPriceSection": "Agregar precio",
     "editPriceSection": "Editar precio",
     "loading": "Cargando precios...",
+    "chartTitle": "Historial de precios",
     "empty": "No hay historial de precios disponible",
     "columns": {
       "date": "Fecha",

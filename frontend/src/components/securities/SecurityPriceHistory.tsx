@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -11,6 +11,7 @@ import { investmentsApi } from '@/lib/investments';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { getErrorMessage } from '@/lib/errors';
 import { SecurityPriceForm } from './SecurityPriceForm';
+import { BalanceHistoryChart } from '@/components/transactions/BalanceHistoryChart';
 
 interface SecurityPriceHistoryProps {
   security: Security;
@@ -117,6 +118,20 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
     }
   }, [security.id, deletingPrice, loadPrices, t]);
 
+  // The same shape the account balance chart takes, so the price history can
+  // reuse it: oldest first (the API returns newest first) and the close price as
+  // the series value.
+  const chartData = useMemo(
+    () =>
+      prices
+        .map((price) => ({
+          date: price.priceDate.slice(0, 10),
+          balance: Number(price.closePrice),
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [prices],
+  );
+
   const handleForceUpdate = useCallback(async () => {
     setIsUpdating(true);
     try {
@@ -189,6 +204,21 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
             onCancel={() => setEditingPrice(undefined)}
           />
         </div>
+      )}
+
+      {/* Price chart. Deliberately the account balance-history chart: same
+          shape of data, so the two screens read the same way -- title and
+          neutral colouring are the only differences (a price has no good or
+          bad sign). */}
+      {!isLoading && chartData.length > 1 && (
+        <BalanceHistoryChart
+          data={chartData}
+          isLoading={false}
+          currencyCode={security.currencyCode}
+          accountName={security.symbol}
+          title={t('priceHistory.chartTitle')}
+          neutralValues
+        />
       )}
 
       {/* Price Table */}

@@ -31,8 +31,20 @@ interface BalanceHistoryChartProps {
   data: Array<{ date: string; balance: number }>;
   isLoading: boolean;
   currencyCode?: string;
-  /** Account name to append to the download filename, e.g. "Checking". */
+  /** Subject to append to the download filename, e.g. "Checking" or "AAPL". */
   accountName?: string;
+  /**
+   * Overrides the in-card title (and the download filename), for series that
+   * are not an account balance -- a security's price history reuses this chart
+   * so the two read identically.
+   */
+  title?: string;
+  /**
+   * Drop the green/red colouring of the footer figures. For a series where the
+   * sign carries no meaning: a security price is always positive, so tinting
+   * every figure green says nothing.
+   */
+  neutralValues?: boolean;
   /**
    * True when the balance belongs to a liability account (credit card, loan,
    * mortgage, line of credit). A negative balance is the normal, expected
@@ -58,10 +70,13 @@ function BalanceTooltip({
   active,
   payload,
   formatCurrency,
+  neutral = false,
 }: {
   active?: boolean;
   payload?: Array<{ payload: ChartPoint }>;
   formatCurrency: (v: number) => string;
+  /** Skip the by-sign colouring, for a series whose sign means nothing. */
+  neutral?: boolean;
 }) {
   if (active && payload?.[0]) {
     const data = payload[0].payload;
@@ -72,7 +87,9 @@ function BalanceTooltip({
         </p>
         <p
           className={`text-lg font-semibold ${
-            gainLossColor(data.balance)
+            neutral
+              ? 'text-gray-900 dark:text-gray-100'
+              : gainLossColor(data.balance)
           }`}
         >
           {formatCurrency(data.balance)}
@@ -90,10 +107,12 @@ export function BalanceHistoryChart({
   accountName,
   isLiability = false,
   hideTitle = false,
+  title,
+  neutralValues = false,
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
-  const chartTitle = t('charts.balanceHistory.title');
+  const chartTitle = title ?? t('charts.balanceHistory.title');
   const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatCurrencyFlag } =
     useNumberFormat();
   const formatChartDate = useChartDateFormat();
@@ -175,6 +194,9 @@ export function BalanceHistoryChart({
   }, [chartData, formatChartDate, t]);
 
   const summary = useMemo(() => computeBalanceSummary(chartData), [chartData]);
+  /** Footer figure colour: by sign, unless the sign means nothing here. */
+  const valueColor = (value: number) =>
+    neutralValues ? 'text-gray-900 dark:text-gray-100' : gainLossColor(value);
 
   // Date of the last point on or before today, when future (projected) points
   // follow it -- used to draw the "history vs projection" divider line.
@@ -294,7 +316,14 @@ export function BalanceHistoryChart({
               width="auto"
               domain={['auto', 'auto']}
             />
-            <Tooltip content={<BalanceTooltip formatCurrency={formatCurrency} />} />
+            <Tooltip
+              content={
+                <BalanceTooltip
+                  formatCurrency={formatCurrency}
+                  neutral={neutralValues}
+                />
+              }
+            />
             <ReferenceLine
               y={0}
               stroke={chartColors.expense}
@@ -364,20 +393,20 @@ export function BalanceHistoryChart({
         <div className={`mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 grid ${summary.hasFutureData ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-4 text-center`}>
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">{t('charts.balanceHistory.starting')}</div>
-            <div className={`font-semibold ${gainLossColor(summary.startBalance)}`}>
+            <div className={`font-semibold ${valueColor(summary.startBalance)}`}>
               {formatCurrency(summary.startBalance)}
             </div>
           </div>
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">{t('charts.balanceHistory.current')}</div>
-            <div className={`font-semibold ${gainLossColor(summary.currentBalance)}`}>
+            <div className={`font-semibold ${valueColor(summary.currentBalance)}`}>
               {formatCurrency(summary.currentBalance)}
             </div>
           </div>
           {summary.hasFutureData && (
             <div>
               <div className="text-sm text-gray-500 dark:text-gray-400">{t('charts.balanceHistory.ending')}</div>
-              <div className={`font-semibold ${gainLossColor(summary.endBalance)}`}>
+              <div className={`font-semibold ${valueColor(summary.endBalance)}`}>
                 {formatCurrency(summary.endBalance)}
               </div>
             </div>
@@ -392,7 +421,7 @@ export function BalanceHistoryChart({
                 ? t('charts.balanceHistory.lowest')
                 : t('charts.balanceHistory.minBalance')}
             </div>
-            <div className={`font-semibold ${gainLossColor(summary.minBalance)}`}>
+            <div className={`font-semibold ${valueColor(summary.minBalance)}`}>
               {formatCurrency(summary.minBalance)}
               {summary.goesNegative && !isLiability && (
                 <span className="ml-1 text-xs text-red-500">!</span>

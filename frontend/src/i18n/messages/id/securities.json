@@ -203,6 +203,7 @@
     "addPriceSection": "Tambah Harga",
     "editPriceSection": "Edit Harga",
     "loading": "Memuat harga...",
+    "chartTitle": "Riwayat harga",
     "empty": "Tidak ada riwayat harga tersedia",
     "columns": {
       "date": "Tanggal",

@@ -203,6 +203,7 @@
     "addPriceSection": "Ajouter un cours",
     "editPriceSection": "Modifier le cours",
     "loading": "Chargement des cours...",
+    "chartTitle": "Historique du cours",
     "empty": "Aucun historique des cours disponible",
     "columns": {
       "date": "Date",

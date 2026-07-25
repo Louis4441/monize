@@ -203,6 +203,7 @@
     "addPriceSection": "Fiyat Ekle",
     "editPriceSection": "Fiyatı Düzenle",
     "loading": "Fiyatlar yükleniyor...",
+    "chartTitle": "Fiyat geçmişi",
     "empty": "Fiyat geçmişi mevcut değil",
     "columns": {
       "date": "Tarih",

@@ -373,6 +373,27 @@ describe('SecurityPriceHistory', () => {
     expect(screen.getAllByText('Edit')).toHaveLength(3);
   });
 
+  describe('price chart', () => {
+    it('charts the price series above the table', async () => {
+      await renderComponent();
+
+      // Deliberately the account balance-history chart, so the two screens
+      // read the same way; only the title and the neutral colouring differ.
+      expect(screen.getByText('Price History')).toBeInTheDocument();
+      expect(screen.getByText(/AAPL/)).toBeInTheDocument();
+    });
+
+    it('leaves the chart out when there is nothing to plot', async () => {
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue([
+        mockPrices[0],
+      ]);
+      await renderComponent();
+
+      // A single point is a dot, not a history.
+      expect(screen.queryByText('Price History')).not.toBeInTheDocument();
+    });
+  });
+
   describe('Force Update Prices', () => {
     it('force-updates prices, shows a success toast with the count, and reloads', async () => {
       const toast = (await import('react-hot-toast')).default;

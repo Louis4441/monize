@@ -88,6 +88,7 @@
       "noLosers": "No hay perdedoras hoy."
     },
     "dailyChange": "Cambio diario",
+    "openPriceHistory": "Historial de precios de {symbol}",
     "refreshPrices": "Actualizar precios",
     "viewPortfolio": "Ver cartera",
     "filter": {

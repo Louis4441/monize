@@ -188,9 +188,12 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
             return isForeign ? `${formatted} ${mover.currencyCode}` : formatted;
           };
           return (
-            <div
+            <button
               key={mover.securityId}
-              className="flex items-center justify-between p-2 sm:p-3 rounded-lg border border-gray-200 dark:border-gray-700"
+              type="button"
+              onClick={() => router.push(`/securities?price=${mover.securityId}`)}
+              aria-label={t('topMovers.openPriceHistory', { symbol: mover.symbol })}
+              className="flex w-full items-center justify-between p-2 sm:p-3 rounded-lg border border-gray-200 dark:border-gray-700 text-left transition-colors hover:border-blue-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:border-blue-500 dark:hover:bg-gray-700/50"
             >
               <div className="min-w-0">
                 <div className="font-medium text-gray-900 dark:text-gray-100">
@@ -214,7 +217,7 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
                   {isPositive ? '+' : ''}{formatCurrencyPrecise(mover.dailyChange, mover.currencyCode)} ({isPositive ? '+' : ''}{formatPercent(mover.dailyChangePercent)})
                 </div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

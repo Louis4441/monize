@@ -88,6 +88,7 @@
       "noLosers": "[XX-No losers today.-XX]"
     },
     "dailyChange": "[XX-Daily change-XX]",
+    "openPriceHistory": "[XX-Price history for {symbol}-XX]",
     "refreshPrices": "[XX-Refresh prices-XX]",
     "viewPortfolio": "[XX-View portfolio-XX]",
     "filter": {

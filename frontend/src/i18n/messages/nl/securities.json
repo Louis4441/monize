@@ -203,6 +203,7 @@
     "addPriceSection": "Koers toevoegen",
     "editPriceSection": "Koers bewerken",
     "loading": "Koersen laden...",
+    "chartTitle": "Koersgeschiedenis",
     "empty": "Geen koershistorie beschikbaar",
     "columns": {
       "date": "Datum",

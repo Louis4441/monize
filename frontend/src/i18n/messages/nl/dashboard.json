@@ -88,6 +88,7 @@
       "noLosers": "Vandaag geen dalers."
     },
     "dailyChange": "Dagelijkse wijziging",
+    "openPriceHistory": "Koersgeschiedenis van {symbol}",
     "refreshPrices": "Koersen vernieuwen",
     "viewPortfolio": "Portefeuille bekijken",
     "filter": {
