@@ -70,6 +70,21 @@ describe('DragHandle', () => {
     expect(onActivate).not.toHaveBeenCalled();
   });
 
+  it('still activates from the keyboard after a mouse drag', () => {
+    const { handle, onActivate } = setup();
+
+    fireEvent.pointerDown(handle(), { clientX: 0, clientY: 0, pointerId: 1 });
+    fireEvent.pointerMove(handle(), { clientX: 60, clientY: 40, pointerId: 1 });
+    fireEvent.pointerUp(handle(), { clientX: 60, clientY: 40, pointerId: 1 });
+    fireEvent.click(handle()); // the click that follows the drag: suppressed
+    expect(onActivate).not.toHaveBeenCalled();
+
+    // Enter reaches onClick with no pointerdown before it, so the drag flag
+    // must not still be set from the mouse.
+    fireEvent.click(handle());
+    expect(onActivate).toHaveBeenCalledTimes(1);
+  });
+
   it('still activates when the pointer barely moved', () => {
     const { handle, onActivate } = setup();
 

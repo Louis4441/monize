@@ -106,7 +106,12 @@ export function DragHandle({
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
       onClick={() => {
-        if (!dragged.current) onActivate?.();
+        // Consume the flag: a keyboard activation fires `click` with no
+        // preceding pointerdown, so leaving it set after a mouse drag would
+        // make Enter and Space dead for the rest of the component's life.
+        const wasDrag = dragged.current;
+        dragged.current = false;
+        if (!wasDrag) onActivate?.();
       }}
       onKeyDown={handleKeyDown}
       aria-label={label}
