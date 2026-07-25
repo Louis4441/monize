@@ -165,6 +165,12 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.foreignCurrencyFees,
       placement: 'auto',
       fallbackWhenMissing: true,
+      // The stand-in only shows once the anchor times out, and the overlay
+      // renders nothing while it waits. The user drove the navigation here, so
+      // the page is already loaded and the section either mounts with it or
+      // does not exist: a full 5s of blank screen would read as the crash this
+      // fallback exists to prevent.
+      anchorTimeoutMs: 2500,
     },
     {
       // The cross-account report card on the Reports listing. The category
@@ -180,6 +186,10 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       // A saved search or a hidden category can still filter the card out of
       // the listing; name the report in a centered card rather than vanish.
       fallbackWhenMissing: true,
+      // Long enough for the engine's own navigation to /reports to land and the
+      // listing to render, short enough that the stand-in does not sit behind a
+      // blank screen (the post-navigation default is 10s).
+      anchorTimeoutMs: 4000,
     },
     {
       id: 'finish',

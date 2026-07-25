@@ -107,6 +107,10 @@ export interface TourStep {
    * Skipping is right for an anchor that went missing to a refactor; it is
    * wrong for one whose absence is itself worth a sentence, and it leaves the
    * step counter jumping with nothing to explain the gap.
+   *
+   * Pair it with a short `anchorTimeoutMs`: the stand-in only appears once the
+   * wait is over, and the overlay renders nothing while waiting, so a default
+   * timeout would blank the screen for seconds before explaining itself.
    */
   fallbackWhenMissing?: boolean;
   /**
