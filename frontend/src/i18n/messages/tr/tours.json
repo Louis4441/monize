@@ -160,11 +160,13 @@
           },
           "fxSection": {
             "title": "Yabancı para birimi bölümünüz",
-            "body": "Yabancı para birimi hareketi olan hesaplar bu bölümü kazanır: para birimi başına ödenen ücretler, zaman içindeki grafik ve eşleşen işlemler; CSV ve PNG olarak dışa aktarılabilir. Hesapta bir yurt dışı alışverişi olduğunda görünür."
+            "body": "Yabancı para birimi hareketi olan hesaplar bu bölümü kazanır: para birimi başına ödenen ücretler, zaman içindeki grafik ve eşleşen işlemler; CSV ve PNG olarak dışa aktarılabilir. Hesapta bir yurt dışı alışverişi olduğunda görünür.",
+            "fallbackBody": "Bu hesapta henüz yabancı para birimi hareketi yok, bu yüzden bölüm sayfasında görünmüyor. Hesaba başka bir para biriminde bir alışveriş kaydedin ve bölüm ortaya çıkar: para birimi başına ücretler, zaman içindeki grafik ve CSV ile PNG çıktısı."
           },
           "report": {
             "title": "Yabancı Para Birimi İşlem Ücretleri raporu",
-            "body": "Bu rapor, tüm hesaplarınızdaki ve para birimlerinizdeki yurt dışı alışverişlerini tek yerde toplar; böylece \"yurt dışı işlem ücreti yok\" denen kartların gerçekte ne kadara mal olduğunu görürsünüz. İstediğiniz zaman **Raporlar**'dan açın."
+            "body": "Bu rapor, tüm hesaplarınızdaki ve para birimlerinizdeki yurt dışı alışverişlerini tek yerde toplar; böylece \"yurt dışı işlem ücreti yok\" denen kartların gerçekte ne kadara mal olduğunu görürsünüz. İstediğiniz zaman **Raporlar**'dan açın.",
+            "fallbackBody": "**Yabancı para birimi ücretleri** raporu, tüm hesap ve para birimlerindeki yurt dışı alışverişlerini tek yerde toplar. Şu anda ekranda değil — bir arama ya da kategori filtresi onu gizleyebilir — ama **Raporlar** içinde bulabilirsiniz."
           },
           "finish": {
             "title": "Monize'de yabancı para birimi bu kadar",

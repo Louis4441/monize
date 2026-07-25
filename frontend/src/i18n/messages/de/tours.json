@@ -160,11 +160,13 @@
           },
           "fxSection": {
             "title": "Ihr Fremdwährungsbereich",
-            "body": "Konten mit Fremdwährungsaktivität erhalten diesen Bereich: die gezahlten Gebühren je Währung, ein Diagramm über die Zeit und die zugehörigen Buchungen, exportierbar als CSV und PNG. Er erscheint, sobald das Konto einen Auslandseinkauf hat."
+            "body": "Konten mit Fremdwährungsaktivität erhalten diesen Bereich: die gezahlten Gebühren je Währung, ein Diagramm über die Zeit und die zugehörigen Buchungen, exportierbar als CSV und PNG. Er erscheint, sobald das Konto einen Auslandseinkauf hat.",
+            "fallbackBody": "Dieses Konto hat noch keine Fremdwährungsaktivität, daher fehlt der Abschnitt auf seiner Seite. Erfassen Sie darauf einen Einkauf in einer anderen Währung, und der Abschnitt erscheint: Gebühren je Währung, ein Verlaufsdiagramm sowie CSV- und PNG-Export."
           },
           "report": {
             "title": "Der Bericht \"Fremdwährungs-Transaktionsgebühren\"",
-            "body": "Dieser Bericht führt Auslandseinkäufe über alle Ihre Konten und Währungen an einer Stelle zusammen, sodass Sie sehen, was Karten \"ohne Auslandsgebühr\" wirklich kosten. Sie können ihn jederzeit über **Berichte** öffnen."
+            "body": "Dieser Bericht führt Auslandseinkäufe über alle Ihre Konten und Währungen an einer Stelle zusammen, sodass Sie sehen, was Karten \"ohne Auslandsgebühr\" wirklich kosten. Sie können ihn jederzeit über **Berichte** öffnen.",
+            "fallbackBody": "Der Bericht **Fremdwährungsgebühren** fasst Fremdwährungseinkäufe über alle Konten und Währungen hinweg zusammen. Gerade ist er nicht zu sehen — eine Suche oder ein Kategoriefilter kann ihn ausblenden — Sie finden ihn unter **Berichte**."
           },
           "finish": {
             "title": "Das war Fremdwährung in Monize",

@@ -98,6 +98,18 @@ export interface TourStep {
    */
   skipOnBack?: boolean;
   /**
+   * When the anchor never appears, show the step as a centered card carrying
+   * `steps.<id>.fallbackBody` instead of skipping it.
+   *
+   * For steps whose anchor depends on the user's own data -- the
+   * foreign-currency section exists only once an account has foreign activity,
+   * so a tour run on a fresh account would drop the very step it builds up to.
+   * Skipping is right for an anchor that went missing to a refactor; it is
+   * wrong for one whose absence is itself worth a sentence, and it leaves the
+   * step counter jumping with nothing to explain the gap.
+   */
+  fallbackWhenMissing?: boolean;
+  /**
    * How long to wait for the anchor before gracefully skipping the step.
    * Defaults to 5000ms; the engine uses 10000ms for the first anchor after a
    * navigation so cold route loads on slow connections do not eat steps.

@@ -160,11 +160,13 @@
           },
           "fxSection": {
             "title": "Su sección de moneda extranjera",
-            "body": "Las cuentas con actividad en moneda extranjera obtienen esta sección: las comisiones pagadas por moneda, un gráfico a lo largo del tiempo y las transacciones correspondientes, exportables a CSV y PNG. Aparece en cuanto la cuenta tiene una compra en el extranjero."
+            "body": "Las cuentas con actividad en moneda extranjera obtienen esta sección: las comisiones pagadas por moneda, un gráfico a lo largo del tiempo y las transacciones correspondientes, exportables a CSV y PNG. Aparece en cuanto la cuenta tiene una compra en el extranjero.",
+            "fallbackBody": "Esta cuenta aún no tiene actividad en moneda extranjera, así que la sección no está en su página. Registra en ella una compra en otra moneda y la sección aparecerá: comisiones por moneda, un gráfico a lo largo del tiempo y exportación a CSV y PNG."
           },
           "report": {
             "title": "El informe de comisiones por transacción en moneda extranjera",
-            "body": "Este informe reúne en un solo lugar las compras en el extranjero de todas sus cuentas y monedas, para que vea lo que cuestan realmente esas tarjetas «sin comisión por transacción en el extranjero». Ábralo cuando quiera desde **Informes**."
+            "body": "Este informe reúne en un solo lugar las compras en el extranjero de todas sus cuentas y monedas, para que vea lo que cuestan realmente esas tarjetas «sin comisión por transacción en el extranjero». Ábralo cuando quiera desde **Informes**.",
+            "fallbackBody": "El informe **Comisiones por moneda extranjera** reúne las compras en el extranjero de todas tus cuentas y monedas en un solo lugar. Ahora no está a la vista — una búsqueda o un filtro de categoría puede ocultarlo — pero lo encontrarás en **Informes**."
           },
           "finish": {
             "title": "Esto es la moneda extranjera en Monize",

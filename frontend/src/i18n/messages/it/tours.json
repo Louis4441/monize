@@ -160,11 +160,13 @@
           },
           "fxSection": {
             "title": "La tua sezione valuta estera",
-            "body": "I conti con attività in valuta estera ottengono questa sezione: le commissioni pagate per valuta, un grafico nel tempo e le transazioni corrispondenti, esportabili in CSV e PNG. Compare non appena il conto ha un acquisto estero."
+            "body": "I conti con attività in valuta estera ottengono questa sezione: le commissioni pagate per valuta, un grafico nel tempo e le transazioni corrispondenti, esportabili in CSV e PNG. Compare non appena il conto ha un acquisto estero.",
+            "fallbackBody": "Questo conto non ha ancora attività in valuta estera, quindi la sezione non è nella sua pagina. Registraci un acquisto in un'altra valuta e la sezione comparirà: commissioni per valuta, un grafico nel tempo ed esportazione in CSV e PNG."
           },
           "report": {
             "title": "Il report Commissioni per transazioni in valuta estera",
-            "body": "Questo report raccoglie in un unico posto gli acquisti esteri di tutti i tuoi conti e valute, così vedi quanto costano davvero le carte \"senza commissioni sull'estero\". Aprilo quando vuoi da **Report**."
+            "body": "Questo report raccoglie in un unico posto gli acquisti esteri di tutti i tuoi conti e valute, così vedi quanto costano davvero le carte \"senza commissioni sull'estero\". Aprilo quando vuoi da **Report**.",
+            "fallbackBody": "Il report **Commissioni in valuta estera** raccoglie gli acquisti esteri di tutti i conti e tutte le valute in un unico posto. Ora non è visibile — una ricerca o un filtro di categoria può nasconderlo — ma lo trovi in **Report**."
           },
           "finish": {
             "title": "Questa è la valuta estera in Monize",

@@ -160,11 +160,13 @@
           },
           "fxSection": {
             "title": "Twoja sekcja walutowa",
-            "body": "Konta z aktywnością w obcej walucie zyskują tę sekcję: opłaty zapłacone w podziale na waluty, wykres w czasie i pasujące transakcje, z eksportem do CSV i PNG. Pojawia się, gdy konto ma zagraniczny zakup."
+            "body": "Konta z aktywnością w obcej walucie zyskują tę sekcję: opłaty zapłacone w podziale na waluty, wykres w czasie i pasujące transakcje, z eksportem do CSV i PNG. Pojawia się, gdy konto ma zagraniczny zakup.",
+            "fallbackBody": "To konto nie ma jeszcze żadnej aktywności w obcej walucie, więc sekcji nie ma na jego stronie. Zapisz na nim zakup w innej walucie i sekcja się pojawi: opłaty w podziale na waluty, wykres w czasie oraz eksport do CSV i PNG."
           },
           "report": {
             "title": "Raport Opłaty za transakcje w obcej walucie",
-            "body": "Ten raport zbiera w jednym miejscu zagraniczne zakupy ze wszystkich Twoich kont i walut, więc widzisz, ile naprawdę kosztują karty \"bez opłat zagranicznych\". Otwórz go kiedy chcesz z sekcji **Raporty**."
+            "body": "Ten raport zbiera w jednym miejscu zagraniczne zakupy ze wszystkich Twoich kont i walut, więc widzisz, ile naprawdę kosztują karty \"bez opłat zagranicznych\". Otwórz go kiedy chcesz z sekcji **Raporty**.",
+            "fallbackBody": "Raport **Opłaty za waluty obce** zbiera zagraniczne zakupy ze wszystkich kont i walut w jednym miejscu. Teraz go tu nie widać — może go ukrywać wyszukiwanie albo filtr kategorii — ale znajdziesz go w **Raportach**."
           },
           "finish": {
             "title": "To tyle o walutach obcych w Monize",

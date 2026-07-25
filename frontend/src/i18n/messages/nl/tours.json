@@ -160,11 +160,13 @@
           },
           "fxSection": {
             "title": "Uw sectie vreemde valuta",
-            "body": "Rekeningen met activiteit in vreemde valuta krijgen deze sectie: de betaalde kosten per valuta, een grafiek in de tijd en de bijbehorende transacties, exporteerbaar naar CSV en PNG. Hij verschijnt zodra de rekening een buitenlandse aankoop heeft."
+            "body": "Rekeningen met activiteit in vreemde valuta krijgen deze sectie: de betaalde kosten per valuta, een grafiek in de tijd en de bijbehorende transacties, exporteerbaar naar CSV en PNG. Hij verschijnt zodra de rekening een buitenlandse aankoop heeft.",
+            "fallbackBody": "Deze rekening heeft nog geen activiteit in vreemde valuta, dus de sectie staat niet op de pagina. Leg er een aankoop in een andere valuta vast en de sectie verschijnt: kosten per valuta, een grafiek in de tijd en export naar CSV en PNG."
           },
           "report": {
             "title": "Het rapport Transactiekosten in vreemde valuta",
-            "body": "Dit rapport brengt buitenlandse aankopen van al uw rekeningen en valuta op één plek samen, zodat u ziet wat kaarten \"zonder buitenlandkosten\" werkelijk kosten. Open het wanneer u wilt via **Rapporten**."
+            "body": "Dit rapport brengt buitenlandse aankopen van al uw rekeningen en valuta op één plek samen, zodat u ziet wat kaarten \"zonder buitenlandkosten\" werkelijk kosten. Open het wanneer u wilt via **Rapporten**.",
+            "fallbackBody": "Het rapport **Kosten vreemde valuta** brengt buitenlandse aankopen van al uw rekeningen en valuta's samen. Het is nu niet in beeld — een zoekopdracht of een categoriefilter kan het verbergen — maar u vindt het bij **Rapporten**."
           },
           "finish": {
             "title": "Dit was vreemde valuta in Monize",

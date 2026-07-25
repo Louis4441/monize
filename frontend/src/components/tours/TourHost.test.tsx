@@ -419,4 +419,51 @@ describe('TourHost', () => {
     expect(saveProgress).toHaveBeenCalledWith('test/skip', 'completed');
   });
 
+
+  it('stands in for a missing anchor when the step asked to', async () => {
+    const tour: TourDefinition = {
+      id: 'test/fallback',
+      area: 'transactions',
+      i18nPrefix: 'release.v1_13_0.foreignCurrency',
+      steps: [
+        { id: 'welcome', route: '/', anchorId: null },
+        {
+          id: 'fxSection',
+          route: '/',
+          anchorId: TOUR_ANCHORS.foreignCurrencyFees,
+          anchorTimeoutMs: 30,
+          fallbackWhenMissing: true,
+        },
+        { id: 'finish', route: '/', anchorId: null },
+      ],
+    };
+
+    await mountHost();
+    await start(tour);
+    await act(async () => {
+      fireEvent.click(screen.getByText('Next'));
+    });
+
+    // The section only exists once an account has foreign activity. Rather than
+    // vanish (and jump the counter), the step explains itself in place.
+    await waitFor(() =>
+      expect(
+        screen.getByText(/no foreign-currency activity yet/),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByText('Your foreign-currency section')).toBeInTheDocument();
+    expect(screen.getByText('2 of 3')).toBeInTheDocument();
+    // Shown, not skipped: no degraded-tour outro waiting at the end.
+    expect(useTourStore.getState().active!.skippedCount).toBe(0);
+
+    // And it advances like any passive step.
+    await act(async () => {
+      fireEvent.click(screen.getByText('Next'));
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByText("That's foreign currency in Monize"),
+      ).toBeInTheDocument(),
+    );
+  });
 });

@@ -185,11 +185,16 @@ export function TourHost() {
     }
   }, [active, showingOutro, pathname, router, setPhase, setExpectedRoute]);
 
-  // Anchor found -> show it; timed out -> gracefully skip the step.
+  // Anchor found -> show it. Timed out -> gracefully skip the step, unless it
+  // asked to stand in for itself with a centered card (`fallbackWhenMissing`),
+  // in which case it stays on screen and keeps its place in the counter.
   useEffect(() => {
     if (!active || showingOutro || active.phase !== 'waiting-anchor') return;
     if (anchorStatus === 'found') setPhase('active');
-    else if (anchorStatus === 'timeout') skip();
+    else if (anchorStatus !== 'timeout') return;
+    else if (active.steps[active.stepIndex]?.fallbackWhenMissing) {
+      setPhase('missing');
+    } else skip();
   }, [active, showingOutro, anchorStatus, setPhase, skip]);
 
   // Scroll the anchor into view once it is active.
@@ -299,14 +304,22 @@ export function TourHost() {
 
   // --- Render ----------------------------------------------------------------
   if (!active) return null;
-  const showOverlay = active.phase === 'active' || showingOutro;
+  // `missing` = the step's anchor never appeared and the step opted to stand in
+  // for itself with a centered card rather than be skipped.
+  const standingIn = active.phase === 'missing';
+  const showOverlay = active.phase === 'active' || standingIn || showingOutro;
   if (!showOverlay) return null;
 
-  const centered = showingOutro || step?.anchorId == null;
+  const centered = showingOutro || standingIn || step?.anchorId == null;
   if (!centered && !anchorRect) return null; // still measuring the anchor rect
 
+  // A stand-in card has no anchor, so nothing can be clicked or waited for: it
+  // reads as a plain passive step whatever the step declared.
   const interactive =
-    !showingOutro && !!step?.advance && step.advance.type !== 'next';
+    !showingOutro &&
+    !standingIn &&
+    !!step?.advance &&
+    step.advance.type !== 'next';
   // Whether the spotlit control stays clickable. Interactive steps always are;
   // a passive step can opt in with `allowInteraction` when it asks the user to
   // type into the highlighted field but still advances with Next.
@@ -315,10 +328,10 @@ export function TourHost() {
   // Form-filling steps also need the dimmed area to pass clicks through: a
   // combobox list or date picker opened from the spotlit field renders outside
   // the cutout and would otherwise be covered by the dim.
-  const passThrough = !showingOutro && !!step?.allowInteraction;
+  const passThrough = !showingOutro && !standingIn && !!step?.allowInteraction;
   // Coach-mark steps drop the dim entirely and park the card out of the way,
   // so the user can scan and use the whole page.
-  const unobtrusive = !showingOutro && !!step?.unobtrusive;
+  const unobtrusive = !showingOutro && !standingIn && !!step?.unobtrusive;
   const leaveFocusToForm = !!anchorElement?.closest('[role="dialog"]');
   const isLast = showingOutro || active.stepIndex === active.steps.length - 1;
   // Only offer Back when there is a step behind that can actually be shown
@@ -332,7 +345,11 @@ export function TourHost() {
     : t(`${active.tour.i18nPrefix}.steps.${step!.id}.title`);
   const body = showingOutro
     ? t('controls.skippedBody')
-    : t(`${active.tour.i18nPrefix}.steps.${step!.id}.body`);
+    : t(
+        `${active.tour.i18nPrefix}.steps.${step!.id}.${
+          standingIn ? 'fallbackBody' : 'body'
+        }`,
+      );
   const stepLabel = showingOutro
     ? ''
     : t('controls.stepCounter', {

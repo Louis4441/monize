@@ -160,11 +160,13 @@
           },
           "fxSection": {
             "title": "[XX-Your foreign-currency section-XX]",
-            "body": "[XX-Accounts with foreign activity gain this section: the fees paid per currency, a chart over time, and the matching transactions, exportable to CSV and PNG. It appears once the account has a foreign purchase.-XX]"
+            "body": "[XX-Accounts with foreign activity gain this section: the fees paid per currency, a chart over time, and the matching transactions, exportable to CSV and PNG. It appears once the account has a foreign purchase.-XX]",
+            "fallbackBody": "[XX-This account has no foreign-currency activity yet, so the section is not on its page. Record a purchase in another currency on it and the section appears: fees paid per currency, a chart over time, and CSV and PNG exports.-XX]"
           },
           "report": {
             "title": "[XX-The Foreign-Currency Fees report-XX]",
-            "body": "[XX-This report gathers foreign purchases across all your accounts and currencies in one place, so you can see what those \"no foreign fee\" cards really cost. Open it anytime from **Reports**.-XX]"
+            "body": "[XX-This report gathers foreign purchases across all your accounts and currencies in one place, so you can see what those \"no foreign fee\" cards really cost. Open it anytime from **Reports**.-XX]",
+            "fallbackBody": "[XX-The **Foreign-Currency Fees** report gathers foreign purchases across all your accounts and currencies in one place. It is not on screen right now — a search or a category filter can hide it — but you will find it in **Reports**.-XX]"
           },
           "finish": {
             "title": "[XX-That's foreign currency in Monize-XX]",

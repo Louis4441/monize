@@ -160,11 +160,13 @@
           },
           "fxSection": {
             "title": "Bagian mata uang asing Anda",
-            "body": "Akun dengan aktivitas mata uang asing mendapatkan bagian ini: biaya yang dibayar per mata uang, grafik dari waktu ke waktu, dan transaksi yang cocok, dapat diekspor ke CSV dan PNG. Bagian ini muncul begitu akun memiliki pembelian luar negeri."
+            "body": "Akun dengan aktivitas mata uang asing mendapatkan bagian ini: biaya yang dibayar per mata uang, grafik dari waktu ke waktu, dan transaksi yang cocok, dapat diekspor ke CSV dan PNG. Bagian ini muncul begitu akun memiliki pembelian luar negeri.",
+            "fallbackBody": "Akun ini belum memiliki aktivitas mata uang asing, jadi bagian tersebut tidak ada di halamannya. Catat pembelian dalam mata uang lain pada akun ini dan bagian itu akan muncul: biaya per mata uang, grafik sepanjang waktu, serta ekspor CSV dan PNG."
           },
           "report": {
             "title": "Laporan Biaya Transaksi Mata Uang Asing",
-            "body": "Laporan ini mengumpulkan pembelian luar negeri dari semua akun dan mata uang Anda di satu tempat, sehingga Anda bisa melihat berapa sebenarnya biaya kartu \"tanpa biaya luar negeri\" itu. Buka kapan saja dari **Laporan**."
+            "body": "Laporan ini mengumpulkan pembelian luar negeri dari semua akun dan mata uang Anda di satu tempat, sehingga Anda bisa melihat berapa sebenarnya biaya kartu \"tanpa biaya luar negeri\" itu. Buka kapan saja dari **Laporan**.",
+            "fallbackBody": "Laporan **Biaya mata uang asing** mengumpulkan pembelian luar negeri dari semua akun dan mata uang Anda dalam satu tempat. Saat ini tidak terlihat — pencarian atau filter kategori bisa menyembunyikannya — tetapi Anda akan menemukannya di **Laporan**."
           },
           "finish": {
             "title": "Itulah mata uang asing di Monize",

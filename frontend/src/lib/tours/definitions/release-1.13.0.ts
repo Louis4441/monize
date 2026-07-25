@@ -154,13 +154,17 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       advance: { type: 'route', route: '/accounts/' },
     },
     {
-      // The new per-account section. Skips gracefully when the account has no
-      // foreign activity yet (the section renders nothing, so nothing mounts).
+      // The new per-account section. It only exists once the account has
+      // foreign activity, so on a fresh account nothing mounts -- and this is
+      // the step the whole tour builds up to. `fallbackWhenMissing` keeps it on
+      // screen as a centered card that says so, instead of dropping it and
+      // leaving a hole in the step counter.
       id: 'fxSection',
       route: '/accounts',
       routeMatch: '/accounts/',
       anchorId: TOUR_ANCHORS.foreignCurrencyFees,
       placement: 'auto',
+      fallbackWhenMissing: true,
     },
     {
       // The cross-account report card on the Reports listing. The category
@@ -173,6 +177,9 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       routeMatch: '/reports',
       anchorId: TOUR_ANCHORS.reportForeignCurrencyFees,
       placement: 'auto',
+      // A saved search or a hidden category can still filter the card out of
+      // the listing; name the report in a centered card rather than vanish.
+      fallbackWhenMissing: true,
     },
     {
       id: 'finish',
