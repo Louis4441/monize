@@ -8,8 +8,11 @@ import type { TourDefinition } from '@/lib/tours/types';
 interface TourOfferListProps {
   /** The running app version; picks the release tours to offer. */
   currentVersion: string;
-  /** Close the What's New modal before the tour starts. */
-  onClose: () => void;
+  /**
+   * Called just before a tour starts, so the What's New modal can step aside:
+   * the tour drives the app underneath it.
+   */
+  onStartTour: () => void;
 }
 
 /**
@@ -20,7 +23,10 @@ interface TourOfferListProps {
  * Renders nothing when there is nothing to offer. Works in demo mode (manual
  * start only).
  */
-export function TourOfferList({ currentVersion, onClose }: TourOfferListProps) {
+export function TourOfferList({
+  currentVersion,
+  onStartTour,
+}: TourOfferListProps) {
   const t = useTranslations('tours');
   const progress = useTourStore((s) => s.progress);
   const startTour = useTourStore((s) => s.startTour);
@@ -34,7 +40,7 @@ export function TourOfferList({ currentVersion, onClose }: TourOfferListProps) {
   if (rows.length === 0) return null;
 
   const handleStart = (tour: TourDefinition) => {
-    onClose();
+    onStartTour();
     startTour(tour);
   };
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
+import { useTourStore } from '@/store/tourStore';
 import { useWhatsNewStore } from '@/store/whatsNewStore';
 import { whatsNewApi, type ReleaseNotes } from '@/lib/whats-new';
 import { createLogger } from '@/lib/logger';
@@ -24,6 +25,8 @@ export function WhatsNewHost() {
   const isOpen = useWhatsNewStore((s) => s.isOpen);
   const open = useWhatsNewStore((s) => s.open);
   const close = useWhatsNewStore((s) => s.close);
+  const closeForTour = useWhatsNewStore((s) => s.closeForTour);
+  const resumeAfterTour = useWhatsNewStore((s) => s.resumeAfterTour);
 
   const [notes, setNotes] = useState<ReleaseNotes | null>(null);
   const [currentVersion, setCurrentVersion] = useState<string | undefined>(
@@ -62,6 +65,19 @@ export function WhatsNewHost() {
     };
   }, [isAuthenticated, open]);
 
+  // A tour started from the offer list has to have the modal out of its way (it
+  // drives the app underneath), so bring the modal back once the tour ends --
+  // with the tour just taken marked as viewed and the rest still on offer.
+  // Without this, finishing a tour left no way back to the list short of
+  // hunting through Settings.
+  useEffect(
+    () =>
+      useTourStore.subscribe((state, previous) => {
+        if (previous.active && !state.active) resumeAfterTour();
+      }),
+    [resumeAfterTour],
+  );
+
   const handleDontShowAgain = () => {
     whatsNewApi.markSeen().catch((error) => {
       logger.debug('Failed to record release notes as seen', error);
@@ -84,6 +100,7 @@ export function WhatsNewHost() {
       authenticated={isAuthenticated}
       currentVersion={currentVersion}
       onClose={close}
+      onTourStart={closeForTour}
       onShowNextLogin={handleShowNextLogin}
       onDontShowAgain={handleDontShowAgain}
     />

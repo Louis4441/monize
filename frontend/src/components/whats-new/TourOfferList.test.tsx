@@ -25,7 +25,7 @@ afterEach(() => cleanup());
 
 describe('TourOfferList', () => {
   it('offers the intro row plus the release tours for the matching version', () => {
-    render(<TourOfferList currentVersion="1.13.0" onClose={vi.fn()} />);
+    render(<TourOfferList currentVersion="1.13.0" onStartTour={vi.fn()} />);
     expect(
       screen.getByText('New here? Take the introduction tour'),
     ).toBeInTheDocument();
@@ -36,11 +36,11 @@ describe('TourOfferList', () => {
     expect(screen.getAllByText('Show me')).toHaveLength(3);
   });
 
-  it('starts a tour and closes the modal on click', () => {
-    const onClose = vi.fn();
-    render(<TourOfferList currentVersion="1.13.0" onClose={onClose} />);
+  it('starts a tour and steps the modal aside on click', () => {
+    const onStartTour = vi.fn();
+    render(<TourOfferList currentVersion="1.13.0" onStartTour={onStartTour} />);
     fireEvent.click(screen.getAllByText('Show me')[0]);
-    expect(onClose).toHaveBeenCalled();
+    expect(onStartTour).toHaveBeenCalled();
     expect(useTourStore.getState().active?.tour.id).toBe('intro/basics');
   });
 
@@ -51,7 +51,7 @@ describe('TourOfferList', () => {
         'release-1.13.0/foreign-currency': { status: 'completed', updatedAt: 'now' },
       },
     });
-    render(<TourOfferList currentVersion="1.13.0" onClose={vi.fn()} />);
+    render(<TourOfferList currentVersion="1.13.0" onStartTour={vi.fn()} />);
     expect(
       screen.queryByText('New here? Take the introduction tour'),
     ).toBeNull();
@@ -63,7 +63,7 @@ describe('TourOfferList', () => {
       progress: { 'intro/basics': { status: 'dismissed', updatedAt: 'now' } },
     });
     const { container } = render(
-      <TourOfferList currentVersion="1.12.1" onClose={vi.fn()} />,
+      <TourOfferList currentVersion="1.12.1" onStartTour={vi.fn()} />,
     );
     expect(container).toBeEmptyDOMElement();
   });

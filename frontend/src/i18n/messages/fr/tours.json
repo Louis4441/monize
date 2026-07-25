@@ -13,7 +13,7 @@
   },
   "offer": {
     "heading": "Faire une visite rapide",
-    "subheading": "De courtes visites guidées des nouveautés de cette version.",
+    "subheading": "De courtes visites guidées des nouveautés de cette version. Cette fenêtre s'efface pendant une visite et revient à la fin.",
     "showMe": "Me montrer",
     "viewed": "Consultée",
     "introTitle": "Nouveau ici ? Suivez la visite d'introduction",

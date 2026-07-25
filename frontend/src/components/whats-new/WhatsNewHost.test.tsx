@@ -3,6 +3,7 @@ import { act, fireEvent, waitFor } from '@testing-library/react';
 import { render, screen } from '@/test/render';
 import { WhatsNewHost } from './WhatsNewHost';
 import { useAuthStore } from '@/store/authStore';
+import { useTourStore } from '@/store/tourStore';
 import { useWhatsNewStore } from '@/store/whatsNewStore';
 import { whatsNewApi, type ReleaseNotes } from '@/lib/whats-new';
 
@@ -12,6 +13,14 @@ vi.mock('@/lib/whats-new', () => ({
     getReleaseNotes: vi.fn(),
     markSeen: vi.fn(),
     remindNextLogin: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/tours-api', () => ({
+  toursApi: {
+    getProgress: vi.fn().mockResolvedValue({}),
+    saveProgress: vi.fn().mockResolvedValue({ saved: true }),
+    resetProgress: vi.fn().mockResolvedValue({ reset: true }),
   },
 }));
 
@@ -33,7 +42,8 @@ async function renderHost() {
 describe('WhatsNewHost', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useWhatsNewStore.setState({ isOpen: false });
+    useWhatsNewStore.setState({ isOpen: false, pausedForTour: false });
+    useTourStore.setState({ active: null, progress: {}, progressLoaded: true });
     useAuthStore.setState({ isAuthenticated: false });
     mockApi.getWhatsNew.mockResolvedValue({
       currentVersion: '1.12.1',
@@ -124,6 +134,55 @@ describe('WhatsNewHost', () => {
 
     expect(mockApi.remindNextLogin).toHaveBeenCalledTimes(1);
     expect(mockApi.markSeen).not.toHaveBeenCalled();
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
+  });
+
+  it('steps aside for a tour from the offer list and comes back when it ends', async () => {
+    useAuthStore.setState({ isAuthenticated: true });
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.12.1',
+      autoShow: true,
+      notes: NOTES,
+    });
+
+    await renderHost();
+    await waitFor(() =>
+      expect(screen.getByText('Intro paragraph.')).toBeInTheDocument(),
+    );
+
+    // The tour needs the page to itself, so the dialog gets out of the way.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Show me' }));
+    });
+    expect(useTourStore.getState().active).not.toBeNull();
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
+
+    // ...and comes back afterwards, so the rest of the list is reachable.
+    await act(async () => {
+      useTourStore.getState().endTour('completed');
+    });
+    expect(useWhatsNewStore.getState().isOpen).toBe(true);
+    expect(screen.getByText('Intro paragraph.')).toBeInTheDocument();
+  });
+
+  it('leaves a dialog the user closed alone when a tour ends', async () => {
+    useAuthStore.setState({ isAuthenticated: true });
+    await renderHost();
+    await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalled());
+
+    // A tour started from Settings or the Getting Started card, with no dialog
+    // waiting behind it, must not conjure one up on the way out.
+    await act(async () => {
+      useTourStore.getState().startTour({
+        id: 'test/elsewhere',
+        area: 'intro',
+        i18nPrefix: 'intro.basics',
+        steps: [{ id: 'welcome', anchorId: null }],
+      });
+    });
+    await act(async () => {
+      useTourStore.getState().endTour('dismissed');
+    });
     expect(useWhatsNewStore.getState().isOpen).toBe(false);
   });
 });

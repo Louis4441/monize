@@ -13,7 +13,7 @@
   },
   "offer": {
     "heading": "Zobacz krótki przewodnik",
-    "subheading": "Krótkie wprowadzenia do nowości w tym wydaniu.",
+    "subheading": "Krótkie wprowadzenia do nowości w tym wydaniu. To okno ustępuje na czas przewodnika i wraca, gdy się on skończy.",
     "showMe": "Pokaż mi",
     "viewed": "Obejrzano",
     "introTitle": "Nowy tutaj? Skorzystaj z przewodnika wprowadzającego",

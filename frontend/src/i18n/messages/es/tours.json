@@ -13,7 +13,7 @@
   },
   "offer": {
     "heading": "Haz un recorrido rápido",
-    "subheading": "Recorridos breves de las novedades de esta versión.",
+    "subheading": "Recorridos breves de las novedades de esta versión. Esta ventana se aparta mientras dura un recorrido y vuelve al terminar.",
     "showMe": "Mostrarme",
     "viewed": "Visto",
     "introTitle": "¿Nuevo aquí? Realiza el recorrido de introducción",

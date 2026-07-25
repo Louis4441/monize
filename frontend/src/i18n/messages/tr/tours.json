@@ -13,7 +13,7 @@
   },
   "offer": {
     "heading": "Kısa bir tur yapın",
-    "subheading": "Bu sürümdeki yeniliklerin kısa anlatımları.",
+    "subheading": "Bu sürümdeki yeniliklerin kısa anlatımları. Bu pencere tur sürerken kenara çekilir ve tur bitince geri gelir.",
     "showMe": "Bana göster",
     "viewed": "Görüntülendi",
     "introTitle": "Buraya yeni mi geldiniz? Tanıtım turunu yapın",

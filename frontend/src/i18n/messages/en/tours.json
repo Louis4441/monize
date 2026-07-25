@@ -13,7 +13,7 @@
   },
   "offer": {
     "heading": "Take a quick tour",
-    "subheading": "Short walkthroughs of what's new in this release.",
+    "subheading": "Short walkthroughs of what's new in this release. This dialog steps aside while a tour runs and comes back when it ends.",
     "showMe": "Show me",
     "viewed": "Viewed",
     "introTitle": "New here? Take the introduction tour",

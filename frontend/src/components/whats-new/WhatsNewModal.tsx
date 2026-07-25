@@ -22,6 +22,12 @@ interface WhatsNewModalProps {
   /** Close without changing state (X, backdrop, Escape). */
   onClose: () => void;
   /**
+   * Called when a tour starts from the offer list, so the host can step the
+   * modal aside (and bring it back afterwards) rather than plainly close it.
+   * Falls back to `onClose`.
+   */
+  onTourStart?: () => void;
+  /**
    * Clear the acknowledgement so the digest shows again next login ("Show at
    * next login"). Only when authenticated; falls back to a plain close.
    */
@@ -57,6 +63,7 @@ export function WhatsNewModal({
   authenticated,
   currentVersion,
   onClose,
+  onTourStart,
   onShowNextLogin,
   onDontShowAgain,
 }: WhatsNewModalProps) {
@@ -127,7 +134,10 @@ export function WhatsNewModal({
         {/* Body */}
         <div className="overflow-y-auto px-6 py-4">
           {authenticated && currentVersion && (
-            <TourOfferList currentVersion={currentVersion} onClose={onClose} />
+            <TourOfferList
+              currentVersion={currentVersion}
+              onStartTour={onTourStart ?? onClose}
+            />
           )}
           {notes ? (
             <>
