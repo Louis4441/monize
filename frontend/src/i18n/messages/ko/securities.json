@@ -204,6 +204,10 @@
     "editPriceSection": "가격 편집",
     "loading": "가격 불러오는 중...",
     "chartTitle": "가격 이력",
+    "markers": {
+      "bought": "매수 {quantity} · {account}",
+      "sold": "매도 {quantity} · {account}"
+    },
     "empty": "사용 가능한 가격 이력이 없습니다",
     "columns": {
       "date": "날짜",

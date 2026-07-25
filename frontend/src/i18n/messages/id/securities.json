@@ -204,6 +204,10 @@
     "editPriceSection": "Edit Harga",
     "loading": "Memuat harga...",
     "chartTitle": "Riwayat harga",
+    "markers": {
+      "bought": "Beli {quantity} · {account}",
+      "sold": "Jual {quantity} · {account}"
+    },
     "empty": "Tidak ada riwayat harga tersedia",
     "columns": {
       "date": "Tanggal",

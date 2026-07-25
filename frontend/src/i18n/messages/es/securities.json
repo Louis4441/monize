@@ -204,6 +204,10 @@
     "editPriceSection": "Editar precio",
     "loading": "Cargando precios...",
     "chartTitle": "Historial de precios",
+    "markers": {
+      "bought": "Compra {quantity} · {account}",
+      "sold": "Venta {quantity} · {account}"
+    },
     "empty": "No hay historial de precios disponible",
     "columns": {
       "date": "Fecha",

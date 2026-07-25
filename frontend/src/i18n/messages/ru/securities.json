@@ -204,6 +204,10 @@
     "editPriceSection": "Редактировать цену",
     "loading": "Загрузка цен...",
     "chartTitle": "История цены",
+    "markers": {
+      "bought": "Покупка {quantity} · {account}",
+      "sold": "Продажа {quantity} · {account}"
+    },
     "empty": "История цен недоступна",
     "columns": {
       "date": "Дата",

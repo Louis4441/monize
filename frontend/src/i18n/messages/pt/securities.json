@@ -204,6 +204,10 @@
     "editPriceSection": "Editar Cotação",
     "loading": "A carregar cotações...",
     "chartTitle": "Histórico de preços",
+    "markers": {
+      "bought": "Compra {quantity} · {account}",
+      "sold": "Venda {quantity} · {account}"
+    },
     "empty": "Sem histórico de cotações disponível",
     "columns": {
       "date": "Data",

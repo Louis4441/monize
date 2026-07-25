@@ -204,6 +204,10 @@
     "editPriceSection": "Редагувати ціну",
     "loading": "Завантаження цін...",
     "chartTitle": "Історія ціни",
+    "markers": {
+      "bought": "Купівля {quantity} · {account}",
+      "sold": "Продаж {quantity} · {account}"
+    },
     "empty": "Histórico цін відсутня",
     "columns": {
       "date": "Дата",

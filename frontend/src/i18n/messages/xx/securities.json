@@ -204,6 +204,10 @@
     "editPriceSection": "[XX-Edit Price-XX]",
     "loading": "[XX-Loading prices...-XX]",
     "chartTitle": "[XX-Price History-XX]",
+    "markers": {
+      "bought": "[XX-Bought {quantity} · {account}-XX]",
+      "sold": "[XX-Sold {quantity} · {account}-XX]"
+    },
     "empty": "[XX-No price history available-XX]",
     "columns": {
       "date": "[XX-Date-XX]",

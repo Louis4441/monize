@@ -6,12 +6,21 @@ import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Security, SecurityPrice, CreateSecurityPriceData } from '@/types/investment';
+import {
+  Security,
+  SecurityPrice,
+  CreateSecurityPriceData,
+  SecurityHistoryTransaction,
+} from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { getErrorMessage } from '@/lib/errors';
 import { SecurityPriceForm } from './SecurityPriceForm';
-import { BalanceHistoryChart } from '@/components/transactions/BalanceHistoryChart';
+import {
+  BalanceHistoryChart,
+  type ChartMarker,
+} from '@/components/transactions/BalanceHistoryChart';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
 
 interface SecurityPriceHistoryProps {
   security: Security;
@@ -59,11 +68,16 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   const t = useTranslations('securities');
   const { formatDate } = useDateFormat();
   const [prices, setPrices] = useState<SecurityPrice[]>([]);
+  // Trades, only for the chart's markers. A failed lookup costs the markers,
+  // never the price list the modal is actually for.
+  const [trades, setTrades] = useState<SecurityHistoryTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingPrice, setEditingPrice] = useState<SecurityPrice | undefined>();
   const [deletingPrice, setDeletingPrice] = useState<SecurityPrice | undefined>();
   const [isUpdating, setIsUpdating] = useState(false);
+
+  const { formatQuantity } = useNumberFormat();
 
   const loadPrices = useCallback(async () => {
     setIsLoading(true);
@@ -80,6 +94,23 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   useEffect(() => {
     loadPrices();
   }, [loadPrices]);
+
+  useEffect(() => {
+    let cancelled = false;
+    investmentsApi
+      .getSecurityTransactionHistory(security.id)
+      .then((history) => {
+        if (!cancelled) setTrades(history.transactions);
+      })
+      // Markers are a nicety: without them the chart still reads, so a failed
+      // lookup stays silent rather than raising a toast over the price list.
+      .catch(() => {
+        if (!cancelled) setTrades([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [security.id]);
 
   const handleAdd = useCallback(async (data: CreateSecurityPriceData) => {
     try {
@@ -131,6 +162,38 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
         .sort((a, b) => a.date.localeCompare(b.date)),
     [prices],
   );
+
+  // Which way each action moved the position. Actions with no share movement
+  // (dividends, interest, capital gains) carry no quantity and are left off the
+  // chart -- a dot with nothing to say is noise.
+  const chartMarkers = useMemo<ChartMarker[]>(() => {
+    const direction: Partial<Record<SecurityHistoryTransaction['action'], 'in' | 'out'>> = {
+      BUY: 'in',
+      REINVEST: 'in',
+      TRANSFER_IN: 'in',
+      ADD_SHARES: 'in',
+      SELL: 'out',
+      TRANSFER_OUT: 'out',
+      REMOVE_SHARES: 'out',
+    };
+    return trades.flatMap((trade) => {
+      const way = direction[trade.action];
+      if (!way || trade.quantity === null) return [];
+      const quantity = formatQuantity(Math.abs(Number(trade.quantity)));
+      return [
+        {
+          date: trade.transactionDate.slice(0, 10),
+          direction: way,
+          label: t(
+            way === 'in'
+              ? 'priceHistory.markers.bought'
+              : 'priceHistory.markers.sold',
+            { quantity, account: trade.accountName },
+          ),
+        },
+      ];
+    });
+  }, [trades, formatQuantity, t]);
 
   const handleForceUpdate = useCallback(async () => {
     setIsUpdating(true);
@@ -218,6 +281,7 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
           accountName={security.symbol}
           title={t('priceHistory.chartTitle')}
           neutralValues
+          markers={chartMarkers}
         />
       )}
 

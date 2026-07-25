@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@/test/render';
+import { render, screen, fireEvent, cleanup } from '@/test/render';
 import { BalanceHistoryChart } from './BalanceHistoryChart';
 import { computeBalanceGradient } from '@/lib/balance-history';
 
@@ -22,8 +22,28 @@ vi.mock('recharts', () => ({
   XAxis: () => <div data-testid="x-axis" />,
   YAxis: () => <div data-testid="y-axis" />,
   CartesianGrid: () => <div data-testid="cartesian-grid" />,
-  Tooltip: () => <div data-testid="tooltip" />,
+  // Render the tooltip's content with a hovered point, so the marker lines
+  // under the value are exercised.
+  Tooltip: ({ content }: any) => (
+    <div data-testid="tooltip">
+      {content
+        ? {
+            ...content,
+            props: {
+              ...content.props,
+              active: true,
+              payload: [
+                { payload: { date: '2026-01-02', label: 'Jan 2, 2026', balance: 120 } },
+              ],
+            },
+          }
+        : null}
+    </div>
+  ),
   ReferenceLine: () => <div data-testid="reference-line" />,
+  ReferenceDot: ({ x, y, fill }: any) => (
+    <div data-testid="reference-dot" data-x={x} data-y={y} data-fill={fill} />
+  ),
 }));
 
 const mockFormatCurrency = vi.fn((n: number, _code?: string) => `$${n.toFixed(2)}`);
@@ -415,5 +435,78 @@ describe('computeBalanceGradient', () => {
     expect(g.topOpacity).toBe(0);
     expect(g.bottomOpacity).toBe(0.3);
     expect(g.zeroOffset).toBe(0);
+  });
+
+  describe('markers', () => {
+    const series = [
+      { date: '2026-01-01', balance: 100 },
+      { date: '2026-01-02', balance: 120 },
+      { date: '2026-01-03', balance: 110 },
+    ];
+
+    it('pins a dot on the day of each event, green in and red out', () => {
+      render(
+        <BalanceHistoryChart
+          data={series}
+          isLoading={false}
+          markers={[
+            { date: '2026-01-02', direction: 'in', label: 'Bought 10' },
+            { date: '2026-01-03', direction: 'out', label: 'Sold 4' },
+          ]}
+        />,
+      );
+
+      const dots = screen.getAllByTestId('reference-dot');
+      expect(dots).toHaveLength(2);
+      expect(dots[0]).toHaveAttribute('data-x', '2026-01-02');
+      expect(dots[0]).toHaveAttribute('data-y', '120');
+      expect(dots[0].getAttribute('data-fill')).not.toBe(
+        dots[1].getAttribute('data-fill'),
+      );
+    });
+
+    it('snaps an event on a non-trading day back to the last known price', () => {
+      // A trade on a Saturday has no price row of its own.
+      render(
+        <BalanceHistoryChart
+          data={series}
+          isLoading={false}
+          markers={[{ date: '2026-01-02T12:00:00Z'.slice(0, 10), direction: 'in', label: 'Bought 1' }]}
+        />,
+      );
+      expect(screen.getByTestId('reference-dot')).toHaveAttribute('data-x', '2026-01-02');
+
+      cleanup();
+      render(
+        <BalanceHistoryChart
+          data={series}
+          isLoading={false}
+          markers={[{ date: '2026-01-04', direction: 'out', label: 'Sold 2' }]}
+        />,
+      );
+      // Later than every point: pinned to the last one, not dropped.
+      expect(screen.getByTestId('reference-dot')).toHaveAttribute('data-x', '2026-01-03');
+    });
+
+    it('lists the events for the hovered day in the tooltip', () => {
+      render(
+        <BalanceHistoryChart
+          data={series}
+          isLoading={false}
+          markers={[
+            { date: '2026-01-02', direction: 'in', label: 'Bought 10' },
+            { date: '2026-01-02', direction: 'out', label: 'Sold 4' },
+          ]}
+        />,
+      );
+
+      expect(screen.getByText('Bought 10')).toBeInTheDocument();
+      expect(screen.getByText('Sold 4')).toBeInTheDocument();
+    });
+
+    it('draws no dots without markers', () => {
+      render(<BalanceHistoryChart data={series} isLoading={false} />);
+      expect(screen.queryByTestId('reference-dot')).toBeNull();
+    });
   });
 });

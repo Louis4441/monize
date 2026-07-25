@@ -204,6 +204,10 @@
     "editPriceSection": "Edit Price",
     "loading": "Loading prices...",
     "chartTitle": "Price History",
+    "markers": {
+      "bought": "Bought {quantity} · {account}",
+      "sold": "Sold {quantity} · {account}"
+    },
     "empty": "No price history available",
     "columns": {
       "date": "Date",

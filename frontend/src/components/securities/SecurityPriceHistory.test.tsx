@@ -2,9 +2,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@/test/render';
 import { SecurityPriceHistory } from './SecurityPriceHistory';
 
+// The chart itself is covered by BalanceHistoryChart.test; here it stands in
+// for itself so the props the modal builds -- the title and the trade markers
+// -- can be asserted directly.
+vi.mock('@/components/transactions/BalanceHistoryChart', () => ({
+  BalanceHistoryChart: ({ title, markers }: any) => (
+    <div data-testid="price-chart">
+      {title}
+      {(markers ?? []).map((marker: any, i: number) => (
+        <span key={i} data-testid="chart-marker">
+          {marker.direction}: {marker.label}
+        </span>
+      ))}
+    </div>
+  ),
+}));
+
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
     getSecurityPrices: vi.fn(),
+    getSecurityTransactionHistory: vi.fn(),
     createSecurityPrice: vi.fn(),
     updateSecurityPrice: vi.fn(),
     deleteSecurityPrice: vi.fn(),
@@ -98,6 +115,16 @@ describe('SecurityPriceHistory', () => {
     vi.clearAllMocks();
     window.addEventListener('unhandledrejection', swallowExpected);
     (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrices);
+    (investmentsApi.getSecurityTransactionHistory as ReturnType<typeof vi.fn>).mockResolvedValue({
+      securityId: 'sec-1',
+      symbol: 'AAPL',
+      name: 'Apple Inc.',
+      currencyCode: 'USD',
+      isActive: true,
+      accounts: [],
+      transactions: [],
+      currentQuantityAll: 0,
+    });
   });
 
   afterEach(() => {
@@ -381,6 +408,42 @@ describe('SecurityPriceHistory', () => {
       // read the same way; only the title and the neutral colouring differ.
       expect(screen.getByText('Price History')).toBeInTheDocument();
       expect(screen.getByText(/AAPL/)).toBeInTheDocument();
+    });
+
+    it('marks the days shares moved, and how many', async () => {
+      (investmentsApi.getSecurityTransactionHistory as ReturnType<typeof vi.fn>).mockResolvedValue({
+        securityId: 'sec-1',
+        symbol: 'AAPL',
+        name: 'Apple Inc.',
+        currencyCode: 'USD',
+        isActive: true,
+        accounts: [],
+        currentQuantityAll: 8,
+        transactions: [
+          { id: 't1', transactionDate: '2025-05-30', accountId: 'a1', accountName: 'RRSP', action: 'BUY', quantity: 10, price: 150, commission: 0, totalAmount: 1500, description: null, runningQuantityAccount: 10, runningQuantityAll: 10 },
+          { id: 't2', transactionDate: '2025-06-01', accountId: 'a1', accountName: 'RRSP', action: 'SELL', quantity: 2, price: 193, commission: 0, totalAmount: 386, description: null, runningQuantityAccount: 8, runningQuantityAll: 8 },
+          // No shares moved, so nothing to pin on the chart.
+          { id: 't3', transactionDate: '2025-06-01', accountId: 'a1', accountName: 'RRSP', action: 'DIVIDEND', quantity: null, price: null, commission: 0, totalAmount: 12, description: null, runningQuantityAccount: 8, runningQuantityAll: 8 },
+        ],
+      });
+
+      await renderComponent();
+
+      const markers = screen.getAllByTestId('chart-marker');
+      expect(markers).toHaveLength(2);
+      expect(markers[0]).toHaveTextContent('in: Bought 10 · RRSP');
+      expect(markers[1]).toHaveTextContent('out: Sold 2 · RRSP');
+    });
+
+    it('keeps the chart when the trade lookup fails', async () => {
+      (investmentsApi.getSecurityTransactionHistory as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('nope'),
+      );
+      await renderComponent();
+
+      // Markers are a nicety; the price history is the point of the modal.
+      expect(screen.getByTestId('price-chart')).toBeInTheDocument();
+      expect(screen.queryAllByTestId('chart-marker')).toHaveLength(0);
     });
 
     it('leaves the chart out when there is nothing to plot', async () => {

@@ -13,6 +13,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  ReferenceDot,
 } from 'recharts';
 import { chartColors } from '@/lib/chart-colors';
 import { parseLocalDate, type ChartDatePattern } from '@/lib/utils';
@@ -27,6 +28,20 @@ import {
 } from '@/components/investments/portfolio-chart-utils';
 
 
+/**
+ * An event to pin on the series: the security price chart marks the days a
+ * holding was bought or sold, so a step in the line has a visible cause.
+ */
+export interface ChartMarker {
+  /** ISO `yyyy-MM-dd`; snapped to the nearest earlier point if the series has
+   *  no value for that exact day (a trade on a non-trading day). */
+  date: string;
+  /** Which way the event moved the position: 'in' reads green, 'out' red. */
+  direction: 'in' | 'out';
+  /** One tooltip line, already formatted, e.g. "Bought 12.5". */
+  label: string;
+}
+
 interface BalanceHistoryChartProps {
   data: Array<{ date: string; balance: number }>;
   isLoading: boolean;
@@ -39,6 +54,11 @@ interface BalanceHistoryChartProps {
    * so the two read identically.
    */
   title?: string;
+  /**
+   * Events to pin on the line, each snapped to a point in the series. Empty or
+   * omitted for a plain balance history.
+   */
+  markers?: readonly ChartMarker[];
   /**
    * Drop the green/red colouring of the footer figures. For a series where the
    * sign carries no meaning: a security price is always positive, so tinting
@@ -71,12 +91,15 @@ function BalanceTooltip({
   payload,
   formatCurrency,
   neutral = false,
+  markersByDate,
 }: {
   active?: boolean;
   payload?: Array<{ payload: ChartPoint }>;
   formatCurrency: (v: number) => string;
   /** Skip the by-sign colouring, for a series whose sign means nothing. */
   neutral?: boolean;
+  /** Events pinned on each day, listed under the value. */
+  markersByDate?: Map<string, ChartMarker[]>;
 }) {
   if (active && payload?.[0]) {
     const data = payload[0].payload;
@@ -94,6 +117,18 @@ function BalanceTooltip({
         >
           {formatCurrency(data.balance)}
         </p>
+        {markersByDate?.get(data.date)?.map((marker, i) => (
+          <p
+            key={i}
+            className={`mt-1 text-sm font-medium ${
+              marker.direction === 'in'
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-red-600 dark:text-red-400'
+            }`}
+          >
+            {marker.label}
+          </p>
+        ))}
       </div>
     );
   }
@@ -109,6 +144,7 @@ export function BalanceHistoryChart({
   hideTitle = false,
   title,
   neutralValues = false,
+  markers,
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
@@ -192,6 +228,33 @@ export function BalanceHistoryChart({
     );
     return t('charts.balanceHistory.range', { start, end });
   }, [chartData, formatChartDate, t]);
+
+  // Markers snapped onto the series: a trade can fall on a day with no price
+  // row (a weekend, or a gap in history), so it lands on the nearest earlier
+  // point -- and on the first point when it predates the whole series.
+  const pinnedMarkers = useMemo(() => {
+    if (!markers?.length || chartData.length === 0) return [];
+    return markers
+      .map((marker) => {
+        let point = chartData[0];
+        for (const candidate of chartData) {
+          if (candidate.date <= marker.date) point = candidate;
+          else break;
+        }
+        return { marker, point };
+      })
+      .filter(({ point }) => !!point);
+  }, [markers, chartData]);
+
+  const markersByDate = useMemo(() => {
+    const byDate = new Map<string, ChartMarker[]>();
+    for (const { marker, point } of pinnedMarkers) {
+      const existing = byDate.get(point.date);
+      if (existing) existing.push(marker);
+      else byDate.set(point.date, [marker]);
+    }
+    return byDate;
+  }, [pinnedMarkers]);
 
   const summary = useMemo(() => computeBalanceSummary(chartData), [chartData]);
   /** Footer figure colour: by sign, unless the sign means nothing here. */
@@ -321,6 +384,7 @@ export function BalanceHistoryChart({
                 <BalanceTooltip
                   formatCurrency={formatCurrency}
                   neutral={neutralValues}
+                  markersByDate={markersByDate}
                 />
               }
             />
@@ -354,6 +418,25 @@ export function BalanceHistoryChart({
                 strokeOpacity={0.4}
               />
             )}
+            {/* Pinned events (buys and sells on a price series): a dot on the
+                line at the day it happened, green in / red out, with the
+                quantity in the tooltip for that day. */}
+            {pinnedMarkers.map(({ marker, point }, i) => (
+              <ReferenceDot
+                key={`${point.date}-${i}`}
+                x={point.date}
+                y={point.balance}
+                r={4}
+                fill={
+                  marker.direction === 'in'
+                    ? chartColors.income
+                    : chartColors.expense
+                }
+                stroke="#fff"
+                strokeWidth={1.5}
+                ifOverflow="extendDomain"
+              />
+            ))}
             <Area
               type="monotone"
               dataKey="balance"
