@@ -4,12 +4,12 @@
     "back": "Geri",
     "done": "Bitti",
     "endTour": "Turu bitir",
-    "tryIt": "Deneyin -- siz yapınca tur devam eder",
+    "tryIt": "Deneyin — siz yapınca tur devam eder",
     "skipStep": "Bu adımı atla",
     "stepCounter": "{current} / {total}",
     "skippedTitle": "Tur tamamlandı",
     "skippedBody": "Ekranı veya denetimi kullanılamadığı için bazı adımlar atlandı. Turu istediğiniz zaman Ayarlar'dan yeniden alabilirsiniz.",
-    "move": "Bu kartı taşı -- sürükleyin veya ok tuşlarıyla kaydırın"
+    "move": "Bu kartı taşı — sürükleyin veya ok tuşlarıyla kaydırın"
   },
   "offer": {
     "heading": "Kısa bir tur yapın",
@@ -56,15 +56,15 @@
         },
         "tools": {
           "title": "Araçlar menüsü",
-          "body": "**Araçlar** menüsü, finansal yapı taşlarınızı yönettiğiniz yerdir -- alıcılar, kategoriler, para birimleri, etiketler ve daha fazlası."
+          "body": "**Araçlar** menüsü, finansal yapı taşlarınızı yönettiğiniz yerdir — alıcılar, kategoriler, para birimleri, etiketler ve daha fazlası."
         },
         "accounts": {
           "title": "Hesaplarınız",
-          "body": "Banka, kredi kartı, kredi ve yatırım hesaplarınızı buraya **Hesap Ekle** ile ekleyin. Her bakiye ve işlem bir hesaba aittir."
+          "body": "Banka, kredi kartı, kredi ve yatırım hesaplarınızı buraya vurgulanan düğmeyle ekleyin. Her bakiye ve işlem bir hesaba aittir."
         },
         "transactions": {
           "title": "İşlemler",
-          "body": "Bu, işlem kayıt defterinizdir -- hesaplarınıza ait her ödeme ve yatırma burada bulunur, aramaya ve filtrelemeye hazırdır."
+          "body": "Bu, işlem kayıt defterinizdir — hesaplarınıza ait her ödeme ve yatırma burada bulunur, aramaya ve filtrelemeye hazırdır."
         },
         "createTransaction": {
           "title": "Bir işlem kaydedin",
@@ -76,15 +76,15 @@
         },
         "splits": {
           "title": "İşlemi Böl",
-          "body": "Tek bir alışveriş birden fazla kategoriyi mi kapsıyor? Tek bir işlemi kategorilere bölmek için **İşlemi Böl** seçeneğini kullanın -- örneğin tek bir alışverişten market ve ev eşyası gibi."
+          "body": "Tek bir alışveriş birden fazla kategoriyi mi kapsıyor? Tek bir işlemi kategorilere bölmek için **İşlemi Böl** seçeneğini kullanın — örneğin tek bir alışverişten market ve ev eşyası gibi."
         },
         "currencyField": {
           "title": "Yabancı para birimleri",
-          "body": "Yurt dışında bir şey mi aldınız? Para birimini burada ayarlayın ve tutarı ödendiği şekilde girin -- Monize bunu hesap para birimine sizin için çevirir."
+          "body": "Yurt dışında bir şey mi aldınız? Para birimini burada ayarlayın ve tutarı ödendiği şekilde girin — Monize bunu hesap para birimine sizin için çevirir."
         },
         "closeForm": {
           "title": "Devam etmek için formu kapatın",
-          "body": "İşlem formunu kapatın (**İptal** veya X) ve tur devam edecektir."
+          "body": "İşlem formunu **İptal** ile kapatın veya diğer düğmeyle kaydedin; tur devam edecektir."
         },
         "bills": {
           "title": "Faturalar ve Mevduatlar",
@@ -100,7 +100,7 @@
         },
         "reports": {
           "title": "Paranızı anlayın",
-          "body": "Raporlar, işlemlerinizi grafiklere dönüştürür -- kategoriye göre harcama, zaman içinde net değer ve daha fazlası."
+          "body": "Raporlar, işlemlerinizi grafiklere dönüştürür — kategoriye göre harcama, zaman içinde net değer ve daha fazlası."
         },
         "finish": {
           "title": "Her şey hazır",
@@ -116,15 +116,15 @@
         "steps": {
           "welcome": {
             "title": "Diğer para birimlerindeki harcamalarınızı izleyin",
-            "body": "Yurt dışından bir şey mi aldınız? Bu tur, bir kartın yabancı para birimi işlem ücretini ayarlar, size yansıtılan para biriminde bir alışveriş kaydeder ve bu maliyetlerin nerede göründüğünü gösterir. **Esc** tuşuyla veya **Turu bitir** ile istediğiniz an çıkabilirsiniz."
+            "body": "Yurt dışından bir şey mi aldınız? Bu tur, bir hesabın yabancı para birimi işlem ücretini ayarlar, size yansıtılan para biriminde bir alışveriş kaydeder ve bu maliyetlerin nerede göründüğünü gösterir. **Esc** tuşuyla veya **Turu bitir** ile istediğiniz an çıkabilirsiniz."
           },
           "openAccountEdit": {
-            "title": "Karttan başlayın",
-            "body": "Yabancı para birimi işlem ücretleri hesaba aittir. Yurt dışında kullandığınız bir kredi kartını seçin ve ayarlarını açmak için satırındaki işlemlerden **Düzenle**'yi seçin -- mobilde satıra uzun basın."
+            "title": "Hesapla başlayın",
+            "body": "Yabancı para birimi işlem ücretleri hesaba aittir. Yurt dışında ödeme yaptığınız hesabı seçin — kredi kartı, banka kartı ya da telefonunuzun ödeme yaptığı hesap — ve ayarlarını açmak için satırındaki işlemlerden **Düzenle**'yi seçin; mobilde satıra uzun basın."
           },
           "fxFeePercent": {
             "title": "Dönüşüm ücretini belirleyin",
-            "body": "Kartınızın yabancı para birimi işlem ücretini buraya yüzde olarak girin -- örneğin 2,5. Monize bunu her yurt dışı alışverişin dönüştürülmüş tutarına katar, böylece ücret sizin için kaydedilir."
+            "body": "Hesabın yabancı para birimi işlem ücretini buraya yüzde olarak girin — örneğin 2,5. Monize bunu her yurt dışı alışverişin dönüştürülmüş tutarına katar, böylece ücret sizin için kaydedilir."
           },
           "closeAccountForm": {
             "title": "Kaydedin ve kapatın",
@@ -132,31 +132,31 @@
           },
           "newTransaction": {
             "title": "Bir yurt dışı alışverişi kaydedin",
-            "body": "Şimdi o kartla başka bir para biriminde yaptığınız bir alışverişi kaydedin. **Yeni İşlem**'i açın ve hesap olarak o kartı seçin."
+            "body": "Şimdi o hesapla başka bir para biriminde yaptığınız bir alışverişi kaydedin. **Yeni İşlem**'i açın ve hesap olarak onu seçin."
           },
           "chooseAccount": {
             "title": "Hesabı ve tarihi kontrol edin",
-            "body": "Dönüşüm ücreti hesaba ait olduğundan, **Hesap** alanının ücreti az önce belirlediğiniz kart olduğundan emin olun -- değilse buradan değiştirin. **Tarih**'i de alışverişin yapıldığı güne ayarlayın: döviz kuru o tarih için aranır."
+            "body": "Dönüşüm ücreti hesaba ait olduğundan, **Hesap** alanının ücreti az önce belirlediğiniz hesap olduğundan emin olun — değilse buradan değiştirin. **Tarih**'i de alışverişin yapıldığı güne ayarlayın: döviz kuru o tarih için aranır."
           },
           "enterDetails": {
-            "title": "Ayrıntıları her zamanki gibi girin",
+            "title": "Ayrıntıları girin",
             "body": "Alacaklıyı ve kategoriyi diğer işlemlerde olduğu gibi doldurun. Yabancı para birimi kısmı hemen ardından geliyor."
           },
           "entryCurrency": {
             "title": "Ödeme yaptığınız para birimini seçin",
-            "body": "Bunu açın ve size yansıtılan para birimini seçin. Listede yalnızca kendi para biriminiz mi var? Bir tane eklemek için en alttaki **Para birimi ekle...** seçeneğini kullanın -- hemen sizin için seçilir."
+            "body": "Bunu açın ve size yansıtılan para birimini seçin. Listede yalnızca kendi para biriminiz mi var? Bir tane eklemek için en alttaki **Para birimi ekle...** seçeneğini kullanın — hemen sizin için seçilir."
           },
           "enterAmount": {
             "title": "Size yansıtılan tutarı girin",
-            "body": "Toplamı ekstrenizde göründüğü gibi tam olarak yazın. Monize işlemin tarihi için **döviz kurunu** arar, dönüştürülmüş toplamı yanında gösterir ve hesapta belirlediğiniz **yabancı para birimi işlem ücretini** ekler -- alttaki açıklama ikisini de ayrıntılandırır. Bankanız farklı mı yuvarladı? Kuruşuna kadar tutması için kuru veya dönüştürülmüş toplamı düzenleyin."
+            "body": "Toplamı ekstrenizde göründüğü gibi tam olarak yazın. Monize işlemin tarihi için **döviz kurunu** arar, dönüştürülmüş toplamı yanında gösterir ve hesapta belirlediğiniz **yabancı para birimi işlem ücretini** ekler — alttaki açıklama ikisini de ayrıntılandırır. Bankanız farklı mı yuvarladı? Kuruşuna kadar tutması için kuru veya dönüştürülmüş toplamı düzenleyin."
           },
           "closeTransactionForm": {
             "title": "Formu kapatın",
             "body": "Burada da aynısı: işlemi gönder düğmesiyle kaydedin veya **İptal** ile kapatın, tur devam eder."
           },
           "openAccountDetail": {
-            "title": "Karta geri dönün",
-            "body": "Yabancı para birimi hareketlerinin nasıl özetlendiğini görmek için o kartın Ayrıntılar sayfasını açın -- satırındaki işlemlerden **Ayrıntılar**'ı seçin."
+            "title": "Hesaba geri dönün",
+            "body": "Yabancı para birimi hareketlerinin nasıl özetlendiğini görmek için o hesabın Ayrıntılar sayfasını açın — satırındaki işlemlerden **Ayrıntılar**'ı seçin."
           },
           "fxSection": {
             "title": "Yabancı para birimi bölümünüz",

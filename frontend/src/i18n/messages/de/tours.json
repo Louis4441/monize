@@ -4,12 +4,12 @@
     "back": "Zurück",
     "done": "Fertig",
     "endTour": "Tour beenden",
-    "tryIt": "Probieren Sie es aus -- die Tour geht danach weiter",
+    "tryIt": "Probieren Sie es aus — die Tour geht danach weiter",
     "skipStep": "Diesen Schritt überspringen",
     "stepCounter": "{current} von {total}",
     "skippedTitle": "Tour beendet",
     "skippedBody": "Einige Schritte wurden übersprungen, weil ihr Bildschirm oder Element nicht verfügbar war. Sie können die Tour jederzeit über die Einstellungen erneut starten.",
-    "move": "Diese Karte verschieben -- ziehen Sie sie oder bewegen Sie sie mit den Pfeiltasten"
+    "move": "Diese Karte verschieben — ziehen Sie sie oder bewegen Sie sie mit den Pfeiltasten"
   },
   "offer": {
     "heading": "Machen Sie eine kurze Tour",
@@ -56,15 +56,15 @@
         },
         "tools": {
           "title": "Das Menü Tools",
-          "body": "Im Menü **Tools** verwalten Sie die Bausteine Ihrer Finanzen -- Zahlungsempfänger, Kategorien, Währungen, Tags und mehr."
+          "body": "Im Menü **Tools** verwalten Sie die Bausteine Ihrer Finanzen — Zahlungsempfänger, Kategorien, Währungen, Tags und mehr."
         },
         "accounts": {
           "title": "Ihre Konten",
-          "body": "Fügen Sie hier über **Konto hinzufügen** Ihre Bank-, Kreditkarten-, Kredit- und Anlagekonten hinzu. Jeder Saldo und jede Buchung gehört zu einem Konto."
+          "body": "Fügen Sie hier über die hervorgehobene Schaltfläche Ihre Bank-, Kreditkarten-, Kredit- und Anlagekonten hinzu. Jeder Saldo und jede Buchung gehört zu einem Konto."
         },
         "transactions": {
           "title": "Buchungen",
-          "body": "Das ist Ihr Buchungsregister -- jede Zahlung und Einzahlung Ihrer Konten befindet sich hier und kann durchsucht und gefiltert werden."
+          "body": "Das ist Ihr Buchungsregister — jede Zahlung und Einzahlung Ihrer Konten befindet sich hier und kann durchsucht und gefiltert werden."
         },
         "createTransaction": {
           "title": "Eine Buchung erfassen",
@@ -76,15 +76,15 @@
         },
         "splits": {
           "title": "Eine Buchung aufteilen",
-          "body": "Ein Einkauf, der mehrere Kategorien betrifft? Nutzen Sie **Buchung aufteilen**, um eine einzelne Buchung auf mehrere Kategorien aufzuteilen -- zum Beispiel Lebensmittel und Haushaltswaren aus einem Einkauf."
+          "body": "Ein Einkauf, der mehrere Kategorien betrifft? Nutzen Sie **Buchung aufteilen**, um eine einzelne Buchung auf mehrere Kategorien aufzuteilen — zum Beispiel Lebensmittel und Haushaltswaren aus einem Einkauf."
         },
         "currencyField": {
           "title": "Fremdwährungen",
-          "body": "Etwas im Ausland gekauft? Legen Sie hier die Währung fest und geben Sie den belasteten Betrag ein -- Monize rechnet ihn für Sie in die Kontowährung um."
+          "body": "Etwas im Ausland gekauft? Legen Sie hier die Währung fest und geben Sie den belasteten Betrag ein — Monize rechnet ihn für Sie in die Kontowährung um."
         },
         "closeForm": {
           "title": "Schließen Sie das Formular, um fortzufahren",
-          "body": "Schließen Sie das Buchungsformular (**Abbrechen** oder das X), und die Tour geht weiter."
+          "body": "Schließen Sie das Buchungsformular mit **Abbrechen** oder speichern Sie die Buchung mit der anderen Schaltfläche, und die Tour geht weiter."
         },
         "bills": {
           "title": "Rechnungen & Einzahlungen",
@@ -100,7 +100,7 @@
         },
         "reports": {
           "title": "Ihre Finanzen verstehen",
-          "body": "Berichte verwandeln Ihre Buchungen in Diagramme -- Ausgaben nach Kategorie, Vermögensentwicklung über die Zeit und mehr."
+          "body": "Berichte verwandeln Ihre Buchungen in Diagramme — Ausgaben nach Kategorie, Vermögensentwicklung über die Zeit und mehr."
         },
         "finish": {
           "title": "Sie sind startklar",
@@ -116,15 +116,15 @@
         "steps": {
           "welcome": {
             "title": "Ausgaben in anderen Währungen verfolgen",
-            "body": "Im Ausland eingekauft? Diese Tour richtet die Fremdwährungsgebühr einer Karte ein, erfasst einen Einkauf in der belasteten Währung und zeigt, wo diese Kosten auftauchen. Sie können jederzeit mit **Esc** oder **Tour beenden** aussteigen."
+            "body": "Im Ausland eingekauft? Diese Tour richtet die Fremdwährungsgebühr eines Kontos ein, erfasst einen Einkauf in der belasteten Währung und zeigt, wo diese Kosten auftauchen. Sie können jederzeit mit **Esc** oder **Tour beenden** aussteigen."
           },
           "openAccountEdit": {
-            "title": "Beginnen Sie bei der Karte",
-            "body": "Fremdwährungsgebühren gehören zum Konto. Wählen Sie eine Kreditkarte, die Sie im Ausland nutzen, und klicken Sie in ihrer Zeile auf **Bearbeiten** -- oder tippen Sie auf dem Handy lange auf die Zeile -- um ihre Einstellungen zu öffnen."
+            "title": "Beginnen Sie beim Konto",
+            "body": "Fremdwährungsgebühren gehören zum Konto. Wählen Sie das Konto, mit dem Sie im Ausland bezahlen — eine Kredit- oder Debitkarte oder das Konto hinter Ihren Handyzahlungen — und klicken Sie in seiner Zeile auf **Bearbeiten**; auf dem Handy tippen Sie lange auf die Zeile, um die Einstellungen zu öffnen."
           },
           "fxFeePercent": {
             "title": "Umrechnungsgebühr festlegen",
-            "body": "Geben Sie hier die Fremdwährungsgebühr Ihrer Karte als Prozentsatz ein -- etwa 2,5. Monize rechnet sie in den umgerechneten Betrag jeder Fremdwährungsbuchung ein, sodass die Gebühr automatisch erfasst wird."
+            "body": "Geben Sie hier die Fremdwährungsgebühr des Kontos als Prozentsatz ein — etwa 2,5. Monize rechnet sie in den umgerechneten Betrag jeder Fremdwährungsbuchung ein, sodass die Gebühr automatisch erfasst wird."
           },
           "closeAccountForm": {
             "title": "Speichern und schließen",
@@ -132,31 +132,31 @@
           },
           "newTransaction": {
             "title": "Einen Auslandseinkauf erfassen",
-            "body": "Erfassen Sie nun einen Einkauf, den Sie mit dieser Karte in einer anderen Währung getätigt haben. Öffnen Sie **Neue Buchung** und wählen Sie diese Karte als Konto."
+            "body": "Erfassen Sie nun einen Einkauf, den Sie mit diesem Konto in einer anderen Währung getätigt haben. Öffnen Sie **Neue Buchung** und wählen Sie dieses Konto aus."
           },
           "chooseAccount": {
             "title": "Konto und Datum prüfen",
-            "body": "Die Umrechnungsgebühr gehört zum Konto -- achten Sie also darauf, dass unter **Konto** die Karte steht, für die Sie die Gebühr gerade festgelegt haben, und ändern Sie es hier gegebenenfalls. Setzen Sie auch das **Datum** auf den Tag des Einkaufs: Der Wechselkurs wird für dieses Datum abgerufen."
+            "body": "Die Umrechnungsgebühr gehört zum Konto — achten Sie also darauf, dass unter **Konto** das Konto steht, für das Sie die Gebühr gerade festgelegt haben, und ändern Sie es hier gegebenenfalls. Setzen Sie auch das **Datum** auf den Tag des Einkaufs: Der Wechselkurs wird für dieses Datum abgerufen."
           },
           "enterDetails": {
-            "title": "Angaben wie gewohnt eintragen",
+            "title": "Angaben eintragen",
             "body": "Tragen Sie Zahlungsempfänger und Kategorie wie bei jeder anderen Buchung ein. Der Fremdwährungsteil kommt als Nächstes."
           },
           "entryCurrency": {
             "title": "Wählen Sie die Währung, in der Sie bezahlt haben",
-            "body": "Öffnen Sie dies und wählen Sie die Währung, die Ihnen belastet wurde. Steht nur Ihre eigene Währung in der Liste? Wählen Sie unten **Währung hinzufügen...**, um eine anzulegen -- sie wird sofort für Sie ausgewählt."
+            "body": "Öffnen Sie dies und wählen Sie die Währung, die Ihnen belastet wurde. Steht nur Ihre eigene Währung in der Liste? Wählen Sie unten **Währung hinzufügen...**, um eine anzulegen — sie wird sofort für Sie ausgewählt."
           },
           "enterAmount": {
             "title": "Geben Sie den belasteten Betrag ein",
-            "body": "Tippen Sie den Gesamtbetrag genau so ein, wie er auf Ihrer Abrechnung steht. Monize ruft den **Wechselkurs** für das Datum der Buchung ab, zeigt daneben den umgerechneten Gesamtbetrag und rechnet die **Fremdwährungsgebühr** ein, die Sie für das Konto festgelegt haben -- die Bildunterschrift darunter führt beides auf. Hat Ihre Bank anders gerundet? Passen Sie den Kurs oder den umgerechneten Betrag centgenau an."
+            "body": "Tippen Sie den Gesamtbetrag genau so ein, wie er auf Ihrer Abrechnung steht. Monize ruft den **Wechselkurs** für das Datum der Buchung ab, zeigt daneben den umgerechneten Gesamtbetrag und rechnet die **Fremdwährungsgebühr** ein, die Sie für das Konto festgelegt haben — die Bildunterschrift darunter führt beides auf. Hat Ihre Bank anders gerundet? Passen Sie den Kurs oder den umgerechneten Betrag centgenau an."
           },
           "closeTransactionForm": {
             "title": "Formular schließen",
-            "body": "Auch hier: Speichern Sie die Buchung über die Schaltfläche zum Speichern oder schließen Sie sie mit **Abbrechen** -- und die Tour geht weiter."
+            "body": "Auch hier: Speichern Sie die Buchung über die Schaltfläche zum Speichern oder schließen Sie sie mit **Abbrechen** — und die Tour geht weiter."
           },
           "openAccountDetail": {
-            "title": "Zurück zur Karte",
-            "body": "Öffnen Sie die Detailseite dieser Karte -- wählen Sie **Details** in ihrer Zeile -- um zu sehen, wie die Fremdwährungsaktivität zusammengefasst wird."
+            "title": "Zurück zum Konto",
+            "body": "Öffnen Sie die Detailseite dieses Kontos — wählen Sie **Details** in ihrer Zeile — um zu sehen, wie die Fremdwährungsaktivität zusammengefasst wird."
           },
           "fxSection": {
             "title": "Ihr Fremdwährungsbereich",
@@ -168,7 +168,7 @@
           },
           "finish": {
             "title": "Das war Fremdwährung in Monize",
-            "body": "Einmal eine Gebühr festlegen, Einkäufe wie belastet erfassen -- und die Gebühren führen sich von selbst. Sie können diese Tour jederzeit im Bereich **Geführte Touren** in den **Einstellungen** wiederholen."
+            "body": "Einmal eine Gebühr festlegen, Einkäufe wie belastet erfassen — und die Gebühren führen sich von selbst. Sie können diese Tour jederzeit im Bereich **Geführte Touren** in den **Einstellungen** wiederholen."
           }
         }
       },

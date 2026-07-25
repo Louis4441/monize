@@ -4,12 +4,12 @@
     "back": "Terug",
     "done": "Klaar",
     "endTour": "Rondleiding beëindigen",
-    "tryIt": "Probeer het -- de rondleiding gaat verder zodra u dit doet",
+    "tryIt": "Probeer het — de rondleiding gaat verder zodra u dit doet",
     "skipStep": "Deze stap overslaan",
     "stepCounter": "{current} van {total}",
     "skippedTitle": "Rondleiding voltooid",
     "skippedBody": "Sommige stappen zijn overgeslagen omdat het bijbehorende scherm of element niet beschikbaar was. U kunt de rondleiding altijd opnieuw starten via Instellingen.",
-    "move": "Deze kaart verplaatsen -- sleep hem of verplaats hem met de pijltoetsen"
+    "move": "Deze kaart verplaatsen — sleep hem of verplaats hem met de pijltoetsen"
   },
   "offer": {
     "heading": "Volg een korte rondleiding",
@@ -56,15 +56,15 @@
         },
         "tools": {
           "title": "Het menu Hulpmiddelen",
-          "body": "In het menu **Hulpmiddelen** beheert u de bouwstenen van uw financiën -- begunstigden, categorieën, valuta, labels en meer."
+          "body": "In het menu **Hulpmiddelen** beheert u de bouwstenen van uw financiën — begunstigden, categorieën, valuta, labels en meer."
         },
         "accounts": {
           "title": "Uw rekeningen",
-          "body": "Voeg hier uw bank-, creditcard-, lening- en beleggingsrekeningen toe met **Rekening toevoegen**. Elk saldo en elke transactie hoort bij een rekening."
+          "body": "Voeg hier uw bank-, creditcard-, lening- en beleggingsrekeningen toe met de gemarkeerde knop. Elk saldo en elke transactie hoort bij een rekening."
         },
         "transactions": {
           "title": "Transacties",
-          "body": "Dit is uw transactieoverzicht -- elke betaling en storting voor uw rekeningen staat hier, klaar om te doorzoeken en te filteren."
+          "body": "Dit is uw transactieoverzicht — elke betaling en storting voor uw rekeningen staat hier, klaar om te doorzoeken en te filteren."
         },
         "createTransaction": {
           "title": "Een transactie registreren",
@@ -76,15 +76,15 @@
         },
         "splits": {
           "title": "Een transactie splitsen",
-          "body": "Eén aankoop die meerdere categorieën omvat? Gebruik **Splitsen** om één transactie over meerdere categorieën te verdelen -- bijvoorbeeld boodschappen en huishoudelijke artikelen van dezelfde winkel."
+          "body": "Eén aankoop die meerdere categorieën omvat? Gebruik **Splitsen** om één transactie over meerdere categorieën te verdelen — bijvoorbeeld boodschappen en huishoudelijke artikelen van dezelfde winkel."
         },
         "currencyField": {
           "title": "Vreemde valuta",
-          "body": "Iets in het buitenland gekocht? Stel hier de valuta in en voer het bedrag in zoals het in rekening is gebracht -- Monize rekent dit automatisch om naar de valuta van de rekening."
+          "body": "Iets in het buitenland gekocht? Stel hier de valuta in en voer het bedrag in zoals het in rekening is gebracht — Monize rekent dit automatisch om naar de valuta van de rekening."
         },
         "closeForm": {
           "title": "Sluit het formulier om verder te gaan",
-          "body": "Sluit het transactieformulier (**Annuleren** of de X) en de rondleiding gaat verder."
+          "body": "Sluit het transactieformulier met **Annuleren**, of sla de transactie op met de andere knop, en de rondleiding gaat verder."
         },
         "bills": {
           "title": "Facturen & stortingen",
@@ -100,7 +100,7 @@
         },
         "reports": {
           "title": "Inzicht in uw geld",
-          "body": "Rapporten zetten uw transacties om in grafieken -- uitgaven per categorie, nettovermogen in de tijd, en meer."
+          "body": "Rapporten zetten uw transacties om in grafieken — uitgaven per categorie, nettovermogen in de tijd, en meer."
         },
         "finish": {
           "title": "U bent helemaal klaar",
@@ -116,15 +116,15 @@
         "steps": {
           "welcome": {
             "title": "Houd uitgaven in andere valuta bij",
-            "body": "Iets in het buitenland gekocht? Deze rondleiding stelt de transactiekosten voor vreemde valuta van een kaart in, legt een aankoop vast in de valuta die in rekening werd gebracht en laat zien waar die kosten opduiken. U kunt altijd stoppen met **Esc** of **Rondleiding beëindigen**."
+            "body": "Iets in het buitenland gekocht? Deze rondleiding stelt de transactiekosten voor vreemde valuta van een rekening in, legt een aankoop vast in de valuta die in rekening werd gebracht en laat zien waar die kosten opduiken. U kunt altijd stoppen met **Esc** of **Rondleiding beëindigen**."
           },
           "openAccountEdit": {
-            "title": "Begin bij de kaart",
-            "body": "Transactiekosten voor vreemde valuta horen bij de rekening. Kies een creditcard die u in het buitenland gebruikt en kies **Bewerken** bij de acties van die rij -- of houd de rij lang ingedrukt op mobiel -- om de instellingen te openen."
+            "title": "Begin bij de rekening",
+            "body": "Transactiekosten voor vreemde valuta horen bij de rekening. Kies de rekening waarmee u in het buitenland betaalt — een creditcard, een debetkaart of de rekening achter uw telefoonbetalingen — en kies **Bewerken** bij de acties van die rij; houd op mobiel de rij lang ingedrukt om de instellingen te openen."
           },
           "fxFeePercent": {
             "title": "Stel de omrekenkosten in",
-            "body": "Voer hier de transactiekosten voor vreemde valuta van uw kaart in als percentage -- bijvoorbeeld 2,5. Monize verwerkt ze in het omgerekende bedrag van elke buitenlandse aankoop, zodat de kosten automatisch worden vastgelegd."
+            "body": "Voer hier de transactiekosten voor vreemde valuta van de rekening in als percentage — bijvoorbeeld 2,5. Monize verwerkt ze in het omgerekende bedrag van elke buitenlandse aankoop, zodat de kosten automatisch worden vastgelegd."
           },
           "closeAccountForm": {
             "title": "Opslaan en sluiten",
@@ -132,31 +132,31 @@
           },
           "newTransaction": {
             "title": "Leg een buitenlandse aankoop vast",
-            "body": "Leg nu een aankoop vast die u met die kaart in een andere valuta deed. Open **Nieuwe transactie** en kies die kaart als rekening."
+            "body": "Leg nu een aankoop vast die u met die rekening in een andere valuta deed. Open **Nieuwe transactie** en kies die rekening."
           },
           "chooseAccount": {
             "title": "Controleer rekening en datum",
-            "body": "De omrekenkosten horen bij de rekening, dus zorg dat **Rekening** de kaart is waarvoor u ze net hebt ingesteld -- wijzig dit hier als dat niet zo is. Zet ook de **Datum** op de dag van de aankoop: de wisselkoers wordt voor die datum opgezocht."
+            "body": "De omrekenkosten horen bij de rekening, dus zorg dat **Rekening** de rekening is waarvoor u ze net hebt ingesteld — wijzig dit hier als dat niet zo is. Zet ook de **Datum** op de dag van de aankoop: de wisselkoers wordt voor die datum opgezocht."
           },
           "enterDetails": {
-            "title": "Vul de gegevens in zoals gebruikelijk",
+            "title": "Vul de gegevens in",
             "body": "Vul begunstigde en categorie in zoals bij elke andere transactie. Het deel over vreemde valuta volgt hierna."
           },
           "entryCurrency": {
             "title": "Kies de valuta waarin u betaalde",
-            "body": "Open dit en kies de valuta die in rekening werd gebracht. Staat alleen uw eigen valuta in de lijst? Kies onderaan **Valuta toevoegen...** om er een toe te voegen -- die wordt meteen voor u geselecteerd."
+            "body": "Open dit en kies de valuta die in rekening werd gebracht. Staat alleen uw eigen valuta in de lijst? Kies onderaan **Valuta toevoegen...** om er een toe te voegen — die wordt meteen voor u geselecteerd."
           },
           "enterAmount": {
             "title": "Voer het in rekening gebrachte bedrag in",
-            "body": "Typ het totaal precies zoals het op uw afschrift staat. Monize zoekt de **wisselkoers** op voor de datum van de transactie, toont het omgerekende totaal ernaast en verwerkt de **transactiekosten voor vreemde valuta** die u op de rekening hebt ingesteld -- het bijschrift eronder benoemt beide. Rondde uw bank anders af? Pas de koers of het omgerekende totaal aan tot op de cent."
+            "body": "Typ het totaal precies zoals het op uw afschrift staat. Monize zoekt de **wisselkoers** op voor de datum van de transactie, toont het omgerekende totaal ernaast en verwerkt de **transactiekosten voor vreemde valuta** die u op de rekening hebt ingesteld — het bijschrift eronder benoemt beide. Rondde uw bank anders af? Pas de koers of het omgerekende totaal aan tot op de cent."
           },
           "closeTransactionForm": {
             "title": "Sluit het formulier",
             "body": "Hier hetzelfde: sla de transactie op met de verzendknop of sluit hem met **Annuleren**, en de rondleiding gaat verder."
           },
           "openAccountDetail": {
-            "title": "Terug naar de kaart",
-            "body": "Open de detailpagina van die kaart -- kies **Details** bij de acties van die rij -- om te zien hoe de activiteit in vreemde valuta wordt samengevat."
+            "title": "Terug naar de rekening",
+            "body": "Open de detailpagina van die rekening — kies **Details** bij de acties van die rij — om te zien hoe de activiteit in vreemde valuta wordt samengevat."
           },
           "fxSection": {
             "title": "Uw sectie vreemde valuta",

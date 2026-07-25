@@ -4,12 +4,12 @@
     "back": "Quay lại",
     "done": "Xong",
     "endTour": "Kết thúc hướng dẫn",
-    "tryIt": "Thử ngay -- phần hướng dẫn sẽ tiếp tục sau khi bạn thực hiện",
+    "tryIt": "Thử ngay — phần hướng dẫn sẽ tiếp tục sau khi bạn thực hiện",
     "skipStep": "Bỏ qua bước này",
     "stepCounter": "{current} / {total}",
     "skippedTitle": "Đã hoàn tất hướng dẫn",
     "skippedBody": "Một số bước đã bị bỏ qua vì màn hình hoặc điều khiển tương ứng không khả dụng. Bạn có thể xem lại hướng dẫn bất cứ lúc nào từ Cài đặt.",
-    "move": "Di chuyển thẻ này -- kéo thẻ, hoặc dịch bằng các phím mũi tên"
+    "move": "Di chuyển thẻ này — kéo thẻ, hoặc dịch bằng các phím mũi tên"
   },
   "offer": {
     "heading": "Xem hướng dẫn nhanh",
@@ -56,15 +56,15 @@
         },
         "tools": {
           "title": "Menu Công cụ",
-          "body": "Menu **Công cụ** là nơi bạn quản lý các thành phần cơ bản trong tài chính của mình -- người thụ hưởng, danh mục, loại tiền tệ, thẻ và nhiều hơn nữa."
+          "body": "Menu **Công cụ** là nơi bạn quản lý các thành phần cơ bản trong tài chính của mình — người thụ hưởng, danh mục, loại tiền tệ, thẻ và nhiều hơn nữa."
         },
         "accounts": {
           "title": "Tài khoản của bạn",
-          "body": "**Thêm tài khoản** ngân hàng, thẻ tín dụng, khoản vay và đầu tư của bạn tại đây bằng Thêm tài khoản. Mọi số dư và giao dịch đều thuộc về một tài khoản."
+          "body": "Thêm tài khoản ngân hàng, thẻ tín dụng, khoản vay và đầu tư của bạn tại đây bằng nút được làm nổi bật. Mọi số dư và giao dịch đều thuộc về một tài khoản."
         },
         "transactions": {
           "title": "Giao dịch",
-          "body": "Đây là sổ giao dịch của bạn -- mọi khoản thanh toán và tiền gửi cho các tài khoản đều nằm ở đây, sẵn sàng để tìm kiếm và lọc."
+          "body": "Đây là sổ giao dịch của bạn — mọi khoản thanh toán và tiền gửi cho các tài khoản đều nằm ở đây, sẵn sàng để tìm kiếm và lọc."
         },
         "createTransaction": {
           "title": "Ghi lại một giao dịch",
@@ -76,15 +76,15 @@
         },
         "splits": {
           "title": "Chia giao tác",
-          "body": "Một lần mua hàng bao gồm nhiều danh mục? Dùng **Chia giao tác** để chia một giao dịch thành nhiều danh mục -- ví dụ như hàng tạp hóa và đồ gia dụng từ cùng một cửa hàng."
+          "body": "Một lần mua hàng bao gồm nhiều danh mục? Dùng **Chia giao tác** để chia một giao dịch thành nhiều danh mục — ví dụ như hàng tạp hóa và đồ gia dụng từ cùng một cửa hàng."
         },
         "currencyField": {
           "title": "Ngoại tệ",
-          "body": "Mua hàng ở nước ngoài? Đặt loại tiền tệ tại đây và nhập số tiền theo hóa đơn -- Monize sẽ quy đổi sang loại tiền tệ của tài khoản giúp bạn."
+          "body": "Mua hàng ở nước ngoài? Đặt loại tiền tệ tại đây và nhập số tiền theo hóa đơn — Monize sẽ quy đổi sang loại tiền tệ của tài khoản giúp bạn."
         },
         "closeForm": {
           "title": "Đóng biểu mẫu để tiếp tục",
-          "body": "Đóng biểu mẫu giao dịch (**Hủy** hoặc nút X) và hướng dẫn sẽ tiếp tục."
+          "body": "Đóng biểu mẫu giao dịch bằng **Hủy**, hoặc lưu lại bằng nút còn lại, và hướng dẫn sẽ tiếp tục."
         },
         "bills": {
           "title": "Hóa đơn & Tiền gửi",
@@ -100,7 +100,7 @@
         },
         "reports": {
           "title": "Hiểu rõ tình hình tài chính",
-          "body": "Báo cáo biến giao dịch của bạn thành biểu đồ -- chi tiêu theo danh mục, giá trị tài sản ròng theo thời gian, và nhiều hơn nữa."
+          "body": "Báo cáo biến giao dịch của bạn thành biểu đồ — chi tiêu theo danh mục, giá trị tài sản ròng theo thời gian, và nhiều hơn nữa."
         },
         "finish": {
           "title": "Vậy là bạn đã sẵn sàng",
@@ -116,15 +116,15 @@
         "steps": {
           "welcome": {
             "title": "Theo dõi chi tiêu bằng các loại tiền tệ khác",
-            "body": "Bạn mua gì đó ở nước ngoài? Phần hướng dẫn này thiết lập phí giao tác ngoại tệ cho một thẻ, ghi nhận một giao dịch mua theo đúng loại tiền bạn bị tính, và cho thấy các chi phí đó xuất hiện ở đâu. Bạn có thể thoát bất cứ lúc nào bằng **Esc** hoặc **Kết thúc hướng dẫn**."
+            "body": "Bạn mua gì đó ở nước ngoài? Phần hướng dẫn này thiết lập phí giao tác ngoại tệ cho một tài khoản, ghi nhận một giao dịch mua theo đúng loại tiền bạn bị tính, và cho thấy các chi phí đó xuất hiện ở đâu. Bạn có thể thoát bất cứ lúc nào bằng **Esc** hoặc **Kết thúc hướng dẫn**."
           },
           "openAccountEdit": {
-            "title": "Bắt đầu từ chiếc thẻ",
-            "body": "Phí giao tác ngoại tệ thuộc về tài khoản. Hãy chọn một thẻ tín dụng bạn dùng ở nước ngoài rồi chọn **Chỉnh sửa** trong các thao tác trên dòng của thẻ -- hoặc nhấn giữ dòng đó trên di động -- để mở cài đặt của thẻ."
+            "title": "Bắt đầu từ tài khoản",
+            "body": "Phí giao tác ngoại tệ thuộc về tài khoản. Hãy chọn tài khoản bạn dùng để chi trả ở nước ngoài — thẻ tín dụng, thẻ ghi nợ, hay bất cứ nguồn nào điện thoại của bạn thanh toán từ đó — rồi chọn **Chỉnh sửa** trong các thao tác trên dòng của tài khoản, hoặc nhấn giữ dòng đó trên di động, để mở cài đặt."
           },
           "fxFeePercent": {
             "title": "Đặt phí quy đổi",
-            "body": "Nhập phí giao tác ngoại tệ của thẻ tại đây dưới dạng phần trăm -- ví dụ 2,5. Monize gộp phí này vào số tiền đã quy đổi của mọi giao dịch mua ở nước ngoài, nên phí được ghi nhận sẵn cho bạn."
+            "body": "Nhập phí giao tác ngoại tệ của tài khoản tại đây dưới dạng phần trăm — ví dụ 2,5. Monize gộp phí này vào số tiền đã quy đổi của mọi giao dịch mua ở nước ngoài, nên phí được ghi nhận sẵn cho bạn."
           },
           "closeAccountForm": {
             "title": "Lưu và đóng",
@@ -132,31 +132,31 @@
           },
           "newTransaction": {
             "title": "Ghi nhận một giao dịch mua ở nước ngoài",
-            "body": "Bây giờ hãy ghi lại một giao dịch mua bạn đã thực hiện bằng thẻ đó bằng loại tiền khác. Mở **Giao tác mới** và chọn chính thẻ đó làm tài khoản."
+            "body": "Bây giờ hãy ghi lại một giao dịch mua bạn đã thực hiện bằng tài khoản đó bằng loại tiền khác. Mở **Giao tác mới** và chọn chính tài khoản đó."
           },
           "chooseAccount": {
             "title": "Kiểm tra tài khoản và ngày",
-            "body": "Phí quy đổi thuộc về tài khoản, vì vậy hãy đảm bảo **Tài khoản** đúng là chiếc thẻ bạn vừa đặt phí -- nếu không, hãy đổi tại đây. Cũng hãy đặt **Ngày** đúng ngày mua: tỷ giá được tra cứu theo ngày đó."
+            "body": "Phí quy đổi thuộc về tài khoản, vì vậy hãy đảm bảo **Tài khoản** đúng là tài khoản bạn vừa đặt phí — nếu không, hãy đổi tại đây. Cũng hãy đặt **Ngày** đúng ngày mua: tỷ giá được tra cứu theo ngày đó."
           },
           "enterDetails": {
-            "title": "Nhập thông tin như thường lệ",
+            "title": "Nhập thông tin",
             "body": "Điền người nhận và danh mục như mọi giao tác khác. Phần ngoại tệ sẽ đến ngay sau đây."
           },
           "entryCurrency": {
             "title": "Chọn loại tiền bạn đã thanh toán",
-            "body": "Mở mục này và chọn loại tiền bạn bị tính. Danh sách chỉ có loại tiền của riêng bạn? Chọn **Thêm tiền tệ...** ở dưới cùng để thêm một loại -- nó được chọn ngay cho bạn."
+            "body": "Mở mục này và chọn loại tiền bạn bị tính. Danh sách chỉ có loại tiền của riêng bạn? Chọn **Thêm tiền tệ...** ở dưới cùng để thêm một loại — nó được chọn ngay cho bạn."
           },
           "enterAmount": {
             "title": "Nhập số tiền bạn bị tính",
-            "body": "Gõ tổng số tiền đúng như trên sao kê của bạn. Monize tra **tỷ giá** theo ngày của giao tác, hiển thị tổng đã quy đổi ngay bên cạnh, và gộp **phí giao tác ngoại tệ** bạn đã đặt trên tài khoản -- dòng chú thích bên dưới nêu rõ cả hai. Ngân hàng làm tròn khác? Hãy sửa tỷ giá hoặc tổng đã quy đổi cho khớp đến từng xu."
+            "body": "Gõ tổng số tiền đúng như trên sao kê của bạn. Monize tra **tỷ giá** theo ngày của giao tác, hiển thị tổng đã quy đổi ngay bên cạnh, và gộp **phí giao tác ngoại tệ** bạn đã đặt trên tài khoản — dòng chú thích bên dưới nêu rõ cả hai. Ngân hàng làm tròn khác? Hãy sửa tỷ giá hoặc tổng đã quy đổi cho khớp đến từng xu."
           },
           "closeTransactionForm": {
             "title": "Đóng biểu mẫu",
             "body": "Cũng vậy ở đây: lưu giao tác bằng nút gửi, hoặc đóng bằng **Hủy**, rồi phần hướng dẫn sẽ tiếp tục."
           },
           "openAccountDetail": {
-            "title": "Quay lại chiếc thẻ",
-            "body": "Mở trang chi tiết của thẻ đó -- chọn **Chi tiết** trong các thao tác trên dòng của thẻ -- để xem hoạt động ngoại tệ được tóm tắt ra sao."
+            "title": "Quay lại tài khoản",
+            "body": "Mở trang chi tiết của tài khoản đó — chọn **Chi tiết** trong các thao tác trên dòng của thẻ — để xem hoạt động ngoại tệ được tóm tắt ra sao."
           },
           "fxSection": {
             "title": "Mục ngoại tệ của bạn",

@@ -4,12 +4,12 @@
     "back": "Voltar",
     "done": "Concluir",
     "endTour": "Encerrar tour",
-    "tryIt": "Experimente -- o tour continua quando você fizer isso",
+    "tryIt": "Experimente — o tour continua quando você fizer isso",
     "skipStep": "Pular esta etapa",
     "stepCounter": "{current} de {total}",
     "skippedTitle": "Tour encerrado",
     "skippedBody": "Algumas etapas foram puladas porque a tela ou o controle correspondente não estava disponível. Você pode refazer o tour a qualquer momento em Configurações.",
-    "move": "Mover este cartão -- arraste-o ou desloque-o com as teclas de seta"
+    "move": "Mover este cartão — arraste-o ou desloque-o com as teclas de seta"
   },
   "offer": {
     "heading": "Faça um tour rápido",
@@ -56,15 +56,15 @@
         },
         "tools": {
           "title": "O menu Ferramentas",
-          "body": "O menu **Ferramentas** é onde você gerencia os blocos que compõem suas finanças -- beneficiários, categorias, moedas, tags e mais."
+          "body": "O menu **Ferramentas** é onde você gerencia os blocos que compõem suas finanças — beneficiários, categorias, moedas, tags e mais."
         },
         "accounts": {
           "title": "Suas contas",
-          "body": "Adicione aqui suas contas bancárias, cartões de crédito, empréstimos e investimentos com **Adicionar Conta**. Todo saldo e transação pertence a uma conta."
+          "body": "Adicione aqui suas contas bancárias, cartões de crédito, empréstimos e investimentos com o botão destacado. Todo saldo e transação pertence a uma conta."
         },
         "transactions": {
           "title": "Transações",
-          "body": "Este é o seu registro de transações -- todo pagamento e depósito das suas contas fica aqui, pronto para busca e filtro."
+          "body": "Este é o seu registro de transações — todo pagamento e depósito das suas contas fica aqui, pronto para busca e filtro."
         },
         "createTransaction": {
           "title": "Registre uma transação",
@@ -76,15 +76,15 @@
         },
         "splits": {
           "title": "Dividir uma transação",
-          "body": "Uma compra que abrange várias categorias? Use **Dividir Transação** para repartir uma única transação entre categorias -- mercado e itens de casa em uma mesma compra, por exemplo."
+          "body": "Uma compra que abrange várias categorias? Use **Dividir Transação** para repartir uma única transação entre categorias — mercado e itens de casa em uma mesma compra, por exemplo."
         },
         "currencyField": {
           "title": "Moedas estrangeiras",
-          "body": "Comprou algo no exterior? Defina a moeda aqui e informe o valor cobrado -- o Monize converte para a moeda da conta automaticamente."
+          "body": "Comprou algo no exterior? Defina a moeda aqui e informe o valor cobrado — o Monize converte para a moeda da conta automaticamente."
         },
         "closeForm": {
           "title": "Feche o formulário para continuar",
-          "body": "Feche o formulário de transação (**Cancelar** ou o X) e o tour vai continuar."
+          "body": "Feche o formulário de transação com **Cancelar**, ou salve-a com o outro botão, e o tour vai continuar."
         },
         "bills": {
           "title": "Faturas e depósitos",
@@ -100,7 +100,7 @@
         },
         "reports": {
           "title": "Entenda o seu dinheiro",
-          "body": "Os relatórios transformam suas transações em gráficos -- gastos por categoria, patrimônio líquido ao longo do tempo e muito mais."
+          "body": "Os relatórios transformam suas transações em gráficos — gastos por categoria, patrimônio líquido ao longo do tempo e muito mais."
         },
         "finish": {
           "title": "Tudo pronto",
@@ -116,15 +116,15 @@
         "steps": {
           "welcome": {
             "title": "Acompanhe os gastos em outras moedas",
-            "body": "Comprou algo no exterior? Este tour configura a taxa de transação em moeda estrangeira de um cartão, registra uma compra na moeda que foi cobrada e mostra onde esses custos aparecem. Você pode sair quando quiser com **Esc** ou **Encerrar tour**."
+            "body": "Comprou algo no exterior? Este tour configura a taxa de transação em moeda estrangeira de uma conta, registra uma compra na moeda que foi cobrada e mostra onde esses custos aparecem. Você pode sair quando quiser com **Esc** ou **Encerrar tour**."
           },
           "openAccountEdit": {
-            "title": "Comece pelo cartão",
-            "body": "As taxas de transação em moeda estrangeira pertencem à conta. Escolha um cartão de crédito que você usa no exterior e selecione **Editar** nas ações da linha dele -- ou pressione e segure a linha no celular -- para abrir as configurações."
+            "title": "Comece pela conta",
+            "body": "As taxas de transação em moeda estrangeira pertencem à conta. Escolha a conta com que você paga no exterior — um cartão de crédito ou de débito, ou a que está por trás dos pagamentos pelo celular — e selecione **Editar** nas ações da linha dela, ou pressione e segure a linha no celular, para abrir as configurações."
           },
           "fxFeePercent": {
             "title": "Defina a taxa de conversão",
-            "body": "Informe aqui a taxa de transação em moeda estrangeira do seu cartão em porcentagem -- 2,5, por exemplo. O Monize a incorpora ao valor convertido de cada compra no exterior, de modo que a taxa fica registrada para você."
+            "body": "Informe aqui a taxa de transação em moeda estrangeira da conta em porcentagem — 2,5, por exemplo. O Monize a incorpora ao valor convertido de cada compra no exterior, de modo que a taxa fica registrada para você."
           },
           "closeAccountForm": {
             "title": "Salvar e fechar",
@@ -132,31 +132,31 @@
           },
           "newTransaction": {
             "title": "Registre uma compra no exterior",
-            "body": "Agora registre uma compra que você fez com esse cartão em outra moeda. Abra **Nova Transação** e escolha esse cartão como conta."
+            "body": "Agora registre uma compra que você fez com essa conta em outra moeda. Abra **Nova Transação** e escolha essa conta."
           },
           "chooseAccount": {
             "title": "Confira a conta e a data",
-            "body": "A taxa de conversão pertence à conta, então confirme que **Conta** é o cartão em que você acabou de defini-la -- altere aqui, se não for. Ajuste também a **Data** para o dia da compra: a taxa de câmbio é consultada para essa data."
+            "body": "A taxa de conversão pertence à conta, então confirme que **Conta** é a conta em que você acabou de defini-la — altere aqui, se não for. Ajuste também a **Data** para o dia da compra: a taxa de câmbio é consultada para essa data."
           },
           "enterDetails": {
-            "title": "Preencha os detalhes como sempre",
+            "title": "Preencha os detalhes",
             "body": "Informe o beneficiário e a categoria como em qualquer outra transação. A parte de moeda estrangeira vem a seguir."
           },
           "entryCurrency": {
             "title": "Escolha a moeda em que você pagou",
-            "body": "Abra isto e escolha a moeda que foi cobrada. Só aparece a sua própria moeda na lista? Escolha **Adicionar moeda...** no fim para adicionar uma -- ela é selecionada na hora."
+            "body": "Abra isto e escolha a moeda que foi cobrada. Só aparece a sua própria moeda na lista? Escolha **Adicionar moeda...** no fim para adicionar uma — ela é selecionada na hora."
           },
           "enterAmount": {
             "title": "Informe o valor cobrado",
-            "body": "Digite o total exatamente como aparece na sua fatura. O Monize consulta a **taxa de câmbio** para a data da transação, mostra o total convertido ao lado e incorpora a **taxa de transação em moeda estrangeira** que você definiu na conta -- a legenda abaixo detalha as duas. O banco arredondou de outro jeito? Edite a taxa ou o total convertido para bater centavo a centavo."
+            "body": "Digite o total exatamente como aparece na sua fatura. O Monize consulta a **taxa de câmbio** para a data da transação, mostra o total convertido ao lado e incorpora a **taxa de transação em moeda estrangeira** que você definiu na conta — a legenda abaixo detalha as duas. O banco arredondou de outro jeito? Edite a taxa ou o total convertido para bater centavo a centavo."
           },
           "closeTransactionForm": {
             "title": "Feche o formulário",
             "body": "O mesmo aqui: salve a transação com o botão de envio, ou feche-a com **Cancelar**, e o tour continua."
           },
           "openAccountDetail": {
-            "title": "De volta ao cartão",
-            "body": "Abra a página de detalhes desse cartão -- escolha **Detalhes** nas ações da linha dele -- para ver como a atividade em moeda estrangeira é resumida."
+            "title": "De volta à conta",
+            "body": "Abra a página de detalhes dessa conta — escolha **Detalhes** nas ações da linha dele — para ver como a atividade em moeda estrangeira é resumida."
           },
           "fxSection": {
             "title": "Sua seção de moeda estrangeira",

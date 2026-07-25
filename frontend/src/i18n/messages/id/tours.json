@@ -4,12 +4,12 @@
     "back": "Kembali",
     "done": "Selesai",
     "endTour": "Akhiri tur",
-    "tryIt": "Coba sendiri -- tur akan berlanjut setelah Anda melakukannya",
+    "tryIt": "Coba sendiri — tur akan berlanjut setelah Anda melakukannya",
     "skipStep": "Lewati langkah ini",
     "stepCounter": "{current} dari {total}",
     "skippedTitle": "Tur selesai",
     "skippedBody": "Beberapa langkah dilewati karena layar atau kontrolnya tidak tersedia. Anda dapat mengulang tur kapan saja dari Pengaturan.",
-    "move": "Pindahkan kartu ini -- seret, atau geser dengan tombol panah"
+    "move": "Pindahkan kartu ini — seret, atau geser dengan tombol panah"
   },
   "offer": {
     "heading": "Ikuti tur singkat",
@@ -56,15 +56,15 @@
         },
         "tools": {
           "title": "Menu Alat",
-          "body": "Menu **Alat** adalah tempat Anda mengelola elemen dasar keuangan Anda -- penerima pembayaran, kategori, mata uang, tag, dan lainnya."
+          "body": "Menu **Alat** adalah tempat Anda mengelola elemen dasar keuangan Anda — penerima pembayaran, kategori, mata uang, tag, dan lainnya."
         },
         "accounts": {
           "title": "Akun Anda",
-          "body": "Tambahkan akun bank, kartu kredit, pinjaman, dan investasi Anda di sini dengan **Tambah Akun**. Setiap saldo dan transaksi terkait dengan sebuah akun."
+          "body": "Tambahkan akun bank, kartu kredit, pinjaman, dan investasi Anda di sini dengan tombol yang disorot. Setiap saldo dan transaksi terkait dengan sebuah akun."
         },
         "transactions": {
           "title": "Transaksi",
-          "body": "Ini adalah daftar transaksi Anda -- setiap pembayaran dan setoran untuk akun Anda tercatat di sini, siap untuk dicari dan disaring."
+          "body": "Ini adalah daftar transaksi Anda — setiap pembayaran dan setoran untuk akun Anda tercatat di sini, siap untuk dicari dan disaring."
         },
         "createTransaction": {
           "title": "Catat transaksi",
@@ -76,15 +76,15 @@
         },
         "splits": {
           "title": "Bagi transaksi",
-          "body": "Satu pembelian mencakup beberapa kategori? Gunakan **Transaksi Terbagi** untuk membagi satu transaksi ke beberapa kategori -- misalnya belanja bahan makanan dan keperluan rumah tangga dari satu toko."
+          "body": "Satu pembelian mencakup beberapa kategori? Gunakan **Transaksi Terbagi** untuk membagi satu transaksi ke beberapa kategori — misalnya belanja bahan makanan dan keperluan rumah tangga dari satu toko."
         },
         "currencyField": {
           "title": "Mata uang asing",
-          "body": "Membeli sesuatu di luar negeri? Atur mata uangnya di sini dan masukkan jumlah sesuai yang dibebankan -- Monize akan mengonversinya ke mata uang akun untuk Anda."
+          "body": "Membeli sesuatu di luar negeri? Atur mata uangnya di sini dan masukkan jumlah sesuai yang dibebankan — Monize akan mengonversinya ke mata uang akun untuk Anda."
         },
         "closeForm": {
           "title": "Tutup formulir untuk melanjutkan",
-          "body": "Tutup formulir transaksi (**Batal** atau tombol X) dan tur akan berlanjut."
+          "body": "Tutup formulir transaksi dengan **Batal**, atau simpan dengan tombol satunya, dan tur akan berlanjut."
         },
         "bills": {
           "title": "Tagihan & Setoran",
@@ -100,7 +100,7 @@
         },
         "reports": {
           "title": "Pahami keuangan Anda",
-          "body": "Laporan mengubah transaksi Anda menjadi grafik -- pengeluaran per kategori, kekayaan bersih dari waktu ke waktu, dan lainnya."
+          "body": "Laporan mengubah transaksi Anda menjadi grafik — pengeluaran per kategori, kekayaan bersih dari waktu ke waktu, dan lainnya."
         },
         "finish": {
           "title": "Semua sudah siap",
@@ -116,15 +116,15 @@
         "steps": {
           "welcome": {
             "title": "Lacak pengeluaran dalam mata uang lain",
-            "body": "Belanja di luar negeri? Tur ini menyiapkan biaya transaksi mata uang asing sebuah kartu, mencatat pembelian dalam mata uang yang ditagihkan kepada Anda, dan menunjukkan di mana biaya itu muncul. Anda bisa keluar kapan saja dengan **Esc** atau **Akhiri tur**."
+            "body": "Belanja di luar negeri? Tur ini menyiapkan biaya transaksi mata uang asing sebuah akun, mencatat pembelian dalam mata uang yang ditagihkan kepada Anda, dan menunjukkan di mana biaya itu muncul. Anda bisa keluar kapan saja dengan **Esc** atau **Akhiri tur**."
           },
           "openAccountEdit": {
-            "title": "Mulai dari kartunya",
-            "body": "Biaya transaksi mata uang asing melekat pada akun. Pilih kartu kredit yang Anda pakai di luar negeri lalu pilih **Edit** pada tindakan barisnya -- atau tekan lama barisnya di ponsel -- untuk membuka pengaturannya."
+            "title": "Mulai dari akunnya",
+            "body": "Biaya transaksi mata uang asing melekat pada akun. Pilih akun yang Anda pakai membayar di luar negeri — kartu kredit, kartu debit, atau apa pun yang dipakai ponsel Anda — lalu pilih **Edit** pada tindakan barisnya, atau tekan lama barisnya di ponsel, untuk membuka pengaturannya."
           },
           "fxFeePercent": {
             "title": "Tetapkan biaya konversi",
-            "body": "Masukkan biaya transaksi mata uang asing kartu Anda di sini dalam persen -- misalnya 2,5. Monize menyertakannya ke dalam jumlah terkonversi setiap pembelian luar negeri, sehingga biayanya tercatat untuk Anda."
+            "body": "Masukkan biaya transaksi mata uang asing akun ini di sini dalam persen — misalnya 2,5. Monize menyertakannya ke dalam jumlah terkonversi setiap pembelian luar negeri, sehingga biayanya tercatat untuk Anda."
           },
           "closeAccountForm": {
             "title": "Simpan dan tutup",
@@ -132,31 +132,31 @@
           },
           "newTransaction": {
             "title": "Catat pembelian luar negeri",
-            "body": "Sekarang catat pembelian yang Anda lakukan dengan kartu itu dalam mata uang lain. Buka **Transaksi Baru** dan pilih kartu itu sebagai akun."
+            "body": "Sekarang catat pembelian yang Anda lakukan dengan akun itu dalam mata uang lain. Buka **Transaksi Baru** dan pilih akun itu."
           },
           "chooseAccount": {
             "title": "Periksa akun dan tanggal",
-            "body": "Biaya konversi melekat pada akun, jadi pastikan **Akun** adalah kartu yang baru saja Anda atur -- ubah di sini jika bukan. Atur juga **Tanggal** ke hari pembelian: kurs dicari untuk tanggal tersebut."
+            "body": "Biaya konversi melekat pada akun, jadi pastikan **Akun** adalah akun yang baru saja Anda atur — ubah di sini jika bukan. Atur juga **Tanggal** ke hari pembelian: kurs dicari untuk tanggal tersebut."
           },
           "enterDetails": {
-            "title": "Isi detailnya seperti biasa",
+            "title": "Isi detailnya",
             "body": "Isi penerima dan kategori seperti transaksi lainnya. Bagian mata uang asingnya menyusul."
           },
           "entryCurrency": {
             "title": "Pilih mata uang yang Anda bayarkan",
-            "body": "Buka ini dan pilih mata uang yang ditagihkan kepada Anda. Hanya mata uang Anda sendiri yang ada di daftar? Pilih **Tambah mata uang...** di bagian bawah untuk menambahkannya -- langsung terpilih untuk Anda."
+            "body": "Buka ini dan pilih mata uang yang ditagihkan kepada Anda. Hanya mata uang Anda sendiri yang ada di daftar? Pilih **Tambah mata uang...** di bagian bawah untuk menambahkannya — langsung terpilih untuk Anda."
           },
           "enterAmount": {
             "title": "Masukkan jumlah yang ditagihkan",
-            "body": "Ketik totalnya persis seperti yang tertera di rekening koran Anda. Monize mencari **kurs** untuk tanggal transaksi, menampilkan total terkonversi di sebelahnya, dan menyertakan **biaya transaksi mata uang asing** yang Anda atur pada akun -- keterangan di bawah menjabarkan keduanya. Bank membulatkan berbeda? Ubah kursnya atau total terkonversinya agar cocok hingga sen terakhir."
+            "body": "Ketik totalnya persis seperti yang tertera di rekening koran Anda. Monize mencari **kurs** untuk tanggal transaksi, menampilkan total terkonversi di sebelahnya, dan menyertakan **biaya transaksi mata uang asing** yang Anda atur pada akun — keterangan di bawah menjabarkan keduanya. Bank membulatkan berbeda? Ubah kursnya atau total terkonversinya agar cocok hingga sen terakhir."
           },
           "closeTransactionForm": {
             "title": "Tutup formulirnya",
             "body": "Sama di sini: simpan transaksinya dengan tombol kirim, atau tutup dengan **Batal**, dan tur berlanjut."
           },
           "openAccountDetail": {
-            "title": "Kembali ke kartunya",
-            "body": "Buka halaman detail kartu itu -- pilih **Detail** pada tindakan barisnya -- untuk melihat bagaimana aktivitas mata uang asing dirangkum."
+            "title": "Kembali ke akunnya",
+            "body": "Buka halaman detail akun itu — pilih **Detail** pada tindakan barisnya — untuk melihat bagaimana aktivitas mata uang asing dirangkum."
           },
           "fxSection": {
             "title": "Bagian mata uang asing Anda",

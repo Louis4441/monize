@@ -4,9 +4,9 @@
     "back": "Back",
     "done": "Done",
     "endTour": "End tour",
-    "tryIt": "Try it -- the tour continues once you do",
+    "tryIt": "Try it — the tour continues once you do",
     "skipStep": "Skip this step",
-    "move": "Move this card -- drag it, or nudge it with the arrow keys",
+    "move": "Move this card — drag it, or nudge it with the arrow keys",
     "stepCounter": "{current} of {total}",
     "skippedTitle": "Tour finished",
     "skippedBody": "Some steps were skipped because their screen or control wasn't available. You can retake the tour anytime from Settings."
@@ -56,15 +56,15 @@
         },
         "tools": {
           "title": "The Tools menu",
-          "body": "The **Tools** menu is where you manage the building blocks of your finances -- payees, categories, currencies, tags and more."
+          "body": "The **Tools** menu is where you manage the building blocks of your finances — payees, categories, currencies, tags and more."
         },
         "accounts": {
           "title": "Your accounts",
-          "body": "Add your bank, credit card, loan, and investment accounts here with **Add Account**. Every balance and transaction belongs to an account."
+          "body": "Add your bank, credit card, loan, and investment accounts here with the highlighted button. Every balance and transaction belongs to an account."
         },
         "transactions": {
           "title": "Transactions",
-          "body": "This is your transaction register -- every payment and deposit for your accounts lives here, ready to search and filter."
+          "body": "This is your transaction register — every payment and deposit for your accounts lives here, ready to search and filter."
         },
         "createTransaction": {
           "title": "Record a transaction",
@@ -76,15 +76,15 @@
         },
         "splits": {
           "title": "Split a transaction",
-          "body": "One purchase covering several categories? Use **Split** to divide a single transaction across categories -- groceries and household from one shop, say."
+          "body": "One purchase covering several categories? Use **Split** to divide a single transaction across categories — groceries and household from one shop, say."
         },
         "currencyField": {
           "title": "Foreign currencies",
-          "body": "Bought something abroad? Set the currency here and enter the amount as charged -- Monize converts it to the account currency for you."
+          "body": "Bought something abroad? Set the currency here and enter the amount as charged — Monize converts it to the account currency for you."
         },
         "closeForm": {
           "title": "Close the form to continue",
-          "body": "Close the transaction form (**Cancel** or the **X**) and the tour will move on."
+          "body": "Close the transaction form with **Cancel**, or save it with the other button, and the tour will move on."
         },
         "bills": {
           "title": "Bills & Deposits",
@@ -100,7 +100,7 @@
         },
         "reports": {
           "title": "Understand your money",
-          "body": "Reports turn your transactions into charts -- spending by category, net worth over time, and more."
+          "body": "Reports turn your transactions into charts — spending by category, net worth over time, and more."
         },
         "finish": {
           "title": "You're all set",
@@ -116,15 +116,15 @@
         "steps": {
           "welcome": {
             "title": "Track spending in other currencies",
-            "body": "Bought something abroad? This tour sets up a card's foreign-transaction fee, records a purchase in the currency you were charged, and shows where those costs turn up. Leave anytime with **Escape** or **End tour**."
+            "body": "Bought something abroad? This tour sets up an account's foreign-transaction fee, records a purchase in the currency you were charged, and shows where those costs turn up. Leave anytime with **Escape** or **End tour**."
           },
           "openAccountEdit": {
-            "title": "Start on the card",
-            "body": "Foreign-transaction fees belong to the account. Pick a credit card you use abroad and choose **Edit** from its row actions -- or long-press the row on mobile -- to open its settings."
+            "title": "Start with the account",
+            "body": "Foreign-transaction fees belong to the account. Pick the account you pay with abroad — a credit or debit card, or whatever your phone pays from — and choose **Edit** from its row actions, or long-press the row on mobile, to open its settings."
           },
           "fxFeePercent": {
             "title": "Set the conversion fee",
-            "body": "Enter your card's foreign-transaction fee here as a percentage -- 2.5, say. Monize folds it into the converted amount of every foreign purchase, so the fee is captured for you."
+            "body": "Enter the account's foreign-transaction fee here as a percentage — 2.5, say. Monize folds it into the converted amount of every foreign purchase, so the fee is captured for you."
           },
           "closeAccountForm": {
             "title": "Save and close",
@@ -132,31 +132,31 @@
           },
           "newTransaction": {
             "title": "Record a foreign purchase",
-            "body": "Now log a purchase you made on that card in another currency. Open **New Transaction** and pick that card as the account."
+            "body": "Now log a purchase you made with that account in another currency. Open **New Transaction** and pick it as the account."
           },
           "chooseAccount": {
             "title": "Check the account and date",
-            "body": "The conversion fee belongs to the account, so make sure **Account** is the card you just set it on -- change it here if not. Set **Date** to the day of the purchase too: the exchange rate is looked up for that date."
+            "body": "The conversion fee belongs to the account, so make sure **Account** is the account you just set it on — change it here if not. Set **Date** to the day of the purchase too: the exchange rate is looked up for that date."
           },
           "enterDetails": {
-            "title": "Enter the details as usual",
+            "title": "Enter the details",
             "body": "Fill in the payee and category just like any other transaction. The foreign-currency part comes next."
           },
           "entryCurrency": {
             "title": "Choose the currency you paid in",
-            "body": "Open this and pick the currency you were charged in. Only your own currency in the list? Choose **Add currency...** at the bottom to add one -- it's selected for you straight away."
+            "body": "Open this and pick the currency you were charged in. Only your own currency in the list? Choose **Add currency...** at the bottom to add one — it's selected for you straight away."
           },
           "enterAmount": {
             "title": "Enter the amount you were charged",
-            "body": "Type the total exactly as it appears on your statement. Monize looks up the **exchange rate** for the transaction's date, shows the converted total beside it, and folds in the **foreign-transaction fee** you set on the account -- the caption below spells out both. Bank rounded differently? Edit the rate or the converted total to match to the cent."
+            "body": "Type the total exactly as it appears on your statement. Monize looks up the **exchange rate** for the transaction's date, shows the converted total beside it, and folds in the **foreign-transaction fee** you set on the account — the caption below spells out both. Bank rounded differently? Edit the rate or the converted total to match to the cent."
           },
           "closeTransactionForm": {
             "title": "Close the form",
             "body": "Same here: save the transaction with the submit button, or close it with **Cancel**, and the tour continues."
           },
           "openAccountDetail": {
-            "title": "Back to the card",
-            "body": "Open that card's Details page -- choose **Details** from its row actions -- to see how the foreign activity is summarized."
+            "title": "Back to the account",
+            "body": "Open that account's Details page — choose **Details** from its row actions — to see how the foreign activity is summarized."
           },
           "fxSection": {
             "title": "Your foreign-currency section",

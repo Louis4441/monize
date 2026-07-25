@@ -4,12 +4,12 @@
     "back": "Retour",
     "done": "Terminé",
     "endTour": "Terminer la visite",
-    "tryIt": "Essayez -- la visite continue une fois que c'est fait",
+    "tryIt": "Essayez — la visite continue une fois que c'est fait",
     "skipStep": "Passer cette étape",
     "stepCounter": "{current} sur {total}",
     "skippedTitle": "Visite terminée",
     "skippedBody": "Certaines étapes ont été ignorées car leur écran ou leur contrôle n'était pas disponible. Vous pouvez refaire la visite à tout moment depuis les Paramètres.",
-    "move": "Déplacer cette carte -- faites-la glisser ou déplacez-la avec les touches fléchées"
+    "move": "Déplacer cette carte — faites-la glisser ou déplacez-la avec les touches fléchées"
   },
   "offer": {
     "heading": "Faire une visite rapide",
@@ -56,15 +56,15 @@
         },
         "tools": {
           "title": "Le menu Outils",
-          "body": "Le menu **Outils** est l'endroit où vous gérez les éléments de base de vos finances -- bénéficiaires, catégories, devises, étiquettes et plus encore."
+          "body": "Le menu **Outils** est l'endroit où vous gérez les éléments de base de vos finances — bénéficiaires, catégories, devises, étiquettes et plus encore."
         },
         "accounts": {
           "title": "Vos comptes",
-          "body": "Ajoutez ici vos comptes bancaires, cartes de crédit, prêts et comptes de placement avec **Ajouter un compte**. Chaque solde et chaque transaction appartiennent à un compte."
+          "body": "Ajoutez ici vos comptes bancaires, cartes de crédit, prêts et comptes de placement avec le bouton mis en évidence. Chaque solde et chaque transaction appartiennent à un compte."
         },
         "transactions": {
           "title": "Transactions",
-          "body": "Voici votre registre de transactions -- chaque paiement et dépôt de vos comptes s'y trouve, prêt à être recherché et filtré."
+          "body": "Voici votre registre de transactions — chaque paiement et dépôt de vos comptes s'y trouve, prêt à être recherché et filtré."
         },
         "createTransaction": {
           "title": "Enregistrer une transaction",
@@ -76,15 +76,15 @@
         },
         "splits": {
           "title": "Répartir une transaction",
-          "body": "Un achat couvre plusieurs catégories ? Utilisez **Répartir la transaction** pour diviser une seule transaction entre plusieurs catégories -- l'épicerie et les articles ménagers d'un même magasin, par exemple."
+          "body": "Un achat couvre plusieurs catégories ? Utilisez **Répartir la transaction** pour diviser une seule transaction entre plusieurs catégories — l'épicerie et les articles ménagers d'un même magasin, par exemple."
         },
         "currencyField": {
           "title": "Devises étrangères",
-          "body": "Avez-vous acheté quelque chose à l'étranger ? Définissez la devise ici et saisissez le montant tel que facturé -- Monize le convertit pour vous dans la devise du compte."
+          "body": "Avez-vous acheté quelque chose à l'étranger ? Définissez la devise ici et saisissez le montant tel que facturé — Monize le convertit pour vous dans la devise du compte."
         },
         "closeForm": {
           "title": "Fermez le formulaire pour continuer",
-          "body": "Fermez le formulaire de transaction (**Annuler** ou le X) et la visite se poursuivra."
+          "body": "Fermez le formulaire de transaction avec **Annuler**, ou enregistrez-la avec l'autre bouton, et la visite se poursuivra."
         },
         "bills": {
           "title": "Factures et dépôts",
@@ -100,7 +100,7 @@
         },
         "reports": {
           "title": "Comprenez vos finances",
-          "body": "Les rapports transforment vos transactions en graphiques -- dépenses par catégorie, évolution de la valeur nette, et bien plus."
+          "body": "Les rapports transforment vos transactions en graphiques — dépenses par catégorie, évolution de la valeur nette, et bien plus."
         },
         "finish": {
           "title": "Vous êtes prêt",
@@ -116,15 +116,15 @@
         "steps": {
           "welcome": {
             "title": "Suivez vos dépenses dans d'autres devises",
-            "body": "Un achat à l'étranger ? Cette visite configure les frais de transaction à l'étranger d'une carte, enregistre un achat dans la devise qui vous a été facturée et montre où ces coûts apparaissent. Vous pouvez partir à tout moment avec **Échap** ou **Terminer la visite**."
+            "body": "Un achat à l'étranger ? Cette visite configure les frais de transaction à l'étranger d'un compte, enregistre un achat dans la devise qui vous a été facturée et montre où ces coûts apparaissent. Vous pouvez partir à tout moment avec **Échap** ou **Terminer la visite**."
           },
           "openAccountEdit": {
-            "title": "Commencez par la carte",
-            "body": "Les frais de transaction à l'étranger appartiennent au compte. Choisissez une carte de crédit que vous utilisez à l'étranger et sélectionnez **Modifier** dans les actions de sa ligne -- ou appuyez longuement sur la ligne sur mobile -- pour ouvrir ses paramètres."
+            "title": "Commencez par le compte",
+            "body": "Les frais de transaction à l'étranger appartiennent au compte. Choisissez le compte avec lequel vous payez à l'étranger — une carte de crédit ou de débit, ou celui qui alimente vos paiements mobiles — et sélectionnez **Modifier** dans les actions de sa ligne, ou appuyez longuement sur la ligne sur mobile, pour ouvrir ses paramètres."
           },
           "fxFeePercent": {
             "title": "Définissez les frais de conversion",
-            "body": "Saisissez ici les frais de transaction à l'étranger de votre carte en pourcentage -- 2,5 par exemple. Monize les intègre au montant converti de chaque achat à l'étranger, de sorte que les frais sont enregistrés pour vous."
+            "body": "Saisissez ici les frais de transaction à l'étranger du compte en pourcentage — 2,5 par exemple. Monize les intègre au montant converti de chaque achat à l'étranger, de sorte que les frais sont enregistrés pour vous."
           },
           "closeAccountForm": {
             "title": "Enregistrer et fermer",
@@ -132,31 +132,31 @@
           },
           "newTransaction": {
             "title": "Enregistrez un achat à l'étranger",
-            "body": "Enregistrez maintenant un achat effectué avec cette carte dans une autre devise. Ouvrez **Nouvelle transaction** et choisissez cette carte comme compte."
+            "body": "Enregistrez maintenant un achat effectué avec ce compte dans une autre devise. Ouvrez **Nouvelle transaction** et choisissez ce compte."
           },
           "chooseAccount": {
             "title": "Vérifiez le compte et la date",
-            "body": "Les frais de conversion appartiennent au compte : assurez-vous donc que le champ **Compte** indique bien la carte que vous venez de configurer, et changez-le ici si besoin. Réglez aussi la **Date** sur le jour de l'achat : le taux de change est recherché pour cette date."
+            "body": "Les frais de conversion appartiennent au compte : assurez-vous donc que le champ **Compte** indique bien le compte que vous venez de configurer, et changez-le ici si besoin. Réglez aussi la **Date** sur le jour de l'achat : le taux de change est recherché pour cette date."
           },
           "enterDetails": {
-            "title": "Saisissez les détails comme d'habitude",
+            "title": "Saisissez les détails",
             "body": "Renseignez le bénéficiaire et la catégorie comme pour n'importe quelle autre transaction. La partie devise étrangère arrive juste après."
           },
           "entryCurrency": {
             "title": "Choisissez la devise que vous avez payée",
-            "body": "Ouvrez ceci et choisissez la devise qui vous a été facturée. Seule votre propre devise apparaît dans la liste ? Choisissez **Ajouter une devise...** en bas pour en ajouter une -- elle est sélectionnée pour vous aussitôt."
+            "body": "Ouvrez ceci et choisissez la devise qui vous a été facturée. Seule votre propre devise apparaît dans la liste ? Choisissez **Ajouter une devise...** en bas pour en ajouter une — elle est sélectionnée pour vous aussitôt."
           },
           "enterAmount": {
             "title": "Saisissez le montant qui vous a été facturé",
-            "body": "Tapez le total exactement tel qu'il figure sur votre relevé. Monize recherche le **taux de change** à la date de la transaction, affiche le total converti à côté et y intègre les **frais de transaction à l'étranger** que vous avez définis sur le compte -- la légende ci-dessous détaille les deux. Votre banque a arrondi différemment ? Modifiez le taux ou le total converti au centime près."
+            "body": "Tapez le total exactement tel qu'il figure sur votre relevé. Monize recherche le **taux de change** à la date de la transaction, affiche le total converti à côté et y intègre les **frais de transaction à l'étranger** que vous avez définis sur le compte — la légende ci-dessous détaille les deux. Votre banque a arrondi différemment ? Modifiez le taux ou le total converti au centime près."
           },
           "closeTransactionForm": {
             "title": "Fermez le formulaire",
             "body": "Même chose ici : enregistrez la transaction avec le bouton de validation, ou fermez-la avec **Annuler**, et la visite continue."
           },
           "openAccountDetail": {
-            "title": "Retour à la carte",
-            "body": "Ouvrez la page Détails de cette carte -- choisissez **Détails** dans les actions de sa ligne -- pour voir comment l'activité en devise étrangère est résumée."
+            "title": "Retour au compte",
+            "body": "Ouvrez la page Détails de ce compte — choisissez **Détails** dans les actions de sa ligne — pour voir comment l'activité en devise étrangère est résumée."
           },
           "fxSection": {
             "title": "Votre section devises étrangères",
