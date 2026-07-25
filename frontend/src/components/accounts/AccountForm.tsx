@@ -1015,11 +1015,14 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
         )}
       </div>
 
-      {/* Wrapped so a guided tour can spotlight the Cancel/Save pair without
-          anchoring the shared FormActions used by every other form. */}
-      <div {...tourAnchor(TOUR_ANCHORS.accountFormActions)}>
-        <FormActions onCancel={onCancel} submitLabel={account ? t('form.updateAccount') : t('form.createAccount')} isSubmitting={isSubmitting} />
-      </div>
+      {/* anchorProps, not a wrapper: it rings the Cancel/Save pair itself, so a
+          guided tour highlights the buttons rather than the full-width row. */}
+      <FormActions
+        anchorProps={tourAnchor(TOUR_ANCHORS.accountFormActions)}
+        onCancel={onCancel}
+        submitLabel={account ? t('form.updateAccount') : t('form.createAccount')}
+        isSubmitting={isSubmitting}
+      />
 
       {account && (
         <AccountExportModal

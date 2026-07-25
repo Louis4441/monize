@@ -11,8 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useTranslations } from 'next-intl';
 import { SupportBackupModal } from '@/components/settings/SupportBackupModal';
-
-const REPO_URL = 'https://github.com/kenlasko/monize';
+import { GITHUB_REPO_URL as REPO_URL } from '@/lib/github';
 
 const HELP_LINK_KEYS = [
   { key: 'github' as const, href: REPO_URL, Icon: CodeBracketIcon },

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Modal } from '@/components/ui/Modal';
@@ -21,6 +21,12 @@ interface WhatsNewModalProps {
   currentVersion?: string;
   /** Close without changing state (X, backdrop, Escape). */
   onClose: () => void;
+  /**
+   * Called when a tour starts from the offer list, so the host can step the
+   * modal aside (and bring it back afterwards) rather than plainly close it.
+   * Falls back to `onClose`.
+   */
+  onTourStart?: () => void;
   /**
    * Clear the acknowledgement so the digest shows again next login ("Show at
    * next login"). Only when authenticated; falls back to a plain close.
@@ -57,10 +63,16 @@ export function WhatsNewModal({
   authenticated,
   currentVersion,
   onClose,
+  onTourStart,
   onShowNextLogin,
   onDontShowAgain,
 }: WhatsNewModalProps) {
   const t = useTranslations('common');
+  const locale = useLocale();
+  // The notes are curated Markdown shipped in the image and written in English
+  // only, while everything around them is translated. Say so, rather than
+  // leaving a reader of another language wondering what went wrong.
+  const notesAreForeign = !locale.toLowerCase().startsWith('en');
 
   const { all: allKeys, defaults } = useMemo(() => collectKeys(notes), [notes]);
 
@@ -122,10 +134,18 @@ export function WhatsNewModal({
         {/* Body */}
         <div className="overflow-y-auto px-6 py-4">
           {authenticated && currentVersion && (
-            <TourOfferList currentVersion={currentVersion} onClose={onClose} />
+            <TourOfferList
+              currentVersion={currentVersion}
+              onStartTour={onTourStart ?? onClose}
+            />
           )}
           {notes ? (
             <>
+              {notesAreForeign && (
+                <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                  {t('whatsNew.englishOnly')}
+                </p>
+              )}
               {notes.intro && (
                 <div className="mb-4">
                   <ReleaseNotesMarkdown content={notes.intro} />

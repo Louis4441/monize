@@ -324,6 +324,76 @@ including the interactive New Transaction click; with the version temporarily bu
 to 1.13.0: What's New -> Show me -> accounts and settings mini-tours; Settings ->
 reset progress; demo instance -> no auto CTA, manual Show me works.
 
+## Beta review follow-through (PR #958)
+
+The 1.13 beta was tested against a Polish UI on discussion #950
+(comments #17780149, #17780260, #17780267). What it surfaced, and the rules worth
+keeping when the 1.14 tours are written:
+
+- **Tour copy must not quote a control's label.** The Accounts step said "Add Account"
+  while the button says "New Account" ("Nowe konto" in Polish), and the close-the-form
+  step told users to click an X the transaction form does not have. A quoted label is a
+  promise the translation cannot keep: point at the highlighted control instead, and
+  never name an affordance without checking it exists in that form. Same class of bug:
+  the foreign-currency tour insisted on a *credit card* where any account works.
+- **Anchor the whole group the step talks about.** The currency step explained setting
+  the currency *and* entering the amount while ringing only the picker. Both now sit in
+  one anchored group (`transactionAmountCurrency`), built once in
+  `NormalTransactionFields` and used by the plain and foreign-currency layouts so the
+  anchor-uniqueness test still holds. Likewise `FormActions` takes an optional
+  `anchorProps` and wraps just the button pair: anchoring the row spotlit the full width
+  of the form.
+- **An anchor rect moves without resizing.** A `ResizeObserver` reports size changes and
+  scroll events report scrolling, so the reflow when a list finishes loading -- a
+  vertical scrollbar appearing shifts a right-aligned button sideways -- left the ring a
+  scrollbar's width off the button. `useAnchorRect` also re-measures on a 250ms poll and
+  re-renders only when the rect really changed.
+- **Back must not re-enter UI the user has closed.** Pressing Back after the transaction
+  detour landed on a step whose anchor could no longer mount, so the graceful-skip
+  machinery blanked the overlay for the anchor timeout and then auto-advanced -- read by
+  the tester as the tour crashing and then jumping. Steps whose anchor lives inside UI
+  they do not open themselves are marked `skipOnBack`; `lib/tours/navigation.ts`
+  (`backTargetIndex`) walks past them while their anchor is missing, and Back is hidden
+  when nothing behind can be shown. Graceful degradation forward does not imply
+  graceful degradation backward.
+- **The card must not move after it has appeared.** The measured card size now resets
+  with the step (like the dragged position already did), so a step never paints at
+  coordinates derived from the previous card's dimensions, and the viewport is state so
+  a corner-parked card follows a resize.
+- **Secondary controls have to look like controls.** "End tour" and "Skip this step"
+  were grey text that read as disabled -- underlined and higher-contrast now. They are
+  the only way out of a step.
+- **`--` is a code-comment convention, not a copy convention.** Every tour string that
+  used `--` as an em dash rendered as a visible "- -". Message catalogs use a real dash
+  (full-width for ja/zh); `--` stays in source comments and docs like this one.
+- **The digest has to survive its own tours.** "Show me" closed the What's New modal and
+  nothing brought it back, so the release's other tours were reachable only through
+  Settings, and "Don't show this again" was unreachable altogether. The modal now steps
+  aside (`whatsNewStore.pausedForTour`) and the host reopens it when the tour ends.
+- **Say that the notes are English-only.** A fully translated dialog wrapped around
+  English prose reads as a bug; one localized line for non-English locales explains it.
+  The `#123` references in the notes are also links now
+  (`lib/markdown/remark-issue-links.ts`, repo URL in `lib/github.ts`).
+
+Still open, and worth doing before the 1.14 tours:
+
+- The **payoff-step fallback this plan already required** (see Shipped tour content:
+  "instead of ending silently, the tour falls through to a centered outro card") was not
+  built. The shipped `fxSection` step skips silently when the account has no
+  foreign-currency activity yet, so the counter jumps from 11/14 to 13/14 with nothing
+  to explain it -- exactly the failure the plan set out to avoid. Either give such a
+  step a centered fallback card, or stop advertising a fixed total in the counter.
+- **Shipped tour content above is stale.** 1.13 shipped
+  `release-1.13.0/foreign-currency` (14 steps, the full fee -> purchase -> detail ->
+  report workflow) plus `release-1.13.0/settings`, not the `release-1.13.0/accounts`
+  three-step tour described there.
+- **None of this is in `frontend/CLAUDE.md`.** Neither it, the root `CLAUDE.md`, nor
+  `.claude/skills/frontend.md` mentions tours, so the next author (agent or human)
+  starts from an archived plan in `future-plans/` with every checkbox ticked. A short
+  "Guided tours" section pointing at the engine, the one-anchor-per-id rule, the step
+  flags (`unobtrusive`, `allowInteraction`, `requires`, `skipOnMobile`, `skipOnBack`)
+  and the copy rules above would carry these lessons forward.
+
 ## Risks / notes
 
 - Focus vs `Modal`: the intro's currency-field step renders while the transaction form

@@ -8,8 +8,11 @@ import type { TourDefinition } from '@/lib/tours/types';
 interface TourOfferListProps {
   /** The running app version; picks the release tours to offer. */
   currentVersion: string;
-  /** Close the What's New modal before the tour starts. */
-  onClose: () => void;
+  /**
+   * Called just before a tour starts, so the What's New modal can step aside:
+   * the tour drives the app underneath it.
+   */
+  onStartTour: () => void;
 }
 
 /**
@@ -20,7 +23,10 @@ interface TourOfferListProps {
  * Renders nothing when there is nothing to offer. Works in demo mode (manual
  * start only).
  */
-export function TourOfferList({ currentVersion, onClose }: TourOfferListProps) {
+export function TourOfferList({
+  currentVersion,
+  onStartTour,
+}: TourOfferListProps) {
   const t = useTranslations('tours');
   const progress = useTourStore((s) => s.progress);
   const startTour = useTourStore((s) => s.startTour);
@@ -34,8 +40,12 @@ export function TourOfferList({ currentVersion, onClose }: TourOfferListProps) {
   if (rows.length === 0) return null;
 
   const handleStart = (tour: TourDefinition) => {
-    onClose();
+    // Start first, step aside second: `startTour` declines a tour with no steps
+    // left for this viewport, and a modal that closed for a tour that never ran
+    // would neither come back nor clear its pending resume. Both stores settle
+    // in one render -- this is a single event handler.
     startTour(tour);
+    if (useTourStore.getState().active) onStartTour();
   };
 
   return (

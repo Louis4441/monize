@@ -14,7 +14,8 @@
     "dontShowAgain": "Non mostrare più",
     "showNextLogin": "Mostra al prossimo accesso",
     "close": "Chiudi",
-    "unavailable": "Le note di rilascio per questa versione non sono disponibili."
+    "unavailable": "Le note di rilascio per questa versione non sono disponibili.",
+    "englishOnly": "Le note di rilascio qui sotto sono solo in inglese. Monize, comprese le visite guidate, segue le tue impostazioni della lingua."
   },
   "save": "Salva",
   "cancel": "Annulla",

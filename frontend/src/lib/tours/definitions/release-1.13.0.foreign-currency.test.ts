@@ -163,4 +163,15 @@ describe('foreign-currency release tour', () => {
   it('keeps Split out of reach so the walkthrough has one path', () => {
     expect(tour.disableTransactionSplit).toBe(true);
   });
+
+  it('does not sit behind a blank screen before standing in for itself', () => {
+    // The stand-in card only shows once the anchor wait is over, and the
+    // overlay renders nothing while it waits -- so a fallback step that kept
+    // the 5s/10s defaults would blank the tour before explaining itself.
+    for (const id of ['fxSection', 'report']) {
+      const step = RELEASE_1_13_FOREIGN_CURRENCY_TOUR.steps.find((s) => s.id === id)!;
+      expect(step.fallbackWhenMissing).toBe(true);
+      expect(step.anchorTimeoutMs).toBeLessThanOrEqual(4000);
+    }
+  });
 });

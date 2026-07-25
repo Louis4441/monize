@@ -77,6 +77,26 @@ interface TourTooltipProps {
 
 const MOBILE_QUERY = '(max-width: 639px)';
 
+/**
+ * The viewport, as state. A centered or corner-parked card is positioned
+ * against it, so a resize has to re-render the card -- reading
+ * `window.innerWidth` during render alone would leave it stranded off-screen.
+ */
+function useViewportSize(): Size {
+  const [viewport, setViewport] = useState<Size>(() => ({
+    width: typeof window === 'undefined' ? 1024 : window.innerWidth,
+    height: typeof window === 'undefined' ? 768 : window.innerHeight,
+  }));
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () =>
+      setViewport({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return viewport;
+}
+
 function useIsMobile(): boolean {
   const [mobile, setMobile] = useState(
     () =>
@@ -124,6 +144,7 @@ export function TourTooltip({
 }: TourTooltipProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
+  const viewport = useViewportSize();
   const [size, setSize] = useState<Size | null>(null);
   // Where the user dragged the card, if they moved it. Null = auto-positioned.
   const [movedTo, setMovedTo] = useState<{ top: number; left: number } | null>(
@@ -136,17 +157,23 @@ export function TourTooltip({
     left: number;
   } | null>(null);
 
-  // A manual position belongs to the step it was set on: the next step points
-  // at something else, so it re-positions itself ("info from previous render",
-  // never a setState in an effect).
-  const stepKey = `${stepLabel}|${title}`;
+  // A manual position, and the measured size, belong to the step they were
+  // taken on: the next step points at something else and its card is a
+  // different height, so both reset ("info from previous render", never a
+  // setState in an effect). Keeping a stale size would position the new card
+  // from the old one's dimensions and then visibly jump once it re-measures.
+  const stepKey = `${stepLabel}|${title}|${body}`;
   const [prevStepKey, setPrevStepKey] = useState(stepKey);
   if (stepKey !== prevStepKey) {
     setPrevStepKey(stepKey);
     setMovedTo(null);
+    setSize(null);
   }
 
-  // Measure the card after first paint so positioning can center/flip it.
+  // Measure the card after first paint so positioning can center/flip it. Also
+  // after a resize: the card is `w-80 max-w-[calc(100vw-16px)]`, so a narrower
+  // viewport re-wraps the body and changes the height that decides whether the
+  // card sits above or below its anchor.
   useEffect(() => {
     if (!cardRef.current) return;
     const el = cardRef.current;
@@ -154,7 +181,7 @@ export function TourTooltip({
       setSize({ width: el.offsetWidth, height: el.offsetHeight });
     });
     return () => cancelAnimationFrame(raf);
-  }, [title, body, isMobile]);
+  }, [stepKey, isMobile, viewport]);
 
   // Move focus to the card on each step so its controls are keyboard-reachable
   // and Modal (which traps Tab) yields to us -- unless an in-form step asked us
@@ -163,17 +190,18 @@ export function TourTooltip({
     if (leaveFocusToForm || isMobile) return;
     const raf = requestAnimationFrame(() => cardRef.current?.focus());
     return () => cancelAnimationFrame(raf);
-  }, [title, leaveFocusToForm, isMobile]);
+  }, [stepKey, leaveFocusToForm, isMobile]);
 
   const primaryLabel = isLast ? labels.done : labels.next;
 
+  // Secondary actions read as links, not as disabled-looking grey text: they
+  // are the only way out of a step, so they have to look clickable.
+  const linkClass =
+    'rounded text-xs font-medium text-gray-600 underline decoration-gray-400 decoration-dotted underline-offset-2 hover:text-gray-900 hover:decoration-solid focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-gray-300 dark:decoration-gray-500 dark:hover:text-white';
+
   const controls = (
     <div className="mt-4 flex items-center justify-between gap-3">
-      <button
-        type="button"
-        onClick={onEnd}
-        className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-      >
+      <button type="button" onClick={onEnd} className={linkClass}>
         {labels.endTour}
       </button>
       <div className="flex items-center gap-2">
@@ -183,11 +211,7 @@ export function TourTooltip({
           </Button>
         )}
         {interactive ? (
-          <button
-            type="button"
-            onClick={onSkip}
-            className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
+          <button type="button" onClick={onSkip} className={linkClass}>
             {labels.skipStep}
           </button>
         ) : (
@@ -238,10 +262,6 @@ export function TourTooltip({
     );
   }
 
-  const viewport = {
-    width: typeof window !== 'undefined' ? window.innerWidth : 1024,
-    height: typeof window !== 'undefined' ? window.innerHeight : 768,
-  };
   const tooltipSize = size ?? { width: 320, height: 160 };
 
   let top: number;
@@ -273,8 +293,12 @@ export function TourTooltip({
     ),
   });
 
-  const shownTop = movedTo ? movedTo.top : top;
-  const shownLeft = movedTo ? movedTo.left : left;
+  // Clamped on every render, not just while dragging: a window narrowed after
+  // the user parked the card would otherwise leave it off-screen for the rest
+  // of the step, with no handle left to drag it back.
+  const moved = movedTo ? clampToViewport(movedTo.top, movedTo.left) : null;
+  const shownTop = moved ? moved.top : top;
+  const shownLeft = moved ? moved.left : left;
 
   const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     // Stop the press from selecting text or focusing through to the page.

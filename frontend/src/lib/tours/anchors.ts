@@ -40,6 +40,7 @@ export const TOUR_ANCHORS = {
   transactionFields: 'transaction-fields',
   transactionSplit: 'transaction-split',
   transactionCurrencyField: 'transaction-currency-field',
+  transactionAmountCurrency: 'transaction-amount-currency',
   transactionConvertedAmount: 'transaction-converted-amount',
   transactionFxConversion: 'transaction-fx-conversion',
   transactionFormActions: 'transaction-form-actions',

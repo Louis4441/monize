@@ -14,7 +14,8 @@
     "dontShowAgain": "Não mostrar novamente",
     "showNextLogin": "Mostrar no próximo login",
     "close": "Fechar",
-    "unavailable": "Não há notas de versão disponíveis para esta versão."
+    "unavailable": "Não há notas de versão disponíveis para esta versão.",
+    "englishOnly": "As notas de versão abaixo estão apenas em inglês. O Monize, incluindo os tours guiados, segue sua configuração de idioma."
   },
   "save": "Salvar",
   "cancel": "Cancelar",

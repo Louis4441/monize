@@ -269,6 +269,22 @@ export function NormalTransactionFields({
             {...register('referenceNumber')}
           />
         );
+        // The entry-currency picker and the amount it applies to, as one
+        // tour-anchored group: a step explaining "set the currency and enter the
+        // amount as charged" has to highlight both, not just the picker. Built
+        // once and used by both layouts so the anchor stays attached in exactly
+        // one place. Normal mode only -- SplitTransactionFields renders the
+        // picker without an equivalent group, so a tour step on this anchor
+        // gracefully skips if the form is ever in split mode when it runs.
+        const amountGroup = (
+          <div
+            {...tourAnchor(TOUR_ANCHORS.transactionAmountCurrency)}
+            className="flex items-stretch space-x-2"
+          >
+            {currencyPickerSlot}
+            <div className="flex-1 min-w-0">{amountInput}</div>
+          </div>
+        );
         return convertedAmountSlot ? (
           // On mobile each currency field and Reference Number sits on its own
           // line; on md+ the two currency fields share a row and Reference
@@ -287,10 +303,7 @@ export function NormalTransactionFields({
               className="md:col-span-2"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                <div className="flex items-stretch space-x-2">
-                  {currencyPickerSlot}
-                  <div className="flex-1 min-w-0">{amountInput}</div>
-                </div>
+                {amountGroup}
                 {convertedAmountSlot}
               </div>
               {fxCaptionSlot}
@@ -299,10 +312,7 @@ export function NormalTransactionFields({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex items-stretch space-x-2">
-              {currencyPickerSlot}
-              <div className="flex-1 min-w-0">{amountInput}</div>
-            </div>
+            {amountGroup}
             {referenceInput}
           </div>
         );

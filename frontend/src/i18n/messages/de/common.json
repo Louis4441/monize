@@ -14,7 +14,8 @@
     "dontShowAgain": "Nicht mehr anzeigen",
     "showNextLogin": "Bei der nächsten Anmeldung anzeigen",
     "close": "Schließen",
-    "unavailable": "Für diese Version sind keine Versionshinweise verfügbar."
+    "unavailable": "Für diese Version sind keine Versionshinweise verfügbar.",
+    "englishOnly": "Die Versionshinweise unten sind nur auf Englisch verfügbar. Monize selbst, einschließlich der geführten Touren, folgt Ihrer Spracheinstellung."
   },
   "save": "Speichern",
   "cancel": "Abbrechen",

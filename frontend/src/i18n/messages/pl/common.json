@@ -14,7 +14,8 @@
     "dontShowAgain": "Nie pokazuj ponownie",
     "showNextLogin": "Pokaż przy następnym logowaniu",
     "close": "Zamknij",
-    "unavailable": "Informacje o wydaniu tej wersji są niedostępne."
+    "unavailable": "Informacje o wydaniu tej wersji są niedostępne.",
+    "englishOnly": "Informacje o wydaniu poniżej są dostępne tylko w języku angielskim. Sam Monize, w tym przewodniki, używa wybranego przez Ciebie języka."
   },
   "save": "Zapisz",
   "cancel": "Anuluj",

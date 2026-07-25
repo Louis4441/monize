@@ -71,6 +71,12 @@ describe('tour registry', () => {
         const base = `${tour.i18nPrefix}.steps.${step.id}`;
         expect(getNested(enMessages, `${base}.title`)).toBeTruthy();
         expect(getNested(enMessages, `${base}.body`)).toBeTruthy();
+        // A step that stands in for itself when its anchor is missing renders
+        // this instead of `body`, so a missing key would surface as a raw
+        // message path exactly when the tour is already degraded.
+        if (step.fallbackWhenMissing) {
+          expect(getNested(enMessages, `${base}.fallbackBody`)).toBeTruthy();
+        }
       }
     }
   });

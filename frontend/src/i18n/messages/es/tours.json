@@ -4,16 +4,16 @@
     "back": "Atrás",
     "done": "Listo",
     "endTour": "Finalizar recorrido",
-    "tryIt": "Pruébalo -- el recorrido continúa cuando lo hagas",
+    "tryIt": "Pruébalo — el recorrido continúa cuando lo hagas",
     "skipStep": "Omitir este paso",
     "stepCounter": "{current} de {total}",
     "skippedTitle": "Recorrido finalizado",
     "skippedBody": "Se omitieron algunos pasos porque su pantalla o control no estaba disponible. Puedes repetir el recorrido en cualquier momento desde Ajustes.",
-    "move": "Mover esta tarjeta -- arrástrela o desplácela con las teclas de flecha"
+    "move": "Mover esta tarjeta — arrástrela o desplácela con las teclas de flecha"
   },
   "offer": {
     "heading": "Haz un recorrido rápido",
-    "subheading": "Recorridos breves de las novedades de esta versión.",
+    "subheading": "Recorridos breves de las novedades de esta versión. Esta ventana se aparta mientras dura un recorrido y vuelve al terminar.",
     "showMe": "Mostrarme",
     "viewed": "Visto",
     "introTitle": "¿Nuevo aquí? Realiza el recorrido de introducción",
@@ -34,6 +34,8 @@
   "settings": {
     "title": "Recorridos guiados",
     "description": "Recorre las funciones de la aplicación paso a paso.",
+    "showList": "Mostrar recorridos ({count})",
+    "hideList": "Ocultar recorridos",
     "start": "Iniciar",
     "restart": "Repetir",
     "statusNotViewed": "No visto",
@@ -60,7 +62,7 @@
         },
         "accounts": {
           "title": "Tus cuentas",
-          "body": "Agrega aquí tus cuentas bancarias, de tarjeta de crédito, préstamos e inversiones con **Agregar cuenta**. Todo saldo y transacción pertenece a una cuenta."
+          "body": "Agrega aquí tus cuentas bancarias, de tarjeta de crédito, préstamos e inversiones con el botón resaltado. Todo saldo y transacción pertenece a una cuenta."
         },
         "transactions": {
           "title": "Transacciones",
@@ -71,20 +73,20 @@
           "body": "Agrega un ingreso o gasto con **Nueva transacción**. Adelante, abre el formulario."
         },
         "fields": {
-          "title": "Beneficiario, categoría e importe",
-          "body": "Para cada transacción eliges un beneficiario, asignas una categoría e ingresas el importe. Las categorías son las que impulsan tus presupuestos e informes."
+          "title": "Beneficiario y categoría",
+          "body": "Para cada transacción eliges un beneficiario y asignas una categoría. Las categorías son las que impulsan tus presupuestos e informes; el importe viene en el paso siguiente."
         },
         "splits": {
           "title": "Desglosar una transacción",
           "body": "¿Una compra que abarca varias categorías? Usa **Desglosar transacción** para dividir una sola transacción entre categorías; por ejemplo, comestibles y artículos del hogar de una misma tienda."
         },
         "currencyField": {
-          "title": "Monedas extranjeras",
-          "body": "¿Compraste algo en el extranjero? Configura aquí la moneda e ingresa el importe tal como se cobró -- Monize lo convierte a la moneda de la cuenta por ti."
+          "title": "Importe y moneda",
+          "body": "Introduce aquí el importe de la transacción. ¿Pagaste en otra moneda? Configura la moneda junto al importe e introdúcelo tal como se cobró — Monize lo convierte a la moneda de la cuenta por ti."
         },
         "closeForm": {
           "title": "Cierra el formulario para continuar",
-          "body": "Cierra el formulario de transacción (**Cancelar** o la X) y el recorrido continuará."
+          "body": "Cierra el formulario de transacción con **Cancelar**, o guárdala con el otro botón, y el recorrido continuará."
         },
         "bills": {
           "title": "Facturas y depósitos",
@@ -100,7 +102,7 @@
         },
         "reports": {
           "title": "Entiende tu dinero",
-          "body": "Los informes convierten tus transacciones en gráficos -- gastos por categoría, patrimonio neto a lo largo del tiempo y más."
+          "body": "Los informes convierten tus transacciones en gráficos — gastos por categoría, patrimonio neto a lo largo del tiempo y más."
         },
         "finish": {
           "title": "Todo listo",
@@ -116,15 +118,15 @@
         "steps": {
           "welcome": {
             "title": "Controle sus gastos en otras monedas",
-            "body": "¿Compró algo en el extranjero? Este recorrido configura la comisión por transacción en moneda extranjera de una tarjeta, registra una compra en la moneda que le cobraron y muestra dónde aparecen esos costes. Puede salir en cualquier momento con **Esc** o **Finalizar recorrido**."
+            "body": "¿Compró algo en el extranjero? Este recorrido configura la comisión por transacción en moneda extranjera de una cuenta, registra una compra en la moneda que le cobraron y muestra dónde aparecen esos costes. Puede salir en cualquier momento con **Esc** o **Finalizar recorrido**."
           },
           "openAccountEdit": {
-            "title": "Empiece por la tarjeta",
-            "body": "Las comisiones por transacción en moneda extranjera pertenecen a la cuenta. Elija una tarjeta de crédito que use en el extranjero y seleccione **Editar** en las acciones de su fila -- o mantenga pulsada la fila en el móvil -- para abrir sus ajustes."
+            "title": "Empiece por la cuenta",
+            "body": "Las comisiones por transacción en moneda extranjera pertenecen a la cuenta. Elija la cuenta con la que paga en el extranjero — una tarjeta de crédito o de débito, o la que usa el móvil — y seleccione **Editar** en las acciones de su fila, o mantenga pulsada la fila en el móvil, para abrir sus ajustes."
           },
           "fxFeePercent": {
             "title": "Defina la comisión de conversión",
-            "body": "Introduzca aquí la comisión por transacción en moneda extranjera de su tarjeta como porcentaje -- 2,5, por ejemplo. Monize la incorpora al importe convertido de cada compra en el extranjero, de modo que la comisión queda registrada por usted."
+            "body": "Introduzca aquí la comisión por transacción en moneda extranjera de la cuenta como porcentaje — 2,5, por ejemplo. Monize la incorpora al importe convertido de cada compra en el extranjero, de modo que la comisión queda registrada por usted."
           },
           "closeAccountForm": {
             "title": "Guardar y cerrar",
@@ -132,14 +134,14 @@
           },
           "newTransaction": {
             "title": "Registre una compra en el extranjero",
-            "body": "Ahora registre una compra que hiciera con esa tarjeta en otra moneda. Abra **Nueva transacción** y elija esa tarjeta como cuenta."
+            "body": "Ahora registre una compra que hiciera con esa cuenta en otra moneda. Abra **Nueva transacción** y elija esa cuenta."
           },
           "chooseAccount": {
             "title": "Compruebe la cuenta y la fecha",
-            "body": "La comisión de conversión pertenece a la cuenta, así que asegúrese de que **Cuenta** sea la tarjeta en la que acaba de definirla y cámbiela aquí si no lo es. Ajuste también la **Fecha** al día de la compra: el tipo de cambio se consulta para esa fecha."
+            "body": "La comisión de conversión pertenece a la cuenta, así que asegúrese de que **Cuenta** sea la cuenta en la que acaba de definirla y cámbiela aquí si no lo es. Ajuste también la **Fecha** al día de la compra: el tipo de cambio se consulta para esa fecha."
           },
           "enterDetails": {
-            "title": "Introduzca los datos como siempre",
+            "title": "Introduzca los datos",
             "body": "Rellene el beneficiario y la categoría igual que en cualquier otra transacción. La parte de moneda extranjera viene a continuación."
           },
           "entryCurrency": {
@@ -155,16 +157,18 @@
             "body": "Lo mismo aquí: guarde la transacción con el botón de envío o ciérrela con **Cancelar**, y el recorrido continúa."
           },
           "openAccountDetail": {
-            "title": "Vuelva a la tarjeta",
-            "body": "Abra la página de detalles de esa tarjeta -- elija **Detalles** en las acciones de su fila -- para ver cómo se resume la actividad en moneda extranjera."
+            "title": "Vuelva a la cuenta",
+            "body": "Abra la página de detalles de esa cuenta — elija **Detalles** en las acciones de su fila — para ver cómo se resume la actividad en moneda extranjera."
           },
           "fxSection": {
             "title": "Su sección de moneda extranjera",
-            "body": "Las cuentas con actividad en moneda extranjera obtienen esta sección: las comisiones pagadas por moneda, un gráfico a lo largo del tiempo y las transacciones correspondientes, exportables a CSV y PNG. Aparece en cuanto la cuenta tiene una compra en el extranjero."
+            "body": "Las cuentas con actividad en moneda extranjera obtienen esta sección: las comisiones pagadas por moneda, un gráfico a lo largo del tiempo y las transacciones correspondientes, exportables a CSV y PNG. Aparece en cuanto la cuenta tiene una compra en el extranjero.",
+            "fallbackBody": "Esta cuenta aún no tiene actividad en moneda extranjera, así que la sección no está en su página. Registra en ella una compra en otra moneda y la sección aparecerá: comisiones por moneda, un gráfico a lo largo del tiempo y exportación a CSV y PNG."
           },
           "report": {
             "title": "El informe de comisiones por transacción en moneda extranjera",
-            "body": "Este informe reúne en un solo lugar las compras en el extranjero de todas sus cuentas y monedas, para que vea lo que cuestan realmente esas tarjetas «sin comisión por transacción en el extranjero». Ábralo cuando quiera desde **Informes**."
+            "body": "Este informe reúne en un solo lugar las compras en el extranjero de todas sus cuentas y monedas, para que vea lo que cuestan realmente esas tarjetas «sin comisión por transacción en el extranjero». Ábralo cuando quiera desde **Informes**.",
+            "fallbackBody": "El informe **Comisiones por moneda extranjera** reúne las compras en el extranjero de todas tus cuentas y monedas en un solo lugar. Ahora no está a la vista — una búsqueda o un filtro de categoría puede ocultarlo — pero lo encontrarás en **Informes**."
           },
           "finish": {
             "title": "Esto es la moneda extranjera en Monize",

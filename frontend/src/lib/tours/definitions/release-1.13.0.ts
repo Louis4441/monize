@@ -64,6 +64,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.accountFxFeePercent,
       placement: 'auto',
       allowInteraction: true,
+      skipOnBack: true,
     },
     {
       // Spotlight the form's own Cancel/Update pair so the user can see (and
@@ -73,6 +74,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.accountFormActions,
       placement: 'top',
       advance: { type: 'disappear', anchorId: TOUR_ANCHORS.accountFxFeePercent },
+      skipOnBack: true,
     },
     {
       // Interactive: clicking New Transaction opens the form; advance on appear.
@@ -91,6 +93,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionAccountDate,
       placement: 'auto',
       allowInteraction: true,
+      skipOnBack: true,
     },
     {
       // In-form: the ordinary payee/category entry, unchanged by foreign
@@ -101,6 +104,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionFields,
       placement: 'auto',
       allowInteraction: true,
+      skipOnBack: true,
     },
     {
       // Interactive: spotlight the entry-currency picker and wait until the
@@ -115,6 +119,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       // which opens downward from it.
       placement: 'top',
       advance: { type: 'appear', anchorId: TOUR_ANCHORS.transactionConvertedAmount },
+      skipOnBack: true,
     },
     {
       // The payoff: the whole conversion group (entered amount, converted
@@ -127,6 +132,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionFxConversion,
       placement: 'auto',
       allowInteraction: true,
+      skipOnBack: true,
     },
     {
       // Spotlight the transaction form's own Cancel/Save pair, as above.
@@ -135,6 +141,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionFormActions,
       placement: 'top',
       advance: { type: 'disappear', anchorId: TOUR_ANCHORS.transactionForm },
+      skipOnBack: true,
     },
     {
       // Prompt on the accounts list; advance when the user opens an account's
@@ -147,13 +154,23 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       advance: { type: 'route', route: '/accounts/' },
     },
     {
-      // The new per-account section. Skips gracefully when the account has no
-      // foreign activity yet (the section renders nothing, so nothing mounts).
+      // The new per-account section. It only exists once the account has
+      // foreign activity, so on a fresh account nothing mounts -- and this is
+      // the step the whole tour builds up to. `fallbackWhenMissing` keeps it on
+      // screen as a centered card that says so, instead of dropping it and
+      // leaving a hole in the step counter.
       id: 'fxSection',
       route: '/accounts',
       routeMatch: '/accounts/',
       anchorId: TOUR_ANCHORS.foreignCurrencyFees,
       placement: 'auto',
+      fallbackWhenMissing: true,
+      // The stand-in only shows once the anchor times out, and the overlay
+      // renders nothing while it waits. The user drove the navigation here, so
+      // the page is already loaded and the section either mounts with it or
+      // does not exist: a full 5s of blank screen would read as the crash this
+      // fallback exists to prevent.
+      anchorTimeoutMs: 2500,
     },
     {
       // The cross-account report card on the Reports listing. The category
@@ -166,6 +183,13 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       routeMatch: '/reports',
       anchorId: TOUR_ANCHORS.reportForeignCurrencyFees,
       placement: 'auto',
+      // A saved search or a hidden category can still filter the card out of
+      // the listing; name the report in a centered card rather than vanish.
+      fallbackWhenMissing: true,
+      // Long enough for the engine's own navigation to /reports to land and the
+      // listing to render, short enough that the stand-in does not sit behind a
+      // blank screen (the post-navigation default is 10s).
+      anchorTimeoutMs: 4000,
     },
     {
       id: 'finish',

@@ -3,7 +3,7 @@
     "basics": {
       "steps": {
         "dashboard": {
-          "body": "This is your dashboard. Use the Customise button in the top-right to rearrange or hide widgets so the summaries you care about sit right at the top."
+          "body": "This is your dashboard. Use the **Customise** button in the top-right to rearrange or hide widgets so the summaries you care about sit right at the top."
         }
       }
     }
