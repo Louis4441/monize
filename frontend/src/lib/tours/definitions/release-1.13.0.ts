@@ -64,6 +64,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.accountFxFeePercent,
       placement: 'auto',
       allowInteraction: true,
+      skipOnBack: true,
     },
     {
       // Spotlight the form's own Cancel/Update pair so the user can see (and
@@ -73,6 +74,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.accountFormActions,
       placement: 'top',
       advance: { type: 'disappear', anchorId: TOUR_ANCHORS.accountFxFeePercent },
+      skipOnBack: true,
     },
     {
       // Interactive: clicking New Transaction opens the form; advance on appear.
@@ -91,6 +93,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionAccountDate,
       placement: 'auto',
       allowInteraction: true,
+      skipOnBack: true,
     },
     {
       // In-form: the ordinary payee/category entry, unchanged by foreign
@@ -101,6 +104,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionFields,
       placement: 'auto',
       allowInteraction: true,
+      skipOnBack: true,
     },
     {
       // Interactive: spotlight the entry-currency picker and wait until the
@@ -115,6 +119,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       // which opens downward from it.
       placement: 'top',
       advance: { type: 'appear', anchorId: TOUR_ANCHORS.transactionConvertedAmount },
+      skipOnBack: true,
     },
     {
       // The payoff: the whole conversion group (entered amount, converted
@@ -127,6 +132,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionFxConversion,
       placement: 'auto',
       allowInteraction: true,
+      skipOnBack: true,
     },
     {
       // Spotlight the transaction form's own Cancel/Save pair, as above.
@@ -135,6 +141,7 @@ export const RELEASE_1_13_FOREIGN_CURRENCY_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionFormActions,
       placement: 'top',
       advance: { type: 'disappear', anchorId: TOUR_ANCHORS.transactionForm },
+      skipOnBack: true,
     },
     {
       // Prompt on the accounts list; advance when the user opens an account's

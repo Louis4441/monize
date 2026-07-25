@@ -19,6 +19,24 @@ const TOUR: TourDefinition = {
   ],
 };
 
+/** A tour with an in-form step, for the Back-navigation cases. */
+const FORM_TOUR: TourDefinition = {
+  id: 'test/form',
+  area: 'transactions',
+  i18nPrefix: 'intro.basics',
+  steps: [
+    { id: 'welcome', anchorId: null },
+    { id: 'openForm', route: '/transactions', anchorId: 'transactions-new-button' },
+    {
+      id: 'fields',
+      route: '/transactions',
+      anchorId: 'transaction-fields',
+      skipOnBack: true,
+    },
+    { id: 'bills', route: '/bills', anchorId: null },
+  ],
+};
+
 function setDesktop(isDesktop: boolean) {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
     matches: isDesktop, // min-width:640 matches on desktop
@@ -131,6 +149,37 @@ describe('tourStore', () => {
     useTourStore.getState().skip();
     useTourStore.getState().back();
     expect(useTourStore.getState().active!.fastForward).toBe(false);
+  });
+
+  it('back walks past steps whose transient UI is gone', () => {
+    const store = useTourStore.getState();
+    store.startTour(FORM_TOUR);
+    store.next(); // openForm
+    store.next(); // fields (in-form)
+    store.next(); // bills
+    expect(useTourStore.getState().active!.stepIndex).toBe(3);
+
+    // The form has been closed, so the in-form step cannot be shown again:
+    // Back has to land on the step that reopens it, not inside it.
+    useTourStore.getState().back();
+    expect(useTourStore.getState().active!.stepIndex).toBe(1);
+  });
+
+  it('back returns to an in-form step while the form is still open', () => {
+    const anchor = document.createElement('div');
+    anchor.setAttribute('data-tour-id', 'transaction-fields');
+    document.body.appendChild(anchor);
+    try {
+      const store = useTourStore.getState();
+      store.startTour(FORM_TOUR);
+      store.next();
+      store.next();
+      store.next(); // bills, with the form still on screen
+      useTourStore.getState().back();
+      expect(useTourStore.getState().active!.stepIndex).toBe(2);
+    } finally {
+      anchor.remove();
+    }
   });
 
   it('omit advances without counting the step as skipped', () => {

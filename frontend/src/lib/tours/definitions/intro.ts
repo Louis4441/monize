@@ -19,6 +19,10 @@ import type { TourDefinition } from '../types';
  * dimming would hide the very page being described. Anchored ones keep their
  * highlight ring, so they still point at the control they name.
  *
+ * The steps that render inside the open transaction form are `skipOnBack`: once
+ * the user has closed it, Back has to walk past them, or it would land on a
+ * step whose anchor can never mount again and strand the tour.
+ *
  * The record-a-transaction detour `requires` an account, payee and category:
  * for a user who has none of those yet, walking through the form teaches
  * nothing, so the engine omits those five steps entirely.
@@ -84,6 +88,7 @@ export const INTRO_TOUR: TourDefinition = {
       route: '/transactions',
       anchorId: TOUR_ANCHORS.transactionFields,
       placement: 'auto',
+      skipOnBack: true,
     },
     {
       id: 'splits',
@@ -92,13 +97,18 @@ export const INTRO_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionSplit,
       placement: 'auto',
       skipOnMobile: true,
+      skipOnBack: true,
     },
     {
+      // Rings the entry-currency picker together with the Amount it applies to:
+      // the step asks the user to set both, so highlighting only the picker
+      // would leave half the instruction unmarked.
       id: 'currencyField',
       requires: 'transactionEntry',
       route: '/transactions',
-      anchorId: TOUR_ANCHORS.transactionCurrencyField,
+      anchorId: TOUR_ANCHORS.transactionAmountCurrency,
       placement: 'auto',
+      skipOnBack: true,
     },
     {
       // Spotlights the form's own Cancel/Create pair; advance when it closes.
@@ -108,6 +118,7 @@ export const INTRO_TOUR: TourDefinition = {
       anchorId: TOUR_ANCHORS.transactionFormActions,
       placement: 'top',
       advance: { type: 'disappear', anchorId: TOUR_ANCHORS.transactionForm },
+      skipOnBack: true,
     },
     {
       id: 'bills',

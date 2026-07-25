@@ -9,6 +9,7 @@ import { toursApi } from '@/lib/tours-api';
 import { accountsApi } from '@/lib/accounts';
 import { createLogger } from '@/lib/logger';
 import { findTourAnchor } from '@/lib/tours/anchors';
+import { backTargetIndex } from '@/lib/tours/navigation';
 import { useTourAnchor } from '@/hooks/useTourAnchor';
 import { useAnchorRect } from '@/hooks/useAnchorRect';
 import type { TourRequirement } from '@/lib/tours/types';
@@ -320,7 +321,11 @@ export function TourHost() {
   const unobtrusive = !showingOutro && !!step?.unobtrusive;
   const leaveFocusToForm = !!anchorElement?.closest('[role="dialog"]');
   const isLast = showingOutro || active.stepIndex === active.steps.length - 1;
-  const canBack = !showingOutro && active.stepIndex > 0;
+  // Only offer Back when there is a step behind that can actually be shown
+  // again: inside a form the user has closed, the steps before this one are
+  // unreachable, and offering Back there would strand the tour.
+  const canBack =
+    !showingOutro && backTargetIndex(active.steps, active.stepIndex) !== null;
 
   const title = showingOutro
     ? t('controls.skippedTitle')

@@ -88,6 +88,16 @@ export interface TourStep {
   /** Filtered out at startTour on narrow viewports. */
   skipOnMobile?: boolean;
   /**
+   * The step only makes sense while transient UI it does not open itself is on
+   * screen -- the fields inside the New Transaction form, say. Once that UI is
+   * gone, Back must not land here: the anchor can no longer mount, so the card
+   * would vanish and the engine would auto-skip forward seconds later, which
+   * reads as the tour breaking. Back walks past such steps (while their anchor
+   * is missing) to the nearest one that can be shown again; with the form still
+   * open they behave normally, so stepping back inside a form keeps working.
+   */
+  skipOnBack?: boolean;
+  /**
    * How long to wait for the anchor before gracefully skipping the step.
    * Defaults to 5000ms; the engine uses 10000ms for the first anchor after a
    * navigation so cold route loads on slow connections do not eat steps.

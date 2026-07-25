@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createLogger } from '@/lib/logger';
 import { toursApi } from '@/lib/tours-api';
+import { backTargetIndex } from '@/lib/tours/navigation';
 import type {
   TourDefinition,
   TourProgressMap,
@@ -141,11 +142,14 @@ export const useTourStore = create<TourState>((set, get) => ({
   back: () => {
     const { active } = get();
     if (!active || active.showSkippedOutro) return;
-    if (active.stepIndex === 0) return;
+    // Not simply stepIndex - 1: steps that live inside UI the user has since
+    // closed cannot be shown again, and landing on one strands the tour.
+    const target = backTargetIndex(active.steps, active.stepIndex);
+    if (target === null) return;
     set({
       active: {
         ...active,
-        stepIndex: active.stepIndex - 1,
+        stepIndex: target,
         phase: 'navigating',
         expectedRoute: null,
         fastForward: false,
