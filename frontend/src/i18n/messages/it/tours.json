@@ -25,7 +25,8 @@
     "accounts": "Conti",
     "budgets": "Budget",
     "reports": "Report",
-    "settings": "Impostazioni"
+    "settings": "Impostazioni",
+    "tools": "Strumenti"
   },
   "gettingStarted": {
     "takeTour": "Fai il tour",
@@ -105,6 +106,37 @@
         "finish": {
           "title": "Tutto pronto",
           "body": "Il tour finisce qui. Puoi rifarlo in qualsiasi momento dalla sezione **Tour guidati** nelle **Impostazioni**."
+        }
+      }
+    }
+  },
+  "import": {
+    "bringingDataIn": {
+      "title": "Portare i tuoi dati in Monize",
+      "steps": {
+        "welcome": {
+          "title": "Portare i tuoi dati in Monize",
+          "body": "Arrivi da Microsoft Money, da Quicken o da un export della banca? Questo tour mostra dove si trova l'importazione e cosa preparare: le scelte difficili da annullare si fanno tutte prima che il wizard si apra."
+        },
+        "whereItLives": {
+          "title": "L'importazione è in Strumenti",
+          "body": "**Importa transazioni** si trova qui, nel menu **Strumenti**. Puoi anche partire dalla pagina di un conto: quel conto viene preselezionato."
+        },
+        "files": {
+          "title": "Con cosa presentarsi",
+          "body": "Esporta **un file per conto**, e i conti di investimento **due volte** — una come Investment per le operazioni sui titoli, una come Regular per la parte in contanti. In Microsoft Money scegli sempre **Loose QIF**: lo Strict QIF perde i dettagli delle suddivisioni e i riferimenti ai trasferimenti. Vanno bene QIF, OFX, QFX e CSV, e puoi trascinare più file insieme."
+        },
+        "order": {
+          "title": "L'ordine conta",
+          "body": "I file vengono elaborati nell'ordine elencato e ciascuno può usare categorie, beneficiari e conti creati dai precedenti. Prima i beni, poi i conti nella tua valuta, poi quelli in valuta estera, poi la liquidità dei conti di investimento e per ultimi i file del deposito titoli — così ogni trasferimento trova già l'altra metà."
+        },
+        "wizard": {
+          "title": "Cosa chiederà il wizard",
+          "body": "I passaggi compaiono solo se il file li richiede: su quale conto importare, poi la corrispondenza di categorie, titoli e conti di trasferimento. L'ambra aspetta te, il verde è già stato abbinato e saltare va bene — potrai categorizzare dopo. L'intera importazione gira in una sola transazione del database, quindi un errore non lascia nulla a metà."
+        },
+        "afterwards": {
+          "title": "Dopo l'importazione",
+          "body": "Confronta ogni saldo con il programma precedente e cerca nelle transazioni la nota **PENDING IMPORT** — i trasferimenti tra valute arrivano senza tasso, perché il QIF non lo contiene. La guida completa, con schermate e risoluzione dei problemi, è nella wiki alla voce **Importing from Microsoft Money**."
         }
       }
     }
