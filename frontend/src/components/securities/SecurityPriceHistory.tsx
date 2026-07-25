@@ -281,6 +281,7 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
           accountName={security.symbol}
           title={t('priceHistory.chartTitle')}
           neutralValues
+          precise
           markers={chartMarkers}
         />
       )}

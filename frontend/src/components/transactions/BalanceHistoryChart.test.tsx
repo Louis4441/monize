@@ -50,9 +50,14 @@ const mockFormatCurrency = vi.fn((n: number, _code?: string) => `$${n.toFixed(2)
 const mockFormatCurrencyAxis = vi.fn((n: number, _code?: string) => `$${n}`);
 const mockFormatCurrencyFlag = vi.fn((n: number, _code?: string) => `$${n}`);
 
+const mockFormatCurrencyPrecise = vi.fn(
+  (n: number, _code?: string) => `$${n.toFixed(6)}`,
+);
+
 vi.mock('@/hooks/useNumberFormat', () => ({
   useNumberFormat: () => ({
     formatCurrency: mockFormatCurrency,
+    formatCurrencyPrecise: mockFormatCurrencyPrecise,
     formatCurrencyAxis: mockFormatCurrencyAxis,
     formatCurrencyFlag: mockFormatCurrencyFlag,
   }),
@@ -481,11 +486,17 @@ describe('computeBalanceGradient', () => {
         <BalanceHistoryChart
           data={series}
           isLoading={false}
-          markers={[{ date: '2026-01-04', direction: 'out', label: 'Sold 2' }]}
+          markers={[
+            { date: '2025-12-31', direction: 'in', label: 'Bought 100' },
+            { date: '2026-01-04', direction: 'out', label: 'Sold 2' },
+          ]}
         />,
       );
-      // Later than every point: pinned to the last one, not dropped.
-      expect(screen.getByTestId('reference-dot')).toHaveAttribute('data-x', '2026-01-03');
+      // Outside the series entirely: dropped, not clamped onto its ends. A
+      // migration carries decades of trades against a couple of years of
+      // backfilled prices, and clamping would claim they all happened on the
+      // first day it has a price for.
+      expect(screen.queryByTestId('reference-dot')).toBeNull();
     });
 
     it('lists the events for the hovered day in the tooltip', () => {
@@ -507,6 +518,38 @@ describe('computeBalanceGradient', () => {
     it('draws no dots without markers', () => {
       render(<BalanceHistoryChart data={series} isLoading={false} />);
       expect(screen.queryByTestId('reference-dot')).toBeNull();
+    });
+  });
+
+  describe('precise mode', () => {
+    const subCent = [
+      { date: '2026-01-01', balance: 0.000342 },
+      { date: '2026-01-02', balance: 0.000411 },
+    ];
+
+    it('keeps sub-cent values and formats them precisely', () => {
+      render(
+        <BalanceHistoryChart data={subCent} isLoading={false} precise />
+      );
+
+      // Rounding a price to cents would flatten the series to zero and print
+      // "$0.00" beside a table showing 0.000342.
+      expect(mockFormatCurrencyPrecise).toHaveBeenCalled();
+      const rounded = mockFormatCurrency.mock.calls.map((call) => call[0]);
+      expect(rounded).not.toContain(0);
+    });
+
+    it('still rounds a balance series to cents', () => {
+      render(
+        <BalanceHistoryChart
+          data={[
+            { date: '2026-01-01', balance: 10.005 },
+            { date: '2026-01-02', balance: 12.344 },
+          ]}
+          isLoading={false}
+        />,
+      );
+      expect(mockFormatCurrency).toHaveBeenCalled();
     });
   });
 });

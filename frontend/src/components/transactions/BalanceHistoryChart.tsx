@@ -55,6 +55,13 @@ interface BalanceHistoryChartProps {
    */
   title?: string;
   /**
+   * Keep sub-cent precision. A balance is money and rounds to 2dp, but a price
+   * series can be quoted at 4-6dp (a fund NAV, a penny stock, a crypto pair):
+   * rounding those to cents flattens the line to zero and makes every tooltip
+   * read "$0.00" while the table beside it shows 0.000342.
+   */
+  precise?: boolean;
+  /**
    * Events to pin on the line, each snapped to a point in the series. Empty or
    * omitted for a plain balance history.
    */
@@ -144,13 +151,18 @@ export function BalanceHistoryChart({
   hideTitle = false,
   title,
   neutralValues = false,
+  precise = false,
   markers,
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
   const chartTitle = title ?? t('charts.balanceHistory.title');
-  const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatCurrencyFlag } =
-    useNumberFormat();
+  const {
+    formatCurrency: formatCurrencyFull,
+    formatCurrencyPrecise,
+    formatCurrencyAxis,
+    formatCurrencyFlag,
+  } = useNumberFormat();
   const formatChartDate = useChartDateFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   // High/low value bubbles a user has temporarily dismissed, keyed by the value
@@ -162,18 +174,27 @@ export function BalanceHistoryChart({
   const downloadFilename = accountName ? `${chartTitle} - ${accountName}` : chartTitle;
 
   const formatCurrency = useCallback(
-    (value: number) => formatCurrencyFull(value, currencyCode),
-    [formatCurrencyFull, currencyCode],
+    (value: number) =>
+      precise
+        ? formatCurrencyPrecise(value, currencyCode)
+        : formatCurrencyFull(value, currencyCode),
+    [precise, formatCurrencyPrecise, formatCurrencyFull, currencyCode],
   );
 
   const formatAxis = useCallback(
-    (value: number) => formatCurrencyAxis(value, currencyCode),
-    [formatCurrencyAxis, currencyCode],
+    (value: number) =>
+      precise
+        ? formatCurrencyPrecise(value, currencyCode)
+        : formatCurrencyAxis(value, currencyCode),
+    [precise, formatCurrencyPrecise, formatCurrencyAxis, currencyCode],
   );
 
   const formatFlag = useCallback(
-    (value: number) => formatCurrencyFlag(value, currencyCode),
-    [formatCurrencyFlag, currencyCode],
+    (value: number) =>
+      precise
+        ? formatCurrencyPrecise(value, currencyCode)
+        : formatCurrencyFlag(value, currencyCode),
+    [precise, formatCurrencyPrecise, formatCurrencyFlag, currencyCode],
   );
 
   const { chartData, axisTicks, axisPattern } = useMemo(() => {
@@ -188,7 +209,8 @@ export function BalanceHistoryChart({
     const points = data.map((d) => ({
       date: d.date,
       label: formatChartDate(parseLocalDate(d.date), 'MMM d, yyyy'),
-      balance: Math.round(d.balance * 100) / 100,
+      // Money rounds to cents; a price keeps what it was quoted at.
+      balance: precise ? d.balance : Math.round(d.balance * 100) / 100,
     }));
 
     // A month tick per month reads well over ~2 years or less; beyond that the
@@ -215,7 +237,7 @@ export function BalanceHistoryChart({
       axisTicks: ticks,
       axisPattern: (useYearTicks ? 'yyyy' : 'MMM') as ChartDatePattern,
     };
-  }, [data, formatChartDate]);
+  }, [data, formatChartDate, precise]);
 
   // The exact span the chart covers, shown under the title so the timeframe is
   // always explicit (e.g. the all-history default is no longer a silent range).
@@ -231,19 +253,23 @@ export function BalanceHistoryChart({
 
   // Markers snapped onto the series: a trade can fall on a day with no price
   // row (a weekend, or a gap in history), so it lands on the nearest earlier
-  // point -- and on the first point when it predates the whole series.
+  // point. Events outside the series are dropped rather than clamped to its
+  // ends: a Microsoft Money migration carries decades of trades against a
+  // couple of years of backfilled prices, and pinning them all to the earliest
+  // point would claim they happened that day.
   const pinnedMarkers = useMemo(() => {
     if (!markers?.length || chartData.length === 0) return [];
-    return markers
-      .map((marker) => {
-        let point = chartData[0];
-        for (const candidate of chartData) {
-          if (candidate.date <= marker.date) point = candidate;
-          else break;
-        }
-        return { marker, point };
-      })
-      .filter(({ point }) => !!point);
+    const first = chartData[0].date;
+    const last = chartData[chartData.length - 1].date;
+    return markers.flatMap((marker) => {
+      if (marker.date < first || marker.date > last) return [];
+      let point = chartData[0];
+      for (const candidate of chartData) {
+        if (candidate.date <= marker.date) point = candidate;
+        else break;
+      }
+      return [{ marker, point }];
+    });
   }, [markers, chartData]);
 
   const markersByDate = useMemo(() => {
@@ -432,6 +458,11 @@ export function BalanceHistoryChart({
                     ? chartColors.income
                     : chartColors.expense
                 }
+                // Same white ring the min/max flag dots use (see
+                // portfolio-chart-utils): it separates the dot from the line
+                // under it on every theme. A themed ring would need a new
+                // `--chart-surface` variable, worth adding for all of them at
+                // once rather than for this one dot.
                 stroke="#fff"
                 strokeWidth={1.5}
                 ifOverflow="extendDomain"

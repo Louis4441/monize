@@ -225,7 +225,12 @@ describe('TopMovers', () => {
     ] as any[];
 
     render(<TopMovers movers={movers} isLoading={false} hasInvestmentAccounts={true} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Price history for AAPL' }));
+    // The row names itself with its own content; the action is screen-reader
+    // text inside it, not an aria-label that would hide the price and change.
+    const row = screen.getByRole('button', { name: /Price history for AAPL/ });
+    expect(row).toHaveAccessibleName(expect.stringContaining('Apple'));
+    expect(row).toHaveAccessibleName(expect.stringContaining('$180.00'));
+    fireEvent.click(row);
 
     // The same view the securities page opens from its Prices action, reached
     // by deep link rather than by a second copy of it on the dashboard.
