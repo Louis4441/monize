@@ -165,6 +165,32 @@ describe('WhatsNewHost', () => {
     expect(screen.getByText('Intro paragraph.')).toBeInTheDocument();
   });
 
+  it('stays away when the user left the tour instead of finishing it', async () => {
+    useAuthStore.setState({ isAuthenticated: true });
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.12.1',
+      autoShow: true,
+      notes: NOTES,
+    });
+
+    await renderHost();
+    await waitFor(() =>
+      expect(screen.getByText('Intro paragraph.')).toBeInTheDocument(),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Show me' }));
+    });
+
+    // Escape, End tour, and a browser Back out of the tour all land here. The
+    // user is leaving; the dialog must not reappear -- and the pending resume
+    // must not survive to fire after some later tour.
+    await act(async () => {
+      useTourStore.getState().endTour('dismissed');
+    });
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
+    expect(useWhatsNewStore.getState().pausedForTour).toBe(false);
+  });
+
   it('leaves a dialog the user closed alone when a tour ends', async () => {
     useAuthStore.setState({ isAuthenticated: true });
     await renderHost();

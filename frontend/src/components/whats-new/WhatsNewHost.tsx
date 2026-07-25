@@ -66,16 +66,28 @@ export function WhatsNewHost() {
   }, [isAuthenticated, open]);
 
   // A tour started from the offer list has to have the modal out of its way (it
-  // drives the app underneath), so bring the modal back once the tour ends --
+  // drives the app underneath), so bring the modal back once the tour is done --
   // with the tour just taken marked as viewed and the rest still on offer.
   // Without this, finishing a tour left no way back to the list short of
   // hunting through Settings.
+  //
+  // Only for a tour the user saw through to the end. A dismissal is the user
+  // leaving, and one of its causes is a browser Back press during the tour
+  // (TourHost treats unexpected navigation as a dismissal) -- reopening a
+  // `pushHistory` modal on top of that would answer their Back with another
+  // history entry. Anything else just drops the pending resume.
   useEffect(
     () =>
       useTourStore.subscribe((state, previous) => {
-        if (previous.active && !state.active) resumeAfterTour();
+        const finished = previous.active?.tour.id;
+        if (!finished || state.active) return;
+        if (state.progress[finished]?.status === 'completed') {
+          resumeAfterTour();
+        } else {
+          close();
+        }
       }),
-    [resumeAfterTour],
+    [resumeAfterTour, close],
   );
 
   const handleDontShowAgain = () => {

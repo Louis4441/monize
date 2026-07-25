@@ -40,8 +40,12 @@ export function TourOfferList({
   if (rows.length === 0) return null;
 
   const handleStart = (tour: TourDefinition) => {
-    onStartTour();
+    // Start first, step aside second: `startTour` declines a tour with no steps
+    // left for this viewport, and a modal that closed for a tour that never ran
+    // would neither come back nor clear its pending resume. Both stores settle
+    // in one render -- this is a single event handler.
     startTour(tour);
+    if (useTourStore.getState().active) onStartTour();
   };
 
   return (
