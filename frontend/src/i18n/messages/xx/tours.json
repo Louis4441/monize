@@ -34,6 +34,8 @@
   "settings": {
     "title": "[XX-Guided tours-XX]",
     "description": "[XX-Walk through the app's features step by step.-XX]",
+    "showList": "[XX-Show tours ({count})-XX]",
+    "hideList": "[XX-Hide tours-XX]",
     "start": "[XX-Start-XX]",
     "restart": "[XX-Retake-XX]",
     "statusNotViewed": "[XX-Not viewed-XX]",

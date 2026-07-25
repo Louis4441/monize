@@ -34,6 +34,8 @@
   "settings": {
     "title": "Visites guidées",
     "description": "Découvrez les fonctionnalités de l'application étape par étape.",
+    "showList": "Afficher les visites ({count})",
+    "hideList": "Masquer les visites",
     "start": "Démarrer",
     "restart": "Refaire",
     "statusNotViewed": "Non consultée",

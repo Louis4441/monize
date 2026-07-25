@@ -34,6 +34,8 @@
   "settings": {
     "title": "निर्देशित टूर",
     "description": "ऐप की सुविधाओं को चरण दर चरण देखें।",
+    "showList": "टूर दिखाएँ ({count})",
+    "hideList": "टूर छिपाएँ",
     "start": "शुरू करें",
     "restart": "दोबारा लें",
     "statusNotViewed": "नहीं देखा गया",

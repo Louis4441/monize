@@ -34,6 +34,8 @@
   "settings": {
     "title": "引导式导览",
     "description": "逐步了解应用的各项功能。",
+    "showList": "显示导览（{count}）",
+    "hideList": "隐藏导览",
     "start": "开始",
     "restart": "重新查看",
     "statusNotViewed": "未查看",

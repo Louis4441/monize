@@ -34,6 +34,8 @@
   "settings": {
     "title": "ガイド付きツアー",
     "description": "アプリの機能を順を追って確認できます。",
+    "showList": "ツアーを表示（{count}）",
+    "hideList": "ツアーを隠す",
     "start": "開始",
     "restart": "もう一度",
     "statusNotViewed": "未表示",

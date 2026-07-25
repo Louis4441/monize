@@ -34,6 +34,8 @@
   "settings": {
     "title": "Tours guiados",
     "description": "Percorra as funcionalidades do aplicativo passo a passo.",
+    "showList": "Mostrar tours ({count})",
+    "hideList": "Ocultar tours",
     "start": "Iniciar",
     "restart": "Refazer",
     "statusNotViewed": "Não visto",

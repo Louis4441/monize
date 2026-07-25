@@ -34,6 +34,8 @@
   "settings": {
     "title": "가이드 투어",
     "description": "앱의 기능을 단계별로 안내받아보세요.",
+    "showList": "투어 보기 ({count})",
+    "hideList": "투어 숨기기",
     "start": "시작",
     "restart": "다시 보기",
     "statusNotViewed": "보지 않음",

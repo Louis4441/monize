@@ -34,6 +34,8 @@
   "settings": {
     "title": "Geführte Touren",
     "description": "Gehen Sie die Funktionen der App Schritt für Schritt durch.",
+    "showList": "Touren anzeigen ({count})",
+    "hideList": "Touren ausblenden",
     "start": "Starten",
     "restart": "Wiederholen",
     "statusNotViewed": "Nicht angesehen",
