@@ -9,7 +9,7 @@
     "expand": "Expand to full screen",
     "collapse": "Collapse to panel",
     "close": "Close",
-    "moveCorner": "Move panel to next corner",
+    "movePanel": "Move the panel: drag it, nudge it with the arrow keys, or click to snap it to the next corner",
     "moveCornerTo": "Move to {corner}",
     "corner": {
       "bottom-right": "bottom right",

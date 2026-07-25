@@ -9,7 +9,7 @@
     "expand": "Auf Vollbild erweitern",
     "collapse": "Auf Fenster verkleinern",
     "close": "Schließen",
-    "moveCorner": "Panel in nächste Ecke verschieben",
+    "movePanel": "Panel verschieben: ziehen, mit den Pfeiltasten bewegen oder klicken, um es in die nächste Ecke zu setzen",
     "moveCornerTo": "Nach {corner} verschieben",
     "corner": {
       "bottom-right": "unten rechts",

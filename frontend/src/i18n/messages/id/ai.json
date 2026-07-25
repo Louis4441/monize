@@ -9,7 +9,7 @@
     "expand": "Perbesar ke layar penuh",
     "collapse": "Ciutkan ke panel",
     "close": "Tutup",
-    "moveCorner": "Pindahkan panel ke sudut berikutnya",
+    "movePanel": "Pindahkan panel: seret, geser dengan tombol panah, atau klik untuk memindahkannya ke sudut berikutnya",
     "moveCornerTo": "Pindahkan ke {corner}",
     "corner": {
       "bottom-right": "kanan bawah",

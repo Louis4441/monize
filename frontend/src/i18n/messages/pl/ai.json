@@ -9,7 +9,7 @@
     "expand": "Rozwiń na pełny ekran",
     "collapse": "Zwiń do panelu",
     "close": "Zamknij",
-    "moveCorner": "Przenieś panel do następnego rogu",
+    "movePanel": "Przenieś panel: przeciągnij go, przesuń strzałkami albo kliknij, aby przeskoczyć do następnego narożnika",
     "moveCornerTo": "Przenieś w {corner}",
     "corner": {
       "bottom-right": "prawy dolny róg",

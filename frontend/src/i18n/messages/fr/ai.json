@@ -9,7 +9,7 @@
     "expand": "Passer en plein écran",
     "collapse": "Réduire au panneau",
     "close": "Fermer",
-    "moveCorner": "Déplacer le panneau vers le coin suivant",
+    "movePanel": "Déplacer le panneau : faites-le glisser, utilisez les flèches, ou cliquez pour le placer dans le coin suivant",
     "moveCornerTo": "Déplacer {corner}",
     "corner": {
       "bottom-right": "en bas à droite",

@@ -9,7 +9,7 @@
     "expand": "Expandir para tela cheia",
     "collapse": "Recolher para o painel",
     "close": "Fechar",
-    "moveCorner": "Mover o painel para o próximo canto",
+    "movePanel": "Mover o painel: arraste, use as setas ou clique para levá-lo ao próximo canto",
     "moveCornerTo": "Mover para o {corner}",
     "corner": {
       "bottom-right": "canto inferior direito",

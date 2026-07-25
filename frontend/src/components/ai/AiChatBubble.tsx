@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { DragHandle } from '@/components/ui/DragHandle';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { AI_ENTITY_LINK_EVENT } from '@/lib/ai-entity-links';
 
@@ -110,8 +111,10 @@ function writeStoredPlacement(placement: Placement): void {
  * singleton aiChatStore, the conversation is shared between the two surfaces.
  *
  * On desktop the floating "sheet" panel is repositionable: drag it by its
- * header (clamped to the viewport) or cycle it between the four corners with
- * the header button. The position is persisted to localStorage per device.
+ * header or by the same grip handle the guided-tour card uses (clamped to the
+ * viewport, nudgeable with the arrow keys), and clicking that grip still cycles
+ * it between the four corners. The position is persisted to localStorage per
+ * device.
  * Mobile keeps the fixed bottom-sheet, and the full-screen view is unchanged.
  *
  * Mounted once in SwipeShell's authenticated branch, so it self-gates on the
@@ -132,6 +135,8 @@ export function AiChatBubble() {
     readStoredPlacement(),
   );
   const [dragging, setDragging] = useState(false);
+  // Where the panel sat when a grip drag started; the handle reports offsets.
+  const handleBase = useRef<Position | null>(null);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -233,6 +238,21 @@ export function AiChatBubble() {
 
   const nextCorner = CORNERS[(CORNERS.indexOf(currentCorner) + 1) % CORNERS.length];
 
+  /**
+   * Apply an offset from where a handle drag started (or from `base`, for a
+   * keyboard nudge), clamped to the viewport. Returns the placement it set so
+   * the caller can persist the final one.
+   */
+  const moveBy = (dx: number, dy: number, base?: Position): Placement => {
+    const origin = base ?? handleBase.current ?? position;
+    const next = clampPosition({ x: origin.x + dx, y: origin.y + dy });
+    const updated: Placement = { ...next, corner: currentCorner };
+    setPlacement(updated);
+    return updated;
+  };
+
+  const persist = (updated: Placement) => writeStoredPlacement(updated);
+
   const cycleCorner = () => {
     const snapped = cornerToPosition(nextCorner);
     const updated: Placement = { ...snapped, corner: nextCorner };
@@ -322,15 +342,20 @@ export function AiChatBubble() {
           </h2>
           <div className="flex items-center gap-1">
             {isFloating && (
-              <button
-                type="button"
-                onClick={cycleCorner}
-                aria-label={t('moveCorner')}
+              <DragHandle
+                label={t('movePanel')}
                 title={t('moveCornerTo', { corner: t(`corner.${nextCorner}`) })}
-                className="rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-              >
-                <MoveIcon className="h-5 w-5" />
-              </button>
+                className="p-1.5"
+                onDragStart={() => {
+                  handleBase.current = position;
+                }}
+                onDragMove={(dx, dy) => moveBy(dx, dy)}
+                onDragEnd={(dx, dy) => persist(moveBy(dx, dy))}
+                onNudge={(dx, dy) => persist(moveBy(dx, dy, position))}
+                // A click (or Enter) that did not drag keeps the old
+                // one-button corner cycle, for people who prefer snapping.
+                onActivate={cycleCorner}
+              />
             )}
             {isFull ? (
               <button
@@ -393,25 +418,6 @@ function ChatIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
         d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
-      />
-    </svg>
-  );
-}
-
-function MoveIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.8}
-      stroke="currentColor"
-      aria-hidden="true"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M7.5 3.75 12 8.25l4.5-4.5M7.5 20.25 12 15.75l4.5 4.5M3.75 7.5 8.25 12l-4.5 4.5M20.25 7.5 15.75 12l4.5 4.5"
       />
     </svg>
   );

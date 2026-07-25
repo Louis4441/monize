@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
+import { DragHandle } from '@/components/ui/DragHandle';
 import {
   computeTooltipPosition,
   type Rect,
@@ -40,8 +41,6 @@ export interface TourTooltipLabels {
   move: string;
 }
 
-/** Keyboard nudge distance for the move handle, in px. */
-const NUDGE = 24;
 /** Minimum gap kept between the card and the viewport edges. */
 const EDGE = 8;
 
@@ -150,12 +149,9 @@ export function TourTooltip({
   const [movedTo, setMovedTo] = useState<{ top: number; left: number } | null>(
     null,
   );
-  const dragFrom = useRef<{
-    x: number;
-    y: number;
-    top: number;
-    left: number;
-  } | null>(null);
+  // Where the card sat when the current drag started; the handle reports
+  // offsets from the press, not absolute coordinates.
+  const dragBase = useRef<{ top: number; left: number } | null>(null);
 
   // A manual position, and the measured size, belong to the step they were
   // taken on: the next step points at something else and its card is a
@@ -300,48 +296,10 @@ export function TourTooltip({
   const shownTop = moved ? moved.top : top;
   const shownLeft = moved ? moved.left : left;
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-    // Stop the press from selecting text or focusing through to the page.
-    e.preventDefault();
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    dragFrom.current = {
-      x: e.clientX,
-      y: e.clientY,
-      top: shownTop,
-      left: shownLeft,
-    };
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    const from = dragFrom.current;
-    if (!from) return;
-    setMovedTo(
-      clampToViewport(
-        from.top + (e.clientY - from.y),
-        from.left + (e.clientX - from.x),
-      ),
-    );
-  };
-
-  const endDrag = (e: React.PointerEvent<HTMLButtonElement>) => {
-    dragFrom.current = null;
-    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
-      e.currentTarget.releasePointerCapture?.(e.pointerId);
-    }
-  };
-
-  // Keyboard equivalent: nudge with the arrow keys while the handle is focused.
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    const deltas: Record<string, [number, number]> = {
-      ArrowUp: [0, -NUDGE],
-      ArrowDown: [0, NUDGE],
-      ArrowLeft: [-NUDGE, 0],
-      ArrowRight: [NUDGE, 0],
-    };
-    const delta = deltas[e.key];
-    if (!delta) return;
-    e.preventDefault();
-    setMovedTo(clampToViewport(shownTop + delta[1], shownLeft + delta[0]));
+  const dragTo = (dx: number, dy: number) => {
+    const base = dragBase.current;
+    if (!base) return;
+    setMovedTo(clampToViewport(base.top + dy, base.left + dx));
   };
 
   // Hide until measured to avoid a first-paint jump (visibility keeps it
@@ -361,27 +319,17 @@ export function TourTooltip({
       }`}
       style={{ top: shownTop, left: shownLeft }}
     >
-      <button
-        type="button"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onKeyDown={handleKeyDown}
-        aria-label={labels.move}
-        title={labels.move}
-        className="absolute right-1.5 top-1.5 cursor-move touch-none rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-      >
-        {/* Six-dot grip */}
-        <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <circle cx="7" cy="5" r="1.5" />
-          <circle cx="13" cy="5" r="1.5" />
-          <circle cx="7" cy="10" r="1.5" />
-          <circle cx="13" cy="10" r="1.5" />
-          <circle cx="7" cy="15" r="1.5" />
-          <circle cx="13" cy="15" r="1.5" />
-        </svg>
-      </button>
+      <DragHandle
+        label={labels.move}
+        className="absolute right-1.5 top-1.5"
+        onDragStart={() => {
+          dragBase.current = { top: shownTop, left: shownLeft };
+        }}
+        onDragMove={dragTo}
+        onNudge={(dx, dy) =>
+          setMovedTo(clampToViewport(shownTop + dy, shownLeft + dx))
+        }
+      />
       {cardBody}
     </div>,
     document.body,

@@ -9,7 +9,7 @@
     "expand": "Naar volledig scherm vergroten",
     "collapse": "Tot paneel verkleinen",
     "close": "Sluiten",
-    "moveCorner": "Paneel naar volgende hoek verplaatsen",
+    "movePanel": "Paneel verplaatsen: sleep het, verplaats het met de pijltjestoetsen of klik om het naar de volgende hoek te zetten",
     "moveCornerTo": "Naar {corner} verplaatsen",
     "corner": {
       "bottom-right": "rechtsonder",

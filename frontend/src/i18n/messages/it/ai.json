@@ -9,7 +9,7 @@
     "expand": "Espandi a schermo intero",
     "collapse": "Riduci a pannello",
     "close": "Chiudi",
-    "moveCorner": "Sposta il pannello nell’angolo successivo",
+    "movePanel": "Sposta il pannello: trascinalo, spostalo con le frecce o fai clic per portarlo nell'angolo successivo",
     "moveCornerTo": "Sposta {corner}",
     "corner": {
       "bottom-right": "in basso a destra",
