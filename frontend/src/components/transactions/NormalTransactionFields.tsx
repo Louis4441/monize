@@ -273,7 +273,9 @@ export function NormalTransactionFields({
         // tour-anchored group: a step explaining "set the currency and enter the
         // amount as charged" has to highlight both, not just the picker. Built
         // once and used by both layouts so the anchor stays attached in exactly
-        // one place.
+        // one place. Normal mode only -- SplitTransactionFields renders the
+        // picker without an equivalent group, so a tour step on this anchor
+        // gracefully skips if the form is ever in split mode when it runs.
         const amountGroup = (
           <div
             {...tourAnchor(TOUR_ANCHORS.transactionAmountCurrency)}
