@@ -14,7 +14,8 @@
     "dontShowAgain": "不再顯示",
     "showNextLogin": "下次登入時顯示",
     "close": "關閉",
-    "unavailable": "此版本的版本說明無法使用。"
+    "unavailable": "此版本的版本說明無法使用。",
+    "englishOnly": "以下版本說明僅提供英文。Monize 本身（包括導覽教學）會依照你的語言設定。"
   },
   "save": "儲存",
   "cancel": "取消",

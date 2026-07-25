@@ -14,7 +14,8 @@
     "dontShowAgain": "Bir daha gösterme",
     "showNextLogin": "Sonraki girişte göster",
     "close": "Kapat",
-    "unavailable": "Bu sürüme ait sürüm notları mevcut değil."
+    "unavailable": "Bu sürüme ait sürüm notları mevcut değil.",
+    "englishOnly": "Aşağıdaki sürüm notları yalnızca İngilizcedir. Rehberli turlar dahil Monize'nin kendisi dil ayarınızı kullanır."
   },
   "save": "Kaydet",
   "cancel": "İptal",

@@ -1,8 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent } from '@testing-library/react';
+import { fireEvent, render as rtlRender } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
 import { render, screen } from '@/test/render';
+import { ThemeProvider } from '@/contexts/ThemeContext';
+import commonMessages from '@/i18n/messages/en/common.json';
 import { WhatsNewModal } from './WhatsNewModal';
 import type { ReleaseNotes } from '@/lib/whats-new';
+
+const ENGLISH_ONLY = commonMessages.whatsNew.englishOnly;
 
 const NOTES: ReleaseNotes = {
   version: '1.12.1',
@@ -29,6 +34,26 @@ function renderModal(props: Partial<React.ComponentProps<typeof WhatsNewModal>> 
       onDontShowAgain={vi.fn()}
       {...props}
     />,
+  );
+}
+
+/**
+ * The shared test render pins the locale to English; the English-only notice
+ * depends on it, so these cases supply their own provider. English copy is
+ * fine either way -- only the locale drives the notice.
+ */
+function renderInLocale(locale: string) {
+  return rtlRender(
+    <NextIntlClientProvider locale={locale} messages={{ common: commonMessages }}>
+      <ThemeProvider>
+        <WhatsNewModal
+          isOpen
+          notes={NOTES}
+          authenticated={false}
+          onClose={vi.fn()}
+        />
+      </ThemeProvider>
+    </NextIntlClientProvider>,
   );
 }
 
@@ -133,5 +158,15 @@ describe('WhatsNewModal', () => {
   it('omits the tour offer for unauthenticated viewers', () => {
     renderModal({ authenticated: false, currentVersion: '1.13.0' });
     expect(screen.queryByText('Take a quick tour')).toBeNull();
+  });
+
+  it('says the notes are English-only when the app is in another language', () => {
+    renderInLocale('pl');
+    expect(screen.getByText(ENGLISH_ONLY)).toBeInTheDocument();
+  });
+
+  it('leaves the notice out for English readers', () => {
+    renderInLocale('en-GB');
+    expect(screen.queryByText(ENGLISH_ONLY)).toBeNull();
   });
 });

@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { remarkIssueLinks } from '@/lib/markdown/remark-issue-links';
 
 interface ReleaseNotesMarkdownProps {
   content: string;
@@ -10,8 +11,9 @@ interface ReleaseNotesMarkdownProps {
 /**
  * Renders a snippet of release-notes Markdown for the What's New modal.
  * Patterned on AssistantMarkdown but tuned for readable prose in a dialog:
- * external links open in a new tab. Headings are intentionally styled small
- * because the modal supplies the section/subsection structure itself.
+ * external links open in a new tab, and the `#123` references the notes credit
+ * their changes with become links to GitHub. Headings are intentionally styled
+ * small because the modal supplies the section/subsection structure itself.
  */
 export function ReleaseNotesMarkdown({ content }: ReleaseNotesMarkdownProps) {
   if (!content) return null;
@@ -19,7 +21,7 @@ export function ReleaseNotesMarkdown({ content }: ReleaseNotesMarkdownProps) {
   return (
     <div className="text-sm text-gray-700 dark:text-gray-300">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkIssueLinks]}
         components={{
           p: ({ children }) => (
             <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>

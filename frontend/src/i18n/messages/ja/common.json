@@ -14,7 +14,8 @@
     "dontShowAgain": "今後表示しない",
     "showNextLogin": "次回ログイン時に表示",
     "close": "閉じる",
-    "unavailable": "このバージョンのリリースノートはありません。"
+    "unavailable": "このバージョンのリリースノートはありません。",
+    "englishOnly": "以下のリリースノートは英語のみです。ガイドツアーを含む Monize 本体は言語設定に従います。"
   },
   "save": "保存",
   "cancel": "キャンセル",

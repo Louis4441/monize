@@ -14,7 +14,8 @@
     "dontShowAgain": "Niet meer weergeven",
     "showNextLogin": "Weergeven bij volgende aanmelding",
     "close": "Sluiten",
-    "unavailable": "Er zijn geen release-opmerkingen beschikbaar voor deze versie."
+    "unavailable": "Er zijn geen release-opmerkingen beschikbaar voor deze versie.",
+    "englishOnly": "De release-opmerkingen hieronder zijn alleen in het Engels. Monize zelf, inclusief de rondleidingen, volgt je taalinstelling."
   },
   "save": "Opslaan",
   "cancel": "Annuleren",
