@@ -41,7 +41,7 @@ test.describe('Guided tours', () => {
     // Interactive: clicking the highlighted New Transaction button opens the
     // form, and the tour auto-advances into the in-form steps.
     await page.getByRole('button', { name: '+ New Transaction' }).click();
-    await expect(page.getByText('Payee, category and amount')).toBeVisible();
+    await expect(page.getByText('Payee and category')).toBeVisible();
 
     // In-form passive steps (fields -> splits -> currency) up to the centered
     // "close the form" step.

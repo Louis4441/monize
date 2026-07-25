@@ -71,16 +71,16 @@
           "body": "Agrega un ingreso o gasto con **Nueva transacción**. Adelante, abre el formulario."
         },
         "fields": {
-          "title": "Beneficiario, categoría e importe",
-          "body": "Para cada transacción eliges un beneficiario, asignas una categoría e ingresas el importe. Las categorías son las que impulsan tus presupuestos e informes."
+          "title": "Beneficiario y categoría",
+          "body": "Para cada transacción eliges un beneficiario y asignas una categoría. Las categorías son las que impulsan tus presupuestos e informes; el importe viene en el paso siguiente."
         },
         "splits": {
           "title": "Desglosar una transacción",
           "body": "¿Una compra que abarca varias categorías? Usa **Desglosar transacción** para dividir una sola transacción entre categorías; por ejemplo, comestibles y artículos del hogar de una misma tienda."
         },
         "currencyField": {
-          "title": "Monedas extranjeras",
-          "body": "¿Compraste algo en el extranjero? Configura aquí la moneda e ingresa el importe tal como se cobró — Monize lo convierte a la moneda de la cuenta por ti."
+          "title": "Importe y moneda",
+          "body": "Introduce aquí el importe de la transacción. ¿Pagaste en otra moneda? Configura la moneda junto al importe e introdúcelo tal como se cobró — Monize lo convierte a la moneda de la cuenta por ti."
         },
         "closeForm": {
           "title": "Cierra el formulario para continuar",

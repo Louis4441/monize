@@ -71,16 +71,16 @@
           "body": "Tambahkan pemasukan atau pengeluaran dengan **Transaksi Baru**. Silakan buka formulirnya."
         },
         "fields": {
-          "title": "Penerima pembayaran, kategori, dan jumlah",
-          "body": "Untuk setiap transaksi, Anda memilih penerima pembayaran, menetapkan kategori, dan memasukkan jumlahnya. Kategori inilah yang menjadi dasar anggaran dan laporan Anda."
+          "title": "Penerima pembayaran dan kategori",
+          "body": "Untuk setiap transaksi, Anda memilih penerima pembayaran dan menetapkan kategori. Kategori inilah yang menjadi dasar anggaran dan laporan Anda; jumlahnya menyusul di langkah berikutnya."
         },
         "splits": {
           "title": "Bagi transaksi",
           "body": "Satu pembelian mencakup beberapa kategori? Gunakan **Transaksi Terbagi** untuk membagi satu transaksi ke beberapa kategori — misalnya belanja bahan makanan dan keperluan rumah tangga dari satu toko."
         },
         "currencyField": {
-          "title": "Mata uang asing",
-          "body": "Membeli sesuatu di luar negeri? Atur mata uangnya di sini dan masukkan jumlah sesuai yang dibebankan — Monize akan mengonversinya ke mata uang akun untuk Anda."
+          "title": "Jumlah dan mata uang",
+          "body": "Masukkan jumlah transaksinya di sini. Membayar dalam mata uang lain? Atur mata uang di samping jumlah dan masukkan sesuai yang dibebankan — Monize akan mengonversinya ke mata uang akun untuk Anda."
         },
         "closeForm": {
           "title": "Tutup formulir untuk melanjutkan",

@@ -71,16 +71,16 @@
           "body": "[XX-Add income or spending with **New Transaction**. Go ahead and open the form.-XX]"
         },
         "fields": {
-          "title": "[XX-Payee, category and amount-XX]",
-          "body": "[XX-For each transaction you pick a payee, assign a category, and enter the amount. Categories are what power your budgets and reports.-XX]"
+          "title": "[XX-Payee and category-XX]",
+          "body": "[XX-For each transaction you pick a payee and assign a category. Categories are what power your budgets and reports; the amount comes next.-XX]"
         },
         "splits": {
           "title": "[XX-Split a transaction-XX]",
           "body": "[XX-One purchase covering several categories? Use **Split** to divide a single transaction across categories — groceries and household from one shop, say.-XX]"
         },
         "currencyField": {
-          "title": "[XX-Foreign currencies-XX]",
-          "body": "[XX-Bought something abroad? Set the currency here and enter the amount as charged — Monize converts it to the account currency for you.-XX]"
+          "title": "[XX-Amount and currency-XX]",
+          "body": "[XX-Enter what the transaction cost here. Paid in another currency? Set the entry currency beside the amount and type it as charged — Monize converts it to the account currency for you.-XX]"
         },
         "closeForm": {
           "title": "[XX-Close the form to continue-XX]",

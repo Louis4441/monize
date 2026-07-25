@@ -71,16 +71,16 @@
           "body": "Ajoutez un revenu ou une dépense avec **Nouvelle transaction**. Allez-y, ouvrez le formulaire."
         },
         "fields": {
-          "title": "Bénéficiaire, catégorie et montant",
-          "body": "Pour chaque transaction, vous choisissez un bénéficiaire, attribuez une catégorie et saisissez le montant. Ce sont les catégories qui alimentent vos budgets et vos rapports."
+          "title": "Bénéficiaire et catégorie",
+          "body": "Pour chaque transaction, vous choisissez un bénéficiaire et attribuez une catégorie. Ce sont les catégories qui alimentent vos budgets et vos rapports ; le montant vient à l'étape suivante."
         },
         "splits": {
           "title": "Répartir une transaction",
           "body": "Un achat couvre plusieurs catégories ? Utilisez **Répartir la transaction** pour diviser une seule transaction entre plusieurs catégories — l'épicerie et les articles ménagers d'un même magasin, par exemple."
         },
         "currencyField": {
-          "title": "Devises étrangères",
-          "body": "Avez-vous acheté quelque chose à l'étranger ? Définissez la devise ici et saisissez le montant tel que facturé — Monize le convertit pour vous dans la devise du compte."
+          "title": "Montant et devise",
+          "body": "Saisissez ici le montant de la transaction. Payé dans une autre devise ? Définissez la devise à côté du montant et saisissez-le tel que facturé — Monize le convertit pour vous dans la devise du compte."
         },
         "closeForm": {
           "title": "Fermez le formulaire pour continuer",

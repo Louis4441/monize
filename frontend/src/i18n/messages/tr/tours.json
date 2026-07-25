@@ -71,16 +71,16 @@
           "body": "**Yeni İşlem** ile gelir veya gider ekleyin. Hadi formu açın."
         },
         "fields": {
-          "title": "Alıcı, kategori ve tutar",
-          "body": "Her işlem için bir alıcı seçer, bir kategori atar ve tutarı girersiniz. Kategoriler, bütçelerinizi ve raporlarınızı besleyen unsurlardır."
+          "title": "Alıcı ve kategori",
+          "body": "Her işlem için bir alıcı seçer ve bir kategori atarsınız. Kategoriler, bütçelerinizi ve raporlarınızı besleyen unsurlardır; tutar bir sonraki adımda."
         },
         "splits": {
           "title": "İşlemi Böl",
           "body": "Tek bir alışveriş birden fazla kategoriyi mi kapsıyor? Tek bir işlemi kategorilere bölmek için **İşlemi Böl** seçeneğini kullanın — örneğin tek bir alışverişten market ve ev eşyası gibi."
         },
         "currencyField": {
-          "title": "Yabancı para birimleri",
-          "body": "Yurt dışında bir şey mi aldınız? Para birimini burada ayarlayın ve tutarı ödendiği şekilde girin — Monize bunu hesap para birimine sizin için çevirir."
+          "title": "Tutar ve para birimi",
+          "body": "İşlemin tutarını burada girin. Başka bir para biriminde mi ödediniz? Tutarın yanındaki para birimini ayarlayın ve tutarı ödendiği şekilde girin — Monize bunu hesap para birimine sizin için çevirir."
         },
         "closeForm": {
           "title": "Devam etmek için formu kapatın",

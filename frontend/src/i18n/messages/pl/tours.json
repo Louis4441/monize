@@ -13,7 +13,7 @@
   },
   "offer": {
     "heading": "Zobacz krótki przewodnik",
-    "subheading": "Krótkie wprowadzenia do nowości w tym wydaniu. To okno ustępuje na czas przewodnika i wraca, gdy się on skończy.",
+    "subheading": "Krótkie wprowadzenia do nowości w tym wydaniu. To okno schowa się na czas przewodnika i wróci po jego zakończeniu.",
     "showMe": "Pokaż mi",
     "viewed": "Obejrzano",
     "introTitle": "Nowy tutaj? Skorzystaj z przewodnika wprowadzającego",
@@ -71,16 +71,16 @@
           "body": "Dodaj przychód lub wydatek za pomocą przycisku **Nowa transakcja**. Otwórz teraz formularz."
         },
         "fields": {
-          "title": "Odbiorca, kategoria i kwota",
-          "body": "Dla każdej transakcji wybierasz odbiorcę, przypisujesz kategorię i wprowadzasz kwotę. To kategorie napędzają Twoje budżety i raporty."
+          "title": "Odbiorca i kategoria",
+          "body": "Dla każdej transakcji wybierasz odbiorcę i przypisujesz kategorię. To kategorie napędzają Twoje budżety i raporty; kwota będzie w następnym kroku."
         },
         "splits": {
           "title": "Podziel transakcję",
           "body": "Jeden zakup obejmujący kilka kategorii? Użyj opcji **Podziel transakcję**, aby rozdzielić pojedynczą transakcję na kilka kategorii — na przykład zakupy spożywcze i artykuły gospodarstwa domowego z jednego sklepu."
         },
         "currencyField": {
-          "title": "Waluty obce",
-          "body": "Kupiłeś coś za granicą? Ustaw tutaj walutę i wprowadź kwotę zgodnie z obciążeniem — Monize przeliczy ją na walutę konta za Ciebie."
+          "title": "Kwota i waluta",
+          "body": "Tutaj wpisujesz kwotę transakcji. Płaciłeś w innej walucie? Ustaw walutę obok kwoty i wpisz ją zgodnie z obciążeniem — Monize przeliczy ją na walutę konta za Ciebie."
         },
         "closeForm": {
           "title": "Zamknij formularz, aby kontynuować",

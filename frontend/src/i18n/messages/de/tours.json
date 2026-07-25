@@ -71,16 +71,16 @@
           "body": "Fügen Sie Einnahmen oder Ausgaben über **Neue Buchung** hinzu. Öffnen Sie ruhig das Formular."
         },
         "fields": {
-          "title": "Zahlungsempfänger, Kategorie und Betrag",
-          "body": "Bei jeder Buchung wählen Sie einen Zahlungsempfänger, weisen eine Kategorie zu und geben den Betrag ein. Kategorien sind die Grundlage für Ihre Budgets und Berichte."
+          "title": "Zahlungsempfänger und Kategorie",
+          "body": "Bei jeder Buchung wählen Sie einen Zahlungsempfänger und weisen eine Kategorie zu. Kategorien sind die Grundlage für Ihre Budgets und Berichte; der Betrag kommt im nächsten Schritt."
         },
         "splits": {
           "title": "Eine Buchung aufteilen",
           "body": "Ein Einkauf, der mehrere Kategorien betrifft? Nutzen Sie **Buchung aufteilen**, um eine einzelne Buchung auf mehrere Kategorien aufzuteilen — zum Beispiel Lebensmittel und Haushaltswaren aus einem Einkauf."
         },
         "currencyField": {
-          "title": "Fremdwährungen",
-          "body": "Etwas im Ausland gekauft? Legen Sie hier die Währung fest und geben Sie den belasteten Betrag ein — Monize rechnet ihn für Sie in die Kontowährung um."
+          "title": "Betrag und Währung",
+          "body": "Hier geben Sie den Betrag der Buchung ein. In einer anderen Währung bezahlt? Legen Sie neben dem Betrag die Währung fest und geben Sie ihn wie belastet ein — Monize rechnet ihn für Sie in die Kontowährung um."
         },
         "closeForm": {
           "title": "Schließen Sie das Formular, um fortzufahren",

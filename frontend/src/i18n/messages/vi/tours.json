@@ -71,16 +71,16 @@
           "body": "Thêm khoản thu hoặc chi bằng **Giao tác mới**. Hãy mở biểu mẫu để thử."
         },
         "fields": {
-          "title": "Người thụ hưởng, danh mục và số tiền",
-          "body": "Với mỗi giao dịch, bạn chọn một người thụ hưởng, gán một danh mục và nhập số tiền. Danh mục chính là yếu tố vận hành ngân sách và báo cáo của bạn."
+          "title": "Người thụ hưởng và danh mục",
+          "body": "Với mỗi giao dịch, bạn chọn một người thụ hưởng và gán một danh mục. Danh mục chính là yếu tố vận hành ngân sách và báo cáo của bạn; số tiền sẽ ở bước tiếp theo."
         },
         "splits": {
           "title": "Chia giao tác",
           "body": "Một lần mua hàng bao gồm nhiều danh mục? Dùng **Chia giao tác** để chia một giao dịch thành nhiều danh mục — ví dụ như hàng tạp hóa và đồ gia dụng từ cùng một cửa hàng."
         },
         "currencyField": {
-          "title": "Ngoại tệ",
-          "body": "Mua hàng ở nước ngoài? Đặt loại tiền tệ tại đây và nhập số tiền theo hóa đơn — Monize sẽ quy đổi sang loại tiền tệ của tài khoản giúp bạn."
+          "title": "Số tiền và loại tiền",
+          "body": "Nhập số tiền của giao dịch tại đây. Bạn đã trả bằng loại tiền khác? Đặt loại tiền bên cạnh số tiền và nhập theo đúng hóa đơn — Monize sẽ quy đổi sang loại tiền của tài khoản giúp bạn."
         },
         "closeForm": {
           "title": "Đóng biểu mẫu để tiếp tục",

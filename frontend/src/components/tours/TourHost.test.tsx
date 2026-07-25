@@ -200,7 +200,7 @@ describe('TourHost', () => {
 
     await start(buildTour(false));
     await waitFor(() =>
-      expect(screen.getByText('Payee, category and amount')).toBeInTheDocument(),
+      expect(screen.getByText('Payee and category')).toBeInTheDocument(),
     );
     const passiveChildren = spotlightChildren();
 
@@ -209,7 +209,7 @@ describe('TourHost', () => {
     });
     await start(buildTour(true));
     await waitFor(() =>
-      expect(screen.getByText('Payee, category and amount')).toBeInTheDocument(),
+      expect(screen.getByText('Payee and category')).toBeInTheDocument(),
     );
 
     // One fewer child: the hole blocker is gone, so the field accepts input.
@@ -418,4 +418,5 @@ describe('TourHost', () => {
     expect(useTourStore.getState().active).toBeNull();
     expect(saveProgress).toHaveBeenCalledWith('test/skip', 'completed');
   });
+
 });

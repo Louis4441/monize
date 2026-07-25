@@ -71,16 +71,16 @@
           "body": "Adicione uma receita ou despesa com **Nova Transação**. Avance e abra o formulário."
         },
         "fields": {
-          "title": "Beneficiário, categoria e montante",
-          "body": "Para cada transação escolhe um beneficiário, atribui uma categoria e introduz o montante. As categorias são o motor dos seus orçamentos e relatórios."
+          "title": "Beneficiário e categoria",
+          "body": "Para cada transação escolhe um beneficiário e atribui uma categoria. As categorias são o motor dos seus orçamentos e relatórios; o montante vem no passo seguinte."
         },
         "splits": {
           "title": "Dividir uma transação",
           "body": "Uma compra que abrange várias categorias? Utilize **Dividir Transação em Parcelas** para dividir uma única transação por várias categorias — por exemplo, mercearia e artigos para casa numa só compra."
         },
         "currencyField": {
-          "title": "Moedas estrangeiras",
-          "body": "Comprou algo no estrangeiro? Defina aqui a moeda e introduza o montante tal como foi cobrado — o Monize converte-o para a moeda da conta por si."
+          "title": "Montante e moeda",
+          "body": "Introduza aqui o montante da transação. Pagou noutra moeda? Defina a moeda ao lado do montante e introduza-o tal como foi cobrado — o Monize converte-o para a moeda da conta por si."
         },
         "closeForm": {
           "title": "Feche o formulário para continuar",

@@ -71,16 +71,16 @@
           "body": "Aggiungi entrate o uscite con **Nuova transazione**. Vai pure ad aprire il modulo."
         },
         "fields": {
-          "title": "Beneficiario, categoria e importo",
-          "body": "Per ogni transazione scegli un beneficiario, assegni una categoria e inserisci l'importo. Le categorie sono ciò che alimenta i tuoi budget e report."
+          "title": "Beneficiario e categoria",
+          "body": "Per ogni transazione scegli un beneficiario e assegni una categoria. Le categorie sono ciò che alimenta i tuoi budget e report; l'importo arriva al passo successivo."
         },
         "splits": {
           "title": "Suddividi transazione",
           "body": "Un acquisto che copre più categorie? Usa **Suddividi transazione** per dividere una singola transazione tra più categorie: ad esempio spesa alimentare e casa da un unico negozio."
         },
         "currencyField": {
-          "title": "Valute estere",
-          "body": "Hai acquistato qualcosa all'estero? Imposta qui la valuta e inserisci l'importo addebitato: Monize lo converte automaticamente nella valuta del conto."
+          "title": "Importo e valuta",
+          "body": "Inserisci qui l'importo della transazione. Hai pagato in un'altra valuta? Imposta la valuta accanto all'importo e inseriscilo come addebitato: Monize lo converte nella valuta del conto."
         },
         "closeForm": {
           "title": "Chiudi il modulo per continuare",
