@@ -56,9 +56,14 @@ beforeEach(() => {
   }));
 });
 
+/** jsdom's default viewport, restored after the cases that resize it. */
+const VIEWPORT = { width: window.innerWidth, height: window.innerHeight };
+
 afterEach(() => {
   cleanup();
   document.body.innerHTML = '';
+  window.innerWidth = VIEWPORT.width;
+  window.innerHeight = VIEWPORT.height;
 });
 
 describe('TourTooltip', () => {
@@ -142,6 +147,29 @@ describe('TourTooltip', () => {
       rerender({ stepLabel: '3 of 5', title: 'Another step' });
       expect(card().className).toContain('opacity-0');
       await waitFor(() => expect(card().className).toContain('opacity-100'));
+    });
+
+    it('pulls a dragged card back inside a shrunken viewport', () => {
+      setup();
+      fireEvent.pointerDown(handle(), { clientX: 0, clientY: 0, pointerId: 1 });
+      fireEvent.pointerMove(handle(), {
+        clientX: 900,
+        clientY: 700,
+        pointerId: 1,
+      });
+      fireEvent.pointerUp(handle(), { pointerId: 1 });
+      const parked = cardPos();
+
+      window.innerWidth = 500;
+      window.innerHeight = 400;
+      fireEvent(window, new Event('resize'));
+
+      // The manual position survives the step, but not at coordinates that put
+      // the card (and its drag handle) outside the window.
+      const after = cardPos();
+      expect(parseFloat(after.left)).toBeLessThan(parseFloat(parked.left));
+      expect(parseFloat(after.left)).toBeLessThanOrEqual(500);
+      expect(parseFloat(after.top)).toBeLessThanOrEqual(400);
     });
 
     it('keeps a corner-parked card against the resized viewport', () => {

@@ -170,7 +170,10 @@ export function TourTooltip({
     setSize(null);
   }
 
-  // Measure the card after first paint so positioning can center/flip it.
+  // Measure the card after first paint so positioning can center/flip it. Also
+  // after a resize: the card is `w-80 max-w-[calc(100vw-16px)]`, so a narrower
+  // viewport re-wraps the body and changes the height that decides whether the
+  // card sits above or below its anchor.
   useEffect(() => {
     if (!cardRef.current) return;
     const el = cardRef.current;
@@ -178,7 +181,7 @@ export function TourTooltip({
       setSize({ width: el.offsetWidth, height: el.offsetHeight });
     });
     return () => cancelAnimationFrame(raf);
-  }, [stepKey, isMobile]);
+  }, [stepKey, isMobile, viewport]);
 
   // Move focus to the card on each step so its controls are keyboard-reachable
   // and Modal (which traps Tab) yields to us -- unless an in-form step asked us
@@ -290,8 +293,12 @@ export function TourTooltip({
     ),
   });
 
-  const shownTop = movedTo ? movedTo.top : top;
-  const shownLeft = movedTo ? movedTo.left : left;
+  // Clamped on every render, not just while dragging: a window narrowed after
+  // the user parked the card would otherwise leave it off-screen for the rest
+  // of the step, with no handle left to drag it back.
+  const moved = movedTo ? clampToViewport(movedTo.top, movedTo.left) : null;
+  const shownTop = moved ? moved.top : top;
+  const shownLeft = moved ? moved.left : left;
 
   const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     // Stop the press from selecting text or focusing through to the page.
