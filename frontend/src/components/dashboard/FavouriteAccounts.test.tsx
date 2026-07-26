@@ -280,6 +280,24 @@ describe("FavouriteAccounts", () => {
     expect(mockPush).toHaveBeenCalledWith("/investments?accountId=brok-1");
   });
 
+  it("highlights the row edge on hover, matching the Top Movers widget", () => {
+    const accounts = [
+      {
+        id: "acc-1",
+        name: "Checking",
+        currentBalance: 1500,
+        currencyCode: "CAD",
+        isFavourite: true, favouriteSortOrder: 0,
+        isClosed: false,
+      },
+    ] as any[];
+
+    render(<FavouriteAccounts accounts={accounts} isLoading={false} />);
+    const row = screen.getByText("Checking").closest("button")!;
+    expect(row.className).toContain("hover:border-blue-400");
+    expect(row.className).toContain("dark:hover:border-blue-500");
+  });
+
   describe("favourite account ordering", () => {
     const orderedAccounts = [
       {

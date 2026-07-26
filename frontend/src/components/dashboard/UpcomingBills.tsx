@@ -235,7 +235,7 @@ export function UpcomingBills({ scheduledTransactions, accounts, isLoading, maxI
                 }
               }}
               title={t('upcomingBills.postTransaction')}
-              className={`flex items-center justify-between p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`flex items-center justify-between p-2 sm:p-3 rounded-lg border cursor-pointer transition-colors hover:border-blue-400 hover:bg-gray-50 dark:hover:border-blue-500 dark:hover:bg-gray-700/50 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 isOverdue(item.nextDueDate)
                   ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/10'
                   : 'border-gray-200 dark:border-gray-700'
