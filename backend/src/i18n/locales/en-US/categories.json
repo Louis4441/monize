@@ -1,22 +1,24 @@
 {
   "defaults": {
-    "automobile": {
+    "bills": {
       "sub": {
-        "licencing": "Licensing"
+        "mobilePhone": "Cell Phone"
       }
     },
-    "childcare": {
+    "business": {
       "sub": {
-        "counselling": "Counseling"
+        "mobilePhone": "Cell Phone"
+      }
+    },
+    "governmentFees": {
+      "sub": {
+        "licencesPermits": "Licenses & Permits"
       }
     },
     "healthcare": {
       "sub": {
         "counselling": "Counseling"
       }
-    },
-    "licencingFees": {
-      "name": "Licensing Fees"
     }
   }
 }

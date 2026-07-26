@@ -1,9 +1,6 @@
 import { readFileSync } from "fs";
 import { join } from "path";
-import {
-  DEFAULT_INCOME_CATEGORIES,
-  DEFAULT_EXPENSE_CATEGORIES,
-} from "./default-categories";
+import { allDefaultCategoryDefinitions } from "./country-category-additions";
 import {
   categoryKeySegment,
   defaultCategoryNameKey,
@@ -18,10 +15,19 @@ const catalog = JSON.parse(
   defaults: Record<string, { name: string; sub: Record<string, string> }>;
 };
 
-const ALL_CATEGORIES = [
-  ...DEFAULT_INCOME_CATEGORIES,
-  ...DEFAULT_EXPENSE_CATEGORIES,
-];
+// Every name that any country's default import can create -- the generic
+// baseline plus each country overlay.
+const ALL_CATEGORIES = allDefaultCategoryDefinitions();
+
+/** Union of the subcategories each parent name can have across countries. */
+const SUBS_BY_PARENT = ALL_CATEGORIES.reduce<Map<string, Set<string>>>(
+  (acc, cat) => {
+    const subs = acc.get(cat.name) ?? new Set<string>();
+    cat.subcategories.forEach((s) => subs.add(s));
+    return new Map(acc).set(cat.name, subs);
+  },
+  new Map(),
+);
 
 function resolve(obj: Json, dotKey: string): string | undefined {
   // Keys are produced as `categories.defaults.<parent>...`; the `categories`
@@ -38,13 +44,13 @@ function resolve(obj: Json, dotKey: string): string | undefined {
 describe("categoryKeySegment", () => {
   it.each([
     ["Car Payment", "carPayment"],
-    ["US Dollars", "usDollars"],
     ["Water & Sewer", "waterSewer"],
     ["CPP/QPP Benefits", "cppQppBenefits"],
+    ["GST/HST Credit", "gstHstCredit"],
+    ["Licences & Permits", "licencesPermits"],
+    ["401(k) Withdrawal", "401KWithdrawal"],
     ["Mother's Day", "mothersDay"],
-    ["Homeowner/Renter", "homeownerRenter"],
     ["ATM", "atm"],
-    ["Camera/Film", "cameraFilm"],
   ])("slugs %s -> %s", (input, expected) => {
     expect(categoryKeySegment(input)).toBe(expected);
   });
@@ -75,10 +81,10 @@ describe("default category catalog parity", () => {
       expect(expectedParentSlugs.has(parentSlug)).toBe(true);
     }
 
-    for (const cat of ALL_CATEGORIES) {
-      const parentSlug = categoryKeySegment(cat.name);
+    for (const [parentName, subs] of SUBS_BY_PARENT) {
+      const parentSlug = categoryKeySegment(parentName);
       const expectedSubSlugs = new Set(
-        cat.subcategories.map((s) => categoryKeySegment(s)),
+        Array.from(subs).map((s) => categoryKeySegment(s)),
       );
       const catalogSubSlugs = Object.keys(catalog.defaults[parentSlug].sub);
       expect(catalogSubSlugs.length).toBe(expectedSubSlugs.size);
@@ -89,13 +95,14 @@ describe("default category catalog parity", () => {
   });
 
   it("derives collision-free parent slugs", () => {
-    const slugs = ALL_CATEGORIES.map((c) => categoryKeySegment(c.name));
+    const names = Array.from(SUBS_BY_PARENT.keys());
+    const slugs = names.map((n) => categoryKeySegment(n));
     expect(new Set(slugs).size).toBe(slugs.length);
   });
 
   it("derives collision-free subcategory slugs within each parent", () => {
-    for (const cat of ALL_CATEGORIES) {
-      const slugs = cat.subcategories.map((s) => categoryKeySegment(s));
+    for (const subs of SUBS_BY_PARENT.values()) {
+      const slugs = Array.from(subs).map((s) => categoryKeySegment(s));
       expect(new Set(slugs).size).toBe(slugs.length);
     }
   });

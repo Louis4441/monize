@@ -23,10 +23,9 @@ import { CreateCategoryDto } from "./dto/create-category.dto";
 import { UpdateCategoryDto } from "./dto/update-category.dto";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { toCountMap } from "../common/count-map.util";
-import {
-  DEFAULT_INCOME_CATEGORIES,
-  DEFAULT_EXPENSE_CATEGORIES,
-} from "./default-categories";
+import { getDefaultCategories } from "./country-category-additions";
+import { isSupportedLocale } from "../i18n/config";
+import { ImportDefaultsDto } from "./dto/import-defaults.dto";
 
 @Injectable()
 export class CategoriesService {
@@ -769,7 +768,10 @@ export class CategoriesService {
     return { principalCategory, interestCategory };
   }
 
-  async importDefaults(userId: string): Promise<{ categoriesCreated: number }> {
+  async importDefaults(
+    userId: string,
+    options: ImportDefaultsDto = {},
+  ): Promise<{ categoriesCreated: number }> {
     const existingCount = await this.categoriesRepository.count({
       where: { userId, isSystem: false },
     });
@@ -783,14 +785,14 @@ export class CategoriesService {
       );
     }
 
-    // Seed the rows in the user's own language, not the request locale. The
+    // Seed the rows in the language the user picked for this import, falling
+    // back to their own stored language rather than the request locale. The
     // names become user-owned, editable rows, so this localizes only what is
     // created now; already-imported categories are untouched. Missing catalog
     // keys fall back to the English source.
-    const lang = await resolveUserEmailLocale(
-      this.preferencesRepository,
-      userId,
-    );
+    const lang = isSupportedLocale(options.language)
+      ? (options.language as string)
+      : await resolveUserEmailLocale(this.preferencesRepository, userId);
     const localizeCategory = (name: string): string =>
       translateInLocale(this.i18n, lang, defaultCategoryNameKey(name), name);
     const localizeSubcategory = (parentName: string, name: string): string =>
@@ -801,6 +803,11 @@ export class CategoriesService {
         name,
       );
 
+    // Country-specific additions (tax lines, benefits, local charges) are
+    // layered over the country-neutral baseline; an omitted or unknown country
+    // yields the generic catalog.
+    const { income, expense } = getDefaultCategories(options.country);
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -809,7 +816,7 @@ export class CategoriesService {
       const repo = queryRunner.manager.getRepository(Category);
       let categoryCount = 0;
 
-      for (const cat of DEFAULT_INCOME_CATEGORIES) {
+      for (const cat of income) {
         const parentCategory = repo.create({
           userId,
           name: localizeCategory(cat.name),
@@ -830,7 +837,7 @@ export class CategoriesService {
         }
       }
 
-      for (const cat of DEFAULT_EXPENSE_CATEGORIES) {
+      for (const cat of expense) {
         const parentCategory = repo.create({
           userId,
           name: localizeCategory(cat.name),

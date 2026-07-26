@@ -1,12 +1,14 @@
 {
   "defaults": {
-    "automobile": {
+    "food": {
       "sub": {
-        "licencing": "Licensing"
+        "takeout": "Takeaway"
       }
     },
-    "licencingFees": {
-      "name": "Licensing Fees"
+    "transportation": {
+      "sub": {
+        "publicTransit": "Public Transport"
+      }
     }
   }
 }

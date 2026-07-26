@@ -9,10 +9,11 @@ import { useHighlightParam } from '@/hooks/useHighlightTarget';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/Button';
 const CategoryForm = dynamic(() => import('@/components/categories/CategoryForm').then(m => m.CategoryForm), { ssr: false });
+import { ImportDefaultCategoriesDialog } from '@/components/categories/ImportDefaultCategoriesDialog';
 import { CategoryList, type DensityLevel, type SortField, type SortDirection } from '@/components/categories/CategoryList';
 import { Modal } from '@/components/ui/Modal';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
-import { categoriesApi } from '@/lib/categories';
+import { categoriesApi, type ImportDefaultsOptions } from '@/lib/categories';
 import { Category } from '@/types/category';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { PageLayout } from '@/components/layout/PageLayout';
@@ -42,6 +43,7 @@ function CategoriesContent() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [listDensity, setListDensity] = useLocalStorage<DensityLevel>('monize-categories-density', 'normal');
@@ -107,11 +109,12 @@ function CategoriesContent() {
     }
   };
 
-  const handleImportDefaults = async () => {
+  const handleImportDefaults = async (options: ImportDefaultsOptions) => {
     setIsImporting(true);
     try {
-      const result = await categoriesApi.importDefaults();
+      const result = await categoriesApi.importDefaults(options);
       toast.success(t('toasts.importSuccess', { count: result.categoriesCreated }));
+      setShowImportDialog(false);
       loadCategories();
     } catch (error) {
       toast.error(getErrorMessage(error, t('toasts.importFailed')));
@@ -247,6 +250,14 @@ function CategoriesContent() {
         </Modal>
         <UnsavedChangesDialog {...unsavedChangesDialog} />
 
+        {/* Default category import (country + language) */}
+        <ImportDefaultCategoriesDialog
+          isOpen={showImportDialog}
+          isImporting={isImporting}
+          onClose={() => setShowImportDialog(false)}
+          onConfirm={handleImportDefaults}
+        />
+
         {/* Categories List */}
         <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg overflow-hidden">
           {isLoading ? (
@@ -274,7 +285,7 @@ function CategoriesContent() {
               </p>
               <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
                 <Button
-                  onClick={handleImportDefaults}
+                  onClick={() => setShowImportDialog(true)}
                   isLoading={isImporting}
                   disabled={isImporting}
                 >
