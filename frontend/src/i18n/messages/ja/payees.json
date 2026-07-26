@@ -4,6 +4,7 @@
     "subtitle": "支払先とデフォルトカテゴリを管理する",
     "deactivateUnused": "未使用を無効化",
     "autoAssignCategories": "カテゴリを自動割り当て",
+    "maintenance": "メンテナンス",
     "autoMergePayees": "支払先を自動マージ",
     "newPayee": "+ 新規支払先",
     "searchPlaceholder": "支払先を検索...",

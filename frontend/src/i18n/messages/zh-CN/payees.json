@@ -4,6 +4,7 @@
     "subtitle": "管理您的收款人及其默认分类",
     "deactivateUnused": "停用未使用",
     "autoAssignCategories": "自动分配分类",
+    "maintenance": "维护",
     "autoMergePayees": "自动合并收款人",
     "newPayee": "+ 新建收款人",
     "searchPlaceholder": "搜索收款人...",
