@@ -6,6 +6,7 @@ import { useTourStore } from '@/store/tourStore';
 import {
   useWhatsNewStore,
   consumeWhatsNewPendingForLogin,
+  recordAnnouncedVersion,
 } from '@/store/whatsNewStore';
 import { whatsNewApi, type ReleaseNotes } from '@/lib/whats-new';
 import { createLogger } from '@/lib/logger';
@@ -24,9 +25,12 @@ const logger = createLogger('WhatsNew');
  * manually.
  *
  * The modal auto-opens only when the backend says the user is due this version
- * *and* this page load followed a login (see `markWhatsNewPendingForLogin`).
- * The backend status alone is version-scoped, not session-scoped, so gating on
- * it alone reopened the modal on every refresh until acknowledged.
+ * *and* this page load is a moment to deliver it: either it followed a login
+ * (`markWhatsNewPendingForLogin`), or the version is one this browser has not
+ * announced yet (`recordAnnouncedVersion`), which covers a deploy landing under
+ * a session that never logs out. The backend status alone is version-scoped,
+ * not session-scoped, so gating on it alone reopened the modal on every refresh
+ * until acknowledged.
  */
 export function WhatsNewHost() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -56,17 +60,20 @@ export function WhatsNewHost() {
         setCurrentVersion(
           'currentVersion' in res ? res.currentVersion : res.version,
         );
-        // `autoShow` says the user is *due* this version's digest; the login
-        // flag says this page load is the one that should deliver it. Both, or
-        // it reopens on every refresh for as long as the version is
-        // unacknowledged.
+        // `autoShow` says the user is *due* this version's digest; the two
+        // client-side triggers say this page load is a moment to deliver it --
+        // a fresh login, or a version this browser has not announced yet (so a
+        // deploy under a long-lived session lands on the next refresh).
+        // Without one of them the modal reopened on every refresh for as long
+        // as the version stayed unacknowledged.
         //
-        // Spent on any authenticated check, not just one that opens the modal,
-        // so a login with nothing to show cannot leave it armed for a later
-        // refresh to pick up.
+        // Both are evaluated, never short-circuited: the login flag has to be
+        // spent and the version recorded on every authenticated check, or a
+        // load with nothing to show leaves a trigger armed for a later refresh.
         if ('autoShow' in res) {
           const cameFromLogin = consumeWhatsNewPendingForLogin();
-          if (cameFromLogin && res.autoShow && res.notes) {
+          const isNewToThisBrowser = recordAnnouncedVersion(res.currentVersion);
+          if ((cameFromLogin || isNewToThisBrowser) && res.autoShow && res.notes) {
             open();
           }
         }

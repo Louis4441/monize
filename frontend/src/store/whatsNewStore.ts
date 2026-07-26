@@ -36,6 +36,38 @@ export function consumeWhatsNewPendingForLogin(): boolean {
 }
 
 /**
+ * The last app version this browser auto-showed the digest for.
+ *
+ * The second way in: a session that never logs out would otherwise wait for a
+ * login it never performs, so a deploy landing under an open session should
+ * announce itself on the next refresh.
+ *
+ * localStorage rather than sessionStorage deliberately. Scoping this per tab
+ * would announce the same deploy once in every open tab; per browser it is
+ * announced once, whichever tab refreshes first. The backend's `autoShow` still
+ * gates it, so this can only surface a version the user has neither
+ * acknowledged nor disabled.
+ */
+const ANNOUNCED_VERSION_KEY = 'monize:whats-new-announced-version';
+
+/**
+ * Records `version` as announced and reports whether it differs from what was
+ * recorded before -- i.e. whether this browser is seeing it for the first time.
+ * Storage failures report false, leaving login as the only trigger.
+ */
+export function recordAnnouncedVersion(version: string | undefined): boolean {
+  if (!version) return false;
+  try {
+    const previous = window.localStorage.getItem(ANNOUNCED_VERSION_KEY);
+    if (previous === version) return false;
+    window.localStorage.setItem(ANNOUNCED_VERSION_KEY, version);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Controls the "What's New" release-notes modal. Kept separate from the data
  * fetching (handled by WhatsNewHost) so any component -- notably the clickable
  * version labels on the login screen and in Settings -- can reopen the modal.

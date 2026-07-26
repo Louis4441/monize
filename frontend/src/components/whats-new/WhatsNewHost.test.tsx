@@ -7,6 +7,7 @@ import { useTourStore } from '@/store/tourStore';
 import {
   useWhatsNewStore,
   markWhatsNewPendingForLogin,
+  recordAnnouncedVersion,
 } from '@/store/whatsNewStore';
 import { whatsNewApi, type ReleaseNotes } from '@/lib/whats-new';
 
@@ -52,10 +53,20 @@ function signedInViaLogin() {
   markWhatsNewPendingForLogin();
 }
 
+/**
+ * A refresh of an existing session: authenticated with no login flag, and the
+ * running version already announced in this browser, so neither trigger fires.
+ */
+function refreshedSession(announced = '1.12.1') {
+  useAuthStore.setState({ isAuthenticated: true });
+  recordAnnouncedVersion(announced);
+}
+
 describe('WhatsNewHost', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
+    window.localStorage.clear();
     useWhatsNewStore.setState({ isOpen: false, pausedForTour: false });
     useTourStore.setState({ active: null, progress: {}, progressLoaded: true });
     useAuthStore.setState({ isAuthenticated: false });
@@ -91,7 +102,7 @@ describe('WhatsNewHost', () => {
     // through login(), and the backend still reports the user as due this
     // version -- the exact combination that used to reopen the dialog on
     // every page load.
-    useAuthStore.setState({ isAuthenticated: true });
+    refreshedSession();
     mockApi.getWhatsNew.mockResolvedValue({
       currentVersion: '1.12.1',
       autoShow: true,
@@ -145,21 +156,74 @@ describe('WhatsNewHost', () => {
 
   it('spends the login flag even when there is nothing to show', async () => {
     // Logged in on an acknowledged version, so nothing opens. If the flag
-    // survived, a later refresh -- after a new version shipped -- would open
-    // the dialog outside a login.
+    // survived, the next refresh would open the dialog outside a login --
+    // here the version is unchanged, so the login flag is the only trigger
+    // under test.
     signedInViaLogin();
     await renderHost();
     await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalled());
     expect(useWhatsNewStore.getState().isOpen).toBe(false);
 
+    // "Show at next login" flips autoShow back on for the same version.
     mockApi.getWhatsNew.mockResolvedValue({
-      currentVersion: '1.13.0',
+      currentVersion: '1.12.1',
       autoShow: true,
       notes: NOTES,
     });
     await renderHost();
 
     await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalledTimes(2));
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
+  });
+
+  it('opens on the first refresh after a deploy, with no login involved', async () => {
+    // The long-lived session case: the tab has been open across a deploy, so
+    // there is no login to hang the digest off.
+    refreshedSession('1.12.1');
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.13.0',
+      autoShow: true,
+      notes: NOTES,
+    });
+
+    await renderHost();
+
+    await waitFor(() => expect(useWhatsNewStore.getState().isOpen).toBe(true));
+  });
+
+  it('announces a new version once per browser, not on every later refresh', async () => {
+    refreshedSession('1.12.1');
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.13.0',
+      autoShow: true,
+      notes: NOTES,
+    });
+
+    await renderHost();
+    await waitFor(() => expect(useWhatsNewStore.getState().isOpen).toBe(true));
+
+    // Still unacknowledged, but this browser has already had its one
+    // announcement for 1.13.0.
+    useWhatsNewStore.setState({ isOpen: false, pausedForTour: false });
+    await renderHost();
+
+    await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalledTimes(2));
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
+  });
+
+  it('does not announce a new version the user already turned off', async () => {
+    // autoShow false covers acknowledged, preference off, and demo mode. The
+    // version trigger must not talk over any of them.
+    refreshedSession('1.12.1');
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.13.0',
+      autoShow: false,
+      notes: NOTES,
+    });
+
+    await renderHost();
+
+    await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalled());
     expect(useWhatsNewStore.getState().isOpen).toBe(false);
   });
 
