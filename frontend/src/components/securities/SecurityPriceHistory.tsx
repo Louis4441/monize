@@ -14,6 +14,8 @@ import {
 } from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { useLongPress } from '@/hooks/useLongPress';
+import { RowActionSheet, type RowAction } from '@/components/ui/row-actions';
 import { getErrorMessage } from '@/lib/errors';
 import { SecurityPriceForm } from './SecurityPriceForm';
 import {
@@ -76,6 +78,9 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   const [editingPrice, setEditingPrice] = useState<SecurityPrice | undefined>();
   const [deletingPrice, setDeletingPrice] = useState<SecurityPrice | undefined>();
   const [isUpdating, setIsUpdating] = useState(false);
+  // Mobile has no per-row action buttons -- a long-press (or right-click on a
+  // desktop pointer) opens the shared action sheet instead.
+  const [contextPrice, setContextPrice] = useState<SecurityPrice | undefined>();
 
   const { formatQuantity } = useNumberFormat();
 
@@ -136,6 +141,36 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
       throw error;
     }
   }, [security.id, editingPrice, loadPrices, t]);
+
+  const startEdit = useCallback((price: SecurityPrice) => {
+    setShowAddForm(false);
+    setEditingPrice(price);
+  }, []);
+
+  const { getRowHandlers } = useLongPress<SecurityPrice>({
+    onLongPress: setContextPrice,
+  });
+
+  const contextActions = useMemo<RowAction[]>(() => {
+    if (!contextPrice) return [];
+    return [
+      {
+        key: 'edit',
+        label: t('list.actions.edit'),
+        icon: 'edit',
+        tone: 'primary',
+        onClick: () => startEdit(contextPrice),
+      },
+      {
+        key: 'delete',
+        label: t('list.actions.delete'),
+        icon: 'delete',
+        tone: 'delete',
+        destructive: true,
+        onClick: () => setDeletingPrice(contextPrice),
+      },
+    ];
+  }, [contextPrice, startEdit, t]);
 
   const handleDelete = useCallback(async () => {
     if (!deletingPrice) return;
@@ -305,12 +340,17 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.low')}</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">{t('priceHistory.columns.volume')}</th>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.source')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.actions')}</th>
+                {/* Actions - hidden on mobile, where long-press opens the sheet */}
+                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {prices.map((price) => (
-                <tr key={price.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <tr
+                  key={price.id}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-700 select-none"
+                  {...getRowHandlers(price)}
+                >
                   <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100 whitespace-nowrap">
                     {formatDate(price.priceDate)}
                   </td>
@@ -334,16 +374,18 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
                       {getSourceLabel(price.source)}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                  <td className="px-3 py-2 text-right whitespace-nowrap hidden sm:table-cell">
                     <div className="flex gap-2 justify-end">
                       <button
-                        onClick={() => { setShowAddForm(false); setEditingPrice(price); }}
+                        onClick={() => startEdit(price)}
+                        onMouseDown={(e) => e.stopPropagation()}
                         className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs"
                       >
                         {t('list.actions.edit')}
                       </button>
                       <button
                         onClick={() => setDeletingPrice(price)}
+                        onMouseDown={(e) => e.stopPropagation()}
                         className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs"
                       >
                         {t('list.actions.delete')}
@@ -356,6 +398,15 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
           </table>
         </div>
       )}
+
+      {/* Long-press action sheet -- the mobile stand-in for the actions column */}
+      <RowActionSheet
+        isOpen={!!contextPrice}
+        title={contextPrice ? formatDate(contextPrice.priceDate) : ''}
+        subtitle={contextPrice ? formatPrice(contextPrice.closePrice) : undefined}
+        actions={contextActions}
+        onClose={() => setContextPrice(undefined)}
+      />
 
       <ConfirmDialog
         isOpen={!!deletingPrice}

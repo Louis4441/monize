@@ -400,6 +400,88 @@ describe('SecurityPriceHistory', () => {
     expect(screen.getAllByText('Edit')).toHaveLength(3);
   });
 
+  describe('mobile long-press actions', () => {
+    // The actions column is CSS-hidden below the sm breakpoint, so on a phone
+    // the row's only route to edit/delete is a press-and-hold.
+    async function longPressFirstRow() {
+      const row = screen.getByText('2025-06-01').closest('tr')!;
+      fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 0 }] });
+      await act(async () => {
+        await new Promise((res) => setTimeout(res, 800));
+      });
+      return row;
+    }
+
+    it('hides the actions column on mobile and keeps it from the sm breakpoint up', async () => {
+      await renderComponent();
+
+      const header = screen.getByRole('columnheader', { name: 'Actions' });
+      expect(header.className).toContain('hidden');
+      expect(header.className).toContain('sm:table-cell');
+
+      const actionCell = screen.getAllByText('Edit')[0].closest('td')!;
+      expect(actionCell.className).toContain('hidden');
+      expect(actionCell.className).toContain('sm:table-cell');
+    });
+
+    it('opens the action sheet on long-press, headed by the row date and close price', async () => {
+      await renderComponent();
+      await longPressFirstRow();
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      // Sheet heading: the pressed row's date, subtitled with its close price.
+      // Both also appear in the table row, hence the duplicate counts.
+      const sheet = screen.getByRole('dialog');
+      expect(sheet.textContent).toContain('2025-06-01');
+      expect(sheet.textContent).toContain('193.50');
+    });
+
+    it('does not open the sheet when the touch moves beyond the drag threshold', async () => {
+      await renderComponent();
+
+      const row = screen.getByText('2025-06-01').closest('tr')!;
+      fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 0 }] });
+      fireEvent.touchMove(row, { touches: [{ clientX: 50, clientY: 50 }] });
+      await act(async () => {
+        await new Promise((res) => setTimeout(res, 800));
+      });
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('opens the edit form from the action sheet', async () => {
+      await renderComponent();
+      await longPressFirstRow();
+
+      const sheetEdit = screen.getAllByRole('button', { name: 'Edit' }).at(-1)!;
+      await act(async () => {
+        fireEvent.click(sheetEdit);
+      });
+
+      expect(screen.getByText('Edit Price')).toBeInTheDocument();
+    });
+
+    it('deletes a price from the action sheet after confirmation', async () => {
+      (investmentsApi.deleteSecurityPrice as ReturnType<typeof vi.fn>).mockResolvedValue(
+        undefined,
+      );
+      await renderComponent();
+      await longPressFirstRow();
+
+      const sheetDelete = screen.getAllByRole('button', { name: 'Delete' }).at(-1)!;
+      await act(async () => {
+        fireEvent.click(sheetDelete);
+      });
+
+      const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
+      await act(async () => {
+        fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+      });
+
+      expect(investmentsApi.deleteSecurityPrice).toHaveBeenCalledWith('sec-1', 1);
+    });
+  });
+
   describe('price chart', () => {
     it('charts the price series above the table', async () => {
       await renderComponent();
