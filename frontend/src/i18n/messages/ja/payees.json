@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "再有効化",
-      "reactivateShort": "再",
       "merge": "マージ",
-      "mergeShort": "M",
       "edit": "編集",
-      "editShort": "E",
-      "delete": "削除",
-      "deleteShort": "X"
+      "delete": "削除"
     },
     "viewTransactionsTitle": "この支払先の取引を確認",
     "uncategorizedBadge": "{count, plural, one {# 件未分類} other {# 件未分類}}",

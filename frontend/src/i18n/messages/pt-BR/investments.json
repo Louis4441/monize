@@ -66,8 +66,6 @@
     "untagged": "Sem etiquetas",
     "noTagData": "Não há posições etiquetadas para mostrar. Adicione etiquetas aos seus ativos para ver a exposição por etiqueta.",
     "noCountryData": "Sem dados de alocação por país disponíveis.",
-    "tagExposureNote": "Exposição por etiqueta: uma posição com várias etiquetas é contada integralmente em cada uma, então os percentuais podem somar mais de 100%.",
-    "countryExposureNote": "Transparência por país: as posições em fundos são divididas conforme sua alocação por país. Os 10 principais países são exibidos; o restante é agrupado como \"Outros países\".",
     "otherCountries": "Outros países",
     "groupBy": {
       "security": "Por ativo",
@@ -113,7 +111,6 @@
     "viewReport": "Ver relatório",
     "viewReportTitle": "Abrir o relatório completo Valor do Portfólio",
     "updatingLabel": "Atualizando…",
-    "updatingAriaLabel": "Atualizando",
     "intradayFallbackWarningAriaLabel": "Cotações intradiárias detalhadas indisponíveis",
     "intradayUnavailableTitle": "Vista intradiária indisponível para esta combinação de contas",
     "intradayUnavailableDescription": "Uma ou mais posições usam um fornecedor de cotações (MSN Money) que não disponibiliza dados intradiários. Selecione um intervalo mais longo para ver instantâneos diários.",

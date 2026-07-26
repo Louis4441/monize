@@ -72,12 +72,9 @@
       "closeAccount": "Rekening sluiten",
       "reopenAccount": "Rekening heropenen",
       "deleteAccount": "Rekening verwijderen",
-      "reconcileTitle": "Rekening afstemmen met een afschrift",
       "deleteTitle": "Rekening definitief verwijderen (geen transacties)",
       "closeTitleDisabled": "Rekening moet een saldo van nul hebben om te sluiten",
       "closeTitleEnabled": "Rekening sluiten",
-      "balanceMustBeZero": "Saldo moet nul zijn",
-      "closedPrefix": " — Gesloten",
       "details": "Details"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Betalingen instellen",
     "settingUp": "Instellen...",
     "fillRequiredFields": "Vul alle verplichte velden in",
-    "requiredFieldsMissing": "Vul alle verplichte velden in",
     "frequencyOptions": {
       "weekly": "Wekelijks",
       "biweekly": "Elke 2 weken",
@@ -406,19 +402,13 @@
       "reset": "Opnieuw instellen",
       "detectedExtraHint": "Uw betalingsgeschiedenis toont gemiddeld {amount} aan extra hoofdsom per betaling.",
       "applyDetected": "Gebruiken",
-      "recurringAmount": "Extra per betaling",
       "recurringStart": "Vanaf (optioneel)",
       "recurringEnd": "Tot (optioneel)",
       "lumpSums": "Eenmalige extra stortingen",
-      "addLumpSum": "Extra storting toevoegen",
-      "noLumpSums": "Geen extra stortingen toegevoegd.",
-      "lumpSumDate": "Datum",
-      "lumpSumAmount": "Bedrag",
       "removeLumpSum": "Verwijderen",
       "modeLabel": "Na een extra aflossing",
       "modeShortenTerm": "Looptijd verkorten",
       "modeLowerInstallment": "Termijn verlagen",
-      "modeShortenTermHint": "Houd dezelfde termijn aan en los de lening eerder af. Maximale rentebesparing.",
       "modeLowerInstallmentHint": "Houd dezelfde einddatum aan en herbereken een lagere termijn op het verlaagde saldo.",
       "goalSeek": {
         "title": "Doelzoeken",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Onhaalbaar — zelfs een zeer grote extra aflossing kan niet zoveel rente besparen.",
         "unreachableDate": "Onhaalbaar — die maand ligt vóór de vroegst mogelijke aflossing."
       },
-      "optionalGroup": "Optioneel",
       "simulationTypeLabel": "Simulatietype",
       "overpaymentAmount": "Bedrag extra aflossing",
       "frequencyLabel": "Frequentie",
@@ -517,7 +506,6 @@
       "description": "Hoe de betalingen die u al hebt gedaan zich verhouden tot het oorspronkelijke contractuele schema.",
       "extraPrincipalPaid": "Extra afgeloste hoofdsom",
       "extraPrincipalNote": "Hoever u voorloopt op het oorspronkelijke schema",
-      "missingData": "Om te zien hoeveel uw extra aflossingen deze lening hebben verkort, heeft deze rekening een rentepercentage, een betalingsfrequentie en enkele vastgelegde betalingen nodig om het oorspronkelijke schema te reconstrueren.",
       "monthsAlreadySaved": "Reeds bespaarde tijd",
       "monthsValue": "{count, plural, one {# maand} other {# maanden}}",
       "payoffComparison": "Oorspronkelijk {original}, nu {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "tegenover oorspronkelijk geprojecteerde {amount}",
       "seriesOriginal": "Oorspronkelijk schema",
       "seriesActual": "Werkelijk saldo",
-      "seriesCurrent": "Huidige projectie",
       "unknown": "Onbekend"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Rentecategorie",
       "description": "Waar de rente van deze lening wordt geregistreerd. Wanneer rente als een aparte transactie wordt geboekt in plaats van als onderdeel van de betaling, zorgt het benoemen van de categorie ervoor dat het schema de werkelijke rente toont en dat 'Detecteren uit geschiedenis' genoeg rente vindt om te werken.",
       "label": "Rentecategorie",
-      "placeholder": "Selecteer een rentecategorie",
-      "saveError": "Kan de rentecategorie niet opslaan"
+      "placeholder": "Selecteer een rentecategorie"
     },
     "overpaymentCategory": {
       "title": "Detectie van extra aflossingen",
@@ -606,8 +592,7 @@
       "placeholder": "Selecteer een categorie",
       "memoLabel": "Memo voor extra aflossing",
       "memoPlaceholder": "bijv. Extra aflossing",
-      "memoHelp": "Betalingen waarvan het memo deze tekst bevat, tellen als extra aflossingen (niet hoofdlettergevoelig).",
-      "saveError": "Kan de instellingen voor extra aflossingen niet opslaan"
+      "memoHelp": "Betalingen waarvan het memo deze tekst bevat, tellen als extra aflossingen (niet hoofdlettergevoelig)."
     }
   }
 }

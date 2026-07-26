@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "[XX-AI Not Configured-XX]",
-    "message": "[XX-No AI provider is configured. To use the AI Assistant, please {link} in your settings.-XX]",
-    "linkText": "[XX-configure an AI provider-XX]"
+    "message": "[XX-No AI provider is configured. To use the AI Assistant, please {link} in your settings.-XX]"
   },
   "suggestedQueries": {
     "heading": "[XX-Ask about your finances-XX]",

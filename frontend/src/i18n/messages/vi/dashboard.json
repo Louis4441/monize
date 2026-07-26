@@ -102,6 +102,7 @@
     "empty": "Chưa có chứng khoán yêu thích nào. Truy cập <securitiesLink>trang Chứng khoán</securitiesLink> và gắn sao các chứng khoán bạn muốn theo dõi tại đây.",
     "noPriceYet": "Chưa có giá",
     "dailyChange": "Thay đổi hàng ngày",
+    "openPriceHistory": "Lịch sử giá của {symbol}",
     "refreshPrices": "Làm mới giá",
     "manage": "Quản lý chứng khoán"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "Chi tiêu theo danh mục",
     "empty": "Không có dữ liệu chi tiêu trong kỳ này.",
-    "past30Days": "30 ngày qua",
     "total": "Tổng cộng",
     "uncategorized": "Chưa phân loại",
     "other": "Khác"
   },
   "incomeExpenses": {
     "title": "Thu nhập và Chi tiêu",
-    "last5Weeks": "5 tuần qua",
-    "weekOf": "Tuần {date}",
     "income": "Thu nhập",
     "expenses": "Chi tiêu",
     "net": "Ròng"

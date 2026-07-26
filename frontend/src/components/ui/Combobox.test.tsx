@@ -238,6 +238,33 @@ describe('Combobox', () => {
     expect(screen.getByText('Apple')).toBeInTheDocument();
   });
 
+  it('offers to create a name far longer than the input, and keeps it on one line', async () => {
+    const onCreateNew = vi.fn();
+
+    render(
+      <Combobox
+        options={options}
+        onChange={onChange}
+        allowCustomValue
+        onCreateNew={onCreateNew}
+        usePortal
+      />,
+    );
+
+    const input = screen.getByRole('textbox');
+    fireEvent.focus(input);
+    await new Promise((r) => setTimeout(r, 150));
+
+    const longName = "Drongkowski's Farm Market & Deli";
+    fireEvent.change(input, { target: { value: longName } });
+
+    const option = await screen.findByText(`Create "${longName}"`);
+    // The dropdown is only as wide as its input, so the label truncates rather
+    // than overflowing it -- the same treatment every option row below gets.
+    expect(option.className).toContain('truncate');
+    expect(option.parentElement?.className).toContain('min-w-0');
+  });
+
   it('calls onCreateNew when create option is clicked', async () => {
     const onCreateNew = vi.fn();
 

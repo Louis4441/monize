@@ -102,6 +102,7 @@
     "empty": "अभी कोई पसंदीदा प्रतिभूति नहीं। <securitiesLink>प्रतिभूति पृष्ठ</securitiesLink> पर जाएं और जिन प्रतिभूतियों को यहाँ ट्रैक करना चाहते हैं उन्हें स्टार करें।",
     "noPriceYet": "अभी कोई मूल्य नहीं",
     "dailyChange": "दैनिक परिवर्तन",
+    "openPriceHistory": "{symbol} का मूल्य इतिहास",
     "refreshPrices": "मूल्य रीफ्रेश करें",
     "manage": "प्रतिभूतियां प्रबंधित करें"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "श्रेणी के अनुसार व्यय",
     "empty": "इस अवधि के लिए कोई व्यय डेटा नहीं।",
-    "past30Days": "पिछले 30 दिन",
     "total": "कुल",
     "uncategorized": "अवर्गीकृत",
     "other": "अन्य"
   },
   "incomeExpenses": {
     "title": "आय बनाम व्यय",
-    "last5Weeks": "पिछले 5 सप्ताह",
-    "weekOf": "{date} का सप्ताह",
     "income": "आय",
     "expenses": "व्यय",
     "net": "शुद्ध"

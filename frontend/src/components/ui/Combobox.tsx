@@ -487,9 +487,13 @@ export function Combobox({
             highlightedIndex === 0 ? 'bg-green-100 dark:bg-green-900' : 'hover:bg-green-50 dark:hover:bg-green-900/50'
           )}
         >
-          <div className="flex items-center">
-            <span className="text-green-600 dark:text-green-400 mr-2">+</span>
-            <span className="font-medium text-green-700 dark:text-green-300">
+          <div className="flex items-center min-w-0">
+            <span className="text-green-600 dark:text-green-400 mr-2 flex-shrink-0">+</span>
+            {/* truncate, like every option row below: the dropdown is only as
+                wide as its input, and a long name would otherwise overflow it
+                -- worst in the transaction form, where the payee field gives up
+                width to the history button. */}
+            <span className="block truncate font-medium text-green-700 dark:text-green-300">
               {t('combobox.createOption', { value: inputValue.trim() })}
             </span>
           </div>

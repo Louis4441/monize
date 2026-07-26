@@ -102,6 +102,7 @@
     "empty": "Aucun titre favori pour l'instant. Rendez-vous sur la <securitiesLink>page Titres</securitiesLink> et mettez en favori les titres que vous souhaitez suivre ici.",
     "noPriceYet": "Aucun cours pour l'instant",
     "dailyChange": "Variation quotidienne",
+    "openPriceHistory": "Historique du cours de {symbol}",
     "refreshPrices": "Actualiser les cours",
     "manage": "Gérer les titres"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "Dépenses par catégorie",
     "empty": "Aucune donnée de dépenses pour cette période.",
-    "past30Days": "30 derniers jours",
     "total": "Total",
     "uncategorized": "Non catégorisé",
     "other": "Autre"
   },
   "incomeExpenses": {
     "title": "Revenus et dépenses",
-    "last5Weeks": "5 dernières semaines",
-    "weekOf": "Semaine du {date}",
     "income": "Revenus",
     "expenses": "Dépenses",
     "net": "Net"

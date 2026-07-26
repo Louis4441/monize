@@ -72,12 +72,9 @@
       "closeAccount": "Clôturer le compte",
       "reopenAccount": "Rouvrir le compte",
       "deleteAccount": "Supprimer le compte",
-      "reconcileTitle": "Rapprocher le compte avec un relevé",
       "deleteTitle": "Supprimer définitivement le compte (sans transactions)",
       "closeTitleDisabled": "Le solde du compte doit être nul pour le clôturer",
       "closeTitleEnabled": "Clôturer le compte",
-      "balanceMustBeZero": "Le solde doit être nul",
-      "closedPrefix": " — Clôturé",
       "details": "Détails"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Configurer les paiements",
     "settingUp": "Configuration…",
     "fillRequiredFields": "Veuillez remplir tous les champs obligatoires",
-    "requiredFieldsMissing": "Veuillez remplir tous les champs obligatoires",
     "frequencyOptions": {
       "weekly": "Hebdomadaire",
       "biweekly": "Toutes les 2 semaines",
@@ -406,19 +402,13 @@
       "reset": "Réinitialiser",
       "detectedExtraHint": "Votre historique de paiements montre une moyenne de {amount} de capital supplémentaire par versement.",
       "applyDetected": "Utiliser",
-      "recurringAmount": "Supplément par versement",
       "recurringStart": "À partir de (facultatif)",
       "recurringEnd": "Jusqu'à (facultatif)",
       "lumpSums": "Versements forfaitaires ponctuels",
-      "addLumpSum": "Ajouter un versement forfaitaire",
-      "noLumpSums": "Aucun versement forfaitaire ajouté.",
-      "lumpSumDate": "Date",
-      "lumpSumAmount": "Montant",
       "removeLumpSum": "Retirer",
       "modeLabel": "Après un remboursement anticipé",
       "modeShortenTerm": "Raccourcir la durée",
       "modeLowerInstallment": "Réduire la mensualité",
-      "modeShortenTermHint": "Conserver la même mensualité et rembourser le prêt plus tôt. Économie d'intérêts maximale.",
       "modeLowerInstallmentHint": "Conserver la même date de remboursement et recalculer une mensualité plus faible sur le solde réduit.",
       "goalSeek": {
         "title": "Recherche d'objectif",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Hors de portée — même un très gros remboursement anticipé ne peut pas économiser autant d'intérêts.",
         "unreachableDate": "Hors de portée — ce mois est antérieur au remboursement le plus tôt possible."
       },
-      "optionalGroup": "Facultatif",
       "simulationTypeLabel": "Type de simulation",
       "overpaymentAmount": "Montant du remboursement anticipé",
       "frequencyLabel": "Fréquence",
@@ -517,7 +506,6 @@
       "description": "Comment les versements que vous avez déjà effectués se comparent au calendrier contractuel initial.",
       "extraPrincipalPaid": "Capital supplémentaire payé",
       "extraPrincipalNote": "De combien vous êtes en avance sur le calendrier initial",
-      "missingData": "Pour voir comment vos remboursements anticipés ont raccourci ce prêt, ce compte a besoin d'un taux d'intérêt, d'une fréquence de versement et de quelques paiements enregistrés pour reconstituer son calendrier initial.",
       "monthsAlreadySaved": "Temps déjà économisé",
       "monthsValue": "{count, plural, one {# mois} other {# mois}}",
       "payoffComparison": "Initialement {original}, maintenant {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "contre {amount} projetés initialement",
       "seriesOriginal": "Calendrier initial",
       "seriesActual": "Solde réel",
-      "seriesCurrent": "Projection actuelle",
       "unknown": "Inconnu"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Catégorie d'intérêts",
       "description": "Où les intérêts de ce prêt sont enregistrés. Lorsque les intérêts sont saisis comme une transaction distincte plutôt que comme une ventilation du paiement, indiquer leur catégorie permet à l'échéancier d'afficher les intérêts réels et à « Détecter à partir de l'historique » de trouver suffisamment d'intérêts pour fonctionner.",
       "label": "Catégorie d'intérêts",
-      "placeholder": "Sélectionner une catégorie d'intérêts",
-      "saveError": "Échec de l'enregistrement de la catégorie d'intérêts"
+      "placeholder": "Sélectionner une catégorie d'intérêts"
     },
     "overpaymentCategory": {
       "title": "Détection des remboursements anticipés",
@@ -606,8 +592,7 @@
       "placeholder": "Sélectionner une catégorie",
       "memoLabel": "Note de remboursement anticipé",
       "memoPlaceholder": "ex. Capital supplémentaire",
-      "memoHelp": "Les paiements dont la note contient ce texte sont comptés comme des remboursements anticipés (insensible à la casse).",
-      "saveError": "Échec de l'enregistrement des paramètres de remboursement anticipé"
+      "memoHelp": "Les paiements dont la note contient ce texte sont comptés comme des remboursements anticipés (insensible à la casse)."
     }
   }
 }

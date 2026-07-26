@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Nie udało się zapisać motywu kolorystycznego"
     },
     "browserLocale": "Użyj ustawień regionalnych przeglądarki (automatycznie)",
-    "browserTimezonePrefix": "Użyj strefy czasowej przeglądarki (wykryto {tz})",
     "numberFormatOptions": {
       "browser": "Użyj ustawień regionalnych przeglądarki (wykryto {sample})",
       "enUS": "Angielski (US) - 1,234.56",

@@ -209,6 +209,7 @@
       "sold": "Vente {quantity} · {account}"
     },
     "empty": "Aucun historique des cours disponible",
+    "showingCount": "Affichage de {shown} cours sur {total}",
     "columns": {
       "date": "Date",
       "close": "Clôture",
@@ -235,6 +236,7 @@
     "closeButton": "Fermer",
     "deleteConfirm": {
       "title": "Supprimer le cours",
+      "message": "Supprimer le cours du {date} ?",
       "confirmLabel": "Supprimer"
     }
   },

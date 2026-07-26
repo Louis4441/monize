@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "AI が設定されていません",
-    "message": "AI プロバイダーが設定されていません。AI アシスタントを使用するには、設定で {link} してください。",
-    "linkText": "AI プロバイダーを設定"
+    "message": "AI プロバイダーが設定されていません。AI アシスタントを使用するには、設定で {link} してください。"
   },
   "suggestedQueries": {
     "heading": "財務について質問してください",

@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "AI Belum Dikonfigurasi",
-    "message": "Tidak ada penyedia AI yang dikonfigurasi. Untuk menggunakan Asisten AI, silakan {link} di pengaturan Anda.",
-    "linkText": "konfigurasikan penyedia AI"
+    "message": "Tidak ada penyedia AI yang dikonfigurasi. Untuk menggunakan Asisten AI, silakan {link} di pengaturan Anda."
   },
   "suggestedQueries": {
     "heading": "Tanyakan tentang keuangan Anda",

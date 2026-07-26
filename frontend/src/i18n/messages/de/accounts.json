@@ -72,12 +72,9 @@
       "closeAccount": "Konto schließen",
       "reopenAccount": "Konto wiedereröffnen",
       "deleteAccount": "Konto löschen",
-      "reconcileTitle": "Konto anhand eines Kontoauszugs abgleichen",
       "deleteTitle": "Konto dauerhaft löschen (keine Buchungen)",
       "closeTitleDisabled": "Kontostand muss null sein, um das Konto zu schließen",
       "closeTitleEnabled": "Konto schließen",
-      "balanceMustBeZero": "Saldo muss null sein",
-      "closedPrefix": " – Geschlossen",
       "details": "Details"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Zahlungen einrichten",
     "settingUp": "Wird eingerichtet...",
     "fillRequiredFields": "Bitte alle Pflichtfelder ausfüllen",
-    "requiredFieldsMissing": "Bitte alle Pflichtfelder ausfüllen",
     "frequencyOptions": {
       "weekly": "Wöchentlich",
       "biweekly": "Alle 2 Wochen",
@@ -406,19 +402,13 @@
       "reset": "Zurücksetzen",
       "detectedExtraHint": "Ihre Zahlungshistorie zeigt durchschnittlich {amount} an zusätzlicher Tilgung pro Zahlung.",
       "applyDetected": "Übernehmen",
-      "recurringAmount": "Zusätzlich pro Rate",
       "recurringStart": "Ab (optional)",
       "recurringEnd": "Bis (optional)",
       "lumpSums": "Einmalige Sonderzahlungen",
-      "addLumpSum": "Sonderzahlung hinzufügen",
-      "noLumpSums": "Keine Sonderzahlungen hinzugefügt.",
-      "lumpSumDate": "Datum",
-      "lumpSumAmount": "Betrag",
       "removeLumpSum": "Entfernen",
       "modeLabel": "Nach einer Sondertilgung",
       "modeShortenTerm": "Laufzeit verkürzen",
       "modeLowerInstallment": "Rate senken",
-      "modeShortenTermHint": "Gleiche Rate beibehalten und das Darlehen früher abbezahlen. Maximale Zinsersparnis.",
       "modeLowerInstallmentHint": "Gleiches Tilgungsdatum beibehalten und eine niedrigere Rate auf den reduzierten Saldo berechnen.",
       "goalSeek": {
         "title": "Zielwertsuche",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Unerreichbar — selbst eine sehr hohe Sondertilgung kann nicht so viel Zinsen sparen.",
         "unreachableDate": "Unerreichbar — dieser Monat liegt vor dem frühestmöglichen Tilgungstermin."
       },
-      "optionalGroup": "Optional",
       "simulationTypeLabel": "Simulationstyp",
       "overpaymentAmount": "Sondertilgungsbetrag",
       "frequencyLabel": "Häufigkeit",
@@ -517,7 +506,6 @@
       "description": "Wie sich Ihre bereits geleisteten Zahlungen im Vergleich zum ursprünglichen vertraglichen Tilgungsplan auswirken.",
       "extraPrincipalPaid": "Zusätzliche Tilgung",
       "extraPrincipalNote": "Wie weit Sie dem ursprünglichen Plan voraus sind",
-      "missingData": "Um zu sehen, wie Ihre Sondertilgungen diesen Kredit verkürzt haben, benötigt dieses Konto einen Zinssatz, ein Zahlungsintervall und einige erfasste Zahlungen, um seinen ursprünglichen Tilgungsplan zu rekonstruieren.",
       "monthsAlreadySaved": "Bereits gesparte Zeit",
       "monthsValue": "{count, plural, one {# Monat} other {# Monate}}",
       "payoffComparison": "Ursprünglich {original}, jetzt {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "gegenüber ursprünglich prognostizierten {amount}",
       "seriesOriginal": "Ursprünglicher Plan",
       "seriesActual": "Tatsächlicher Saldo",
-      "seriesCurrent": "Aktuelle Prognose",
       "unknown": "Unbekannt"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Zinskategorie",
       "description": "Wo die Zinsen dieses Kredits erfasst werden. Wenn Zinsen als separate Buchung statt als Aufteilung der Zahlung erfasst werden, sorgt die Angabe ihrer Kategorie dafür, dass der Tilgungsplan die tatsächlichen Zinsen anzeigt und „Aus Verlauf erkennen“ genügend Zinsen findet.",
       "label": "Zinskategorie",
-      "placeholder": "Zinskategorie auswählen",
-      "saveError": "Zinskategorie konnte nicht gespeichert werden"
+      "placeholder": "Zinskategorie auswählen"
     },
     "overpaymentCategory": {
       "title": "Sondertilgungs-Erkennung",
@@ -606,8 +592,7 @@
       "placeholder": "Kategorie auswählen",
       "memoLabel": "Sondertilgungs-Memo",
       "memoPlaceholder": "z. B. Zusätzliche Tilgung",
-      "memoHelp": "Zahlungen, deren Memo diesen Text enthält, zählen als Sondertilgungen (Groß-/Kleinschreibung wird ignoriert).",
-      "saveError": "Sondertilgungs-Einstellungen konnten nicht gespeichert werden"
+      "memoHelp": "Zahlungen, deren Memo diesen Text enthält, zählen als Sondertilgungen (Groß-/Kleinschreibung wird ignoriert)."
     }
   }
 }

@@ -363,7 +363,7 @@ function SecuritiesContent() {
         <UnsavedChangesDialog {...unsavedChangesDialog} />
 
         {/* Price History Modal */}
-        <Modal isOpen={!!shownPriceSecurity} onClose={closePriceHistory} maxWidth="5xl" className="p-6" pushHistory>
+        <Modal isOpen={!!shownPriceSecurity} onClose={closePriceHistory} maxWidth="5xl" className="p-3 sm:p-6" pushHistory tightMobileInset>
           {shownPriceSecurity && (
             <SecurityPriceHistory
               security={shownPriceSecurity}

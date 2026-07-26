@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Error al guardar el tema de color"
     },
     "browserLocale": "Usar configuración regional del navegador (detección automática)",
-    "browserTimezonePrefix": "Usar zona horaria del navegador (detectada automáticamente como {tz})",
     "numberFormatOptions": {
       "browser": "Usar configuración regional del navegador (detectado automáticamente como {sample})",
       "enUS": "English (US) - 1,234.56",

@@ -102,6 +102,7 @@
     "empty": "お気に入りの有価証券がまだありません。<securitiesLink>有価証券ページ</securitiesLink>を開いて追跡したい有価証券をスターしてください。",
     "noPriceYet": "価格未登録",
     "dailyChange": "日次変動",
+    "openPriceHistory": "{symbol} の価格履歴",
     "refreshPrices": "価格を更新",
     "manage": "有価証券を管理"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "カテゴリ別支出",
     "empty": "この期間の支出データがありません。",
-    "past30Days": "過去30日間",
     "total": "合計",
     "uncategorized": "未分類",
     "other": "その他"
   },
   "incomeExpenses": {
     "title": "収入 対 支出",
-    "last5Weeks": "過去5週間",
-    "weekOf": "{date} の週",
     "income": "収入",
     "expenses": "支出",
     "net": "差引"

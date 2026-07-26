@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Не удалось сохранить цветовую тему"
     },
     "browserLocale": "Использовать язык браузера (автоопределение)",
-    "browserTimezonePrefix": "Использовать часовой пояс браузера (автоопределено: {tz})",
     "numberFormatOptions": {
       "browser": "Использовать язык браузера (автоопределение: {sample})",
       "enUS": "English (US) - 1,234.56",

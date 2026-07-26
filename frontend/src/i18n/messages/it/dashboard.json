@@ -102,6 +102,7 @@
     "empty": "Nessun titolo preferito. Visita la <securitiesLink>pagina Titoli</securitiesLink> e aggiungi ai preferiti i titoli che vuoi monitorare.",
     "noPriceYet": "Nessun prezzo disponibile",
     "dailyChange": "Variazione giornaliera",
+    "openPriceHistory": "Storico prezzi di {symbol}",
     "refreshPrices": "Aggiorna quotazioni",
     "manage": "Gestisci titoli"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "Uscite per categoria",
     "empty": "Nessun dato sulle uscite per questo periodo.",
-    "past30Days": "Ultimi 30 giorni",
     "total": "Totale",
     "uncategorized": "Non categorizzate",
     "other": "Altro"
   },
   "incomeExpenses": {
     "title": "Entrate vs Uscite",
-    "last5Weeks": "Ultime 5 settimane",
-    "weekOf": "Settimana del {date}",
     "income": "Entrate",
     "expenses": "Uscite",
     "net": "Netto"

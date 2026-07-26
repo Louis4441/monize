@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "AI chưa được cấu hình",
-    "message": "Chưa có nhà cung cấp AI nào được cấu hình. Để sử dụng Trợ lý AI, vui lòng {link} trong cài đặt của bạn.",
-    "linkText": "cấu hình nhà cung cấp AI"
+    "message": "Chưa có nhà cung cấp AI nào được cấu hình. Để sử dụng Trợ lý AI, vui lòng {link} trong cài đặt của bạn."
   },
   "suggestedQueries": {
     "heading": "Hỏi về tài chính của bạn",

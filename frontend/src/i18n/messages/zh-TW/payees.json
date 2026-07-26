@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "重新啟用",
-      "reactivateShort": "啟",
       "merge": "合併",
-      "mergeShort": "合",
       "edit": "編輯",
-      "editShort": "編",
-      "delete": "刪除",
-      "deleteShort": "刪"
+      "delete": "刪除"
     },
     "viewTransactionsTitle": "檢視此收款人的交易",
     "uncategorizedBadge": "{count, plural, one {# 筆未分類} other {# 筆未分類}}",

@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Renk teması kaydedilemedi"
     },
     "browserLocale": "Tarayıcı yerel ayarını kullan (otomatik algıla)",
-    "browserTimezonePrefix": "Tarayıcı saat dilimini kullan (otomatik algılandı: {tz})",
     "numberFormatOptions": {
       "browser": "Tarayıcı yerel ayarını kullan (otomatik algılama: {sample})",
       "enUS": "İngilizce (ABD) - 1,234.56",

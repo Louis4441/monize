@@ -66,8 +66,6 @@
     "untagged": "Bez tagów",
     "noTagData": "Brak otagowanych pozycji do pokazania. Dodaj tagi do swoich papierów, aby zobaczyć ekspozycję wg tagów.",
     "noCountryData": "Brak danych o alokacji krajowej.",
-    "tagExposureNote": "Ekspozycja wg tagów: pozycja z kilkoma tagami liczona jest w całości pod każdym z nich, więc procenty mogą sumować się do ponad 100%.",
-    "countryExposureNote": "Prześwietlenie krajów: pozycje w funduszach są dzielone według ich wag krajowych. Wyświetlanych jest 10 największych krajów; pozostałe są grupowane jako „Pozostałe kraje”.",
     "otherCountries": "Pozostałe kraje",
     "groupBy": {
       "security": "Wg papieru",
@@ -113,7 +111,6 @@
     "viewReport": "Zobacz raport",
     "viewReportTitle": "Otwórz pełny raport Wartość portfela",
     "updatingLabel": "Aktualizowanie…",
-    "updatingAriaLabel": "Aktualizowanie",
     "intradayFallbackWarningAriaLabel": "Szczegółowe ceny śróddzienne niedostępne",
     "intradayUnavailableTitle": "Widok śróddzienny niedostępny dla tego zestawu kont",
     "intradayUnavailableDescription": "Jedna lub więcej pozycji korzysta z dostawcy notowań (MSN Money), który nie udostępnia danych śróddziennych. Przełącz na dłuższy zakres, aby zobaczyć migawki dzienne.",

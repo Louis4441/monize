@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "AI niet geconfigureerd",
-    "message": "Er is geen AI-provider geconfigureerd. Om de AI-assistent te gebruiken, {link} in je instellingen.",
-    "linkText": "configureer een AI-provider"
+    "message": "Er is geen AI-provider geconfigureerd. Om de AI-assistent te gebruiken, {link} in je instellingen."
   },
   "suggestedQueries": {
     "heading": "Stel een vraag over je financiën",

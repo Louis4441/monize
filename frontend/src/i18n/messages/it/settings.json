@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Impossibile salvare il tema colori"
     },
     "browserLocale": "Usa localizzazione del browser (rilevamento automatico)",
-    "browserTimezonePrefix": "Usa fuso orario del browser (rilevato automaticamente: {tz})",
     "numberFormatOptions": {
       "browser": "Usa localizzazione del browser (rilevata automaticamente: {sample})",
       "enUS": "English (US) - 1,234.56",

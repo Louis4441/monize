@@ -72,12 +72,9 @@
       "closeAccount": "Zamknij konto",
       "reopenAccount": "Otwórz ponownie konto",
       "deleteAccount": "Usuń konto",
-      "reconcileTitle": "Uzgodnij konto z wyciągiem",
       "deleteTitle": "Trwale usuń konto (bez transakcji)",
       "closeTitleDisabled": "Konto musi mieć zerowe saldo, aby je zamknąć",
       "closeTitleEnabled": "Zamknij konto",
-      "balanceMustBeZero": "Saldo musi wynosić zero",
-      "closedPrefix": " — Zamknięte",
       "details": "Szczegóły"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Skonfiguruj płatności",
     "settingUp": "Konfigurowanie...",
     "fillRequiredFields": "Wypełnij wszystkie wymagane pola",
-    "requiredFieldsMissing": "Wypełnij wszystkie wymagane pola",
     "frequencyOptions": {
       "weekly": "Co tydzień",
       "biweekly": "Co 2 tygodnie",
@@ -406,19 +402,13 @@
       "reset": "Resetuj",
       "detectedExtraHint": "Twoja historia płatności pokazuje średnio {amount} dodatkowego kapitału na ratę.",
       "applyDetected": "Użyj",
-      "recurringAmount": "Dodatkowo na ratę",
       "recurringStart": "Od (opcjonalnie)",
       "recurringEnd": "Do (opcjonalnie)",
       "lumpSums": "Jednorazowe nadpłaty",
-      "addLumpSum": "Dodaj nadpłatę jednorazową",
-      "noLumpSums": "Nie dodano nadpłat jednorazowych.",
-      "lumpSumDate": "Data",
-      "lumpSumAmount": "Kwota",
       "removeLumpSum": "Usuń",
       "modeLabel": "Po nadpłacie",
       "modeShortenTerm": "Skrócenie okresu",
       "modeLowerInstallment": "Obniżenie raty",
-      "modeShortenTermHint": "Zachowaj tę samą ratę i spłać kredyt szybciej. Maksymalna oszczędność na odsetkach.",
       "modeLowerInstallmentHint": "Zachowaj tę samą datę spłaty i przelicz niższą ratę od zmniejszonego salda.",
       "goalSeek": {
         "title": "Szukanie celu",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Poza zasięgiem — nawet bardzo duża nadpłata nie da tak dużej oszczędności na odsetkach.",
         "unreachableDate": "Poza zasięgiem — ten miesiąc jest wcześniejszy niż najwcześniejsza możliwa spłata."
       },
-      "optionalGroup": "Opcjonalne",
       "simulationTypeLabel": "Typ symulacji",
       "overpaymentAmount": "Kwota nadpłaty",
       "frequencyLabel": "Częstotliwość",
@@ -517,7 +506,6 @@
       "description": "Jak dokonane już płatności wypadają na tle pierwotnego harmonogramu umownego.",
       "extraPrincipalPaid": "Zapłacony dodatkowy kapitał",
       "extraPrincipalNote": "O ile wyprzedzasz pierwotny harmonogram",
-      "missingData": "Aby zobaczyć, o ile Twoje nadpłaty skróciły ten kredyt, to konto potrzebuje oprocentowania, częstotliwości płatności oraz kilku zarejestrowanych płatności, aby odtworzyć pierwotny harmonogram.",
       "monthsAlreadySaved": "Już zaoszczędzony czas",
       "monthsValue": "{count, plural, one {# miesiąc} few {# miesiące} many {# miesięcy} other {# miesiąca}}",
       "payoffComparison": "Pierwotnie {original}, teraz {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "wobec pierwotnie prognozowanych {amount}",
       "seriesOriginal": "Pierwotny harmonogram",
       "seriesActual": "Rzeczywiste saldo",
-      "seriesCurrent": "Bieżąca prognoza",
       "unknown": "Nieznane"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Kategoria odsetek",
       "description": "Gdzie zapisywane są odsetki tego kredytu. Gdy odsetki są księgowane jako osobna transakcja, a nie jako część płatności, wskazanie ich kategorii sprawia, że harmonogram pokazuje rzeczywiste odsetki, a „Wykryj z historii” znajduje wystarczająco dużo odsetek, aby zadziałać.",
       "label": "Kategoria odsetek",
-      "placeholder": "Wybierz kategorię odsetek",
-      "saveError": "Nie udało się zapisać kategorii odsetek"
+      "placeholder": "Wybierz kategorię odsetek"
     },
     "overpaymentCategory": {
       "title": "Wykrywanie nadpłat",
@@ -606,8 +592,7 @@
       "placeholder": "Wybierz kategorię",
       "memoLabel": "Notatka nadpłaty",
       "memoPlaceholder": "np. Dodatkowy kapitał",
-      "memoHelp": "Płatności, których notatka zawiera ten tekst, są liczone jako nadpłaty (bez rozróżniania wielkości liter).",
-      "saveError": "Nie udało się zapisać ustawień nadpłat"
+      "memoHelp": "Płatności, których notatka zawiera ten tekst, są liczone jako nadpłaty (bez rozróżniania wielkości liter)."
     }
   }
 }

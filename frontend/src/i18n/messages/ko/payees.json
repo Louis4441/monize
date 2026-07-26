@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "재활성화",
-      "reactivateShort": "재",
       "merge": "병합",
-      "mergeShort": "병",
       "edit": "수정",
-      "editShort": "수",
-      "delete": "삭제",
-      "deleteShort": "X"
+      "delete": "삭제"
     },
     "viewTransactionsTitle": "이 수취인의 거래 보기",
     "uncategorizedBadge": "{count, plural, one {미분류 #건} other {미분류 #건}}",

@@ -72,12 +72,9 @@
       "closeAccount": "Tutup Akun",
       "reopenAccount": "Buka Kembali Akun",
       "deleteAccount": "Hapus Akun",
-      "reconcileTitle": "Rekonsiliasi akun terhadap laporan",
       "deleteTitle": "Hapus akun secara permanen (tanpa transaksi)",
       "closeTitleDisabled": "Saldo akun harus nol untuk menutupnya",
       "closeTitleEnabled": "Tutup akun",
-      "balanceMustBeZero": "Saldo harus nol",
-      "closedPrefix": " — Ditutup",
       "details": "Detail"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Atur Pembayaran",
     "settingUp": "Mengatur...",
     "fillRequiredFields": "Silakan isi semua kolom yang wajib diisi",
-    "requiredFieldsMissing": "Silakan isi semua kolom yang wajib diisi",
     "frequencyOptions": {
       "weekly": "Mingguan",
       "biweekly": "Setiap 2 Minggu",
@@ -406,19 +402,13 @@
       "reset": "Atur ulang",
       "detectedExtraHint": "Riwayat pembayaran Anda menunjukkan rata-rata {amount} pokok tambahan per angsuran.",
       "applyDetected": "Gunakan",
-      "recurringAmount": "Tambahan per angsuran",
       "recurringStart": "Mulai (opsional)",
       "recurringEnd": "Sampai (opsional)",
       "lumpSums": "Pembayaran sekaligus",
-      "addLumpSum": "Tambah pembayaran sekaligus",
-      "noLumpSums": "Belum ada pembayaran sekaligus.",
-      "lumpSumDate": "Tanggal",
-      "lumpSumAmount": "Jumlah",
       "removeLumpSum": "Hapus",
       "modeLabel": "Setelah pembayaran ekstra",
       "modeShortenTerm": "Perpendek tenor",
       "modeLowerInstallment": "Turunkan angsuran",
-      "modeShortenTermHint": "Pertahankan angsuran yang sama dan lunasi pinjaman lebih cepat. Penghematan bunga maksimal.",
       "modeLowerInstallmentHint": "Pertahankan tanggal pelunasan yang sama dan hitung ulang angsuran yang lebih kecil atas saldo yang berkurang.",
       "goalSeek": {
         "title": "Pencarian target",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Tidak terjangkau — pembayaran ekstra yang sangat besar pun tidak dapat menghemat bunga sebanyak itu.",
         "unreachableDate": "Tidak terjangkau — bulan itu lebih awal dari pelunasan tercepat yang mungkin."
       },
-      "optionalGroup": "Opsional",
       "simulationTypeLabel": "Jenis simulasi",
       "overpaymentAmount": "Jumlah pembayaran ekstra",
       "frequencyLabel": "Frekuensi",
@@ -517,7 +506,6 @@
       "description": "Bagaimana pembayaran yang sudah Anda lakukan dibandingkan dengan jadwal kontrak awal.",
       "extraPrincipalPaid": "Pokok Tambahan Dibayar",
       "extraPrincipalNote": "Seberapa jauh Anda mendahului jadwal awal",
-      "missingData": "Untuk melihat seberapa besar pembayaran tambahan Anda mempersingkat pinjaman ini, akun ini memerlukan suku bunga, frekuensi pembayaran, dan beberapa pembayaran tercatat untuk merekonstruksi jadwal awalnya.",
       "monthsAlreadySaved": "Waktu yang Sudah Dihemat",
       "monthsValue": "{count, plural, one {# bulan} other {# bulan}}",
       "payoffComparison": "Semula {original}, sekarang {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "dibandingkan {amount} yang diproyeksikan semula",
       "seriesOriginal": "Jadwal Awal",
       "seriesActual": "Saldo Aktual",
-      "seriesCurrent": "Proyeksi Saat Ini",
       "unknown": "Tidak diketahui"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Kategori bunga",
       "description": "Tempat bunga pinjaman ini dicatat. Ketika bunga dicatat sebagai transaksi terpisah alih-alih bagian dari pembayaran, menentukan kategorinya membuat jadwal menampilkan bunga sebenarnya dan membuat \"Deteksi dari riwayat\" menemukan cukup bunga untuk bekerja.",
       "label": "Kategori bunga",
-      "placeholder": "Pilih kategori bunga",
-      "saveError": "Gagal menyimpan kategori bunga"
+      "placeholder": "Pilih kategori bunga"
     },
     "overpaymentCategory": {
       "title": "Deteksi pembayaran ekstra",
@@ -606,8 +592,7 @@
       "placeholder": "Pilih kategori",
       "memoLabel": "Memo pembayaran ekstra",
       "memoPlaceholder": "mis. Pokok tambahan",
-      "memoHelp": "Pembayaran yang memonya berisi teks ini dihitung sebagai pembayaran ekstra (tidak membedakan huruf besar/kecil).",
-      "saveError": "Gagal menyimpan pengaturan pembayaran ekstra"
+      "memoHelp": "Pembayaran yang memonya berisi teks ini dihitung sebagai pembayaran ekstra (tidak membedakan huruf besar/kecil)."
     }
   }
 }

@@ -144,7 +144,6 @@
       "cleared": "Bevestigd",
       "reconciled": "Afgestemd",
       "void": "Ongeldig",
-      "unreconciledDense": "N",
       "clearedDense": "B",
       "reconciledDense": "A",
       "voidDense": "O",

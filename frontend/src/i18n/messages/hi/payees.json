@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "पुनः सक्रिय करें",
-      "reactivateShort": "पु",
       "merge": "मर्ज करें",
-      "mergeShort": "म",
       "edit": "संपादित करें",
-      "editShort": "सं",
-      "delete": "हटाएं",
-      "deleteShort": "ह"
+      "delete": "हटाएं"
     },
     "viewTransactionsTitle": "इस भुगतानकर्ता के लेनदेन देखें",
     "uncategorizedBadge": "{count, plural, one {# वर्गीकृत न किया गया} other {# वर्गीकृत न किए गए}}",

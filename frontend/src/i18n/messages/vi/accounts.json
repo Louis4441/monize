@@ -72,12 +72,9 @@
       "closeAccount": "Đóng tài khoản",
       "reopenAccount": "Mở lại tài khoản",
       "deleteAccount": "Xóa tài khoản",
-      "reconcileTitle": "Đối soát tài khoản với sao kê",
       "deleteTitle": "Xóa vĩnh viễn tài khoản (không có giao dịch)",
       "closeTitleDisabled": "Tài khoản phải có số dư bằng không để đóng",
       "closeTitleEnabled": "Đóng tài khoản",
-      "balanceMustBeZero": "Số dư phải bằng không",
-      "closedPrefix": " — Đã đóng",
       "details": "Chi tiết"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Thiết lập thanh toán",
     "settingUp": "Đang thiết lập...",
     "fillRequiredFields": "Vui lòng điền tất cả các trường bắt buộc",
-    "requiredFieldsMissing": "Vui lòng điền tất cả các trường bắt buộc",
     "frequencyOptions": {
       "weekly": "Hàng tuần",
       "biweekly": "Mỗi 2 tuần",
@@ -406,19 +402,13 @@
       "reset": "Đặt lại",
       "detectedExtraHint": "Lịch sử thanh toán cho thấy trung bình bạn trả thêm {amount} tiền gốc mỗi kỳ.",
       "applyDetected": "Dùng số này",
-      "recurringAmount": "Trả thêm mỗi kỳ",
       "recurringStart": "Từ ngày (tùy chọn)",
       "recurringEnd": "Đến ngày (tùy chọn)",
       "lumpSums": "Các khoản trả một lần",
-      "addLumpSum": "Thêm khoản trả một lần",
-      "noLumpSums": "Chưa thêm khoản trả một lần nào.",
-      "lumpSumDate": "Ngày",
-      "lumpSumAmount": "Số tiền",
       "removeLumpSum": "Xóa",
       "modeLabel": "Sau khi trả thêm gốc",
       "modeShortenTerm": "Rút ngắn kỳ hạn",
       "modeLowerInstallment": "Giảm kỳ trả",
-      "modeShortenTermHint": "Giữ nguyên số tiền trả và tất toán khoản vay sớm hơn. Tiết kiệm lãi tối đa.",
       "modeLowerInstallmentHint": "Giữ nguyên ngày tất toán và tính lại số tiền trả nhỏ hơn trên dư nợ đã giảm.",
       "goalSeek": {
         "title": "Tìm mục tiêu",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Ngoài tầm với — khoản trả thêm rất lớn cũng không thể tiết kiệm được nhiều lãi đến vậy.",
         "unreachableDate": "Ngoài tầm với — tháng đó sớm hơn thời điểm tất toán sớm nhất có thể."
       },
-      "optionalGroup": "Tùy chọn",
       "simulationTypeLabel": "Loại mô phỏng",
       "overpaymentAmount": "Số tiền trả thêm",
       "frequencyLabel": "Tần suất",
@@ -517,7 +506,6 @@
       "description": "So sánh các khoản bạn đã trả với lịch trả nợ theo hợp đồng ban đầu.",
       "extraPrincipalPaid": "Gốc trả thêm",
       "extraPrincipalNote": "Bạn đang vượt trước lịch ban đầu bao nhiêu",
-      "missingData": "Để xem các khoản trả trước hạn đã rút ngắn khoản vay này bao nhiêu, tài khoản này cần có lãi suất, tần suất thanh toán và một số khoản thanh toán đã ghi nhận để tái tạo lịch trả nợ ban đầu.",
       "monthsAlreadySaved": "Thời gian đã tiết kiệm",
       "monthsValue": "{count, plural, one {# tháng} other {# tháng}}",
       "payoffComparison": "Ban đầu {original}, hiện tại {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "so với {amount} dự kiến ban đầu",
       "seriesOriginal": "Lịch ban đầu",
       "seriesActual": "Số dư thực tế",
-      "seriesCurrent": "Dự báo hiện tại",
       "unknown": "Không rõ"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Danh mục lãi",
       "description": "Nơi ghi nhận lãi của khoản vay này. Khi lãi được ghi thành một giao dịch riêng thay vì một phần của khoản thanh toán, việc chỉ định danh mục của nó giúp lịch trả nợ hiển thị lãi thực tế và giúp \"Phát hiện từ lịch sử\" tìm đủ lãi để hoạt động.",
       "label": "Danh mục lãi",
-      "placeholder": "Chọn danh mục lãi",
-      "saveError": "Không thể lưu danh mục lãi"
+      "placeholder": "Chọn danh mục lãi"
     },
     "overpaymentCategory": {
       "title": "Phát hiện khoản trả thêm gốc",
@@ -606,8 +592,7 @@
       "placeholder": "Chọn một danh mục",
       "memoLabel": "Ghi nhớ khoản trả thêm gốc",
       "memoPlaceholder": "vd. Gốc bổ sung",
-      "memoHelp": "Các khoản thanh toán có ghi nhớ chứa nội dung này được tính là khoản trả thêm gốc (không phân biệt chữ hoa/thường).",
-      "saveError": "Không thể lưu cài đặt khoản trả thêm gốc"
+      "memoHelp": "Các khoản thanh toán có ghi nhớ chứa nội dung này được tính là khoản trả thêm gốc (không phân biệt chữ hoa/thường)."
     }
   }
 }

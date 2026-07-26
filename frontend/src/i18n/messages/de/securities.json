@@ -209,6 +209,7 @@
       "sold": "Verkauf {quantity} · {account}"
     },
     "empty": "Kein Kursverlauf verfügbar",
+    "showingCount": "{shown} von {total} Kursen angezeigt",
     "columns": {
       "date": "Datum",
       "close": "Schluss",
@@ -235,6 +236,7 @@
     "closeButton": "Schließen",
     "deleteConfirm": {
       "title": "Kurs löschen",
+      "message": "Kurseintrag für {date} löschen?",
       "confirmLabel": "Löschen"
     }
   },

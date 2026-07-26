@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "[XX-Reactivate-XX]",
-      "reactivateShort": "[XX-Re-XX]",
       "merge": "[XX-Merge-XX]",
-      "mergeShort": "[XX-M-XX]",
       "edit": "[XX-Edit-XX]",
-      "editShort": "[XX-E-XX]",
-      "delete": "[XX-Delete-XX]",
-      "deleteShort": "[XX-X-XX]"
+      "delete": "[XX-Delete-XX]"
     },
     "viewTransactionsTitle": "[XX-View transactions with this payee-XX]",
     "uncategorizedBadge": "[XX-{count, plural, one {# uncategorized} other {# uncategorized}}-XX]",

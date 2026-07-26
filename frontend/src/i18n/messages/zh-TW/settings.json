@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "儲存色彩主題失敗"
     },
     "browserLocale": "使用瀏覽器語言設定（自動偵測）",
-    "browserTimezonePrefix": "使用瀏覽器時區（自動偵測為 {tz}）",
     "numberFormatOptions": {
       "browser": "使用瀏覽器語言設定（自動偵測為 {sample}）",
       "enUS": "英文（美國）- 1,234.56",

@@ -102,6 +102,7 @@
     "empty": "Aún no hay valores favoritos. Visita la <securitiesLink>página de Valores</securitiesLink> y marca con estrella los valores que quieres seguir aquí.",
     "noPriceYet": "Sin precio aún",
     "dailyChange": "Cambio diario",
+    "openPriceHistory": "Historial de precios de {symbol}",
     "refreshPrices": "Actualizar precios",
     "manage": "Gestionar valores"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "Gastos por categoría",
     "empty": "No hay datos de gastos para este período.",
-    "past30Days": "Últimos 30 días",
     "total": "Total",
     "uncategorized": "Sin categorizar",
     "other": "Otros"
   },
   "incomeExpenses": {
     "title": "Ingresos vs Gastos",
-    "last5Weeks": "Últimas 5 semanas",
-    "weekOf": "Semana del {date}",
     "income": "Ingresos",
     "expenses": "Gastos",
     "net": "Neto"

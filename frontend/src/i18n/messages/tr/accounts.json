@@ -72,12 +72,9 @@
       "closeAccount": "Hesabı Kapat",
       "reopenAccount": "Hesabı Yeniden Aç",
       "deleteAccount": "Hesabı Sil",
-      "reconcileTitle": "Hesabı bir ekstreye göre mutabakat et",
       "deleteTitle": "Hesabı kalıcı olarak sil (işlem yok)",
       "closeTitleDisabled": "Hesabı kapatmak için bakiyenin sıfır olması gerekir",
       "closeTitleEnabled": "Hesabı kapat",
-      "balanceMustBeZero": "Bakiye sıfır olmalıdır",
-      "closedPrefix": " — Kapalı",
       "details": "Ayrıntılar"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Ödemeleri Ayarla",
     "settingUp": "Ayarlanıyor...",
     "fillRequiredFields": "Lütfen tüm zorunlu alanları doldurun",
-    "requiredFieldsMissing": "Lütfen tüm zorunlu alanları doldurun",
     "frequencyOptions": {
       "weekly": "Haftalık",
       "biweekly": "2 Haftada Bir",
@@ -406,19 +402,13 @@
       "reset": "Sıfırla",
       "detectedExtraHint": "Ödeme geçmişinize göre taksit başına ortalama {amount} ek anapara ödüyorsunuz.",
       "applyDetected": "Kullan",
-      "recurringAmount": "Taksit başına ek",
       "recurringStart": "Başlangıç (isteğe bağlı)",
       "recurringEnd": "Bitiş (isteğe bağlı)",
       "lumpSums": "Tek seferlik toplu ödemeler",
-      "addLumpSum": "Toplu ödeme ekle",
-      "noLumpSums": "Toplu ödeme eklenmedi.",
-      "lumpSumDate": "Tarih",
-      "lumpSumAmount": "Tutar",
       "removeLumpSum": "Kaldır",
       "modeLabel": "Ek ödemeden sonra",
       "modeShortenTerm": "Vadeyi kısalt",
       "modeLowerInstallment": "Taksiti düşür",
-      "modeShortenTermHint": "Aynı taksiti koruyun ve krediyi daha erken kapatın. Maksimum faiz tasarrufu.",
       "modeLowerInstallmentHint": "Aynı kapanış tarihini koruyun ve azalan bakiye üzerinden daha düşük bir taksit hesaplayın.",
       "goalSeek": {
         "title": "Hedef arama",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Ulaşılamaz — çok büyük bir ek ödeme bile o kadar faiz tasarrufu sağlayamaz.",
         "unreachableDate": "Ulaşılamaz — bu ay, mümkün olan en erken kapanıştan daha önce."
       },
-      "optionalGroup": "İsteğe bağlı",
       "simulationTypeLabel": "Simülasyon türü",
       "overpaymentAmount": "Ek ödeme tutarı",
       "frequencyLabel": "Sıklık",
@@ -517,7 +506,6 @@
       "description": "Şimdiye kadar yaptığınız ödemelerin orijinal sözleşme planıyla karşılaştırması.",
       "extraPrincipalPaid": "Ödenen Ek Anapara",
       "extraPrincipalNote": "Orijinal planın ne kadar önündesiniz",
-      "missingData": "Erken ödemelerinizin bu krediyi ne kadar kısalttığını görmek için bu hesabın bir faiz oranına, bir ödeme sıklığına ve orijinal planını yeniden oluşturmak için kayıtlı bazı ödemelere ihtiyacı var.",
       "monthsAlreadySaved": "Şimdiden Kazanılan Süre",
       "monthsValue": "{count, plural, one {# ay} other {# ay}}",
       "payoffComparison": "Başlangıçta {original}, şimdi {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "başlangıçta öngörülen {amount} tutara karşı",
       "seriesOriginal": "Orijinal Plan",
       "seriesActual": "Gerçek Bakiye",
-      "seriesCurrent": "Mevcut Öngörü",
       "unknown": "Bilinmiyor"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Faiz kategorisi",
       "description": "Bu kredinin faizinin nereye kaydedildiği. Faiz, ödemenin bir bölümü yerine ayrı bir işlem olarak kaydedildiğinde, kategorisini belirtmek ödeme planının gerçek faizi göstermesini ve \"Geçmişten algıla\" işlevinin çalışmak için yeterli faizi bulmasını sağlar.",
       "label": "Faiz kategorisi",
-      "placeholder": "Bir faiz kategorisi seçin",
-      "saveError": "Faiz kategorisi kaydedilemedi"
+      "placeholder": "Bir faiz kategorisi seçin"
     },
     "overpaymentCategory": {
       "title": "Ek ödeme algılama",
@@ -606,8 +592,7 @@
       "placeholder": "Bir kategori seçin",
       "memoLabel": "Ek ödeme notu",
       "memoPlaceholder": "örn. Ek anapara",
-      "memoHelp": "Notu bu metni içeren ödemeler ek ödeme olarak sayılır (büyük/küçük harfe duyarlı değildir).",
-      "saveError": "Ek ödeme ayarları kaydedilemedi"
+      "memoHelp": "Notu bu metni içeren ödemeler ek ödeme olarak sayılır (büyük/küçük harfe duyarlı değildir)."
     }
   }
 }

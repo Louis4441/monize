@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "रंग थीम सहेजने में विफल"
     },
     "browserLocale": "ब्राउज़र लोकेल उपयोग करें (स्वत: पहचान)",
-    "browserTimezonePrefix": "ब्राउज़र समयक्षेत्र उपयोग करें (स्वत: पहचाना {tz})",
     "numberFormatOptions": {
       "browser": "ब्राउज़र लोकेल उपयोग करें (स्वत: पहचान {sample})",
       "enUS": "अंग्रेजी (US) - 1,234.56",

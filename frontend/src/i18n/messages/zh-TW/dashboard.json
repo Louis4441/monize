@@ -102,6 +102,7 @@
     "empty": "尚無我的最愛證券。請前往<securitiesLink>證券頁面</securitiesLink>，將您想追蹤的證券加入星號。",
     "noPriceYet": "尚無價格",
     "dailyChange": "每日變動",
+    "openPriceHistory": "{symbol} 的價格歷史",
     "refreshPrices": "更新價格",
     "manage": "管理證券"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "依類別支出",
     "empty": "此期間無支出資料。",
-    "past30Days": "過去 30 天",
     "total": "總計",
     "uncategorized": "未分類",
     "other": "其他"
   },
   "incomeExpenses": {
     "title": "收入與支出",
-    "last5Weeks": "最近 5 週",
-    "weekOf": "{date} 當週",
     "income": "收入",
     "expenses": "支出",
     "net": "淨額"

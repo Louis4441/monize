@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "Реактивировать",
-      "reactivateShort": "Р",
       "merge": "Объединить",
-      "mergeShort": "О",
       "edit": "Изменить",
-      "editShort": "И",
-      "delete": "Удалить",
-      "deleteShort": "У"
+      "delete": "Удалить"
     },
     "viewTransactionsTitle": "Просмотр проводок с этим получателем",
     "uncategorizedBadge": "{count, plural, one {# без категории} other {# без категории}}",

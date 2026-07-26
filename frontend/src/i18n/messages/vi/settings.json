@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Không thể lưu giao diện màu sắc"
     },
     "browserLocale": "Sử dụng ngôn ngữ trình duyệt (tự động phát hiện)",
-    "browserTimezonePrefix": "Sử dụng múi giờ trình duyệt (tự động phát hiện là {tz})",
     "numberFormatOptions": {
       "browser": "Sử dụng ngôn ngữ trình duyệt (tự động phát hiện: {sample})",
       "enUS": "Tiếng Anh (Mỹ) - 1,234.56",

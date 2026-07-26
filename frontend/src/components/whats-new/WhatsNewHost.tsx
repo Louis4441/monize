@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useTourStore } from '@/store/tourStore';
-import { useWhatsNewStore } from '@/store/whatsNewStore';
+import {
+  useWhatsNewStore,
+  consumeWhatsNewPendingForLogin,
+  recordAnnouncedVersion,
+} from '@/store/whatsNewStore';
 import { whatsNewApi, type ReleaseNotes } from '@/lib/whats-new';
 import { createLogger } from '@/lib/logger';
 import { WhatsNewModal } from './WhatsNewModal';
@@ -15,10 +19,18 @@ const logger = createLogger('WhatsNew');
  * so it is present on every route, including the login screen.
  *
  * On load it fetches the current version's notes: authenticated users get the
- * per-user status (and the modal auto-opens when the backend says so — the
- * backend suppresses this for acknowledged versions, disabled preference, and
- * demo instances); unauthenticated visitors get the public notes so the login
- * screen's version label can still open the modal manually.
+ * per-user status (the backend suppresses it for acknowledged versions,
+ * disabled preference, and demo instances); unauthenticated visitors get the
+ * public notes so the login screen's version label can still open the modal
+ * manually.
+ *
+ * The modal auto-opens only when the backend says the user is due this version
+ * *and* this page load is a moment to deliver it: either it followed a login
+ * (`markWhatsNewPendingForLogin`), or the version is one this browser has not
+ * announced yet (`recordAnnouncedVersion`), which covers a deploy landing under
+ * a session that never logs out. The backend status alone is version-scoped,
+ * not session-scoped, so gating on it alone reopened the modal on every refresh
+ * until acknowledged.
  */
 export function WhatsNewHost() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -48,8 +60,22 @@ export function WhatsNewHost() {
         setCurrentVersion(
           'currentVersion' in res ? res.currentVersion : res.version,
         );
-        if ('autoShow' in res && res.autoShow && res.notes) {
-          open();
+        // `autoShow` says the user is *due* this version's digest; the two
+        // client-side triggers say this page load is a moment to deliver it --
+        // a fresh login, or a version this browser has not announced yet (so a
+        // deploy under a long-lived session lands on the next refresh).
+        // Without one of them the modal reopened on every refresh for as long
+        // as the version stayed unacknowledged.
+        //
+        // Both are evaluated, never short-circuited: the login flag has to be
+        // spent and the version recorded on every authenticated check, or a
+        // load with nothing to show leaves a trigger armed for a later refresh.
+        if ('autoShow' in res) {
+          const cameFromLogin = consumeWhatsNewPendingForLogin();
+          const isNewToThisBrowser = recordAnnouncedVersion(res.currentVersion);
+          if ((cameFromLogin || isNewToThisBrowser) && res.autoShow && res.notes) {
+            open();
+          }
         }
       })
       .catch((error) => {

@@ -102,6 +102,7 @@
     "empty": "No favourite securities yet. Visit the <securitiesLink>Securities page</securitiesLink> and star the securities you want to track here.",
     "noPriceYet": "No price yet",
     "dailyChange": "Daily change",
+    "openPriceHistory": "Price history for {symbol}",
     "refreshPrices": "Refresh prices",
     "manage": "Manage securities"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "Expenses by Category",
     "empty": "No expense data for this period.",
-    "past30Days": "Past 30 days",
     "total": "Total",
     "uncategorized": "Uncategorized",
     "other": "Other"
   },
   "incomeExpenses": {
     "title": "Income vs Expenses",
-    "last5Weeks": "Last 5 weeks",
-    "weekOf": "Week of {date}",
     "income": "Income",
     "expenses": "Expenses",
     "net": "Net"

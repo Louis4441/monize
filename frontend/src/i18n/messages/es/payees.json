@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "Reactivar",
-      "reactivateShort": "Re",
       "merge": "Fusionar",
-      "mergeShort": "F",
       "edit": "Editar",
-      "editShort": "E",
-      "delete": "Eliminar",
-      "deleteShort": "X"
+      "delete": "Eliminar"
     },
     "viewTransactionsTitle": "Ver transacciones con este beneficiario",
     "uncategorizedBadge": "{count, plural, one {# sin categoría} other {# sin categoría}}",

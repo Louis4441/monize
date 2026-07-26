@@ -72,12 +72,9 @@
       "closeAccount": "Fechar Conta",
       "reopenAccount": "Reabrir Conta",
       "deleteAccount": "Eliminar Conta",
-      "reconcileTitle": "Reconciliar conta com um extrato",
       "deleteTitle": "Eliminar conta permanentemente (sem transações)",
       "closeTitleDisabled": "O saldo da conta deve ser zero para fechar",
       "closeTitleEnabled": "Fechar conta",
-      "balanceMustBeZero": "O saldo deve ser zero",
-      "closedPrefix": " — Fechada",
       "details": "Detalhes"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Configurar Pagamentos",
     "settingUp": "A configurar...",
     "fillRequiredFields": "Preencha todos os campos obrigatórios",
-    "requiredFieldsMissing": "Preencha todos os campos obrigatórios",
     "frequencyOptions": {
       "weekly": "Semanal",
       "biweekly": "Quinzenal",
@@ -406,19 +402,13 @@
       "reset": "Repor",
       "detectedExtraHint": "O seu histórico de pagamentos mostra uma média de {amount} de capital extra por prestação.",
       "applyDetected": "Usar",
-      "recurringAmount": "Extra por prestação",
       "recurringStart": "A partir de (opcional)",
       "recurringEnd": "Até (opcional)",
       "lumpSums": "Pagamentos únicos",
-      "addLumpSum": "Adicionar pagamento único",
-      "noLumpSums": "Nenhum pagamento único adicionado.",
-      "lumpSumDate": "Data",
-      "lumpSumAmount": "Montante",
       "removeLumpSum": "Remover",
       "modeLabel": "Após uma amortização antecipada",
       "modeShortenTerm": "Encurtar prazo",
       "modeLowerInstallment": "Reduzir prestação",
-      "modeShortenTermHint": "Manter a mesma prestação e liquidar o empréstimo mais cedo. Poupança máxima de juros.",
       "modeLowerInstallmentHint": "Manter a mesma data de liquidação e recalcular uma prestação menor sobre o saldo reduzido.",
       "goalSeek": {
         "title": "Procura de objetivo",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Fora de alcance — nem uma amortização extra muito grande consegue poupar tantos juros.",
         "unreachableDate": "Fora de alcance — esse mês é anterior à liquidação mais cedo possível."
       },
-      "optionalGroup": "Opcional",
       "simulationTypeLabel": "Tipo de simulação",
       "overpaymentAmount": "Valor do pagamento extra",
       "frequencyLabel": "Frequência",
@@ -517,7 +506,6 @@
       "description": "Como os pagamentos que já efetuou se comparam com o plano contratual original.",
       "extraPrincipalPaid": "Capital extra pago",
       "extraPrincipalNote": "Quanto está adiantado em relação ao plano original",
-      "missingData": "Para ver quanto as suas amortizações antecipadas encurtaram este empréstimo, esta conta precisa de uma taxa de juro, uma frequência de pagamento e alguns pagamentos registados para reconstruir o seu plano original.",
       "monthsAlreadySaved": "Tempo já poupado",
       "monthsValue": "{count, plural, one {# mês} other {# meses}}",
       "payoffComparison": "Originalmente {original}, agora {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "face a {amount} projetados originalmente",
       "seriesOriginal": "Plano original",
       "seriesActual": "Saldo real",
-      "seriesCurrent": "Projeção atual",
       "unknown": "Desconhecido"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Categoria de juros",
       "description": "Onde os juros deste empréstimo são registados. Quando os juros são lançados como uma transação separada em vez de uma divisão do pagamento, indicar a sua categoria permite que o plano mostre os juros reais e que «Detetar a partir do histórico» encontre juros suficientes para funcionar.",
       "label": "Categoria de juros",
-      "placeholder": "Selecione uma categoria de juros",
-      "saveError": "Não foi possível guardar a categoria de juros"
+      "placeholder": "Selecione uma categoria de juros"
     },
     "overpaymentCategory": {
       "title": "Deteção de amortizações antecipadas",
@@ -606,8 +592,7 @@
       "placeholder": "Selecione uma categoria",
       "memoLabel": "Nota de amortização antecipada",
       "memoPlaceholder": "ex. Capital adicional",
-      "memoHelp": "Os pagamentos cuja nota contém este texto são contabilizados como amortizações antecipadas (não distingue maiúsculas de minúsculas).",
-      "saveError": "Não foi possível guardar as definições de amortização antecipada"
+      "memoHelp": "Os pagamentos cuja nota contém este texto são contabilizados como amortizações antecipadas (não distingue maiúsculas de minúsculas)."
     }
   }
 }

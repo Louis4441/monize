@@ -66,8 +66,6 @@
     "untagged": "Etiketsiz",
     "noTagData": "Gösterilecek etiketli pozisyon yok. Etikete göre dağılımı görmek için menkul kıymetlerinize etiket ekleyin.",
     "noCountryData": "Ülke dağılımı verisi mevcut değil.",
-    "tagExposureNote": "Etikete göre dağılım: birden fazla etikete sahip bir pozisyon her birinin altında tam olarak sayılır, bu yüzden yüzdelerin toplamı %100'ü aşabilir.",
-    "countryExposureNote": "Ülke şeffaf bakışı: fon pozisyonları ülke ağırlıklarına göre bölünür. En büyük 10 ülke gösterilir; geri kalanı \"Diğer ülkeler\" olarak gruplanır.",
     "otherCountries": "Diğer ülkeler",
     "groupBy": {
       "security": "Menkul kıymete göre",
@@ -113,7 +111,6 @@
     "viewReport": "Raporu görüntüle",
     "viewReportTitle": "Portföy Değeri raporunun tamamını aç",
     "updatingLabel": "Güncelleniyor…",
-    "updatingAriaLabel": "Güncelleniyor",
     "intradayFallbackWarningAriaLabel": "Ayrıntılı gün içi fiyatlandırma kullanılamıyor",
     "intradayUnavailableTitle": "Bu hesap karışımı için gün içi görünüm kullanılamıyor",
     "intradayUnavailableDescription": "Bir veya daha fazla pozisyon, gün içi veriyi sunmayan bir fiyat sağlayıcısı (MSN Money) kullanıyor. Günlük anlık görüntüleri görmek için daha uzun bir aralığa geçin.",

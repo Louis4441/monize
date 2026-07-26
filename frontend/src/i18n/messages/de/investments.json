@@ -66,8 +66,6 @@
     "untagged": "Ohne Tags",
     "noTagData": "Keine getaggten Positionen vorhanden. Vergib Tags an deine Wertpapiere, um die Aufteilung nach Tags zu sehen.",
     "noCountryData": "Keine Länderaufteilungsdaten verfügbar.",
-    "tagExposureNote": "Aufteilung nach Tags: Eine Position mit mehreren Tags zählt unter jedem voll, daher kann die Summe der Prozentwerte über 100 % liegen.",
-    "countryExposureNote": "Länder-Durchschau: Fondsbestände werden anhand ihrer Ländergewichtung aufgeteilt. Die 10 größten Länder werden angezeigt; der Rest wird als „Andere Länder“ zusammengefasst.",
     "otherCountries": "Andere Länder",
     "groupBy": {
       "security": "Nach Wertpapier",
@@ -113,7 +111,6 @@
     "viewReport": "Bericht ansehen",
     "viewReportTitle": "Vollständigen Portfolio-Wert-Bericht öffnen",
     "updatingLabel": "Wird aktualisiert…",
-    "updatingAriaLabel": "Wird aktualisiert",
     "intradayFallbackWarningAriaLabel": "Detaillierte Intraday-Kursdaten nicht verfügbar",
     "intradayUnavailableTitle": "Intraday-Ansicht für diese Kontokombination nicht verfügbar",
     "intradayUnavailableDescription": "Ein oder mehrere Bestände verwenden einen Kursanbieter (MSN Money), der keine Intraday-Daten bereitstellt. Wechseln Sie zu einem längeren Zeitraum, um tägliche Momentaufnahmen anzuzeigen.",

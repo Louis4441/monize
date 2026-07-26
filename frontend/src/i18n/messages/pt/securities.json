@@ -209,6 +209,7 @@
       "sold": "Venda {quantity} · {account}"
     },
     "empty": "Sem histórico de cotações disponível",
+    "showingCount": "A mostrar {shown} de {total} cotações",
     "columns": {
       "date": "Data",
       "close": "Fecho",
@@ -235,6 +236,7 @@
     "closeButton": "Fechar",
     "deleteConfirm": {
       "title": "Eliminar Cotação",
+      "message": "Eliminar a cotação de {date}?",
       "confirmLabel": "Eliminar"
     }
   },

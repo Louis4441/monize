@@ -102,6 +102,7 @@
     "empty": "Brak ulubionych papierów wartościowych. Odwiedź <securitiesLink>stronę Papiery wartościowe</securitiesLink> i oznacz gwiazdką te, które chcesz tu śledzić.",
     "noPriceYet": "Brak ceny",
     "dailyChange": "Zmiana dzienna",
+    "openPriceHistory": "Historia ceny: {symbol}",
     "refreshPrices": "Odśwież ceny",
     "manage": "Zarządzaj papierami wartościowymi"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "Wydatki według kategorii",
     "empty": "Brak danych o wydatkach dla tego okresu.",
-    "past30Days": "Ostatnie 30 dni",
     "total": "Suma",
     "uncategorized": "Bez kategorii",
     "other": "Inne"
   },
   "incomeExpenses": {
     "title": "Przychody a wydatki",
-    "last5Weeks": "Ostatnie 5 tygodni",
-    "weekOf": "Tydzień od {date}",
     "income": "Przychody",
     "expenses": "Wydatki",
     "net": "Saldo"

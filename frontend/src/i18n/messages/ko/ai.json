@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "AI가 설정되지 않았습니다",
-    "message": "설정된 AI 제공자가 없습니다. AI 어시스턴트를 사용하려면 설정에서 {link}하세요.",
-    "linkText": "AI 제공자를 설정"
+    "message": "설정된 AI 제공자가 없습니다. AI 어시스턴트를 사용하려면 설정에서 {link}하세요."
   },
   "suggestedQueries": {
     "heading": "재정에 관해 질문하세요",

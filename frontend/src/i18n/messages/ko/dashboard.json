@@ -102,6 +102,7 @@
     "empty": "즐겨찾기 유가증권이 없습니다. <securitiesLink>유가증권 페이지</securitiesLink>를 방문하여 여기서 추적할 유가증권에 별표를 표시하세요.",
     "noPriceYet": "아직 가격 없음",
     "dailyChange": "일일 변동",
+    "openPriceHistory": "{symbol} 가격 이력",
     "refreshPrices": "가격 새로고침",
     "manage": "유가증권 관리"
   },
@@ -122,15 +123,12 @@
   "expensesPieChart": {
     "title": "카테고리별 지출",
     "empty": "해당 기간의 지출 데이터가 없습니다.",
-    "past30Days": "지난 30일",
     "total": "합계",
     "uncategorized": "미분류",
     "other": "기타"
   },
   "incomeExpenses": {
     "title": "수입 대 지출",
-    "last5Weeks": "지난 5주",
-    "weekOf": "{date} 주",
     "income": "수입",
     "expenses": "지출",
     "net": "순액"

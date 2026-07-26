@@ -181,7 +181,7 @@ export function FavouriteAccounts({ accounts, brokerageMarketValues, isLoading, 
               className={`flex-1 flex items-center justify-between p-2 sm:p-3 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors text-left ${
                 reordering
                   ? 'cursor-default'
-                  : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  : 'hover:border-blue-400 hover:bg-gray-50 dark:hover:border-blue-500 dark:hover:bg-gray-700/50'
               }`}
             >
               <div className="flex items-center gap-2 min-w-0">
