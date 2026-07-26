@@ -209,7 +209,6 @@
       "sold": "Venda {quantity} · {account}"
     },
     "empty": "Sem histórico de cotações disponível",
-    "loadMore": "Carregar mais {count}",
     "showingCount": "Mostrando {shown} de {total} cotações",
     "columns": {
       "date": "Data",

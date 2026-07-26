@@ -209,7 +209,6 @@
       "sold": "Jual {quantity} · {account}"
     },
     "empty": "Tidak ada riwayat harga tersedia",
-    "loadMore": "Muat {count} lagi",
     "showingCount": "Menampilkan {shown} dari {total} harga",
     "columns": {
       "date": "Tanggal",

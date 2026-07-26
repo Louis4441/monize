@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -58,8 +58,12 @@ function getSourceColor(source: string | null): string {
   }
 }
 
-/** Rows rendered initially, and added by each "Load more" press. */
-const PAGE_SIZE = 10;
+/** Rows rendered before the user scrolls. */
+const INITIAL_PAGE_SIZE = 10;
+/** Rows appended each time the end of the list scrolls into view. */
+const SCROLL_PAGE_SIZE = 50;
+/** Start fetching the next batch this far before the list actually ends. */
+const PREFETCH_MARGIN = '200px';
 
 function formatPrice(value: number | null): string {
   if (value === null || value === undefined) return '-';
@@ -90,14 +94,15 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   // The full series is still fetched -- the chart plots every point -- but the
   // table renders a page at a time so a security with years of history does not
   // mount thousands of rows.
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const loadPrices = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await investmentsApi.getSecurityPrices(security.id, 9999);
       setPrices(data);
-      setVisibleCount(PAGE_SIZE);
+      setVisibleCount(INITIAL_PAGE_SIZE);
     } catch (error) {
       toast.error(getErrorMessage(error, t('priceHistory.toasts.loadFailed')));
     } finally {
@@ -264,6 +269,27 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   const visiblePrices = prices.slice(0, visibleCount);
   const remainingCount = prices.length - visiblePrices.length;
 
+  // Reveal the next batch as the end of the list comes into view. Re-observed
+  // on every visibleCount change: a batch that still does not reach past the
+  // sentinel leaves it intersecting, and an observer already reporting
+  // "intersecting" will not fire again on its own.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setVisibleCount((count) =>
+          Math.min(count + SCROLL_PAGE_SIZE, prices.length),
+        );
+      },
+      { rootMargin: PREFETCH_MARGIN },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [prices.length, visibleCount]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -411,21 +437,18 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
               ))}
             </tbody>
           </table>
+          {/* Both the "more is coming" caption and the trigger that fetches it:
+              scrolling this into view reveals the next batch. */}
           {remainingCount > 0 && (
-            <div className="flex flex-col items-center gap-1 pt-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
-              >
-                {t('priceHistory.loadMore', { count: Math.min(PAGE_SIZE, remainingCount) })}
-              </Button>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {t('priceHistory.showingCount', {
-                  shown: visiblePrices.length,
-                  total: prices.length,
-                })}
-              </span>
+            <div
+              ref={sentinelRef}
+              data-testid="price-history-sentinel"
+              className="flex items-center justify-center pt-3 text-xs text-gray-500 dark:text-gray-400"
+            >
+              {t('priceHistory.showingCount', {
+                shown: visiblePrices.length,
+                total: prices.length,
+              })}
             </div>
           )}
         </div>

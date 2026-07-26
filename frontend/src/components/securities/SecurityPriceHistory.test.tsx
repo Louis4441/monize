@@ -99,18 +99,52 @@ const mockPrices = [
 
 /** `count` synthetic daily prices, newest first, as the API returns them. */
 function manyPrices(count: number) {
-  return Array.from({ length: count }, (_, i) => ({
-    id: 100 + i,
-    securityId: 'sec-1',
-    priceDate: `2025-04-${String(count - i).padStart(2, '0')}`,
-    openPrice: 100 + i,
-    highPrice: 101 + i,
-    lowPrice: 99 + i,
-    closePrice: 100 + i,
-    volume: 1000,
-    source: 'yahoo_finance',
-    createdAt: '2025-04-01T10:00:00Z',
-  }));
+  return Array.from({ length: count }, (_, i) => {
+    const month = 1 + Math.floor(i / 28);
+    const day = 1 + (i % 28);
+    return {
+      id: 100 + i,
+      securityId: 'sec-1',
+      priceDate: `2025-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+      openPrice: 100 + i,
+      highPrice: 101 + i,
+      lowPrice: 99 + i,
+      closePrice: 100 + i,
+      volume: 1000,
+      source: 'yahoo_finance',
+      createdAt: '2025-04-01T10:00:00Z',
+    };
+  });
+}
+
+/**
+ * Controllable IntersectionObserver. The component tears its observer down and
+ * rebuilds it on every batch, so only the most recent callback is live --
+ * `scrollToEnd` always drives that one.
+ */
+type IntersectCallback = (entries: { isIntersecting: boolean }[]) => void;
+const liveObservers: IntersectCallback[] = [];
+
+vi.stubGlobal(
+  'IntersectionObserver',
+  vi.fn(function (this: Record<string, unknown>, callback: IntersectCallback) {
+    this.observe = vi.fn(() => {
+      liveObservers.push(callback);
+    });
+    this.unobserve = vi.fn();
+    this.disconnect = vi.fn(() => {
+      const index = liveObservers.indexOf(callback);
+      if (index !== -1) liveObservers.splice(index, 1);
+    });
+  }),
+);
+
+/** Scrolls the end-of-list sentinel into view, releasing the next batch. */
+async function scrollToEnd() {
+  const callback = liveObservers[liveObservers.length - 1];
+  await act(async () => {
+    callback?.([{ isIntersecting: true }]);
+  });
 }
 
 describe('SecurityPriceHistory', () => {
@@ -129,6 +163,7 @@ describe('SecurityPriceHistory', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    liveObservers.length = 0;
     window.addEventListener('unhandledrejection', swallowExpected);
     (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrices);
     (investmentsApi.getSecurityTransactionHistory as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -428,42 +463,53 @@ describe('SecurityPriceHistory', () => {
     const rowCount = () =>
       document.querySelectorAll('tbody tr').length;
 
-    it('renders only the first 10 rows and offers to load more', async () => {
+    it('renders only the first 10 rows, with no button to press', async () => {
       (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
-        manyPrices(25),
+        manyPrices(75),
       );
       await renderComponent();
 
       expect(rowCount()).toBe(10);
-      expect(screen.getByText('Showing 10 of 25 prices')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Load 10 more' })).toBeInTheDocument();
+      expect(screen.getByText('Showing 10 of 75 prices')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
     });
 
-    it('adds a page per press and drops the control on the last page', async () => {
+    it('appends 50 more each time the end of the list scrolls into view', async () => {
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyPrices(75),
+      );
+      await renderComponent();
+      expect(rowCount()).toBe(10);
+
+      await scrollToEnd();
+      expect(rowCount()).toBe(60);
+      expect(screen.getByText('Showing 60 of 75 prices')).toBeInTheDocument();
+
+      // Last batch is short: 15 left, not another 50.
+      await scrollToEnd();
+      expect(rowCount()).toBe(75);
+    });
+
+    it('stops observing once every row is shown', async () => {
       (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
         manyPrices(25),
       );
       await renderComponent();
 
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Load 10 more' }));
-      });
-      expect(rowCount()).toBe(20);
+      await scrollToEnd();
 
-      // Only 5 left, so the button offers exactly that many.
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Load 5 more' }));
-      });
       expect(rowCount()).toBe(25);
-      expect(screen.queryByRole('button', { name: /Load \d+ more/ })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('price-history-sentinel')).not.toBeInTheDocument();
       expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
+      expect(liveObservers).toHaveLength(0);
     });
 
-    it('leaves the control out when everything already fits on one page', async () => {
+    it('leaves the sentinel out when everything already fits on one page', async () => {
       await renderComponent();
 
       expect(rowCount()).toBe(3);
-      expect(screen.queryByRole('button', { name: /Load \d+ more/ })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('price-history-sentinel')).not.toBeInTheDocument();
+      expect(liveObservers).toHaveLength(0);
     });
 
     it('charts the whole series even though the table is paged', async () => {
@@ -487,10 +533,8 @@ describe('SecurityPriceHistory', () => {
       );
       await renderComponent();
 
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Load 10 more' }));
-      });
-      expect(rowCount()).toBe(20);
+      await scrollToEnd();
+      expect(rowCount()).toBe(25);
 
       fireEvent.click(screen.getAllByText('Delete')[0]);
       const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });

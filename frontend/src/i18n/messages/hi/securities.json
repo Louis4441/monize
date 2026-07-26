@@ -209,7 +209,6 @@
       "sold": "बिक्री {quantity} · {account}"
     },
     "empty": "कोई मूल्य इतिहास उपलब्ध नहीं",
-    "loadMore": "{count} और लोड करें",
     "showingCount": "{total} में से {shown} मूल्य दिखाए जा रहे हैं",
     "columns": {
       "date": "तिथि",

@@ -209,7 +209,6 @@
       "sold": "[XX-Sold {quantity} · {account}-XX]"
     },
     "empty": "[XX-No price history available-XX]",
-    "loadMore": "[XX-Load {count} more-XX]",
     "showingCount": "[XX-Showing {shown} of {total} prices-XX]",
     "columns": {
       "date": "[XX-Date-XX]",

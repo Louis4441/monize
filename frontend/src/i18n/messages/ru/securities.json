@@ -209,7 +209,6 @@
       "sold": "Продажа {quantity} · {account}"
     },
     "empty": "История цен недоступна",
-    "loadMore": "Загрузить ещё {count}",
     "showingCount": "Показано {shown} из {total} цен",
     "columns": {
       "date": "Дата",

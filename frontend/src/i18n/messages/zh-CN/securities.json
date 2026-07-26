@@ -209,7 +209,6 @@
       "sold": "卖出 {quantity} · {account}"
     },
     "empty": "暂无价格历史",
-    "loadMore": "再加载 {count} 条",
     "showingCount": "显示 {shown} 条，共 {total} 条价格",
     "columns": {
       "date": "日期",
