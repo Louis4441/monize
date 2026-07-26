@@ -4,7 +4,10 @@ import { render, screen } from '@/test/render';
 import { WhatsNewHost } from './WhatsNewHost';
 import { useAuthStore } from '@/store/authStore';
 import { useTourStore } from '@/store/tourStore';
-import { useWhatsNewStore } from '@/store/whatsNewStore';
+import {
+  useWhatsNewStore,
+  markWhatsNewPendingForLogin,
+} from '@/store/whatsNewStore';
 import { whatsNewApi, type ReleaseNotes } from '@/lib/whats-new';
 
 vi.mock('@/lib/whats-new', () => ({
@@ -39,9 +42,20 @@ async function renderHost() {
   });
 }
 
+/**
+ * Authenticated *and* arriving from a login, which is what the digest needs to
+ * auto-open. `authStore.login()` sets the flag in the real app; setting
+ * isAuthenticated directly (as a refresh does) deliberately does not.
+ */
+function signedInViaLogin() {
+  useAuthStore.setState({ isAuthenticated: true });
+  markWhatsNewPendingForLogin();
+}
+
 describe('WhatsNewHost', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     useWhatsNewStore.setState({ isOpen: false, pausedForTour: false });
     useTourStore.setState({ active: null, progress: {}, progressLoaded: true });
     useAuthStore.setState({ isAuthenticated: false });
@@ -56,7 +70,7 @@ describe('WhatsNewHost', () => {
   });
 
   it('auto-opens for an authenticated user when the backend says so', async () => {
-    useAuthStore.setState({ isAuthenticated: true });
+    signedInViaLogin();
     mockApi.getWhatsNew.mockResolvedValue({
       currentVersion: '1.12.1',
       autoShow: true,
@@ -70,6 +84,83 @@ describe('WhatsNewHost', () => {
     );
     expect(mockApi.getWhatsNew).toHaveBeenCalledTimes(1);
     expect(useWhatsNewStore.getState().isOpen).toBe(true);
+  });
+
+  it('stays shut on a refresh, even while the version is unacknowledged', async () => {
+    // A refresh rehydrates isAuthenticated from localStorage without going
+    // through login(), and the backend still reports the user as due this
+    // version -- the exact combination that used to reopen the dialog on
+    // every page load.
+    useAuthStore.setState({ isAuthenticated: true });
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.12.1',
+      autoShow: true,
+      notes: NOTES,
+    });
+
+    await renderHost();
+
+    await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalled());
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
+    expect(screen.queryByText('Intro paragraph.')).not.toBeInTheDocument();
+  });
+
+  it('opens once per login, not again on the refresh that follows', async () => {
+    signedInViaLogin();
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.12.1',
+      autoShow: true,
+      notes: NOTES,
+    });
+
+    await renderHost();
+    await waitFor(() => expect(useWhatsNewStore.getState().isOpen).toBe(true));
+
+    // Same tab, same session, same unacknowledged version: the second mount
+    // stands in for the refresh.
+    useWhatsNewStore.setState({ isOpen: false, pausedForTour: false });
+    await renderHost();
+
+    await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalledTimes(2));
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
+  });
+
+  it('arms itself through authStore.login, so a real login opens it', async () => {
+    // Guards the wiring: the host trusts login() to set the flag, and nothing
+    // else does.
+    useAuthStore.getState().login(
+      { id: 'u1', email: 'a@b.c', firstName: 'A', lastName: 'B', role: 'user' } as never,
+      'httpOnly',
+    );
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.12.1',
+      autoShow: true,
+      notes: NOTES,
+    });
+
+    await renderHost();
+
+    await waitFor(() => expect(useWhatsNewStore.getState().isOpen).toBe(true));
+  });
+
+  it('spends the login flag even when there is nothing to show', async () => {
+    // Logged in on an acknowledged version, so nothing opens. If the flag
+    // survived, a later refresh -- after a new version shipped -- would open
+    // the dialog outside a login.
+    signedInViaLogin();
+    await renderHost();
+    await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalled());
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
+
+    mockApi.getWhatsNew.mockResolvedValue({
+      currentVersion: '1.13.0',
+      autoShow: true,
+      notes: NOTES,
+    });
+    await renderHost();
+
+    await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalledTimes(2));
+    expect(useWhatsNewStore.getState().isOpen).toBe(false);
   });
 
   it('does not auto-open when the backend says autoShow is false', async () => {
@@ -91,7 +182,7 @@ describe('WhatsNewHost', () => {
   });
 
   it('records the version as seen and closes on "Don\'t show this again"', async () => {
-    useAuthStore.setState({ isAuthenticated: true });
+    signedInViaLogin();
     mockApi.getWhatsNew.mockResolvedValue({
       currentVersion: '1.12.1',
       autoShow: true,
@@ -114,7 +205,7 @@ describe('WhatsNewHost', () => {
   });
 
   it('clears the acknowledgement and closes on "Show at next login"', async () => {
-    useAuthStore.setState({ isAuthenticated: true });
+    signedInViaLogin();
     mockApi.getWhatsNew.mockResolvedValue({
       currentVersion: '1.12.1',
       autoShow: true,
@@ -138,7 +229,7 @@ describe('WhatsNewHost', () => {
   });
 
   it('steps aside for a tour from the offer list and comes back when it ends', async () => {
-    useAuthStore.setState({ isAuthenticated: true });
+    signedInViaLogin();
     mockApi.getWhatsNew.mockResolvedValue({
       currentVersion: '1.12.1',
       autoShow: true,
@@ -166,7 +257,7 @@ describe('WhatsNewHost', () => {
   });
 
   it('stays away when the user left the tour instead of finishing it', async () => {
-    useAuthStore.setState({ isAuthenticated: true });
+    signedInViaLogin();
     mockApi.getWhatsNew.mockResolvedValue({
       currentVersion: '1.12.1',
       autoShow: true,

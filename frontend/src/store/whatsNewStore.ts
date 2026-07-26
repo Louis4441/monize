@@ -1,6 +1,41 @@
 import { create } from 'zustand';
 
 /**
+ * Set for exactly one auto-show check, by `authStore.login()`.
+ *
+ * The backend's `autoShow` is pure persisted state -- enabled, unacknowledged
+ * version, notes exist -- with no notion of a session, so on its own it stays
+ * true across every page load and the digest reopened on each refresh. Arming
+ * it at the one moment a real login happens makes it login-scoped, which is
+ * what the dialog's own "Show at next login" button promises.
+ *
+ * sessionStorage, not the store: the OIDC callback lands on a fresh document,
+ * so in-memory state would be gone by the time the host reads it. Per-tab and
+ * cleared with the tab, which is the closest the browser gets to "this login".
+ */
+const LOGIN_PENDING_KEY = 'monize:whats-new-login-pending';
+
+export function markWhatsNewPendingForLogin(): void {
+  try {
+    window.sessionStorage.setItem(LOGIN_PENDING_KEY, '1');
+  } catch {
+    // Storage blocked (private mode, hardened settings): the digest just does
+    // not auto-open. Never fail a login over a nicety.
+  }
+}
+
+/** Reads and clears the flag, so only the first check after a login sees it. */
+export function consumeWhatsNewPendingForLogin(): boolean {
+  try {
+    const pending = window.sessionStorage.getItem(LOGIN_PENDING_KEY) !== null;
+    if (pending) window.sessionStorage.removeItem(LOGIN_PENDING_KEY);
+    return pending;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Controls the "What's New" release-notes modal. Kept separate from the data
  * fetching (handled by WhatsNewHost) so any component -- notably the clickable
  * version labels on the login screen and in Settings -- can reopen the modal.
