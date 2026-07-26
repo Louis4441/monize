@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "Przywróć",
-      "reactivateShort": "Pr",
       "merge": "Scal",
-      "mergeShort": "S",
       "edit": "Edytuj",
-      "editShort": "E",
-      "delete": "Usuń",
-      "deleteShort": "X"
+      "delete": "Usuń"
     },
     "viewTransactionsTitle": "Wyświetl transakcje z tym odbiorcą",
     "uncategorizedBadge": "{count, plural, one {# bez kategorii} few {# bez kategorii} many {# bez kategorii} other {# bez kategorii}}",

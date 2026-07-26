@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "Kategoriye Göre Giderler",
     "empty": "Bu dönem için gider verisi yok.",
-    "past30Days": "Son 30 gün",
     "total": "Toplam",
     "uncategorized": "Kategorisiz",
     "other": "Diğer"
   },
   "incomeExpenses": {
     "title": "Gelir ve Giderler",
-    "last5Weeks": "Son 5 hafta",
-    "weekOf": "{date} haftası",
     "income": "Gelir",
     "expenses": "Giderler",
     "net": "Net"

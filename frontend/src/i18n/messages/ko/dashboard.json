@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "카테고리별 지출",
     "empty": "해당 기간의 지출 데이터가 없습니다.",
-    "past30Days": "지난 30일",
     "total": "합계",
     "uncategorized": "미분류",
     "other": "기타"
   },
   "incomeExpenses": {
     "title": "수입 대 지출",
-    "last5Weeks": "지난 5주",
-    "weekOf": "{date} 주",
     "income": "수입",
     "expenses": "지출",
     "net": "순액"

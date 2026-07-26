@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "[XX-Expenses by Category-XX]",
     "empty": "[XX-No expense data for this period.-XX]",
-    "past30Days": "[XX-Past 30 days-XX]",
     "total": "[XX-Total-XX]",
     "uncategorized": "[XX-Uncategorized-XX]",
     "other": "[XX-Other-XX]"
   },
   "incomeExpenses": {
     "title": "[XX-Income vs Expenses-XX]",
-    "last5Weeks": "[XX-Last 5 weeks-XX]",
-    "weekOf": "[XX-Week of {date}-XX]",
     "income": "[XX-Income-XX]",
     "expenses": "[XX-Expenses-XX]",
     "net": "[XX-Net-XX]"

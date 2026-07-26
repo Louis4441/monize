@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "Chi tiêu theo danh mục",
     "empty": "Không có dữ liệu chi tiêu trong kỳ này.",
-    "past30Days": "30 ngày qua",
     "total": "Tổng cộng",
     "uncategorized": "Chưa phân loại",
     "other": "Khác"
   },
   "incomeExpenses": {
     "title": "Thu nhập và Chi tiêu",
-    "last5Weeks": "5 tuần qua",
-    "weekOf": "Tuần {date}",
     "income": "Thu nhập",
     "expenses": "Chi tiêu",
     "net": "Ròng"

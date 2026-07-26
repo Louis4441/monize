@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Opslaan van kleurthema mislukt"
     },
     "browserLocale": "Browserinstelling gebruiken (automatisch detecteren)",
-    "browserTimezonePrefix": "Browsertijdzone gebruiken (automatisch gedetecteerd als {tz})",
     "numberFormatOptions": {
       "browser": "Browserinstelling gebruiken (automatisch gedetecteerd als {sample})",
       "enUS": "English (US) - 1,234.56",

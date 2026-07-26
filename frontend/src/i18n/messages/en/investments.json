@@ -68,8 +68,6 @@
     "noKeyData": "No holdings carry a value for this tag key. Tag securities as key:value (e.g. country:usa) to see this breakdown.",
     "noCountryData": "No country allocation data available.",
     "keySelectorLabel": "Tag key to aggregate by",
-    "tagExposureNote": "Exposure by tag: a holding with several tags counts in full under each, so percentages can total more than 100%.",
-    "countryExposureNote": "Geographic look-through: fund holdings are split by their country weightings. The 10 largest countries are shown; the rest are grouped as Other Countries.",
     "otherCountries": "Other Countries",
     "groupBy": {
       "security": "By security",
@@ -113,7 +111,6 @@
     "viewReport": "View report",
     "viewReportTitle": "Open the full Portfolio Value report",
     "updatingLabel": "Updating…",
-    "updatingAriaLabel": "Updating",
     "intradayFallbackWarningAriaLabel": "Detailed intraday pricing unavailable",
     "intradayUnavailableTitle": "Intraday view unavailable for this account mix",
     "intradayUnavailableDescription": "One or more holdings use a quote provider (MSN Money) that does not expose intraday data. Switch to a longer range to see daily snapshots.",

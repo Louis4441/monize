@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "Aktifkan Kembali",
-      "reactivateShort": "Re",
       "merge": "Gabungkan",
-      "mergeShort": "G",
       "edit": "Edit",
-      "editShort": "E",
-      "delete": "Hapus",
-      "deleteShort": "X"
+      "delete": "Hapus"
     },
     "viewTransactionsTitle": "Lihat transaksi dengan penerima ini",
     "uncategorizedBadge": "{count, plural, one {# tanpa kategori} other {# tanpa kategori}}",

@@ -25,8 +25,7 @@
   },
   "notConfigured": {
     "heading": "AI chưa được cấu hình",
-    "message": "Chưa có nhà cung cấp AI nào được cấu hình. Để sử dụng Thông tin chi tiêu, vui lòng {link} trong cài đặt của bạn.",
-    "linkText": "cấu hình nhà cung cấp AI"
+    "message": "Chưa có nhà cung cấp AI nào được cấu hình. Để sử dụng Thông tin chi tiêu, vui lòng {link} trong cài đặt của bạn."
   },
   "insightTypes": {
     "anomaly": "Bất thường",

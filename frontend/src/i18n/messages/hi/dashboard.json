@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "श्रेणी के अनुसार व्यय",
     "empty": "इस अवधि के लिए कोई व्यय डेटा नहीं।",
-    "past30Days": "पिछले 30 दिन",
     "total": "कुल",
     "uncategorized": "अवर्गीकृत",
     "other": "अन्य"
   },
   "incomeExpenses": {
     "title": "आय बनाम व्यय",
-    "last5Weeks": "पिछले 5 सप्ताह",
-    "weekOf": "{date} का सप्ताह",
     "income": "आय",
     "expenses": "व्यय",
     "net": "शुद्ध"

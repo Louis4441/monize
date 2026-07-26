@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "Heractiveren",
-      "reactivateShort": "He",
       "merge": "Samenvoegen",
-      "mergeShort": "S",
       "edit": "Bewerken",
-      "editShort": "B",
-      "delete": "Verwijderen",
-      "deleteShort": "X"
+      "delete": "Verwijderen"
     },
     "viewTransactionsTitle": "Transacties met deze begunstigde bekijken",
     "uncategorizedBadge": "{count, plural, one {# zonder categorie} other {# zonder categorie}}",

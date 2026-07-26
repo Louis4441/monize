@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "Pengeluaran per Kategori",
     "empty": "Tidak ada data pengeluaran untuk periode ini.",
-    "past30Days": "30 hari terakhir",
     "total": "Total",
     "uncategorized": "Tidak berkategori",
     "other": "Lainnya"
   },
   "incomeExpenses": {
     "title": "Pendapatan vs Pengeluaran",
-    "last5Weeks": "5 minggu terakhir",
-    "weekOf": "Minggu {date}",
     "income": "Pendapatan",
     "expenses": "Pengeluaran",
     "net": "Bersih"

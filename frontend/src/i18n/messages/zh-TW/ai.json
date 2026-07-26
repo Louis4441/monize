@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "AI 未設定",
-    "message": "尚未設定 AI 提供者。如需使用 AI 助手，請在設定中{link}。",
-    "linkText": "設定 AI 提供者"
+    "message": "尚未設定 AI 提供者。如需使用 AI 助手，請在設定中{link}。"
   },
   "suggestedQueries": {
     "heading": "詢問您的財務問題",

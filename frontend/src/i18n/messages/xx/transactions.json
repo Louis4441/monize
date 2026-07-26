@@ -144,7 +144,6 @@
       "cleared": "[XX-Cleared-XX]",
       "reconciled": "[XX-Reconciled-XX]",
       "void": "[XX-Void-XX]",
-      "unreconciledDense": "[XX-U-XX]",
       "clearedDense": "[XX-C-XX]",
       "reconciledDense": "[XX-R-XX]",
       "voidDense": "[XX-V-XX]",

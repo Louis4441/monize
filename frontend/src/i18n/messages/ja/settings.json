@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "カラーテーマの保存に失敗しました"
     },
     "browserLocale": "ブラウザのロケールを使用（自動検出）",
-    "browserTimezonePrefix": "ブラウザのタイムゾーンを使用（自動検出: {tz}）",
     "numberFormatOptions": {
       "browser": "ブラウザのロケールを使用（自動検出: {sample}）",
       "enUS": "英語（US） - 1,234.56",

@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "Yeniden Etkinleştir",
-      "reactivateShort": "YE",
       "merge": "Birleştir",
-      "mergeShort": "B",
       "edit": "Düzenle",
-      "editShort": "D",
-      "delete": "Sil",
-      "deleteShort": "S"
+      "delete": "Sil"
     },
     "viewTransactionsTitle": "Bu alacaklının işlemlerini görüntüle",
     "uncategorizedBadge": "{count, plural, one {# kategorisiz} other {# kategorisiz}}",

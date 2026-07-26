@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "Reactivate",
-      "reactivateShort": "Re",
       "merge": "Merge",
-      "mergeShort": "M",
       "edit": "Edit",
-      "editShort": "E",
-      "delete": "Delete",
-      "deleteShort": "X"
+      "delete": "Delete"
     },
     "viewTransactionsTitle": "View transactions with this payee",
     "uncategorizedBadge": "{count, plural, one {# uncategorized} other {# uncategorized}}",

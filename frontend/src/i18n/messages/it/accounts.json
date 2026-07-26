@@ -72,12 +72,9 @@
       "closeAccount": "Chiudi conto",
       "reopenAccount": "Riapri conto",
       "deleteAccount": "Elimina conto",
-      "reconcileTitle": "Riconcilia il conto con un estratto conto",
       "deleteTitle": "Elimina definitivamente il conto (senza transazioni)",
       "closeTitleDisabled": "Il saldo del conto deve essere zero per chiuderlo",
       "closeTitleEnabled": "Chiudi conto",
-      "balanceMustBeZero": "Il saldo deve essere zero",
-      "closedPrefix": " — Chiuso",
       "details": "Dettagli"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Configura pagamenti",
     "settingUp": "Configurazione in corso...",
     "fillRequiredFields": "Compila tutti i campi obbligatori",
-    "requiredFieldsMissing": "Compila tutti i campi obbligatori",
     "frequencyOptions": {
       "weekly": "Settimanale",
       "biweekly": "Ogni 2 settimane",
@@ -406,19 +402,13 @@
       "reset": "Reimposta",
       "detectedExtraHint": "La tua cronologia dei pagamenti mostra una media di {amount} di capitale extra per rata.",
       "applyDetected": "Usalo",
-      "recurringAmount": "Extra per rata",
       "recurringStart": "Da (facoltativo)",
       "recurringEnd": "Fino a (facoltativo)",
       "lumpSums": "Versamenti una tantum",
-      "addLumpSum": "Aggiungi versamento una tantum",
-      "noLumpSums": "Nessun versamento una tantum aggiunto.",
-      "lumpSumDate": "Data",
-      "lumpSumAmount": "Importo",
       "removeLumpSum": "Rimuovi",
       "modeLabel": "Dopo un rimborso anticipato",
       "modeShortenTerm": "Accorcia la durata",
       "modeLowerInstallment": "Riduci la rata",
-      "modeShortenTermHint": "Mantieni la stessa rata e salda il prestito prima. Massimo risparmio di interessi.",
       "modeLowerInstallmentHint": "Mantieni la stessa data di estinzione e ricalcola una rata più bassa sul saldo ridotto.",
       "goalSeek": {
         "title": "Ricerca obiettivo",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Irraggiungibile: nemmeno un pagamento extra molto grande può far risparmiare così tanti interessi.",
         "unreachableDate": "Irraggiungibile: quel mese è precedente alla prima estinzione possibile."
       },
-      "optionalGroup": "Facoltativo",
       "simulationTypeLabel": "Tipo di simulazione",
       "overpaymentAmount": "Importo del versamento extra",
       "frequencyLabel": "Frequenza",
@@ -517,7 +506,6 @@
       "description": "Come i pagamenti già effettuati si confrontano con il piano contrattuale originario.",
       "extraPrincipalPaid": "Capitale extra versato",
       "extraPrincipalNote": "Quanto sei in anticipo sul piano originario",
-      "missingData": "Per vedere quanto i tuoi rimborsi anticipati hanno accorciato questo prestito, questo conto necessita di un tasso d'interesse, di una frequenza di pagamento e di alcuni pagamenti registrati per ricostruire il suo piano originario.",
       "monthsAlreadySaved": "Tempo già risparmiato",
       "monthsValue": "{count, plural, one {# mese} other {# mesi}}",
       "payoffComparison": "In origine {original}, ora {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "rispetto a {amount} previsti in origine",
       "seriesOriginal": "Piano originario",
       "seriesActual": "Saldo effettivo",
-      "seriesCurrent": "Proiezione attuale",
       "unknown": "Sconosciuto"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Categoria degli interessi",
       "description": "Dove vengono registrati gli interessi di questo prestito. Quando gli interessi sono registrati come transazione separata anziché come parte del pagamento, indicarne la categoria permette al piano di ammortamento di mostrare gli interessi reali e a «Rileva dallo storico» di trovare interessi sufficienti per funzionare.",
       "label": "Categoria degli interessi",
-      "placeholder": "Seleziona una categoria di interessi",
-      "saveError": "Impossibile salvare la categoria degli interessi"
+      "placeholder": "Seleziona una categoria di interessi"
     },
     "overpaymentCategory": {
       "title": "Rilevamento dei rimborsi anticipati",
@@ -606,8 +592,7 @@
       "placeholder": "Seleziona una categoria",
       "memoLabel": "Memo di rimborso anticipato",
       "memoPlaceholder": "es. Capitale aggiuntivo",
-      "memoHelp": "I pagamenti il cui memo contiene questo testo vengono conteggiati come rimborsi anticipati (senza distinzione tra maiuscole e minuscole).",
-      "saveError": "Impossibile salvare le impostazioni di rimborso anticipato"
+      "memoHelp": "I pagamenti il cui memo contiene questo testo vengono conteggiati come rimborsi anticipati (senza distinzione tra maiuscole e minuscole)."
     }
   }
 }

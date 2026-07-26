@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "색상 테마 저장에 실패했습니다"
     },
     "browserLocale": "브라우저 로케일 사용 (자동 감지)",
-    "browserTimezonePrefix": "브라우저 시간대 사용 ({tz}로 자동 감지됨)",
     "numberFormatOptions": {
       "browser": "브라우저 로케일 사용 (자동 감지: {sample})",
       "enUS": "English (US) - 1,234.56",

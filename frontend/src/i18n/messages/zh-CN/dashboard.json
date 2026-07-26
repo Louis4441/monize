@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "按科目划分的支出",
     "empty": "此期间无支出数据。",
-    "past30Days": "过去 30 天",
     "total": "合计",
     "uncategorized": "未分类",
     "other": "其他"
   },
   "incomeExpenses": {
     "title": "收入与支出",
-    "last5Weeks": "最近 5 周",
-    "weekOf": "{date} 当周",
     "income": "收入",
     "expenses": "支出",
     "net": "净额"

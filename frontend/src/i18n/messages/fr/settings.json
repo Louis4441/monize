@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Échec de l'enregistrement du thème de couleur"
     },
     "browserLocale": "Utiliser les paramètres régionaux du navigateur (détection automatique)",
-    "browserTimezonePrefix": "Utiliser le fuseau horaire du navigateur (détecté automatiquement : {tz})",
     "numberFormatOptions": {
       "browser": "Utiliser les paramètres régionaux du navigateur (détecté automatiquement : {sample})",
       "enUS": "English (US) - 1,234.56",

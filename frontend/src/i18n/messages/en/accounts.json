@@ -72,12 +72,9 @@
       "closeAccount": "Close Account",
       "reopenAccount": "Reopen Account",
       "deleteAccount": "Delete Account",
-      "reconcileTitle": "Reconcile account against a statement",
       "deleteTitle": "Permanently delete account (no transactions)",
       "closeTitleDisabled": "Account must have zero balance to close",
       "closeTitleEnabled": "Close account",
-      "balanceMustBeZero": "Balance must be zero",
-      "closedPrefix": " — Closed",
       "details": "Details"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Set Up Payments",
     "settingUp": "Setting Up...",
     "fillRequiredFields": "Please fill in all required fields",
-    "requiredFieldsMissing": "Please fill in all required fields",
     "frequencyOptions": {
       "weekly": "Weekly",
       "biweekly": "Every 2 Weeks",
@@ -459,8 +455,7 @@
       "title": "Interest category",
       "description": "Where this loan's interest is recorded. When interest is booked as a separate transaction rather than a split of the payment, naming its category lets the schedule show real interest and lets \"Detect from history\" find enough interest to work.",
       "label": "Interest category",
-      "placeholder": "Select interest category",
-      "saveError": "Failed to save the interest category"
+      "placeholder": "Select interest category"
     },
     "overpaymentCategory": {
       "title": "Overpayment Detection",
@@ -469,8 +464,7 @@
       "placeholder": "Select a category",
       "memoLabel": "Overpayment memo",
       "memoPlaceholder": "e.g. Extra principal",
-      "memoHelp": "Payments whose memo contains this text count as overpayments (case-insensitive).",
-      "saveError": "Failed to save the overpayment settings"
+      "memoHelp": "Payments whose memo contains this text count as overpayments (case-insensitive)."
     },
     "simulator": {
       "title": "Overpayment Simulator",
@@ -479,11 +473,9 @@
       "modeLabel": "After an overpayment",
       "modeShortenTerm": "Shorten term",
       "modeLowerInstallment": "Lower installment",
-      "modeShortenTermHint": "Keep the same payment and pay the loan off sooner. Maximum interest saved.",
       "modeLowerInstallmentHint": "Keep the same payoff date and recalculate a smaller payment on the reduced balance.",
       "detectedExtraHint": "Your payment history shows an average of {amount} in extra principal per payment.",
       "applyDetected": "Use it",
-      "optionalGroup": "Optional",
       "simulationTypeLabel": "Simulation type",
       "overpaymentAmount": "Overpayment amount",
       "budgetLabel": "Total monthly payment",
@@ -498,14 +490,9 @@
       "frequencyQuarterly": "Quarterly",
       "frequencyAnnually": "Annually",
       "oneOffDateLabel": "Date",
-      "recurringAmount": "Extra per payment",
       "recurringStart": "Starting (optional)",
       "recurringEnd": "Until (optional)",
       "lumpSums": "One-off lump sums",
-      "addLumpSum": "Add lump sum",
-      "noLumpSums": "No lump sums added.",
-      "lumpSumDate": "Date",
-      "lumpSumAmount": "Amount",
       "removeLumpSum": "Remove",
       "goalSeek": {
         "title": "Goal seek",
@@ -589,7 +576,6 @@
       "description": "How the payments you have already made compare against the original contractual schedule.",
       "extraPrincipalPaid": "Extra Principal Paid",
       "extraPrincipalNote": "Total extra principal paid on top of your scheduled payments",
-      "missingData": "To see how your overpayments have shortened this loan, this account needs an interest rate, a payment frequency, and some recorded payments to reconstruct its original schedule.",
       "monthsAlreadySaved": "Time Already Saved",
       "monthsValue": "{count, plural, one {# month} other {# months}}",
       "payoffComparison": "Originally {original}, now {current}",
@@ -597,7 +583,6 @@
       "vsOriginalInterest": "vs {amount} originally projected",
       "seriesOriginal": "Original Schedule",
       "seriesActual": "Actual Balance",
-      "seriesCurrent": "Current Projection",
       "unknown": "Unknown"
     },
     "lineOfCredit": {

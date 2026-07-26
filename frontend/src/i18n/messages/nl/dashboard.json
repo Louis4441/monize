@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "Uitgaven per categorie",
     "empty": "Geen uitgavengegevens voor deze periode.",
-    "past30Days": "Afgelopen 30 dagen",
     "total": "Totaal",
     "uncategorized": "Niet gecategoriseerd",
     "other": "Overig"
   },
   "incomeExpenses": {
     "title": "Inkomsten versus uitgaven",
-    "last5Weeks": "Laatste 5 weken",
-    "weekOf": "Week van {date}",
     "income": "Inkomsten",
     "expenses": "Uitgaven",
     "net": "Netto"

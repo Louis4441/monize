@@ -72,12 +72,9 @@
       "closeAccount": "Fechar Conta",
       "reopenAccount": "Reabrir Conta",
       "deleteAccount": "Excluir Conta",
-      "reconcileTitle": "Reconciliar conta com um extrato",
       "deleteTitle": "Excluir conta permanentemente (sem transações)",
       "closeTitleDisabled": "O saldo da conta deve ser zero para fechar",
       "closeTitleEnabled": "Fechar conta",
-      "balanceMustBeZero": "O saldo deve ser zero",
-      "closedPrefix": " — Fechada",
       "details": "Detalhes"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Configurar Pagamentos",
     "settingUp": "Configurando...",
     "fillRequiredFields": "Preencha todos os campos obrigatórios",
-    "requiredFieldsMissing": "Preencha todos os campos obrigatórios",
     "frequencyOptions": {
       "weekly": "Semanal",
       "biweekly": "Quinzenal",
@@ -406,19 +402,13 @@
       "reset": "Redefinir",
       "detectedExtraHint": "Seu histórico de pagamentos mostra uma média de {amount} de principal extra por parcela.",
       "applyDetected": "Usar",
-      "recurringAmount": "Extra por parcela",
       "recurringStart": "A partir de (opcional)",
       "recurringEnd": "Até (opcional)",
       "lumpSums": "Pagamentos avulsos",
-      "addLumpSum": "Adicionar pagamento avulso",
-      "noLumpSums": "Nenhum pagamento avulso adicionado.",
-      "lumpSumDate": "Data",
-      "lumpSumAmount": "Valor",
       "removeLumpSum": "Remover",
       "modeLabel": "Após uma amortização extra",
       "modeShortenTerm": "Encurtar prazo",
       "modeLowerInstallment": "Reduzir parcela",
-      "modeShortenTermHint": "Manter a mesma parcela e quitar o empréstimo mais cedo. Máxima economia de juros.",
       "modeLowerInstallmentHint": "Manter a mesma data de quitação e recalcular uma parcela menor sobre o saldo reduzido.",
       "goalSeek": {
         "title": "Busca de meta",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Fora de alcance — nem um pagamento extra muito grande consegue economizar tantos juros.",
         "unreachableDate": "Fora de alcance — esse mês é anterior à quitação mais cedo possível."
       },
-      "optionalGroup": "Opcional",
       "simulationTypeLabel": "Tipo de simulação",
       "overpaymentAmount": "Valor do pagamento extra",
       "frequencyLabel": "Frequência",
@@ -517,7 +506,6 @@
       "description": "Como os pagamentos que você já fez se comparam com a tabela contratual original.",
       "extraPrincipalPaid": "Principal extra pago",
       "extraPrincipalNote": "Quanto você está adiantado em relação à tabela original",
-      "missingData": "Para ver quanto suas amortizações extras encurtaram este empréstimo, esta conta precisa de uma taxa de juros, uma frequência de pagamento e alguns pagamentos registrados para reconstruir sua tabela original.",
       "monthsAlreadySaved": "Tempo já economizado",
       "monthsValue": "{count, plural, one {# mês} other {# meses}}",
       "payoffComparison": "Originalmente {original}, agora {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "contra {amount} projetados originalmente",
       "seriesOriginal": "Tabela original",
       "seriesActual": "Saldo real",
-      "seriesCurrent": "Projeção atual",
       "unknown": "Desconhecido"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Categoria de juros",
       "description": "Onde os juros deste empréstimo são registrados. Quando os juros são lançados como uma transação separada em vez de uma divisão do pagamento, indicar sua categoria permite que o cronograma mostre os juros reais e que \"Detectar do histórico\" encontre juros suficientes para funcionar.",
       "label": "Categoria de juros",
-      "placeholder": "Selecione uma categoria de juros",
-      "saveError": "Não foi possível salvar a categoria de juros"
+      "placeholder": "Selecione uma categoria de juros"
     },
     "overpaymentCategory": {
       "title": "Detecção de amortizações extras",
@@ -606,8 +592,7 @@
       "placeholder": "Selecione uma categoria",
       "memoLabel": "Nota de amortização extra",
       "memoPlaceholder": "ex. Principal adicional",
-      "memoHelp": "Os pagamentos cuja nota contém este texto são contabilizados como amortizações extras (não diferencia maiúsculas de minúsculas).",
-      "saveError": "Não foi possível salvar as configurações de amortização extra"
+      "memoHelp": "Os pagamentos cuja nota contém este texto são contabilizados como amortizações extras (não diferencia maiúsculas de minúsculas)."
     }
   }
 }

@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "依類別支出",
     "empty": "此期間無支出資料。",
-    "past30Days": "過去 30 天",
     "total": "總計",
     "uncategorized": "未分類",
     "other": "其他"
   },
   "incomeExpenses": {
     "title": "收入與支出",
-    "last5Weeks": "最近 5 週",
-    "weekOf": "{date} 當週",
     "income": "收入",
     "expenses": "支出",
     "net": "淨額"

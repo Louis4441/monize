@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "IA non configurée",
-    "message": "Aucun fournisseur IA n'est configuré. Pour utiliser l'Assistant IA, veuillez {link} dans vos paramètres.",
-    "linkText": "configurer un fournisseur IA"
+    "message": "Aucun fournisseur IA n'est configuré. Pour utiliser l'Assistant IA, veuillez {link} dans vos paramètres."
   },
   "suggestedQueries": {
     "heading": "Posez des questions sur vos finances",

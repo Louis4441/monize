@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Gagal menyimpan tema warna"
     },
     "browserLocale": "Gunakan lokal browser (deteksi otomatis)",
-    "browserTimezonePrefix": "Gunakan zona waktu browser (terdeteksi otomatis sebagai {tz})",
     "numberFormatOptions": {
       "browser": "Gunakan lokal browser (deteksi otomatis: {sample})",
       "enUS": "Inggris (AS) - 1,234.56",

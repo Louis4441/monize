@@ -72,12 +72,9 @@
       "closeAccount": "계정 종료",
       "reopenAccount": "계정 재개",
       "deleteAccount": "계정 삭제",
-      "reconcileTitle": "명세서와 계정 조정",
       "deleteTitle": "계정 영구 삭제 (거래 없음)",
       "closeTitleDisabled": "잔액이 0이어야 종료할 수 있습니다",
       "closeTitleEnabled": "계정 종료",
-      "balanceMustBeZero": "잔액이 0이어야 합니다",
-      "closedPrefix": " — 종료됨",
       "details": "상세 정보"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "납부 설정",
     "settingUp": "설정 중...",
     "fillRequiredFields": "필수 항목을 모두 입력해 주세요",
-    "requiredFieldsMissing": "필수 항목을 모두 입력해 주세요",
     "frequencyOptions": {
       "weekly": "매주",
       "biweekly": "격주",
@@ -406,19 +402,13 @@
       "reset": "초기화",
       "detectedExtraHint": "납부 이력에 따르면 회당 평균 {amount}의 추가 원금을 상환하고 있습니다.",
       "applyDetected": "사용하기",
-      "recurringAmount": "회당 추가 금액",
       "recurringStart": "시작일(선택)",
       "recurringEnd": "종료일(선택)",
       "lumpSums": "일시 상환",
-      "addLumpSum": "일시 상환 추가",
-      "noLumpSums": "추가된 일시 상환이 없습니다.",
-      "lumpSumDate": "날짜",
-      "lumpSumAmount": "금액",
       "removeLumpSum": "제거",
       "modeLabel": "추가 상환 후",
       "modeShortenTerm": "상환 기간 단축",
       "modeLowerInstallment": "상환액 낮추기",
-      "modeShortenTermHint": "같은 상환액을 유지하고 대출을 더 빨리 상환합니다. 이자 절감 최대.",
       "modeLowerInstallmentHint": "같은 상환 완료일을 유지하고 줄어든 잔액에 대해 더 낮은 상환액을 다시 계산합니다.",
       "goalSeek": {
         "title": "목표값 찾기",
@@ -432,7 +422,6 @@
         "unreachableInterest": "달성 불가 — 아무리 큰 추가 상환으로도 그만큼 이자를 절약할 수 없습니다.",
         "unreachableDate": "달성 불가 — 해당 월은 가장 빠른 상환 완료 시점보다 이릅니다."
       },
-      "optionalGroup": "선택 사항",
       "simulationTypeLabel": "시뮬레이션 유형",
       "overpaymentAmount": "추가 상환 금액",
       "frequencyLabel": "주기",
@@ -517,7 +506,6 @@
       "description": "지금까지의 납부가 최초 계약 일정과 어떻게 비교되는지 보여줍니다.",
       "extraPrincipalPaid": "추가 상환 원금",
       "extraPrincipalNote": "원래 일정보다 얼마나 앞서 있는지",
-      "missingData": "조기 상환으로 이 대출이 얼마나 단축되었는지 보려면 이 계좌에 이자율, 상환 주기, 그리고 원래 일정을 재구성할 수 있는 상환 기록이 필요합니다.",
       "monthsAlreadySaved": "이미 단축된 기간",
       "monthsValue": "{count, plural, one {#개월} other {#개월}}",
       "payoffComparison": "원래 {original}, 현재 {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "최초 예상 {amount} 대비",
       "seriesOriginal": "최초 일정",
       "seriesActual": "실제 잔액",
-      "seriesCurrent": "현재 예측",
       "unknown": "알 수 없음"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "이자 카테고리",
       "description": "이 대출의 이자가 기록되는 위치입니다. 이자가 결제의 분할 항목이 아니라 별도의 거래로 입력된 경우, 해당 카테고리를 지정하면 상환 일정에 실제 이자가 표시되고 '내역에서 검출'이 충분한 이자를 찾을 수 있습니다.",
       "label": "이자 카테고리",
-      "placeholder": "이자 카테고리 선택",
-      "saveError": "이자 카테고리를 저장하지 못했습니다"
+      "placeholder": "이자 카테고리 선택"
     },
     "overpaymentCategory": {
       "title": "추가 상환 감지",
@@ -606,8 +592,7 @@
       "placeholder": "카테고리 선택",
       "memoLabel": "추가 상환 메모",
       "memoPlaceholder": "예: 추가 원금",
-      "memoHelp": "메모에 이 텍스트가 포함된 결제는 추가 상환으로 계산됩니다(대소문자 구분 안 함).",
-      "saveError": "추가 상환 설정을 저장하지 못했습니다"
+      "memoHelp": "메모에 이 텍스트가 포함된 결제는 추가 상환으로 계산됩니다(대소문자 구분 안 함)."
     }
   }
 }

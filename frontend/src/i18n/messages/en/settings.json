@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Failed to save colour theme"
     },
     "browserLocale": "Use browser locale (auto-detect)",
-    "browserTimezonePrefix": "Use browser timezone (auto-detected as {tz})",
     "numberFormatOptions": {
       "browser": "Use browser locale (auto-detected as {sample})",
       "enUS": "English (US) - 1,234.56",

@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "Reaktivieren",
-      "reactivateShort": "Re",
       "merge": "Zusammenführen",
-      "mergeShort": "Z",
       "edit": "Bearbeiten",
-      "editShort": "B",
-      "delete": "Löschen",
-      "deleteShort": "X"
+      "delete": "Löschen"
     },
     "viewTransactionsTitle": "Buchungen mit diesem Zahlungsempfänger anzeigen",
     "uncategorizedBadge": "{count, plural, one {# ohne Kategorie} other {# ohne Kategorie}}",

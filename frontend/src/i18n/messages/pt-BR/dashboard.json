@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "Despesas por Categoria",
     "empty": "Sem dados de despesas para este período.",
-    "past30Days": "Últimos 30 dias",
     "total": "Total",
     "uncategorized": "Sem categoria",
     "other": "Outros"
   },
   "incomeExpenses": {
     "title": "Receitas vs Despesas",
-    "last5Weeks": "Últimas 5 semanas",
-    "weekOf": "Semana de {date}",
     "income": "Receitas",
     "expenses": "Despesas",
     "net": "Líquido"

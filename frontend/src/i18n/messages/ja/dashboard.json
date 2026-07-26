@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "カテゴリ別支出",
     "empty": "この期間の支出データがありません。",
-    "past30Days": "過去30日間",
     "total": "合計",
     "uncategorized": "未分類",
     "other": "その他"
   },
   "incomeExpenses": {
     "title": "収入 対 支出",
-    "last5Weeks": "過去5週間",
-    "weekOf": "{date} の週",
     "income": "収入",
     "expenses": "支出",
     "net": "差引"

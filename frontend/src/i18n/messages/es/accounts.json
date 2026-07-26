@@ -72,12 +72,9 @@
       "closeAccount": "Cerrar Cuenta",
       "reopenAccount": "Reabrir Cuenta",
       "deleteAccount": "Eliminar Cuenta",
-      "reconcileTitle": "Conciliar cuenta con un estado de cuenta",
       "deleteTitle": "Eliminar permanentemente la cuenta (sin transacciones)",
       "closeTitleDisabled": "La cuenta debe tener saldo cero para cerrarla",
       "closeTitleEnabled": "Cerrar cuenta",
-      "balanceMustBeZero": "El saldo debe ser cero",
-      "closedPrefix": " — Cerrada",
       "details": "Detalles"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "Configurar Pagos",
     "settingUp": "Configurando...",
     "fillRequiredFields": "Por favor completa todos los campos obligatorios",
-    "requiredFieldsMissing": "Por favor completa todos los campos obligatorios",
     "frequencyOptions": {
       "weekly": "Semanal",
       "biweekly": "Cada 2 Semanas",
@@ -406,19 +402,13 @@
       "reset": "Restablecer",
       "detectedExtraHint": "Su historial de pagos muestra un promedio de {amount} de capital adicional por pago.",
       "applyDetected": "Usarlo",
-      "recurringAmount": "Adicional por pago",
       "recurringStart": "Desde (opcional)",
       "recurringEnd": "Hasta (opcional)",
       "lumpSums": "Pagos únicos",
-      "addLumpSum": "Añadir pago único",
-      "noLumpSums": "No se han añadido pagos únicos.",
-      "lumpSumDate": "Fecha",
-      "lumpSumAmount": "Importe",
       "removeLumpSum": "Quitar",
       "modeLabel": "Tras un pago anticipado",
       "modeShortenTerm": "Acortar plazo",
       "modeLowerInstallment": "Reducir cuota",
-      "modeShortenTermHint": "Mantener la misma cuota y liquidar el préstamo antes. Máximo ahorro de intereses.",
       "modeLowerInstallmentHint": "Mantener la misma fecha de liquidación y recalcular una cuota menor sobre el saldo reducido.",
       "goalSeek": {
         "title": "Búsqueda de objetivo",
@@ -432,7 +422,6 @@
         "unreachableInterest": "Inalcanzable: ni siquiera un pago extra muy grande puede ahorrar tantos intereses.",
         "unreachableDate": "Inalcanzable: ese mes es anterior a la liquidación más temprana posible."
       },
-      "optionalGroup": "Opcional",
       "simulationTypeLabel": "Tipo de simulación",
       "overpaymentAmount": "Importe de amortización",
       "frequencyLabel": "Frecuencia",
@@ -517,7 +506,6 @@
       "description": "Cómo se comparan los pagos que ya ha realizado con el calendario contractual original.",
       "extraPrincipalPaid": "Capital adicional pagado",
       "extraPrincipalNote": "Cuánto se adelanta al calendario original",
-      "missingData": "Para ver cuánto han acortado este préstamo sus pagos anticipados, esta cuenta necesita una tasa de interés, una frecuencia de pago y algunos pagos registrados para reconstruir su calendario original.",
       "monthsAlreadySaved": "Tiempo ya ahorrado",
       "monthsValue": "{count, plural, one {# mes} other {# meses}}",
       "payoffComparison": "Originalmente {original}, ahora {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "frente a {amount} proyectados originalmente",
       "seriesOriginal": "Calendario original",
       "seriesActual": "Saldo real",
-      "seriesCurrent": "Proyección actual",
       "unknown": "Desconocido"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "Categoría de intereses",
       "description": "Dónde se registran los intereses de este préstamo. Cuando los intereses se registran como una transacción aparte en lugar de como parte del pago, indicar su categoría permite que el calendario muestre los intereses reales y que «Detectar del historial» encuentre suficientes intereses para funcionar.",
       "label": "Categoría de intereses",
-      "placeholder": "Selecciona una categoría de intereses",
-      "saveError": "No se pudo guardar la categoría de intereses"
+      "placeholder": "Selecciona una categoría de intereses"
     },
     "overpaymentCategory": {
       "title": "Detección de pagos anticipados",
@@ -606,8 +592,7 @@
       "placeholder": "Selecciona una categoría",
       "memoLabel": "Nota de pago anticipado",
       "memoPlaceholder": "p. ej. Capital adicional",
-      "memoHelp": "Los pagos cuya nota contenga este texto se cuentan como pagos anticipados (no distingue mayúsculas de minúsculas).",
-      "saveError": "No se pudo guardar la configuración de pagos anticipados"
+      "memoHelp": "Los pagos cuya nota contenga este texto se cuentan como pagos anticipados (no distingue mayúsculas de minúsculas)."
     }
   }
 }

@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "AI non configurata",
-    "message": "Nessun provider AI è configurato. Per usare l'Assistente AI, {link} nelle impostazioni.",
-    "linkText": "configura un provider AI"
+    "message": "Nessun provider AI è configurato. Per usare l'Assistente AI, {link} nelle impostazioni."
   },
   "suggestedQueries": {
     "heading": "Chiedi delle tue finanze",

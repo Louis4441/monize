@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "AI 未配置",
-    "message": "未配置任何 AI 提供商。要使用 AI 助手，请在设置中{link}。",
-    "linkText": "配置 AI 提供商"
+    "message": "未配置任何 AI 提供商。要使用 AI 助手，请在设置中{link}。"
   },
   "suggestedQueries": {
     "heading": "询问您的财务状况",

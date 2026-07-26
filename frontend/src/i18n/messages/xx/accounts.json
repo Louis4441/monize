@@ -72,12 +72,9 @@
       "closeAccount": "[XX-Close Account-XX]",
       "reopenAccount": "[XX-Reopen Account-XX]",
       "deleteAccount": "[XX-Delete Account-XX]",
-      "reconcileTitle": "[XX-Reconcile account against a statement-XX]",
       "deleteTitle": "[XX-Permanently delete account (no transactions)-XX]",
       "closeTitleDisabled": "[XX-Account must have zero balance to close-XX]",
       "closeTitleEnabled": "[XX-Close account-XX]",
-      "balanceMustBeZero": "[XX-Balance must be zero-XX]",
-      "closedPrefix": "[XX- — Closed-XX]",
       "details": "[XX-Details-XX]"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "[XX-Set Up Payments-XX]",
     "settingUp": "[XX-Setting Up...-XX]",
     "fillRequiredFields": "[XX-Please fill in all required fields-XX]",
-    "requiredFieldsMissing": "[XX-Please fill in all required fields-XX]",
     "frequencyOptions": {
       "weekly": "[XX-Weekly-XX]",
       "biweekly": "[XX-Every 2 Weeks-XX]",
@@ -459,8 +455,7 @@
       "title": "[XX-Interest category-XX]",
       "description": "[XX-Where this loan's interest is recorded. When interest is booked as a separate transaction rather than a split of the payment, naming its category lets the schedule show real interest and lets \"Detect from history\" find enough interest to work.-XX]",
       "label": "[XX-Interest category-XX]",
-      "placeholder": "[XX-Select interest category-XX]",
-      "saveError": "[XX-Failed to save the interest category-XX]"
+      "placeholder": "[XX-Select interest category-XX]"
     },
     "overpaymentCategory": {
       "title": "[XX-Overpayment Detection-XX]",
@@ -469,8 +464,7 @@
       "placeholder": "[XX-Select a category-XX]",
       "memoLabel": "[XX-Overpayment memo-XX]",
       "memoPlaceholder": "[XX-e.g. Extra principal-XX]",
-      "memoHelp": "[XX-Payments whose memo contains this text count as overpayments (case-insensitive).-XX]",
-      "saveError": "[XX-Failed to save the overpayment settings-XX]"
+      "memoHelp": "[XX-Payments whose memo contains this text count as overpayments (case-insensitive).-XX]"
     },
     "simulator": {
       "title": "[XX-Overpayment Simulator-XX]",
@@ -479,11 +473,9 @@
       "modeLabel": "[XX-After an overpayment-XX]",
       "modeShortenTerm": "[XX-Shorten term-XX]",
       "modeLowerInstallment": "[XX-Lower installment-XX]",
-      "modeShortenTermHint": "[XX-Keep the same payment and pay the loan off sooner. Maximum interest saved.-XX]",
       "modeLowerInstallmentHint": "[XX-Keep the same payoff date and recalculate a smaller payment on the reduced balance.-XX]",
       "detectedExtraHint": "[XX-Your payment history shows an average of {amount} in extra principal per payment.-XX]",
       "applyDetected": "[XX-Use it-XX]",
-      "optionalGroup": "[XX-Optional-XX]",
       "simulationTypeLabel": "[XX-Simulation type-XX]",
       "overpaymentAmount": "[XX-Overpayment amount-XX]",
       "budgetLabel": "[XX-Total monthly payment-XX]",
@@ -498,14 +490,9 @@
       "frequencyQuarterly": "[XX-Quarterly-XX]",
       "frequencyAnnually": "[XX-Annually-XX]",
       "oneOffDateLabel": "[XX-Date-XX]",
-      "recurringAmount": "[XX-Extra per payment-XX]",
       "recurringStart": "[XX-Starting (optional)-XX]",
       "recurringEnd": "[XX-Until (optional)-XX]",
       "lumpSums": "[XX-One-off lump sums-XX]",
-      "addLumpSum": "[XX-Add lump sum-XX]",
-      "noLumpSums": "[XX-No lump sums added.-XX]",
-      "lumpSumDate": "[XX-Date-XX]",
-      "lumpSumAmount": "[XX-Amount-XX]",
       "removeLumpSum": "[XX-Remove-XX]",
       "goalSeek": {
         "title": "[XX-Goal seek-XX]",
@@ -589,7 +576,6 @@
       "description": "[XX-How the payments you have already made compare against the original contractual schedule.-XX]",
       "extraPrincipalPaid": "[XX-Extra Principal Paid-XX]",
       "extraPrincipalNote": "[XX-Total extra principal paid on top of your scheduled payments-XX]",
-      "missingData": "[XX-To see how your overpayments have shortened this loan, this account needs an interest rate, a payment frequency, and some recorded payments to reconstruct its original schedule.-XX]",
       "monthsAlreadySaved": "[XX-Time Already Saved-XX]",
       "monthsValue": "[XX-{count, plural, one {# month} other {# months}}-XX]",
       "payoffComparison": "[XX-Originally {original}, now {current}-XX]",
@@ -597,7 +583,6 @@
       "vsOriginalInterest": "[XX-vs {amount} originally projected-XX]",
       "seriesOriginal": "[XX-Original Schedule-XX]",
       "seriesActual": "[XX-Actual Balance-XX]",
-      "seriesCurrent": "[XX-Current Projection-XX]",
       "unknown": "[XX-Unknown-XX]"
     },
     "lineOfCredit": {

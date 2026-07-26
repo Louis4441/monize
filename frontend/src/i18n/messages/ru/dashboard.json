@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "Расходы по категориям",
     "empty": "Нет данных о расходах за этот период.",
-    "past30Days": "За последние 30 дней",
     "total": "Итого",
     "uncategorized": "Без категории",
     "other": "Прочее"
   },
   "incomeExpenses": {
     "title": "Доходы и расходы",
-    "last5Weeks": "Последние 5 недель",
-    "weekOf": "Неделя с {date}",
     "income": "Доходы",
     "expenses": "Расходы",
     "net": "Чистые"

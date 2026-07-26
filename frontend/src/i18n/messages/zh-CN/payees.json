@@ -61,13 +61,9 @@
     },
     "actions": {
       "reactivate": "重新激活",
-      "reactivateShort": "激活",
       "merge": "合并",
-      "mergeShort": "并",
       "edit": "编辑",
-      "editShort": "编",
-      "delete": "删除",
-      "deleteShort": "删"
+      "delete": "删除"
     },
     "viewTransactionsTitle": "查看此收款人的交易",
     "uncategorizedBadge": "{count, plural, one {# 笔未分类} other {# 笔未分类}}",

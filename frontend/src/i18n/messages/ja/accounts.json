@@ -72,12 +72,9 @@
       "closeAccount": "勘定科目を閉鎖",
       "reopenAccount": "勘定科目を再開",
       "deleteAccount": "勘定科目を削除",
-      "reconcileTitle": "明細書に対して勘定科目を照合する",
       "deleteTitle": "勘定科目を完全に削除する（取引なし）",
       "closeTitleDisabled": "閉鎖するには残高がゼロである必要があります",
       "closeTitleEnabled": "勘定科目を閉鎖",
-      "balanceMustBeZero": "残高はゼロである必要があります",
-      "closedPrefix": " — 閉鎖済み",
       "details": "詳細"
     }
   },
@@ -240,7 +237,6 @@
     "setUpPayments": "支払いを設定",
     "settingUp": "設定中...",
     "fillRequiredFields": "必須項目をすべて入力してください",
-    "requiredFieldsMissing": "必須項目をすべて入力してください",
     "frequencyOptions": {
       "weekly": "毎週",
       "biweekly": "隔週",
@@ -406,19 +402,13 @@
       "reset": "リセット",
       "detectedExtraHint": "返済履歴によると、1回あたり平均 {amount} の繰上返済を行っています。",
       "applyDetected": "使用する",
-      "recurringAmount": "毎回の追加額",
       "recurringStart": "開始日（任意）",
       "recurringEnd": "終了日（任意）",
       "lumpSums": "一括繰上返済",
-      "addLumpSum": "一括返済を追加",
-      "noLumpSums": "一括返済は追加されていません。",
-      "lumpSumDate": "日付",
-      "lumpSumAmount": "金額",
       "removeLumpSum": "削除",
       "modeLabel": "繰り上げ返済後",
       "modeShortenTerm": "期間を短縮",
       "modeLowerInstallment": "返済額を減額",
-      "modeShortenTermHint": "返済額を維持し、ローンをより早く完済します。利息の節約が最大になります。",
       "modeLowerInstallmentHint": "完済日を維持し、減少した残高に対してより少ない返済額を再計算します。",
       "goalSeek": {
         "title": "ゴールシーク",
@@ -432,7 +422,6 @@
         "unreachableInterest": "達成不可 — どれほど大きな追加返済でもそこまで利息を節約できません。",
         "unreachableDate": "達成不可 — その月は最短の完済時期より前です。"
       },
-      "optionalGroup": "任意",
       "simulationTypeLabel": "シミュレーションの種類",
       "overpaymentAmount": "繰上返済額",
       "frequencyLabel": "頻度",
@@ -517,7 +506,6 @@
       "description": "これまでの返済が当初の契約スケジュールと比べてどう推移しているかを示します。",
       "extraPrincipalPaid": "追加で支払った元金",
       "extraPrincipalNote": "当初スケジュールよりどれだけ前倒しか",
-      "missingData": "繰上返済によってこのローンがどれだけ短縮されたかを見るには、この口座に金利、返済頻度、および元のスケジュールを再構築するための返済記録が必要です。",
       "monthsAlreadySaved": "すでに短縮された期間",
       "monthsValue": "{count, plural, one {# か月} other {# か月}}",
       "payoffComparison": "当初 {original} → 現在 {current}",
@@ -525,7 +513,6 @@
       "vsOriginalInterest": "当初予測 {amount} に対して",
       "seriesOriginal": "当初スケジュール",
       "seriesActual": "実際の残高",
-      "seriesCurrent": "現在の予測",
       "unknown": "不明"
     },
     "lineOfCredit": {
@@ -596,8 +583,7 @@
       "title": "利息カテゴリ",
       "description": "このローンの利息が記録される場所です。利息が支払いの内訳ではなく別の取引として記録されている場合、そのカテゴリを指定すると、返済予定表に実際の利息が表示され、「履歴から検出」が十分な利息を見つけられるようになります。",
       "label": "利息カテゴリ",
-      "placeholder": "利息カテゴリを選択",
-      "saveError": "利息カテゴリを保存できませんでした"
+      "placeholder": "利息カテゴリを選択"
     },
     "overpaymentCategory": {
       "title": "繰り上げ返済の検出",
@@ -606,8 +592,7 @@
       "placeholder": "カテゴリを選択",
       "memoLabel": "繰り上げ返済の摘要",
       "memoPlaceholder": "例: 追加元金",
-      "memoHelp": "摘要にこのテキストが含まれる支払いは繰り上げ返済として扱われます（大文字と小文字は区別しません）。",
-      "saveError": "繰り上げ返済の設定を保存できませんでした"
+      "memoHelp": "摘要にこのテキストが含まれる支払いは繰り上げ返済として扱われます（大文字と小文字は区別しません）。"
     }
   }
 }

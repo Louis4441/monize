@@ -42,8 +42,7 @@
   },
   "notConfigured": {
     "heading": "AI nie jest skonfigurowane",
-    "message": "Nie skonfigurowano żadnego dostawcy AI. Aby korzystać z Asystenta AI, {link} w ustawieniach.",
-    "linkText": "skonfiguruj dostawcę AI"
+    "message": "Nie skonfigurowano żadnego dostawcy AI. Aby korzystać z Asystenta AI, {link} w ustawieniach."
   },
   "suggestedQueries": {
     "heading": "Zapytaj o swoje finanse",

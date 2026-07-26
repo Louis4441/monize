@@ -123,15 +123,12 @@
   "expensesPieChart": {
     "title": "Wydatki według kategorii",
     "empty": "Brak danych o wydatkach dla tego okresu.",
-    "past30Days": "Ostatnie 30 dni",
     "total": "Suma",
     "uncategorized": "Bez kategorii",
     "other": "Inne"
   },
   "incomeExpenses": {
     "title": "Przychody a wydatki",
-    "last5Weeks": "Ostatnie 5 tygodni",
-    "weekOf": "Tydzień od {date}",
     "income": "Przychody",
     "expenses": "Wydatki",
     "net": "Saldo"

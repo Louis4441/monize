@@ -140,7 +140,6 @@
       "colorThemeSaveFailed": "Farbdesign konnte nicht gespeichert werden"
     },
     "browserLocale": "Browser-Gebietsschema verwenden (automatisch erkennen)",
-    "browserTimezonePrefix": "Browser-Zeitzone verwenden (automatisch erkannt: {tz})",
     "numberFormatOptions": {
       "browser": "Browser-Gebietsschema verwenden (automatisch erkannt: {sample})",
       "enUS": "English (US) - 1,234.56",
