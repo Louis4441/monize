@@ -209,6 +209,8 @@
       "sold": "Satım {quantity} · {account}"
     },
     "empty": "Fiyat geçmişi mevcut değil",
+    "loadMore": "{count} tane daha yükle",
+    "showingCount": "{total} fiyatın {shown} tanesi gösteriliyor",
     "columns": {
       "date": "Tarih",
       "close": "Kapanış",

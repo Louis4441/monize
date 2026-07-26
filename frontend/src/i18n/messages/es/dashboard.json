@@ -102,6 +102,7 @@
     "empty": "Aún no hay valores favoritos. Visita la <securitiesLink>página de Valores</securitiesLink> y marca con estrella los valores que quieres seguir aquí.",
     "noPriceYet": "Sin precio aún",
     "dailyChange": "Cambio diario",
+    "openPriceHistory": "Historial de precios de {symbol}",
     "refreshPrices": "Actualizar precios",
     "manage": "Gestionar valores"
   },

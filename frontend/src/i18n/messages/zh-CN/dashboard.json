@@ -102,6 +102,7 @@
     "empty": "暂无收藏证券。前往<securitiesLink>证券页面</securitiesLink>并收藏您想在此跟踪的证券。",
     "noPriceYet": "暂无价格",
     "dailyChange": "日涨跌",
+    "openPriceHistory": "{symbol} 的价格历史",
     "refreshPrices": "刷新价格",
     "manage": "管理证券"
   },

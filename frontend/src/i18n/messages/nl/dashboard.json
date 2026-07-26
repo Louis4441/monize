@@ -102,6 +102,7 @@
     "empty": "Nog geen favoriete waardepapieren. Ga naar de <securitiesLink>pagina Waardepapieren</securitiesLink> en markeer de waardepapieren die je hier wilt volgen.",
     "noPriceYet": "Nog geen koers",
     "dailyChange": "Dagelijkse wijziging",
+    "openPriceHistory": "Koersgeschiedenis van {symbol}",
     "refreshPrices": "Koersen vernieuwen",
     "manage": "Waardepapieren beheren"
   },

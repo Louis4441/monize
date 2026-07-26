@@ -209,6 +209,8 @@
       "sold": "Verkauf {quantity} · {account}"
     },
     "empty": "Kein Kursverlauf verfügbar",
+    "loadMore": "{count} weitere laden",
+    "showingCount": "{shown} von {total} Kursen angezeigt",
     "columns": {
       "date": "Datum",
       "close": "Schluss",

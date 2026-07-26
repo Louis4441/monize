@@ -209,6 +209,8 @@
       "sold": "Sold {quantity} · {account}"
     },
     "empty": "No price history available",
+    "loadMore": "Load {count} more",
+    "showingCount": "Showing {shown} of {total} prices",
     "columns": {
       "date": "Date",
       "close": "Close",

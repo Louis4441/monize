@@ -102,6 +102,7 @@
     "empty": "Henüz favori menkul kıymet yok. <securitiesLink>Menkul Kıymetler sayfasını</securitiesLink> ziyaret edin ve burada takip etmek istediğiniz menkul kıymetleri yıldızlayın.",
     "noPriceYet": "Henüz fiyat yok",
     "dailyChange": "Günlük değişim",
+    "openPriceHistory": "{symbol} fiyat geçmişi",
     "refreshPrices": "Fiyatları yenile",
     "manage": "Menkul kıymetleri yönet"
   },

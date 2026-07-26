@@ -58,6 +58,9 @@ function getSourceColor(source: string | null): string {
   }
 }
 
+/** Rows rendered initially, and added by each "Load more" press. */
+const PAGE_SIZE = 10;
+
 function formatPrice(value: number | null): string {
   if (value === null || value === undefined) return '-';
   return Number(value).toLocaleString(undefined, {
@@ -84,11 +87,17 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
 
   const { formatQuantity } = useNumberFormat();
 
+  // The full series is still fetched -- the chart plots every point -- but the
+  // table renders a page at a time so a security with years of history does not
+  // mount thousands of rows.
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
   const loadPrices = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await investmentsApi.getSecurityPrices(security.id, 9999);
       setPrices(data);
+      setVisibleCount(PAGE_SIZE);
     } catch (error) {
       toast.error(getErrorMessage(error, t('priceHistory.toasts.loadFailed')));
     } finally {
@@ -252,6 +261,8 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   }, [security.id, loadPrices, t]);
 
   const isFormOpen = showAddForm || !!editingPrice;
+  const visiblePrices = prices.slice(0, visibleCount);
+  const remainingCount = prices.length - visiblePrices.length;
 
   return (
     <div className="space-y-4">
@@ -329,9 +340,13 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
           {t('priceHistory.empty')}
         </p>
       ) : (
-        <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+        // Only the modal panel scrolls vertically. A capped inner scroller here
+        // put a second scrollbar inside the first, whose track ran past the
+        // panel's edge; paging the rows keeps this block short enough not to
+        // need one.
+        <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+            <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.date')}</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.close')}</th>
@@ -345,7 +360,7 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {prices.map((price) => (
+              {visiblePrices.map((price) => (
                 <tr
                   key={price.id}
                   className="hover:bg-gray-50 dark:hover:bg-gray-700 select-none"
@@ -396,6 +411,23 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
               ))}
             </tbody>
           </table>
+          {remainingCount > 0 && (
+            <div className="flex flex-col items-center gap-1 pt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+              >
+                {t('priceHistory.loadMore', { count: Math.min(PAGE_SIZE, remainingCount) })}
+              </Button>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {t('priceHistory.showingCount', {
+                  shown: visiblePrices.length,
+                  total: prices.length,
+                })}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

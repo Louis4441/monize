@@ -209,6 +209,8 @@
       "sold": "Vente {quantity} · {account}"
     },
     "empty": "Aucun historique des cours disponible",
+    "loadMore": "Charger {count} de plus",
+    "showingCount": "Affichage de {shown} cours sur {total}",
     "columns": {
       "date": "Date",
       "close": "Clôture",

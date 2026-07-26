@@ -209,6 +209,8 @@
       "sold": "売却 {quantity}・{account}"
     },
     "empty": "株価履歴がありません",
+    "loadMore": "さらに{count}件を読み込む",
+    "showingCount": "{total} 件中 {shown} 件の株価を表示",
     "columns": {
       "date": "日付",
       "close": "終値",

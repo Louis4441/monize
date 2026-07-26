@@ -209,6 +209,8 @@
       "sold": "Sprzedaż {quantity} · {account}"
     },
     "empty": "Brak dostępnej historii cen",
+    "loadMore": "Wczytaj {count} więcej",
+    "showingCount": "Wyświetlono {shown} z {total} cen",
     "columns": {
       "date": "Data",
       "close": "Zamknij",

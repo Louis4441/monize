@@ -102,6 +102,7 @@
     "empty": "Belum ada sekuritas favorit. Kunjungi <securitiesLink>halaman Sekuritas</securitiesLink> dan bintangi sekuritas yang ingin Anda lacak di sini.",
     "noPriceYet": "Belum ada harga",
     "dailyChange": "Perubahan harian",
+    "openPriceHistory": "Riwayat harga {symbol}",
     "refreshPrices": "Perbarui harga",
     "manage": "Kelola sekuritas"
   },

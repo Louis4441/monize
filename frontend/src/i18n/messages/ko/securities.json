@@ -209,6 +209,8 @@
       "sold": "매도 {quantity} · {account}"
     },
     "empty": "사용 가능한 가격 이력이 없습니다",
+    "loadMore": "{count}개 더 불러오기",
+    "showingCount": "{total}개의 가격 중 {shown}개 표시",
     "columns": {
       "date": "날짜",
       "close": "종가",

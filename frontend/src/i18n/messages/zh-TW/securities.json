@@ -209,6 +209,8 @@
       "sold": "賣出 {quantity} · {account}"
     },
     "empty": "無可用的價格歷史",
+    "loadMore": "再載入 {count} 筆",
+    "showingCount": "顯示 {shown} 筆（共 {total} 筆）價格",
     "columns": {
       "date": "日期",
       "close": "收盤",

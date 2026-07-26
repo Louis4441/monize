@@ -97,6 +97,22 @@ const mockPrices = [
   },
 ];
 
+/** `count` synthetic daily prices, newest first, as the API returns them. */
+function manyPrices(count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: 100 + i,
+    securityId: 'sec-1',
+    priceDate: `2025-04-${String(count - i).padStart(2, '0')}`,
+    openPrice: 100 + i,
+    highPrice: 101 + i,
+    lowPrice: 99 + i,
+    closePrice: 100 + i,
+    volume: 1000,
+    source: 'yahoo_finance',
+    createdAt: '2025-04-01T10:00:00Z',
+  }));
+}
+
 describe('SecurityPriceHistory', () => {
   const onClose = vi.fn();
 
@@ -406,6 +422,95 @@ describe('SecurityPriceHistory', () => {
 
     expect(toast.error).toHaveBeenCalledWith('Failed to delete price');
     expect(screen.getAllByText('Edit')).toHaveLength(3);
+  });
+
+  describe('paging the price table', () => {
+    const rowCount = () =>
+      document.querySelectorAll('tbody tr').length;
+
+    it('renders only the first 10 rows and offers to load more', async () => {
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyPrices(25),
+      );
+      await renderComponent();
+
+      expect(rowCount()).toBe(10);
+      expect(screen.getByText('Showing 10 of 25 prices')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Load 10 more' })).toBeInTheDocument();
+    });
+
+    it('adds a page per press and drops the control on the last page', async () => {
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyPrices(25),
+      );
+      await renderComponent();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Load 10 more' }));
+      });
+      expect(rowCount()).toBe(20);
+
+      // Only 5 left, so the button offers exactly that many.
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Load 5 more' }));
+      });
+      expect(rowCount()).toBe(25);
+      expect(screen.queryByRole('button', { name: /Load \d+ more/ })).not.toBeInTheDocument();
+      expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
+    });
+
+    it('leaves the control out when everything already fits on one page', async () => {
+      await renderComponent();
+
+      expect(rowCount()).toBe(3);
+      expect(screen.queryByRole('button', { name: /Load \d+ more/ })).not.toBeInTheDocument();
+    });
+
+    it('charts the whole series even though the table is paged', async () => {
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyPrices(25),
+      );
+      await renderComponent();
+
+      // The chart is fed every fetched point, not just the visible rows.
+      expect(investmentsApi.getSecurityPrices).toHaveBeenCalledWith('sec-1', 9999);
+      expect(screen.getByTestId('price-chart')).toBeInTheDocument();
+      expect(rowCount()).toBe(10);
+    });
+
+    it('collapses back to the first page after a reload', async () => {
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyPrices(25),
+      );
+      (investmentsApi.deleteSecurityPrice as ReturnType<typeof vi.fn>).mockResolvedValue(
+        undefined,
+      );
+      await renderComponent();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Load 10 more' }));
+      });
+      expect(rowCount()).toBe(20);
+
+      fireEvent.click(screen.getAllByText('Delete')[0]);
+      const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
+      await act(async () => {
+        fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+      });
+
+      expect(rowCount()).toBe(10);
+    });
+
+    it('keeps the table in a single vertical scroll region -- the modal panel', async () => {
+      await renderComponent();
+
+      const scroller = document.querySelector('table')!.parentElement!;
+      // Horizontal overflow stays for narrow screens; a capped vertical
+      // scroller here would nest a second scrollbar inside the modal's.
+      expect(scroller.className).toContain('overflow-x-auto');
+      expect(scroller.className).not.toContain('overflow-y-auto');
+      expect(scroller.className).not.toContain('max-h-');
+    });
   });
 
   describe('mobile long-press actions', () => {

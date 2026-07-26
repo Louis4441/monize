@@ -102,6 +102,7 @@
     "empty": "Noch keine Favoritwertpapiere. Besuchen Sie die <securitiesLink>Wertpapierseite</securitiesLink> und markieren Sie die Wertpapiere, die Sie hier verfolgen möchten.",
     "noPriceYet": "Noch kein Kurs",
     "dailyChange": "Tagesveränderung",
+    "openPriceHistory": "Kursverlauf für {symbol}",
     "refreshPrices": "Kurse aktualisieren",
     "manage": "Wertpapiere verwalten"
   },

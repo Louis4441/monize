@@ -209,6 +209,8 @@
       "sold": "Verkoop {quantity} · {account}"
     },
     "empty": "Geen koershistorie beschikbaar",
+    "loadMore": "{count} meer laden",
+    "showingCount": "{shown} van {total} koersen weergegeven",
     "columns": {
       "date": "Datum",
       "close": "Slotkoers",

@@ -209,6 +209,8 @@
       "sold": "Bán {quantity} · {account}"
     },
     "empty": "Không có lịch sử giá",
+    "loadMore": "Tải thêm {count}",
+    "showingCount": "Đang hiển thị {shown} trong {total} giá",
     "columns": {
       "date": "Ngày",
       "close": "Đóng cửa",

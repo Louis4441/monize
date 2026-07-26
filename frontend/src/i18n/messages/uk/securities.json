@@ -209,6 +209,8 @@
       "sold": "Продаж {quantity} · {account}"
     },
     "empty": "Історія цін відсутня",
+    "loadMore": "Завантажити ще {count}",
+    "showingCount": "Відображається {shown} із {total} цін",
     "columns": {
       "date": "Дата",
       "close": "Закриття",

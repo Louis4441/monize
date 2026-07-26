@@ -102,6 +102,7 @@
     "empty": "お気に入りの有価証券がまだありません。<securitiesLink>有価証券ページ</securitiesLink>を開いて追跡したい有価証券をスターしてください。",
     "noPriceYet": "価格未登録",
     "dailyChange": "日次変動",
+    "openPriceHistory": "{symbol} の価格履歴",
     "refreshPrices": "価格を更新",
     "manage": "有価証券を管理"
   },

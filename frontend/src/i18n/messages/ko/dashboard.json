@@ -102,6 +102,7 @@
     "empty": "즐겨찾기 유가증권이 없습니다. <securitiesLink>유가증권 페이지</securitiesLink>를 방문하여 여기서 추적할 유가증권에 별표를 표시하세요.",
     "noPriceYet": "아직 가격 없음",
     "dailyChange": "일일 변동",
+    "openPriceHistory": "{symbol} 가격 이력",
     "refreshPrices": "가격 새로고침",
     "manage": "유가증권 관리"
   },

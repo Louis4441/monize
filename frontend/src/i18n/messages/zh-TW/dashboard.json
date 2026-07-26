@@ -102,6 +102,7 @@
     "empty": "尚無我的最愛證券。請前往<securitiesLink>證券頁面</securitiesLink>，將您想追蹤的證券加入星號。",
     "noPriceYet": "尚無價格",
     "dailyChange": "每日變動",
+    "openPriceHistory": "{symbol} 的價格歷史",
     "refreshPrices": "更新價格",
     "manage": "管理證券"
   },

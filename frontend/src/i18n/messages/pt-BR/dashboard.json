@@ -102,6 +102,7 @@
     "empty": "Ainda sem títulos favoritos. Visite a <securitiesLink>página de Títulos</securitiesLink> e marque os títulos que deseja acompanhar aqui.",
     "noPriceYet": "Sem cotação ainda",
     "dailyChange": "Variação diária",
+    "openPriceHistory": "Histórico de preços de {symbol}",
     "refreshPrices": "Atualizar cotações",
     "manage": "Gerenciar títulos"
   },
