@@ -4,6 +4,7 @@
     "subtitle": "Zarządzaj odbiorcami i ich domyślnymi kategoriami",
     "deactivateUnused": "Dezaktywuj nieużywanych",
     "autoAssignCategories": "Automatycznie przypisz kategorie",
+    "maintenance": "Zarządzaj",
     "autoMergePayees": "Automatycznie scal odbiorców",
     "newPayee": "+ Nowy odbiorca",
     "searchPlaceholder": "Szukaj odbiorców...",

@@ -4,6 +4,7 @@
     "subtitle": "Verwalten Sie Ihre Zahlungsempfänger und deren Standardkategorien",
     "deactivateUnused": "Ungenutzte deaktivieren",
     "autoAssignCategories": "Kategorien automatisch zuweisen",
+    "maintenance": "Wartung",
     "autoMergePayees": "Zahlungsempfänger automatisch zusammenführen",
     "newPayee": "+ Neuer Zahlungsempfänger",
     "searchPlaceholder": "Zahlungsempfänger suchen...",

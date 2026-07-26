@@ -4,6 +4,7 @@
     "subtitle": "Gérez vos bénéficiaires et leurs catégories par défaut",
     "deactivateUnused": "Désactiver les inutilisés",
     "autoAssignCategories": "Attribuer les catégories automatiquement",
+    "maintenance": "Maintenance",
     "autoMergePayees": "Fusionner automatiquement les bénéficiaires",
     "newPayee": "+ Nouveau bénéficiaire",
     "searchPlaceholder": "Rechercher des bénéficiaires...",

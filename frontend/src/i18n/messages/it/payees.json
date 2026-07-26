@@ -4,6 +4,7 @@
     "subtitle": "Gestisci i beneficiari e le loro categorie predefinite",
     "deactivateUnused": "Disattiva inutilizzati",
     "autoAssignCategories": "Assegna categorie automaticamente",
+    "maintenance": "Manutenzione",
     "autoMergePayees": "Unisci beneficiari automaticamente",
     "newPayee": "+ Nuovo beneficiario",
     "searchPlaceholder": "Cerca beneficiari...",

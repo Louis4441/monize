@@ -4,6 +4,7 @@
     "subtitle": "[XX-Manage your payees and their default categories-XX]",
     "deactivateUnused": "[XX-Deactivate Unused-XX]",
     "autoAssignCategories": "[XX-Auto-Assign Categories-XX]",
+    "maintenance": "[XX-Maintenance-XX]",
     "autoMergePayees": "[XX-Auto-Merge Payees-XX]",
     "newPayee": "[XX-+ New Payee-XX]",
     "searchPlaceholder": "[XX-Search payees...-XX]",
