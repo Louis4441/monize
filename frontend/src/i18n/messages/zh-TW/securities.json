@@ -203,6 +203,11 @@
     "addPriceSection": "新增價格",
     "editPriceSection": "編輯價格",
     "loading": "載入價格中...",
+    "chartTitle": "價格歷史",
+    "markers": {
+      "bought": "買入 {quantity} · {account}",
+      "sold": "賣出 {quantity} · {account}"
+    },
     "empty": "無可用的價格歷史",
     "columns": {
       "date": "日期",

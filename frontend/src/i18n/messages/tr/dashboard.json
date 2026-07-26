@@ -88,6 +88,7 @@
       "noLosers": "Bugün kaybedenler yok."
     },
     "dailyChange": "Günlük değişim",
+    "openPriceHistory": "{symbol} fiyat geçmişi",
     "refreshPrices": "Fiyatları yenile",
     "viewPortfolio": "Portföyü görüntüle",
     "filter": {

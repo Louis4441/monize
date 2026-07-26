@@ -203,6 +203,11 @@
     "addPriceSection": "Thêm giá",
     "editPriceSection": "Chỉnh sửa giá",
     "loading": "Đang tải giá...",
+    "chartTitle": "Lịch sử giá",
+    "markers": {
+      "bought": "Mua {quantity} · {account}",
+      "sold": "Bán {quantity} · {account}"
+    },
     "empty": "Không có lịch sử giá",
     "columns": {
       "date": "Ngày",

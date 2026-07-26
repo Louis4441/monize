@@ -203,6 +203,11 @@
     "addPriceSection": "株価を追加",
     "editPriceSection": "株価を編集",
     "loading": "株価を読み込み中...",
+    "chartTitle": "価格履歴",
+    "markers": {
+      "bought": "買付 {quantity}・{account}",
+      "sold": "売却 {quantity}・{account}"
+    },
     "empty": "株価履歴がありません",
     "columns": {
       "date": "日付",

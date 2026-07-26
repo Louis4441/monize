@@ -88,6 +88,7 @@
       "noLosers": "今日無下跌標的。"
     },
     "dailyChange": "每日變動",
+    "openPriceHistory": "{symbol} 的價格歷史",
     "refreshPrices": "更新價格",
     "viewPortfolio": "查看投資組合",
     "filter": {

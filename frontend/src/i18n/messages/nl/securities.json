@@ -203,6 +203,11 @@
     "addPriceSection": "Koers toevoegen",
     "editPriceSection": "Koers bewerken",
     "loading": "Koersen laden...",
+    "chartTitle": "Koersgeschiedenis",
+    "markers": {
+      "bought": "Aankoop {quantity} · {account}",
+      "sold": "Verkoop {quantity} · {account}"
+    },
     "empty": "Geen koershistorie beschikbaar",
     "columns": {
       "date": "Datum",

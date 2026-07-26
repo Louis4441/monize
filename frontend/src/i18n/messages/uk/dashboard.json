@@ -88,6 +88,7 @@
       "noLosers": "Сьогодні немає падіння."
     },
     "dailyChange": "Денна зміна",
+    "openPriceHistory": "Історія ціни: {symbol}",
     "refreshPrices": "Оновити ціни",
     "viewPortfolio": "Переглянути портфель",
     "filter": {

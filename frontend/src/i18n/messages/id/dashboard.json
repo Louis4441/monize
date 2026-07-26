@@ -88,6 +88,7 @@
       "noLosers": "Tidak ada yang turun hari ini."
     },
     "dailyChange": "Perubahan harian",
+    "openPriceHistory": "Riwayat harga {symbol}",
     "refreshPrices": "Perbarui harga",
     "viewPortfolio": "Lihat portofolio",
     "filter": {

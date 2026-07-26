@@ -88,6 +88,7 @@
       "noLosers": "오늘 하락 종목이 없습니다."
     },
     "dailyChange": "일일 변동",
+    "openPriceHistory": "{symbol} 가격 이력",
     "refreshPrices": "가격 새로고침",
     "viewPortfolio": "포트폴리오 보기",
     "filter": {

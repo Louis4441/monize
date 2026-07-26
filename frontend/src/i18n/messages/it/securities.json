@@ -203,6 +203,11 @@
     "addPriceSection": "Aggiungi prezzo",
     "editPriceSection": "Modifica prezzo",
     "loading": "Caricamento prezzi...",
+    "chartTitle": "Storico prezzi",
+    "markers": {
+      "bought": "Acquisto {quantity} · {account}",
+      "sold": "Vendita {quantity} · {account}"
+    },
     "empty": "Nessuno storico delle quotazioni disponibile",
     "columns": {
       "date": "Data",

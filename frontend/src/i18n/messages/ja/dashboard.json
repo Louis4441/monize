@@ -88,6 +88,7 @@
       "noLosers": "今日の値下がり銘柄はありません。"
     },
     "dailyChange": "日次変動",
+    "openPriceHistory": "{symbol} の価格履歴",
     "refreshPrices": "価格を更新",
     "viewPortfolio": "ポートフォリオを見る",
     "filter": {

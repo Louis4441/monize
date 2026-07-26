@@ -203,6 +203,11 @@
     "addPriceSection": "Kurs hinzufügen",
     "editPriceSection": "Kurs bearbeiten",
     "loading": "Kurse werden geladen...",
+    "chartTitle": "Kursverlauf",
+    "markers": {
+      "bought": "Kauf {quantity} · {account}",
+      "sold": "Verkauf {quantity} · {account}"
+    },
     "empty": "Kein Kursverlauf verfügbar",
     "columns": {
       "date": "Datum",

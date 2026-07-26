@@ -203,6 +203,11 @@
     "addPriceSection": "Dodaj cenę",
     "editPriceSection": "Edytuj cenę",
     "loading": "Wczytywanie cen...",
+    "chartTitle": "Historia ceny",
+    "markers": {
+      "bought": "Kupno {quantity} · {account}",
+      "sold": "Sprzedaż {quantity} · {account}"
+    },
     "empty": "Brak dostępnej historii cen",
     "columns": {
       "date": "Data",

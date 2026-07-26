@@ -88,6 +88,7 @@
       "noLosers": "Sem descidas hoje."
     },
     "dailyChange": "Variação diária",
+    "openPriceHistory": "Histórico de preços de {symbol}",
     "refreshPrices": "Atualizar cotações",
     "viewPortfolio": "Ver portefólio",
     "filter": {

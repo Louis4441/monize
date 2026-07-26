@@ -88,6 +88,7 @@
       "noLosers": "Aucun perdant aujourd'hui."
     },
     "dailyChange": "Variation quotidienne",
+    "openPriceHistory": "Historique du cours de {symbol}",
     "refreshPrices": "Actualiser les cours",
     "viewPortfolio": "Voir le portefeuille",
     "filter": {

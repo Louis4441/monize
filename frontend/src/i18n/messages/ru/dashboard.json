@@ -88,6 +88,7 @@
       "noLosers": "Сегодня нет падающих активов."
     },
     "dailyChange": "Изменение за день",
+    "openPriceHistory": "История цены: {symbol}",
     "refreshPrices": "Обновить цены",
     "viewPortfolio": "Просмотреть портфель",
     "filter": {

@@ -88,6 +88,7 @@
       "noLosers": "Không có cổ phiếu giảm hôm nay."
     },
     "dailyChange": "Thay đổi hàng ngày",
+    "openPriceHistory": "Lịch sử giá của {symbol}",
     "refreshPrices": "Làm mới giá",
     "viewPortfolio": "Xem danh mục đầu tư",
     "filter": {
