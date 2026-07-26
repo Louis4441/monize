@@ -235,6 +235,7 @@
     "closeButton": "Schließen",
     "deleteConfirm": {
       "title": "Kurs löschen",
+      "message": "Kurseintrag für {date} löschen?",
       "confirmLabel": "Löschen"
     }
   },

@@ -235,6 +235,7 @@
     "closeButton": "Kapat",
     "deleteConfirm": {
       "title": "Fiyatı Sil",
+      "message": "{date} tarihli fiyat kaydı silinsin mi?",
       "confirmLabel": "Sil"
     }
   },

@@ -235,6 +235,7 @@
     "closeButton": "Fermer",
     "deleteConfirm": {
       "title": "Supprimer le cours",
+      "message": "Supprimer le cours du {date} ?",
       "confirmLabel": "Supprimer"
     }
   },

@@ -235,6 +235,7 @@
     "closeButton": "[XX-Close-XX]",
     "deleteConfirm": {
       "title": "[XX-Delete Price-XX]",
+      "message": "[XX-Delete price entry for {date}?-XX]",
       "confirmLabel": "[XX-Delete-XX]"
     }
   },

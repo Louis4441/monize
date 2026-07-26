@@ -235,6 +235,7 @@
     "closeButton": "बंद करें",
     "deleteConfirm": {
       "title": "मूल्य हटाएं",
+      "message": "{date} के लिए मूल्य प्रविष्टि हटाएं?",
       "confirmLabel": "हटाएं"
     }
   },

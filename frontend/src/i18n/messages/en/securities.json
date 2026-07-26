@@ -235,6 +235,7 @@
     "closeButton": "Close",
     "deleteConfirm": {
       "title": "Delete Price",
+      "message": "Delete price entry for {date}?",
       "confirmLabel": "Delete"
     }
   },

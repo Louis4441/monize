@@ -235,6 +235,7 @@
     "closeButton": "Закрыть",
     "deleteConfirm": {
       "title": "Удалить цену",
+      "message": "Удалить запись цены за {date}?",
       "confirmLabel": "Удалить"
     }
   },

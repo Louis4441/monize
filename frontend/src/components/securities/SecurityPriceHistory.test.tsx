@@ -371,6 +371,14 @@ describe('SecurityPriceHistory', () => {
     expect(toast.success).toHaveBeenCalledWith('Price deleted');
   });
 
+  it('names the row being deleted in the confirm dialog', async () => {
+    await renderComponent();
+
+    fireEvent.click(screen.getAllByText('Delete')[0]);
+
+    expect(screen.getByText('Delete price entry for 2025-06-01?')).toBeInTheDocument();
+  });
+
   it('does not delete when the confirm dialog is cancelled', async () => {
     await renderComponent();
 

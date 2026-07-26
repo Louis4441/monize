@@ -411,7 +411,9 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
       <ConfirmDialog
         isOpen={!!deletingPrice}
         title={t('priceHistory.deleteConfirm.title')}
-        message={`Delete price entry for ${deletingPrice ? formatDate(deletingPrice.priceDate) : ''}?`}
+        message={t('priceHistory.deleteConfirm.message', {
+          date: deletingPrice ? formatDate(deletingPrice.priceDate) : '',
+        })}
         confirmLabel={t('priceHistory.deleteConfirm.confirmLabel')}
         onConfirm={handleDelete}
         onCancel={() => setDeletingPrice(undefined)}

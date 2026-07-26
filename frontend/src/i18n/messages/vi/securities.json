@@ -235,6 +235,7 @@
     "closeButton": "Đóng",
     "deleteConfirm": {
       "title": "Xóa giá",
+      "message": "Xóa bản ghi giá cho {date}?",
       "confirmLabel": "Xóa"
     }
   },

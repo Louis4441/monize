@@ -235,6 +235,7 @@
     "closeButton": "關閉",
     "deleteConfirm": {
       "title": "刪除價格",
+      "message": "確定要刪除 {date} 的價格記錄嗎？",
       "confirmLabel": "刪除"
     }
   },

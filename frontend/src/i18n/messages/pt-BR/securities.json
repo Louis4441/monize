@@ -235,6 +235,7 @@
     "closeButton": "Fechar",
     "deleteConfirm": {
       "title": "Excluir Cotação",
+      "message": "Excluir a cotação de {date}?",
       "confirmLabel": "Excluir"
     }
   },

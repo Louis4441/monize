@@ -235,6 +235,7 @@
     "closeButton": "閉じる",
     "deleteConfirm": {
       "title": "株価を削除",
+      "message": "{date} の株価を削除しますか？",
       "confirmLabel": "削除"
     }
   },
