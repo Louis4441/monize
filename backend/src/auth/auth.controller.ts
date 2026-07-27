@@ -498,7 +498,14 @@ export class AuthController {
       );
 
       this.setAuthCookies(res, accessToken, refreshToken, result.user.id);
-      res.redirect(`${frontendUrl}/auth/callback?success=true`);
+      // `welcome` tells the callback page this login provisioned the account,
+      // so it shows the same language/currency step local registration ends
+      // on instead of dropping the user straight on the dashboard.
+      res.redirect(
+        `${frontendUrl}/auth/callback?success=true${
+          result.isNewUser ? "&welcome=true" : ""
+        }`,
+      );
     } catch (error) {
       // Clear OIDC cookies on error path as well
       res.clearCookie("oidc_state", clearOidcCookieOptions);
