@@ -84,8 +84,23 @@ describe("WhatsNewService", () => {
       expect(mockedTenantTx).toHaveBeenCalledTimes(1);
     });
 
-    it("auto-shows when the user has no preferences row yet", async () => {
+    it("does not auto-show on a first login (no preferences row yet)", async () => {
       repo.findOne.mockResolvedValue(null);
+
+      const status = await service.getWhatsNew("user-1");
+
+      expect(status.autoShow).toBe(false);
+      // The notes still come back so the version label can open the modal.
+      expect(status.notes).toBe(SAMPLE_NOTES);
+    });
+
+    it("auto-shows for a legacy row that predates the digest columns", async () => {
+      repo.findOne.mockResolvedValue(
+        prefs({
+          showWhatsNew: null as unknown as boolean,
+          lastSeenVersion: null,
+        }),
+      );
 
       const status = await service.getWhatsNew("user-1");
 
@@ -178,12 +193,17 @@ describe("WhatsNewService", () => {
       expect(result.reminded).toBe(true);
     });
 
-    it("is a no-op (still succeeds) when no preferences row exists", async () => {
+    it("materializes an unacknowledged row when none exists", async () => {
       repo.findOne.mockResolvedValue(null);
 
       const result = await service.remindNextLogin("user-1");
 
-      expect(repo.save).not.toHaveBeenCalled();
+      expect(repo.save).toHaveBeenCalledTimes(1);
+      const saved = repo.save.mock.calls[0][0] as UserPreference;
+      expect(saved.userId).toBe("user-1");
+      // Defaults stamp the running version; the reminder has to clear it, or the
+      // digest the user just asked for would be suppressed as a first login.
+      expect(saved.lastSeenVersion).toBeNull();
       expect(result.reminded).toBe(true);
     });
 
