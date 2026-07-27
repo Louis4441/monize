@@ -319,9 +319,9 @@ CREATE INDEX idx_transaction_splits_category ON transaction_splits(category_id);
 CREATE INDEX idx_transaction_splits_transfer_account ON transaction_splits(transfer_account_id);
 CREATE INDEX idx_transaction_splits_linked ON transaction_splits(linked_transaction_id);
 
--- Transaction Attachments: receipts/invoices/documents stored in Postgres.
--- Metadata lives here; the bytes live in attachment_blobs (database provider) or
--- an external store keyed by storage_key. See migration 086.
+-- Transaction Attachments: receipts/invoices/documents stored in Postgres by
+-- default. Metadata lives here; the bytes live in attachment_blobs (database
+-- provider) or an external store keyed by storage_key. See migration 109.
 CREATE TABLE transaction_attachments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -330,8 +330,8 @@ CREATE TABLE transaction_attachments (
     content_type VARCHAR(100) NOT NULL, -- server-sniffed MIME, not the client's claim
     byte_size BIGINT NOT NULL,
     sha256 CHAR(64) NOT NULL, -- hex digest of the original bytes (integrity + dedup)
-    storage_provider VARCHAR(20) NOT NULL DEFAULT 'database', -- 'database' | 's3' | ...
-    storage_key VARCHAR(512) NOT NULL, -- database provider: attachment id; s3: object key
+    storage_provider VARCHAR(20) NOT NULL DEFAULT 'database', -- 'database' | 'local' | 's3'
+    storage_key VARCHAR(512) NOT NULL, -- database/local: attachment id; s3: object key
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
