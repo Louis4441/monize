@@ -486,7 +486,6 @@
     "empty": "Die hochgeladene Datei ist leer",
     "fileTooLarge": "Die Datei überschreitet die maximale Größe von {{ max }} Bytes",
     "unsupportedType": "Nicht unterstützter Dateityp. Erlaubte Typen: {{ types }}",
-    "tooMany": "Diese Transaktion hat bereits die maximale Anzahl von {{ max }} Anhängen",
-    "s3NotImplemented": "S3-Anhangspeicher ist noch nicht implementiert"
+    "tooMany": "Diese Transaktion hat bereits die maximale Anzahl von {{ max }} Anhängen"
   }
 }

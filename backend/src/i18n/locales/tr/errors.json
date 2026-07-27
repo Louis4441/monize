@@ -486,7 +486,6 @@
     "empty": "Yüklenen dosya boş",
     "fileTooLarge": "Dosya, {{ max }} baytlık maksimum boyutu aşıyor",
     "unsupportedType": "Desteklenmeyen dosya türü. İzin verilen türler: {{ types }}",
-    "tooMany": "Bu işlemde zaten en fazla {{ max }} ek var",
-    "s3NotImplemented": "S3 ek depolama henüz uygulanmadı"
+    "tooMany": "Bu işlemde zaten en fazla {{ max }} ek var"
   }
 }

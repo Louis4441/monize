@@ -3,15 +3,17 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AttachmentsController } from "./attachments.controller";
 import { AttachmentsService } from "./attachments.service";
 import { DatabaseStorageProvider } from "./storage/database-storage.provider";
+import { LocalStorageProvider } from "./storage/local-storage.provider";
 import { S3StorageProvider } from "./storage/s3-storage.provider";
 import { ATTACHMENT_STORAGE_PROVIDER } from "./storage/attachment-storage.interface";
 
 /**
  * Transaction attachments. Bytes are stored via the injected storage provider,
- * selected by ATTACHMENT_STORAGE_PROVIDER (default "database" = Postgres BYTEA;
- * "s3" binds the S3-ready seam). Entities are auto-registered via the datasource
- * glob, so no forFeature is needed -- the service reads repositories from the
- * tenantTx EntityManager.
+ * selected by ATTACHMENT_STORAGE_PROVIDER: "database" (default) keeps bytes in
+ * Postgres BYTEA; "local" writes them to a filesystem directory; "s3" stores
+ * them in S3-compatible object storage. Entities are auto-registered via the
+ * datasource glob, so no forFeature is needed -- the service reads repositories
+ * from the tenantTx EntityManager.
  */
 @Module({
   imports: [ConfigModule],
@@ -19,20 +21,29 @@ import { ATTACHMENT_STORAGE_PROVIDER } from "./storage/attachment-storage.interf
   providers: [
     AttachmentsService,
     DatabaseStorageProvider,
+    LocalStorageProvider,
     S3StorageProvider,
     {
       provide: ATTACHMENT_STORAGE_PROVIDER,
       useFactory: (
         config: ConfigService,
         database: DatabaseStorageProvider,
+        local: LocalStorageProvider,
         s3: S3StorageProvider,
       ) => {
         const kind = (
           config.get<string>("ATTACHMENT_STORAGE_PROVIDER") ?? "database"
         ).toLowerCase();
-        return kind === "s3" ? s3 : database;
+        if (kind === "s3") return s3;
+        if (kind === "local") return local;
+        return database;
       },
-      inject: [ConfigService, DatabaseStorageProvider, S3StorageProvider],
+      inject: [
+        ConfigService,
+        DatabaseStorageProvider,
+        LocalStorageProvider,
+        S3StorageProvider,
+      ],
     },
   ],
   exports: [AttachmentsService],

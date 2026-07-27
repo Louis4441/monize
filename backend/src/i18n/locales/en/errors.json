@@ -5,8 +5,7 @@
     "empty": "Uploaded file is empty",
     "fileTooLarge": "File exceeds the maximum size of {{ max }} bytes",
     "unsupportedType": "Unsupported file type. Allowed types: {{ types }}",
-    "tooMany": "This transaction already has the maximum of {{ max }} attachments",
-    "s3NotImplemented": "S3 attachment storage is not yet implemented"
+    "tooMany": "This transaction already has the maximum of {{ max }} attachments"
   },
   "accounts": {
     "accountWithIdNotFound": "Account with ID {{ id }} not found",
