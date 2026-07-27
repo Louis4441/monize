@@ -1789,8 +1789,9 @@ describe('TransactionFilterPanel', () => {
 
       const select = screen.getByLabelText('Attachments') as HTMLSelectElement;
       expect(select).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: 'Has attachments' })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: 'No attachments' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Any' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Yes' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'No' })).toBeInTheDocument();
     });
 
     it('sets the attachments filter when a value is chosen', () => {

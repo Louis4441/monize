@@ -619,16 +619,16 @@ export function TransactionFilterPanel({
 
               {/* Second row: Time period, dates, amount range, currency,
                   attachments, and search on one lg row. The fr weights are
-                  scaled x10 (integers, so Tailwind reliably emits the arbitrary
-                  class): Time Period 20->14 (-30%) and each date 20->15 (-25%)
-                  from their old 2fr, the narrow controls stay at 10 (1fr), and
-                  Search keeps 30 (3fr). The Currency column is dropped when it
-                  isn't shown. */}
+                  integers (so Tailwind reliably emits the arbitrary class):
+                  Time Period 34, each date 27 (another ~10% shaved off and
+                  given to Time Period), the narrow controls 20 (1fr), and
+                  Search 60 (3fr). The Currency column is dropped when it isn't
+                  shown. */}
               <div
                 className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 ${
                   hasCurrencyFilter
-                    ? 'lg:grid-cols-[14fr_15fr_15fr_10fr_10fr_10fr_10fr_30fr]'
-                    : 'lg:grid-cols-[14fr_15fr_15fr_10fr_10fr_10fr_30fr]'
+                    ? 'lg:grid-cols-[34fr_27fr_27fr_20fr_20fr_20fr_20fr_60fr]'
+                    : 'lg:grid-cols-[34fr_27fr_27fr_20fr_20fr_20fr_60fr]'
                 }`}
               >
                 <Select

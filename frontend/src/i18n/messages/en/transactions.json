@@ -230,8 +230,8 @@
     },
     "hasAttachmentsOptions": {
       "any": "Any",
-      "yes": "Has attachments",
-      "no": "No attachments"
+      "yes": "Yes",
+      "no": "No"
     },
     "placeholders": {
       "accounts": "All accounts",
