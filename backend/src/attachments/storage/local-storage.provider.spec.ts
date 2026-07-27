@@ -32,11 +32,36 @@ describe("LocalStorageProvider", () => {
     await expect(provider.load(key)).resolves.toEqual(data);
   });
 
-  it("creates the base directory on first save", async () => {
+  it("fans saved bytes out into a two-level shard by id prefix", async () => {
+    const key = "abcd1234-5678-4abc-9def-0123456789ab";
+    await provider.save(key, Buffer.from("sharded"));
+
+    // <baseDir>/<ab>/<cd>/<id>, not flat at <baseDir>/<id>.
+    const sharded = join(baseDir, key.slice(0, 2), key.slice(2, 4), key);
+    await expect(fs.readFile(sharded, "utf8")).resolves.toBe("sharded");
+    await expect(fs.access(join(baseDir, key))).rejects.toBeDefined();
+  });
+
+  it("creates the shard directories on first save", async () => {
     const nested = join(baseDir, "does", "not", "exist");
     const p = new LocalStorageProvider(configFor(nested));
-    await p.save("k1", Buffer.from("x"));
-    await expect(p.load("k1")).resolves.toEqual(Buffer.from("x"));
+    const key = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    await p.save(key, Buffer.from("x"));
+    await expect(p.load(key)).resolves.toEqual(Buffer.from("x"));
+  });
+
+  it("loads bytes written under the pre-sharding flat layout", async () => {
+    const key = "ffffffff-0000-4000-8000-000000000000";
+    // Simulate an attachment written before sharding: a flat file in baseDir.
+    await fs.writeFile(join(baseDir, key), "legacy");
+    await expect(provider.load(key)).resolves.toEqual(Buffer.from("legacy"));
+  });
+
+  it("deletes a pre-sharding flat file too", async () => {
+    const key = "ffffffff-1111-4111-8111-111111111111";
+    await fs.writeFile(join(baseDir, key), "legacy");
+    await expect(provider.delete(key)).resolves.toBeUndefined();
+    await expect(provider.load(key)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("throws NotFound when loading a missing key", async () => {
@@ -46,10 +71,11 @@ describe("LocalStorageProvider", () => {
   });
 
   it("delete is idempotent", async () => {
-    await provider.save("k2", Buffer.from("y"));
-    await expect(provider.delete("k2")).resolves.toBeUndefined();
-    await expect(provider.delete("k2")).resolves.toBeUndefined();
-    await expect(provider.load("k2")).rejects.toBeInstanceOf(NotFoundException);
+    const key = "22222222-2222-4222-8222-222222222222";
+    await provider.save(key, Buffer.from("y"));
+    await expect(provider.delete(key)).resolves.toBeUndefined();
+    await expect(provider.delete(key)).resolves.toBeUndefined();
+    await expect(provider.load(key)).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("rejects keys that would escape the base directory", async () => {
