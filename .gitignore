@@ -39,6 +39,9 @@ docker-compose.override.yml
 # Automatic backup output (BACKUP_HOST_DIR)
 /backups/
 
+# Local attachment storage (ATTACHMENT_HOST_DIR)
+/attachments/
+
 # Testing
 coverage/
 .nyc_output/

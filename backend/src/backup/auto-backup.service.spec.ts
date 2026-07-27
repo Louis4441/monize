@@ -3,7 +3,10 @@ import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { BadRequestException } from "@nestjs/common";
 import * as fs from "fs";
-import { AutoBackupService, DEFAULT_BACKUP_DIR } from "./auto-backup.service";
+import {
+  AutoBackupService,
+  DEFAULT_BACKUP_CONTAINER_DIR,
+} from "./auto-backup.service";
 import { BackupService } from "./backup.service";
 import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
 import { User } from "../users/entities/user.entity";
@@ -163,7 +166,7 @@ describe("AutoBackupService", () => {
 
       expect(result.userId).toBe(userId);
       expect(result.enabled).toBe(false);
-      expect(result.folderPath).toBe(DEFAULT_BACKUP_DIR);
+      expect(result.folderPath).toBe(DEFAULT_BACKUP_CONTAINER_DIR);
       expect(result.frequency).toBe("daily");
       expect(result.backupTime).toBe("02:00");
       expect(result.retentionDaily).toBe(7);
@@ -178,12 +181,14 @@ describe("AutoBackupService", () => {
 
       const result = await service.getSettings(userId);
 
-      expect(result.folderPath).toBe(DEFAULT_BACKUP_DIR);
+      expect(result.folderPath).toBe(DEFAULT_BACKUP_CONTAINER_DIR);
       expect(result.enabled).toBe(true);
     });
 
-    it("should default the folder path to BACKUP_DIR when configured", async () => {
-      service = await createService({ BACKUP_DIR: "/mnt/monize-backups" });
+    it("should default the folder path to BACKUP_CONTAINER_DIR when configured", async () => {
+      service = await createService({
+        BACKUP_CONTAINER_DIR: "/mnt/monize-backups",
+      });
       mockSettingsRepo.findOne.mockResolvedValue(null);
 
       const result = await service.getSettings(userId);
@@ -191,8 +196,10 @@ describe("AutoBackupService", () => {
       expect(result.folderPath).toBe("/mnt/monize-backups");
     });
 
-    it("should trim a configured BACKUP_DIR", async () => {
-      service = await createService({ BACKUP_DIR: "  /mnt/backups/  " });
+    it("should trim a configured BACKUP_CONTAINER_DIR", async () => {
+      service = await createService({
+        BACKUP_CONTAINER_DIR: "  /mnt/backups/  ",
+      });
       mockSettingsRepo.findOne.mockResolvedValue(null);
 
       const result = await service.getSettings(userId);
@@ -200,13 +207,15 @@ describe("AutoBackupService", () => {
       expect(result.folderPath).toBe("/mnt/backups");
     });
 
-    it("should fall back to the built-in default for an invalid BACKUP_DIR", async () => {
-      service = await createService({ BACKUP_DIR: "relative/backups" });
+    it("should fall back to the built-in default for an invalid BACKUP_CONTAINER_DIR", async () => {
+      service = await createService({
+        BACKUP_CONTAINER_DIR: "relative/backups",
+      });
       mockSettingsRepo.findOne.mockResolvedValue(null);
 
       const result = await service.getSettings(userId);
 
-      expect(result.folderPath).toBe(DEFAULT_BACKUP_DIR);
+      expect(result.folderPath).toBe(DEFAULT_BACKUP_CONTAINER_DIR);
     });
   });
 
@@ -220,7 +229,10 @@ describe("AutoBackupService", () => {
       });
 
       expect(mockSettingsRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ userId, folderPath: DEFAULT_BACKUP_DIR }),
+        expect.objectContaining({
+          userId,
+          folderPath: DEFAULT_BACKUP_CONTAINER_DIR,
+        }),
       );
       expect(mockSettingsRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -247,8 +259,10 @@ describe("AutoBackupService", () => {
       );
     });
 
-    it("should fall back to BACKUP_DIR when enabling without a folder path", async () => {
-      service = await createService({ BACKUP_DIR: "/mnt/monize-backups" });
+    it("should fall back to BACKUP_CONTAINER_DIR when enabling without a folder path", async () => {
+      service = await createService({
+        BACKUP_CONTAINER_DIR: "/mnt/monize-backups",
+      });
       mockSettingsRepo.findOne.mockResolvedValue(null);
       setupFsWritableMocks();
 
@@ -413,12 +427,15 @@ describe("AutoBackupService", () => {
       );
       (fsPromises.unlink as unknown as jest.Mock).mockResolvedValue(undefined);
 
-      const result = await service.validateFolder(DEFAULT_BACKUP_DIR);
+      const result = await service.validateFolder(DEFAULT_BACKUP_CONTAINER_DIR);
 
       expect(result).toEqual({ valid: true });
-      expect(fsPromises.mkdir).toHaveBeenCalledWith(DEFAULT_BACKUP_DIR, {
-        recursive: true,
-      });
+      expect(fsPromises.mkdir).toHaveBeenCalledWith(
+        DEFAULT_BACKUP_CONTAINER_DIR,
+        {
+          recursive: true,
+        },
+      );
     });
 
     it("should not create a user-chosen folder that is missing", async () => {
@@ -441,7 +458,7 @@ describe("AutoBackupService", () => {
         new Error("EACCES"),
       );
 
-      const result = await service.validateFolder(DEFAULT_BACKUP_DIR);
+      const result = await service.validateFolder(DEFAULT_BACKUP_CONTAINER_DIR);
 
       expect(result.valid).toBe(false);
       expect(result.error).toContain("does not exist");
@@ -484,8 +501,10 @@ describe("AutoBackupService", () => {
   });
 
   describe("runManualBackup", () => {
-    it("should back up to BACKUP_DIR when no settings exist", async () => {
-      service = await createService({ BACKUP_DIR: "/mnt/monize-backups" });
+    it("should back up to BACKUP_CONTAINER_DIR when no settings exist", async () => {
+      service = await createService({
+        BACKUP_CONTAINER_DIR: "/mnt/monize-backups",
+      });
       mockSettingsRepo.findOne.mockResolvedValue(null);
       setupExportMocks();
 
@@ -499,7 +518,7 @@ describe("AutoBackupService", () => {
       );
     });
 
-    it("should back up to BACKUP_DIR when no folder path is set", async () => {
+    it("should back up to BACKUP_CONTAINER_DIR when no folder path is set", async () => {
       mockSettingsRepo.findOne.mockResolvedValue(
         createSettings({ folderPath: "" }),
       );
@@ -508,7 +527,9 @@ describe("AutoBackupService", () => {
       await service.runManualBackup(userId);
 
       expect(fsPromises.writeFile).toHaveBeenCalledWith(
-        expect.stringContaining(`${DEFAULT_BACKUP_DIR}/monize-backup-daily-`),
+        expect.stringContaining(
+          `${DEFAULT_BACKUP_CONTAINER_DIR}/monize-backup-daily-`,
+        ),
         expect.any(Buffer),
       );
     });
@@ -618,7 +639,7 @@ describe("AutoBackupService", () => {
       );
     });
 
-    it("should write to BACKUP_DIR when a due row has no folder path", async () => {
+    it("should write to BACKUP_CONTAINER_DIR when a due row has no folder path", async () => {
       const settings = createSettings({
         enabled: true,
         folderPath: "",
@@ -630,7 +651,9 @@ describe("AutoBackupService", () => {
       await service.handleAutoBackupCron();
 
       expect(fsPromises.writeFile).toHaveBeenCalledWith(
-        expect.stringContaining(`${DEFAULT_BACKUP_DIR}/monize-backup-daily-`),
+        expect.stringContaining(
+          `${DEFAULT_BACKUP_CONTAINER_DIR}/monize-backup-daily-`,
+        ),
         expect.any(Buffer),
       );
     });

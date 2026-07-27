@@ -18,11 +18,11 @@ import { tr } from "../i18n/translate";
 const BACKUP_FILE_PREFIX = "monize-backup-";
 
 /**
- * Folder automatic backups are written to when BACKUP_DIR is unset. Monize runs
- * in a container, so this is a container path: mount a host folder there (see
- * .env.example and the docker-compose files).
+ * Folder automatic backups are written to when BACKUP_CONTAINER_DIR is unset.
+ * Monize runs in a container, so this is a container path: mount a host folder
+ * there (see .env.example and the docker-compose files).
  */
-export const DEFAULT_BACKUP_DIR = "/data/backups";
+export const DEFAULT_BACKUP_CONTAINER_DIR = "/data/backups";
 
 // File extensions: .json.gz for unencrypted, .mzbe for encrypted Monize backups.
 // Retention enforcement matches both so we can clean up legacy and encrypted
@@ -63,7 +63,7 @@ function parseYearMonthString(ym: string): Date | null {
 export class AutoBackupService {
   private readonly logger = new Logger(AutoBackupService.name);
 
-  /** Deployment-wide backup folder (BACKUP_DIR), used whenever a user has not
+  /** Deployment-wide backup folder (BACKUP_CONTAINER_DIR), used whenever a user has not
    *  chosen one of their own. */
   private readonly defaultFolderPath: string;
 
@@ -76,25 +76,25 @@ export class AutoBackupService {
     config: ConfigService,
   ) {
     this.defaultFolderPath = this.resolveConfiguredFolderPath(
-      config.get<string>("BACKUP_DIR"),
+      config.get<string>("BACKUP_CONTAINER_DIR"),
     );
   }
 
   /**
-   * BACKUP_DIR is operator-supplied, so it goes through the same CWE-22
+   * BACKUP_CONTAINER_DIR is operator-supplied, so it goes through the same CWE-22
    * validation as a user-supplied path. An unusable value falls back to the
    * built-in default with a loud log rather than taking the whole app down.
    */
   private resolveConfiguredFolderPath(configured: string | undefined): string {
     const trimmed = configured?.trim();
-    if (!trimmed) return DEFAULT_BACKUP_DIR;
+    if (!trimmed) return DEFAULT_BACKUP_CONTAINER_DIR;
     try {
       return this.validateFolderPath(trimmed);
     } catch (error) {
       this.logger.error(
-        `Invalid BACKUP_DIR "${trimmed}": ${error.message}. Falling back to ${DEFAULT_BACKUP_DIR}`,
+        `Invalid BACKUP_CONTAINER_DIR "${trimmed}": ${error.message}. Falling back to ${DEFAULT_BACKUP_CONTAINER_DIR}`,
       );
-      return DEFAULT_BACKUP_DIR;
+      return DEFAULT_BACKUP_CONTAINER_DIR;
     }
   }
 
