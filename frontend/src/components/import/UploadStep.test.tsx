@@ -107,6 +107,28 @@ describe('UploadStep', () => {
     expect(onFileSelect).toHaveBeenCalledTimes(1);
   });
 
+  it('renders the wiki notice banner with links to both import guides', () => {
+    render(<UploadStep preselectedAccount={undefined} isLoading={false} onFileSelect={onFileSelect} />);
+
+    expect(screen.getByText('Before you import')).toBeInTheDocument();
+
+    const moneyLink = screen.getByRole('link', { name: 'Importing from Microsoft Money' });
+    expect(moneyLink).toHaveAttribute(
+      'href',
+      'https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money'
+    );
+    expect(moneyLink).toHaveAttribute('target', '_blank');
+    expect(moneyLink).toHaveAttribute('rel', 'noopener noreferrer');
+
+    const quickenLink = screen.getByRole('link', { name: 'Importing from Quicken' });
+    expect(quickenLink).toHaveAttribute(
+      'href',
+      'https://github.com/kenlasko/monize/wiki/Importing-from-Quicken'
+    );
+    expect(quickenLink).toHaveAttribute('target', '_blank');
+    expect(quickenLink).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
   it('renders file input with correct accept attribute', () => {
     render(<UploadStep preselectedAccount={undefined} isLoading={false} onFileSelect={onFileSelect} />);
 
