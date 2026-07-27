@@ -269,8 +269,6 @@ CREATE TABLE transactions (
     original_currency_code VARCHAR(3) CONSTRAINT fk_transactions_original_currency REFERENCES currencies(code), -- currency actually paid in
     description TEXT,
     reference_number VARCHAR(100), -- check number, confirmation number, etc
-    is_cleared BOOLEAN DEFAULT false, -- LEGACY: replaced by status field
-    is_reconciled BOOLEAN DEFAULT false, -- LEGACY: replaced by status field
     reconciled_date DATE,
     status VARCHAR(20) DEFAULT 'UNRECONCILED', -- 'UNRECONCILED', 'CLEARED', 'RECONCILED', 'VOID'
     is_split BOOLEAN DEFAULT false, -- indicates this is a split transaction
@@ -289,9 +287,6 @@ CREATE INDEX idx_transactions_category ON transactions(category_id);
 CREATE INDEX idx_transactions_parent ON transactions(parent_transaction_id);
 CREATE INDEX idx_transactions_linked ON transactions(linked_transaction_id);
 CREATE INDEX idx_transactions_original_currency ON transactions(original_currency_code);
-CREATE INDEX idx_transactions_cleared ON transactions(is_cleared); -- LEGACY
-CREATE INDEX idx_transactions_reconciled ON transactions(is_reconciled); -- LEGACY
-CREATE INDEX idx_transactions_user_cleared ON transactions(user_id, is_cleared); -- LEGACY
 -- Trigram indexes accelerate the register/report search (ILIKE '%term%')
 CREATE INDEX idx_transactions_payee_name_trgm ON transactions USING gin (payee_name gin_trgm_ops);
 CREATE INDEX idx_transactions_description_trgm ON transactions USING gin (description gin_trgm_ops);

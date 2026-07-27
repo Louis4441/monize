@@ -350,7 +350,7 @@ export class SeedService {
         payeeName: "ABC Corporation",
         amount: 4500.0,
         description: "Monthly salary",
-        isCleared: true,
+        status: "CLEARED",
       },
       {
         accountId: accountIds.CHEQUING,
@@ -358,7 +358,7 @@ export class SeedService {
         payeeName: "Freelance Client",
         amount: 1200.0,
         description: "Website development project",
-        isCleared: true,
+        status: "CLEARED",
       },
 
       // Expense transactions
@@ -368,8 +368,7 @@ export class SeedService {
         payeeName: "City Apartments",
         amount: -1800.0,
         description: "January rent",
-        isCleared: true,
-        isReconciled: true,
+        status: "RECONCILED",
       },
       {
         accountId: accountIds.CHEQUING,
@@ -377,7 +376,7 @@ export class SeedService {
         payeeName: "Grocery Store",
         amount: -157.32,
         description: "Weekly groceries",
-        isCleared: true,
+        status: "CLEARED",
       },
       {
         accountId: accountIds.CREDIT_CARD,
@@ -385,7 +384,7 @@ export class SeedService {
         payeeName: "Gas Station",
         amount: -65.0,
         description: "Fuel",
-        isCleared: false,
+        status: "UNRECONCILED",
       },
       {
         accountId: accountIds.CREDIT_CARD,
@@ -393,7 +392,7 @@ export class SeedService {
         payeeName: "Restaurant",
         amount: -87.5,
         description: "Dinner with friends",
-        isCleared: false,
+        status: "UNRECONCILED",
       },
       {
         accountId: accountIds.CHEQUING,
@@ -401,7 +400,7 @@ export class SeedService {
         payeeName: "Electric Company",
         amount: -125.0,
         description: "Electricity bill",
-        isCleared: true,
+        status: "CLEARED",
       },
       {
         accountId: accountIds.CHEQUING,
@@ -409,7 +408,7 @@ export class SeedService {
         payeeName: "Internet Provider",
         amount: -79.99,
         description: "Monthly internet",
-        isCleared: true,
+        status: "CLEARED",
       },
       {
         accountId: accountIds.CREDIT_CARD,
@@ -417,7 +416,7 @@ export class SeedService {
         payeeName: "Coffee Shop",
         amount: -5.75,
         description: "Morning coffee",
-        isCleared: false,
+        status: "UNRECONCILED",
       },
       {
         accountId: accountIds.CREDIT_CARD,
@@ -425,7 +424,7 @@ export class SeedService {
         payeeName: "Streaming Service",
         amount: -15.99,
         description: "Netflix subscription",
-        isCleared: false,
+        status: "UNRECONCILED",
       },
       {
         accountId: accountIds.CHEQUING,
@@ -433,7 +432,7 @@ export class SeedService {
         payeeName: "Pharmacy",
         amount: -42.3,
         description: "Prescription medication",
-        isCleared: true,
+        status: "CLEARED",
       },
       {
         accountId: accountIds.CHEQUING,
@@ -441,7 +440,7 @@ export class SeedService {
         payeeName: "Transit Authority",
         amount: -100.0,
         description: "Monthly transit pass",
-        isCleared: true,
+        status: "CLEARED",
       },
       {
         accountId: accountIds.CREDIT_CARD,
@@ -449,7 +448,7 @@ export class SeedService {
         payeeName: "Online Store",
         amount: -145.0,
         description: "New headphones",
-        isCleared: false,
+        status: "UNRECONCILED",
       },
     ];
 
@@ -457,8 +456,8 @@ export class SeedService {
       await this.dataSource.query(
         `INSERT INTO transactions (
           user_id, account_id, transaction_date, payee_name, amount,
-          currency_code, description, is_cleared, is_reconciled
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          currency_code, description, status
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           userId,
           tx.accountId,
@@ -467,8 +466,7 @@ export class SeedService {
           tx.amount,
           "CAD",
           tx.description,
-          tx.isCleared || false,
-          tx.isReconciled || false,
+          tx.status,
         ],
       );
     }
