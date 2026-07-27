@@ -19,8 +19,9 @@
   - No new user-facing strings (RLS is backend-only; if an exception message becomes user-visible, it
     must go through `tr()` + English catalogs, then `npm run i18n:pseudo`).
 - **Terminology:** "the design doc" = `row-level-security.md`. Section references (e.g. "Phase 2b")
-  point there. Migration numbers below assume the current max is `102_*`; **verify with
-  `ls database/migrations` and renumber from the actual max before writing files.**
+  point there. Migration numbers below were written when the max was `102_*` and are now stale:
+  M1/M2 actually shipped as `111`–`114`. **Verify with `ls database/migrations` and renumber from the
+  actual max before writing files.**
 
 ## Deployment safety
 
@@ -44,8 +45,8 @@ uses four classes:
 | F1 | RLS_MODE flag, role creation + grants in db-init, env plumbing (compose + helm/k8s) | — | inert | done |
 | F2 | Request context extension (incl. `realUserId`) + `tenantTx` (re-entrant, both identity GUCs) + `with-context` helpers + exception-filter mapping | F1 | none | done |
 | F3 | CI ratchet on `@InjectRepository` / `createQueryRunner` counts | F2 | none | done |
-| M1 | Migration: helper functions + GUC-aware trigger (**no grants — they live in db-init, F1**) | — | inert | not started |
-| M2 | Migrations: direct + indirect + special (users/delegation/emergency) policies (no enable) | M1 | inert | not started |
+| M1 | Migration: helper functions + GUC-aware trigger (**no grants — they live in db-init, F1**) | — | inert | done |
+| M2 | Migrations: direct + indirect + special (users/delegation/emergency) policies (no enable) | M1 | inert | done |
 | M3 | Migration: `ENABLE ROW LEVEL SECURITY` (authored, **not deployed**) | M2 | **DO NOT DEPLOY** | not started |
 | T1 | Integration harness applies real RLS migrations + role/grants + `updated_at` triggers | M2, F1 | none | not started |
 | T2 | Catalog-driven `rls-enforcement` integration spec (4 buckets) | T1, M3 | none | not started |
@@ -93,6 +94,33 @@ Notes on the subtle rows:
 
 Operator-only steps (not agent tasks — see runbook): shadow flip, staging enforce, prod flip A
 (privilege drop), prod flip B (deploy M3), monitoring during soaks.
+
+### Open findings from M2's ownership audit — must be closed before flip B
+
+M2 audited how every candidate table is actually keyed at its call sites (rather than trusting the
+design doc's lists). That audit surfaced three call paths that **no policy can fix** — they will
+return zero rows under enforcement because the ambient context does not name the right user. They are
+context-wrapping bugs, out of M2's file scope, and are recorded here rather than papered over with a
+policy arm. None of them affects anything today (`RLS_MODE=off`, policies not enabled).
+
+1. **`delegation.service.ts` `delegateMustEnrollOwn2FA` reads the *owner's* `user_preferences` under
+   `withUserContext(delegate)`.** Reached from `jwt.strategy`'s `validateActingContext`, i.e. on
+   **every delegate-token request**. `withUserContext(sub)` seeds only `userId`, so both GUCs collapse
+   to the delegate and the owner's preferences row matches neither arm. The fix belongs with the
+   delegation wrapping work: seed **both** identities (current = owner, real = delegate) for delegate
+   tokens instead of a single-id context. Blocks R7 as well as flip B.
+2. **`AccountDelegateGuard` needs the same two-GUC seeding** — already flagged in C1 as out of its
+   scope, repeated here because it has the same root cause and the same fix. It must land **before**
+   R2/R7 convert `DelegationService` to `tenantTx`, or delegate requests throw at `off`.
+3. **`backend/src/admin/` contains no `withSystemContext` at all.** Admin cross-user writes to
+   `refresh_tokens`, `personal_access_tokens` and `user_preferences` run under the admin's own user
+   context and would silently affect zero rows under enforcement. The design doc (Phase 4) assumes
+   admin is wrapped; no task currently owns it. R7 lists the admin module but R-task rules forbid
+   adding new wrapping — this needs its own C-task (or an explicit extension of R7's scope).
+
+A fourth, milder case is already covered by policy and needs no follow-up:
+`users.service.ts` deleting refresh tokens by `actingAsUserId` works because M2 gave
+`refresh_tokens` an `acting_as_user_id = current` arm.
 
 ---
 
@@ -206,7 +234,27 @@ below actual also fails (prevents over-claiming).
 
 ### M1. Helper functions + GUC-aware trigger (no grants)
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-migration-m1-m2-gyj3w6`). Shipped as
+  `database/migrations/111_rls_helpers_and_trigger.sql` (actual max at authoring time was `110`,
+  not the `102` the plan assumed), mirrored into `database/schema.sql`. Acceptance spec:
+  `backend/test/integration/rls-helpers-and-trigger.integration.spec.ts` (11 tests), which executes
+  the migration file **read from disk** so it cannot drift from what ships.
+
+  **One deliberate deviation from the design doc's SQL.** `app_bypass_rls()` is
+  `COALESCE(current_setting('app.bypass_rls', true) = 'on', false)`, not the doc's bare comparison.
+  With the GUC unset the bare form returns **NULL**, not `false`. In the OR-ed policy predicates
+  that is still fail-closed (`false OR NULL` is NULL, so the row is filtered out — verified), but a
+  boolean helper that can return NULL is a trap for any future caller writing `NOT app_bypass_rls()`,
+  which would also be NULL and silently match nothing. `app_current_user_id()` /
+  `app_real_user_id()` keep returning NULL by design — that is what makes the policies deny.
+
+  **Verified against a real PostgreSQL 16** (not just review): applies and re-applies cleanly on a
+  fresh `schema.sql` install *and* on the pre-M1 schema; **no `monize_app` role existed in the
+  cluster** for either run; helpers return NULL/false unset, read both GUCs independently, revert at
+  COMMIT on the same physical connection, treat empty string as unset, and raise 22P02 (not zero
+  rows) on a non-UUID value; the `updated_at` trigger stamps `CURRENT_TIMESTAMP` exactly as before
+  while `app.preserve_timestamps` is unset, preserves the supplied value when it is `'on'`, and
+  resumes stamping after that transaction commits.
 
 **Scope:** new `database/migrations/103_rls_helpers_and_trigger.sql` (renumber from actual max),
 `database/schema.sql`.
@@ -225,7 +273,74 @@ returns nothing.
 
 ### M2. Policy migrations (direct, indirect, special) — no enable
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-migration-m1-m2-gyj3w6`). Shipped as
+  `112_rls_policies_direct.sql`, `113_rls_policies_indirect.sql`, `114_rls_policies_special.sql`,
+  all mirrored into `database/schema.sql`. **50 policies over 54 tables** (4 exempt), one policy per
+  table, no `ENABLE`, no role or grant statement anywhere.
+
+  **The design doc's table lists were re-derived from `schema.sql`, as the task instructed — and
+  they had drifted.** Final buckets:
+
+  | Bucket | Count | Change vs. design doc |
+  |--------|-------|------------------------|
+  | Direct, effective-user keyed (`user_id = current`) | 26 | — |
+  | Direct, **authenticated**-user keyed (`current OR real`) | 4 | **new sub-bucket** (see below) |
+  | Indirect (`EXISTS` to parent) | 15 | +1: `attachment_blobs` |
+  | Special (bespoke owner columns) | 5 | — |
+  | Exempt | 4 | — |
+
+  - `transaction_attachments` (direct) and `attachment_blobs` (indirect → `transaction_attachments`)
+    postdate the design doc (migration 109) and were missing from every list in it.
+  - **Four tables the doc filed under a uniform `user_id = current` policy are keyed by the
+    *authenticated* user, not the effective one**, so that policy would have returned zero rows for
+    an acting delegate — inside normal request scope, where nothing throws and nothing logs. Each was
+    confirmed at the call sites, not assumed: `refresh_tokens` (entity comment and
+    `token.service.ts` are explicit that `user_id` is always the real user, with the owner in
+    `acting_as_user_id`; `POST /auth/switch-context` is `@AllowDelegate` and both revokes and inserts
+    delegate-keyed rows), `trusted_devices` (every authenticated route passes `req.user.realUserId`
+    and those routes *are* `@AllowDelegate`), `user_preferences` (mostly effective-keyed, but the
+    three `@AllowDelegate` 2FA endpoints read/write the delegate's own row), and
+    `personal_access_tokens` (real-keyed in effect — `PatController` has no `@AllowDelegate`, so the
+    two ids coincide today; the real arm makes adding one later a non-event instead of a silent
+    zero-rows bug). These get `user_id = current OR user_id = real`. The arm cannot widen isolation:
+    `app.real_user_id` only ever holds the id the JWT layer authenticated, so it exposes the caller's
+    own rows and never a third party's.
+  - `refresh_tokens` also gets an `acting_as_user_id = current` arm so that an owner deleting their
+    account still purges the delegate sessions opened against their data (`users.service.ts` deletes
+    by `actingAsUserId`; those rows carry another user's `user_id` and would otherwise be invisible,
+    leaving live sessions pointing at deleted data).
+  - **`currencies` exemption rationale corrected.** The doc justified it as having "no owner"; it
+    does have `created_by_user_id`. It stays exempt for a better reason, now documented in the
+    migration: that column is attribution (NULL = system currency), not ownership — any user may
+    reference a custom code through `accounts.currency_code`, and a `created_by_user_id` policy would
+    hide every system currency and break those foreign keys. Per-user visibility is already carried
+    by `user_currency_preferences`, which *is* policied.
+  - Junction tables are scoped through their **owning parent only**, not both FKs — matching the
+    indirect-ownership map shape T2 expects. Rationale in `113`: the owning-side predicate is what
+    enforces isolation, and the residual case (linking one's own row to another user's tag) exposes
+    nothing readable, since the tag row is protected by the `tags` policy.
+
+  **Verified under actual enforcement, not just by review.** The policies are inert as shipped, so
+  correctness was proved in a scratch PostgreSQL 16 database by enabling RLS on all 50 policied
+  tables, creating a non-owner `monize_app` role with the F1 grants, and seeding an owner, a
+  delegate, and an unrelated third user: no GUC → zero rows on direct *and* indirect tables; per-user
+  GUC → only that user's rows; `WITH CHECK` rejects a cross-user INSERT and a UPDATE that reassigns
+  `user_id`, on both direct and indirect tables; a cross-user UPDATE affects 0 rows; a non-UUID GUC
+  raises 22P02; `app.bypass_rls` sees everything; the app role cannot `ALTER TABLE ... DISABLE ROW
+  LEVEL SECURITY` or `DROP POLICY` (`must be owner of table`). Delegation, all four cases: acting
+  (current=owner, real=delegate) sees the owner's accounts/transactions, both `users` rows, the
+  delegation from both sides, its grants, and its own favourites/devices/refresh tokens; the delegate
+  can INSERT a favourite while acting; the **owner alone cannot see the delegate's private
+  favourites or trusted devices**; the delegate in their own session sees none of the owner's data
+  but still sees the delegation row. Removing the `real` arm from any of the three special policies
+  breaks the corresponding case.
+
+  **Zero schema drift:** a fresh `schema.sql` install and a pre-RLS schema + migrations 111–114 were
+  diffed on `pg_policies` (qual + with_check text) and on `pg_get_functiondef` for all four
+  functions — identical.
+
+  **T2 note:** the four-bucket map in the catalog spec must include the new authenticated-user
+  sub-bucket and `attachment_blobs`, or it will fail against these migrations.
 
 **Scope:** new `database/migrations/104_rls_policies_direct.sql`, `105_rls_policies_indirect.sql`,
 `106_rls_policies_special.sql`, `database/schema.sql`.
@@ -256,7 +371,11 @@ without enable); schema.sql mirrored.
 
 ### M3. Enable migration — authored, not deployed
 
-- [ ] Status: not started
+- [ ] Status: not started. **Renumber: M2 ended at `114`, so this is `115_rls_enable.sql`.** The
+  exact target list is the 50 tables policied by migrations `112`–`114`; derive it from
+  `SELECT DISTINCT tablename FROM pg_policies WHERE schemaname = 'public'` rather than retyping it.
+  M2 already dry-ran this enable in a scratch database and verified every policy behaves correctly
+  under it (see M2's status note), so M3 is expected to be mechanical.
 
 **Scope:** new `database/migrations/107_rls_enable.sql`, `database/schema.sql`.
 
