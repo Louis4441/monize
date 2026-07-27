@@ -109,7 +109,8 @@
       "feePaid": "Ödenen Ücret",
       "balance": "Bakiye",
       "status": "Durum",
-      "actions": "İşlemler"
+      "actions": "İşlemler",
+      "attachments": "Ekler"
     },
     "today": "Bugün",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Düzenle",
       "deleteButton": "Sil"
     },
-    "itemNamePlural": "işlemler"
+    "itemNamePlural": "işlemler",
+    "attachmentsCount": "{count, plural, other {# ek}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Etiket anahtarı",
       "tagKeyOp": "Koşul",
       "tagKeyValue": "Değer",
-      "currency": "Para birimi"
+      "currency": "Para birimi",
+      "hasAttachments": "Ekler"
     },
     "placeholders": {
       "accounts": "Tüm hesaplar",
@@ -248,7 +251,10 @@
       "dateUntil": "{date} tarihine kadar",
       "amountFrom": "{amount} tutarından",
       "amountUpTo": "{amount} tutarına kadar",
-      "removeCurrency": "{name} para birimi filtresini kaldır"
+      "removeCurrency": "{name} para birimi filtresini kaldır",
+      "hasAttachments": "Ekleri var",
+      "noAttachments": "Ek yok",
+      "removeAttachments": "Ek filtresini kaldır"
     },
     "bulkUpdate": "Toplu Güncelle",
     "cancelBulk": "Toplu İptal",
@@ -279,6 +285,11 @@
       "noValue": "Değeri yok",
       "contains": "Değer içerir",
       "notContains": "Değer içermez"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Herhangi biri",
+      "yes": "Evet",
+      "no": "Hayır"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "\"{name}\" kategorisi oluşturuldu",
       "categoryCreateFailed": "Kategori oluşturulamadı",
       "tagCreated": "\"{name}\" etiketi oluşturuldu",
-      "fxRateRequired": "Yabancı para birimi işlemini kaydetmeden önce bir döviz kuru veya dönüştürülen tutarı girin."
+      "fxRateRequired": "Yabancı para birimi işlemini kaydetmeden önce bir döviz kuru veya dönüştürülen tutarı girin.",
+      "attachmentsUploadFailed": "İşlem kaydedildi, ancak {count} ek yüklenemedi"
     },
     "ariaHistory": "Son işlemleri göster",
     "ariaHistoryForPayee": "Bu alacaklının son işlemlerini göster",

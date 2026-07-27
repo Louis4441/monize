@@ -165,6 +165,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -199,6 +200,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -217,6 +219,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         false,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -267,6 +270,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -298,6 +302,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         true,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -351,7 +356,23 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
+    });
+
+    it("passes hasAttachments through to the service", async () => {
+      mockService.findAll.mockResolvedValue({ data: [], total: 0 });
+
+      // hasAttachments is the last positional param; fill the intervening
+      // query args with undefined so we don't hand-count positions.
+      const args = [mockReq, ...Array(21).fill(undefined), true];
+      await (controller.findAll as (...a: unknown[]) => Promise<unknown>)(
+        ...args,
+      );
+
+      const calls = mockService.findAll.mock.calls as unknown[][];
+      const lastCall = calls[calls.length - 1];
+      expect(lastCall[lastCall.length - 1]).toBe(true);
     });
 
     // ── Validation tests ────────────────────────────────────────
@@ -531,6 +552,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         ["UNRECONCILED", "CLEARED"],
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -1270,6 +1292,7 @@ describe("TransactionsController", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -1530,10 +1553,7 @@ describe("TransactionsController", () => {
       const result = await controller.getFxFeeSummary(mockReq, uuid1);
 
       expect(result).toEqual(expected);
-      expect(mockService.getFxFeeSummary).toHaveBeenCalledWith(
-        "user-1",
-        uuid1,
-      );
+      expect(mockService.getFxFeeSummary).toHaveBeenCalledWith("user-1", uuid1);
     });
 
     it("returns empty for a delegate without READ access to the account", async () => {

@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "還款額重新計算僅適用於抵押貸款科目",
     "insufficientData": "具利息明細的還款不足，無法偵測利率變更",
     "frequencyMismatch": "還款日期與科目的還款頻率不符；推算的利率可能較不準確"
+  },
+  "attachments": {
+    "notFound": "找不到附件",
+    "transactionNotFound": "找不到交易",
+    "empty": "上傳的檔案為空",
+    "fileTooLarge": "檔案超過最大大小 {{ max }} 位元組",
+    "unsupportedType": "不支援的檔案類型。允許的類型：{{ types }}",
+    "tooMany": "此交易已達到最多 {{ max }} 個附件的上限",
+    "s3NotImplemented": "S3 附件儲存尚未實作"
   }
 }

@@ -27,6 +27,7 @@ import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
 import { AccountsModule } from "./accounts/accounts.module";
 import { TransactionsModule } from "./transactions/transactions.module";
+import { AttachmentsModule } from "./attachments/attachments.module";
 import { CategoriesModule } from "./categories/categories.module";
 import { CurrenciesModule } from "./currencies/currencies.module";
 import { SecuritiesModule } from "./securities/securities.module";
@@ -137,6 +138,7 @@ import { I18nModule } from "./i18n/i18n.module";
     UsersModule,
     AccountsModule,
     TransactionsModule,
+    AttachmentsModule,
     CategoriesModule,
     PayeesModule,
     InstitutionsModule,

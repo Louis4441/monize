@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "Taksit yeniden hesaplaması yalnızca ipotek hesapları için kullanılabilir",
     "insufficientData": "Faiz değişikliklerini algılamak için faiz ayrıntıları olan yeterli ödeme yok",
     "frequencyMismatch": "Ödeme tarihleri hesabın ödeme sıklığıyla eşleşmiyor; çıkarsanan oranlar daha az doğru olabilir"
+  },
+  "attachments": {
+    "notFound": "Ek bulunamadı",
+    "transactionNotFound": "İşlem bulunamadı",
+    "empty": "Yüklenen dosya boş",
+    "fileTooLarge": "Dosya, {{ max }} baytlık maksimum boyutu aşıyor",
+    "unsupportedType": "Desteklenmeyen dosya türü. İzin verilen türler: {{ types }}",
+    "tooMany": "Bu işlemde zaten en fazla {{ max }} ek var",
+    "s3NotImplemented": "S3 ek depolama henüz uygulanmadı"
   }
 }

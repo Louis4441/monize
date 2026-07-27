@@ -109,7 +109,8 @@
       "feePaid": "Biaya Dibayar",
       "balance": "Saldo",
       "status": "Status",
-      "actions": "Aksi"
+      "actions": "Aksi",
+      "attachments": "Lampiran"
     },
     "today": "Hari ini",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Edit",
       "deleteButton": "Hapus"
     },
-    "itemNamePlural": "transaksi"
+    "itemNamePlural": "transaksi",
+    "attachmentsCount": "{count, plural, other {# lampiran}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Kunci tag",
       "tagKeyOp": "Kondisi",
       "tagKeyValue": "Nilai",
-      "currency": "Mata uang"
+      "currency": "Mata uang",
+      "hasAttachments": "Lampiran"
     },
     "placeholders": {
       "accounts": "Semua akun",
@@ -248,7 +251,10 @@
       "dateUntil": "Hingga {date}",
       "amountFrom": "Dari {amount}",
       "amountUpTo": "Hingga {amount}",
-      "removeCurrency": "Hapus filter mata uang {name}"
+      "removeCurrency": "Hapus filter mata uang {name}",
+      "hasAttachments": "Ada lampiran",
+      "noAttachments": "Tanpa lampiran",
+      "removeAttachments": "Hapus filter lampiran"
     },
     "bulkUpdate": "Perbarui Massal",
     "cancelBulk": "Batalkan Massal",
@@ -279,6 +285,11 @@
       "noValue": "Tidak memiliki nilai",
       "contains": "Nilai mengandung",
       "notContains": "Nilai tidak mengandung"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Semua",
+      "yes": "Ya",
+      "no": "Tidak"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Kategori \"{name}\" dibuat",
       "categoryCreateFailed": "Gagal membuat kategori",
       "tagCreated": "Tag \"{name}\" dibuat",
-      "fxRateRequired": "Masukkan nilai tukar atau jumlah terkonversi sebelum menyimpan transaksi mata uang asing."
+      "fxRateRequired": "Masukkan nilai tukar atau jumlah terkonversi sebelum menyimpan transaksi mata uang asing.",
+      "attachmentsUploadFailed": "Transaksi disimpan, tetapi {count} lampiran gagal diunggah"
     },
     "ariaHistory": "Tampilkan transaksi terbaru",
     "ariaHistoryForPayee": "Tampilkan transaksi terbaru untuk penerima ini",

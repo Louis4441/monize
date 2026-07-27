@@ -246,6 +246,10 @@ function TransactionsContent() {
           tagKey: filters.filterTagKey || undefined,
           tagKeyOp: filters.filterTagKeyOp,
           tagKeyValue: filters.filterTagKeyValue || undefined,
+          hasAttachments:
+            filters.filterHasAttachments === ''
+              ? undefined
+              : filters.filterHasAttachments === 'yes',
         }),
         chartPromise,
       ]);
@@ -286,7 +290,7 @@ function TransactionsContent() {
       // with the freshly loaded chart/list data.
       setReloadKey((k) => k + 1);
     }
-  }, [accountIdsForQuery, filters.filterAccountStatus, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, t]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accountIdsForQuery, filters.filterAccountStatus, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadData = useCallback(async (page: number = filters.currentPage) => {
     await loadTransactions(page);
@@ -347,6 +351,7 @@ function TransactionsContent() {
         tagKey: filters.filterTagKey,
         tagKeyOp: filters.filterTagKeyOp,
         tagKeyValue: filters.filterTagKeyValue,
+        hasAttachments: filters.filterHasAttachments,
       }, wasFilterChange);
     }
 
@@ -358,7 +363,7 @@ function TransactionsContent() {
     } else {
       loadTransactions(page);
     }
-  }, [filters.currentPage, filters.filterAccountIds, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.updateUrl, loadTransactions, filters.filtersInitialized, undoRedoTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filters.currentPage, filters.filterAccountIds, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterTagKey, filters.filterTagKeyOp, filters.filterTagKeyValue, filters.filterHasAttachments, filters.updateUrl, loadTransactions, filters.filtersInitialized, undoRedoTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Once the deep-linked transaction is actually on the page, let the flash
   // linger briefly then clear it, so the highlight does not stick around on
@@ -775,6 +780,10 @@ function TransactionsContent() {
         amountTo: parsedAmountTo,
         statuses: filters.filterStatuses.length > 0 ? filters.filterStatuses : undefined,
         originalCurrencyCodes: filters.filterOriginalCurrencyCodes.length > 0 ? filters.filterOriginalCurrencyCodes : undefined,
+        hasAttachments:
+          filters.filterHasAttachments === ''
+            ? undefined
+            : filters.filterHasAttachments === 'yes',
       };
 
       // Fetch all pages of filtered transactions
@@ -842,7 +851,7 @@ function TransactionsContent() {
     } finally {
       setIsExporting(false);
     }
-  }, [accountIdsForQuery, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, t]);
+  }, [accountIdsForQuery, filters.filterCategoryIds, filters.filterPayeeIds, filters.filterTagIds, filters.filterStartDate, filters.filterEndDate, filters.filterSearch, filters.filterAmountFrom, filters.filterAmountTo, filters.filterStatuses, filters.filterOriginalCurrencyCodes, filters.filterHasAttachments, t]);
 
   return (
     <PageLayout>
@@ -1115,6 +1124,7 @@ function TransactionsContent() {
           filterTagKey={filters.filterTagKey}
           filterTagKeyOp={filters.filterTagKeyOp}
           filterTagKeyValue={filters.filterTagKeyValue}
+          filterHasAttachments={filters.filterHasAttachments}
           weekStartsOn={weekStartsOn}
           handleArrayFilterChange={filters.handleArrayFilterChange}
           handleFilterChange={filters.handleFilterChange}
@@ -1135,6 +1145,7 @@ function TransactionsContent() {
           setFilterTagKey={filters.setFilterTagKey}
           setFilterTagKeyOp={filters.setFilterTagKeyOp}
           setFilterTagKeyValue={filters.setFilterTagKeyValue}
+          setFilterHasAttachments={filters.setFilterHasAttachments}
           filtersExpanded={filters.filtersExpanded}
           setFiltersExpanded={filters.setFiltersExpanded}
           activeFilterCount={filters.activeFilterCount}

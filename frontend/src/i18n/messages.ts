@@ -12,6 +12,7 @@ import { deepMerge } from "./deep-merge";
  */
 const NAMESPACES = [
   "common",
+  "attachments",
   "settings",
   "auth",
   "navigation",

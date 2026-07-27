@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "Die Neuberechnung der Rate ist nur für Hypothekenkonten verfügbar",
     "insufficientData": "Nicht genügend Zahlungen mit Zinsdetails, um Zinssatzänderungen zu erkennen",
     "frequencyMismatch": "Die Zahlungsdaten stimmen nicht mit dem Zahlungsintervall des Kontos überein; abgeleitete Zinssätze sind möglicherweise weniger genau"
+  },
+  "attachments": {
+    "notFound": "Anhang nicht gefunden",
+    "transactionNotFound": "Transaktion nicht gefunden",
+    "empty": "Die hochgeladene Datei ist leer",
+    "fileTooLarge": "Die Datei überschreitet die maximale Größe von {{ max }} Bytes",
+    "unsupportedType": "Nicht unterstützter Dateityp. Erlaubte Typen: {{ types }}",
+    "tooMany": "Diese Transaktion hat bereits die maximale Anzahl von {{ max }} Anhängen",
+    "s3NotImplemented": "S3-Anhangspeicher ist noch nicht implementiert"
   }
 }

@@ -583,7 +583,7 @@ describe('useTransactionFilters - URL update', () => {
         amountTo: '5',
         statuses: [],
         originalCurrencyCodes: [],
-        tagKey: '', tagKeyOp: 'hasValue', tagKeyValue: '',
+        tagKey: '', tagKeyOp: 'hasValue', tagKeyValue: '', hasAttachments: '',
       });
     });
     expect(mockReplace).toHaveBeenCalled();
@@ -601,10 +601,36 @@ describe('useTransactionFilters - URL update', () => {
         startDate: '', endDate: '', search: '', amountFrom: '', amountTo: '',
         statuses: [],
         originalCurrencyCodes: [],
-        tagKey: '', tagKeyOp: 'hasValue', tagKeyValue: '',
+        tagKey: '', tagKeyOp: 'hasValue', tagKeyValue: '', hasAttachments: '',
       }, true);
     });
     expect(mockPush).toHaveBeenCalledWith('/transactions', { scroll: false });
+  });
+
+  it('serializes hasAttachments to the query string', () => {
+    const { result } = renderHook(() => useTransactionFilters(defaultOptions));
+    act(() => {
+      result.current.updateUrl(1, {
+        accountIds: [], categoryIds: [], payeeIds: [], tagIds: [],
+        startDate: '', endDate: '', search: '', amountFrom: '', amountTo: '',
+        statuses: [], originalCurrencyCodes: [],
+        tagKey: '', tagKeyOp: 'hasValue', tagKeyValue: '', hasAttachments: 'yes',
+      });
+    });
+    expect(mockReplace.mock.calls[0][0]).toContain('hasAttachments=yes');
+  });
+
+  it('initializes hasAttachments from the URL and counts it as active', () => {
+    mockSearchParams = new URLSearchParams('hasAttachments=no');
+    const { result } = renderHook(() => useTransactionFilters(defaultOptions));
+    expect(result.current.filterHasAttachments).toBe('no');
+    expect(result.current.activeFilterCount).toBe(1);
+  });
+
+  it('ignores an invalid hasAttachments URL value', () => {
+    mockSearchParams = new URLSearchParams('hasAttachments=maybe');
+    const { result } = renderHook(() => useTransactionFilters(defaultOptions));
+    expect(result.current.filterHasAttachments).toBe('');
   });
 });
 
@@ -831,7 +857,7 @@ describe('useTransactionFilters - filter persistence', () => {
         startDate: '', endDate: '', search: '', amountFrom: '', amountTo: '',
         statuses: result.current.filterStatuses,
         originalCurrencyCodes: result.current.filterOriginalCurrencyCodes,
-        tagKey: '', tagKeyOp: 'hasValue', tagKeyValue: '',
+        tagKey: '', tagKeyOp: 'hasValue', tagKeyValue: '', hasAttachments: '',
       });
     });
     expect(mockReplace).toHaveBeenCalled();

@@ -109,7 +109,8 @@
       "feePaid": "Phí đã trả",
       "balance": "Số tiền còn lại",
       "status": "Trạng thái",
-      "actions": "Hành động"
+      "actions": "Hành động",
+      "attachments": "Tệp đính kèm"
     },
     "today": "Hôm nay",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Chỉnh sửa",
       "deleteButton": "Xóa"
     },
-    "itemNamePlural": "giao tác"
+    "itemNamePlural": "giao tác",
+    "attachmentsCount": "{count, plural, other {# tệp đính kèm}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Khóa thẻ",
       "tagKeyOp": "Điều kiện",
       "tagKeyValue": "Giá trị",
-      "currency": "Tiền tệ"
+      "currency": "Tiền tệ",
+      "hasAttachments": "Tệp đính kèm"
     },
     "placeholders": {
       "accounts": "Tất cả tài khoản",
@@ -248,7 +251,10 @@
       "dateUntil": "Đến {date}",
       "amountFrom": "Từ {amount}",
       "amountUpTo": "Đến {amount}",
-      "removeCurrency": "Xóa bộ lọc tiền tệ {name}"
+      "removeCurrency": "Xóa bộ lọc tiền tệ {name}",
+      "hasAttachments": "Có tệp đính kèm",
+      "noAttachments": "Không có tệp đính kèm",
+      "removeAttachments": "Xóa bộ lọc tệp đính kèm"
     },
     "bulkUpdate": "Cập nhật hàng loạt",
     "cancelBulk": "Hủy hàng loạt",
@@ -279,6 +285,11 @@
       "noValue": "Không có giá trị",
       "contains": "Giá trị chứa",
       "notContains": "Giá trị không chứa"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Bất kỳ",
+      "yes": "Có",
+      "no": "Không"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Danh mục \"{name}\" đã được tạo",
       "categoryCreateFailed": "Không thể tạo danh mục",
       "tagCreated": "Thẻ \"{name}\" đã được tạo",
-      "fxRateRequired": "Nhập tỷ giá hoặc số tiền đã quy đổi trước khi lưu giao dịch bằng ngoại tệ."
+      "fxRateRequired": "Nhập tỷ giá hoặc số tiền đã quy đổi trước khi lưu giao dịch bằng ngoại tệ.",
+      "attachmentsUploadFailed": "Đã lưu giao tác, nhưng {count} tệp đính kèm tải lên không thành công"
     },
     "ariaHistory": "Hiển thị giao tác gần đây",
     "ariaHistoryForPayee": "Hiển thị giao tác gần đây cho người nhận này",

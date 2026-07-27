@@ -33,11 +33,17 @@ export type TableRules = Record<string, ColumnRule>;
 /**
  * Tables never written to a support backup regardless of section selection.
  * `ai_provider_configs` holds encrypted API keys and endpoint URLs with zero
- * diagnostic value for a finance bug, so it is dropped wholesale (its columns
- * are intentionally absent from RULES below; the golden test skips it).
+ * diagnostic value for a finance bug, so it is dropped wholesale. The two
+ * attachment tables carry user-uploaded receipts/documents: `attachment_blobs`
+ * is raw file bytes (a NOT NULL BYTEA with no useful de-identified form) and
+ * `transaction_attachments` is their metadata (filenames can embed PII), so
+ * both are omitted from the de-identified support backup. Their columns are
+ * intentionally absent from RULES below; the golden test skips them.
  */
 export const ALWAYS_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   "ai_provider_configs",
+  "transaction_attachments",
+  "attachment_blobs",
 ]);
 
 export const RULES: Record<string, TableRules> = {

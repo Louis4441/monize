@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "Przeliczenie raty jest dostępne tylko dla kont kredytów hipotecznych",
     "insufficientData": "Za mało płatności ze szczegółami odsetek, aby wykryć zmiany oprocentowania",
     "frequencyMismatch": "Daty płatności nie odpowiadają częstotliwości płatności konta; wywnioskowane oprocentowanie może być mniej dokładne"
+  },
+  "attachments": {
+    "notFound": "Nie znaleziono załącznika",
+    "transactionNotFound": "Nie znaleziono transakcji",
+    "empty": "Przesłany plik jest pusty",
+    "fileTooLarge": "Plik przekracza maksymalny rozmiar {{ max }} bajtów",
+    "unsupportedType": "Nieobsługiwany typ pliku. Dozwolone typy: {{ types }}",
+    "tooMany": "Ta transakcja ma już maksymalną liczbę {{ max }} załączników",
+    "s3NotImplemented": "Przechowywanie załączników w S3 nie jest jeszcze zaimplementowane"
   }
 }

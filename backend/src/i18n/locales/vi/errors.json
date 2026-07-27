@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "Tính lại khoản trả chỉ khả dụng cho tài khoản thế chấp",
     "insufficientData": "Không đủ khoản thanh toán có chi tiết lãi để phát hiện thay đổi lãi suất",
     "frequencyMismatch": "Ngày thanh toán không khớp với tần suất thanh toán của tài khoản; lãi suất suy ra có thể kém chính xác hơn"
+  },
+  "attachments": {
+    "notFound": "Không tìm thấy tệp đính kèm",
+    "transactionNotFound": "Không tìm thấy giao tác",
+    "empty": "Tệp đã tải lên trống",
+    "fileTooLarge": "Tệp vượt quá kích thước tối đa {{ max }} byte",
+    "unsupportedType": "Loại tệp không được hỗ trợ. Các loại được phép: {{ types }}",
+    "tooMany": "Giao tác này đã có tối đa {{ max }} tệp đính kèm",
+    "s3NotImplemented": "Lưu trữ tệp đính kèm S3 chưa được triển khai"
   }
 }

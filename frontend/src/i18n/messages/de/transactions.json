@@ -109,7 +109,8 @@
       "feePaid": "Gezahlte Gebühr",
       "balance": "Saldo",
       "status": "Status",
-      "actions": "Aktionen"
+      "actions": "Aktionen",
+      "attachments": "Anhänge"
     },
     "today": "Heute",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Bearbeiten",
       "deleteButton": "Löschen"
     },
-    "itemNamePlural": "Buchungen"
+    "itemNamePlural": "Buchungen",
+    "attachmentsCount": "{count, plural, one {# Anhang} other {# Anhänge}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Tag-Schlüssel",
       "tagKeyOp": "Bedingung",
       "tagKeyValue": "Wert",
-      "currency": "Währung"
+      "currency": "Währung",
+      "hasAttachments": "Anhänge"
     },
     "placeholders": {
       "accounts": "Alle Konten",
@@ -248,7 +251,10 @@
       "dateUntil": "Bis {date}",
       "amountFrom": "Ab {amount}",
       "amountUpTo": "Bis zu {amount}",
-      "removeCurrency": "Währungsfilter {name} entfernen"
+      "removeCurrency": "Währungsfilter {name} entfernen",
+      "hasAttachments": "Mit Anhängen",
+      "noAttachments": "Ohne Anhänge",
+      "removeAttachments": "Anhangsfilter entfernen"
     },
     "bulkUpdate": "Massenaktualisierung",
     "cancelBulk": "Massenauswahl abbrechen",
@@ -279,6 +285,11 @@
       "noValue": "Hat keinen Wert",
       "contains": "Wert enthält",
       "notContains": "Wert enthält nicht"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Beliebig",
+      "yes": "Ja",
+      "no": "Nein"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Kategorie „{name}” erstellt",
       "categoryCreateFailed": "Kategorie konnte nicht erstellt werden",
       "tagCreated": "Tag „{name}” erstellt",
-      "fxRateRequired": "Geben Sie einen Wechselkurs oder den umgerechneten Betrag ein, bevor Sie eine Fremdwährungstransaktion speichern."
+      "fxRateRequired": "Geben Sie einen Wechselkurs oder den umgerechneten Betrag ein, bevor Sie eine Fremdwährungstransaktion speichern.",
+      "attachmentsUploadFailed": "Transaktion gespeichert, aber {count} Anhang/Anhänge konnten nicht hochgeladen werden"
     },
     "ariaHistory": "Letzte Buchungen anzeigen",
     "ariaHistoryForPayee": "Letzte Buchungen für diesen Zahlungsempfänger anzeigen",

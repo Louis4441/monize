@@ -109,7 +109,8 @@
       "feePaid": "Сплачена комісія",
       "balance": "Баланс",
       "status": "Статус",
-      "actions": "Дії"
+      "actions": "Дії",
+      "attachments": "Вкладення"
     },
     "today": "Сьогодні",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Редагувати",
       "deleteButton": "Видалити"
     },
-    "itemNamePlural": "транзакцій"
+    "itemNamePlural": "транзакцій",
+    "attachmentsCount": "{count, plural, one {# вкладення} few {# вкладення} many {# вкладень} other {# вкладення}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Ключ тегу",
       "tagKeyOp": "Умова",
       "tagKeyValue": "Значення",
-      "currency": "Валюта"
+      "currency": "Валюта",
+      "hasAttachments": "Вкладення"
     },
     "placeholders": {
       "accounts": "Всі рахунки",
@@ -248,7 +251,10 @@
       "dateUntil": "До {date}",
       "amountFrom": "Від {amount}",
       "amountUpTo": "До {amount}",
-      "removeCurrency": "Видалити фільтр за валютою {name}"
+      "removeCurrency": "Видалити фільтр за валютою {name}",
+      "hasAttachments": "З вкладеннями",
+      "noAttachments": "Без вкладень",
+      "removeAttachments": "Прибрати фільтр вкладень"
     },
     "bulkUpdate": "Масове оновлення",
     "cancelBulk": "Скасувати масове",
@@ -279,6 +285,11 @@
       "noValue": "Не має значення",
       "contains": "Значення містить",
       "notContains": "Значення не містить"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Будь-які",
+      "yes": "Так",
+      "no": "Ні"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Категорію «{name}» створено",
       "categoryCreateFailed": "Не вдалося створити категорію",
       "tagCreated": "Тег «{name}» створено",
-      "fxRateRequired": "Введіть курс обміну або конвертовану суму перед збереженням операції в іноземній валюті."
+      "fxRateRequired": "Введіть курс обміну або конвертовану суму перед збереженням операції в іноземній валюті.",
+      "attachmentsUploadFailed": "Транзакцію збережено, але не вдалося завантажити вкладень: {count}"
     },
     "ariaHistory": "Показати нещодавні транзакції",
     "ariaHistoryForPayee": "Показати нещодавні транзакції для цього одержувача",

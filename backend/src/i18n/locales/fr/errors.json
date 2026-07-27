@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "Le recalcul du versement n'est disponible que pour les comptes de prêt hypothécaire",
     "insufficientData": "Pas assez de paiements avec des détails d'intérêts pour détecter les changements de taux",
     "frequencyMismatch": "Les dates de paiement ne correspondent pas à la fréquence de paiement du compte ; les taux déduits peuvent être moins précis"
+  },
+  "attachments": {
+    "notFound": "Pièce jointe introuvable",
+    "transactionNotFound": "Transaction introuvable",
+    "empty": "Le fichier téléversé est vide",
+    "fileTooLarge": "Le fichier dépasse la taille maximale de {{ max }} octets",
+    "unsupportedType": "Type de fichier non pris en charge. Types autorisés : {{ types }}",
+    "tooMany": "Cette transaction a déjà le maximum de {{ max }} pièces jointes",
+    "s3NotImplemented": "Le stockage des pièces jointes sur S3 n'est pas encore implémenté"
   }
 }

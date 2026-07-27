@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "Il ricalcolo della rata è disponibile solo per i conti mutuo",
     "insufficientData": "Pagamenti con dettagli sugli interessi insufficienti per rilevare le variazioni del tasso",
     "frequencyMismatch": "Le date di pagamento non corrispondono alla frequenza di pagamento del conto; i tassi dedotti potrebbero essere meno accurati"
+  },
+  "attachments": {
+    "notFound": "Allegato non trovato",
+    "transactionNotFound": "Transazione non trovata",
+    "empty": "Il file caricato è vuoto",
+    "fileTooLarge": "Il file supera la dimensione massima di {{ max }} byte",
+    "unsupportedType": "Tipo di file non supportato. Tipi consentiti: {{ types }}",
+    "tooMany": "Questa transazione ha già il numero massimo di {{ max }} allegati",
+    "s3NotImplemented": "L'archiviazione degli allegati su S3 non è ancora implementata"
   }
 }

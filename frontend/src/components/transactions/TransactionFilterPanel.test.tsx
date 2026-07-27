@@ -111,6 +111,8 @@ describe('TransactionFilterPanel', () => {
     setFilterTagKey: vi.fn(),
     setFilterTagKeyOp: vi.fn(),
     setFilterTagKeyValue: vi.fn(),
+    filterHasAttachments: '' as '' | 'yes' | 'no',
+    setFilterHasAttachments: vi.fn(),
     onClearFilters: vi.fn(),
   };
 
@@ -1777,6 +1779,51 @@ describe('TransactionFilterPanel', () => {
       expect(defaultProps.handleArrayFilterChange).toHaveBeenCalledWith(
         defaultProps.setFilterOriginalCurrencyCodes,
         ['GBP'],
+      );
+    });
+  });
+
+  describe('attachments filter', () => {
+    it('renders the attachments select with All/Has/None options', () => {
+      render(<TransactionFilterPanel {...defaultProps} filtersExpanded={true} />);
+
+      const select = screen.getByLabelText('Attachments') as HTMLSelectElement;
+      expect(select).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Any' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'Yes' })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: 'No' })).toBeInTheDocument();
+    });
+
+    it('sets the attachments filter when a value is chosen', () => {
+      render(<TransactionFilterPanel {...defaultProps} filtersExpanded={true} />);
+
+      fireEvent.change(screen.getByLabelText('Attachments'), {
+        target: { value: 'yes' },
+      });
+
+      expect(defaultProps.handleFilterChange).toHaveBeenCalledWith(
+        defaultProps.setFilterHasAttachments,
+        'yes',
+      );
+    });
+
+    it('shows a chip and clears the filter from the chip when collapsed', () => {
+      render(
+        <TransactionFilterPanel
+          {...defaultProps}
+          filtersExpanded={false}
+          activeFilterCount={1}
+          filterHasAttachments={'no'}
+        />,
+      );
+
+      const removeBtn = screen.getByLabelText('Remove attachments filter');
+      // The chip (not the still-rendered collapsed <option>) shows the label.
+      expect(removeBtn.closest('span')).toHaveTextContent('No attachments');
+      fireEvent.click(removeBtn);
+      expect(defaultProps.handleFilterChange).toHaveBeenCalledWith(
+        defaultProps.setFilterHasAttachments,
+        '',
       );
     });
   });

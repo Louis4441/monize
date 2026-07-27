@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "O recálculo da parcela só está disponível para contas de hipoteca",
     "insufficientData": "Não há pagamentos suficientes com detalhes de juros para detectar alterações de taxa",
     "frequencyMismatch": "As datas de pagamento não correspondem à frequência de pagamento da conta; as taxas inferidas podem ser menos precisas"
+  },
+  "attachments": {
+    "notFound": "Anexo não encontrado",
+    "transactionNotFound": "Transação não encontrada",
+    "empty": "O arquivo enviado está vazio",
+    "fileTooLarge": "O arquivo excede o tamanho máximo de {{ max }} bytes",
+    "unsupportedType": "Tipo de arquivo não suportado. Tipos permitidos: {{ types }}",
+    "tooMany": "Esta transação já tem o máximo de {{ max }} anexos",
+    "s3NotImplemented": "O armazenamento de anexos no S3 ainda não foi implementado"
   }
 }

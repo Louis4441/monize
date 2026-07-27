@@ -109,7 +109,8 @@
       "feePaid": "Comisión pagada",
       "balance": "Saldo",
       "status": "Estado",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "attachments": "Adjuntos"
     },
     "today": "Hoy",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Editar",
       "deleteButton": "Eliminar"
     },
-    "itemNamePlural": "transacciones"
+    "itemNamePlural": "transacciones",
+    "attachmentsCount": "{count, plural, one {# adjunto} other {# adjuntos}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Clave de etiqueta",
       "tagKeyOp": "Condición",
       "tagKeyValue": "Valor",
-      "currency": "Moneda"
+      "currency": "Moneda",
+      "hasAttachments": "Adjuntos"
     },
     "placeholders": {
       "accounts": "Todas las cuentas",
@@ -248,7 +251,10 @@
       "dateUntil": "Hasta {date}",
       "amountFrom": "Desde {amount}",
       "amountUpTo": "Hasta {amount}",
-      "removeCurrency": "Quitar el filtro de moneda {name}"
+      "removeCurrency": "Quitar el filtro de moneda {name}",
+      "hasAttachments": "Con adjuntos",
+      "noAttachments": "Sin adjuntos",
+      "removeAttachments": "Quitar filtro de adjuntos"
     },
     "bulkUpdate": "Actualización masiva",
     "cancelBulk": "Cancelar masiva",
@@ -279,6 +285,11 @@
       "noValue": "No tiene valor",
       "contains": "El valor contiene",
       "notContains": "El valor no contiene"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Cualquiera",
+      "yes": "Sí",
+      "no": "No"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Categoría \"{name}\" creada",
       "categoryCreateFailed": "Error al crear la categoría",
       "tagCreated": "Etiqueta \"{name}\" creada",
-      "fxRateRequired": "Introduce un tipo de cambio o el importe convertido antes de guardar una transacción en moneda extranjera."
+      "fxRateRequired": "Introduce un tipo de cambio o el importe convertido antes de guardar una transacción en moneda extranjera.",
+      "attachmentsUploadFailed": "Transacción guardada, pero no se pudieron subir {count} adjunto(s)"
     },
     "ariaHistory": "Mostrar transacciones recientes",
     "ariaHistoryForPayee": "Mostrar transacciones recientes de este beneficiario",

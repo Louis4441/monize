@@ -39,6 +39,20 @@ const REFS: Record<string, RefRule[]> = {
   payee_aliases: [
     { column: "payee_id", refTable: "payees", onMissing: "dropRow" },
   ],
+  // transaction_attachments.transaction_id is a real FK (the entity models the
+  // relation) between two fully-exported tables, so the coverage guard requires
+  // it here even though the de-identified support backup excludes the table. A
+  // row cannot outlive its parent transaction, hence dropRow. (attachment_blobs
+  // .attachment_id is a plain PrimaryColumn, not a modeled relation, so it is
+  // not a real FK in the entity-synced test DB -- adding a REFS entry for it
+  // would trip the staleRefs guard.)
+  transaction_attachments: [
+    {
+      column: "transaction_id",
+      refTable: "transactions",
+      onMissing: "dropRow",
+    },
+  ],
   accounts: [
     { column: "linked_account_id", refTable: "accounts", onMissing: "null" },
     {

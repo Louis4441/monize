@@ -49,6 +49,8 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
+import { AttachmentsSection } from './AttachmentsSection';
+import { attachmentsApi } from '@/lib/attachments';
 import { optionalUuid, optionalString } from '@/lib/zod-helpers';
 import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
 import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
@@ -135,6 +137,9 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
   const timeFormat = usePreferencesStore((s) => s.preferences?.timeFormat ?? '24h');
   const timezonePref = usePreferencesStore((s) => s.preferences?.timezone);
   const [isLoading, setIsLoading] = useState(false);
+  // Files chosen in the New Transaction window before the transaction exists;
+  // uploaded once it has been created. Empty (and unused) when editing.
+  const [stagedAttachments, setStagedAttachments] = useState<File[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [payees, setPayees] = useState<Payee[]>([]); // Full list of active payees
@@ -947,6 +952,25 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
   const [reconciledConfirmData, setReconciledConfirmData] =
     useState<TransactionFormData | null>(null);
 
+  // Upload any files staged in the New Transaction window to the freshly
+  // created transaction. The transaction already exists at this point, so a
+  // failed upload is reported but never rolls back the save.
+  const uploadStagedAttachments = async (newTransactionId: string) => {
+    if (stagedAttachments.length === 0) return;
+    let failed = 0;
+    for (const file of stagedAttachments) {
+      try {
+        await attachmentsApi.upload(newTransactionId, file);
+      } catch (error) {
+        failed += 1;
+        logger.error('Failed to upload staged attachment:', error);
+      }
+    }
+    if (failed > 0) {
+      toast.error(t('form.toasts.attachmentsUploadFailed', { count: failed }));
+    }
+  };
+
   const performSubmit = async (data: TransactionFormData) => {
     setIsLoading(true);
     try {
@@ -1002,9 +1026,11 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
           await transactionsApi.updateTransfer(transaction.id, transferData);
           toast.success(t('form.toasts.transferUpdated'));
         } else {
-          await transactionsApi.createTransfer(transferData);
+          const transfer = await transactionsApi.createTransfer(transferData);
           toast.success(t('form.toasts.transferCreated'));
           rememberTransactionDate(LAST_TRANSACTION_DATE_KEY, data.transactionDate);
+          // Attach staged files to the "from" leg (the account being edited).
+          await uploadStagedAttachments(transfer.fromTransaction.id);
         }
         onSuccess?.();
         return;
@@ -1085,12 +1111,13 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         await transactionsApi.update(transaction.id, updatePayload);
         toast.success(t('form.toasts.transactionUpdated'));
       } else {
-        await transactionsApi.create(payload);
+        const created = await transactionsApi.create(payload);
         toast.success(t('form.toasts.transactionCreated'));
         rememberTransactionDate(LAST_TRANSACTION_DATE_KEY, data.transactionDate);
         // Remember the entry currency so the next new transaction pre-selects it
         // ('' when the account currency was used, which clears the stickiness).
         rememberTransactionCurrency(isForeign ? entryCurrency : '');
+        await uploadStagedAttachments(created.id);
       }
       onSuccess?.();
     } catch (error) {
@@ -1456,6 +1483,18 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         ]}
         {...register('status')}
       />
+
+      {/* Attachments. When editing, they are managed directly against the
+          saved transaction; when creating, files are staged client-side and
+          uploaded once the transaction has been created. */}
+      {transaction ? (
+        <AttachmentsSection transactionId={transaction.id} />
+      ) : (
+        <AttachmentsSection
+          stagedFiles={stagedAttachments}
+          onStagedFilesChange={setStagedAttachments}
+        />
+      )}
 
       {/* Actions. anchorProps, not a wrapper, so a guided tour rings the
           Cancel/Save pair rather than the full-width row around it. */}
