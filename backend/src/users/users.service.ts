@@ -425,7 +425,15 @@ export class UsersService {
       return { downgraded: true };
     }
 
-    // Delete preferences first (due to FK constraint), then the user.
+    // Clear the rows that point at the user before removing it. Databases
+    // predating migration 108 can carry TypeORM-generated foreign keys with no
+    // ON DELETE CASCADE, which abort the delete outright; the sessions, tokens
+    // and preferences are worthless once the account is gone either way.
+    // Delegate sessions acting *as* this user go too -- the owner they point
+    // at is about to disappear.
+    await this.refreshTokensRepository.delete({ userId });
+    await this.refreshTokensRepository.delete({ actingAsUserId: userId });
+    await this.patRepository.delete({ userId });
     await this.preferencesRepository.delete({ userId });
     await this.usersRepository.remove(user);
     return { downgraded: false };
