@@ -25,7 +25,8 @@
     "accounts": "Comptes",
     "budgets": "Budgets",
     "reports": "Rapports",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "tools": "Outils"
   },
   "gettingStarted": {
     "takeTour": "Faire la visite",
@@ -107,6 +108,37 @@
         "finish": {
           "title": "Vous êtes prêt",
           "body": "Voilà, la visite est terminée. Vous pouvez la refaire à tout moment depuis la section **Visites guidées** dans les **Paramètres**."
+        }
+      }
+    }
+  },
+  "import": {
+    "bringingDataIn": {
+      "title": "Importer vos données",
+      "steps": {
+        "welcome": {
+          "title": "Importer vos données",
+          "body": "Vous arrivez de Microsoft Money, de Quicken ou d'un export bancaire ? Cette visite montre où se trouve l'import et ce qu'il faut préparer : les choix difficiles à défaire se font tous avant l'ouverture de l'assistant."
+        },
+        "whereItLives": {
+          "title": "L'import est dans Outils",
+          "body": "**Importer des transactions** se trouve ici, dans le menu **Outils**. Vous pouvez aussi partir de la page d'un compte : ce compte est alors présélectionné."
+        },
+        "files": {
+          "title": "Ce qu'il faut apporter",
+          "body": "Exportez **un fichier par compte**, et les comptes de placement **deux fois** — une fois en Investment pour les opérations sur titres, une fois en Regular pour la partie espèces. Dans Microsoft Money, choisissez toujours **Loose QIF** : le Strict QIF perd les détails des ventilations et les références de virement. QIF, OFX, QFX et CSV sont acceptés, et vous pouvez déposer plusieurs fichiers à la fois."
+        },
+        "order": {
+          "title": "L'ordre compte",
+          "body": "Les fichiers sont traités dans l'ordre affiché, et chacun peut réutiliser les catégories, bénéficiaires et comptes créés par les précédents. D'abord les actifs, puis les comptes dans votre devise, puis ceux en devise étrangère, puis les comptes espèces des portefeuilles, et les fichiers de titres en dernier — ainsi chaque virement trouve son autre extrémité déjà en place."
+        },
+        "wizard": {
+          "title": "Ce que l'assistant demande",
+          "body": "Les étapes n'apparaissent que si votre fichier les réclame : le compte de destination, puis la correspondance des catégories, des titres et des comptes de virement. L'ambre attend votre décision, le vert a déjà été rapproché, et passer est acceptable — vous catégoriserez plus tard. Tout l'import s'exécute dans une seule transaction de base de données : en cas d'échec, rien ne subsiste."
+        },
+        "afterwards": {
+          "title": "Après l'import",
+          "body": "Comparez chaque solde avec votre ancien logiciel et cherchez dans les transactions la note **PENDING IMPORT** — les virements multidevises arrivent sans taux, car le QIF n'en transporte pas. Le guide complet, avec captures d'écran et dépannage, est dans le wiki sous [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

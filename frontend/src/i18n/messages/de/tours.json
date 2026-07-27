@@ -25,7 +25,8 @@
     "accounts": "Konten",
     "budgets": "Budgets",
     "reports": "Berichte",
-    "settings": "Einstellungen"
+    "settings": "Einstellungen",
+    "tools": "Werkzeuge"
   },
   "gettingStarted": {
     "takeTour": "Tour starten",
@@ -107,6 +108,37 @@
         "finish": {
           "title": "Sie sind startklar",
           "body": "Das war die Tour. Sie können sie jederzeit über den Bereich **Geführte Touren** in den **Einstellungen** erneut starten."
+        }
+      }
+    }
+  },
+  "import": {
+    "bringingDataIn": {
+      "title": "Ihre Daten übernehmen",
+      "steps": {
+        "welcome": {
+          "title": "Ihre Daten übernehmen",
+          "body": "Wechseln Sie von Microsoft Money, Quicken oder einem Bankexport? Diese Tour zeigt, wo der Import liegt und was Sie bereithalten sollten — die schwer rückgängig zu machenden Entscheidungen fallen alle, bevor der Assistent öffnet."
+        },
+        "whereItLives": {
+          "title": "Der Import liegt unter Werkzeuge",
+          "body": "**Buchungen importieren** finden Sie hier im Menü **Werkzeuge**. Sie können auch von der Seite eines Kontos aus starten — dann ist dieses Konto schon vorausgewählt."
+        },
+        "files": {
+          "title": "Was Sie mitbringen",
+          "body": "Exportieren Sie **eine Datei pro Konto**, Anlagekonten **zweimal** — einmal als Investment für die Wertpapiergeschäfte, einmal als Regular für die Bargeldseite. Wählen Sie in Microsoft Money immer **Loose QIF**: Strict QIF verliert Splitdetails und Umbuchungsverweise. QIF, OFX, QFX und CSV sind möglich, und Sie können mehrere Dateien zugleich ablegen."
+        },
+        "order": {
+          "title": "Die Reihenfolge zählt",
+          "body": "Dateien werden in der aufgeführten Reihenfolge verarbeitet, und jede kann die Kategorien, Zahlungsempfänger und Konten der vorherigen nutzen. Zuerst Sachwerte, dann Konten in Ihrer Währung, dann Fremdwährungskonten, dann die Bargeldkonten der Depots und zuletzt die Depotdateien — so findet jede Umbuchung ihre Gegenseite schon vor."
+        },
+        "wizard": {
+          "title": "Was der Assistent fragt",
+          "body": "Schritte erscheinen nur, wenn die Datei sie braucht: in welches Konto importiert wird, dann die Zuordnung von Kategorien, Wertpapieren und Umbuchungskonten. Gelb wartet auf Sie, Grün wurde bereits zugeordnet, und Überspringen ist in Ordnung — kategorisieren können Sie später. Der Import läuft in einer einzigen Datenbanktransaktion, ein Fehler hinterlässt also nichts."
+        },
+        "afterwards": {
+          "title": "Nach dem Import",
+          "body": "Vergleichen Sie jeden Saldo mit Ihrer alten Software und suchen Sie in den Buchungen nach dem Vermerk **PENDING IMPORT** — währungsübergreifende Umbuchungen kommen ohne Kurs an, weil QIF keinen mitliefert. Die vollständige Anleitung mit Screenshots und Fehlerbehebung steht im Wiki unter [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

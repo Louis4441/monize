@@ -15,6 +15,7 @@ import { CompleteStep } from '@/components/import/CompleteStep';
 import { MultiAccountReviewStep } from '@/components/import/MultiAccountReviewStep';
 import { useImportWizard } from '@/hooks/useImportWizard';
 import { formatCategoryPath } from './import-utils';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 
 export default function ImportPage() {
   return (
@@ -209,7 +210,7 @@ function ImportContent() {
           helpUrl="https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money"
         />
         {/* Progress indicator */}
-        <div className="mb-8">
+        <div {...tourAnchor(TOUR_ANCHORS.importStepper)} className="mb-8">
           <div className="flex items-center justify-center space-x-4">
             {(() => {
               const stepOrder = ['upload', 'csvColumnMapping', 'selectAccount', 'mapCategories', 'mapSecurities', 'mapAccounts', 'review', 'multiAccountReview', 'complete'];

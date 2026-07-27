@@ -11,24 +11,64 @@ import {
 } from '@/lib/tours/positioning';
 import type { TourPlacement } from '@/lib/tours/types';
 
+/** `[label](https://…)` -- the only link form tour copy needs. */
+const LINK = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+
 /**
- * Render a tour string, emphasizing **bold** segments. Deliberately tiny -- the
- * only markup tour copy needs -- so bodies stay plain strings (no next-intl
- * rich text, and the `**` markers survive pseudo-locale generation untouched).
+ * Render a tour string: **bold** segments, and `[label](url)` links out to the
+ * wiki. Deliberately tiny -- the only markup tour copy needs -- so bodies stay
+ * plain strings (no next-intl rich text, and the markers survive pseudo-locale
+ * generation untouched).
+ *
+ * Links are restricted to http(s) by the pattern itself, so a translated string
+ * can never smuggle in a `javascript:` target, and they open in a new tab: a
+ * tour that navigated away would be dismissed by its own copy.
  */
-function renderEmphasis(text: string): ReactNode {
-  return text.split(/\*\*(.+?)\*\*/g).map((part, i) =>
-    i % 2 === 1 ? (
-      <strong
-        key={i}
-        className="font-semibold text-gray-900 dark:text-gray-100"
+function renderTourText(text: string): ReactNode {
+  const segments: ReactNode[] = [];
+  let cursor = 0;
+  let key = 0;
+
+  const pushEmphasised = (chunk: string) => {
+    if (!chunk) return;
+    chunk.split(/\*\*(.+?)\*\*/g).forEach((part, i) => {
+      if (!part) return;
+      segments.push(
+        i % 2 === 1 ? (
+          <strong
+            key={`s${key++}`}
+            className="font-semibold text-gray-900 dark:text-gray-100"
+          >
+            {part}
+          </strong>
+        ) : (
+          <Fragment key={`s${key++}`}>{part}</Fragment>
+        ),
+      );
+    });
+  };
+
+  LINK.lastIndex = 0;
+  let match = LINK.exec(text);
+  while (match) {
+    pushEmphasised(text.slice(cursor, match.index));
+    segments.push(
+      <a
+        key={`s${key++}`}
+        href={match[2]}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium text-blue-600 underline underline-offset-2 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
       >
-        {part}
-      </strong>
-    ) : (
-      <Fragment key={i}>{part}</Fragment>
-    ),
-  );
+        {match[1]}
+      </a>,
+    );
+    cursor = match.index + match[0].length;
+    match = LINK.exec(text);
+  }
+  pushEmphasised(text.slice(cursor));
+
+  return segments;
 }
 
 export interface TourTooltipLabels {
@@ -232,7 +272,7 @@ export function TourTooltip({
         {title}
       </h2>
       <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-        {renderEmphasis(body)}
+        {renderTourText(body)}
       </p>
       {interactive && (
         <p className="mt-2 text-xs font-medium text-gray-500 dark:text-gray-400">

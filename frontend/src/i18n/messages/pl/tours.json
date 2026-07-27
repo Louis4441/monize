@@ -25,7 +25,8 @@
     "accounts": "Konta",
     "budgets": "Budżety",
     "reports": "Raporty",
-    "settings": "Ustawienia"
+    "settings": "Ustawienia",
+    "tools": "Narzędzia"
   },
   "gettingStarted": {
     "takeTour": "Zobacz przewodnik",
@@ -107,6 +108,37 @@
         "finish": {
           "title": "Wszystko gotowe",
           "body": "To już koniec przewodnika. Możesz go powtórzyć w dowolnym momencie w sekcji **Przewodniki po aplikacji** w **Ustawieniach**."
+        }
+      }
+    }
+  },
+  "import": {
+    "bringingDataIn": {
+      "title": "Przeniesienie danych do Monize",
+      "steps": {
+        "welcome": {
+          "title": "Przeniesienie danych do Monize",
+          "body": "Przechodzisz z Microsoft Money, Quickena albo z eksportu z banku? Ten przewodnik pokazuje, gdzie jest import i co przygotować, bo decyzje, które trudno cofnąć, podejmuje się przed otwarciem kreatora."
+        },
+        "whereItLives": {
+          "title": "Import znajdziesz w Narzędziach",
+          "body": "**Import transakcji** jest tutaj, w menu **Narzędzia**. Możesz też zacząć ze strony konkretnego konta — wtedy to konto jest od razu wybrane."
+        },
+        "files": {
+          "title": "Z czym przyjść",
+          "body": "Wyeksportuj **jeden plik na konto**, a konta inwestycyjne **dwa razy** — raz jako Investment (transakcje na papierach), raz jako Regular (strona gotówkowa). W Microsoft Money wybieraj zawsze **Loose QIF**: Strict QIF gubi szczegóły podziałów i odwołania do transferów. Obsługiwane są QIF, OFX, QFX i CSV, a plików możesz wrzucić wiele naraz."
+        },
+        "order": {
+          "title": "Kolejność ma znaczenie",
+          "body": "Pliki są przetwarzane w podanej kolejności, a każdy kolejny może użyć kategorii, odbiorców i kont utworzonych przez poprzednie. Najpierw aktywa, potem konta w Twojej walucie, potem walutowe, potem gotówka na kontach inwestycyjnych, a pliki maklerskie na końcu — wtedy każdy transfer znajdzie już swoją drugą stronę."
+        },
+        "wizard": {
+          "title": "O co zapyta kreator",
+          "body": "Kroki pojawiają się tylko wtedy, gdy plik ich wymaga: na które konto importować, a następnie mapowanie kategorii, papierów wartościowych i kont transferowych. Pomarańczowy czeka na Ciebie, zielony został dopasowany automatycznie, a pominięcie jest w porządku — kategorie możesz przypisać później. Cały import działa w jednej transakcji bazy danych, więc błąd nie zostawia po sobie połowy danych."
+        },
+        "afterwards": {
+          "title": "Po imporcie",
+          "body": "Porównaj salda z poprzednim programem i poszukaj w transakcjach opisu **PENDING IMPORT** — transfery międzywalutowe trafiają bez kursu, bo QIF go nie przenosi. Pełny przewodnik ze zrzutami ekranu i rozwiązywaniem problemów jest na wiki, w [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

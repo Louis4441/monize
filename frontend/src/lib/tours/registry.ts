@@ -1,12 +1,20 @@
 import type { TourDefinition } from './types';
 import { INTRO_TOUR } from './definitions/intro';
+import { IMPORT_TOUR } from './definitions/import';
 import { RELEASE_1_13_TOURS } from './definitions/release-1.13.0';
 
 export { INTRO_TOUR } from './definitions/intro';
+export { IMPORT_TOUR } from './definitions/import';
 
-/** Every tour known to the app: the evergreen intro plus all release tours. */
+/**
+ * Every tour known to the app: the evergreen ones (introduction, bringing data
+ * in) plus all release tours. Evergreen tours are offered from Settings and,
+ * for the introduction, from the Getting Started card; release tours are also
+ * offered by the What's New digest for their minor line.
+ */
 export const ALL_TOURS: readonly TourDefinition[] = [
   INTRO_TOUR,
+  IMPORT_TOUR,
   ...RELEASE_1_13_TOURS,
 ];
 

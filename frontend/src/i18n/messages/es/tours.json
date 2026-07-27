@@ -25,7 +25,8 @@
     "accounts": "Cuentas",
     "budgets": "Presupuestos",
     "reports": "Informes",
-    "settings": "Ajustes"
+    "settings": "Ajustes",
+    "tools": "Herramientas"
   },
   "gettingStarted": {
     "takeTour": "Hacer el recorrido",
@@ -107,6 +108,37 @@
         "finish": {
           "title": "Todo listo",
           "body": "Eso es todo el recorrido. Puedes repetirlo cuando quieras desde la sección **Recorridos guiados** en **Ajustes**."
+        }
+      }
+    }
+  },
+  "import": {
+    "bringingDataIn": {
+      "title": "Traer tus datos",
+      "steps": {
+        "welcome": {
+          "title": "Traer tus datos",
+          "body": "¿Vienes de Microsoft Money, Quicken o de un export del banco? Este recorrido muestra dónde está la importación y qué conviene tener listo: las decisiones difíciles de deshacer se toman antes de abrir el asistente."
+        },
+        "whereItLives": {
+          "title": "La importación está en Herramientas",
+          "body": "**Importar transacciones** está aquí, en el menú **Herramientas**. También puedes empezar desde la página de una cuenta: esa cuenta queda preseleccionada."
+        },
+        "files": {
+          "title": "Con qué venir",
+          "body": "Exporta **un archivo por cuenta**, y las cuentas de inversión **dos veces** — una como Investment para las operaciones y otra como Regular para el efectivo. En Microsoft Money elige siempre **Loose QIF**: el Strict QIF pierde el detalle de los desglosos y las referencias de transferencia. Se aceptan QIF, OFX, QFX y CSV, y puedes soltar varios archivos a la vez."
+        },
+        "order": {
+          "title": "El orden importa",
+          "body": "Los archivos se procesan en el orden de la lista, y cada uno puede usar las categorías, beneficiarios y cuentas creados por los anteriores. Primero los activos, luego las cuentas en tu moneda, después las de moneda extranjera, luego el efectivo de las cuentas de inversión y al final los archivos de valores — así cada transferencia encuentra su otro extremo ya creado."
+        },
+        "wizard": {
+          "title": "Qué te preguntará el asistente",
+          "body": "Los pasos aparecen solo si tu archivo los necesita: a qué cuenta importar y luego la correspondencia de categorías, valores y cuentas de transferencia. El ámbar te espera, el verde ya se emparejó y omitir está bien — puedes categorizar después. Toda la importación corre en una única transacción de base de datos, así que un error no deja nada a medias."
+        },
+        "afterwards": {
+          "title": "Después de importar",
+          "body": "Compara cada saldo con tu programa anterior y busca en las transacciones la nota **PENDING IMPORT** — las transferencias entre monedas llegan sin tipo de cambio, porque el QIF no lo trae. La guía completa, con capturas y solución de problemas, está en la wiki en [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }
