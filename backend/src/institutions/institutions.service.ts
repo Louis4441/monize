@@ -4,8 +4,7 @@ import {
   ConflictException,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
 import { tr } from "../i18n/translate";
 import { Institution } from "./entities/institution.entity";
 import {
@@ -20,6 +19,7 @@ import {
   FetchedLogo,
 } from "./institution-logo.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { tenantTx } from "../common/db/tenant-tx";
 
 /**
  * Client-facing institution shape. The cached favicon bytes
@@ -44,10 +44,6 @@ export class InstitutionsService {
   private readonly logger = new Logger(InstitutionsService.name);
 
   constructor(
-    @InjectRepository(Institution)
-    private institutionsRepository: Repository<Institution>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
     private dataSource: DataSource,
     private logoService: InstitutionLogoService,
     private actionHistoryService: ActionHistoryService,
@@ -103,8 +99,9 @@ export class InstitutionsService {
    * sub-account of its brokerage partner, so it is excluded from the count and
    * the pair is represented by the brokerage (main) account alone.
    */
-  private logicalAccountsQuery(userId: string) {
-    return this.accountsRepository
+  private logicalAccountsQuery(m: EntityManager, userId: string) {
+    return m
+      .getRepository(Account)
       .createQueryBuilder("account")
       .where("account.user_id = :userId", { userId })
       .andWhere(
@@ -117,18 +114,22 @@ export class InstitutionsService {
     userId: string,
     institutionId: string,
   ): Promise<number> {
-    return this.logicalAccountsQuery(userId)
-      .andWhere("account.institution_id = :institutionId", { institutionId })
-      .getCount();
+    return tenantTx(this.dataSource, (m) =>
+      this.logicalAccountsQuery(m, userId)
+        .andWhere("account.institution_id = :institutionId", { institutionId })
+        .getCount(),
+    );
   }
 
   async create(
     userId: string,
     dto: CreateInstitutionDto,
   ): Promise<InstitutionView> {
-    const existing = await this.institutionsRepository.findOne({
-      where: { userId, name: dto.name },
-    });
+    const existing = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Institution).findOne({
+        where: { userId, name: dto.name },
+      }),
+    );
     if (existing) {
       throw new ConflictException(
         tr(
@@ -140,18 +141,23 @@ export class InstitutionsService {
     }
 
     const website = this.normalizeWebsite(dto.website);
-    const institution = this.institutionsRepository.create({
-      userId,
-      name: dto.name,
-      website,
-      country: dto.country ? dto.country.toUpperCase() : null,
-    });
 
-    // Best-effort: never fail creation because the favicon could not be fetched.
+    // Best-effort: never fail creation because the favicon could not be
+    // fetched. The HTTP fetch stays outside any transaction so a slow remote
+    // host cannot hold a database connection open.
     const logo = await this.logoService.fetchFavicon(website);
-    this.applyLogo(institution, logo);
 
-    const saved = await this.institutionsRepository.save(institution);
+    const saved = await tenantTx(this.dataSource, (m) => {
+      const repo = m.getRepository(Institution);
+      const institution = repo.create({
+        userId,
+        name: dto.name,
+        website,
+        country: dto.country ? dto.country.toUpperCase() : null,
+      });
+      this.applyLogo(institution, logo);
+      return repo.save(institution);
+    });
 
     this.actionHistoryService.record(userId, {
       entityType: "institution",
@@ -172,30 +178,32 @@ export class InstitutionsService {
   }
 
   async findAll(userId: string): Promise<InstitutionView[]> {
-    const institutions = await this.institutionsRepository.find({
-      where: { userId },
-      order: { name: "ASC" },
+    return tenantTx(this.dataSource, async (m) => {
+      const institutions = await m.getRepository(Institution).find({
+        where: { userId },
+        order: { name: "ASC" },
+      });
+
+      if (institutions.length === 0) {
+        return [];
+      }
+
+      const counts = await this.logicalAccountsQuery(m, userId)
+        .select("account.institution_id", "institution_id")
+        .addSelect("COUNT(*)", "count")
+        .andWhere("account.institution_id IS NOT NULL")
+        .groupBy("account.institution_id")
+        .getRawMany<{ institution_id: string; count: string }>();
+
+      const countMap = new Map<string, number>();
+      for (const row of counts) {
+        countMap.set(row.institution_id, parseInt(row.count, 10) || 0);
+      }
+
+      return institutions.map((institution) =>
+        this.toView(institution, countMap.get(institution.id) ?? 0),
+      );
     });
-
-    if (institutions.length === 0) {
-      return [];
-    }
-
-    const counts = await this.logicalAccountsQuery(userId)
-      .select("account.institution_id", "institution_id")
-      .addSelect("COUNT(*)", "count")
-      .andWhere("account.institution_id IS NOT NULL")
-      .groupBy("account.institution_id")
-      .getRawMany<{ institution_id: string; count: string }>();
-
-    const countMap = new Map<string, number>();
-    for (const row of counts) {
-      countMap.set(row.institution_id, parseInt(row.count, 10) || 0);
-    }
-
-    return institutions.map((institution) =>
-      this.toView(institution, countMap.get(institution.id) ?? 0),
-    );
   }
 
   /**
@@ -206,9 +214,11 @@ export class InstitutionsService {
     userId: string,
     id: string,
   ): Promise<Institution> {
-    const institution = await this.institutionsRepository.findOne({
-      where: { id, userId },
-    });
+    const institution = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Institution).findOne({
+        where: { id, userId },
+      }),
+    );
     if (!institution) {
       throw new NotFoundException(
         tr(
@@ -235,9 +245,11 @@ export class InstitutionsService {
     const institution = await this.getOwnedEntity(userId, id);
 
     if (dto.name !== undefined && dto.name !== institution.name) {
-      const existing = await this.institutionsRepository.findOne({
-        where: { userId, name: dto.name },
-      });
+      const existing = await tenantTx(this.dataSource, (m) =>
+        m.getRepository(Institution).findOne({
+          where: { userId, name: dto.name },
+        }),
+      );
       if (existing && existing.id !== id) {
         throw new ConflictException(
           tr(
@@ -254,7 +266,8 @@ export class InstitutionsService {
       institution.country = dto.country ? dto.country.toUpperCase() : null;
     }
 
-    // Re-resolve the favicon whenever the website changes.
+    // Re-resolve the favicon whenever the website changes. The HTTP fetch
+    // happens before the save transaction so it never holds a connection.
     if (dto.website !== undefined) {
       const website = this.normalizeWebsite(dto.website);
       if (website !== institution.website) {
@@ -264,7 +277,9 @@ export class InstitutionsService {
       }
     }
 
-    const saved = await this.institutionsRepository.save(institution);
+    const saved = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Institution).save(institution),
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "institution",
@@ -287,7 +302,9 @@ export class InstitutionsService {
 
   async remove(userId: string, id: string): Promise<void> {
     const institution = await this.getOwnedEntity(userId, id);
-    await this.institutionsRepository.remove(institution);
+    await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Institution).remove(institution),
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "institution",
@@ -312,7 +329,9 @@ export class InstitutionsService {
     const institution = await this.getOwnedEntity(userId, id);
     const logo = await this.logoService.fetchFavicon(institution.website);
     this.applyLogo(institution, logo);
-    const saved = await this.institutionsRepository.save(institution);
+    const saved = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Institution).save(institution),
+    );
     const accountCount = await this.countAccounts(userId, id);
     return this.toView(saved, accountCount);
   }
@@ -322,12 +341,15 @@ export class InstitutionsService {
    * institution is missing or has no cached logo.
    */
   async getLogo(userId: string, id: string): Promise<FetchedLogo> {
-    const institution = await this.institutionsRepository
-      .createQueryBuilder("institution")
-      .addSelect(["institution.logoData", "institution.logoContentType"])
-      .where("institution.id = :id", { id })
-      .andWhere("institution.user_id = :userId", { userId })
-      .getOne();
+    const institution = await tenantTx(this.dataSource, (m) =>
+      m
+        .getRepository(Institution)
+        .createQueryBuilder("institution")
+        .addSelect(["institution.logoData", "institution.logoContentType"])
+        .where("institution.id = :id", { id })
+        .andWhere("institution.user_id = :userId", { userId })
+        .getOne(),
+    );
 
     if (!institution) {
       throw new NotFoundException(
@@ -359,10 +381,12 @@ export class InstitutionsService {
    */
   async getAccounts(userId: string, id: string): Promise<Account[]> {
     await this.getOwnedEntity(userId, id);
-    return this.accountsRepository.find({
-      where: { userId, institutionId: id },
-      order: { name: "ASC" },
-    });
+    return tenantTx(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { userId, institutionId: id },
+        order: { name: "ASC" },
+      }),
+    );
   }
 
   /**
@@ -379,11 +403,8 @@ export class InstitutionsService {
     institutionId: string | null,
     expectedInstitutionId?: string,
   ): Promise<Account> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const account = await queryRunner.manager.findOne(Account, {
+    return tenantTx(this.dataSource, async (m) => {
+      const account = await m.findOne(Account, {
         where: { id: accountId, userId },
       });
       if (!account) {
@@ -401,35 +422,28 @@ export class InstitutionsService {
         expectedInstitutionId !== undefined &&
         account.institutionId !== expectedInstitutionId
       ) {
-        await queryRunner.commitTransaction();
         return account;
       }
 
       account.institutionId = institutionId;
-      await queryRunner.manager.save(account);
+      await m.save(account);
 
       // Mirror the change onto the linked investment partner.
       if (
         account.linkedAccountId &&
         account.accountType === AccountType.INVESTMENT
       ) {
-        const partner = await queryRunner.manager.findOne(Account, {
+        const partner = await m.findOne(Account, {
           where: { id: account.linkedAccountId, userId },
         });
         if (partner && partner.institutionId !== institutionId) {
           partner.institutionId = institutionId;
-          await queryRunner.manager.save(partner);
+          await m.save(partner);
         }
       }
 
-      await queryRunner.commitTransaction();
       return account;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   /**

@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import {
   ConflictException,
   NotFoundException,
@@ -13,6 +12,14 @@ import { Transaction } from "../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import {
+  createTenantTxMocks,
+  DataSourceMock,
+} from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 
 describe("PayeesService", () => {
   let service: PayeesService;
@@ -21,8 +28,9 @@ describe("PayeesService", () => {
   let transactionsRepository: Record<string, jest.Mock>;
   let scheduledTransactionsRepository: Record<string, jest.Mock>;
   let categoriesRepository: Record<string, jest.Mock>;
-  let mockDataSource: Record<string, jest.Mock>;
+  let mockDataSource: DataSourceMock;
   let mockQueryRunner: any;
+  let txManager: Record<string, jest.Mock>;
 
   const userId = "user-1";
 
@@ -138,51 +146,31 @@ describe("PayeesService", () => {
       },
     };
 
-    mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      query: jest.fn().mockResolvedValue(undefined),
-      manager: {
-        find: jest.fn().mockResolvedValue([]),
-        update: jest.fn().mockResolvedValue({ affected: 0 }),
-        create: jest.fn().mockImplementation((_, data) => data),
-        save: jest.fn().mockImplementation((data) => data),
-        remove: jest.fn(),
-        createQueryBuilder: jest.fn(() => ({
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getOne: jest.fn().mockResolvedValue(null),
-        })),
-      },
-    };
-
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    };
+    const { manager, dataSource } = createTenantTxMocks([
+      [Payee, payeesRepository],
+      [PayeeAlias, aliasRepository],
+      [Transaction, transactionsRepository],
+      [ScheduledTransaction, scheduledTransactionsRepository],
+      [Category, categoriesRepository],
+    ]);
+    mockDataSource = dataSource;
+    txManager = manager;
+    txManager.find.mockResolvedValue([]);
+    txManager.update.mockResolvedValue({ affected: 0 });
+    txManager.create.mockImplementation((_, data) => data);
+    txManager.save.mockImplementation((data) => data);
+    txManager.createQueryBuilder.mockImplementation(() => ({
+      ...queryBuilderMock,
+      getOne: jest.fn().mockResolvedValue(null),
+    }));
+    // Transaction-block tests address the manager through this legacy alias;
+    // savepoint SQL (insertPayeeAliasIgnoringDuplicate) also runs through the
+    // manager's query() now.
+    mockQueryRunner = { manager: txManager, query: txManager.query };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PayeesService,
-        { provide: getRepositoryToken(Payee), useValue: payeesRepository },
-        {
-          provide: getRepositoryToken(PayeeAlias),
-          useValue: aliasRepository,
-        },
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(ScheduledTransaction),
-          useValue: scheduledTransactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(Category),
-          useValue: categoriesRepository,
-        },
         { provide: DataSource, useValue: mockDataSource },
         {
           provide: ActionHistoryService,
@@ -284,8 +272,8 @@ describe("PayeesService", () => {
         ...queryBuilderMock,
         getRawMany: jest.fn().mockResolvedValue([]),
       });
-      // The backfill-scope count query runs through the entity manager.
-      (payeesRepository.manager as any).createQueryBuilder.mockReturnValue({
+      // The backfill-scope count query runs through the transaction manager.
+      txManager.createQueryBuilder.mockReturnValue({
         ...queryBuilderMock,
         getRawMany: jest
           .fn()
@@ -511,7 +499,7 @@ describe("PayeesService", () => {
 
       await service.update(userId, "payee-1", { name: "NewName" });
 
-      const manager = mockDataSource.createQueryRunner().manager;
+      const manager = mockQueryRunner.manager;
       expect(manager.update).toHaveBeenCalledWith(
         Transaction,
         { payeeId: "payee-1", userId },
@@ -1225,7 +1213,7 @@ describe("PayeesService", () => {
           }),
         ]),
       );
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should skip assignments for payees not belonging to user", async () => {
@@ -1487,15 +1475,13 @@ describe("PayeesService", () => {
         { name: "starbucks" },
       );
       // Direct name match short-circuits the alias lookup.
-      expect(aliasRepository.manager.find).not.toHaveBeenCalled();
+      expect(txManager.find).not.toHaveBeenCalled();
     });
 
     it("falls back to alias matching when no name matches", async () => {
       queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
       payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
-      aliasRepository.manager.find = jest
-        .fn()
-        .mockResolvedValue([{ alias: "SBUX*", payee: mockPayee }]);
+      txManager.find.mockResolvedValue([{ alias: "SBUX*", payee: mockPayee }]);
 
       const result = await service.resolveByName(userId, "SBUX #123");
 
@@ -1505,7 +1491,7 @@ describe("PayeesService", () => {
     it("returns null when neither name nor alias matches", async () => {
       queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
       payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
-      aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
+      txManager.find.mockResolvedValue([]);
       payeesRepository.find.mockResolvedValue([
         { ...mockPayee, name: "Amazon" },
       ]);
@@ -1519,7 +1505,7 @@ describe("PayeesService", () => {
       const fullPayee = { ...mockPayee, name: "Buon Gusto Restaurant" };
       queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
       payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
-      aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
+      txManager.find.mockResolvedValue([]);
       payeesRepository.find.mockResolvedValue([
         fullPayee,
         { ...mockPayee, id: "payee-z", name: "Amazon" },
@@ -1538,7 +1524,7 @@ describe("PayeesService", () => {
       const zehrs = { ...mockPayee, name: "Zehr's Supermarket" };
       queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
       payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
-      aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
+      txManager.find.mockResolvedValue([]);
       payeesRepository.find.mockResolvedValue([zehrs]);
 
       const result = await service.resolveByName(userId, "Zehrs");
@@ -1550,7 +1536,7 @@ describe("PayeesService", () => {
       const exact = { ...mockPayee, name: "Zehr's Supermarket" };
       queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
       payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
-      aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
+      txManager.find.mockResolvedValue([]);
       payeesRepository.find.mockResolvedValue([
         exact,
         { ...mockPayee, id: "payee-y", name: "Zehr's Supermarket Pharmacy" },
@@ -1564,7 +1550,7 @@ describe("PayeesService", () => {
     it("does not guess when multiple payees match a partial name", async () => {
       queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
       payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
-      aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
+      txManager.find.mockResolvedValue([]);
       payeesRepository.find.mockResolvedValue([
         { ...mockPayee, name: "Buon Gusto Restaurant" },
         { ...mockPayee, id: "payee-x", name: "Buon Gusto Pizzeria" },
@@ -1578,7 +1564,7 @@ describe("PayeesService", () => {
     it("does not partial-match input shorter than 3 characters", async () => {
       queryBuilderMock.getOne = jest.fn().mockResolvedValue(null);
       payeesRepository.createQueryBuilder.mockReturnValue(queryBuilderMock);
-      aliasRepository.manager.find = jest.fn().mockResolvedValue([]);
+      txManager.find.mockResolvedValue([]);
 
       const result = await service.resolveByName(userId, "AB");
 
@@ -2022,7 +2008,7 @@ describe("PayeesService", () => {
   describe("findPayeeByAlias", () => {
     it("should find a payee by matching alias pattern", async () => {
       const matchedPayee = { ...mockPayee };
-      aliasRepository.manager.find.mockResolvedValue([
+      txManager.find.mockResolvedValue([
         {
           id: "a1",
           alias: "STARBUCKS*",
@@ -2036,7 +2022,7 @@ describe("PayeesService", () => {
     });
 
     it("should return null when no alias matches", async () => {
-      aliasRepository.manager.find.mockResolvedValue([
+      txManager.find.mockResolvedValue([
         {
           id: "a1",
           alias: "STARBUCKS*",
@@ -2050,7 +2036,7 @@ describe("PayeesService", () => {
     });
 
     it("should match case-insensitively", async () => {
-      aliasRepository.manager.find.mockResolvedValue([
+      txManager.find.mockResolvedValue([
         {
           id: "a1",
           alias: "starbucks*",
@@ -2080,7 +2066,7 @@ describe("PayeesService", () => {
         .mockResolvedValueOnce(targetPayee)
         .mockResolvedValueOnce(sourcePayee);
 
-      const queryRunner = mockDataSource.createQueryRunner();
+      const queryRunner = mockQueryRunner;
       queryRunner.manager.update.mockResolvedValue({ affected: 3 });
 
       const result = await service.mergePayees(userId, {
@@ -2092,8 +2078,7 @@ describe("PayeesService", () => {
       expect(result.transactionsMigrated).toBe(3);
       expect(result.aliasAdded).toBe(true);
       expect(result.sourcePayeeDeleted).toBe(true);
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
-      expect(queryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should throw BadRequestException when merging payee into itself", async () => {
@@ -2110,7 +2095,7 @@ describe("PayeesService", () => {
         .mockResolvedValueOnce(mockPayee)
         .mockResolvedValueOnce(mockPayeeNoCategory);
 
-      const queryRunner = mockDataSource.createQueryRunner();
+      const queryRunner = mockQueryRunner;
       queryRunner.manager.update.mockRejectedValue(new Error("DB error"));
 
       await expect(
@@ -2120,8 +2105,7 @@ describe("PayeesService", () => {
         }),
       ).rejects.toThrow("DB error");
 
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(queryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should skip alias creation when addAsAlias is false", async () => {
@@ -2129,7 +2113,7 @@ describe("PayeesService", () => {
         .mockResolvedValueOnce(mockPayee)
         .mockResolvedValueOnce(mockPayeeNoCategory);
 
-      const queryRunner = mockDataSource.createQueryRunner();
+      const queryRunner = mockQueryRunner;
       queryRunner.manager.update.mockResolvedValue({ affected: 0 });
 
       const result = await service.mergePayees(userId, {
@@ -2152,7 +2136,7 @@ describe("PayeesService", () => {
         .mockResolvedValueOnce(targetPayee)
         .mockResolvedValueOnce(sourcePayee);
 
-      const queryRunner = mockDataSource.createQueryRunner();
+      const queryRunner = mockQueryRunner;
       queryRunner.manager.update.mockResolvedValue({ affected: 3 });
       // The alias insert loses a race to a concurrent merge: the DB rejects it
       // with the UNIQUE(user_id, LOWER(alias)) violation. It must be swallowed
@@ -2175,7 +2159,7 @@ describe("PayeesService", () => {
       expect(queryRunner.query).toHaveBeenCalledWith(
         "ROLLBACK TO SAVEPOINT merge_payee_alias",
       );
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
   });
 

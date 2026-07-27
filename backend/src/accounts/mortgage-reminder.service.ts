@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull, Not } from "typeorm";
+import { DataSource, IsNull, Not } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { Account, AccountType } from "./entities/account.entity";
@@ -13,6 +12,7 @@ import { formatDateYMD } from "../common/date-utils";
 import { emailTranslator } from "../i18n/email-translator";
 import { DEFAULT_LOCALE } from "../i18n/config";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
+import { tenantTx } from "../common/db/tenant-tx";
 
 /**
  * Service for handling mortgage term renewal reminders
@@ -27,12 +27,7 @@ export class MortgageReminderService {
   private readonly logger = new Logger(MortgageReminderService.name);
 
   constructor(
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    @InjectRepository(UserPreference)
-    private preferencesRepository: Repository<UserPreference>,
+    private dataSource: DataSource,
     private emailService: EmailService,
     private configService: ConfigService,
     private readonly i18n: I18nService,
@@ -93,9 +88,11 @@ export class MortgageReminderService {
       try {
         // RLS (task C2): per-user reads run under the user's own context.
         const prefs = await withUserContext(userId, () =>
-          this.preferencesRepository.findOne({
-            where: { userId },
-          }),
+          tenantTx(this.dataSource, (m) =>
+            m.getRepository(UserPreference).findOne({
+              where: { userId },
+            }),
+          ),
         );
         if (prefs && !prefs.notificationEmail) {
           skipCount++;
@@ -103,9 +100,11 @@ export class MortgageReminderService {
         }
 
         const user = await withUserContext(userId, () =>
-          this.usersRepository.findOne({
-            where: { id: userId },
-          }),
+          tenantTx(this.dataSource, (m) =>
+            m.getRepository(User).findOne({
+              where: { id: userId },
+            }),
+          ),
         );
         if (!user || !user.email) {
           skipCount++;
@@ -163,22 +162,22 @@ export class MortgageReminderService {
     const futureDate = new Date(today);
     futureDate.setDate(futureDate.getDate() + daysAhead);
 
-    return this.accountsRepository
-      .find({
+    return tenantTx(this.dataSource, (m) =>
+      m.getRepository(Account).find({
         where: {
           accountType: AccountType.MORTGAGE,
           isClosed: false,
           termEndDate: Not(IsNull()),
         },
-      })
-      .then((accounts) =>
-        accounts.filter((account) => {
-          if (!account.termEndDate) return false;
-          const termEnd = new Date(account.termEndDate);
-          termEnd.setHours(0, 0, 0, 0);
-          return termEnd >= today && termEnd <= futureDate;
-        }),
-      );
+      }),
+    ).then((accounts) =>
+      accounts.filter((account) => {
+        if (!account.termEndDate) return false;
+        const termEnd = new Date(account.termEndDate);
+        termEnd.setHours(0, 0, 0, 0);
+        return termEnd >= today && termEnd <= futureDate;
+      }),
+    );
   }
 
   /**

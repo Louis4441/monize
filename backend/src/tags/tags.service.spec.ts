@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { TagsService } from "./tags.service";
@@ -7,13 +6,21 @@ import { Tag } from "./entities/tag.entity";
 import { TransactionTag } from "./entities/transaction-tag.entity";
 import { TransactionSplitTag } from "./entities/transaction-split-tag.entity";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import {
+  createTenantTxMocks,
+  ManagerMock,
+  DataSourceMock,
+} from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 
 describe("TagsService", () => {
   let service: TagsService;
   let tagsRepository: Record<string, jest.Mock>;
   let transactionTagsRepository: Record<string, jest.Mock>;
-  let transactionSplitTagsRepository: Record<string, jest.Mock>;
-  let mockDataSource: Record<string, any>;
+  let mockDataSource: DataSourceMock;
 
   const userId = "user-1";
 
@@ -38,13 +45,7 @@ describe("TagsService", () => {
   };
 
   let queryBuilderMock: Record<string, jest.Mock>;
-
-  const mockManager = {
-    find: jest.fn(),
-    delete: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
-  };
+  let mockManager: ManagerMock;
 
   beforeEach(async () => {
     queryBuilderMock = {
@@ -67,27 +68,16 @@ describe("TagsService", () => {
       createQueryBuilder: jest.fn(),
     };
 
-    transactionSplitTagsRepository = {};
-
-    mockDataSource = {
-      manager: mockManager,
-    };
+    ({ manager: mockManager, dataSource: mockDataSource } = createTenantTxMocks(
+      [
+        [Tag, tagsRepository],
+        [TransactionTag, transactionTagsRepository],
+      ],
+    ));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TagsService,
-        {
-          provide: getRepositoryToken(Tag),
-          useValue: tagsRepository,
-        },
-        {
-          provide: getRepositoryToken(TransactionTag),
-          useValue: transactionTagsRepository,
-        },
-        {
-          provide: getRepositoryToken(TransactionSplitTag),
-          useValue: transactionSplitTagsRepository,
-        },
         {
           provide: DataSource,
           useValue: mockDataSource,

@@ -1,16 +1,19 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
+import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 import { AccountExportService } from "./account-export.service";
 import { AccountsService } from "./accounts.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
-import { Account } from "./entities/account.entity";
 
 describe("AccountExportService", () => {
   let service: AccountExportService;
   let mockTransactionRepo: Record<string, jest.Mock>;
   let mockCategoryRepo: Record<string, jest.Mock>;
-  let mockAccountRepo: Record<string, jest.Mock>;
   let mockAccountsService: Partial<Record<keyof AccountsService, jest.Mock>>;
 
   const userId = "user-1";
@@ -145,26 +148,19 @@ describe("AccountExportService", () => {
     mockCategoryRepo = {
       find: jest.fn().mockResolvedValue(mockCategories),
     };
-    mockAccountRepo = {};
     mockAccountsService = {
       findOne: jest.fn().mockResolvedValue(mockAccount),
     };
 
+    const { dataSource } = createTenantTxMocks([
+      [Transaction, mockTransactionRepo],
+      [Category, mockCategoryRepo],
+    ]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AccountExportService,
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: mockTransactionRepo,
-        },
-        {
-          provide: getRepositoryToken(Category),
-          useValue: mockCategoryRepo,
-        },
-        {
-          provide: getRepositoryToken(Account),
-          useValue: mockAccountRepo,
-        },
+        { provide: DataSource, useValue: dataSource },
         {
           provide: AccountsService,
           useValue: mockAccountsService,

@@ -19,6 +19,14 @@ import { LoanMortgageAccountService } from "./loan-mortgage-account.service";
 import { LoanRateChangesService } from "../loan-rate-changes/loan-rate-changes.service";
 import { DataSource } from "typeorm";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import {
+  createTenantTxMocks,
+  DataSourceMock,
+} from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 
 describe("AccountsService", () => {
   let service: AccountsService;
@@ -30,7 +38,7 @@ describe("AccountsService", () => {
   let categoriesService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
   let mockQueryRunner: Record<string, any>;
-  let mockQrRepo: Record<string, jest.Mock>;
+  let mockDataSource: DataSourceMock;
   let mockActionHistoryService: Record<string, jest.Mock>;
   let loanRateChangesService: Record<string, jest.Mock>;
   // loanMortgageService uses the real class with mocked repositories
@@ -124,35 +132,28 @@ describe("AccountsService", () => {
       getLatestNetWorth: jest.fn().mockResolvedValue(null),
     };
 
-    mockQrRepo = {
-      create: jest.fn().mockImplementation((data) => ({ ...data })),
-      save: jest.fn().mockImplementation((data) => data),
-    };
-
     mockActionHistoryService = {
       record: jest.fn().mockResolvedValue(null),
     };
 
-    mockQueryRunner = {
-      connect: jest.fn().mockResolvedValue(undefined),
-      startTransaction: jest.fn().mockResolvedValue(undefined),
-      commitTransaction: jest.fn().mockResolvedValue(undefined),
-      rollbackTransaction: jest.fn().mockResolvedValue(undefined),
-      release: jest.fn().mockResolvedValue(undefined),
-      query: jest.fn().mockResolvedValue(undefined),
-      manager: {
-        getRepository: jest.fn().mockReturnValue(mockQrRepo),
-        findOne: jest.fn(),
-        findOneOrFail: jest.fn(),
-        save: jest.fn().mockImplementation((data) => data),
-        remove: jest.fn().mockImplementation((data) => data),
-        count: jest.fn().mockResolvedValue(0),
-      },
-    };
-
     institutionsRepository = {
       findOne: jest.fn().mockResolvedValue({ id: "inst-1" }),
+      find: jest.fn().mockResolvedValue([]),
     };
+
+    const { manager: txManager, dataSource } = createTenantTxMocks([
+      [Account, accountsRepository],
+      [Transaction, transactionRepository],
+      [InvestmentTransaction, investmentTxRepository],
+      [Institution, institutionsRepository],
+    ]);
+    mockDataSource = dataSource;
+    txManager.save.mockImplementation((data) => data);
+    txManager.remove.mockImplementation((data) => data);
+    txManager.count.mockResolvedValue(0);
+    txManager.query.mockResolvedValue([]);
+    // Transaction-block tests address the manager through this legacy alias.
+    mockQueryRunner = { manager: txManager, query: txManager.query };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -194,10 +195,7 @@ describe("AccountsService", () => {
         },
         {
           provide: DataSource,
-          useValue: {
-            query: jest.fn().mockResolvedValue([]),
-            createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-          },
+          useValue: mockDataSource,
         },
       ],
     }).compile();
@@ -375,7 +373,7 @@ describe("AccountsService", () => {
 
       const result = await service.updateBalance("account-1", 500);
 
-      expect(accountsRepository.query).toHaveBeenCalledWith(
+      expect(mockQueryRunner.query).toHaveBeenCalledWith(
         `UPDATE accounts SET current_balance = ROUND(CAST(current_balance AS numeric) + $1, 4) WHERE id = $2`,
         [500, "account-1"],
       );
@@ -395,7 +393,7 @@ describe("AccountsService", () => {
 
       const result = await service.updateBalance("account-1", -300);
 
-      expect(accountsRepository.query).toHaveBeenCalledWith(
+      expect(mockQueryRunner.query).toHaveBeenCalledWith(
         `UPDATE accounts SET current_balance = ROUND(CAST(current_balance AS numeric) + $1, 4) WHERE id = $2`,
         [-300, "account-1"],
       );
@@ -434,7 +432,7 @@ describe("AccountsService", () => {
 
       const result = await service.updateBalance("account-1", 10.2);
 
-      expect(accountsRepository.query).toHaveBeenCalledWith(
+      expect(mockQueryRunner.query).toHaveBeenCalledWith(
         `UPDATE accounts SET current_balance = ROUND(CAST(current_balance AS numeric) + $1, 4) WHERE id = $2`,
         [10.2, "account-1"],
       );
@@ -454,7 +452,7 @@ describe("AccountsService", () => {
 
       await service.updateBalance("account-1", 100);
 
-      expect(accountsRepository.query).toHaveBeenCalledWith(
+      expect(mockQueryRunner.query).toHaveBeenCalledWith(
         expect.stringContaining("UPDATE accounts"),
         [100, "account-1"],
       );
@@ -504,8 +502,7 @@ describe("AccountsService", () => {
       });
 
       expect(result.name).toBe("Updated Name");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("assigns an owned institution on update", async () => {
@@ -525,7 +522,7 @@ describe("AccountsService", () => {
       await expect(
         service.update("user-1", "account-1", { institutionId: "x" }),
       ).rejects.toThrow(BadRequestException);
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("links and unlinks a loan account for the equity view", async () => {
@@ -559,8 +556,7 @@ describe("AccountsService", () => {
       await expect(
         service.update("user-1", "account-1", { name: "New" }),
       ).rejects.toThrow(BadRequestException);
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("adjusts currentBalance when openingBalance changes", async () => {
@@ -574,7 +570,7 @@ describe("AccountsService", () => {
 
       const saved = mockQueryRunner.manager.save.mock.calls[0][0];
       expect(saved.currentBalance).toBe(1700);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("recalculates termEndDate when termMonths changes to a positive value", async () => {
@@ -782,7 +778,7 @@ describe("AccountsService", () => {
 
         const saved = mockQueryRunner.manager.save.mock.calls[0][0];
         expect(saved.currencyCode).toBe("CAD");
-        expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+        expect(mockDataSource.transaction).toHaveBeenCalled();
       });
 
       it("rejects currency change when account has regular transactions", async () => {
@@ -794,7 +790,7 @@ describe("AccountsService", () => {
         await expect(
           service.update("user-1", "account-1", { currencyCode: "CAD" }),
         ).rejects.toThrow(BadRequestException);
-        expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+        expect(mockDataSource.transaction).toHaveBeenCalled();
         expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
       });
 
@@ -807,7 +803,7 @@ describe("AccountsService", () => {
         await expect(
           service.update("user-1", "account-1", { currencyCode: "CAD" }),
         ).rejects.toThrow(BadRequestException);
-        expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+        expect(mockDataSource.transaction).toHaveBeenCalled();
         expect(mockQueryRunner.manager.save).not.toHaveBeenCalled();
       });
 
@@ -819,7 +815,7 @@ describe("AccountsService", () => {
 
         const saved = mockQueryRunner.manager.save.mock.calls[0][0];
         expect(saved.name).toBe("Renamed");
-        expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+        expect(mockDataSource.transaction).toHaveBeenCalled();
       });
 
       it("allows passing the same currency on an account with transactions (no-op)", async () => {
@@ -830,7 +826,7 @@ describe("AccountsService", () => {
           currencyCode: mockAccount.currencyCode,
         });
 
-        expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+        expect(mockDataSource.transaction).toHaveBeenCalled();
       });
     });
   });
@@ -846,8 +842,7 @@ describe("AccountsService", () => {
 
       expect(result.isClosed).toBe(true);
       expect(result.closedDate).toBeDefined();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("throws when account already closed", async () => {
@@ -859,8 +854,7 @@ describe("AccountsService", () => {
       await expect(service.close("user-1", "account-1")).rejects.toThrow(
         "Account is already closed",
       );
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("throws when balance is non-zero", async () => {
@@ -872,8 +866,7 @@ describe("AccountsService", () => {
       await expect(service.close("user-1", "account-1")).rejects.toThrow(
         "Cannot close account with non-zero balance",
       );
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("throws NotFoundException when account not found", async () => {
@@ -882,8 +875,7 @@ describe("AccountsService", () => {
       await expect(service.close("user-1", "nonexistent")).rejects.toThrow(
         NotFoundException,
       );
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("also closes linked brokerage account for investment cash", async () => {
@@ -903,7 +895,7 @@ describe("AccountsService", () => {
       await service.close("user-1", "account-1");
 
       expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(2);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
   });
 
@@ -1123,7 +1115,7 @@ describe("AccountsService", () => {
   describe("createInvestmentAccountPair", () => {
     it("creates cash and brokerage accounts linked together", async () => {
       let saveCallCount = 0;
-      mockQrRepo.save.mockImplementation((data) => {
+      accountsRepository.save.mockImplementation((data) => {
         saveCallCount++;
         if (saveCallCount === 1) {
           // TypeORM save mutates in-place and returns the entity
@@ -1148,7 +1140,7 @@ describe("AccountsService", () => {
       expect(result.brokerageAccount).toBeDefined();
 
       // First create call should be cash account
-      const cashCreate = mockQrRepo.create.mock.calls[0][0];
+      const cashCreate = accountsRepository.create.mock.calls[0][0];
       expect(cashCreate.name).toBe("My Investment - Cash");
       expect(cashCreate.accountSubType).toBe(AccountSubType.INVESTMENT_CASH);
       expect(cashCreate.openingBalance).toBe(5000);
@@ -1156,7 +1148,7 @@ describe("AccountsService", () => {
       expect(cashCreate.userId).toBe("user-1");
 
       // Second create call should be brokerage account
-      const brokerageCreate = mockQrRepo.create.mock.calls[1][0];
+      const brokerageCreate = accountsRepository.create.mock.calls[1][0];
       expect(brokerageCreate.name).toBe("My Investment - Brokerage");
       expect(brokerageCreate.accountSubType).toBe(
         AccountSubType.INVESTMENT_BROKERAGE,
@@ -1167,20 +1159,17 @@ describe("AccountsService", () => {
       expect(brokerageCreate.linkedAccountId).toBe("cash-account-1");
 
       // Three saves: cash, brokerage, cash again (to set linkedAccountId)
-      expect(mockQrRepo.save).toHaveBeenCalledTimes(3);
+      expect(accountsRepository.save).toHaveBeenCalledTimes(3);
 
       // Third save updates cash account with link back to brokerage
       expect(result.cashAccount.linkedAccountId).toBe("brokerage-account-1");
 
       // Verify transactional behavior
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("defaults opening balance to 0 when not provided", async () => {
-      mockQrRepo.save.mockImplementation((data) => ({
+      accountsRepository.save.mockImplementation((data) => ({
         ...data,
         id: data.id || "gen-id",
       }));
@@ -1191,7 +1180,7 @@ describe("AccountsService", () => {
         currencyCode: "CAD",
       } as any);
 
-      const cashCreate = mockQrRepo.create.mock.calls[0][0];
+      const cashCreate = accountsRepository.create.mock.calls[0][0];
       expect(cashCreate.openingBalance).toBe(0);
       expect(cashCreate.currentBalance).toBe(0);
     });
@@ -1205,7 +1194,7 @@ describe("AccountsService", () => {
         t: (key: string) => localized[key] ?? key,
       } as never);
 
-      mockQrRepo.save.mockImplementation((data) => ({
+      accountsRepository.save.mockImplementation((data) => ({
         ...data,
         id: data.id || "gen-id",
       }));
@@ -1216,8 +1205,8 @@ describe("AccountsService", () => {
         currencyCode: "EUR",
       } as any);
 
-      const cashCreate = mockQrRepo.create.mock.calls[0][0];
-      const brokerageCreate = mockQrRepo.create.mock.calls[1][0];
+      const cashCreate = accountsRepository.create.mock.calls[0][0];
+      const brokerageCreate = accountsRepository.create.mock.calls[1][0];
       expect(cashCreate.name).toBe("Depotkonto - Bargeld");
       expect(brokerageCreate.name).toBe("Depotkonto - Depot");
     });
@@ -2088,7 +2077,7 @@ describe("AccountsService", () => {
       // Second save should be the linked account currency update
       const linkedSave = mockQueryRunner.manager.save.mock.calls[1][0];
       expect(linkedSave.currencyCode).toBe("CAD");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("does not sync currency when account is not investment type", async () => {
@@ -2170,7 +2159,7 @@ describe("AccountsService", () => {
       const brokerageSave = mockQueryRunner.manager.save.mock.calls[1][0];
       expect(brokerageSave.isClosed).toBe(true);
       expect(brokerageSave.closedDate).toBeDefined();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("does not close brokerage if already closed", async () => {
@@ -2192,7 +2181,7 @@ describe("AccountsService", () => {
 
       // Only one save for the cash account
       expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(1);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("does not attempt to close linked account for non-investment account", async () => {
@@ -2207,7 +2196,7 @@ describe("AccountsService", () => {
       await service.close("user-1", "account-1");
 
       expect(mockQueryRunner.manager.save).toHaveBeenCalledTimes(1);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
   });
 
@@ -2500,8 +2489,8 @@ describe("AccountsService", () => {
         "account-c",
       ]);
 
-      expect(accountsRepository.query).toHaveBeenCalledTimes(1);
-      const [sql, params] = accountsRepository.query.mock.calls[0];
+      expect(mockQueryRunner.query).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockQueryRunner.query.mock.calls[0];
       // ids are parameterized, the sort order is the array index, and the
       // userId is the final parameter constraining the update.
       expect(sql).toContain("UPDATE accounts SET favourite_sort_order");
@@ -2531,7 +2520,7 @@ describe("AccountsService", () => {
       await expect(
         service.update("user-1", "missing", { name: "x" }),
       ).rejects.toThrow(NotFoundException);
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("does NOT adjust currentBalance when openingBalance unchanged", async () => {
@@ -2732,7 +2721,7 @@ describe("AccountsService", () => {
         openingBalance: 100,
         currentBalance: 50,
       });
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest.fn().mockResolvedValue([]);
       const r = await service.recalculateCurrentBalance("account-1");
       expect(r.currentBalance).toBe(100);
@@ -2744,7 +2733,7 @@ describe("AccountsService", () => {
         openingBalance: 100,
       });
       accountsRepository.save.mockImplementation((d) => Promise.resolve(d));
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest.fn().mockResolvedValue([{ balance: "275.5" }]);
       const r = await service.recalculateCurrentBalance("account-1");
       expect(r.currentBalance).toBe(275.5);
@@ -2753,14 +2742,14 @@ describe("AccountsService", () => {
 
   describe("getProjectedBalance", () => {
     it("returns 0 when no rows", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest.fn().mockResolvedValue([]);
       const v = await service.getProjectedBalance("user-1", "account-1");
       expect(v).toBe(0);
     });
 
     it("returns rounded balance from query result", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest.fn().mockResolvedValue([{ balance: "1234.56789" }]);
       const v = await service.getProjectedBalance("user-1", "account-1");
       expect(v).toBe(1234.5679);
@@ -3014,7 +3003,7 @@ describe("AccountsService", () => {
 
   describe("getDailyBalances", () => {
     it("uses provided endDate without extending", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest.fn().mockResolvedValue([]);
       await service.getDailyBalances("user-1", "2024-01-01", "2024-12-31", [
         "a1",
@@ -3024,7 +3013,7 @@ describe("AccountsService", () => {
     });
 
     it("extends end to maxFutureDate when no endDate", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest
         .fn()
         .mockResolvedValueOnce([{ max_date: "2099-01-01" }])
@@ -3042,7 +3031,7 @@ describe("AccountsService", () => {
     });
 
     it("uses default startDate when none provided", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest
         .fn()
         .mockResolvedValueOnce([{ max_date: null }])
@@ -3052,14 +3041,14 @@ describe("AccountsService", () => {
     });
 
     it("treats no/empty accountIds as null filter", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest.fn().mockResolvedValue([]);
       await service.getDailyBalances("user-1", "2024-01-01", "2024-12-31", []);
       expect(ds.query).toHaveBeenCalled();
     });
 
     it("keeps every day (step 1) for ranges within the point budget", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest.fn().mockResolvedValue([]);
       await service.getDailyBalances("user-1", "2024-01-01", "2024-12-31", [
         "a1",
@@ -3071,7 +3060,7 @@ describe("AccountsService", () => {
     });
 
     it("downsamples wide ranges with a step greater than 1", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest.fn().mockResolvedValue([]);
       await service.getDailyBalances("user-1", "2010-01-01", "2024-12-31", [
         "a1",
@@ -3081,7 +3070,7 @@ describe("AccountsService", () => {
     });
 
     it("spans earliest to latest transaction when allTime and no startDate", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest
         .fn()
         // allTime -> combined MIN/MAX probe (no separate future-extension probe)
@@ -3105,7 +3094,7 @@ describe("AccountsService", () => {
     });
 
     it("falls back to the one-year default and today when allTime finds no transactions", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest
         .fn()
         .mockResolvedValueOnce([{ min_date: null, max_date: null }])
@@ -3123,7 +3112,7 @@ describe("AccountsService", () => {
     });
 
     it("does not probe for earliest transaction when startDate is given", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       ds.query = jest.fn().mockResolvedValue([]);
       await service.getDailyBalances(
         "user-1",
@@ -3140,15 +3129,21 @@ describe("AccountsService", () => {
 
   describe("applyDueTransactionBalances cron", () => {
     it("returns early when no users", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
-      ds.query = jest.fn().mockResolvedValue([]);
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
+      // One sequenced mock serves both the timezone fan-out (still on
+      // dataSource.query -- shared util, converted with a later R task) and the
+      // per-timezone work that now runs through the tenantTx manager.
+      ds.query = mockDataSource.query = jest.fn().mockResolvedValue([]);
       await service.applyDueTransactionBalances();
       expect(ds.query).toHaveBeenCalledTimes(1);
     });
 
     it("skips invalid timezone users and continues", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
-      ds.query = jest
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
+      // One sequenced mock serves both the timezone fan-out (still on
+      // dataSource.query -- shared util, converted with a later R task) and the
+      // per-timezone work that now runs through the tenantTx manager.
+      ds.query = mockDataSource.query = jest
         .fn()
         // userRows
         .mockResolvedValueOnce([
@@ -3163,8 +3158,11 @@ describe("AccountsService", () => {
     });
 
     it("processes due balances for valid timezone", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
-      ds.query = jest
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
+      // One sequenced mock serves both the timezone fan-out (still on
+      // dataSource.query -- shared util, converted with a later R task) and the
+      // per-timezone work that now runs through the tenantTx manager.
+      ds.query = mockDataSource.query = jest
         .fn()
         // userRows
         .mockResolvedValueOnce([{ user_id: "u1", timezone: "America/Toronto" }])
@@ -3187,8 +3185,13 @@ describe("AccountsService", () => {
     });
 
     it("logs error when query throws", async () => {
-      const ds = service["dataSource"] as unknown as { query: jest.Mock };
-      ds.query = jest.fn().mockRejectedValue(new Error("db down"));
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
+      // One sequenced mock serves both the timezone fan-out (still on
+      // dataSource.query -- shared util, converted with a later R task) and the
+      // per-timezone work that now runs through the tenantTx manager.
+      ds.query = mockDataSource.query = jest
+        .fn()
+        .mockRejectedValue(new Error("db down"));
       await service.applyDueTransactionBalances();
       // Should not throw
     });

@@ -2,10 +2,10 @@ import { QueryFailedError } from "typeorm";
 import { insertPayeeAliasIgnoringDuplicate } from "./insert-payee-alias.util";
 import { PayeeAlias } from "./entities/payee-alias.entity";
 
-function makeQueryRunner(save: jest.Mock) {
+function makeManager(save: jest.Mock) {
   return {
     query: jest.fn().mockResolvedValue(undefined),
-    manager: { save },
+    save,
   } as never;
 }
 
@@ -14,7 +14,7 @@ const alias = { alias: "*LIDL*" } as PayeeAlias;
 describe("insertPayeeAliasIgnoringDuplicate", () => {
   it("saves the alias and releases the savepoint, returning true", async () => {
     const save = jest.fn().mockResolvedValue(alias);
-    const qr = makeQueryRunner(save);
+    const qr = makeManager(save);
 
     const created = await insertPayeeAliasIgnoringDuplicate(qr, alias, "sp");
 
@@ -32,7 +32,7 @@ describe("insertPayeeAliasIgnoringDuplicate", () => {
         code: "23505",
       } as unknown as Error),
     );
-    const qr = makeQueryRunner(save);
+    const qr = makeManager(save);
 
     const created = await insertPayeeAliasIgnoringDuplicate(qr, alias, "sp");
 
@@ -48,7 +48,7 @@ describe("insertPayeeAliasIgnoringDuplicate", () => {
         code: "23503",
       } as unknown as Error),
     );
-    const qr = makeQueryRunner(save);
+    const qr = makeManager(save);
 
     await expect(
       insertPayeeAliasIgnoringDuplicate(qr, alias, "sp"),
@@ -60,7 +60,7 @@ describe("insertPayeeAliasIgnoringDuplicate", () => {
 
   it("rethrows non-QueryFailedError errors", async () => {
     const save = jest.fn().mockRejectedValue(new Error("connection lost"));
-    const qr = makeQueryRunner(save);
+    const qr = makeManager(save);
 
     await expect(
       insertPayeeAliasIgnoringDuplicate(qr, alias, "sp"),

@@ -1,9 +1,13 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { StatementCycleService } from "./statement-cycle.service";
 import { Account, AccountType } from "./entities/account.entity";
+import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 
 // Fix "today" so cycle boundaries are deterministic.
 jest.mock("../common/date-utils", () => ({
@@ -31,13 +35,14 @@ describe("StatementCycleService", () => {
 
   beforeEach(async () => {
     repo = { findOne: jest.fn() };
-    dataSource = { query: jest.fn() };
+    const mocks = createTenantTxMocks([[Account, repo]]);
+    // Raw SQL runs through the transaction manager; tests program it here.
+    dataSource = { query: mocks.manager.query };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StatementCycleService,
-        { provide: getRepositoryToken(Account), useValue: repo },
-        { provide: DataSource, useValue: dataSource },
+        { provide: DataSource, useValue: mocks.dataSource },
       ],
     }).compile();
 

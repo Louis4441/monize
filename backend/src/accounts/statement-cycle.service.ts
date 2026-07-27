@@ -3,13 +3,13 @@ import {
   BadRequestException,
   NotFoundException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { Account, AccountType } from "./entities/account.entity";
 import { computeStatementCycle } from "./statement-cycle.util";
 import { roundMoney } from "../common/round.util";
 import { todayYMD } from "../common/date-utils";
 import { tr } from "../i18n/translate";
+import { tenantTx } from "../common/db/tenant-tx";
 
 export interface StatementCycleResult {
   accountId: string;
@@ -55,19 +55,17 @@ export interface InterestPaidResult {
  */
 @Injectable()
 export class StatementCycleService {
-  constructor(
-    @InjectRepository(Account)
-    private readonly accountsRepository: Repository<Account>,
-    private readonly dataSource: DataSource,
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
 
   private async loadOwnedAccount(
     userId: string,
     accountId: string,
   ): Promise<Account> {
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId, userId },
-    });
+    const account = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id: accountId, userId },
+      }),
+    );
     if (!account) {
       throw new NotFoundException(
         tr(
@@ -116,8 +114,9 @@ export class StatementCycleService {
       statement_balance_date: string | null;
       amount_paid: string;
       expenses_since_statement: string;
-    }[] = await this.dataSource.query(
-      `SELECT
+    }[] = await tenantTx(this.dataSource, (m) =>
+      m.query(
+        `SELECT
            COALESCE(a.opening_balance, 0)
              + COALESCE(SUM(CASE WHEN t.status = 'RECONCILED' THEN t.amount ELSE 0 END), 0)
              AS statement_balance,
@@ -138,7 +137,8 @@ export class StatementCycleService {
            AND t.parent_transaction_id IS NULL
          WHERE a.id = $1 AND a.user_id = $2
          GROUP BY a.id, a.opening_balance`,
-      [accountId, userId],
+        [accountId, userId],
+      ),
     );
 
     const row = rows?.[0];
@@ -177,9 +177,11 @@ export class StatementCycleService {
   ): Promise<InterestPaidResult> {
     await this.loadOwnedAccount(userId, accountId);
 
-    const rows: { amount: string; count: string }[] =
-      await this.dataSource.query(
-        `SELECT COALESCE(SUM(-t.amount), 0) AS amount, COUNT(*) AS count
+    const rows: { amount: string; count: string }[] = await tenantTx(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT COALESCE(SUM(-t.amount), 0) AS amount, COUNT(*) AS count
        FROM transactions t
        JOIN categories c ON c.id = t.category_id
        WHERE t.account_id = $1
@@ -190,8 +192,9 @@ export class StatementCycleService {
          AND t.transaction_date >= $3
          AND t.transaction_date <= $4
          AND c.name ILIKE '%interest%'`,
-        [accountId, userId, startDate, endDate],
-      );
+          [accountId, userId, startDate, endDate],
+        ),
+    );
 
     const row = rows?.[0];
     return {

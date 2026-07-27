@@ -1,4 +1,4 @@
-import { QueryFailedError, QueryRunner } from "typeorm";
+import { EntityManager, QueryFailedError } from "typeorm";
 import { PayeeAlias } from "./entities/payee-alias.entity";
 
 /**
@@ -12,19 +12,22 @@ import { PayeeAlias } from "./entities/payee-alias.entity";
  *
  * The alias is a best-effort convenience on top of a merge/create, not the point
  * of it, so a lost alias must never roll back the reassignment work around it.
+ *
+ * @param manager the EntityManager of the ACTIVE transaction (a `tenantTx`
+ *   callback's manager) -- savepoints are meaningless outside one.
  */
 export async function insertPayeeAliasIgnoringDuplicate(
-  queryRunner: QueryRunner,
+  manager: EntityManager,
   alias: PayeeAlias,
   savepoint = "insert_payee_alias",
 ): Promise<boolean> {
-  await queryRunner.query(`SAVEPOINT ${savepoint}`);
+  await manager.query(`SAVEPOINT ${savepoint}`);
   try {
-    await queryRunner.manager.save(alias);
-    await queryRunner.query(`RELEASE SAVEPOINT ${savepoint}`);
+    await manager.save(alias);
+    await manager.query(`RELEASE SAVEPOINT ${savepoint}`);
     return true;
   } catch (error) {
-    await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+    await manager.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
     const isUniqueViolation =
       error instanceof QueryFailedError &&
       (error.driverError as { code?: string })?.code === "23505";

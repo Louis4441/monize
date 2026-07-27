@@ -55,7 +55,7 @@ uses four classes:
 | C3 | Seeders + demo reset under `withSystemContext` | F2 | inert | done |
 | C4 | Emergency-access claim + expiry monitor under `withSystemContext`; grantee-side read audit | F2 | inert | done |
 | C6 | Interceptor restructure: fire-and-forget writes moved inside the ALS scope | F2 | neutral | done |
-| R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral | not started |
+| R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral | done |
 | R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral | not started |
 | R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral | not started |
 | R4 | Refactor: budgets | F3, C1–C4, C6 | neutral | not started |
@@ -463,8 +463,37 @@ Shared instructions for every R task — the per-task list only names the module
   zero `@InjectRepository`/`createQueryRunner` left in the listed modules.
 
 ### R1. accounts, categories, payees, tags, institutions
-- [ ] Status: not started — ~13 service files. Includes the balance-update atomic SQL paths
-  (`UPDATE accounts SET current_balance = current_balance + $1 ...` stays raw, inside `tenantTx`).
+- [x] Status: done (branch `claude/row-level-security-r1-d6onbm`). All 13 service files converted
+  (accounts ×8, categories, payees ×2 + `insert-payee-alias.util`, tags, institutions); ratchet
+  lowered **251 → 214** `@InjectRepository` / **61 → 47** `createQueryRunner` (−51 sites, zero left
+  in the five modules). Raw SQL (balance updates, daily balances, statement figures, forecast,
+  favourite reorder, the due-balance cron's bulk UPDATE) stayed raw and moved inside `tenantTx`
+  (`m.query`). Full `npm run test:unit` green (9153), build + lint clean.
+
+  **Boundary decisions (for R2/R6 and L1):**
+  - Helpers still called from unrefactored modules **keep their optional `queryRunner` parameter**
+    with today's semantics; only the no-runner fallback became `tenantTx`:
+    `TagsService.setTransactionTags/setSplitTags/+Bulk` (callers: transactions, R2) and
+    `AccountsService.updateBalance/recalculateCurrentBalance` (callers: transactions/securities/
+    import). After R2 converts those callers, the parameters can be dropped -- a nested `tenantTx`
+    joins the ambient transaction. `insertPayeeAliasIgnoringDuplicate` and the auto-merge private
+    helpers now take an `EntityManager` (all callers in-module);
+    `PayeesService.findPayeeByAlias` dropped its never-passed `queryRunner` param.
+  - **`getUsersByEffectiveTimezone` (`common/users-by-timezone.util.ts`) still queries the
+    DataSource directly** -- it is shared by other modules' crons (budgets, scheduled-transactions,
+    notifications), so converting it belongs with a later R task; the accounts cron's own reads and
+    the bulk UPDATE do run through `tenantTx` (one transaction per timezone bucket).
+  - Module files keep their `TypeOrmModule.forFeature` registrations (inert unused providers);
+    dropping them can ride along with L1.
+
+  **Tests:** shared harness `backend/src/test-helpers/tenant-tx-testing.ts` (+ its own spec):
+  specs `jest.mock` the tenant-tx module so `tenantTx(ds, fn)` delegates to the mock
+  `dataSource.transaction`, and `manager.getRepository(Entity)` routes to the same per-entity
+  repository mocks the specs already assert against (the directory is excluded from the F3 ratchet
+  by its existing `test-helpers/` rule). The cron/bootstrap smoke is encoded as
+  `src/accounts/rls-context-smoke.spec.ts`, which runs the two accounts crons under the **real**
+  `tenantTx` + C2 wrappers at `RLS_MODE=off` (plus a negative control proving an unwrapped call
+  still throws), so the no-context-throw acceptance is CI-checked rather than a one-off dev run.
 
 ### R2. transactions, scheduled-transactions
 - [ ] Status: not started — ~9 service files; the heaviest QueryRunner users (create/update/remove,

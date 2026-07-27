@@ -416,7 +416,10 @@ describe("UsersService", () => {
         language: "en",
       });
 
-      await service.updatePreferences("user-1", { language: "pl", theme: "dark" });
+      await service.updatePreferences("user-1", {
+        language: "pl",
+        theme: "dark",
+      });
 
       const savedData = preferencesRepository.save.mock.calls[0][0];
       // Language stays as the shared account had it; other fields still apply.

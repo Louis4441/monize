@@ -1,5 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
+import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { LoanPaymentSetupService } from "./loan-payment-setup.service";
 import { Account, AccountType } from "./entities/account.entity";
@@ -56,13 +61,12 @@ describe("LoanPaymentSetupService", () => {
       create: jest.fn().mockResolvedValue(mockScheduledTx),
     };
 
+    const { dataSource } = createTenantTxMocks([[Account, accountsRepository]]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LoanPaymentSetupService,
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
+        { provide: DataSource, useValue: dataSource },
         {
           provide: CategoriesService,
           useValue: categoriesService,
