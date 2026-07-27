@@ -1069,6 +1069,45 @@ describe("AuthController", () => {
       expect(res.redirect).toHaveBeenCalledWith(
         expect.stringContaining("/auth/callback?success=true"),
       );
+      // An existing account signing in again must not be sent through the
+      // first-run preferences step.
+      expect(res.redirect).not.toHaveBeenCalledWith(
+        expect.stringContaining("welcome=true"),
+      );
+    });
+
+    it("flags a callback that provisioned the account so the UI shows the first-run step", async () => {
+      (oidcService as any).handleCallback = jest.fn().mockResolvedValue({
+        access_token: "oidc-access-token",
+        sub: "oidc-sub-123",
+      });
+      (oidcService as any).getUserInfo = jest.fn().mockResolvedValue({
+        sub: "oidc-sub-123",
+        email: "new@example.com",
+      });
+      authService.findOrCreateOidcUser.mockResolvedValue({
+        user: { id: "user-new", email: "new@example.com" },
+        isNewUser: true,
+      });
+      authService.generateTokenPair.mockResolvedValue({
+        accessToken: "oidc-jwt",
+        refreshToken: "oidc-refresh",
+      });
+
+      const res = mockRes();
+      const expressReq = {
+        cookies: { oidc_state: "valid-state", oidc_nonce: "valid-nonce" },
+      } as any;
+
+      await controller.oidcCallback(
+        { code: "auth-code" },
+        expressReq,
+        res as any,
+      );
+
+      expect(res.redirect).toHaveBeenCalledWith(
+        expect.stringContaining("/auth/callback?success=true&welcome=true"),
+      );
     });
 
     it("redirects with error when state or nonce is missing", async () => {

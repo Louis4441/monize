@@ -460,7 +460,7 @@ export class AuthService {
   async findOrCreateOidcUser(
     userInfo: Record<string, unknown>,
     registrationEnabled = true,
-  ): Promise<{ user: User; linkPending?: boolean }> {
+  ): Promise<{ user: User; linkPending?: boolean; isNewUser?: boolean }> {
     // RLS: pre-identity path (OIDC callback, before a session exists) that
     // looks users up by subject/email across the whole table -- see the note on
     // register(). System context.
@@ -472,7 +472,7 @@ export class AuthService {
   private async findOrCreateOidcUserWithinContext(
     userInfo: Record<string, unknown>,
     registrationEnabled = true,
-  ): Promise<{ user: User; linkPending?: boolean }> {
+  ): Promise<{ user: User; linkPending?: boolean; isNewUser?: boolean }> {
     // Standard OIDC claims
     const sub = userInfo.sub as string;
     const rawEmail = userInfo.email as string | undefined;
@@ -518,6 +518,11 @@ export class AuthService {
     let user = await this.usersRepository.findOne({
       where: { oidcSubject: sub },
     });
+    // True only when this call provisions the account, so the callback can
+    // send an SSO user through the same first-run preferences step local
+    // registration ends on. Linking an OIDC identity to an account that
+    // already exists is not a first run.
+    let isNewUser = false;
 
     if (!user) {
       // SECURITY: Only link to existing account if email is verified by OIDC provider
@@ -586,6 +591,7 @@ export class AuthService {
               return savedUser;
             },
           );
+          isNewUser = true;
         } catch (err: any) {
           // Handle duplicate email: link OIDC to the existing account
           if (err.code === "23505" && trustedEmail) {
@@ -675,7 +681,7 @@ export class AuthService {
     user.lastLogin = new Date();
     await this.usersRepository.save(user);
 
-    return { user };
+    return { user, isNewUser };
   }
 
   async validateOidcUser(profile: any): Promise<any> {

@@ -1504,6 +1504,51 @@ describe("AuthService", () => {
       expect(result.user.authProvider).toBe("oidc");
       expect(result.user.firstName).toBe("OIDC");
       expect(result.user.lastName).toBe("User");
+      // Drives the callback's first-run language/currency step.
+      expect(result.isNewUser).toBe(true);
+    });
+
+    it("does not flag a returning OIDC user as new", async () => {
+      const existing = {
+        id: "oidc-existing",
+        email: "oidc@example.com",
+        oidcSubject: "oidc-sub-123",
+        authProvider: "oidc",
+      };
+      usersRepository.findOne.mockResolvedValueOnce(existing);
+      usersRepository.save.mockImplementation((u) => u);
+
+      const result = await service.findOrCreateOidcUser({
+        sub: "oidc-sub-123",
+        email: "oidc@example.com",
+        email_verified: true,
+      });
+
+      expect(result.user.id).toBe("oidc-existing");
+      expect(result.isNewUser).toBe(false);
+    });
+
+    it("does not flag an account the OIDC identity merely linked to as new", async () => {
+      const existing = {
+        id: "local-existing",
+        email: "oidc@example.com",
+        passwordHash: null,
+        oidcSubject: null,
+        authProvider: "local",
+      };
+      usersRepository.findOne
+        .mockResolvedValueOnce(null) // no match by oidcSubject
+        .mockResolvedValueOnce(existing); // matched by verified email
+      usersRepository.save.mockImplementation((u) => u);
+
+      const result = await service.findOrCreateOidcUser({
+        sub: "oidc-sub-123",
+        email: "oidc@example.com",
+        email_verified: true,
+      });
+
+      expect(result.user.id).toBe("local-existing");
+      expect(result.isNewUser).toBe(false);
     });
 
     it("seeds preferences with the request locale for a new OIDC user", async () => {
