@@ -25,7 +25,8 @@
     "accounts": "帳戶",
     "budgets": "預算",
     "reports": "報表",
-    "settings": "設定"
+    "settings": "設定",
+    "tools": "工具"
   },
   "gettingStarted": {
     "takeTour": "開始導覽",
@@ -107,6 +108,37 @@
         "finish": {
           "title": "一切就緒",
           "body": "導覽到此結束。您隨時可以在**設定**的「**導覽引導**」區塊重新進行這趟導覽。"
+        }
+      }
+    }
+  },
+  "import": {
+    "bringingDataIn": {
+      "title": "把資料搬進來",
+      "steps": {
+        "welcome": {
+          "title": "把資料搬進來",
+          "body": "從 Microsoft Money、Quicken 或銀行匯出檔轉過來嗎？本導覽會說明匯入功能在哪裡、要準備什麼——那些不好還原的選擇，全都在精靈開啟之前就決定了。"
+        },
+        "whereItLives": {
+          "title": "匯入在「工具」裡",
+          "body": "**匯入交易**就在這個 **工具** 選單中。您也可以從某個帳戶的頁面開始，那樣該帳戶會被預先選取。"
+        },
+        "files": {
+          "title": "需要準備的檔案",
+          "body": "**每個帳戶匯出一個檔案**，投資帳戶要匯出**兩次**——一次選 Investment（證券買賣），一次選 Regular（現金部分）。在 Microsoft Money 裡務必選 **Loose QIF**：Strict QIF 會遺失拆分明細與轉帳參照。QIF、OFX、QFX 與 CSV 都支援，而且可以一次拖入多個檔案。"
+        },
+        "order": {
+          "title": "順序很重要",
+          "body": "檔案依列出的順序處理，後面的檔案可以用到前面檔案建立的類別、收付對象與帳戶。先資產，再本幣帳戶，接著外幣帳戶，然後投資帳戶的現金部分，券商檔案放最後——這樣每筆轉帳都能找到已經存在的另一端。"
+        },
+        "wizard": {
+          "title": "精靈會問什麼",
+          "body": "只有檔案需要時才會出現對應步驟：要匯入哪個帳戶，接著是類別、證券與轉帳帳戶的對應。琥珀色在等您處理，綠色已自動比對，跳過也沒問題——類別可以之後再補。整個匯入在一個資料庫交易中完成，出錯不會留下一半的資料。"
+        },
+        "afterwards": {
+          "title": "匯入之後",
+          "body": "把每個帳戶的餘額與舊軟體核對，並在交易中搜尋備註 **PENDING IMPORT**——跨幣別轉帳進來時沒有匯率，因為 QIF 不帶匯率。附螢幕擷圖與疑難排解的完整指南在 wiki 的 [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)。"
         }
       }
     }

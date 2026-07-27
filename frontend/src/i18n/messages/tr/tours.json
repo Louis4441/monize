@@ -25,7 +25,8 @@
     "accounts": "Hesaplar",
     "budgets": "Bütçeler",
     "reports": "Raporlar",
-    "settings": "Ayarlar"
+    "settings": "Ayarlar",
+    "tools": "Araçlar"
   },
   "gettingStarted": {
     "takeTour": "Turu yap",
@@ -107,6 +108,37 @@
         "finish": {
           "title": "Her şey hazır",
           "body": "Tur burada bitiyor. **Ayarlar** içindeki **Rehberli turlar** bölümünden istediğiniz zaman yeniden yapabilirsiniz."
+        }
+      }
+    }
+  },
+  "import": {
+    "bringingDataIn": {
+      "title": "Verilerinizi taşımak",
+      "steps": {
+        "welcome": {
+          "title": "Verilerinizi taşımak",
+          "body": "Microsoft Money, Quicken ya da bir banka çıktısından mı geliyorsunuz? Bu tur içe aktarmanın nerede olduğunu ve neyi hazır etmeniz gerektiğini gösterir: geri alması zor kararların hepsi sihirbaz açılmadan önce verilir."
+        },
+        "whereItLives": {
+          "title": "İçe aktarma Araçlar altında",
+          "body": "**İşlemleri içe aktar**, burada, **Araçlar** menüsünde. Bir hesabın kendi sayfasından da başlayabilirsiniz; o hesap önceden seçili gelir."
+        },
+        "files": {
+          "title": "Neyle gelmeli",
+          "body": "**Hesap başına bir dosya** dışa aktarın, yatırım hesaplarını ise **iki kez** — biri menkul kıymet işlemleri için Investment, biri nakit tarafı için Regular. Microsoft Money'de her zaman **Loose QIF** seçin: Strict QIF, bölme ayrıntılarını ve transfer referanslarını kaybeder. QIF, OFX, QFX ve CSV kabul edilir; birden çok dosyayı bir kerede bırakabilirsiniz."
+        },
+        "order": {
+          "title": "Sıra önemlidir",
+          "body": "Dosyalar listelendiği sırada işlenir ve her biri öncekilerin oluşturduğu kategorileri, alıcıları ve hesapları kullanabilir. Önce varlıklar, sonra kendi para biriminizdeki hesaplar, sonra yabancı para hesapları, sonra yatırım hesaplarının nakit tarafı ve en son aracı kurum dosyaları — böylece her transfer karşı tarafını hazır bulur."
+        },
+        "wizard": {
+          "title": "Sihirbaz ne soracak",
+          "body": "Adımlar yalnızca dosyanız gerektirdiğinde çıkar: hangi hesaba aktarılacağı, ardından kategorilerin, menkul kıymetlerin ve transfer hesaplarının eşlenmesi. Sarı sizi bekler, yeşil zaten eşlendi, atlamak da sorun değil — sonradan kategorilendirebilirsiniz. İçe aktarmanın tamamı tek bir veritabanı işlemi olarak çalışır, yani hata yarım veri bırakmaz."
+        },
+        "afterwards": {
+          "title": "İçe aktarmadan sonra",
+          "body": "Her bakiyeyi eski yazılımınızla karşılaştırın ve işlemlerde **PENDING IMPORT** notunu arayın — çapraz kurlu transferler kur bilgisi olmadan gelir, çünkü QIF kur taşımaz. Ekran görüntüleri ve sorun giderme içeren tam kılavuz wiki'de, [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money) başlığında."
         }
       }
     }

@@ -22,6 +22,7 @@ export const TOUR_ANCHORS = {
   navSettings: 'nav-settings',
   navTools: 'nav-tools',
   navToolsMenu: 'nav-tools-menu',
+  navImportLink: 'nav-import-link',
 
   // Dashboard
   dashboardWidgets: 'dashboard-widgets',
@@ -44,6 +45,10 @@ export const TOUR_ANCHORS = {
   transactionConvertedAmount: 'transaction-converted-amount',
   transactionFxConversion: 'transaction-fx-conversion',
   transactionFormActions: 'transaction-form-actions',
+
+  // Import
+  importStepper: 'import-stepper',
+  importDropzone: 'import-dropzone',
 
   // Reports
   reportForeignCurrencyFees: 'report-foreign-currency-fees',

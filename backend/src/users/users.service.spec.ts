@@ -20,6 +20,7 @@ import { I18nContext } from "nestjs-i18n";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { CurrenciesService } from "../currencies/currencies.service";
 import { BackupEncryptionService } from "../backup/backup-encryption.service";
+import { DemoModeService } from "../common/demo-mode.service";
 
 describe("UsersService", () => {
   let service: UsersService;
@@ -29,6 +30,7 @@ describe("UsersService", () => {
   let patRepository: Record<string, jest.Mock>;
   let trustedDevicesRepository: Record<string, jest.Mock>;
   let passwordBreachService: { isBreached: jest.Mock };
+  let demoModeService: { isDemo: boolean };
   let exchangeRateService: { refreshAllRates: jest.Mock };
   let currenciesService: { ensureSystemCurrency: jest.Mock };
   let backupEncryptionService: { syncOnPasswordChange: jest.Mock };
@@ -128,6 +130,8 @@ describe("UsersService", () => {
       }),
     };
 
+    demoModeService = { isDemo: false };
+
     mockQueryRunner = {
       connect: jest.fn(),
       startTransaction: jest.fn(),
@@ -165,6 +169,7 @@ describe("UsersService", () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: PasswordBreachService, useValue: passwordBreachService },
         { provide: ModuleRef, useValue: moduleRef },
+        { provide: DemoModeService, useValue: demoModeService },
       ],
     }).compile();
 
@@ -392,6 +397,31 @@ describe("UsersService", () => {
       const savedData = preferencesRepository.save.mock.calls[0][0];
       expect(savedData.theme).toBe("dark");
       expect(savedData.defaultCurrency).toBe("USD"); // unchanged
+    });
+
+    it("persists the language when not in demo mode", async () => {
+      demoModeService.isDemo = false;
+      preferencesRepository.findOne.mockResolvedValue({ ...mockPreferences });
+
+      await service.updatePreferences("user-1", { language: "pl" });
+
+      const savedData = preferencesRepository.save.mock.calls[0][0];
+      expect(savedData.language).toBe("pl");
+    });
+
+    it("does not persist the language in demo mode (shared account)", async () => {
+      demoModeService.isDemo = true;
+      preferencesRepository.findOne.mockResolvedValue({
+        ...mockPreferences,
+        language: "en",
+      });
+
+      await service.updatePreferences("user-1", { language: "pl", theme: "dark" });
+
+      const savedData = preferencesRepository.save.mock.calls[0][0];
+      // Language stays as the shared account had it; other fields still apply.
+      expect(savedData.language).toBe("en");
+      expect(savedData.theme).toBe("dark");
     });
 
     it("creates defaults first if preferences do not exist", async () => {

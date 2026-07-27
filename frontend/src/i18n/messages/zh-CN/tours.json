@@ -25,7 +25,8 @@
     "accounts": "账户",
     "budgets": "预算",
     "reports": "报表",
-    "settings": "设置"
+    "settings": "设置",
+    "tools": "工具"
   },
   "gettingStarted": {
     "takeTour": "开始导览",
@@ -107,6 +108,37 @@
         "finish": {
           "title": "一切就绪",
           "body": "导览到此结束。您可以随时在**设置**的“**引导式导览**”部分重新开始本导览。"
+        }
+      }
+    }
+  },
+  "import": {
+    "bringingDataIn": {
+      "title": "把数据搬进来",
+      "steps": {
+        "welcome": {
+          "title": "把数据搬进来",
+          "body": "从 Microsoft Money、Quicken 或银行导出文件迁移过来？本导览会告诉您导入功能在哪里、要准备什么——那些不好撤销的选择，全都在向导打开之前就定下了。"
+        },
+        "whereItLives": {
+          "title": "导入在“工具”里",
+          "body": "**导入交易**就在这个 **工具** 菜单中。您也可以从某个账户的页面开始，那样该账户会被预先选中。"
+        },
+        "files": {
+          "title": "需要准备的文件",
+          "body": "**每个账户导出一个文件**，投资账户要导出**两次**——一次选 Investment（证券买卖），一次选 Regular（现金部分）。在 Microsoft Money 里务必选 **Loose QIF**：Strict QIF 会丢掉拆分明细和转账引用。QIF、OFX、QFX 和 CSV 都支持，并且可以一次拖入多个文件。"
+        },
+        "order": {
+          "title": "顺序很重要",
+          "body": "文件按列出的顺序处理，后面的文件可以用到前面文件创建的分类、收款人和账户。先资产，再本币账户，然后外币账户，接着投资账户的现金部分，券商文件放最后——这样每一笔转账都能找到已经存在的另一端。"
+        },
+        "wizard": {
+          "title": "向导会问什么",
+          "body": "只有文件需要时才会出现相应步骤：导入到哪个账户，然后是分类、证券和转账账户的对应关系。琥珀色在等您处理，绿色已经自动匹配，跳过也没问题——分类可以以后再补。整个导入在一个数据库事务里完成，出错不会留下一半数据。"
+        },
+        "afterwards": {
+          "title": "导入之后",
+          "body": "把每个账户的余额与旧软件核对，并在交易中搜索备注 **PENDING IMPORT**——跨币种转账进来时没有汇率，因为 QIF 不携带汇率。带截图和故障排查的完整指南在 wiki 的 [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money) 一节。"
         }
       }
     }

@@ -7,7 +7,8 @@ export type TourArea =
   | 'accounts'
   | 'budgets'
   | 'reports'
-  | 'settings';
+  | 'settings'
+  | 'tools';
 
 /**
  * How a step advances to the next one.
