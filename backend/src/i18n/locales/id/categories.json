@@ -1,136 +1,71 @@
 {
   "defaults": {
-    "investmentIncome": {
-      "name": "Pendapatan Investasi",
-      "sub": {
-        "capitalGains": "Keuntungan Modal",
-        "interest": "Bunga",
-        "respGrant": "Hibah Tabungan Pendidikan"
-      }
-    },
-    "otherIncome": {
-      "name": "Pendapatan Lain",
-      "sub": {
-        "blogging": "Blogging",
-        "businessReimbursement": "Penggantian Biaya Bisnis",
-        "cashback": "Cashback",
-        "consulting": "Konsultasi",
-        "creditCardReward": "Hadiah Kartu Kredit",
-        "employeeStockOption": "Opsi Saham Karyawan",
-        "giftsReceived": "Hadiah Diterima",
-        "incomeTaxRefund": "Pengembalian Pajak Penghasilan",
-        "rentalIncome": "Pendapatan Sewa",
-        "stateLocalTaxRefund": "Pengembalian Pajak Daerah",
-        "transferBonus": "Bonus Transfer",
-        "tutoring": "Les Privat"
-      }
-    },
-    "retirementIncome": {
-      "name": "Pendapatan Pensiun",
-      "sub": {
-        "cppQppBenefits": "Manfaat Dana Pensiun (CPP/QPP)"
-      }
-    },
-    "wagesSalary": {
-      "name": "Upah & Gaji",
-      "sub": {
-        "bonus": "Bonus",
-        "commission": "Komisi",
-        "employerMatching": "Iuran Tambahan Pemberi Kerja",
-        "grossPay": "Gaji Kotor",
-        "netPay": "Gaji Bersih",
-        "overtime": "Lembur",
-        "vacationPay": "Uang Cuti"
-      }
-    },
     "automobile": {
       "name": "Kendaraan",
       "sub": {
         "accessories": "Aksesori",
         "carPayment": "Cicilan Mobil",
         "cleaning": "Pencucian",
+        "congestionCharge": "Biaya kemacetan",
         "fines": "Denda",
-        "gasoline": "Bensin",
-        "licencing": "Perizinan",
+        "fuel": "Bahan bakar",
         "maintenance": "Perawatan",
+        "mot": "Uji kelayakan kendaraan",
         "parking": "Parkir",
         "parts": "Suku Cadang",
-        "tollCharges": "Biaya Tol"
+        "registration": "Registrasi",
+        "roadTax": "Pajak kendaraan",
+        "tolls": "Tol"
       }
     },
     "bankFees": {
       "name": "Biaya Bank",
       "sub": {
+        "annualFee": "Biaya tahunan",
         "atm": "ATM",
-        "annual": "Tahunan",
+        "foreignTransaction": "Biaya transaksi valas",
         "nsf": "Saldo Tidak Cukup",
         "other": "Lainnya",
         "overdraft": "Cerukan",
-        "service": "Administrasi"
+        "serviceCharge": "Biaya administrasi",
+        "unpaidItemFee": "Biaya gagal bayar"
       }
     },
     "bills": {
       "name": "Tagihan",
       "sub": {
-        "accounting": "Akuntansi",
-        "cableTv": "TV Kabel",
-        "cellPhone": "Ponsel",
         "electricity": "Listrik",
         "internet": "Internet",
-        "lawyer": "Pengacara",
+        "mobilePhone": "Ponsel",
         "naturalGas": "Gas Alam",
-        "satelliteRadio": "Radio Satelit",
-        "streaming": "Streaming",
+        "streamingServices": "Layanan streaming",
         "telephone": "Telepon",
-        "waterSewer": "Air & Saluran Pembuangan",
-        "waterHeater": "Pemanas Air"
+        "television": "Televisi",
+        "tvLicence": "Iuran TV",
+        "wasteCollection": "Pengangkutan sampah",
+        "waterSewer": "Air & Saluran Pembuangan"
       }
     },
     "business": {
       "name": "Bisnis",
       "sub": {
         "airfare": "Tiket Pesawat",
-        "alcohol": "Alkohol",
-        "bankFees": "Biaya Bank",
         "carRental": "Sewa Mobil",
-        "cellPhone": "Ponsel",
-        "computerHardware": "Perangkat Keras Komputer",
-        "computerSoftware": "Perangkat Lunak Komputer",
         "diningOut": "Makan di Luar",
-        "education": "Pendidikan",
-        "gasoline": "Bensin",
-        "internet": "Internet",
+        "fuel": "Bahan bakar",
         "lodging": "Penginapan",
         "mileage": "Jarak Tempuh",
         "miscellaneous": "Lain-lain",
+        "mobilePhone": "Ponsel",
+        "officeSupplies": "Perlengkapan kantor",
         "parking": "Parkir",
-        "recreation": "Rekreasi",
-        "tollCharges": "Biaya Tol",
+        "software": "Perangkat lunak",
         "transit": "Transportasi"
       }
     },
     "cashWithdrawal": {
       "name": "Penarikan Tunai",
-      "sub": {
-        "barbadianDollars": "Dolar Barbados",
-        "bermudianDollars": "Dolar Bermuda",
-        "canadianDollars": "Dolar Kanada",
-        "costaRicanColones": "Colon Kosta Rika",
-        "croatianKunas": "Kuna Kroasia",
-        "dominicanRepublicPesos": "Peso Republik Dominika",
-        "easternCaribbeanDollars": "Dolar Karibia Timur",
-        "euros": "Euro",
-        "forints": "Forint Hongaria",
-        "honduranLempiras": "Lempira Honduras",
-        "hongKongDollars": "Dolar Hong Kong",
-        "indonesianRupiah": "Rupiah Indonesia",
-        "malaysianRinggits": "Ringgit Malaysia",
-        "mexicanPesos": "Peso Meksiko",
-        "peruvianSoles": "Sol Peru",
-        "singaporeDollars": "Dolar Singapura",
-        "thaiBaht": "Baht Thailand",
-        "usDollars": "Dolar AS"
-      }
+      "sub": {}
     },
     "charitableDonations": {
       "name": "Donasi Amal",
@@ -142,21 +77,10 @@
         "activities": "Kegiatan",
         "allowance": "Uang Saku",
         "babysitting": "Jasa Pengasuh",
-        "books": "Buku",
         "clothing": "Pakaian",
-        "counselling": "Konseling",
         "daycare": "Penitipan Anak",
-        "entertainment": "Hiburan",
-        "fees": "Biaya",
-        "furnishings": "Perabotan",
-        "gifts": "Hadiah",
-        "haircut": "Potong Rambut",
-        "medication": "Obat",
-        "shoes": "Sepatu",
-        "sportingGoods": "Perlengkapan Olahraga",
+        "schoolSupplies": "Perlengkapan sekolah",
         "sports": "Olahraga",
-        "supplies": "Perlengkapan",
-        "toiletries": "Perlengkapan Mandi",
         "toysGames": "Mainan & Permainan"
       }
     },
@@ -165,23 +89,17 @@
       "sub": {
         "accessories": "Aksesori",
         "clothes": "Baju",
-        "coats": "Jaket",
+        "outerwear": "Jaket & mantel",
         "shoes": "Sepatu"
-      }
-    },
-    "computer": {
-      "name": "Komputer",
-      "sub": {
-        "hardware": "Perangkat Keras",
-        "software": "Perangkat Lunak",
-        "webHosting": "Web Hosting"
       }
     },
     "education": {
       "name": "Pendidikan",
       "sub": {
+        "529PlanContribution": "Kontribusi rencana 529",
         "books": "Buku",
         "fees": "Biaya",
+        "supplies": "Perlengkapan belajar",
         "tuition": "Uang Kuliah"
       }
     },
@@ -190,8 +108,10 @@
       "sub": {
         "alcohol": "Alkohol",
         "cannabis": "Ganja",
+        "coffeeShops": "Kedai kopi",
         "diningOut": "Makan di Luar",
-        "groceries": "Belanja Bahan Makanan"
+        "groceries": "Belanja Bahan Makanan",
+        "takeout": "Makanan bawa pulang"
       }
     },
     "furnishings": {
@@ -199,16 +119,14 @@
       "sub": {
         "accessories": "Aksesori",
         "appliances": "Peralatan Rumah Tangga",
-        "basement": "Ruang Bawah Tanah",
         "bathroom": "Kamar Mandi",
         "bedroom": "Kamar Tidur",
-        "diningRoom": "Ruang Makan",
+        "decor": "Dekorasi",
         "dishes": "Peralatan Makan",
         "kitchen": "Dapur",
         "livingRoom": "Ruang Tamu",
         "office": "Kantor",
-        "outdoor": "Luar Ruangan",
-        "plants": "Tanaman"
+        "outdoor": "Luar Ruangan"
       }
     },
     "gifts": {
@@ -217,28 +135,32 @@
         "anniversary": "Hari Jadi",
         "birthday": "Ulang Tahun",
         "cards": "Kartu Ucapan",
-        "christmas": "Natal",
         "flowers": "Bunga",
-        "mothersDay": "Hari Ibu",
+        "holiday": "Hari raya",
         "respContribution": "Iuran Tabungan Pendidikan",
-        "valentines": "Hari Valentine",
         "wedding": "Pernikahan"
+      }
+    },
+    "governmentFees": {
+      "name": "Biaya pemerintah",
+      "sub": {
+        "licencesPermits": "Lisensi & izin",
+        "passport": "Paspor"
       }
     },
     "healthcare": {
       "name": "Kesehatan",
       "sub": {
+        "copay": "Iuran pribadi",
         "counselling": "Konseling",
         "dental": "Gigi",
         "eyecare": "Perawatan Mata",
-        "fertility": "Kesuburan",
         "fitness": "Kebugaran",
+        "healthSavingsAccount": "Rekening tabungan kesehatan",
         "hospital": "Rumah Sakit",
-        "massage": "Pijat",
         "medication": "Obat",
         "physician": "Dokter",
         "physiotherapy": "Fisioterapi",
-        "prescriptions": "Resep Obat",
         "supplies": "Perlengkapan"
       }
     },
@@ -246,12 +168,14 @@
       "name": "Perumahan",
       "sub": {
         "fees": "Biaya",
-        "gardenSupplies": "Perlengkapan Taman",
+        "garden": "Taman",
+        "groundRent": "Sewa tanah",
         "homeImprovement": "Renovasi Rumah",
         "maintenance": "Perawatan",
         "mortgageInterest": "Bunga KPR",
         "mortgagePrincipal": "Pokok KPR",
         "rent": "Sewa",
+        "serviceCharge": "Iuran pengelolaan",
         "supplies": "Perlengkapan",
         "tools": "Peralatan"
       }
@@ -262,8 +186,10 @@
         "automobile": "Kendaraan",
         "disability": "Disabilitas",
         "health": "Kesehatan",
-        "homeownerRenter": "Pemilik/Penyewa Rumah",
+        "home": "Rumah",
         "life": "Jiwa",
+        "provincialHealthPremium": "Premi kesehatan provinsi",
+        "renter": "Penyewa",
         "travel": "Perjalanan"
       }
     },
@@ -271,61 +197,73 @@
       "name": "Beban Bunga",
       "sub": {}
     },
+    "investmentIncome": {
+      "name": "Pendapatan Investasi",
+      "sub": {
+        "capitalGains": "Keuntungan Modal",
+        "dividends": "Dividen",
+        "interest": "Bunga",
+        "respGrant": "Hibah Tabungan Pendidikan"
+      }
+    },
     "leisure": {
       "name": "Hiburan",
       "sub": {
         "booksMagazines": "Buku & Majalah",
-        "cd": "CD",
-        "cameraFilm": "Kamera/Film",
         "camping": "Berkemah",
-        "coverCharge": "Biaya Masuk",
+        "concerts": "Konser",
         "culturalEvents": "Acara Budaya",
-        "dvd": "DVD",
         "electronics": "Elektronik",
-        "entertaining": "Menjamu Tamu",
-        "entertainment": "Hiburan",
-        "fees": "Biaya",
-        "gambling": "Judi",
-        "lps": "Piringan Hitam",
+        "games": "Permainan",
+        "hobbies": "Hobi",
         "movies": "Film",
-        "newspaper": "Koran",
+        "music": "Musik",
         "sportingEvents": "Acara Olahraga",
         "sportingGoods": "Perlengkapan Olahraga",
-        "sports": "Olahraga",
-        "toysGames": "Mainan & Permainan",
-        "transit": "Transportasi",
-        "vhs": "VHS",
-        "videoRentals": "Rental Video"
+        "sports": "Olahraga"
       }
-    },
-    "licencingFees": {
-      "name": "Biaya Perizinan",
-      "sub": {}
     },
     "loan": {
       "name": "Pinjaman",
       "sub": {
         "loanInterest": "Bunga Pinjaman",
         "loanPrincipal": "Pokok Pinjaman",
-        "mortgageInterest": "Bunga KPR"
+        "studentLoanInterest": "Bunga pinjaman pendidikan",
+        "studentLoanPrincipal": "Pokok pinjaman pendidikan",
+        "studentLoanRepayment": "Pembayaran pinjaman pendidikan"
       }
     },
     "miscellaneous": {
       "name": "Lain-lain",
       "sub": {
-        "postage": "Ongkos Kirim",
-        "postcards": "Kartu Pos",
-        "tools": "Peralatan",
-        "transit": "Transportasi"
+        "other": "Lainnya",
+        "postage": "Ongkos Kirim"
+      }
+    },
+    "otherIncome": {
+      "name": "Pendapatan Lain",
+      "sub": {
+        "businessReimbursement": "Penggantian Biaya Bisnis",
+        "canadaChildBenefit": "Tunjangan anak (Kanada)",
+        "cashback": "Cashback",
+        "childBenefit": "Tunjangan anak",
+        "creditCardReward": "Hadiah Kartu Kredit",
+        "freelance": "Kerja lepas",
+        "giftsReceived": "Hadiah Diterima",
+        "gstHstCredit": "Kredit GST/HST",
+        "rentalIncome": "Pendapatan Sewa",
+        "stateTaxRefund": "Pengembalian pajak negara bagian",
+        "taxRefund": "Pengembalian pajak"
       }
     },
     "personalCare": {
       "name": "Perawatan Pribadi",
       "sub": {
+        "cosmetics": "Kosmetik",
         "dryCleaning": "Cuci Kering",
         "haircut": "Potong Rambut",
         "laundry": "Binatu",
-        "pedicure": "Pedikur",
+        "spa": "Spa",
         "toiletries": "Perlengkapan Mandi"
       }
     },
@@ -333,36 +271,101 @@
       "name": "Perawatan Hewan Peliharaan",
       "sub": {
         "food": "Makanan",
+        "grooming": "Perawatan hewan",
         "supplies": "Perlengkapan",
         "veterinarian": "Dokter Hewan"
+      }
+    },
+    "professionalServices": {
+      "name": "Jasa profesional",
+      "sub": {
+        "accounting": "Akuntansi",
+        "financialAdvice": "Konsultasi keuangan",
+        "legal": "Jasa hukum"
+      }
+    },
+    "retirementIncome": {
+      "name": "Pendapatan Pensiun",
+      "sub": {
+        "401KWithdrawal": "Penarikan 401(k)",
+        "annuity": "Anuitas",
+        "cppQppBenefits": "Manfaat Dana Pensiun (CPP/QPP)",
+        "iraWithdrawal": "Penarikan IRA",
+        "oasBenefits": "Tunjangan OAS",
+        "pension": "Pensiun",
+        "retirementAccountWithdrawal": "Penarikan dana pensiun",
+        "rrifWithdrawal": "Penarikan RRIF",
+        "rrspWithdrawal": "Penarikan RRSP",
+        "socialSecurityBenefits": "Tunjangan Social Security",
+        "statePension": "Pensiun negara",
+        "workplacePension": "Pensiun perusahaan"
       }
     },
     "taxes": {
       "name": "Pajak",
       "sub": {
+        "councilTax": "Pajak daerah",
         "cppQppContributions": "Iuran Dana Pensiun (CPP/QPP)",
         "eiPremiums": "Premi Asuransi Ketenagakerjaan",
-        "federalIncome": "Penghasilan Federal",
-        "goodsServices": "Barang & Jasa",
+        "federalIncomeTax": "Pajak penghasilan federal",
+        "gstHst": "GST/HST",
+        "incomeTax": "Pajak penghasilan",
+        "localIncomeTax": "Pajak penghasilan lokal",
+        "medicareTax": "Pajak Medicare",
+        "nationalInsurance": "Asuransi nasional",
         "other": "Lainnya",
-        "property": "Properti",
-        "realEstate": "Real Estat",
-        "stateProvincial": "Negara Bagian/Provinsi",
-        "unionDues": "Iuran Serikat Pekerja"
+        "propertyTax": "Pajak properti",
+        "provincialIncomeTax": "Pajak penghasilan provinsi",
+        "provincialSalesTax": "Pajak penjualan provinsi",
+        "salesTax": "Pajak penjualan",
+        "socialSecurityTax": "Pajak Social Security",
+        "stateIncomeTax": "Pajak penghasilan negara bagian",
+        "unionDues": "Iuran Serikat Pekerja",
+        "vat": "PPN"
+      }
+    },
+    "technology": {
+      "name": "Teknologi",
+      "sub": {
+        "hardware": "Perangkat keras",
+        "software": "Perangkat lunak",
+        "subscriptions": "Langganan",
+        "webHosting": "Hosting web"
+      }
+    },
+    "transportation": {
+      "name": "Transportasi",
+      "sub": {
+        "bicycle": "Sepeda",
+        "publicTransit": "Transportasi umum",
+        "rideshare": "Transportasi online",
+        "taxi": "Taksi"
       }
     },
     "vacation": {
       "name": "Liburan",
       "sub": {
+        "activities": "Aktivitas",
         "airfare": "Tiket Pesawat",
         "carRental": "Sewa Mobil",
-        "entertainment": "Hiburan",
-        "gasoline": "Bensin",
+        "fuel": "Bahan bakar",
         "lodging": "Penginapan",
         "miscellaneous": "Lain-lain",
-        "parking": "Parkir",
-        "transit": "Transportasi",
-        "travel": "Perjalanan"
+        "parking": "Parkir"
+      }
+    },
+    "wagesSalary": {
+      "name": "Upah & Gaji",
+      "sub": {
+        "bonus": "Bonus",
+        "commission": "Komisi",
+        "employerMatching": "Iuran Tambahan Pemberi Kerja",
+        "grossPay": "Gaji Kotor",
+        "netPay": "Gaji Bersih",
+        "overtime": "Lembur",
+        "stockOptions": "Opsi saham",
+        "tips": "Tip",
+        "vacationPay": "Uang Cuti"
       }
     }
   }
