@@ -61,6 +61,35 @@ describe("LocalStorageProvider", () => {
     );
   });
 
+  it.each([
+    ["..", "parent traversal segment"],
+    [".", "current directory segment"],
+    ["", "empty key"],
+    ["../../etc/passwd", "deep traversal"],
+    ["a/../../b", "embedded traversal"],
+    ["file.txt", "dotted filename"],
+    ["with space", "whitespace"],
+    ["nul\0byte", "NUL byte"],
+  ])("rejects the key %p (%s)", async (key) => {
+    await expect(provider.load(key)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(provider.save(key, Buffer.from("x"))).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(provider.delete(key)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it("leaves the parent directory untouched when a traversal key is used", async () => {
+    const marker = join(baseDir, "..", "marker-should-survive");
+    await fs.writeFile(marker, "keep");
+    await expect(provider.delete("..")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(fs.readFile(marker, "utf8")).resolves.toBe("keep");
+    await fs.rm(marker, { force: true });
+  });
+
   it("defaults to /data/attachments when unconfigured", () => {
     const p = new LocalStorageProvider({
       get: () => undefined,

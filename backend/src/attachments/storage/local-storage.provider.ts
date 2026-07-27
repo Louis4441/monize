@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { promises as fs } from "fs";
-import { basename, join, resolve } from "path";
+import { basename, resolve, sep } from "path";
 import { tr } from "../../i18n/translate";
 import { AttachmentStorageProvider } from "./attachment-storage.interface";
 
@@ -28,17 +28,36 @@ export class LocalStorageProvider implements AttachmentStorageProvider {
   }
 
   /**
-   * Resolve `key` to a path inside `baseDir`. Keys are server-generated UUIDs,
-   * but treat them as untrusted: reject anything that isn't a bare filename so a
-   * crafted key can never traverse out of the directory.
+   * Keys are server-generated UUIDs. The allowlist deliberately excludes `.`,
+   * so traversal segments (`.`, `..`) and separators cannot be expressed at all.
+   */
+  private static readonly SAFE_KEY = /^[A-Za-z0-9_-]+$/;
+
+  /**
+   * Resolve `key` to a path inside `baseDir`. Keys are server-generated, but
+   * treat them as untrusted: strip any directory component, require the result
+   * to be an unchanged allowlisted filename, then assert the resolved path is
+   * still contained by `baseDir` before it reaches the filesystem.
    */
   private pathFor(key: string): string {
-    if (!key || basename(key) !== key) {
+    const safe = basename(key ?? "");
+    if (
+      !safe ||
+      safe !== key ||
+      !LocalStorageProvider.SAFE_KEY.test(safe) ||
+      safe.includes("\0")
+    ) {
       throw new NotFoundException(
         tr("errors.attachments.notFound", "Attachment not found"),
       );
     }
-    return join(this.baseDir, key);
+    const target = resolve(this.baseDir, safe);
+    if (!target.startsWith(`${this.baseDir}${sep}`)) {
+      throw new NotFoundException(
+        tr("errors.attachments.notFound", "Attachment not found"),
+      );
+    }
+    return target;
   }
 
   async save(key: string, data: Buffer): Promise<void> {
