@@ -1444,6 +1444,93 @@ describe("CategoriesService", () => {
         expect(sub.parentId).toMatch(/^gen-/);
       });
     });
+
+    const importedNames = async (options?: {
+      country?: string;
+      language?: string;
+    }): Promise<string[]> => {
+      categoriesRepository.count.mockResolvedValue(0);
+      let idCounter = 0;
+      const qr = mockDataSource.createQueryRunner();
+      const qrRepo = qr.manager.getRepository();
+      qrRepo.create.mockImplementation((data: unknown) => ({
+        ...(data as Record<string, unknown>),
+        id: `gen-${++idCounter}`,
+      }));
+      qrRepo.save.mockImplementation((data: unknown) => Promise.resolve(data));
+
+      await service.importDefaults("user-1", options);
+
+      return qrRepo.create.mock.calls.map(
+        (c: unknown[]) => (c[0] as { name: string }).name,
+      );
+    };
+
+    it("imports the country-neutral catalog when no country is given", async () => {
+      const names = await importedNames();
+
+      expect(names).toContain("Income Tax");
+      expect(names).not.toContain("CPP/QPP Contributions");
+      expect(names).not.toContain("Council Tax");
+    });
+
+    it("layers the selected country's additions over the baseline", async () => {
+      const names = await importedNames({ country: "CA" });
+
+      expect(names).toContain("CPP/QPP Contributions");
+      expect(names).toContain("EI Premiums");
+      expect(names).not.toContain("Income Tax");
+    });
+
+    it("falls back to the generic catalog for an unknown country", async () => {
+      const names = await importedNames({ country: "ZZ" });
+
+      expect(names).toContain("Income Tax");
+      expect(names).not.toContain("Council Tax");
+    });
+
+    it("seeds names in the requested language", async () => {
+      const i18n = (service as unknown as { i18n: { translate: jest.Mock } })
+        .i18n;
+
+      await importedNames({ language: "fr" });
+
+      expect(i18n.translate).toHaveBeenCalledWith(
+        "categories.defaults.taxes.name",
+        expect.objectContaining({ lang: "fr" }),
+      );
+      // The stored preference is not consulted when a language is supplied.
+      expect(preferencesRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the stored preference language when none is requested", async () => {
+      preferencesRepository.findOne.mockResolvedValue({ language: "de" });
+      const i18n = (service as unknown as { i18n: { translate: jest.Mock } })
+        .i18n;
+
+      await importedNames({ country: "US" });
+
+      expect(preferencesRepository.findOne).toHaveBeenCalledWith({
+        where: { userId: "user-1" },
+      });
+      expect(i18n.translate).toHaveBeenCalledWith(
+        "categories.defaults.taxes.name",
+        expect.objectContaining({ lang: "de" }),
+      );
+    });
+
+    it("ignores an unsupported language and uses the stored preference", async () => {
+      preferencesRepository.findOne.mockResolvedValue({ language: "es" });
+      const i18n = (service as unknown as { i18n: { translate: jest.Mock } })
+        .i18n;
+
+      await importedNames({ language: "klingon" });
+
+      expect(i18n.translate).toHaveBeenCalledWith(
+        "categories.defaults.taxes.name",
+        expect.objectContaining({ lang: "es" }),
+      );
+    });
   });
 
   describe("cross-user data isolation", () => {

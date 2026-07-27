@@ -80,10 +80,12 @@ describe("AdminService", () => {
 
     refreshTokensRepository = {
       update: jest.fn(),
+      delete: jest.fn(),
     };
 
     patRepository = {
       update: jest.fn(),
+      delete: jest.fn(),
     };
 
     oauthProviderService = {
@@ -568,6 +570,20 @@ describe("AdminService", () => {
       );
     });
 
+    it("deletes sessions and tokens so a non-cascading FK cannot block the delete", async () => {
+      usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
+
+      await service.deleteUser("admin-1", "user-2");
+
+      expect(refreshTokensRepository.delete).toHaveBeenCalledWith({
+        userId: "user-2",
+      });
+      expect(refreshTokensRepository.delete).toHaveBeenCalledWith({
+        actingAsUserId: "user-2",
+      });
+      expect(patRepository.delete).toHaveBeenCalledWith({ userId: "user-2" });
+    });
+
     it("demotes a delegate to a pure delegate instead of deleting", async () => {
       usersRepository.findOne.mockResolvedValue({ ...mockTargetUser });
       usersService.isActingDelegate.mockResolvedValue(true);
@@ -577,6 +593,10 @@ describe("AdminService", () => {
       expect(usersService.purgeForDowngrade).toHaveBeenCalledWith("user-2");
       expect(preferencesRepository.delete).not.toHaveBeenCalled();
       expect(usersRepository.remove).not.toHaveBeenCalled();
+      // The account survives as a delegate, so its sessions are revoked, not
+      // deleted along with the row.
+      expect(refreshTokensRepository.delete).not.toHaveBeenCalled();
+      expect(patRepository.delete).not.toHaveBeenCalled();
       // Sessions are still revoked so the demotion takes effect immediately.
       expect(oauthProviderService.revokeAllForUser).toHaveBeenCalledWith(
         "user-2",

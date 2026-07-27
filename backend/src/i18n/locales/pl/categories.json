@@ -1,136 +1,71 @@
 {
   "defaults": {
-    "investmentIncome": {
-      "name": "Dochody z inwestycji",
-      "sub": {
-        "capitalGains": "Zyski kapitałowe",
-        "interest": "Odsetki",
-        "respGrant": "Dopłata do planu oszczędnościowego na edukację"
-      }
-    },
-    "otherIncome": {
-      "name": "Pozostałe dochody",
-      "sub": {
-        "blogging": "Blogowanie",
-        "businessReimbursement": "Zwrot kosztów służbowych",
-        "cashback": "Zwrot gotówki (cashback)",
-        "consulting": "Doradztwo",
-        "creditCardReward": "Nagroda z karty kredytowej",
-        "employeeStockOption": "Opcje na akcje dla pracowników",
-        "giftsReceived": "Otrzymane prezenty",
-        "incomeTaxRefund": "Zwrot podatku dochodowego",
-        "rentalIncome": "Dochody z najmu",
-        "stateLocalTaxRefund": "Zwrot podatku stanowego i lokalnego",
-        "transferBonus": "Premia za przeniesienie",
-        "tutoring": "Korepetycje"
-      }
-    },
-    "retirementIncome": {
-      "name": "Dochody emerytalne",
-      "sub": {
-        "cppQppBenefits": "Świadczenia CPP/QPP"
-      }
-    },
-    "wagesSalary": {
-      "name": "Wynagrodzenie",
-      "sub": {
-        "bonus": "Premia",
-        "commission": "Prowizja",
-        "employerMatching": "Dopłata pracodawcy",
-        "grossPay": "Wynagrodzenie brutto",
-        "netPay": "Wynagrodzenie netto",
-        "overtime": "Nadgodziny",
-        "vacationPay": "Wynagrodzenie za urlop"
-      }
-    },
     "automobile": {
       "name": "Samochód",
       "sub": {
         "accessories": "Akcesoria",
         "carPayment": "Rata za samochód",
         "cleaning": "Mycie i czyszczenie",
+        "congestionCharge": "Opłata za wjazd do centrum",
         "fines": "Mandaty",
-        "gasoline": "Paliwo",
-        "licencing": "Rejestracja i licencje",
+        "fuel": "Paliwo",
         "maintenance": "Konserwacja",
+        "mot": "Przegląd techniczny",
         "parking": "Parking",
         "parts": "Części",
-        "tollCharges": "Opłaty drogowe"
+        "registration": "Rejestracja",
+        "roadTax": "Podatek drogowy",
+        "tolls": "Opłaty drogowe"
       }
     },
     "bankFees": {
       "name": "Opłaty bankowe",
       "sub": {
+        "annualFee": "Opłata roczna",
         "atm": "Bankomat",
-        "annual": "Roczne",
+        "foreignTransaction": "Przewalutowanie",
         "nsf": "Brak środków na koncie",
         "other": "Inne",
         "overdraft": "Debet",
-        "service": "Za obsługę"
+        "serviceCharge": "Opłata za prowadzenie konta",
+        "unpaidItemFee": "Opłata za brak środków"
       }
     },
     "bills": {
       "name": "Rachunki",
       "sub": {
-        "accounting": "Księgowość",
-        "cableTv": "Telewizja kablowa",
-        "cellPhone": "Telefon komórkowy",
         "electricity": "Prąd",
         "internet": "Internet",
-        "lawyer": "Prawnik",
+        "mobilePhone": "Telefon komórkowy",
         "naturalGas": "Gaz ziemny",
-        "satelliteRadio": "Radio satelitarne",
-        "streaming": "Streaming",
+        "streamingServices": "Usługi streamingowe",
         "telephone": "Telefon",
-        "waterSewer": "Woda i kanalizacja",
-        "waterHeater": "Podgrzewacz wody"
+        "television": "Telewizja",
+        "tvLicence": "Abonament RTV",
+        "wasteCollection": "Wywóz śmieci",
+        "waterSewer": "Woda i kanalizacja"
       }
     },
     "business": {
       "name": "Firma",
       "sub": {
         "airfare": "Bilety lotnicze",
-        "alcohol": "Alkohol",
-        "bankFees": "Opłaty bankowe",
         "carRental": "Wynajem samochodu",
-        "cellPhone": "Telefon komórkowy",
-        "computerHardware": "Sprzęt komputerowy",
-        "computerSoftware": "Oprogramowanie",
         "diningOut": "Posiłki na mieście",
-        "education": "Edukacja",
-        "gasoline": "Paliwo",
-        "internet": "Internet",
+        "fuel": "Paliwo",
         "lodging": "Nocleg",
         "mileage": "Kilometrówka",
         "miscellaneous": "Różne",
+        "mobilePhone": "Telefon komórkowy",
+        "officeSupplies": "Artykuły biurowe",
         "parking": "Parking",
-        "recreation": "Rozrywka",
-        "tollCharges": "Opłaty drogowe",
+        "software": "Oprogramowanie",
         "transit": "Transport publiczny"
       }
     },
     "cashWithdrawal": {
       "name": "Wypłata gotówki",
-      "sub": {
-        "barbadianDollars": "Dolary barbadoskie",
-        "bermudianDollars": "Dolary bermudzkie",
-        "canadianDollars": "Dolary kanadyjskie",
-        "costaRicanColones": "Kolony kostarykańskie",
-        "croatianKunas": "Kuny chorwackie",
-        "dominicanRepublicPesos": "Peso dominikańskie",
-        "easternCaribbeanDollars": "Dolary wschodniokaraibskie",
-        "euros": "Euro",
-        "forints": "Forinty",
-        "honduranLempiras": "Lempiry honduraskie",
-        "hongKongDollars": "Dolary hongkońskie",
-        "indonesianRupiah": "Rupie indonezyjskie",
-        "malaysianRinggits": "Ringgity malezyjskie",
-        "mexicanPesos": "Peso meksykańskie",
-        "peruvianSoles": "Sole peruwiańskie",
-        "singaporeDollars": "Dolary singapurskie",
-        "thaiBaht": "Bahty tajskie",
-        "usDollars": "Dolary amerykańskie"
-      }
+      "sub": {}
     },
     "charitableDonations": {
       "name": "Darowizny na cele charytatywne",
@@ -142,21 +77,10 @@
         "activities": "Zajęcia",
         "allowance": "Kieszonkowe",
         "babysitting": "Opieka niani",
-        "books": "Książki",
         "clothing": "Odzież",
-        "counselling": "Poradnictwo",
         "daycare": "Żłobek/przedszkole",
-        "entertainment": "Rozrywka",
-        "fees": "Opłaty",
-        "furnishings": "Wyposażenie",
-        "gifts": "Prezenty",
-        "haircut": "Fryzjer",
-        "medication": "Leki",
-        "shoes": "Buty",
-        "sportingGoods": "Artykuły sportowe",
+        "schoolSupplies": "Przybory szkolne",
         "sports": "Sport",
-        "supplies": "Artykuły",
-        "toiletries": "Kosmetyki i higiena",
         "toysGames": "Zabawki i gry"
       }
     },
@@ -165,23 +89,17 @@
       "sub": {
         "accessories": "Akcesoria",
         "clothes": "Ubrania",
-        "coats": "Płaszcze i kurtki",
+        "outerwear": "Odzież wierzchnia",
         "shoes": "Buty"
-      }
-    },
-    "computer": {
-      "name": "Komputer",
-      "sub": {
-        "hardware": "Sprzęt",
-        "software": "Oprogramowanie",
-        "webHosting": "Hosting stron"
       }
     },
     "education": {
       "name": "Edukacja",
       "sub": {
+        "529PlanContribution": "Wpłata na plan 529",
         "books": "Książki",
         "fees": "Opłaty",
+        "supplies": "Materiały do nauki",
         "tuition": "Czesne"
       }
     },
@@ -190,8 +108,10 @@
       "sub": {
         "alcohol": "Alkohol",
         "cannabis": "Marihuana",
+        "coffeeShops": "Kawiarnie",
         "diningOut": "Posiłki na mieście",
-        "groceries": "Zakupy spożywcze"
+        "groceries": "Zakupy spożywcze",
+        "takeout": "Jedzenie na wynos"
       }
     },
     "furnishings": {
@@ -199,16 +119,14 @@
       "sub": {
         "accessories": "Akcesoria",
         "appliances": "Sprzęt AGD",
-        "basement": "Piwnica",
         "bathroom": "Łazienka",
         "bedroom": "Sypialnia",
-        "diningRoom": "Jadalnia",
+        "decor": "Dekoracje",
         "dishes": "Naczynia",
         "kitchen": "Kuchnia",
         "livingRoom": "Salon",
         "office": "Biuro",
-        "outdoor": "Ogród i taras",
-        "plants": "Rośliny"
+        "outdoor": "Ogród i taras"
       }
     },
     "gifts": {
@@ -217,28 +135,32 @@
         "anniversary": "Rocznica",
         "birthday": "Urodziny",
         "cards": "Kartki okolicznościowe",
-        "christmas": "Boże Narodzenie",
         "flowers": "Kwiaty",
-        "mothersDay": "Dzień Matki",
+        "holiday": "Święta",
         "respContribution": "Wpłata na plan oszczędnościowy na edukację",
-        "valentines": "Walentynki",
         "wedding": "Ślub"
+      }
+    },
+    "governmentFees": {
+      "name": "Opłaty urzędowe",
+      "sub": {
+        "licencesPermits": "Licencje i pozwolenia",
+        "passport": "Paszport"
       }
     },
     "healthcare": {
       "name": "Opieka zdrowotna",
       "sub": {
+        "copay": "Dopłata",
         "counselling": "Poradnictwo",
         "dental": "Stomatologia",
         "eyecare": "Okulistyka",
-        "fertility": "Leczenie niepłodności",
         "fitness": "Fitness",
+        "healthSavingsAccount": "Zdrowotne konto oszczędnościowe",
         "hospital": "Szpital",
-        "massage": "Masaż",
         "medication": "Leki",
         "physician": "Lekarz",
         "physiotherapy": "Fizjoterapia",
-        "prescriptions": "Recepty",
         "supplies": "Artykuły medyczne"
       }
     },
@@ -246,12 +168,14 @@
       "name": "Mieszkanie",
       "sub": {
         "fees": "Opłaty",
-        "gardenSupplies": "Artykuły ogrodowe",
+        "garden": "Ogród",
+        "groundRent": "Użytkowanie wieczyste",
         "homeImprovement": "Remonty i ulepszenia",
         "maintenance": "Konserwacja",
         "mortgageInterest": "Odsetki od kredytu hipotecznego",
         "mortgagePrincipal": "Kapitał kredytu hipotecznego",
         "rent": "Czynsz",
+        "serviceCharge": "Czynsz administracyjny",
         "supplies": "Artykuły",
         "tools": "Narzędzia"
       }
@@ -262,8 +186,10 @@
         "automobile": "Samochodowe",
         "disability": "Na wypadek niezdolności do pracy",
         "health": "Zdrowotne",
-        "homeownerRenter": "Mieszkaniowe/najemcy",
+        "home": "Dom",
         "life": "Na życie",
+        "provincialHealthPremium": "Prowincjonalna składka zdrowotna",
+        "renter": "Najemca",
         "travel": "Podróżne"
       }
     },
@@ -271,61 +197,73 @@
       "name": "Koszty odsetkowe",
       "sub": {}
     },
+    "investmentIncome": {
+      "name": "Dochody z inwestycji",
+      "sub": {
+        "capitalGains": "Zyski kapitałowe",
+        "dividends": "Dywidendy",
+        "interest": "Odsetki",
+        "respGrant": "Dopłata do planu oszczędnościowego na edukację"
+      }
+    },
     "leisure": {
       "name": "Rozrywka",
       "sub": {
         "booksMagazines": "Książki i czasopisma",
-        "cd": "Płyty CD",
-        "cameraFilm": "Aparat/film",
         "camping": "Kemping",
-        "coverCharge": "Opłata za wstęp",
+        "concerts": "Koncerty",
         "culturalEvents": "Wydarzenia kulturalne",
-        "dvd": "Płyty DVD",
         "electronics": "Elektronika",
-        "entertaining": "Przyjmowanie gości",
-        "entertainment": "Rozrywka",
-        "fees": "Opłaty",
-        "gambling": "Hazard",
-        "lps": "Płyty winylowe",
+        "games": "Gry",
+        "hobbies": "Hobby",
         "movies": "Kino",
-        "newspaper": "Gazety",
+        "music": "Muzyka",
         "sportingEvents": "Wydarzenia sportowe",
         "sportingGoods": "Artykuły sportowe",
-        "sports": "Sport",
-        "toysGames": "Zabawki i gry",
-        "transit": "Transport publiczny",
-        "vhs": "Kasety VHS",
-        "videoRentals": "Wypożyczanie filmów"
+        "sports": "Sport"
       }
-    },
-    "licencingFees": {
-      "name": "Opłaty licencyjne",
-      "sub": {}
     },
     "loan": {
       "name": "Pożyczka",
       "sub": {
         "loanInterest": "Odsetki od pożyczki",
         "loanPrincipal": "Kapitał pożyczki",
-        "mortgageInterest": "Odsetki od kredytu hipotecznego"
+        "studentLoanInterest": "Odsetki kredytu studenckiego",
+        "studentLoanPrincipal": "Kapitał kredytu studenckiego",
+        "studentLoanRepayment": "Spłata kredytu studenckiego"
       }
     },
     "miscellaneous": {
       "name": "Różne",
       "sub": {
-        "postage": "Opłaty pocztowe",
-        "postcards": "Pocztówki",
-        "tools": "Narzędzia",
-        "transit": "Transport publiczny"
+        "other": "Inne",
+        "postage": "Opłaty pocztowe"
+      }
+    },
+    "otherIncome": {
+      "name": "Pozostałe dochody",
+      "sub": {
+        "businessReimbursement": "Zwrot kosztów służbowych",
+        "canadaChildBenefit": "Zasiłek na dziecko (Kanada)",
+        "cashback": "Zwrot gotówki (cashback)",
+        "childBenefit": "Zasiłek na dziecko",
+        "creditCardReward": "Nagroda z karty kredytowej",
+        "freelance": "Praca na zlecenie",
+        "giftsReceived": "Otrzymane prezenty",
+        "gstHstCredit": "Kredyt GST/HST",
+        "rentalIncome": "Dochody z najmu",
+        "stateTaxRefund": "Zwrot podatku stanowego",
+        "taxRefund": "Zwrot podatku"
       }
     },
     "personalCare": {
       "name": "Higiena osobista",
       "sub": {
+        "cosmetics": "Kosmetyki",
         "dryCleaning": "Pralnia chemiczna",
         "haircut": "Fryzjer",
         "laundry": "Pranie",
-        "pedicure": "Pedicure",
+        "spa": "Spa",
         "toiletries": "Kosmetyki i higiena"
       }
     },
@@ -333,36 +271,101 @@
       "name": "Opieka nad zwierzętami",
       "sub": {
         "food": "Karma",
+        "grooming": "Pielęgnacja",
         "supplies": "Akcesoria",
         "veterinarian": "Weterynarz"
+      }
+    },
+    "professionalServices": {
+      "name": "Usługi profesjonalne",
+      "sub": {
+        "accounting": "Księgowość",
+        "financialAdvice": "Doradztwo finansowe",
+        "legal": "Obsługa prawna"
+      }
+    },
+    "retirementIncome": {
+      "name": "Dochody emerytalne",
+      "sub": {
+        "401KWithdrawal": "Wypłata z 401(k)",
+        "annuity": "Renta dożywotnia",
+        "cppQppBenefits": "Świadczenia CPP/QPP",
+        "iraWithdrawal": "Wypłata z IRA",
+        "oasBenefits": "Świadczenia OAS",
+        "pension": "Emerytura",
+        "retirementAccountWithdrawal": "Wypłata z konta emerytalnego",
+        "rrifWithdrawal": "Wypłata z RRIF",
+        "rrspWithdrawal": "Wypłata z RRSP",
+        "socialSecurityBenefits": "Świadczenia Social Security",
+        "statePension": "Emerytura państwowa",
+        "workplacePension": "Emerytura pracownicza"
       }
     },
     "taxes": {
       "name": "Podatki",
       "sub": {
+        "councilTax": "Podatek komunalny",
         "cppQppContributions": "Składki CPP/QPP",
         "eiPremiums": "Składki na ubezpieczenie od bezrobocia",
-        "federalIncome": "Podatek dochodowy federalny",
-        "goodsServices": "Podatek od towarów i usług",
+        "federalIncomeTax": "Federalny podatek dochodowy",
+        "gstHst": "GST/HST",
+        "incomeTax": "Podatek dochodowy",
+        "localIncomeTax": "Lokalny podatek dochodowy",
+        "medicareTax": "Podatek Medicare",
+        "nationalInsurance": "Ubezpieczenie społeczne",
         "other": "Inne",
-        "property": "Podatek od nieruchomości",
-        "realEstate": "Podatek od nieruchomości gruntowych",
-        "stateProvincial": "Stanowy/prowincjonalny",
-        "unionDues": "Składki związkowe"
+        "propertyTax": "Podatek od nieruchomości",
+        "provincialIncomeTax": "Prowincjonalny podatek dochodowy",
+        "provincialSalesTax": "Prowincjonalny podatek od sprzedaży",
+        "salesTax": "Podatek od sprzedaży",
+        "socialSecurityTax": "Podatek na ubezpieczenie społeczne",
+        "stateIncomeTax": "Stanowy podatek dochodowy",
+        "unionDues": "Składki związkowe",
+        "vat": "VAT"
+      }
+    },
+    "technology": {
+      "name": "Technologia",
+      "sub": {
+        "hardware": "Sprzęt",
+        "software": "Oprogramowanie",
+        "subscriptions": "Subskrypcje",
+        "webHosting": "Hosting"
+      }
+    },
+    "transportation": {
+      "name": "Transport",
+      "sub": {
+        "bicycle": "Rower",
+        "publicTransit": "Transport publiczny",
+        "rideshare": "Przejazdy współdzielone",
+        "taxi": "Taksówka"
       }
     },
     "vacation": {
       "name": "Wakacje",
       "sub": {
+        "activities": "Atrakcje",
         "airfare": "Bilety lotnicze",
         "carRental": "Wynajem samochodu",
-        "entertainment": "Rozrywka",
-        "gasoline": "Paliwo",
+        "fuel": "Paliwo",
         "lodging": "Nocleg",
         "miscellaneous": "Różne",
-        "parking": "Parking",
-        "transit": "Transport publiczny",
-        "travel": "Podróże"
+        "parking": "Parking"
+      }
+    },
+    "wagesSalary": {
+      "name": "Wynagrodzenie",
+      "sub": {
+        "bonus": "Premia",
+        "commission": "Prowizja",
+        "employerMatching": "Dopłata pracodawcy",
+        "grossPay": "Wynagrodzenie brutto",
+        "netPay": "Wynagrodzenie netto",
+        "overtime": "Nadgodziny",
+        "stockOptions": "Opcje na akcje",
+        "tips": "Napiwki",
+        "vacationPay": "Wynagrodzenie za urlop"
       }
     }
   }

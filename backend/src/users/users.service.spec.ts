@@ -85,10 +85,12 @@ describe("UsersService", () => {
 
     refreshTokensRepository = {
       update: jest.fn(),
+      delete: jest.fn(),
     };
 
     patRepository = {
       update: jest.fn(),
+      delete: jest.fn(),
     };
 
     trustedDevicesRepository = {
@@ -767,6 +769,24 @@ describe("UsersService", () => {
         { isRevoked: true },
       );
       expect(usersRepository.remove).toHaveBeenCalled();
+    });
+
+    it("deletes sessions and tokens so a non-cascading FK cannot block the delete", async () => {
+      const hashedPassword = await bcrypt.hash("CorrectPass123!", 10);
+      usersRepository.findOne.mockResolvedValue({
+        ...mockUser,
+        passwordHash: hashedPassword,
+      });
+
+      await service.deleteAccount("user-1", { password: "CorrectPass123!" });
+
+      expect(refreshTokensRepository.delete).toHaveBeenCalledWith({
+        userId: "user-1",
+      });
+      expect(refreshTokensRepository.delete).toHaveBeenCalledWith({
+        actingAsUserId: "user-1",
+      });
+      expect(patRepository.delete).toHaveBeenCalledWith({ userId: "user-1" });
     });
 
     it("revokes all PATs before deletion", async () => {
