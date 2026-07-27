@@ -183,6 +183,16 @@ const cases: Array<{ name: string; schema: RawShape; raw: unknown }> = [
     raw: { id: "t1", date: "2026-01-01", count: 1 },
   },
   {
+    name: "manageTransactionsOutput (single created with attachments)",
+    schema: schemas.manageTransactionsOutput,
+    raw: {
+      id: "t1",
+      date: "2026-01-01",
+      count: 1,
+      attachments: [{ id: "att-1", filename: "receipt.png" }],
+    },
+  },
+  {
     name: "manageTransactionsOutput (single deleted branch)",
     schema: schemas.manageTransactionsOutput,
     raw: { id: "t1", deleted: true, count: 1 },

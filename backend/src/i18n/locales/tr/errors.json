@@ -94,6 +94,7 @@
     "attachmentTooLarge": "Bir ek, en büyük dosya boyutunu aşıyor.",
     "attachmentCorrupt": "Bir ek okunamadı veya iddia ettiği dosya türünde değil.",
     "attachmentsTooLarge": "Ekler toplam boyut sınırını aşıyor.",
+    "attachmentRefExpired": "Eklenen dosya artık kullanılamıyor. Lütfen dosyayı yeniden yükleyip tekrar sorun.",
     "modelNoImageSupport": "Seçilen yapay zeka modeli görselleri veya PDF'leri okuyamaz. Eki kaldırıp metinle sorun ya da Yapay Zeka Ayarları'nda görsel destekli bir modele geçin."
   },
   "auth": {

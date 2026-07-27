@@ -123,6 +123,21 @@ export interface ResolvedSplitLine extends SplitRowDescriptor {
   categoryName: string;
 }
 
+/**
+ * One chat/MCP-supplied file to persist as a transaction attachment when the
+ * action is confirmed. The bytes themselves never travel in the descriptor:
+ * they are parked server-side in the RelayAttachmentStore under
+ * `attachmentRefId`, and `sha256` binds those parked bytes into the signature
+ * so confirm can verify it is attaching exactly what was previewed.
+ */
+export interface AttachmentRefDescriptor {
+  attachmentRefId: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  sha256: string;
+}
+
 export interface CreateTransactionDescriptor extends BaseDescriptor {
   type: "create_transaction";
   accountId: string;
@@ -145,6 +160,8 @@ export interface CreateTransactionDescriptor extends BaseDescriptor {
    * lines (their amounts sum to `amount`) and `categoryId` is ignored.
    */
   splits?: SplitRowDescriptor[];
+  /** Files to persist as transaction attachments after the create commits. */
+  attachments?: AttachmentRefDescriptor[];
 }
 
 export interface CategorizeTransactionDescriptor extends BaseDescriptor {
@@ -300,6 +317,8 @@ export interface UpdateTransactionDescriptor extends BaseDescriptor {
    * category lines (their amounts sum to `amount`); `categoryId` is ignored.
    */
   splits?: SplitRowDescriptor[];
+  /** Files to persist as transaction attachments after the update commits. */
+  attachments?: AttachmentRefDescriptor[];
 }
 
 /** Delete an existing transaction (identified only; confirm re-checks ownership). */
@@ -566,6 +585,13 @@ export interface AiActionSplitPreview {
   memo?: string | null;
 }
 
+/** Display-only preview of one file an action will attach on approval. */
+export interface AiActionAttachmentPreview {
+  filename: string;
+  contentType: string;
+  byteSize: number;
+}
+
 /**
  * Human-readable preview shown on the confirmation card. Display-only (not part
  * of the signed descriptor) -- it carries resolved names so the user sees what
@@ -595,6 +621,11 @@ export interface AiActionPreview {
    * shown on the confirmation card in place of the single category row.
    */
   splits?: AiActionSplitPreview[];
+  /**
+   * Files that will be saved as transaction attachments on approval.
+   * Display-only mirror of the descriptor's attachment refs.
+   */
+  attachments?: AiActionAttachmentPreview[];
   // create_investment_transaction display fields.
   investmentAction?: InvestmentAction;
   symbol?: string | null;

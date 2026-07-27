@@ -94,6 +94,7 @@
     "attachmentTooLarge": "Załącznik przekracza maksymalny rozmiar pliku.",
     "attachmentCorrupt": "Nie udało się odczytać załącznika lub nie jest on plikiem typu, za jaki się podaje.",
     "attachmentsTooLarge": "Załączniki przekraczają łączny limit rozmiaru.",
+    "attachmentRefExpired": "Załączony plik nie jest już dostępny. Prześlij go ponownie i zapytaj jeszcze raz.",
     "modelNoImageSupport": "Wybrany model AI nie potrafi odczytywać obrazów ani plików PDF. Usuń załącznik i zadaj pytanie tekstem albo przełącz się na model obsługujący obrazy w Ustawieniach AI."
   },
   "auth": {

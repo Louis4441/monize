@@ -102,6 +102,7 @@
     "attachmentTooLarge": "[XX-An attachment exceeds the maximum file size.-XX]",
     "attachmentCorrupt": "[XX-An attachment could not be read or is not the file type it claims to be.-XX]",
     "attachmentsTooLarge": "[XX-The attachments exceed the total size limit.-XX]",
+    "attachmentRefExpired": "[XX-The attached file is no longer available. Please re-upload it and ask again.-XX]",
     "modelNoImageSupport": "[XX-The selected AI model can't read images or PDFs. Remove the attachment and ask in text, or switch to a vision-capable model in AI Settings.-XX]"
   },
   "auth": {

@@ -94,6 +94,7 @@
     "attachmentTooLarge": "Sebuah lampiran melebihi ukuran file maksimum.",
     "attachmentCorrupt": "Sebuah lampiran tidak dapat dibaca atau bukan tipe file seperti yang diklaim.",
     "attachmentsTooLarge": "Lampiran melebihi batas ukuran total.",
+    "attachmentRefExpired": "File yang dilampirkan sudah tidak tersedia. Silakan unggah ulang lalu tanyakan lagi.",
     "modelNoImageSupport": "Model AI yang dipilih tidak dapat membaca gambar atau PDF. Hapus lampiran dan tanyakan dalam teks, atau beralih ke model yang mendukung visi di Pengaturan AI."
   },
   "auth": {

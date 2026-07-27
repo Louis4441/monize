@@ -37,6 +37,7 @@ import { BudgetsModule } from "../budgets/budgets.module";
 import { SecuritiesModule } from "../securities/securities.module";
 import { ScheduledTransactionsModule } from "../scheduled-transactions/scheduled-transactions.module";
 import { BuiltInReportsModule } from "../built-in-reports/built-in-reports.module";
+import { AttachmentsModule } from "../attachments/attachments.module";
 import { AiRelayModule } from "./relay/ai-relay.module";
 
 @Module({
@@ -60,6 +61,9 @@ import { AiRelayModule } from "./relay/ai-relay.module";
     SecuritiesModule,
     forwardRef(() => ScheduledTransactionsModule),
     forwardRef(() => BuiltInReportsModule),
+    // Attachment persistence for confirmed create/update actions that carry
+    // chat-supplied files (attachments module has no dependency back on ai).
+    AttachmentsModule,
     AiActionBuilderModule,
     // AiService routes non-chat completions (insights, forecast) through the
     // reverse MCP relay when the user's provider list reaches an mcp_relay
