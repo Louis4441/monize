@@ -25,8 +25,7 @@
     "accounts": "Rekeningen",
     "budgets": "Budget",
     "reports": "Rapporten",
-    "settings": "Instellingen",
-    "tools": "Hulpmiddelen"
+    "settings": "Instellingen"
   },
   "gettingStarted": {
     "takeTour": "Start de rondleiding",
@@ -108,37 +107,6 @@
         "finish": {
           "title": "U bent helemaal klaar",
           "body": "Dat was de rondleiding. U kunt deze op elk moment opnieuw volgen via het gedeelte **Begeleide rondleidingen** in **Instellingen**."
-        }
-      }
-    }
-  },
-  "import": {
-    "bringingDataIn": {
-      "title": "Uw gegevens binnenhalen",
-      "steps": {
-        "welcome": {
-          "title": "Uw gegevens binnenhalen",
-          "body": "Komt u van Microsoft Money, Quicken of een bankexport? Deze rondleiding laat zien waar de import zit en wat u klaar moet hebben — de keuzes die moeilijk terug te draaien zijn, maakt u vóór de wizard opengaat."
-        },
-        "whereItLives": {
-          "title": "De import zit onder Hulpmiddelen",
-          "body": "**Transacties importeren** staat hier in het menu **Hulpmiddelen**. U kunt ook vanaf de pagina van een rekening beginnen; die rekening is dan al voorgeselecteerd."
-        },
-        "files": {
-          "title": "Wat u meeneemt",
-          "body": "Exporteer **één bestand per rekening**, en beleggingsrekeningen **twee keer** — één keer als Investment voor de effectentransacties en één keer als Regular voor de geldkant. Kies in Microsoft Money altijd **Loose QIF**: Strict QIF verliest splitsingsdetails en verwijzingen naar overboekingen. QIF, OFX, QFX en CSV kunnen allemaal, en u kunt meerdere bestanden tegelijk neerzetten."
-        },
-        "order": {
-          "title": "De volgorde doet ertoe",
-          "body": "Bestanden worden in de vermelde volgorde verwerkt en elk bestand kan de categorieën, begunstigden en rekeningen van de vorige gebruiken. Eerst bezittingen, dan rekeningen in uw eigen valuta, dan die in vreemde valuta, dan de geldrekeningen van beleggingen en als laatste de effectenbestanden — zo vindt elke overboeking haar tegenkant al terug."
-        },
-        "wizard": {
-          "title": "Wat de wizard vraagt",
-          "body": "Stappen verschijnen alleen als uw bestand ze nodig heeft: naar welke rekening geïmporteerd wordt, en daarna het koppelen van categorieën, effecten en overboekingsrekeningen. Amber wacht op u, groen is al gekoppeld, en overslaan mag — categoriseren kan later. De hele import loopt in één databasetransactie, dus een fout laat niets half achter."
-        },
-        "afterwards": {
-          "title": "Na de import",
-          "body": "Vergelijk elk saldo met uw oude software en zoek in de transacties op de notitie **PENDING IMPORT** — overboekingen tussen valuta's komen zonder koers binnen, omdat QIF er geen meestuurt. De volledige handleiding, met schermafbeeldingen en probleemoplossing, staat in de wiki onder [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

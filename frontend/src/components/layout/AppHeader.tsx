@@ -372,12 +372,6 @@ export function AppHeader() {
                       {visibleToolsLinks.map((link) => (
                         <button
                           key={link.href}
-                          // Only the import entry is anchored: the guided tour
-                          // for migrating data points at it from inside the
-                          // open menu.
-                          {...(link.href === '/import'
-                            ? tourAnchor(TOUR_ANCHORS.navImportLink)
-                            : {})}
                           onClick={() => {
                             router.push(link.href);
                             setToolsOpen(false);

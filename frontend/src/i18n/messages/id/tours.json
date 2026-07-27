@@ -25,8 +25,7 @@
     "accounts": "Akun",
     "budgets": "Anggaran",
     "reports": "Laporan",
-    "settings": "Pengaturan",
-    "tools": "Alat"
+    "settings": "Pengaturan"
   },
   "gettingStarted": {
     "takeTour": "Ikuti tur",
@@ -108,37 +107,6 @@
         "finish": {
           "title": "Semua sudah siap",
           "body": "Itulah turnya. Anda dapat mengulanginya kapan saja dari bagian **Tur berpandu** di **Pengaturan**."
-        }
-      }
-    }
-  },
-  "import": {
-    "bringingDataIn": {
-      "title": "Memindahkan data Anda",
-      "steps": {
-        "welcome": {
-          "title": "Memindahkan data Anda",
-          "body": "Pindah dari Microsoft Money, Quicken, atau ekspor bank? Tur ini menunjukkan di mana impor berada dan apa yang perlu disiapkan: keputusan yang sulit dibatalkan semuanya diambil sebelum wizard terbuka."
-        },
-        "whereItLives": {
-          "title": "Impor ada di menu Alat",
-          "body": "**Impor transaksi** ada di sini, di menu **Alat**. Anda juga bisa memulai dari halaman sebuah akun — akun itu langsung terpilih."
-        },
-        "files": {
-          "title": "Apa yang perlu dibawa",
-          "body": "Ekspor **satu berkas per akun**, dan akun investasi **dua kali** — sekali sebagai Investment untuk transaksi efek, sekali sebagai Regular untuk sisi kasnya. Di Microsoft Money selalu pilih **Loose QIF**: Strict QIF kehilangan detail pemecahan dan rujukan transfer. QIF, OFX, QFX, dan CSV semuanya bisa, dan Anda dapat menaruh banyak berkas sekaligus."
-        },
-        "order": {
-          "title": "Urutan itu penting",
-          "body": "Berkas diproses sesuai urutan daftar, dan tiap berkas bisa memakai kategori, penerima, dan akun yang dibuat berkas sebelumnya. Aset dulu, lalu akun dalam mata uang Anda, lalu yang mata uang asing, lalu kas akun investasi, dan berkas broker paling akhir — supaya setiap transfer sudah menemukan pasangannya."
-        },
-        "wizard": {
-          "title": "Yang akan ditanyakan wizard",
-          "body": "Langkah hanya muncul kalau berkas Anda memerlukannya: ke akun mana diimpor, lalu pemetaan kategori, efek, dan akun transfer. Kuning menunggu Anda, hijau sudah dicocokkan, dan melewatinya tidak masalah — kategorinya bisa diisi nanti. Seluruh impor berjalan dalam satu transaksi basis data, jadi kegagalan tidak meninggalkan data separuh jalan."
-        },
-        "afterwards": {
-          "title": "Setelah impor",
-          "body": "Bandingkan setiap saldo dengan perangkat lunak lama Anda, dan cari catatan **PENDING IMPORT** di transaksi — transfer antar mata uang datang tanpa kurs, karena QIF tidak membawanya. Panduan lengkap dengan tangkapan layar dan pemecahan masalah ada di wiki, di [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }
