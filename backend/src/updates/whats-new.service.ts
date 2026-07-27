@@ -13,8 +13,8 @@ export interface WhatsNewStatus {
   currentVersion: string;
   /**
    * Whether the digest should pop up automatically on app load: the user has
-   * the feature enabled, hasn't already acknowledged this version, notes exist,
-   * and this is not a demo instance.
+   * the feature enabled, hasn't already acknowledged this version, this is not
+   * their first login, notes exist, and this is not a demo instance.
    */
   autoShow: boolean;
   /** The parsed release notes for the current version, or null when none exist. */
@@ -47,13 +47,29 @@ export class WhatsNewService {
       manager.getRepository(UserPreference).findOne({ where: { userId } }),
     );
 
-    // Default to enabled: a row that predates this column, or no row yet, still
-    // gets the popup. Only an explicit `false` disables it.
+    // No preferences row means nothing has ever materialized this account's
+    // defaults, so this is a brand-new user signing in for the first time --
+    // admin-created and owner-provisioned (delegate) accounts get their row
+    // lazily on first access, unlike self-registration which writes it eagerly.
+    // A first-time user has no previous version to catch up on, and the digest
+    // must not land on top of the getting-started onboarding. This matches what
+    // `buildDefaultPreferences` does for the eager paths (it stamps
+    // `lastSeenVersion` with the running version), so the popup no longer
+    // depends on which of the first page load's requests materializes the row
+    // first.
+    const firstLogin = !prefs;
+
+    // Default to enabled: a row that predates this column still gets the popup.
+    // Only an explicit `false` disables it.
     const enabled = prefs ? prefs.showWhatsNew !== false : true;
     const alreadySeen = prefs?.lastSeenVersion === currentVersion;
 
     const autoShow =
-      enabled && !alreadySeen && !this.demoModeService.isDemo && notes !== null;
+      !firstLogin &&
+      enabled &&
+      !alreadySeen &&
+      !this.demoModeService.isDemo &&
+      notes !== null;
 
     return { currentVersion, autoShow, notes };
   }
@@ -89,16 +105,24 @@ export class WhatsNewService {
    * markSeen: the two are true opposites, so this reliably brings the popup back
    * even if the user (or an earlier session) had already acknowledged it.
    *
-   * A missing row, or one that carries no acknowledgement, already auto-shows by
-   * default, so there is nothing to clear and no row is created.
+   * A row is materialized when none exists (mirroring markSeen): defaults stamp
+   * `lastSeenVersion` with the running version, and a missing row is read as a
+   * first login, so without writing one the reminder the user just asked for
+   * would never arrive.
    */
   async remindNextLogin(userId: string): Promise<{ reminded: boolean }> {
     await tenantTx(this.dataSource, async (manager) => {
       const repo = manager.getRepository(UserPreference);
       const prefs = await repo.findOne({ where: { userId } });
-      if (prefs && prefs.lastSeenVersion !== null) {
-        prefs.lastSeenVersion = null;
-        await repo.save(prefs);
+      if (prefs) {
+        if (prefs.lastSeenVersion !== null) {
+          prefs.lastSeenVersion = null;
+          await repo.save(prefs);
+        }
+      } else {
+        const created = buildDefaultPreferences(userId, currentRequestLocale());
+        created.lastSeenVersion = null;
+        await repo.save(created);
       }
     });
 
