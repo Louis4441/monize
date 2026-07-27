@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
+import { formatBytes } from '@/components/transactions/AttachmentsSection';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { PendingAction } from '@/types/ai';
 
@@ -117,6 +118,15 @@ export function TransactionConfirmationCard({
         label: t('confirmAction.description'),
         value: preview.description,
       });
+    // Files the approval will save as transaction attachments.
+    if (preview.attachments && preview.attachments.length > 0) {
+      preview.attachments.forEach((attachment, i) => {
+        rows.push({
+          label: i === 0 ? t('confirmAction.attachments') : '',
+          value: `${attachment.filename} (${formatBytes(attachment.byteSize)})`,
+        });
+      });
+    }
   } else if (type === 'categorize_transaction') {
     if (preview.payeeName)
       rows.push({ label: t('confirmAction.payee'), value: preview.payeeName });

@@ -242,6 +242,13 @@ export interface PendingActionSplit {
   memo?: string | null;
 }
 
+/** One chat file a create/update card will save on the transaction on approval. */
+export interface PendingActionAttachment {
+  filename: string;
+  contentType: string;
+  byteSize: number;
+}
+
 export interface PendingActionPreview {
   accountName?: string;
   amount?: number;
@@ -272,6 +279,11 @@ export interface PendingActionPreview {
    * When present the card shows the breakdown in place of the single category.
    */
   splits?: PendingActionSplit[];
+  /**
+   * Chat files a create_transaction / update_transaction will save as
+   * transaction attachments on approval.
+   */
+  attachments?: PendingActionAttachment[];
   // create_investment_transaction display fields.
   investmentAction?: InvestmentAction;
   symbol?: string | null;

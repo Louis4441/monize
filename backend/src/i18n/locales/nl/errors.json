@@ -94,6 +94,7 @@
     "attachmentTooLarge": "Een bijlage overschrijdt de maximale bestandsgrootte.",
     "attachmentCorrupt": "Een bijlage kon niet worden gelezen of is niet het bestandstype dat het beweert te zijn.",
     "attachmentsTooLarge": "De bijlagen overschrijden de totale groottelimiet.",
+    "attachmentRefExpired": "Het bijgevoegde bestand is niet meer beschikbaar. Upload het opnieuw en vraag het nog een keer.",
     "modelNoImageSupport": "Het geselecteerde AI-model kan geen afbeeldingen of PDF's lezen. Verwijder de bijlage en stel je vraag in tekst, of schakel over naar een model met beeldondersteuning in AI-instellingen."
   },
   "auth": {

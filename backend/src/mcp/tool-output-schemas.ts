@@ -196,6 +196,8 @@ export const manageTransactionsOutput = manageToolOutput({
   payeeId: strNull.optional(),
   payeeName: strNull.optional(),
   categoryId: strNull.optional(),
+  // Files saved on the transaction by the direct (non-relay) confirm path.
+  attachments: z.array(looseObject({ id: str, filename: str })).optional(),
 });
 
 // ---------------------------------------------------------------------------

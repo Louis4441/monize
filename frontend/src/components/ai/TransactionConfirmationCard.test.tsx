@@ -67,6 +67,46 @@ describe('TransactionConfirmationCard', () => {
     expect(screen.queryByText('Category')).not.toBeInTheDocument();
   });
 
+  it('lists the files an approval will save as attachments', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeAction({
+          preview: {
+            ...makeAction().preview,
+            attachments: [
+              {
+                filename: 'receipt.png',
+                contentType: 'image/png',
+                byteSize: 2048,
+              },
+              {
+                filename: 'invoice.pdf',
+                contentType: 'application/pdf',
+                byteSize: 1024 * 1024,
+              },
+            ],
+          },
+        })}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Attachments')).toBeInTheDocument();
+    expect(screen.getByText('receipt.png (2.0 KB)')).toBeInTheDocument();
+    expect(screen.getByText('invoice.pdf (1.0 MB)')).toBeInTheDocument();
+  });
+
+  it('shows no attachments section when the preview carries none', () => {
+    render(
+      <TransactionConfirmationCard
+        action={makeAction()}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('Attachments')).not.toBeInTheDocument();
+  });
+
   it('warns when an update targets a reconciled transaction', () => {
     render(
       <TransactionConfirmationCard

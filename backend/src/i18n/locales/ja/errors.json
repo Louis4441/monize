@@ -94,6 +94,7 @@
     "attachmentTooLarge": "添付ファイルが最大ファイルサイズを超えています。",
     "attachmentCorrupt": "添付ファイルを読み込めなかったか、申告された種類のファイルではありません。",
     "attachmentsTooLarge": "添付ファイルが合計サイズの上限を超えています。",
+    "attachmentRefExpired": "添付ファイルは利用できなくなりました。もう一度アップロードしてから、再度お尋ねください。",
     "modelNoImageSupport": "選択したAIモデルは画像やPDFを読み取れません。添付ファイルを削除してテキストで質問するか、AI設定で画像対応モデルに切り替えてください。"
   },
   "auth": {

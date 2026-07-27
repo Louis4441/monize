@@ -94,6 +94,7 @@
     "attachmentTooLarge": "Ein Anhang überschreitet die maximale Dateigröße.",
     "attachmentCorrupt": "Ein Anhang konnte nicht gelesen werden oder entspricht nicht dem angegebenen Dateityp.",
     "attachmentsTooLarge": "Die Anhänge überschreiten die Gesamtgrößenbeschränkung.",
+    "attachmentRefExpired": "Die angehängte Datei ist nicht mehr verfügbar. Bitte laden Sie sie erneut hoch und fragen Sie noch einmal.",
     "modelNoImageSupport": "Das ausgewählte KI-Modell kann keine Bilder oder PDFs lesen. Entfernen Sie den Anhang und fragen Sie in Textform, oder wechseln Sie in den KI-Einstellungen zu einem Modell mit Bildverarbeitung."
   },
   "auth": {

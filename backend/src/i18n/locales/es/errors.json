@@ -94,6 +94,7 @@
     "attachmentTooLarge": "Un archivo adjunto supera el tamaño máximo de archivo.",
     "attachmentCorrupt": "No se pudo leer un archivo adjunto o no es del tipo de archivo que dice ser.",
     "attachmentsTooLarge": "Los archivos adjuntos superan el límite de tamaño total.",
+    "attachmentRefExpired": "El archivo adjunto ya no está disponible. Súbelo de nuevo y vuelve a preguntar.",
     "modelNoImageSupport": "El modelo de IA seleccionado no puede leer imágenes ni PDF. Quita el archivo adjunto y pregunta por texto, o cambia a un modelo con capacidad de visión en Ajustes de IA."
   },
   "auth": {

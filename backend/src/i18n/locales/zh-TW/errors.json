@@ -94,6 +94,7 @@
     "attachmentTooLarge": "某個附件超過了最大檔案大小。",
     "attachmentCorrupt": "無法讀取某個附件，或它並非其聲稱的檔案類型。",
     "attachmentsTooLarge": "附件超過了總大小限制。",
+    "attachmentRefExpired": "附加的檔案已無法使用。請重新上傳後再次詢問。",
     "modelNoImageSupport": "所選的 AI 模型無法讀取圖片或 PDF。請移除附件並以文字提問，或在 AI 設定中切換至支援視覺的模型。"
   },
   "auth": {

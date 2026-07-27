@@ -411,7 +411,9 @@ describe("UsersService", () => {
 
       await service.updatePreferences("user-1", { defaultCurrency: "EUR" });
 
-      expect(currenciesService.ensureSystemCurrency).toHaveBeenCalledWith("EUR");
+      expect(currenciesService.ensureSystemCurrency).toHaveBeenCalledWith(
+        "EUR",
+      );
     });
 
     it("does not ensure a currency when the default is unchanged", async () => {
