@@ -149,11 +149,9 @@
     "incorrectPassword": "Palavra-passe incorreta"
   },
   "backup": {
-    "folderPathRequired": "É necessário definir um caminho de pasta antes de ativar as cópias de segurança automáticas",
     "folderNotExist": "A pasta não existe: {{ safePath }}",
     "folderAccessError": "Não é possível aceder à pasta: {{ safePath }}",
     "pathNotDirectory": "O caminho não é um diretório: {{ safePath }}",
-    "notConfigured": "A cópia de segurança automática não está configurada. Defina um caminho de pasta primeiro.",
     "userNotFound": "Utilizador {{ userId }} não encontrado",
     "encryptedPasswordDecryptFailed": "As cópias de segurança encriptadas estão ativadas mas a palavra-passe armazenada não pôde ser desencriptada. Reative a encriptação nas definições de Segurança.",
     "pathTraversal": "Travessia de caminho detetada: {{ filename }}",

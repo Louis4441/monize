@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Automatische back-up",
-    "description": "Maak automatisch een back-up van jouw gegevens naar een map op een schema. Omdat Monize in Docker draait, moet je een hostmap als volume in de container koppelen (bijv. -v /host/backups:/backups).",
+    "description": "Maak automatisch een back-up van jouw gegevens naar een map op een schema. Omdat Monize in Docker draait, moet je een hostmap als volume in de container koppelen (bijv. -v /host/backups:/data/backups).",
     "loadingText": "Laden...",
     "enableLabel": "Automatische back-ups inschakelen",
     "backupFolderLabel": "Back-upmap",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Bladeren...",
     "validateButton": "Valideren",
     "validatingButton": "Valideren...",

@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Copia de seguridad automática",
-    "description": "Realiza copias de seguridad automáticas de tus datos en una carpeta según un horario. Dado que Monize se ejecuta en Docker, debes mapear una carpeta del host al contenedor como volumen (p. ej., -v /host/backups:/backups).",
+    "description": "Realiza copias de seguridad automáticas de tus datos en una carpeta según un horario. Dado que Monize se ejecuta en Docker, debes mapear una carpeta del host al contenedor como volumen (p. ej., -v /host/backups:/data/backups).",
     "loadingText": "Cargando...",
     "enableLabel": "Habilitar copias de seguridad automáticas",
     "backupFolderLabel": "Carpeta de copia de seguridad",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Examinar...",
     "validateButton": "Validar",
     "validatingButton": "Validando...",

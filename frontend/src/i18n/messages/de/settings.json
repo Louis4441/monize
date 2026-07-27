@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Automatisches Backup",
-    "description": "Sichern Sie Ihre Daten automatisch nach einem Zeitplan in einem Ordner. Da Monize in Docker läuft, müssen Sie einen Host-Ordner als Volume in den Container einbinden (z. B. -v /host/backups:/backups).",
+    "description": "Sichern Sie Ihre Daten automatisch nach einem Zeitplan in einem Ordner. Da Monize in Docker läuft, müssen Sie einen Host-Ordner als Volume in den Container einbinden (z. B. -v /host/backups:/data/backups).",
     "loadingText": "Wird geladen...",
     "enableLabel": "Automatische Backups aktivieren",
     "backupFolderLabel": "Backup-Ordner",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Durchsuchen...",
     "validateButton": "Validieren",
     "validatingButton": "Wird validiert...",

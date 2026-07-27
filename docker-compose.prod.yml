@@ -57,6 +57,10 @@ services:
       REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-true}
       FORCE_2FA: ${FORCE_2FA:-false}
       REMEMBER_ME_DAYS: ${REMEMBER_ME_DAYS:-30}
+      # Backup
+      BACKUP_CONTAINER_DIR: ${BACKUP_CONTAINER_DIR:-/data/backups}
+      # Attachments (used by ATTACHMENT_STORAGE_PROVIDER=local)
+      ATTACHMENT_CONTAINER_DIR: ${ATTACHMENT_CONTAINER_DIR:-/data/attachments}
       # Demo mode (optional)
       DEMO_MODE: ${DEMO_MODE:-false}
       # OIDC (optional)
@@ -78,6 +82,12 @@ services:
       AI_DEFAULT_BASE_URL: ${AI_DEFAULT_BASE_URL:-}
       # HTTP mode (optional)
       DISABLE_HTTPS_HEADERS: ${DISABLE_HTTPS_HEADERS:-false}
+    volumes:
+      # Automatic backups are written to BACKUP_CONTAINER_DIR in the container.
+      - ${BACKUP_HOST_DIR:-./monize/backups}:${BACKUP_CONTAINER_DIR:-/data/backups}
+      # Attachments are written to ATTACHMENT_CONTAINER_DIR in the container
+      # when ATTACHMENT_STORAGE_PROVIDER=local.
+      - ${ATTACHMENT_HOST_DIR:-./monize/attachments}:${ATTACHMENT_CONTAINER_DIR:-/data/attachments}
     networks:
       - monize-network
     healthcheck:

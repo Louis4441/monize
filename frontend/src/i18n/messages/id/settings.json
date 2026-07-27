@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Pencadangan Otomatis",
-    "description": "Cadangkan data Anda secara otomatis ke folder sesuai jadwal. Karena Monize berjalan di Docker, Anda harus memetakan folder host ke dalam kontainer sebagai volume (misalnya, -v /host/backups:/backups).",
+    "description": "Cadangkan data Anda secara otomatis ke folder sesuai jadwal. Karena Monize berjalan di Docker, Anda harus memetakan folder host ke dalam kontainer sebagai volume (misalnya, -v /host/backups:/data/backups).",
     "loadingText": "Memuat...",
     "enableLabel": "Aktifkan pencadangan otomatis",
     "backupFolderLabel": "Folder Cadangan",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Jelajahi...",
     "validateButton": "Validasi",
     "validatingButton": "Memvalidasi...",

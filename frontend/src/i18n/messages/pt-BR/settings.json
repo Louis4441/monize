@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Backup Automático",
-    "description": "Faça backups automáticos dos seus dados para uma pasta, de acordo com um agendamento. Como o Monize roda no Docker, você precisa mapear uma pasta do host para o contêiner como volume (ex.: -v /host/backups:/backups).",
+    "description": "Faça backups automáticos dos seus dados para uma pasta, de acordo com um agendamento. Como o Monize roda no Docker, você precisa mapear uma pasta do host para o contêiner como volume (ex.: -v /host/backups:/data/backups).",
     "loadingText": "Carregando...",
     "enableLabel": "Ativar backups automáticos",
     "backupFolderLabel": "Pasta de Backup",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Procurar...",
     "validateButton": "Validar",
     "validatingButton": "Validando...",

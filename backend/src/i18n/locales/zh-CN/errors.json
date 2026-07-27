@@ -149,11 +149,9 @@
     "incorrectPassword": "密码不正确"
   },
   "backup": {
-    "folderPathRequired": "启用自动备份前必须设置文件夹路径",
     "folderNotExist": "文件夹不存在：{{ safePath }}",
     "folderAccessError": "无法访问文件夹：{{ safePath }}",
     "pathNotDirectory": "路径不是目录：{{ safePath }}",
-    "notConfigured": "未配置自动备份。请先设置文件夹路径。",
     "userNotFound": "未找到用户 {{ userId }}",
     "encryptedPasswordDecryptFailed": "已启用加密备份，但无法解密存储的密码。请在安全设置中重新启用加密。",
     "pathTraversal": "检测到路径遍历：{{ filename }}",

@@ -149,11 +149,9 @@
     "incorrectPassword": "Yanlış şifre"
   },
   "backup": {
-    "folderPathRequired": "Otomatik yedeklemeyi etkinleştirmeden önce bir klasör yolu belirtilmelidir",
     "folderNotExist": "Klasör mevcut değil: {{ safePath }}",
     "folderAccessError": "Klasöre erişilemiyor: {{ safePath }}",
     "pathNotDirectory": "Yol bir dizin değil: {{ safePath }}",
-    "notConfigured": "Otomatik yedekleme yapılandırılmamış. Lütfen önce bir klasör yolu belirleyin.",
     "userNotFound": "{{ userId }} kullanıcısı bulunamadı",
     "encryptedPasswordDecryptFailed": "Şifreli yedeklemeler etkin ancak saklanan şifre çözülemedi. Güvenlik ayarlarında şifrelemeyi yeniden etkinleştirin.",
     "pathTraversal": "Yol geçişi tespit edildi: {{ filename }}",

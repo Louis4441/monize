@@ -3,7 +3,10 @@ import { ConfigService } from "@nestjs/config";
 import { promises as fs } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { LocalStorageProvider } from "./local-storage.provider";
+import {
+  DEFAULT_ATTACHMENT_CONTAINER_DIR,
+  LocalStorageProvider,
+} from "./local-storage.provider";
 
 describe("LocalStorageProvider", () => {
   let baseDir: string;
@@ -90,10 +93,35 @@ describe("LocalStorageProvider", () => {
     await fs.rm(marker, { force: true });
   });
 
-  it("defaults to /data/attachments when unconfigured", () => {
-    const p = new LocalStorageProvider({
-      get: () => undefined,
-    } as unknown as ConfigService);
-    expect(p).toBeInstanceOf(LocalStorageProvider);
+  describe("base directory configuration", () => {
+    const providerFor = (env: Record<string, string>) =>
+      new LocalStorageProvider({
+        get: (key: string) => env[key],
+      } as unknown as ConfigService);
+
+    const baseDirOf = (p: LocalStorageProvider) =>
+      (p as unknown as { baseDir: string }).baseDir;
+
+    it("defaults to /data/attachments when unconfigured", () => {
+      expect(baseDirOf(providerFor({}))).toBe(DEFAULT_ATTACHMENT_CONTAINER_DIR);
+    });
+
+    it("uses ATTACHMENT_CONTAINER_DIR when set", () => {
+      const p = providerFor({ ATTACHMENT_CONTAINER_DIR: "/mnt/attachments" });
+      expect(baseDirOf(p)).toBe("/mnt/attachments");
+    });
+
+    it("falls back to the deprecated ATTACHMENT_LOCAL_DIR", () => {
+      const p = providerFor({ ATTACHMENT_LOCAL_DIR: "/legacy/attachments" });
+      expect(baseDirOf(p)).toBe("/legacy/attachments");
+    });
+
+    it("prefers ATTACHMENT_CONTAINER_DIR over the deprecated name", () => {
+      const p = providerFor({
+        ATTACHMENT_CONTAINER_DIR: "/mnt/attachments",
+        ATTACHMENT_LOCAL_DIR: "/legacy/attachments",
+      });
+      expect(baseDirOf(p)).toBe("/mnt/attachments");
+    });
   });
 });

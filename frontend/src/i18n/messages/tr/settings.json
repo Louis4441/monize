@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Otomatik Yedekleme",
-    "description": "Verilerinizi bir programa göre otomatik olarak bir klasöre yedekleyin. Monize Docker'da çalıştığından, bir ana klasörü kapsayıcıya birim olarak eşlemeniz gerekir (örn., -v /host/backups:/backups).",
+    "description": "Verilerinizi bir programa göre otomatik olarak bir klasöre yedekleyin. Monize Docker'da çalıştığından, bir ana klasörü kapsayıcıya birim olarak eşlemeniz gerekir (örn., -v /host/backups:/data/backups).",
     "loadingText": "Yükleniyor...",
     "enableLabel": "Otomatik yedeklemeyi etkinleştir",
     "backupFolderLabel": "Yedekleme Klasörü",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Göz at...",
     "validateButton": "Doğrula",
     "validatingButton": "Doğrulanıyor...",

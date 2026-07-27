@@ -149,11 +149,9 @@
     "incorrectPassword": "Senha incorreta"
   },
   "backup": {
-    "folderPathRequired": "É necessário definir um caminho de pasta antes de ativar os backups automáticos",
     "folderNotExist": "A pasta não existe: {{ safePath }}",
     "folderAccessError": "Não é possível acessar a pasta: {{ safePath }}",
     "pathNotDirectory": "O caminho não é um diretório: {{ safePath }}",
-    "notConfigured": "O backup automático não está configurado. Defina um caminho de pasta primeiro.",
     "userNotFound": "Usuário {{ userId }} não encontrado",
     "encryptedPasswordDecryptFailed": "Os backups criptografados estão ativados, mas a senha armazenada não pôde ser descriptografada. Reative a criptografia nas configurações de Segurança.",
     "pathTraversal": "Travessia de caminho detectada: {{ filename }}",

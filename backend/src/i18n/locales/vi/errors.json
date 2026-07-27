@@ -149,11 +149,9 @@
     "incorrectPassword": "Mật khẩu không đúng"
   },
   "backup": {
-    "folderPathRequired": "Phải thiết lập đường dẫn thư mục trước khi bật sao lưu tự động",
     "folderNotExist": "Thư mục không tồn tại: {{ safePath }}",
     "folderAccessError": "Không thể truy cập thư mục: {{ safePath }}",
     "pathNotDirectory": "Đường dẫn không phải là thư mục: {{ safePath }}",
-    "notConfigured": "Sao lưu tự động chưa được cấu hình. Vui lòng thiết lập đường dẫn thư mục trước.",
     "userNotFound": "Không tìm thấy người dùng {{ userId }}",
     "encryptedPasswordDecryptFailed": "Sao lưu mã hóa đã được bật nhưng không thể giải mã mật khẩu đã lưu. Hãy bật lại mã hóa trong Cài đặt bảo mật.",
     "pathTraversal": "Phát hiện duyệt đường dẫn: {{ filename }}",

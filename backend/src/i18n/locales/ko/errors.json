@@ -149,11 +149,9 @@
     "incorrectPassword": "비밀번호가 올바르지 않습니다"
   },
   "backup": {
-    "folderPathRequired": "자동 백업을 활성화하기 전에 폴더 경로를 설정해야 합니다",
     "folderNotExist": "폴더가 존재하지 않습니다: {{ safePath }}",
     "folderAccessError": "폴더에 접근할 수 없습니다: {{ safePath }}",
     "pathNotDirectory": "경로가 디렉터리가 아닙니다: {{ safePath }}",
-    "notConfigured": "자동 백업이 구성되지 않았습니다. 먼저 폴더 경로를 설정하세요.",
     "userNotFound": "사용자 {{ userId }}를 찾을 수 없습니다",
     "encryptedPasswordDecryptFailed": "암호화된 백업이 활성화되어 있지만 저장된 비밀번호를 복호화할 수 없습니다. 보안 설정에서 암호화를 다시 활성화하세요.",
     "pathTraversal": "경로 탐색이 감지되었습니다: {{ filename }}",

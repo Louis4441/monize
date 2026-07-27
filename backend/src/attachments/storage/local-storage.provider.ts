@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { promises as fs } from "fs";
 import { basename, resolve, sep } from "path";
@@ -6,11 +6,19 @@ import { tr } from "../../i18n/translate";
 import { AttachmentStorageProvider } from "./attachment-storage.interface";
 
 /**
- * Stores attachment bytes on the local filesystem under ATTACHMENT_LOCAL_DIR,
- * one file per attachment named by its `key` (the attachment id). Chosen by
- * ATTACHMENT_STORAGE_PROVIDER=local -- a zero-dependency alternative to Postgres
- * BYTEA for deployments that would rather keep large blobs off the database
- * (e.g. a mounted volume) without running object storage.
+ * Folder attachment bytes are written to when ATTACHMENT_CONTAINER_DIR is unset.
+ * Monize runs in a container, so this is a container path: mount a host folder
+ * there (see .env.example and the docker-compose files).
+ */
+export const DEFAULT_ATTACHMENT_CONTAINER_DIR = "/data/attachments";
+
+/**
+ * Stores attachment bytes on the local filesystem under
+ * ATTACHMENT_CONTAINER_DIR, one file per attachment named by its `key` (the
+ * attachment id). Chosen by ATTACHMENT_STORAGE_PROVIDER=local -- a
+ * zero-dependency alternative to Postgres BYTEA for deployments that would
+ * rather keep large blobs off the database (e.g. a mounted volume) without
+ * running object storage.
  *
  * Bytes live outside the database, so they are not embedded in the application
  * backup; only the metadata row travels with a backup and the directory must be
@@ -19,11 +27,22 @@ import { AttachmentStorageProvider } from "./attachment-storage.interface";
 @Injectable()
 export class LocalStorageProvider implements AttachmentStorageProvider {
   readonly name = "local";
+  private readonly logger = new Logger(LocalStorageProvider.name);
   private readonly baseDir: string;
 
   constructor(config: ConfigService) {
+    // ATTACHMENT_LOCAL_DIR is the pre-rename name. Existing deployments keep
+    // working on it -- ignoring it would point the provider at a different
+    // folder and hide every attachment already written.
+    const configured = config.get<string>("ATTACHMENT_CONTAINER_DIR");
+    const legacy = config.get<string>("ATTACHMENT_LOCAL_DIR");
+    if (!configured && legacy) {
+      this.logger.warn(
+        "ATTACHMENT_LOCAL_DIR is deprecated; rename it to ATTACHMENT_CONTAINER_DIR",
+      );
+    }
     this.baseDir = resolve(
-      config.get<string>("ATTACHMENT_LOCAL_DIR") ?? "/data/attachments",
+      configured ?? legacy ?? DEFAULT_ATTACHMENT_CONTAINER_DIR,
     );
   }
 

@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Automatyczna kopia zapasowa",
-    "description": "Automatycznie twórz kopie zapasowe danych do folderu według harmonogramu. Ponieważ Monize działa w Dockerze, musisz zamapować folder hosta do kontenera jako wolumin (np. -v /host/backups:/backups).",
+    "description": "Automatycznie twórz kopie zapasowe danych do folderu według harmonogramu. Ponieważ Monize działa w Dockerze, musisz zamapować folder hosta do kontenera jako wolumin (np. -v /host/backups:/data/backups).",
     "loadingText": "Wczytywanie...",
     "enableLabel": "Włącz automatyczne kopie zapasowe",
     "backupFolderLabel": "Folder kopii zapasowych",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Przeglądaj...",
     "validateButton": "Sprawdź",
     "validatingButton": "Sprawdzanie...",

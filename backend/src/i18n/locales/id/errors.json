@@ -149,11 +149,9 @@
     "incorrectPassword": "Kata sandi salah"
   },
   "backup": {
-    "folderPathRequired": "Jalur folder harus diatur sebelum mengaktifkan pencadangan otomatis",
     "folderNotExist": "Folder tidak ada: {{ safePath }}",
     "folderAccessError": "Tidak dapat mengakses folder: {{ safePath }}",
     "pathNotDirectory": "Jalur bukan direktori: {{ safePath }}",
-    "notConfigured": "Pencadangan otomatis belum dikonfigurasi. Harap atur jalur folder terlebih dahulu.",
     "userNotFound": "Pengguna {{ userId }} tidak ditemukan",
     "encryptedPasswordDecryptFailed": "Pencadangan terenkripsi diaktifkan tetapi kata sandi yang tersimpan tidak dapat didekripsi. Aktifkan kembali enkripsi di pengaturan Keamanan.",
     "pathTraversal": "Traversal jalur terdeteksi: {{ filename }}",

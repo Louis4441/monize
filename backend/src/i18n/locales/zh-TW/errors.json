@@ -149,11 +149,9 @@
     "incorrectPassword": "密碼不正確"
   },
   "backup": {
-    "folderPathRequired": "啟用自動備份前必須設定資料夾路徑",
     "folderNotExist": "資料夾不存在：{{ safePath }}",
     "folderAccessError": "無法存取資料夾：{{ safePath }}",
     "pathNotDirectory": "路徑不是目錄：{{ safePath }}",
-    "notConfigured": "未設定自動備份。請先設定資料夾路徑。",
     "userNotFound": "找不到使用者 {{ userId }}",
     "encryptedPasswordDecryptFailed": "已啟用加密備份，但無法解密儲存的密碼。請在安全設定中重新啟用加密。",
     "pathTraversal": "偵測到路徑穿越：{{ filename }}",
