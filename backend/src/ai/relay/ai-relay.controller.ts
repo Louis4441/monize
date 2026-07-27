@@ -20,6 +20,7 @@ import { RelayQueryDto } from "./dto/relay-query.dto";
 import { RelayTunnelStatus } from "./ai-relay.types";
 import { PendingAiAction } from "../actions/ai-action.types";
 import { tr } from "../../i18n/translate";
+import { SSE_HEADERS, sseData } from "../../common/sse.util";
 
 /**
  * Browser side of the reverse MCP relay. The chat posts a prompt here; the
@@ -53,10 +54,9 @@ export class AiRelayController {
     @Body() dto: RelayQueryDto,
     @Res() res: Response,
   ): Promise<void> {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.setHeader("X-Accel-Buffering", "no");
+    for (const [header, value] of Object.entries(SSE_HEADERS)) {
+      res.setHeader(header, value);
+    }
     res.flushHeaders();
 
     const userId = req.user.id;
@@ -77,7 +77,9 @@ export class AiRelayController {
 
     const write = (event: Record<string, unknown>): void => {
       if (!aborted.value && !res.writableEnded) {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
+        // The agent's answer is user-controlled text: escape markup characters
+        // before the frame reaches the socket.
+        res.write(sseData(event));
       }
     };
 

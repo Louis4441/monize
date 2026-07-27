@@ -59,6 +59,36 @@ describe("AiRelayController", () => {
     expect(events.some((e) => e.type === "assistant_text")).toBe(false);
   });
 
+  it("sets nosniff and escapes markup in the agent's answer", async () => {
+    const answer = "<img src=x onerror=alert(1)> Tom & Jerry's";
+    const controller = build({
+      enqueuePrompt: jest.fn().mockResolvedValue({ text: answer }),
+    });
+    const { res, events } = makeRes();
+    const written: string[] = [];
+    (res.write as unknown as jest.Mock).mockImplementation((chunk: string) => {
+      written.push(chunk);
+      if (chunk.startsWith("data: ")) {
+        events.push(JSON.parse(chunk.slice(6)));
+      }
+      return true;
+    });
+
+    await controller.streamQuery(req, { query: "what should I buy?" }, res);
+
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "X-Content-Type-Options",
+      "nosniff",
+    );
+    // Character-level checks: no raw markup character reaches the socket.
+    const body = written.join("");
+    expect(body.includes("<")).toBe(false);
+    expect(body.includes(">")).toBe(false);
+    expect(body.includes("&")).toBe(false);
+    // The client still parses the original text back out unchanged.
+    expect(events).toContainEqual({ type: "content", text: answer });
+  });
+
   it("forwards uploaded attachments to enqueuePrompt", async () => {
     const enqueuePrompt = jest.fn().mockResolvedValue({ text: "ok" });
     const controller = build({ enqueuePrompt });
