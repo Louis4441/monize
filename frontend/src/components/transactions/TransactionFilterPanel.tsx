@@ -618,17 +618,17 @@ export function TransactionFilterPanel({
               )}
 
               {/* Second row: Time period, dates, amount range, currency,
-                  attachments, and search. Explicit fr template keeps the
-                  narrow controls (amount/currency/attachments) at 1fr and gives
-                  Search the remaining space. Time Period is trimmed ~30% and the
-                  dates ~25% from their old 2fr to make room for the always-shown
-                  Attachments column. The Currency column is dropped when it
+                  attachments, and search on one lg row. The fr weights are
+                  scaled x10 (integers, so Tailwind reliably emits the arbitrary
+                  class): Time Period 20->14 (-30%) and each date 20->15 (-25%)
+                  from their old 2fr, the narrow controls stay at 10 (1fr), and
+                  Search keeps 30 (3fr). The Currency column is dropped when it
                   isn't shown. */}
               <div
                 className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 ${
                   hasCurrencyFilter
-                    ? 'lg:grid-cols-[1.4fr_1.5fr_1.5fr_1fr_1fr_1fr_1fr_3fr]'
-                    : 'lg:grid-cols-[1.4fr_1.5fr_1.5fr_1fr_1fr_1fr_3fr]'
+                    ? 'lg:grid-cols-[14fr_15fr_15fr_10fr_10fr_10fr_10fr_30fr]'
+                    : 'lg:grid-cols-[14fr_15fr_15fr_10fr_10fr_10fr_30fr]'
                 }`}
               >
                 <Select
