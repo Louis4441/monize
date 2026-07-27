@@ -282,9 +282,8 @@ export class DemoResetService {
         await this.dataSource.query(
           `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
-            category_id, amount, currency_code, description,
-            is_cleared, is_reconciled, status
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'CAD', $8, false, false, 'UNRECONCILED')`,
+            category_id, amount, currency_code, description, status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'CAD', $8, 'UNRECONCILED')`,
           [
             userId,
             account.id,

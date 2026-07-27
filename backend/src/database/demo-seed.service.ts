@@ -480,9 +480,8 @@ export class DemoSeedService {
         const [fromTx] = await this.dataSource.query(
           `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
-            amount, currency_code, description, is_cleared, is_reconciled, status,
-            is_transfer
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)
+            amount, currency_code, description, status, is_transfer
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
           RETURNING id`,
           [
             userId,
@@ -493,8 +492,6 @@ export class DemoSeedService {
             tx.amount,
             currencyCode,
             tx.description,
-            tx.isCleared,
-            tx.isReconciled,
             tx.status,
           ],
         );
@@ -502,9 +499,9 @@ export class DemoSeedService {
         const [toTx] = await this.dataSource.query(
           `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
-            amount, currency_code, description, is_cleared, is_reconciled, status,
+            amount, currency_code, description, status,
             is_transfer, linked_transaction_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, $12)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10)
           RETURNING id`,
           [
             userId,
@@ -515,8 +512,6 @@ export class DemoSeedService {
             -tx.amount,
             currencyCode,
             tx.description,
-            tx.isCleared,
-            tx.isReconciled,
             tx.status,
             fromTx.id,
           ],
@@ -534,9 +529,8 @@ export class DemoSeedService {
         const [parentTx] = await this.dataSource.query(
           `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
-            amount, currency_code, description, is_cleared, is_reconciled, status,
-            is_split
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true)
+            amount, currency_code, description, status, is_split
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
           RETURNING id`,
           [
             userId,
@@ -547,8 +541,6 @@ export class DemoSeedService {
             tx.amount,
             currencyCode,
             tx.description,
-            tx.isCleared,
-            tx.isReconciled,
             tx.status,
           ],
         );
@@ -569,9 +561,8 @@ export class DemoSeedService {
         await this.dataSource.query(
           `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
-            category_id, amount, currency_code, description,
-            is_cleared, is_reconciled, status
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            category_id, amount, currency_code, description, status
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
           [
             userId,
             accountId,
@@ -582,8 +573,6 @@ export class DemoSeedService {
             tx.amount,
             currencyCode,
             tx.description,
-            tx.isCleared,
-            tx.isReconciled,
             tx.status,
           ],
         );

@@ -207,8 +207,6 @@ export const RULES: Record<string, TableRules> = {
     exchange_rate: keep, // public FX rate
     description: drop,
     reference_number: drop,
-    is_cleared: keep,
-    is_reconciled: keep,
     reconciled_date: keep,
     status: keep,
     is_split: keep,
