@@ -27,6 +27,7 @@ import { ModuleRef } from "@nestjs/core";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { CurrenciesService } from "../currencies/currencies.service";
 import { BackupEncryptionService } from "../backup/backup-encryption.service";
+import { DemoModeService } from "../common/demo-mode.service";
 
 @Injectable()
 export class UsersService {
@@ -46,6 +47,7 @@ export class UsersService {
     private dataSource: DataSource,
     private passwordBreachService: PasswordBreachService,
     private moduleRef: ModuleRef,
+    private demoModeService: DemoModeService,
   ) {}
 
   async findById(id: string): Promise<User | null> {
@@ -227,7 +229,11 @@ export class UsersService {
     if (dto.recentTransactionsLimit !== undefined) {
       preferences.recentTransactionsLimit = dto.recentTransactionsLimit;
     }
-    if (dto.language !== undefined) {
+    // In demo mode the account is shared across all visitors, so the UI
+    // language must not be persisted to it -- otherwise one visitor's choice
+    // would follow the next person until the nightly reset. The locale cookie
+    // (set client-side) still applies the language for the current visit.
+    if (dto.language !== undefined && !this.demoModeService.isDemo) {
       preferences.language = dto.language;
     }
 
