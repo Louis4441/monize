@@ -36,6 +36,7 @@ interface TransactionFilterPanelProps {
   filterTagKey: string;
   filterTagKeyOp: TagKeyOp;
   filterTagKeyValue: string;
+  filterHasAttachments: '' | 'yes' | 'no';
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   handleArrayFilterChange: <T>(setter: (value: T) => void, value: T) => void;
   handleFilterChange: (setter: (value: string) => void, value: string) => void;
@@ -56,6 +57,7 @@ interface TransactionFilterPanelProps {
   setFilterTagKey: (value: string) => void;
   setFilterTagKeyOp: (value: TagKeyOp) => void;
   setFilterTagKeyValue: (value: string) => void;
+  setFilterHasAttachments: (value: '' | 'yes' | 'no') => void;
   filtersExpanded: boolean;
   setFiltersExpanded: (value: boolean) => void;
   activeFilterCount: number;
@@ -92,6 +94,7 @@ export function TransactionFilterPanel({
   filterTagKey,
   filterTagKeyOp,
   filterTagKeyValue,
+  filterHasAttachments,
   weekStartsOn,
   handleArrayFilterChange,
   handleFilterChange,
@@ -112,6 +115,7 @@ export function TransactionFilterPanel({
   setFilterTagKey,
   setFilterTagKeyOp,
   setFilterTagKeyValue,
+  setFilterHasAttachments,
   filtersExpanded,
   setFiltersExpanded,
   activeFilterCount,
@@ -437,6 +441,23 @@ export function TransactionFilterPanel({
                   </button>
                 </span>
               ))}
+              {/* Attachments chip - Lime */}
+              {filterHasAttachments && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-lime-100 dark:bg-lime-900 text-lime-800 dark:text-lime-200 whitespace-nowrap">
+                  {filterHasAttachments === 'yes'
+                    ? t('filter.chips.hasAttachments')
+                    : t('filter.chips.noAttachments')}
+                  <button
+                    onClick={() => handleFilterChange(setFilterHasAttachments as (value: string) => void, '')}
+                    className="ml-0.5 -mr-1 p-0.5 rounded-full inline-flex items-center justify-center hover:bg-lime-200 dark:hover:bg-lime-800"
+                    aria-label={t('filter.chips.removeAttachments')}
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
               {/* Search chip - Gray */}
               {filterSearch && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 whitespace-nowrap">
@@ -596,15 +617,18 @@ export function TransactionFilterPanel({
                 </div>
               )}
 
-              {/* Second row: Time period, dates, amount range, currency, and
-                  search. Explicit fr template keeps Currency narrow (1fr) and
-                  gives Search the remaining space to its right. The Currency
-                  column is dropped from the template when it isn't shown. */}
+              {/* Second row: Time period, dates, amount range, currency,
+                  attachments, and search. Explicit fr template keeps the
+                  narrow controls (amount/currency/attachments) at 1fr and gives
+                  Search the remaining space. Time Period is trimmed ~30% and the
+                  dates ~25% from their old 2fr to make room for the always-shown
+                  Attachments column. The Currency column is dropped when it
+                  isn't shown. */}
               <div
                 className={`grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 ${
                   hasCurrencyFilter
-                    ? 'lg:grid-cols-[2fr_2fr_2fr_1fr_1fr_1fr_3fr]'
-                    : 'lg:grid-cols-[2fr_2fr_2fr_1fr_1fr_3fr]'
+                    ? 'lg:grid-cols-[1.4fr_1.5fr_1.5fr_1fr_1fr_1fr_1fr_3fr]'
+                    : 'lg:grid-cols-[1.4fr_1.5fr_1.5fr_1fr_1fr_1fr_3fr]'
                 }`}
               >
                 <Select
@@ -683,6 +707,22 @@ export function TransactionFilterPanel({
                     placeholder={t('filter.fields.currency')}
                   />
                 )}
+
+                <Select
+                  label={t('filter.fields.hasAttachments')}
+                  options={[
+                    { value: '', label: t('filter.hasAttachmentsOptions.any') },
+                    { value: 'yes', label: t('filter.hasAttachmentsOptions.yes') },
+                    { value: 'no', label: t('filter.hasAttachmentsOptions.no') },
+                  ]}
+                  value={filterHasAttachments}
+                  onChange={(e) =>
+                    handleFilterChange(
+                      setFilterHasAttachments as (value: string) => void,
+                      e.target.value,
+                    )
+                  }
+                />
 
                 <Input
                   label={t('filter.fields.search')}

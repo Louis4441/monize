@@ -261,6 +261,12 @@ export class TransactionsController {
     description:
       "Filter by the currency a transaction was entered in (comma-separated ISO codes, foreign-currency entries only)",
   })
+  @ApiQuery({
+    name: "hasAttachments",
+    required: false,
+    description:
+      "Filter by attachment presence (true = only with attachments, false = only without)",
+  })
   @ApiResponse({
     status: 200,
     description: "List of transactions retrieved successfully",
@@ -291,6 +297,8 @@ export class TransactionsController {
     @Query("tagKeyOp") tagKeyOp?: string,
     @Query("tagKeyValue") tagKeyValue?: string,
     @Query("originalCurrencyCodes") originalCurrencyCodes?: string,
+    @Query("hasAttachments", new ParseBoolPipe({ optional: true }))
+    hasAttachments?: boolean,
   ) {
     // Validate pagination parameters
     if (page !== undefined) {
@@ -412,6 +420,7 @@ export class TransactionsController {
       undefined,
       tagKeyFilter,
       parseCurrencyCodes(originalCurrencyCodes),
+      hasAttachments,
     );
   }
 

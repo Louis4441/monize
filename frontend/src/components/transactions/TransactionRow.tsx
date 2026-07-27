@@ -578,6 +578,18 @@ export const TransactionRow = memo(function TransactionRow({
             : '-'}
         </td>
       )}
+      <td className={`${cellPadding} whitespace-nowrap text-center text-sm hidden min-[900px]:table-cell`}>
+        {transaction.attachmentCount && transaction.attachmentCount > 0 ? (
+          <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-300" title={t('list.attachmentsCount', { count: transaction.attachmentCount })}>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+            {transaction.attachmentCount}
+          </span>
+        ) : (
+          <span className="text-gray-400 dark:text-gray-500">-</span>
+        )}
+      </td>
       <td className={`${cellPadding} whitespace-nowrap text-center hidden min-[1400px]:table-cell`}>
         <button
           onClick={(e) => { e.stopPropagation(); onCycleStatus(transaction); }}

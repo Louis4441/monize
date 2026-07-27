@@ -893,6 +893,21 @@ describe('TransactionList', () => {
         expect(screen.getByText('Amount')).toBeInTheDocument();
         expect(screen.getByText('Status')).toBeInTheDocument();
         expect(screen.getByText('Actions')).toBeInTheDocument();
+        expect(screen.getByLabelText('Attachments')).toBeInTheDocument();
+      });
+    });
+
+    it('renders the attachment count for a transaction that has attachments', async () => {
+      render(
+        <TransactionList
+          transactions={[createTransaction({ id: 'tx-att', attachmentCount: 4 })]}
+          onEdit={mockOnEdit}
+          onRefresh={mockOnRefresh}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('4')).toBeInTheDocument();
       });
     });
 

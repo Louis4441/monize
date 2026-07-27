@@ -233,6 +233,7 @@ function SavedAttachments({ transactionId }: { transactionId: string }) {
                   variant="ghost"
                   size="sm"
                   aria-label={t('delete')}
+                  className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
                   onClick={() => setDeleteTarget(attachment)}
                 >
                   {t('delete')}

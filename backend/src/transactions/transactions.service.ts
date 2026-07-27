@@ -13,6 +13,7 @@ import { TransactionSplit } from "./entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { TransactionAttachment } from "../attachments/entities/transaction-attachment.entity";
 import { CreateTransactionDto } from "./dto/create-transaction.dto";
 import { UpdateTransactionDto } from "./dto/update-transaction.dto";
 import { CreateTransactionSplitDto } from "./dto/create-transaction-split.dto";
@@ -63,6 +64,7 @@ import {
 
 export interface TransactionWithInvestmentLink extends Transaction {
   linkedInvestmentTransactionId?: string | null;
+  attachmentCount?: number;
 }
 
 export interface PaginatedTransactions extends PaginatedResult<TransactionWithInvestmentLink> {
@@ -198,6 +200,8 @@ export class TransactionsService {
     private investmentTransactionsRepository: Repository<InvestmentTransaction>,
     @InjectRepository(UserPreference)
     private userPreferenceRepository: Repository<UserPreference>,
+    @InjectRepository(TransactionAttachment)
+    private transactionAttachmentsRepository: Repository<TransactionAttachment>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     private payeesService: PayeesService,
@@ -838,6 +842,7 @@ export class TransactionsService {
     sortDirection: "ASC" | "DESC" = "DESC",
     tagKeyFilter?: TagKeyFilter,
     originalCurrencyCodes?: string[],
+    hasAttachments?: boolean,
   ): Promise<PaginatedTransactions> {
     const clamped = clampPagination(page, limit);
     const safeLimit = clamped.limit;
@@ -974,6 +979,19 @@ export class TransactionsService {
       queryBuilder.andWhere(
         "transaction.original_currency_code IN (:...originalCurrencyCodes)",
         { originalCurrencyCodes },
+      );
+    }
+
+    // Attachment presence filter. An EXISTS subquery against the separate
+    // transaction_attachments table keeps this out of the heavily-joined main
+    // query, so it never multiplies rows or corrupts pagination.
+    if (hasAttachments !== undefined) {
+      const existsSubquery =
+        "SELECT 1 FROM transaction_attachments ta WHERE ta.transaction_id = transaction.id";
+      queryBuilder.andWhere(
+        hasAttachments
+          ? `EXISTS (${existsSubquery})`
+          : `NOT EXISTS (${existsSubquery})`,
       );
     }
 
@@ -1789,6 +1807,7 @@ export class TransactionsService {
   ): Promise<TransactionWithInvestmentLink[]> {
     const transactionIds = data.map((tx) => tx.id);
     const investmentLinkMap = new Map<string, string>();
+    const attachmentCountMap = new Map<string, number>();
 
     if (transactionIds.length > 0) {
       const linkedInvestmentTxs =
@@ -1802,6 +1821,21 @@ export class TransactionsService {
           investmentLinkMap.set(invTx.transactionId, invTx.id);
         }
       }
+
+      // One grouped count over the current page's ids (index-backed by
+      // idx on transaction_id); avoids an N+1 and keeps the blob-free
+      // attachments table off the main query.
+      const attachmentCounts = await this.transactionAttachmentsRepository
+        .createQueryBuilder("ta")
+        .select("ta.transactionId", "transactionId")
+        .addSelect("COUNT(*)", "count")
+        .where("ta.transactionId IN (:...transactionIds)", { transactionIds })
+        .groupBy("ta.transactionId")
+        .getRawMany<{ transactionId: string; count: string }>();
+
+      for (const row of attachmentCounts) {
+        attachmentCountMap.set(row.transactionId, Number(row.count));
+      }
     }
 
     return data.map((tx) => ({
@@ -1810,6 +1844,7 @@ export class TransactionsService {
       isReconciled: tx.isReconciled,
       isVoid: tx.isVoid,
       linkedInvestmentTransactionId: investmentLinkMap.get(tx.id) || null,
+      attachmentCount: attachmentCountMap.get(tx.id) ?? 0,
     }));
   }
 

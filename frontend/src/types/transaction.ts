@@ -86,6 +86,8 @@ export interface Transaction {
   linkedTransaction?: Transaction | null;
   /** ID of the linked investment transaction (if this is a cash transaction for an investment) */
   linkedInvestmentTransactionId?: string | null;
+  /** Number of file attachments on this transaction (populated by the list endpoint). */
+  attachmentCount?: number;
   splits?: TransactionSplit[];
   tags?: Tag[];
   createdAt: string;

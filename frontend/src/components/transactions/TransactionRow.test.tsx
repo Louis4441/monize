@@ -456,6 +456,21 @@ describe('TransactionRow', () => {
     expect(screen.getAllByText('-').length).toBeGreaterThan(0);
   });
 
+  it('renders the attachment count when the transaction has attachments', () => {
+    renderRow({}, { attachmentCount: 3 });
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('renders a dash when there are no attachments', () => {
+    renderRow({}, { attachmentCount: 0 });
+    expect(screen.getAllByText('-').length).toBeGreaterThan(0);
+  });
+
+  it('renders a dash when attachmentCount is undefined', () => {
+    renderRow({}, { attachmentCount: undefined });
+    expect(screen.getAllByText('-').length).toBeGreaterThan(0);
+  });
+
   it('renders status R in dense mode for reconciled', () => {
     renderRow({ density: 'dense' }, { status: TransactionStatus.RECONCILED });
     expect(screen.getByText('R')).toBeInTheDocument();

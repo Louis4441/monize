@@ -90,6 +90,8 @@ export interface TransactionsGetAllParams {
   tagKeyOp?: 'hasValue' | 'noValue' | 'contains' | 'notContains';
   /** Substring term for the contains / notContains operators. */
   tagKeyValue?: string;
+  /** Filter by attachment presence: true = only with, false = only without. */
+  hasAttachments?: boolean;
 }
 
 export const transactionsApi = {
@@ -117,6 +119,7 @@ export const transactionsApi = {
       tagKey: params?.tagKey || undefined,
       tagKeyOp: params?.tagKey ? params?.tagKeyOp : undefined,
       tagKeyValue: params?.tagKey ? params?.tagKeyValue || undefined : undefined,
+      hasAttachments: params?.hasAttachments,
     };
 
     const response = await apiClient.get<PaginatedTransactions>('/transactions', {

@@ -108,9 +108,11 @@
       "paidAmount": "Paid Amount",
       "feePaid": "Fee Paid",
       "balance": "Balance",
+      "attachments": "Attachments",
       "status": "Status",
       "actions": "Actions"
     },
+    "attachmentsCount": "{count, plural, one {# attachment} other {# attachments}}",
     "today": "Today",
     "export": {
       "button": "Export",
@@ -223,7 +225,13 @@
       "tagKey": "Tag key",
       "tagKeyOp": "Condition",
       "tagKeyValue": "Value",
-      "currency": "Currency"
+      "currency": "Currency",
+      "hasAttachments": "Attachments"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Any",
+      "yes": "Has attachments",
+      "no": "No attachments"
     },
     "placeholders": {
       "accounts": "All accounts",
@@ -255,7 +263,10 @@
       "dateUntil": "Until {date}",
       "amountFrom": "From {amount}",
       "amountUpTo": "Up to {amount}",
-      "removeCurrency": "Remove {name} currency filter"
+      "removeCurrency": "Remove {name} currency filter",
+      "hasAttachments": "Has attachments",
+      "noAttachments": "No attachments",
+      "removeAttachments": "Remove attachments filter"
     },
     "bulkUpdate": "Bulk Update",
     "cancelBulk": "Cancel Bulk",

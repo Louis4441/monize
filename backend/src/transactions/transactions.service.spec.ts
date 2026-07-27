@@ -9,6 +9,7 @@ import { Category } from "../categories/entities/category.entity";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
 import { Payee } from "../payees/entities/payee.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { TransactionAttachment } from "../attachments/entities/transaction-attachment.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
@@ -39,6 +40,7 @@ describe("TransactionsService", () => {
   let categoriesRepository: Record<string, jest.Mock>;
   let investmentTxRepository: Record<string, jest.Mock>;
   let userPreferenceRepository: Record<string, jest.Mock>;
+  let attachmentsRepository: Record<string, jest.Mock>;
   let accountsService: Record<string, jest.Mock>;
   let payeesService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
@@ -98,6 +100,18 @@ describe("TransactionsService", () => {
 
     userPreferenceRepository = {
       findOne: jest.fn().mockResolvedValue(null),
+    };
+
+    // The attachment-count enrichment issues one grouped query builder; default
+    // it to no rows so every existing findAll test yields attachmentCount 0.
+    attachmentsRepository = {
+      createQueryBuilder: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      }),
     };
 
     accountsService = {
@@ -204,6 +218,10 @@ describe("TransactionsService", () => {
         {
           provide: getRepositoryToken(UserPreference),
           useValue: userPreferenceRepository,
+        },
+        {
+          provide: getRepositoryToken(TransactionAttachment),
+          useValue: attachmentsRepository,
         },
         {
           provide: getRepositoryToken(Payee),
@@ -1758,6 +1776,85 @@ describe("TransactionsService", () => {
         "transaction.original_currency_code IN (:...originalCurrencyCodes)",
         { originalCurrencyCodes: ["EUR", "GBP"] },
       );
+    });
+
+    const findAllWith = (
+      overrides: Partial<{ hasAttachments: boolean }>,
+      mockQb: Record<string, jest.Mock>,
+    ) => {
+      transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
+      investmentTxRepository.find.mockResolvedValue([]);
+      return service.findAll(
+        "user-1",
+        undefined, undefined, undefined, undefined, undefined,
+        1, 50, false,
+        undefined, undefined, undefined, undefined, undefined, undefined,
+        "date", "DESC",
+        undefined, undefined,
+        overrides.hasAttachments,
+      );
+    };
+
+    it("filters to transactions that have attachments (EXISTS)", async () => {
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
+      await findAllWith({ hasAttachments: true }, mockQb);
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining("EXISTS (SELECT 1 FROM transaction_attachments"),
+      );
+      expect(mockQb.andWhere).not.toHaveBeenCalledWith(
+        expect.stringContaining("NOT EXISTS"),
+      );
+    });
+
+    it("filters to transactions without attachments (NOT EXISTS)", async () => {
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
+      await findAllWith({ hasAttachments: false }, mockQb);
+
+      expect(mockQb.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "NOT EXISTS (SELECT 1 FROM transaction_attachments",
+        ),
+      );
+    });
+
+    it("does not filter by attachments when unspecified", async () => {
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([[], 0]);
+      await findAllWith({}, mockQb);
+
+      expect(mockQb.andWhere).not.toHaveBeenCalledWith(
+        expect.stringContaining("transaction_attachments"),
+      );
+    });
+
+    it("annotates each transaction with its attachment count", async () => {
+      const mockQb = createMockQueryBuilder();
+      mockQb.getManyAndCount.mockResolvedValue([
+        [
+          { id: "tx-1", isCleared: false, isReconciled: false, isVoid: false },
+          { id: "tx-2", isCleared: false, isReconciled: false, isVoid: false },
+        ],
+        2,
+      ]);
+      transactionsRepository.createQueryBuilder.mockReturnValue(mockQb);
+      investmentTxRepository.find.mockResolvedValue([]);
+      attachmentsRepository.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        groupBy: jest.fn().mockReturnThis(),
+        getRawMany: jest
+          .fn()
+          .mockResolvedValue([{ transactionId: "tx-1", count: "3" }]),
+      });
+
+      const result = await service.findAll("user-1");
+
+      expect(result.data[0].attachmentCount).toBe(3);
+      expect(result.data[1].attachmentCount).toBe(0);
     });
 
     it("applies pagination with page and limit", async () => {

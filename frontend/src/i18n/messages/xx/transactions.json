@@ -108,9 +108,11 @@
       "paidAmount": "[XX-Paid Amount-XX]",
       "feePaid": "[XX-Fee Paid-XX]",
       "balance": "[XX-Balance-XX]",
+      "attachments": "[XX-Attachments-XX]",
       "status": "[XX-Status-XX]",
       "actions": "[XX-Actions-XX]"
     },
+    "attachmentsCount": "[XX-{count, plural, one {# attachment} other {# attachments}}-XX]",
     "today": "[XX-Today-XX]",
     "export": {
       "button": "[XX-Export-XX]",
@@ -223,7 +225,13 @@
       "tagKey": "[XX-Tag key-XX]",
       "tagKeyOp": "[XX-Condition-XX]",
       "tagKeyValue": "[XX-Value-XX]",
-      "currency": "[XX-Currency-XX]"
+      "currency": "[XX-Currency-XX]",
+      "hasAttachments": "[XX-Attachments-XX]"
+    },
+    "hasAttachmentsOptions": {
+      "any": "[XX-Any-XX]",
+      "yes": "[XX-Has attachments-XX]",
+      "no": "[XX-No attachments-XX]"
     },
     "placeholders": {
       "accounts": "[XX-All accounts-XX]",
@@ -255,7 +263,10 @@
       "dateUntil": "[XX-Until {date}-XX]",
       "amountFrom": "[XX-From {amount}-XX]",
       "amountUpTo": "[XX-Up to {amount}-XX]",
-      "removeCurrency": "[XX-Remove {name} currency filter-XX]"
+      "removeCurrency": "[XX-Remove {name} currency filter-XX]",
+      "hasAttachments": "[XX-Has attachments-XX]",
+      "noAttachments": "[XX-No attachments-XX]",
+      "removeAttachments": "[XX-Remove attachments filter-XX]"
     },
     "bulkUpdate": "[XX-Bulk Update-XX]",
     "cancelBulk": "[XX-Cancel Bulk-XX]",

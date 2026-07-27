@@ -6,6 +6,7 @@ import { Category } from "../categories/entities/category.entity";
 import { Payee } from "../payees/entities/payee.entity";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { TransactionAttachment } from "../attachments/entities/transaction-attachment.entity";
 import { TransactionsService } from "./transactions.service";
 import { TransactionSplitService } from "./transaction-split.service";
 import { TransactionTransferService } from "./transaction-transfer.service";
@@ -31,6 +32,7 @@ import { DelegationModule } from "../delegation/delegation.module";
       Payee,
       InvestmentTransaction,
       UserPreference,
+      TransactionAttachment,
     ]),
     forwardRef(() => AccountsModule),
     forwardRef(() => NetWorthModule),
