@@ -20,7 +20,9 @@ const PNG_BYTES = Buffer.from([
 ]);
 const PDF_BYTES = Buffer.from("%PDF-1.7\n...", "ascii");
 
-function pngFile(overrides: Partial<AttachmentToolFile> = {}): AttachmentToolFile {
+function pngFile(
+  overrides: Partial<AttachmentToolFile> = {},
+): AttachmentToolFile {
   return { filename: "receipt.png", buffer: PNG_BYTES, ...overrides };
 }
 
@@ -64,9 +66,7 @@ describe("AttachmentToolPrepService", () => {
   });
 
   it("returns an empty list for no files without touching the database", async () => {
-    await expect(service.prepareAttachments("user-1", [])).resolves.toEqual(
-      [],
-    );
+    await expect(service.prepareAttachments("user-1", [])).resolves.toEqual([]);
     expect(mockedTenantTx).not.toHaveBeenCalled();
   });
 
@@ -86,10 +86,7 @@ describe("AttachmentToolPrepService", () => {
   });
 
   it("rejects a file above the size limit", async () => {
-    const big = Buffer.concat([
-      PNG_BYTES,
-      Buffer.alloc(MAX_ATTACHMENT_BYTES),
-    ]);
+    const big = Buffer.concat([PNG_BYTES, Buffer.alloc(MAX_ATTACHMENT_BYTES)]);
     await expect(
       service.prepareAttachments("user-1", [pngFile({ buffer: big })]),
     ).rejects.toThrow(PayloadTooLargeException);

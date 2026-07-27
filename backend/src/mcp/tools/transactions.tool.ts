@@ -999,7 +999,8 @@ export class McpTransactionsTools {
           (entry.fileData as string).replace(/\s+/g, ""),
           "base64",
         );
-        const mediaType = buffer.length > 0 ? sniffAttachmentMime(buffer) : null;
+        const mediaType =
+          buffer.length > 0 ? sniffAttachmentMime(buffer) : null;
         if (!mediaType) {
           return {
             error: `"${entry.fileName}" is not a supported file type: only images (JPEG/PNG/GIF/WebP) and PDFs can be attached.`,

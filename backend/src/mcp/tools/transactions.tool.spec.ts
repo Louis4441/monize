@@ -1877,7 +1877,12 @@ describe("McpTransactionsTools", () => {
         {
           operation: "create",
           items: [
-            { accountName: "A", amount: -1, date: "2025-01-15", attachments: [{ fileData: PNG_B64, fileName: "r.png" }] },
+            {
+              accountName: "A",
+              amount: -1,
+              date: "2025-01-15",
+              attachments: [{ fileData: PNG_B64, fileName: "r.png" }],
+            },
             { accountName: "B", amount: -2, date: "2025-01-15" },
           ],
         },
@@ -1891,7 +1896,12 @@ describe("McpTransactionsTools", () => {
       const result = await handlers["manage_transactions"](
         {
           operation: "delete",
-          items: [{ transactionId: "33333333-3333-4333-8333-333333333333", attachments: [{ fileData: PNG_B64, fileName: "r.png" }] }],
+          items: [
+            {
+              transactionId: "33333333-3333-4333-8333-333333333333",
+              attachments: [{ fileData: PNG_B64, fileName: "r.png" }],
+            },
+          ],
         },
         { sessionId: "s1" },
       );
@@ -1901,7 +1911,10 @@ describe("McpTransactionsTools", () => {
 
     it("rejects attachments with dryRun", async () => {
       const result = await handlers["manage_transactions"](
-        { ...createArgs([{ fileData: PNG_B64, fileName: "r.png" }]), dryRun: true },
+        {
+          ...createArgs([{ fileData: PNG_B64, fileName: "r.png" }]),
+          dryRun: true,
+        },
         { sessionId: "s1" },
       );
       expect(result.isError).toBe(true);
@@ -1930,14 +1943,19 @@ describe("McpTransactionsTools", () => {
 
     it("requires exactly one of attachmentUri or fileData per entry", async () => {
       const both = await handlers["manage_transactions"](
-        createArgs([{ attachmentUri: "monize-attachment://x", fileData: PNG_B64, fileName: "r.png" }]),
+        createArgs([
+          {
+            attachmentUri: "monize-attachment://x",
+            fileData: PNG_B64,
+            fileName: "r.png",
+          },
+        ]),
         { sessionId: "s1" },
       );
       expect(both.isError).toBe(true);
-      const neither = await handlers["manage_transactions"](
-        createArgs([{}]),
-        { sessionId: "s1" },
-      );
+      const neither = await handlers["manage_transactions"](createArgs([{}]), {
+        sessionId: "s1",
+      });
       expect(neither.isError).toBe(true);
     });
 
@@ -1977,7 +1995,10 @@ describe("McpTransactionsTools", () => {
 
       const bad = await handlers["manage_transactions"](
         createArgs([
-          { fileData: Buffer.from("plain text").toString("base64"), fileName: "x.png" },
+          {
+            fileData: Buffer.from("plain text").toString("base64"),
+            fileName: "x.png",
+          },
         ]),
         { sessionId: "s1" },
       );
@@ -2094,7 +2115,10 @@ describe("McpTransactionsTools", () => {
         {
           operation: "update",
           items: [
-            { transactionId: TXID, attachments: [{ fileData: PNG_B64, fileName: "receipt.png" }] },
+            {
+              transactionId: TXID,
+              attachments: [{ fileData: PNG_B64, fileName: "receipt.png" }],
+            },
           ],
         },
         { sessionId: "s1" },

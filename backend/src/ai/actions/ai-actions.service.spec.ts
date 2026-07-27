@@ -353,9 +353,7 @@ describe("AiActionsService", () => {
         actionId: "act-retry-ref",
         attachments: [attachmentRef()],
       });
-      await expect(
-        service.confirm(USER, dtoFor(descriptor)),
-      ).rejects.toThrow();
+      await expect(service.confirm(USER, dtoFor(descriptor))).rejects.toThrow();
 
       attachmentStore.get.mockReturnValue({ data: FILE_BYTES });
       const result = await service.confirm(USER, dtoFor(descriptor));
