@@ -4,6 +4,8 @@
   "upload": "Add attachment",
   "download": "Download",
   "delete": "Delete",
+  "remove": "Remove",
+  "pendingHint": "Files will be uploaded when you save the transaction.",
   "deleteConfirmTitle": "Delete attachment?",
   "deleteConfirmMessage": "\"{name}\" will be permanently deleted.",
   "uploaded": "Attachment added",

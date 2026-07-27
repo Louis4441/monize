@@ -129,4 +129,50 @@ describe('AttachmentsSection', () => {
     await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('a-1'));
     expect(toast.success).toHaveBeenCalledWith('Attachment deleted');
   });
+
+  describe('staged mode', () => {
+    function renderStaged(files: File[], onChange = vi.fn()) {
+      render(
+        <AttachmentsSection stagedFiles={files} onStagedFilesChange={onChange} />,
+      );
+      return onChange;
+    }
+
+    it('does not touch the server and shows the empty state', () => {
+      renderStaged([]);
+      expect(screen.getByText('No attachments yet')).toBeInTheDocument();
+      expect(mockList).not.toHaveBeenCalled();
+    });
+
+    it('stages a valid file via the change handler without uploading', () => {
+      const onChange = renderStaged([]);
+      const input = screen.getByLabelText('Add attachment') as HTMLInputElement;
+      const file = fileOfType('image/png');
+      fireEvent.change(input, { target: { files: [file] } });
+
+      expect(onChange).toHaveBeenCalledWith([file]);
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unsupported staged file', () => {
+      const onChange = renderStaged([]);
+      const input = screen.getByLabelText('Add attachment') as HTMLInputElement;
+      fireEvent.change(input, {
+        target: { files: [fileOfType('text/plain')] },
+      });
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalled();
+    });
+
+    it('lists staged files with a remove control', () => {
+      const file = fileOfType('application/pdf');
+      Object.defineProperty(file, 'name', { value: 'invoice.pdf' });
+      const onChange = renderStaged([file]);
+
+      expect(screen.getByText('invoice.pdf')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+      expect(onChange).toHaveBeenCalledWith([]);
+    });
+  });
 });

@@ -4,6 +4,8 @@
   "upload": "[XX-Add attachment-XX]",
   "download": "[XX-Download-XX]",
   "delete": "[XX-Delete-XX]",
+  "remove": "[XX-Remove-XX]",
+  "pendingHint": "[XX-Files will be uploaded when you save the transaction.-XX]",
   "deleteConfirmTitle": "[XX-Delete attachment?-XX]",
   "deleteConfirmMessage": "[XX-\"{name}\" will be permanently deleted.-XX]",
   "uploaded": "[XX-Attachment added-XX]",

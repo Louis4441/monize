@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -14,9 +14,15 @@ import {
   MAX_ATTACHMENTS_PER_TRANSACTION,
 } from '@/types/attachment';
 
-interface AttachmentsSectionProps {
-  transactionId: string;
-}
+/**
+ * Saved mode: manages the attachments of an existing transaction directly
+ * against the server. Staged mode: holds files client-side for a transaction
+ * that does not exist yet (the New Transaction window); the parent form uploads
+ * them once the transaction has been created.
+ */
+type AttachmentsSectionProps =
+  | { transactionId: string }
+  | { stagedFiles: File[]; onStagedFilesChange: (files: File[]) => void };
 
 /** Human-readable byte size (e.g. 1.4 MB). */
 function formatBytes(bytes: number): string {
@@ -32,11 +38,77 @@ function formatBytes(bytes: number): string {
 }
 
 /**
- * Lists, uploads, and deletes the file attachments for a saved transaction.
- * Only rendered when a transaction id exists (i.e. when editing) so uploads
- * always have a parent to attach to.
+ * Validate a freshly selected file against the shared limits. Returns a
+ * translated error message when the file is rejected, or null when it is
+ * acceptable. `currentCount` is the number of attachments already present
+ * (existing + pending) so the per-transaction cap is enforced consistently in
+ * both modes.
  */
-export function AttachmentsSection({ transactionId }: AttachmentsSectionProps) {
+function validateSelection(
+  file: File,
+  currentCount: number,
+  t: (key: string, values?: Record<string, string | number>) => string,
+): string | null {
+  if (currentCount >= MAX_ATTACHMENTS_PER_TRANSACTION) {
+    return t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION });
+  }
+  if (!ACCEPTED_ATTACHMENT_TYPES.includes(file.type)) {
+    return t('unsupported');
+  }
+  if (file.size > MAX_ATTACHMENT_BYTES) {
+    return t('tooLarge', { max: formatBytes(MAX_ATTACHMENT_BYTES) });
+  }
+  return null;
+}
+
+/** The Add-attachment button plus its hidden file input, shared by both modes. */
+function UploadControl({
+  onFileSelected,
+  loading,
+  disabled,
+}: {
+  onFileSelected: (file: File) => void;
+  loading?: boolean;
+  disabled?: boolean;
+}) {
+  const t = useTranslations('attachments');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Allow re-selecting the same file after an error/removal.
+    event.target.value = '';
+    if (file) onFileSelected(file);
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        isLoading={loading}
+        disabled={disabled}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        {t('upload')}
+      </Button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPTED_ATTACHMENT_TYPES.join(',')}
+        className="hidden"
+        aria-label={t('upload')}
+        onChange={handleChange}
+      />
+    </>
+  );
+}
+
+/**
+ * Lists, uploads, and deletes the file attachments for a saved transaction.
+ */
+function SavedAttachments({ transactionId }: { transactionId: string }) {
   const t = useTranslations('attachments');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -45,7 +117,6 @@ export function AttachmentsSection({ transactionId }: AttachmentsSectionProps) {
   );
   const [deleteTarget, setDeleteTarget] = useState<Attachment | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -60,24 +131,10 @@ export function AttachmentsSection({ transactionId }: AttachmentsSectionProps) {
     load();
   }, [load]);
 
-  const handleFileSelected = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    // Allow re-selecting the same file after an error/removal.
-    event.target.value = '';
-    if (!file) return;
-
-    if (attachments.length >= MAX_ATTACHMENTS_PER_TRANSACTION) {
-      toast.error(t('tooMany', { max: MAX_ATTACHMENTS_PER_TRANSACTION }));
-      return;
-    }
-    if (!ACCEPTED_ATTACHMENT_TYPES.includes(file.type)) {
-      toast.error(t('unsupported'));
-      return;
-    }
-    if (file.size > MAX_ATTACHMENT_BYTES) {
-      toast.error(t('tooLarge', { max: formatBytes(MAX_ATTACHMENT_BYTES) }));
+  const handleFileSelected = async (file: File) => {
+    const error = validateSelection(file, attachments.length, t);
+    if (error) {
+      toast.error(error);
       return;
     }
 
@@ -86,8 +143,8 @@ export function AttachmentsSection({ transactionId }: AttachmentsSectionProps) {
       await attachmentsApi.upload(transactionId, file);
       toast.success(t('uploaded'));
       await load();
-    } catch (error) {
-      toast.error(getErrorMessage(error, t('uploadFailed')));
+    } catch (err) {
+      toast.error(getErrorMessage(err, t('uploadFailed')));
     } finally {
       setUploading(false);
     }
@@ -116,23 +173,10 @@ export function AttachmentsSection({ transactionId }: AttachmentsSectionProps) {
         <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           {t('title')}
         </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          isLoading={uploading}
+        <UploadControl
+          onFileSelected={handleFileSelected}
+          loading={uploading}
           disabled={uploading || atLimit}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {t('upload')}
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPTED_ATTACHMENT_TYPES.join(',')}
-          className="hidden"
-          aria-label={t('upload')}
-          onChange={handleFileSelected}
         />
       </div>
 
@@ -210,5 +254,141 @@ export function AttachmentsSection({ transactionId }: AttachmentsSectionProps) {
         onCancel={() => (deleting ? undefined : setDeleteTarget(null))}
       />
     </div>
+  );
+}
+
+/**
+ * Holds files client-side for a transaction that does not exist yet. Selected
+ * files are validated the same way as saved uploads and previewed locally; the
+ * parent form uploads them once it has created the transaction.
+ */
+function StagedAttachments({
+  files,
+  onChange,
+}: {
+  files: File[];
+  onChange: (files: File[]) => void;
+}) {
+  const t = useTranslations('attachments');
+
+  // Object URLs for image previews, recreated whenever the file list changes
+  // and revoked on cleanup so blobs are not leaked. Guarded for environments
+  // (jsdom) where createObjectURL is unavailable.
+  const previews = useMemo(
+    () =>
+      files.map((file) =>
+        file.type.startsWith('image/') &&
+        typeof URL.createObjectURL === 'function'
+          ? URL.createObjectURL(file)
+          : null,
+      ),
+    [files],
+  );
+  useEffect(
+    () => () => {
+      previews.forEach(
+        (url) =>
+          url && typeof URL.revokeObjectURL === 'function' &&
+          URL.revokeObjectURL(url),
+      );
+    },
+    [previews],
+  );
+
+  const handleFileSelected = (file: File) => {
+    const error = validateSelection(file, files.length, t);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    onChange([...files, file]);
+  };
+
+  const removeAt = (index: number) => {
+    onChange(files.filter((_, i) => i !== index));
+  };
+
+  const atLimit = files.length >= MAX_ATTACHMENTS_PER_TRANSACTION;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          {t('title')}
+        </span>
+        <UploadControl onFileSelected={handleFileSelected} disabled={atLimit} />
+      </div>
+
+      {files.length === 0 ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">{t('empty')}</p>
+      ) : (
+        <>
+          <ul className="space-y-2">
+            {files.map((file, index) => {
+              const preview = previews[index];
+              return (
+                <li
+                  key={`${file.name}-${index}`}
+                  className="flex items-center gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-2"
+                >
+                  {preview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={preview}
+                      alt={file.name}
+                      className="h-10 w-10 shrink-0 rounded object-cover"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-gray-100 dark:bg-gray-700 text-lg"
+                    >
+                      {file.type === 'application/pdf' ? '📄' : '📎'}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-gray-900 dark:text-gray-100">
+                      {file.name}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {formatBytes(file.size)}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t('remove')}
+                    onClick={() => removeAt(index)}
+                  >
+                    {t('remove')}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {t('pendingHint')}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Attachment manager for a transaction. Renders in saved mode when a
+ * transaction id is supplied, or in staged mode (client-side only) when given a
+ * pending file list and change handler.
+ */
+export function AttachmentsSection(props: AttachmentsSectionProps) {
+  if ('transactionId' in props) {
+    return <SavedAttachments transactionId={props.transactionId} />;
+  }
+  return (
+    <StagedAttachments
+      files={props.stagedFiles}
+      onChange={props.onStagedFilesChange}
+    />
   );
 }

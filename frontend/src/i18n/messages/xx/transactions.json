@@ -381,6 +381,7 @@
       "transferUpdated": "[XX-Transfer updated-XX]",
       "transactionCreated": "[XX-Transaction created-XX]",
       "transactionUpdated": "[XX-Transaction updated-XX]",
+      "attachmentsUploadFailed": "[XX-Transaction saved, but {count} attachment(s) failed to upload-XX]",
       "saveFailed": "[XX-Failed to save transaction-XX]",
       "loadFailed": "[XX-Failed to load form data-XX]",
       "splitsNotEqual": "[XX-Splits total ({splitTotal}) must equal transaction amount ({txAmount})-XX]",
