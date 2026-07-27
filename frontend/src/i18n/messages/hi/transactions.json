@@ -109,7 +109,8 @@
       "feePaid": "भुगतान किया गया शुल्क",
       "balance": "शेष",
       "status": "स्थिति",
-      "actions": "क्रियाएं"
+      "actions": "क्रियाएं",
+      "attachments": "अटैचमेंट"
     },
     "today": "आज",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "संपादित करें",
       "deleteButton": "हटाएं"
     },
-    "itemNamePlural": "लेन-देन"
+    "itemNamePlural": "लेन-देन",
+    "attachmentsCount": "{count, plural, one {# अटैचमेंट} other {# अटैचमेंट}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "टैग कुंजी",
       "tagKeyOp": "शर्त",
       "tagKeyValue": "मान",
-      "currency": "मुद्रा"
+      "currency": "मुद्रा",
+      "hasAttachments": "अटैचमेंट"
     },
     "placeholders": {
       "accounts": "सभी खाते",
@@ -248,7 +251,10 @@
       "dateUntil": "{date} तक",
       "amountFrom": "{amount} से",
       "amountUpTo": "{amount} तक",
-      "removeCurrency": "{name} मुद्रा फ़िल्टर हटाएँ"
+      "removeCurrency": "{name} मुद्रा फ़िल्टर हटाएँ",
+      "hasAttachments": "अटैचमेंट हैं",
+      "noAttachments": "कोई अटैचमेंट नहीं",
+      "removeAttachments": "अटैचमेंट फ़िल्टर हटाएं"
     },
     "bulkUpdate": "बल्क अपडेट",
     "cancelBulk": "बल्क रद्द करें",
@@ -279,6 +285,11 @@
       "noValue": "कोई मान नहीं",
       "contains": "मान में शामिल है",
       "notContains": "मान में शामिल नहीं है"
+    },
+    "hasAttachmentsOptions": {
+      "any": "कोई भी",
+      "yes": "हाँ",
+      "no": "नहीं"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "श्रेणी \"{name}\" बनाई गई",
       "categoryCreateFailed": "श्रेणी बनाने में विफल",
       "tagCreated": "टैग \"{name}\" बनाया गया",
-      "fxRateRequired": "विदेशी मुद्रा लेनदेन सहेजने से पहले विनिमय दर या रूपांतरित राशि दर्ज करें।"
+      "fxRateRequired": "विदेशी मुद्रा लेनदेन सहेजने से पहले विनिमय दर या रूपांतरित राशि दर्ज करें।",
+      "attachmentsUploadFailed": "लेन-देन सहेजा गया, लेकिन {count} अटैचमेंट अपलोड करने में विफल रहे"
     },
     "ariaHistory": "हाल के लेन-देन दिखाएं",
     "ariaHistoryForPayee": "इस भुगतानकर्ता के हाल के लेन-देन दिखाएं",

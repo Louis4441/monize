@@ -39,6 +39,24 @@ const REFS: Record<string, RefRule[]> = {
   payee_aliases: [
     { column: "payee_id", refTable: "payees", onMissing: "dropRow" },
   ],
+  // Attachments are excluded from the de-identified support backup, but the
+  // full backup exports them and remaps ids on restore, so their FKs must be
+  // declared here (and the coverage test requires it). A row cannot outlive its
+  // parent transaction / attachment, hence dropRow.
+  transaction_attachments: [
+    {
+      column: "transaction_id",
+      refTable: "transactions",
+      onMissing: "dropRow",
+    },
+  ],
+  attachment_blobs: [
+    {
+      column: "attachment_id",
+      refTable: "transaction_attachments",
+      onMissing: "dropRow",
+    },
+  ],
   accounts: [
     { column: "linked_account_id", refTable: "accounts", onMissing: "null" },
     {

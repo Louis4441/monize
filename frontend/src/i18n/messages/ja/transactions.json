@@ -109,7 +109,8 @@
       "feePaid": "支払手数料",
       "balance": "残高",
       "status": "状態",
-      "actions": "操作"
+      "actions": "操作",
+      "attachments": "添付ファイル"
     },
     "today": "今日",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "編集",
       "deleteButton": "削除"
     },
-    "itemNamePlural": "件の取引"
+    "itemNamePlural": "件の取引",
+    "attachmentsCount": "{count, plural, other {# 件の添付ファイル}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "タグキー",
       "tagKeyOp": "条件",
       "tagKeyValue": "値",
-      "currency": "通貨"
+      "currency": "通貨",
+      "hasAttachments": "添付ファイル"
     },
     "placeholders": {
       "accounts": "すべての口座",
@@ -248,7 +251,10 @@
       "dateUntil": "{date}まで",
       "amountFrom": "{amount}以上",
       "amountUpTo": "{amount}以下",
-      "removeCurrency": "{name} の通貨フィルターを削除"
+      "removeCurrency": "{name} の通貨フィルターを削除",
+      "hasAttachments": "添付ファイルあり",
+      "noAttachments": "添付ファイルなし",
+      "removeAttachments": "添付ファイルフィルターを削除"
     },
     "bulkUpdate": "一括更新",
     "cancelBulk": "一括操作をキャンセル",
@@ -279,6 +285,11 @@
       "noValue": "値がない",
       "contains": "値が次を含む",
       "notContains": "値が次を含まない"
+    },
+    "hasAttachmentsOptions": {
+      "any": "すべて",
+      "yes": "はい",
+      "no": "いいえ"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "カテゴリ「{name}」を作成しました",
       "categoryCreateFailed": "カテゴリの作成に失敗しました",
       "tagCreated": "タグ「{name}」を作成しました",
-      "fxRateRequired": "外貨取引を保存する前に、為替レートまたは換算後の金額を入力してください。"
+      "fxRateRequired": "外貨取引を保存する前に、為替レートまたは換算後の金額を入力してください。",
+      "attachmentsUploadFailed": "取引は保存されましたが、{count} 件の添付ファイルのアップロードに失敗しました"
     },
     "ariaHistory": "最近の取引を表示",
     "ariaHistoryForPayee": "この支払先の最近の取引を表示",

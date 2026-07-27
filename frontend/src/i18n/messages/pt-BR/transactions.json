@@ -109,7 +109,8 @@
       "feePaid": "Taxa Paga",
       "balance": "Saldo",
       "status": "Status",
-      "actions": "Ações"
+      "actions": "Ações",
+      "attachments": "Anexos"
     },
     "today": "Hoje",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Editar",
       "deleteButton": "Excluir"
     },
-    "itemNamePlural": "transações"
+    "itemNamePlural": "transações",
+    "attachmentsCount": "{count, plural, one {# anexo} other {# anexos}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Chave de tag",
       "tagKeyOp": "Condição",
       "tagKeyValue": "Valor",
-      "currency": "Moeda"
+      "currency": "Moeda",
+      "hasAttachments": "Anexos"
     },
     "placeholders": {
       "accounts": "Todas as contas",
@@ -248,7 +251,10 @@
       "dateUntil": "Até {date}",
       "amountFrom": "A partir de {amount}",
       "amountUpTo": "Até {amount}",
-      "removeCurrency": "Remover o filtro de moeda {name}"
+      "removeCurrency": "Remover o filtro de moeda {name}",
+      "hasAttachments": "Com anexos",
+      "noAttachments": "Sem anexos",
+      "removeAttachments": "Remover filtro de anexos"
     },
     "bulkUpdate": "Atualização em Massa",
     "cancelBulk": "Cancelar Massa",
@@ -279,6 +285,11 @@
       "noValue": "Não tem valor",
       "contains": "O valor contém",
       "notContains": "O valor não contém"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Qualquer",
+      "yes": "Sim",
+      "no": "Não"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Categoria \"{name}\" criada",
       "categoryCreateFailed": "Falha ao criar categoria",
       "tagCreated": "Etiqueta \"{name}\" criada",
-      "fxRateRequired": "Insira uma taxa de câmbio ou o valor convertido antes de salvar uma transação em moeda estrangeira."
+      "fxRateRequired": "Insira uma taxa de câmbio ou o valor convertido antes de salvar uma transação em moeda estrangeira.",
+      "attachmentsUploadFailed": "Transação salva, mas falhou o envio de {count} anexo(s)"
     },
     "ariaHistory": "Mostrar transações recentes",
     "ariaHistoryForPayee": "Mostrar transações recentes deste beneficiário",

@@ -200,8 +200,6 @@ export class TransactionsService {
     private investmentTransactionsRepository: Repository<InvestmentTransaction>,
     @InjectRepository(UserPreference)
     private userPreferenceRepository: Repository<UserPreference>,
-    @InjectRepository(TransactionAttachment)
-    private transactionAttachmentsRepository: Repository<TransactionAttachment>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     private payeesService: PayeesService,
@@ -1824,8 +1822,11 @@ export class TransactionsService {
 
       // One grouped count over the current page's ids (index-backed by
       // idx on transaction_id); avoids an N+1 and keeps the blob-free
-      // attachments table off the main query.
-      const attachmentCounts = await this.transactionAttachmentsRepository
+      // attachments table off the main query. Read via the injected
+      // DataSource rather than a dedicated @InjectRepository so the RLS
+      // ratchet stays flat.
+      const attachmentCounts = await this.dataSource
+        .getRepository(TransactionAttachment)
         .createQueryBuilder("ta")
         .select("ta.transactionId", "transactionId")
         .addSelect("COUNT(*)", "count")

@@ -109,7 +109,8 @@
       "feePaid": "已付手续费",
       "balance": "余额",
       "status": "状态",
-      "actions": "操作"
+      "actions": "操作",
+      "attachments": "附件"
     },
     "today": "今天",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "编辑",
       "deleteButton": "删除"
     },
-    "itemNamePlural": "笔交易"
+    "itemNamePlural": "笔交易",
+    "attachmentsCount": "{count, plural, other {# 个附件}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "标签键",
       "tagKeyOp": "条件",
       "tagKeyValue": "值",
-      "currency": "币种"
+      "currency": "币种",
+      "hasAttachments": "附件"
     },
     "placeholders": {
       "accounts": "所有账户",
@@ -248,7 +251,10 @@
       "dateUntil": "至 {date}",
       "amountFrom": "从 {amount}",
       "amountUpTo": "最多 {amount}",
-      "removeCurrency": "移除 {name} 币种筛选"
+      "removeCurrency": "移除 {name} 币种筛选",
+      "hasAttachments": "有附件",
+      "noAttachments": "无附件",
+      "removeAttachments": "移除附件筛选"
     },
     "bulkUpdate": "批量更新",
     "cancelBulk": "取消批量",
@@ -279,6 +285,11 @@
       "noValue": "无值",
       "contains": "值包含",
       "notContains": "值不包含"
+    },
+    "hasAttachmentsOptions": {
+      "any": "任意",
+      "yes": "是",
+      "no": "否"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "分类\"{name}\"已创建",
       "categoryCreateFailed": "创建分类失败",
       "tagCreated": "标签\"{name}\"已创建",
-      "fxRateRequired": "在保存外币交易前，请输入汇率或换算后的金额。"
+      "fxRateRequired": "在保存外币交易前，请输入汇率或换算后的金额。",
+      "attachmentsUploadFailed": "交易已保存，但 {count} 个附件上传失败"
     },
     "ariaHistory": "显示近期交易",
     "ariaHistoryForPayee": "显示此收款人的近期交易",

@@ -109,7 +109,8 @@
       "feePaid": "Betaalde kosten",
       "balance": "Saldo",
       "status": "Status",
-      "actions": "Acties"
+      "actions": "Acties",
+      "attachments": "Bijlagen"
     },
     "today": "Vandaag",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Bewerken",
       "deleteButton": "Verwijderen"
     },
-    "itemNamePlural": "transacties"
+    "itemNamePlural": "transacties",
+    "attachmentsCount": "{count, plural, one {# bijlage} other {# bijlagen}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Tagsleutel",
       "tagKeyOp": "Voorwaarde",
       "tagKeyValue": "Waarde",
-      "currency": "Valuta"
+      "currency": "Valuta",
+      "hasAttachments": "Bijlagen"
     },
     "placeholders": {
       "accounts": "Alle rekeningen",
@@ -248,7 +251,10 @@
       "dateUntil": "Tot {date}",
       "amountFrom": "Vanaf {amount}",
       "amountUpTo": "Tot {amount}",
-      "removeCurrency": "Valutafilter {name} verwijderen"
+      "removeCurrency": "Valutafilter {name} verwijderen",
+      "hasAttachments": "Met bijlagen",
+      "noAttachments": "Zonder bijlagen",
+      "removeAttachments": "Bijlagenfilter verwijderen"
     },
     "bulkUpdate": "Bulk bijwerken",
     "cancelBulk": "Bulk annuleren",
@@ -279,6 +285,11 @@
       "noValue": "Heeft geen waarde",
       "contains": "Waarde bevat",
       "notContains": "Waarde bevat niet"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Alle",
+      "yes": "Ja",
+      "no": "Nee"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Categorie \"{name}\" aangemaakt",
       "categoryCreateFailed": "Aanmaken van categorie mislukt",
       "tagCreated": "Label \"{name}\" aangemaakt",
-      "fxRateRequired": "Voer een wisselkoers of het omgerekende bedrag in voordat je een transactie in vreemde valuta opslaat."
+      "fxRateRequired": "Voer een wisselkoers of het omgerekende bedrag in voordat je een transactie in vreemde valuta opslaat.",
+      "attachmentsUploadFailed": "Transactie opgeslagen, maar {count} bijlage(n) konden niet worden geüpload"
     },
     "ariaHistory": "Recente transacties tonen",
     "ariaHistoryForPayee": "Recente transacties voor deze begunstigde tonen",

@@ -109,7 +109,8 @@
       "feePaid": "Pobrana opłata",
       "balance": "Saldo",
       "status": "Status",
-      "actions": "Akcje"
+      "actions": "Akcje",
+      "attachments": "Załączniki"
     },
     "today": "Dzisiaj",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Edytuj",
       "deleteButton": "Usuń"
     },
-    "itemNamePlural": "transakcji"
+    "itemNamePlural": "transakcji",
+    "attachmentsCount": "{count, plural, one {# załącznik} few {# załączniki} many {# załączników} other {# załącznika}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Klucz tagu",
       "tagKeyOp": "Warunek",
       "tagKeyValue": "Wartość",
-      "currency": "Waluta"
+      "currency": "Waluta",
+      "hasAttachments": "Załączniki"
     },
     "placeholders": {
       "accounts": "Wszystkie konta",
@@ -248,7 +251,10 @@
       "dateUntil": "Do {date}",
       "amountFrom": "Od {amount}",
       "amountUpTo": "Do {amount}",
-      "removeCurrency": "Usuń filtr waluty {name}"
+      "removeCurrency": "Usuń filtr waluty {name}",
+      "hasAttachments": "Z załącznikami",
+      "noAttachments": "Bez załączników",
+      "removeAttachments": "Usuń filtr załączników"
     },
     "bulkUpdate": "Aktualizacja zbiorcza",
     "cancelBulk": "Anuluj zbiorczą",
@@ -279,6 +285,11 @@
       "noValue": "Nie ma wartości",
       "contains": "Wartość zawiera",
       "notContains": "Wartość nie zawiera"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Dowolne",
+      "yes": "Tak",
+      "no": "Nie"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Utworzono kategorię \"{name}\"",
       "categoryCreateFailed": "Nie udało się utworzyć kategorii",
       "tagCreated": "Tag \"{name}\" utworzony",
-      "fxRateRequired": "Wprowadź kurs wymiany lub przeliczoną kwotę przed zapisaniem transakcji w obcej walucie."
+      "fxRateRequired": "Wprowadź kurs wymiany lub przeliczoną kwotę przed zapisaniem transakcji w obcej walucie.",
+      "attachmentsUploadFailed": "Zapisano transakcję, ale nie udało się przesłać {count} załącznika(ów)"
     },
     "ariaHistory": "Pokaż ostatnie transakcje",
     "ariaHistoryForPayee": "Pokaż ostatnie transakcje dla tego odbiorcy",

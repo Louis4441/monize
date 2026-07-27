@@ -109,7 +109,8 @@
       "feePaid": "부과된 수수료",
       "balance": "잔액",
       "status": "상태",
-      "actions": "작업"
+      "actions": "작업",
+      "attachments": "첨부 파일"
     },
     "today": "오늘",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "편집",
       "deleteButton": "삭제"
     },
-    "itemNamePlural": "거래"
+    "itemNamePlural": "거래",
+    "attachmentsCount": "{count, plural, other {# 개의 첨부 파일}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "태그 키",
       "tagKeyOp": "조건",
       "tagKeyValue": "값",
-      "currency": "통화"
+      "currency": "통화",
+      "hasAttachments": "첨부 파일"
     },
     "placeholders": {
       "accounts": "모든 계정",
@@ -248,7 +251,10 @@
       "dateUntil": "{date}까지",
       "amountFrom": "{amount}부터",
       "amountUpTo": "{amount}까지",
-      "removeCurrency": "{name} 통화 필터 제거"
+      "removeCurrency": "{name} 통화 필터 제거",
+      "hasAttachments": "첨부 파일 있음",
+      "noAttachments": "첨부 파일 없음",
+      "removeAttachments": "첨부 파일 필터 제거"
     },
     "bulkUpdate": "일괄 업데이트",
     "cancelBulk": "일괄 취소",
@@ -279,6 +285,11 @@
       "noValue": "값 없음",
       "contains": "값 포함",
       "notContains": "값 미포함"
+    },
+    "hasAttachmentsOptions": {
+      "any": "전체",
+      "yes": "예",
+      "no": "아니오"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "카테고리 \"{name}\"이(가) 생성되었습니다",
       "categoryCreateFailed": "카테고리 생성에 실패했습니다",
       "tagCreated": "태그 \"{name}\"이(가) 생성되었습니다",
-      "fxRateRequired": "외화 거래를 저장하기 전에 환율 또는 환산 금액을 입력하세요."
+      "fxRateRequired": "외화 거래를 저장하기 전에 환율 또는 환산 금액을 입력하세요.",
+      "attachmentsUploadFailed": "거래가 저장되었지만 첨부 파일 {count}개를 업로드하지 못했습니다"
     },
     "ariaHistory": "최근 거래 보기",
     "ariaHistoryForPayee": "이 수취인의 최근 거래 보기",

@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "还款额重新计算仅适用于抵押贷款账户",
     "insufficientData": "带有利息明细的还款不足，无法检测利率变更",
     "frequencyMismatch": "还款日期与账户的还款频率不匹配；推算的利率可能不太准确"
+  },
+  "attachments": {
+    "notFound": "未找到附件",
+    "transactionNotFound": "未找到交易",
+    "empty": "上传的文件为空",
+    "fileTooLarge": "文件超过最大大小 {{ max }} 字节",
+    "unsupportedType": "不支持的文件类型。允许的类型：{{ types }}",
+    "tooMany": "此交易已达到最多 {{ max }} 个附件的上限",
+    "s3NotImplemented": "S3 附件存储尚未实现"
   }
 }

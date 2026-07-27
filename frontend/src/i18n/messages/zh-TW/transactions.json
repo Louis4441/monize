@@ -109,7 +109,8 @@
       "feePaid": "已付手續費",
       "balance": "結餘",
       "status": "狀態",
-      "actions": "動作"
+      "actions": "動作",
+      "attachments": "附件"
     },
     "today": "今天",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "編輯",
       "deleteButton": "刪除"
     },
-    "itemNamePlural": "筆交易"
+    "itemNamePlural": "筆交易",
+    "attachmentsCount": "{count, plural, other {# 個附件}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "標籤鍵",
       "tagKeyOp": "條件",
       "tagKeyValue": "值",
-      "currency": "幣別"
+      "currency": "幣別",
+      "hasAttachments": "附件"
     },
     "placeholders": {
       "accounts": "所有科目",
@@ -248,7 +251,10 @@
       "dateUntil": "至 {date}",
       "amountFrom": "從 {amount}",
       "amountUpTo": "至 {amount}",
-      "removeCurrency": "移除 {name} 幣別篩選"
+      "removeCurrency": "移除 {name} 幣別篩選",
+      "hasAttachments": "有附件",
+      "noAttachments": "無附件",
+      "removeAttachments": "移除附件篩選"
     },
     "bulkUpdate": "批次更新",
     "cancelBulk": "取消批次",
@@ -279,6 +285,11 @@
       "noValue": "無值",
       "contains": "值包含",
       "notContains": "值不包含"
+    },
+    "hasAttachmentsOptions": {
+      "any": "任何",
+      "yes": "是",
+      "no": "否"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "類別「{name}」已建立",
       "categoryCreateFailed": "建立類別失敗",
       "tagCreated": "標籤「{name}」已建立",
-      "fxRateRequired": "儲存外幣交易前，請輸入匯率或換算後的金額。"
+      "fxRateRequired": "儲存外幣交易前，請輸入匯率或換算後的金額。",
+      "attachmentsUploadFailed": "交易已儲存，但 {count} 個附件上傳失敗"
     },
     "ariaHistory": "顯示最近交易",
     "ariaHistoryForPayee": "顯示此收款人的最近交易",

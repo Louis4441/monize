@@ -109,7 +109,8 @@
       "feePaid": "Commissione pagata",
       "balance": "Saldo",
       "status": "Stato",
-      "actions": "Azioni"
+      "actions": "Azioni",
+      "attachments": "Allegati"
     },
     "today": "Oggi",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Modifica",
       "deleteButton": "Elimina"
     },
-    "itemNamePlural": "transazioni"
+    "itemNamePlural": "transazioni",
+    "attachmentsCount": "{count, plural, one {# allegato} other {# allegati}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Chiave tag",
       "tagKeyOp": "Condizione",
       "tagKeyValue": "Valore",
-      "currency": "Valuta"
+      "currency": "Valuta",
+      "hasAttachments": "Allegati"
     },
     "placeholders": {
       "accounts": "Tutti i conti",
@@ -248,7 +251,10 @@
       "dateUntil": "Fino al {date}",
       "amountFrom": "Da {amount}",
       "amountUpTo": "Fino a {amount}",
-      "removeCurrency": "Rimuovi il filtro valuta {name}"
+      "removeCurrency": "Rimuovi il filtro valuta {name}",
+      "hasAttachments": "Con allegati",
+      "noAttachments": "Senza allegati",
+      "removeAttachments": "Rimuovi filtro allegati"
     },
     "bulkUpdate": "Aggiornamento multiplo",
     "cancelBulk": "Annulla multiplo",
@@ -279,6 +285,11 @@
       "noValue": "Non ha valore",
       "contains": "Il valore contiene",
       "notContains": "Il valore non contiene"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Qualsiasi",
+      "yes": "Sì",
+      "no": "No"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Categoria \"{name}\" creata",
       "categoryCreateFailed": "Creazione categoria non riuscita",
       "tagCreated": "Etichetta \"{name}\" creata",
-      "fxRateRequired": "Inserisci un tasso di cambio o l'importo convertito prima di salvare una transazione in valuta estera."
+      "fxRateRequired": "Inserisci un tasso di cambio o l'importo convertito prima di salvare una transazione in valuta estera.",
+      "attachmentsUploadFailed": "Transazione salvata, ma il caricamento di {count} allegato/i non è riuscito"
     },
     "ariaHistory": "Mostra transazioni recenti",
     "ariaHistoryForPayee": "Mostra transazioni recenti per questo beneficiario",

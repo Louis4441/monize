@@ -109,7 +109,8 @@
       "feePaid": "Уплаченная комиссия",
       "balance": "Остаток",
       "status": "Статус",
-      "actions": "Действия"
+      "actions": "Действия",
+      "attachments": "Вложения"
     },
     "today": "Сегодня",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Изменить",
       "deleteButton": "Удалить"
     },
-    "itemNamePlural": "проводки"
+    "itemNamePlural": "проводки",
+    "attachmentsCount": "{count, plural, one {# вложение} few {# вложения} many {# вложений} other {# вложения}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Ключ тега",
       "tagKeyOp": "Условие",
       "tagKeyValue": "Значение",
-      "currency": "Валюта"
+      "currency": "Валюта",
+      "hasAttachments": "Вложения"
     },
     "placeholders": {
       "accounts": "Все счета",
@@ -248,7 +251,10 @@
       "dateUntil": "До {date}",
       "amountFrom": "От {amount}",
       "amountUpTo": "До {amount}",
-      "removeCurrency": "Удалить фильтр по валюте {name}"
+      "removeCurrency": "Удалить фильтр по валюте {name}",
+      "hasAttachments": "С вложениями",
+      "noAttachments": "Без вложений",
+      "removeAttachments": "Убрать фильтр вложений"
     },
     "bulkUpdate": "Массовое обновление",
     "cancelBulk": "Отменить массовое",
@@ -279,6 +285,11 @@
       "noValue": "Нет значения",
       "contains": "Значение содержит",
       "notContains": "Значение не содержит"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Любые",
+      "yes": "Да",
+      "no": "Нет"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Категория \"{name}\" создана",
       "categoryCreateFailed": "Не удалось создать категорию",
       "tagCreated": "Тег \"{name}\" создан",
-      "fxRateRequired": "Введите курс обмена или конвертированную сумму перед сохранением операции в иностранной валюте."
+      "fxRateRequired": "Введите курс обмена или конвертированную сумму перед сохранением операции в иностранной валюте.",
+      "attachmentsUploadFailed": "Проводка сохранена, но не удалось загрузить вложений: {count}"
     },
     "ariaHistory": "Показать последние проводки",
     "ariaHistoryForPayee": "Показать последние проводки для этого получателя",

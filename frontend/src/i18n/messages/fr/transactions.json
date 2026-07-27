@@ -109,7 +109,8 @@
       "feePaid": "Frais payés",
       "balance": "Solde",
       "status": "Statut",
-      "actions": "Actions"
+      "actions": "Actions",
+      "attachments": "Pièces jointes"
     },
     "today": "Aujourd'hui",
     "export": {
@@ -171,7 +172,8 @@
       "editButton": "Modifier",
       "deleteButton": "Supprimer"
     },
-    "itemNamePlural": "transactions"
+    "itemNamePlural": "transactions",
+    "attachmentsCount": "{count, plural, one {# pièce jointe} other {# pièces jointes}}"
   },
   "row": {
     "copyOptions": {
@@ -223,7 +225,8 @@
       "tagKey": "Clé d'étiquette",
       "tagKeyOp": "Condition",
       "tagKeyValue": "Valeur",
-      "currency": "Devise"
+      "currency": "Devise",
+      "hasAttachments": "Pièces jointes"
     },
     "placeholders": {
       "accounts": "Tous les comptes",
@@ -248,7 +251,10 @@
       "dateUntil": "Jusqu'au {date}",
       "amountFrom": "Depuis {amount}",
       "amountUpTo": "Jusqu'à {amount}",
-      "removeCurrency": "Retirer le filtre de devise {name}"
+      "removeCurrency": "Retirer le filtre de devise {name}",
+      "hasAttachments": "Avec pièces jointes",
+      "noAttachments": "Sans pièces jointes",
+      "removeAttachments": "Retirer le filtre de pièces jointes"
     },
     "bulkUpdate": "Mise à jour groupée",
     "cancelBulk": "Annuler la sélection",
@@ -279,6 +285,11 @@
       "noValue": "N'a pas de valeur",
       "contains": "La valeur contient",
       "notContains": "La valeur ne contient pas"
+    },
+    "hasAttachmentsOptions": {
+      "any": "Tous",
+      "yes": "Oui",
+      "no": "Non"
     }
   },
   "bulk": {
@@ -393,7 +404,8 @@
       "categoryCreated": "Catégorie « {name} » créée",
       "categoryCreateFailed": "Échec de la création de la catégorie",
       "tagCreated": "Étiquette « {name} » créée",
-      "fxRateRequired": "Saisissez un taux de change ou le montant converti avant d'enregistrer une transaction en devise étrangère."
+      "fxRateRequired": "Saisissez un taux de change ou le montant converti avant d'enregistrer une transaction en devise étrangère.",
+      "attachmentsUploadFailed": "Transaction enregistrée, mais le téléversement de {count} pièce(s) jointe(s) a échoué"
     },
     "ariaHistory": "Afficher les transactions récentes",
     "ariaHistoryForPayee": "Afficher les transactions récentes pour ce bénéficiaire",

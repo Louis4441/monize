@@ -479,5 +479,14 @@
     "recalculateMortgageOnly": "Penghitungan ulang angsuran hanya tersedia untuk akun hipotek",
     "insufficientData": "Tidak cukup pembayaran dengan rincian bunga untuk mendeteksi perubahan suku bunga",
     "frequencyMismatch": "Tanggal pembayaran tidak sesuai dengan frekuensi pembayaran akun; suku bunga yang diperkirakan mungkin kurang akurat"
+  },
+  "attachments": {
+    "notFound": "Lampiran tidak ditemukan",
+    "transactionNotFound": "Transaksi tidak ditemukan",
+    "empty": "File yang diunggah kosong",
+    "fileTooLarge": "File melebihi ukuran maksimum {{ max }} byte",
+    "unsupportedType": "Jenis file tidak didukung. Jenis yang diizinkan: {{ types }}",
+    "tooMany": "Transaksi ini sudah memiliki maksimum {{ max }} lampiran",
+    "s3NotImplemented": "Penyimpanan lampiran S3 belum diterapkan"
   }
 }

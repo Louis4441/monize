@@ -9,7 +9,6 @@ import { Category } from "../categories/entities/category.entity";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
 import { Payee } from "../payees/entities/payee.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { TransactionAttachment } from "../attachments/entities/transaction-attachment.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
@@ -194,6 +193,8 @@ describe("TransactionsService", () => {
 
     const mockDataSource = {
       createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
+      // findAll reads attachment counts via dataSource.getRepository(...).
+      getRepository: jest.fn().mockReturnValue(attachmentsRepository),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -218,10 +219,6 @@ describe("TransactionsService", () => {
         {
           provide: getRepositoryToken(UserPreference),
           useValue: userPreferenceRepository,
-        },
-        {
-          provide: getRepositoryToken(TransactionAttachment),
-          useValue: attachmentsRepository,
         },
         {
           provide: getRepositoryToken(Payee),
@@ -1786,11 +1783,24 @@ describe("TransactionsService", () => {
       investmentTxRepository.find.mockResolvedValue([]);
       return service.findAll(
         "user-1",
-        undefined, undefined, undefined, undefined, undefined,
-        1, 50, false,
-        undefined, undefined, undefined, undefined, undefined, undefined,
-        "date", "DESC",
-        undefined, undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        1,
+        50,
+        false,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "date",
+        "DESC",
+        undefined,
+        undefined,
         overrides.hasAttachments,
       );
     };
@@ -1801,7 +1811,9 @@ describe("TransactionsService", () => {
       await findAllWith({ hasAttachments: true }, mockQb);
 
       expect(mockQb.andWhere).toHaveBeenCalledWith(
-        expect.stringContaining("EXISTS (SELECT 1 FROM transaction_attachments"),
+        expect.stringContaining(
+          "EXISTS (SELECT 1 FROM transaction_attachments",
+        ),
       );
       expect(mockQb.andWhere).not.toHaveBeenCalledWith(
         expect.stringContaining("NOT EXISTS"),
