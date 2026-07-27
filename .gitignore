@@ -36,11 +36,8 @@ logs/
 # Docker
 docker-compose.override.yml
 
-# Automatic backup output (BACKUP_HOST_DIR)
-/backups/
-
-# Local attachment storage (ATTACHMENT_HOST_DIR)
-/attachments/
+# Container data mounted from the host (BACKUP_HOST_DIR, ATTACHMENT_HOST_DIR)
+/monize/
 
 # Testing
 coverage/

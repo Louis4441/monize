@@ -90,10 +90,10 @@ services:
       # otherwise shadow the copy baked into the image).
       - ./docs/release-notes:/app/release-notes:ro
       # Automatic backups are written to BACKUP_CONTAINER_DIR in the container.
-      - ${BACKUP_HOST_DIR:-./backups}:${BACKUP_CONTAINER_DIR:-/data/backups}
+      - ${BACKUP_HOST_DIR:-./monize/backups}:${BACKUP_CONTAINER_DIR:-/data/backups}
       # Attachments are written to ATTACHMENT_CONTAINER_DIR in the container
       # when ATTACHMENT_STORAGE_PROVIDER=local.
-      - ${ATTACHMENT_HOST_DIR:-./attachments}:${ATTACHMENT_CONTAINER_DIR:-/data/attachments}
+      - ${ATTACHMENT_HOST_DIR:-./monize/attachments}:${ATTACHMENT_CONTAINER_DIR:-/data/attachments}
       - /app/node_modules
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3000}:3000"

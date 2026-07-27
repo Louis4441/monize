@@ -352,9 +352,9 @@ npm run dev
 | `DISABLE_HTTPS_HEADERS` | Disable HSTS and COOP headers for plain HTTP | `false` |
 | `DEMO_MODE` | Enable demo mode with sample data | `false` |
 | `BACKUP_CONTAINER_DIR` | Container folder automatic backups are written to | `/data/backups` |
-| `BACKUP_HOST_DIR` | Host folder mapped to `BACKUP_CONTAINER_DIR` by docker-compose | `./backups` |
+| `BACKUP_HOST_DIR` | Host folder mapped to `BACKUP_CONTAINER_DIR` by docker-compose | `./monize/backups` |
 | `ATTACHMENT_CONTAINER_DIR` | Container folder local attachments are written to (was `ATTACHMENT_LOCAL_DIR`) | `/data/attachments` |
-| `ATTACHMENT_HOST_DIR` | Host folder mapped to `ATTACHMENT_CONTAINER_DIR` by docker-compose | `./attachments` |
+| `ATTACHMENT_HOST_DIR` | Host folder mapped to `ATTACHMENT_CONTAINER_DIR` by docker-compose | `./monize/attachments` |
 | `SMTP_SECURE` | Use TLS for SMTP | `false` |
 
 
