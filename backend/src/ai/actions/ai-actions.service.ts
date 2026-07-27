@@ -5,7 +5,7 @@ import {
   Inject,
   Injectable,
 } from "@nestjs/common";
-import { createHash } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import { plainToInstance } from "class-transformer";
 import { validateOrReject } from "class-validator";
 import { TransactionsService } from "../../transactions/transactions.service";
@@ -634,8 +634,13 @@ export class AiActionsService {
           ),
         );
       }
-      const sha256 = createHash("sha256").update(stored.data).digest("hex");
-      if (sha256 !== ref.sha256) {
+      // Constant-time comparison, matching the signing service's convention.
+      const sha256 = createHash("sha256").update(stored.data).digest();
+      const expected = Buffer.from(ref.sha256, "hex");
+      if (
+        sha256.length !== expected.length ||
+        !timingSafeEqual(sha256, expected)
+      ) {
         throw new BadRequestException(this.invalidSignatureMessage());
       }
       return {
