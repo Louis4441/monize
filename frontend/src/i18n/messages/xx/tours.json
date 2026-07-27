@@ -25,8 +25,7 @@
     "accounts": "[XX-Accounts-XX]",
     "budgets": "[XX-Budgets-XX]",
     "reports": "[XX-Reports-XX]",
-    "settings": "[XX-Settings-XX]",
-    "tools": "[XX-Tools-XX]"
+    "settings": "[XX-Settings-XX]"
   },
   "gettingStarted": {
     "takeTour": "[XX-Take the tour-XX]",
@@ -108,37 +107,6 @@
         "finish": {
           "title": "[XX-You're all set-XX]",
           "body": "[XX-That's the tour. You can retake it anytime from the **Guided tours** section in **Settings**.-XX]"
-        }
-      }
-    }
-  },
-  "import": {
-    "bringingDataIn": {
-      "title": "[XX-Bringing your data in-XX]",
-      "steps": {
-        "welcome": {
-          "title": "[XX-Bringing your data in-XX]",
-          "body": "[XX-Moving from Microsoft Money, Quicken, or a bank export? This tour shows where the importer lives and what to have ready, because the choices that are hard to undo are all made before the wizard opens.-XX]"
-        },
-        "whereItLives": {
-          "title": "[XX-The importer lives in Tools-XX]",
-          "body": "[XX-**Import Transactions** sits here in the **Tools** menu. You can also start from an account's own page, and that account is then pre-selected for you.-XX]"
-        },
-        "files": {
-          "title": "[XX-What to arrive with-XX]",
-          "body": "[XX-Export **one file per account**, and investment accounts **twice** — once as Investment for the trades, once as Regular for the cash side. From Microsoft Money always choose **Loose QIF**: Strict QIF drops split details and transfer references. QIF, OFX, QFX and CSV all land here, and you can drop many files at once.-XX]"
-        },
-        "order": {
-          "title": "[XX-Order matters-XX]",
-          "body": "[XX-Files are processed in the order listed, and each one can use the categories, payees and accounts the previous files created. Assets first, then your own-currency accounts, then foreign-currency ones, then investment cash accounts, and brokerage files last — so every transfer finds its other side already there.-XX]"
-        },
-        "wizard": {
-          "title": "[XX-What the wizard will ask-XX]",
-          "body": "[XX-Steps appear only when your file needs them: which account to import into, then the categories, securities and transfer accounts to map. Amber needs you, green was matched already, and skipping is fine — you can categorize later. The whole import runs as one database transaction, so a failure leaves nothing behind.-XX]"
-        },
-        "afterwards": {
-          "title": "[XX-After the import-XX]",
-          "body": "[XX-Check each balance against your old software, and search transactions for the memo **PENDING IMPORT** — cross-currency transfers arrive without a rate, because QIF carries none. The full guide, with screenshots and troubleshooting, is in the wiki under [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money).-XX]"
         }
       }
     }

@@ -187,42 +187,6 @@ describe('TourTooltip', () => {
     });
   });
 
-  describe('body markup', () => {
-    it('links [label](url) out to the docs, in a new tab', () => {
-      setup({
-        body: 'The full guide is in the wiki, under [Importing](https://example.test/wiki/Importing).',
-      });
-
-      const link = screen.getByRole('link', { name: 'Importing' });
-      expect(link).toHaveAttribute('href', 'https://example.test/wiki/Importing');
-      // A tour that navigated away would be dismissed by its own copy.
-      expect(link).toHaveAttribute('target', '_blank');
-      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-      // The sentence around it survives.
-      expect(screen.getByText(/The full guide is in the wiki/)).toBeInTheDocument();
-    });
-
-    it('keeps bold and links in the same sentence', () => {
-      setup({
-        body: 'Search for **PENDING IMPORT**, then read [the guide](https://example.test/g).',
-      });
-
-      expect(screen.getByText('PENDING IMPORT').tagName).toBe('STRONG');
-      expect(screen.getByRole('link', { name: 'the guide' })).toBeInTheDocument();
-    });
-
-    it('refuses a non-http target', () => {
-      // Link targets come from translated strings; only http(s) is rendered as
-      // a link, so a catalogue can never smuggle in a script URL.
-      setup({ body: 'Careful: [click me](javascript:alert(1)) is not a link.' });
-
-      expect(screen.queryByRole('link')).toBeNull();
-      expect(
-        screen.getByText(/\[click me\]\(javascript:alert\(1\)\)/),
-      ).toBeInTheDocument();
-    });
-  });
-
   it('emphasizes **bold** segments in the body', () => {
     setup({ body: 'Choose **Edit** from the menu' });
     const strong = screen.getByText('Edit');

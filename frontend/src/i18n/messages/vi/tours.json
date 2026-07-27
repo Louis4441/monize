@@ -25,8 +25,7 @@
     "accounts": "Tài khoản",
     "budgets": "Ngân sách",
     "reports": "Báo cáo",
-    "settings": "Cài đặt",
-    "tools": "Công cụ"
+    "settings": "Cài đặt"
   },
   "gettingStarted": {
     "takeTour": "Xem hướng dẫn",
@@ -108,37 +107,6 @@
         "finish": {
           "title": "Vậy là bạn đã sẵn sàng",
           "body": "Đó là toàn bộ hướng dẫn. Bạn có thể xem lại bất cứ lúc nào từ mục **Hướng dẫn sử dụng** trong **Cài đặt**."
-        }
-      }
-    }
-  },
-  "import": {
-    "bringingDataIn": {
-      "title": "Đưa dữ liệu của bạn vào",
-      "steps": {
-        "welcome": {
-          "title": "Đưa dữ liệu của bạn vào",
-          "body": "Bạn chuyển từ Microsoft Money, Quicken hay một bản xuất của ngân hàng? Phần hướng dẫn này chỉ ra nơi đặt chức năng nhập và những gì cần chuẩn bị: các quyết định khó hoàn lại đều được đưa ra trước khi trình hướng dẫn mở."
-        },
-        "whereItLives": {
-          "title": "Chức năng nhập nằm trong Công cụ",
-          "body": "**Nhập giao dịch** nằm ở đây, trong menu **Công cụ**. Bạn cũng có thể bắt đầu từ trang của một tài khoản — khi đó tài khoản ấy được chọn sẵn."
-        },
-        "files": {
-          "title": "Cần mang theo những gì",
-          "body": "Hãy xuất **một tệp cho mỗi tài khoản**, còn tài khoản đầu tư thì **hai lần** — một lần dạng Investment cho các giao dịch chứng khoán, một lần dạng Regular cho phần tiền mặt. Trong Microsoft Money luôn chọn **Loose QIF**: Strict QIF mất chi tiết phần chia nhỏ và tham chiếu chuyển khoản. QIF, OFX, QFX và CSV đều được, và bạn có thể kéo nhiều tệp cùng lúc."
-        },
-        "order": {
-          "title": "Thứ tự có ý nghĩa",
-          "body": "Các tệp được xử lý theo thứ tự trong danh sách, và mỗi tệp có thể dùng danh mục, người thụ hưởng và tài khoản do các tệp trước tạo ra. Tài sản trước, rồi tài khoản theo loại tiền của bạn, rồi tài khoản ngoại tệ, rồi phần tiền mặt của tài khoản đầu tư, và tệp môi giới sau cùng — để mọi chuyển khoản đều tìm thấy đầu bên kia."
-        },
-        "wizard": {
-          "title": "Trình hướng dẫn sẽ hỏi gì",
-          "body": "Các bước chỉ hiện khi tệp của bạn cần: nhập vào tài khoản nào, rồi ghép danh mục, chứng khoán và tài khoản chuyển khoản. Màu vàng cần bạn xử lý, màu xanh đã được ghép sẵn, và bỏ qua cũng không sao — bạn có thể gán danh mục sau. Toàn bộ quá trình nhập chạy trong một giao tác cơ sở dữ liệu, nên lỗi sẽ không để lại dữ liệu dở dang."
-        },
-        "afterwards": {
-          "title": "Sau khi nhập",
-          "body": "Hãy đối chiếu từng số dư với phần mềm cũ và tìm ghi chú **PENDING IMPORT** trong giao dịch — chuyển khoản khác loại tiền về mà không có tỷ giá, vì QIF không mang theo. Hướng dẫn đầy đủ, kèm ảnh chụp màn hình và cách xử lý sự cố, nằm trong wiki ở mục [Importing from Microsoft Money](https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money)."
         }
       }
     }

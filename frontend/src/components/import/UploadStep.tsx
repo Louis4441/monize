@@ -3,7 +3,6 @@
 import { useTranslations } from 'next-intl';
 import { Account } from '@/types/account';
 import { formatAccountType } from '@/lib/account-utils';
-import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 
 interface UploadStepProps {
   preselectedAccount: Account | undefined;
@@ -31,10 +30,7 @@ export function UploadStep({ preselectedAccount, isLoading, onFileSelect }: Uplo
         <p className="text-gray-600 dark:text-gray-400 mb-6">
           {t('upload.instructions')}
         </p>
-        <div
-          {...tourAnchor(TOUR_ANCHORS.importDropzone)}
-          className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center"
-        >
+        <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
           <input
             type="file"
             accept=".qif,.ofx,.qfx,.csv"
