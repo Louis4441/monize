@@ -149,11 +149,9 @@
     "incorrectPassword": "パスワードが正しくありません"
   },
   "backup": {
-    "folderPathRequired": "自動バックアップを有効にする前にフォルダーパスを設定する必要があります",
     "folderNotExist": "フォルダーが存在しません：{{ safePath }}",
     "folderAccessError": "フォルダーにアクセスできません：{{ safePath }}",
     "pathNotDirectory": "パスはディレクトリではありません：{{ safePath }}",
-    "notConfigured": "自動バックアップが設定されていません。まずフォルダーパスを設定してください。",
     "userNotFound": "ユーザー {{ userId }} が見つかりません",
     "encryptedPasswordDecryptFailed": "暗号化バックアップが有効になっていますが、保存されたパスワードを復号化できませんでした。セキュリティ設定で暗号化を再度有効にしてください。",
     "pathTraversal": "パストラバーサルが検出されました：{{ filename }}",

@@ -149,11 +149,9 @@
     "incorrectPassword": "Nieprawidłowe hasło"
   },
   "backup": {
-    "folderPathRequired": "Przed włączeniem automatycznych kopii zapasowych należy ustawić ścieżkę folderu",
     "folderNotExist": "Folder nie istnieje: {{ safePath }}",
     "folderAccessError": "Brak dostępu do folderu: {{ safePath }}",
     "pathNotDirectory": "Ścieżka nie jest katalogiem: {{ safePath }}",
-    "notConfigured": "Automatyczna kopia zapasowa nie jest skonfigurowana. Najpierw ustaw ścieżkę folderu.",
     "userNotFound": "Nie znaleziono użytkownika {{ userId }}",
     "encryptedPasswordDecryptFailed": "Szyfrowane kopie zapasowe są włączone, ale nie udało się odszyfrować zapisanego hasła. Włącz ponownie szyfrowanie w ustawieniach Bezpieczeństwa.",
     "pathTraversal": "Wykryto przejście po ścieżce: {{ filename }}",

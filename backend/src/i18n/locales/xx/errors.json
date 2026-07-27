@@ -157,11 +157,9 @@
     "incorrectPassword": "[XX-Incorrect password-XX]"
   },
   "backup": {
-    "folderPathRequired": "[XX-A folder path must be set before enabling automatic backups-XX]",
     "folderNotExist": "[XX-Folder does not exist: {{ safePath }}-XX]",
     "folderAccessError": "[XX-Cannot access folder: {{ safePath }}-XX]",
     "pathNotDirectory": "[XX-Path is not a directory: {{ safePath }}-XX]",
-    "notConfigured": "[XX-Auto-backup is not configured. Please set a folder path first.-XX]",
     "userNotFound": "[XX-User {{ userId }} not found-XX]",
     "encryptedPasswordDecryptFailed": "[XX-Encrypted backups are enabled but the stored password could not be decrypted. Re-enable encryption in Security settings.-XX]",
     "pathTraversal": "[XX-Path traversal detected: {{ filename }}-XX]",

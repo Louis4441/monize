@@ -149,11 +149,9 @@
     "incorrectPassword": "Mot de passe incorrect"
   },
   "backup": {
-    "folderPathRequired": "Un chemin de dossier doit être défini avant d'activer les sauvegardes automatiques",
     "folderNotExist": "Le dossier n'existe pas : {{ safePath }}",
     "folderAccessError": "Impossible d'accéder au dossier : {{ safePath }}",
     "pathNotDirectory": "Le chemin n'est pas un répertoire : {{ safePath }}",
-    "notConfigured": "La sauvegarde automatique n'est pas configurée. Veuillez d'abord définir un chemin de dossier.",
     "userNotFound": "Utilisateur {{ userId }} introuvable",
     "encryptedPasswordDecryptFailed": "Les sauvegardes chiffrées sont activées mais le mot de passe stocké n'a pas pu être déchiffré. Réactivez le chiffrement dans les Paramètres de sécurité.",
     "pathTraversal": "Traversée de chemin détectée : {{ filename }}",

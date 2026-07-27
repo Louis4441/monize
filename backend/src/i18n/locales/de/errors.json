@@ -149,11 +149,9 @@
     "incorrectPassword": "Falsches Passwort"
   },
   "backup": {
-    "folderPathRequired": "Ein Ordnerpfad muss festgelegt werden, bevor automatische Sicherungen aktiviert werden",
     "folderNotExist": "Ordner existiert nicht: {{ safePath }}",
     "folderAccessError": "Kein Zugriff auf Ordner: {{ safePath }}",
     "pathNotDirectory": "Pfad ist kein Verzeichnis: {{ safePath }}",
-    "notConfigured": "Automatische Sicherung ist nicht konfiguriert. Bitte legen Sie zuerst einen Ordnerpfad fest.",
     "userNotFound": "Benutzer {{ userId }} nicht gefunden",
     "encryptedPasswordDecryptFailed": "Verschlüsselte Sicherungen sind aktiviert, aber das gespeicherte Passwort konnte nicht entschlüsselt werden. Aktivieren Sie die Verschlüsselung in den Sicherheitseinstellungen erneut.",
     "pathTraversal": "Pfad-Traversal erkannt: {{ filename }}",

@@ -149,11 +149,9 @@
     "incorrectPassword": "Onjuist wachtwoord"
   },
   "backup": {
-    "folderPathRequired": "Er moet een mappad worden ingesteld voordat automatische back-ups worden ingeschakeld",
     "folderNotExist": "Map bestaat niet: {{ safePath }}",
     "folderAccessError": "Kan map niet openen: {{ safePath }}",
     "pathNotDirectory": "Pad is geen map: {{ safePath }}",
-    "notConfigured": "Automatische back-up is niet geconfigureerd. Stel eerst een mappad in.",
     "userNotFound": "Gebruiker {{ userId }} niet gevonden",
     "encryptedPasswordDecryptFailed": "Versleutelde back-ups zijn ingeschakeld, maar het opgeslagen wachtwoord kon niet worden ontsleuteld. Schakel versleuteling opnieuw in via Beveiligingsinstellingen.",
     "pathTraversal": "Padtraversal gedetecteerd: {{ filename }}",

@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Automatic Backup",
-    "description": "Automatically back up your data to a folder on a schedule. Since Monize runs in Docker, you must map a host folder into the container as a volume (e.g., -v /host/backups:/backups).",
+    "description": "Automatically back up your data to a folder on a schedule. Since Monize runs in Docker, you must map a host folder into the container as a volume (e.g., -v /host/backups:/data/backups).",
     "loadingText": "Loading...",
     "enableLabel": "Enable automatic backups",
     "backupFolderLabel": "Backup Folder",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Browse...",
     "validateButton": "Validate",
     "validatingButton": "Validating...",

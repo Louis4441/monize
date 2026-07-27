@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "자동 백업",
-    "description": "일정에 따라 데이터를 폴더에 자동으로 백업합니다. Monize는 Docker에서 실행되므로 호스트 폴더를 볼륨으로 컨테이너에 매핑해야 합니다 (예: -v /host/backups:/backups).",
+    "description": "일정에 따라 데이터를 폴더에 자동으로 백업합니다. Monize는 Docker에서 실행되므로 호스트 폴더를 볼륨으로 컨테이너에 매핑해야 합니다 (예: -v /host/backups:/data/backups).",
     "loadingText": "로딩 중...",
     "enableLabel": "자동 백업 활성화",
     "backupFolderLabel": "백업 폴더",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "찾아보기...",
     "validateButton": "유효성 검사",
     "validatingButton": "유효성 검사 중...",

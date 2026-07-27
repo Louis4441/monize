@@ -149,11 +149,9 @@
     "incorrectPassword": "Password errata"
   },
   "backup": {
-    "folderPathRequired": "È necessario impostare un percorso cartella prima di abilitare i backup automatici",
     "folderNotExist": "La cartella non esiste: {{ safePath }}",
     "folderAccessError": "Impossibile accedere alla cartella: {{ safePath }}",
     "pathNotDirectory": "Il percorso non è una directory: {{ safePath }}",
-    "notConfigured": "Il backup automatico non è configurato. Imposta prima un percorso cartella.",
     "userNotFound": "Utente {{ userId }} non trovato",
     "encryptedPasswordDecryptFailed": "I backup cifrati sono abilitati ma la password memorizzata non può essere decifrata. Riabilita la cifratura nelle impostazioni di sicurezza.",
     "pathTraversal": "Percorso trasversale rilevato: {{ filename }}",

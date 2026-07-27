@@ -149,11 +149,9 @@
     "incorrectPassword": "गलत पासवर्ड"
   },
   "backup": {
-    "folderPathRequired": "स्वचालित बैकअप सक्षम करने से पहले एक फ़ोल्डर पथ सेट होना चाहिए",
     "folderNotExist": "फ़ोल्डर मौजूद नहीं है: {{ safePath }}",
     "folderAccessError": "फ़ोल्डर तक पहुँचने में असमर्थ: {{ safePath }}",
     "pathNotDirectory": "पथ एक निर्देशिका नहीं है: {{ safePath }}",
-    "notConfigured": "ऑटो-बैकअप कॉन्फ़िगर नहीं है। कृपया पहले एक फ़ोल्डर पथ सेट करें।",
     "userNotFound": "उपयोगकर्ता {{ userId }} नहीं मिला",
     "encryptedPasswordDecryptFailed": "एन्क्रिप्टेड बैकअप सक्षम हैं लेकिन संग्रहीत पासवर्ड डिक्रिप्ट नहीं किया जा सका। सुरक्षा सेटिंग्स में एन्क्रिप्शन पुनः सक्षम करें।",
     "pathTraversal": "पथ अतिक्रमण पाया गया: {{ filename }}",

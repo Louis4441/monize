@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Автоматическое резервное копирование",
-    "description": "Автоматически создавайте резервные копии данных в папку по расписанию. Поскольку Monize работает в Docker, необходимо смонтировать папку хоста в контейнер как том (например, -v /host/backups:/backups).",
+    "description": "Автоматически создавайте резервные копии данных в папку по расписанию. Поскольку Monize работает в Docker, необходимо смонтировать папку хоста в контейнер как том (например, -v /host/backups:/data/backups).",
     "loadingText": "Загрузка...",
     "enableLabel": "Включить автоматическое резервное копирование",
     "backupFolderLabel": "Папка резервных копий",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Обзор...",
     "validateButton": "Проверить",
     "validatingButton": "Проверка...",

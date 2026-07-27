@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "स्वचालित बैकअप",
-    "description": "अपने डेटा को एक शेड्यूल पर एक फ़ोल्डर में स्वचालित रूप से बैकअप करें। चूंकि Monize Docker में चलता है, आपको एक होस्ट फ़ोल्डर को कंटेनर में वॉल्यूम के रूप में मैप करना होगा (उदा., -v /host/backups:/backups)।",
+    "description": "अपने डेटा को एक शेड्यूल पर एक फ़ोल्डर में स्वचालित रूप से बैकअप करें। चूंकि Monize Docker में चलता है, आपको एक होस्ट फ़ोल्डर को कंटेनर में वॉल्यूम के रूप में मैप करना होगा (उदा., -v /host/backups:/data/backups)।",
     "loadingText": "लोड हो रहा है...",
     "enableLabel": "स्वचालित बैकअप सक्षम करें",
     "backupFolderLabel": "बैकअप फ़ोल्डर",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "ब्राउज़ करें...",
     "validateButton": "सत्यापित करें",
     "validatingButton": "सत्यापित किया जा रहा है...",

@@ -36,6 +36,9 @@ logs/
 # Docker
 docker-compose.override.yml
 
+# Automatic backup output (BACKUP_HOST_DIR)
+/backups/
+
 # Testing
 coverage/
 .nyc_output/

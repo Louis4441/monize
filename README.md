@@ -351,6 +351,8 @@ npm run dev
 | `REMEMBER_ME_DAYS` | Duration for "Remember Me" sessions (days) | `30` |
 | `DISABLE_HTTPS_HEADERS` | Disable HSTS and COOP headers for plain HTTP | `false` |
 | `DEMO_MODE` | Enable demo mode with sample data | `false` |
+| `BACKUP_DIR` | Container folder automatic backups are written to | `/data/backups` |
+| `BACKUP_HOST_DIR` | Host folder mapped to `BACKUP_DIR` by docker-compose | `./backups` |
 | `SMTP_SECURE` | Use TLS for SMTP | `false` |
 
 

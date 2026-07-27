@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "自动备份",
-    "description": "按计划自动将数据备份到文件夹。由于 Monize 在 Docker 中运行，您必须将主机文件夹作为卷映射到容器中（例如：-v /host/backups:/backups）。",
+    "description": "按计划自动将数据备份到文件夹。由于 Monize 在 Docker 中运行，您必须将主机文件夹作为卷映射到容器中（例如：-v /host/backups:/data/backups）。",
     "loadingText": "加载中...",
     "enableLabel": "启用自动备份",
     "backupFolderLabel": "备份文件夹",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "浏览...",
     "validateButton": "验证",
     "validatingButton": "验证中...",

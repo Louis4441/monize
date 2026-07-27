@@ -57,6 +57,8 @@ services:
       REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-true}
       FORCE_2FA: ${FORCE_2FA:-false}
       REMEMBER_ME_DAYS: ${REMEMBER_ME_DAYS:-30}
+      # Backup
+      BACKUP_DIR: ${BACKUP_DIR:-/data/backups}
       # Demo mode (optional)
       DEMO_MODE: ${DEMO_MODE:-false}
       # OIDC (optional)
@@ -78,6 +80,10 @@ services:
       AI_DEFAULT_BASE_URL: ${AI_DEFAULT_BASE_URL:-}
       # HTTP mode (optional)
       DISABLE_HTTPS_HEADERS: ${DISABLE_HTTPS_HEADERS:-false}
+    volumes:
+      # Automatic backups are written to BACKUP_DIR inside the container; map a
+      # host folder so they survive the container being recreated.
+      - ${BACKUP_HOST_DIR:-./backups}:${BACKUP_DIR:-/data/backups}
     networks:
       - monize-network
     healthcheck:

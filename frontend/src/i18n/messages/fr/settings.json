@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Sauvegarde automatique",
-    "description": "Sauvegardez automatiquement vos données dans un dossier selon un calendrier. Comme Monize fonctionne dans Docker, vous devez mapper un dossier hôte dans le conteneur en tant que volume (ex. : -v /host/backups:/backups).",
+    "description": "Sauvegardez automatiquement vos données dans un dossier selon un calendrier. Comme Monize fonctionne dans Docker, vous devez mapper un dossier hôte dans le conteneur en tant que volume (ex. : -v /host/backups:/data/backups).",
     "loadingText": "Chargement...",
     "enableLabel": "Activer les sauvegardes automatiques",
     "backupFolderLabel": "Dossier de sauvegarde",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Parcourir...",
     "validateButton": "Valider",
     "validatingButton": "Validation...",

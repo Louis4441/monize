@@ -57,6 +57,8 @@ services:
       REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-true}
       FORCE_2FA: ${FORCE_2FA:-false}
       REMEMBER_ME_DAYS: ${REMEMBER_ME_DAYS:-30}
+      # Backup
+      BACKUP_DIR: ${BACKUP_DIR:-/data/backups}
       # Demo mode (optional)
       DEMO_MODE: ${DEMO_MODE:-false}
       # OIDC (optional)
@@ -85,6 +87,8 @@ services:
       # Release notes for the What's New digest (the ./backend:/app mount would
       # otherwise shadow the copy baked into the image).
       - ./docs/release-notes:/app/release-notes:ro
+      # Automatic backups are written to BACKUP_DIR inside the container.
+      - ${BACKUP_HOST_DIR:-./backups}:${BACKUP_DIR:-/data/backups}
       - /app/node_modules
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3000}:3000"

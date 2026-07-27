@@ -149,11 +149,9 @@
     "incorrectPassword": "Contraseña incorrecta"
   },
   "backup": {
-    "folderPathRequired": "Se debe establecer una ruta de carpeta antes de habilitar las copias de seguridad automáticas",
     "folderNotExist": "La carpeta no existe: {{ safePath }}",
     "folderAccessError": "No se puede acceder a la carpeta: {{ safePath }}",
     "pathNotDirectory": "La ruta no es un directorio: {{ safePath }}",
-    "notConfigured": "La copia de seguridad automática no está configurada. Establece una ruta de carpeta primero.",
     "userNotFound": "Usuario {{ userId }} no encontrado",
     "encryptedPasswordDecryptFailed": "Las copias de seguridad cifradas están habilitadas pero la contraseña almacenada no se pudo descifrar. Vuelve a habilitar el cifrado en Ajustes de seguridad.",
     "pathTraversal": "Se detectó path traversal: {{ filename }}",

@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Sao lưu tự động",
-    "description": "Tự động sao lưu dữ liệu của bạn vào một thư mục theo lịch. Vì Monize chạy trong Docker, bạn phải ánh xạ một thư mục máy chủ vào container dưới dạng volume (VD: -v /host/backups:/backups).",
+    "description": "Tự động sao lưu dữ liệu của bạn vào một thư mục theo lịch. Vì Monize chạy trong Docker, bạn phải ánh xạ một thư mục máy chủ vào container dưới dạng volume (VD: -v /host/backups:/data/backups).",
     "loadingText": "Đang tải...",
     "enableLabel": "Bật sao lưu tự động",
     "backupFolderLabel": "Thư mục sao lưu",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Duyệt...",
     "validateButton": "Xác thực",
     "validatingButton": "Đang xác thực...",

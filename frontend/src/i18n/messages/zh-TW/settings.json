@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "自動備份",
-    "description": "依排程自動將您的資料備份至資料夾。由於 Monize 在 Docker 中運行，您必須將主機資料夾映射至容器作為磁碟區（例如：-v /host/backups:/backups）。",
+    "description": "依排程自動將您的資料備份至資料夾。由於 Monize 在 Docker 中運行，您必須將主機資料夾映射至容器作為磁碟區（例如：-v /host/backups:/data/backups）。",
     "loadingText": "載入中...",
     "enableLabel": "啟用自動備份",
     "backupFolderLabel": "備份資料夾",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "瀏覽...",
     "validateButton": "驗證",
     "validatingButton": "驗證中...",

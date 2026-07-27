@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "自動バックアップ",
-    "description": "スケジュールに従ってフォルダーにデータを自動でバックアップします。MonizeはDockerで動作しているため、ホストフォルダーをボリュームとしてコンテナにマップする必要があります（例: -v /host/backups:/backups）。",
+    "description": "スケジュールに従ってフォルダーにデータを自動でバックアップします。MonizeはDockerで動作しているため、ホストフォルダーをボリュームとしてコンテナにマップする必要があります（例: -v /host/backups:/data/backups）。",
     "loadingText": "読み込み中...",
     "enableLabel": "自動バックアップを有効化",
     "backupFolderLabel": "バックアップフォルダー",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "参照...",
     "validateButton": "検証",
     "validatingButton": "検証中...",

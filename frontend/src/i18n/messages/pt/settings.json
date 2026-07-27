@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Cópia de Segurança Automática",
-    "description": "Faça cópias de segurança automáticas dos seus dados para uma pasta, de acordo com um agendamento. Como o Monize corre em Docker, tem de mapear uma pasta do anfitrião para o contentor como volume (ex.: -v /host/backups:/backups).",
+    "description": "Faça cópias de segurança automáticas dos seus dados para uma pasta, de acordo com um agendamento. Como o Monize corre em Docker, tem de mapear uma pasta do anfitrião para o contentor como volume (ex.: -v /host/backups:/data/backups).",
     "loadingText": "A carregar...",
     "enableLabel": "Ativar cópias de segurança automáticas",
     "backupFolderLabel": "Pasta de Cópias de Segurança",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Procurar...",
     "validateButton": "Validar",
     "validatingButton": "A validar...",

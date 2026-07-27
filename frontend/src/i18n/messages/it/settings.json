@@ -399,11 +399,11 @@
   },
   "autoBackup": {
     "heading": "Backup automatico",
-    "description": "Esegui automaticamente il backup dei tuoi dati in una cartella secondo una pianificazione. Poiché Monize gira in Docker, devi mappare una cartella dell'host nel container come volume (es. -v /host/backups:/backups).",
+    "description": "Esegui automaticamente il backup dei tuoi dati in una cartella secondo una pianificazione. Poiché Monize gira in Docker, devi mappare una cartella dell'host nel container come volume (es. -v /host/backups:/data/backups).",
     "loadingText": "Caricamento...",
     "enableLabel": "Attiva backup automatici",
     "backupFolderLabel": "Cartella di backup",
-    "backupFolderPlaceholder": "/backups",
+    "backupFolderPlaceholder": "/data/backups",
     "browseButton": "Sfoglia...",
     "validateButton": "Convalida",
     "validatingButton": "Convalida in corso...",
