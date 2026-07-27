@@ -1,4 +1,13 @@
 {
+  "attachments": {
+    "notFound": "[XX-Attachment not found-XX]",
+    "transactionNotFound": "[XX-Transaction not found-XX]",
+    "empty": "[XX-Uploaded file is empty-XX]",
+    "fileTooLarge": "[XX-File exceeds the maximum size of {{ max }} bytes-XX]",
+    "unsupportedType": "[XX-Unsupported file type. Allowed types: {{ types }}-XX]",
+    "tooMany": "[XX-This transaction already has the maximum of {{ max }} attachments-XX]",
+    "s3NotImplemented": "[XX-S3 attachment storage is not yet implemented-XX]"
+  },
   "accounts": {
     "accountWithIdNotFound": "[XX-Account with ID {{ id }} not found-XX]",
     "notInvestmentPair": "[XX-This account is not part of an investment account pair-XX]",

@@ -60,6 +60,8 @@ export const RESTORABLE_TABLES: ReadonlySet<string> = new Set([
   "tags",
   "transactions",
   "transaction_splits",
+  "transaction_attachments",
+  "attachment_blobs",
   "transaction_tags",
   "transaction_split_tags",
   "scheduled_transactions",
@@ -126,6 +128,8 @@ interface BackupData {
   tags: Record<string, unknown>[];
   transactions: Record<string, unknown>[];
   transaction_splits: Record<string, unknown>[];
+  transaction_attachments: Record<string, unknown>[];
+  attachment_blobs: Record<string, unknown>[];
   transaction_tags: Record<string, unknown>[];
   transaction_split_tags: Record<string, unknown>[];
   scheduled_transactions: Record<string, unknown>[];
@@ -345,6 +349,22 @@ export class BackupService {
         sql: `SELECT ts.* FROM transaction_splits ts
               JOIN transactions t ON ts.transaction_id = t.id
               WHERE t.user_id = $1`,
+      },
+      {
+        // Attachment metadata. Restored after transactions (FK) and before
+        // attachment_blobs (which references transaction_attachments).
+        key: "transaction_attachments",
+        sql: "SELECT * FROM transaction_attachments WHERE user_id = $1",
+      },
+      {
+        // The bytes for database-provider attachments. The BYTEA `data` column
+        // is base64-encoded so it survives JSON; insertRows decodes it back to
+        // bytea on restore (auto-detected via information_schema).
+        key: "attachment_blobs",
+        sql: `SELECT ab.attachment_id, encode(ab.data, 'base64') AS data
+              FROM attachment_blobs ab
+              JOIN transaction_attachments ta ON ab.attachment_id = ta.id
+              WHERE ta.user_id = $1`,
       },
       {
         key: "transaction_tags",
@@ -656,6 +676,21 @@ export class BackupService {
         queryRunner,
         "transaction_splits",
         data.transaction_splits,
+        null,
+      );
+      restored.transactionAttachments = await this.insertRows(
+        queryRunner,
+        "transaction_attachments",
+        data.transaction_attachments,
+        userId,
+      );
+      // attachment_blobs has no user_id; it is scoped transitively through its
+      // FK to transaction_attachments. The base64 `data` column is decoded to
+      // bytea by insertRows (auto-detected).
+      restored.attachmentBlobs = await this.insertRows(
+        queryRunner,
+        "attachment_blobs",
+        data.attachment_blobs,
         null,
       );
       restored.transactionTags = await this.insertRows(
@@ -1083,6 +1118,19 @@ export class BackupService {
     await queryRunner.query(
       `DELETE FROM transaction_splits WHERE transaction_id IN
        (SELECT id FROM transactions WHERE user_id = $1)`,
+      [userId],
+    );
+
+    // Transaction attachments (bytes first, then metadata). Both would cascade
+    // from the transactions delete below, but we clear them explicitly to match
+    // the rest of this FK-ordered teardown.
+    await queryRunner.query(
+      `DELETE FROM attachment_blobs WHERE attachment_id IN
+       (SELECT id FROM transaction_attachments WHERE user_id = $1)`,
+      [userId],
+    );
+    await queryRunner.query(
+      "DELETE FROM transaction_attachments WHERE user_id = $1",
       [userId],
     );
 

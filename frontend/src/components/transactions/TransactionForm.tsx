@@ -49,6 +49,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { usePreferencesStore } from '@/store/preferencesStore';
 import { createLogger } from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
+import { AttachmentsSection } from './AttachmentsSection';
 import { optionalUuid, optionalString } from '@/lib/zod-helpers';
 import { useFormSubmitRef } from '@/hooks/useFormSubmitRef';
 import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
@@ -1456,6 +1457,9 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         ]}
         {...register('status')}
       />
+
+      {/* Attachments - only for saved transactions (an id is required to attach). */}
+      {transaction && <AttachmentsSection transactionId={transaction.id} />}
 
       {/* Actions. anchorProps, not a wrapper, so a guided tour rings the
           Cancel/Save pair rather than the full-width row around it. */}
