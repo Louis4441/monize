@@ -486,7 +486,6 @@
     "empty": "O ficheiro carregado está vazio",
     "fileTooLarge": "O ficheiro excede o tamanho máximo de {{ max }} bytes",
     "unsupportedType": "Tipo de ficheiro não suportado. Tipos permitidos: {{ types }}",
-    "tooMany": "Esta transação já tem o máximo de {{ max }} anexos",
-    "s3NotImplemented": "O armazenamento de anexos no S3 ainda não está implementado"
+    "tooMany": "Esta transação já tem o máximo de {{ max }} anexos"
   }
 }

@@ -486,7 +486,6 @@
     "empty": "Tệp đã tải lên trống",
     "fileTooLarge": "Tệp vượt quá kích thước tối đa {{ max }} byte",
     "unsupportedType": "Loại tệp không được hỗ trợ. Các loại được phép: {{ types }}",
-    "tooMany": "Giao tác này đã có tối đa {{ max }} tệp đính kèm",
-    "s3NotImplemented": "Lưu trữ tệp đính kèm S3 chưa được triển khai"
+    "tooMany": "Giao tác này đã có tối đa {{ max }} tệp đính kèm"
   }
 }

@@ -3,9 +3,11 @@
  * `transaction_attachments`; the bytes live wherever the active provider puts
  * them, addressed by an opaque `key` the provider itself understands.
  *
- * The built-in DatabaseStorageProvider keeps bytes in Postgres. The S3-ready
- * seam (S3StorageProvider) lets a deployment move bytes to object storage
- * without touching the service or controller -- only which provider is bound.
+ * DatabaseStorageProvider keeps bytes in Postgres (the default),
+ * LocalStorageProvider writes them to a filesystem directory, and
+ * S3StorageProvider stores them in S3-compatible object storage. A deployment
+ * moves bytes between backends by changing which provider is bound -- the
+ * service and controller are unaware of the choice.
  */
 export interface AttachmentStorageProvider {
   /** Stable identifier persisted in `transaction_attachments.storage_provider`. */

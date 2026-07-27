@@ -486,7 +486,6 @@
     "empty": "Przesłany plik jest pusty",
     "fileTooLarge": "Plik przekracza maksymalny rozmiar {{ max }} bajtów",
     "unsupportedType": "Nieobsługiwany typ pliku. Dozwolone typy: {{ types }}",
-    "tooMany": "Ta transakcja ma już maksymalną liczbę {{ max }} załączników",
-    "s3NotImplemented": "Przechowywanie załączników w S3 nie jest jeszcze zaimplementowane"
+    "tooMany": "Ta transakcja ma już maksymalną liczbę {{ max }} załączników"
   }
 }

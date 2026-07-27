@@ -486,7 +486,6 @@
     "empty": "Le fichier téléversé est vide",
     "fileTooLarge": "Le fichier dépasse la taille maximale de {{ max }} octets",
     "unsupportedType": "Type de fichier non pris en charge. Types autorisés : {{ types }}",
-    "tooMany": "Cette transaction a déjà le maximum de {{ max }} pièces jointes",
-    "s3NotImplemented": "Le stockage des pièces jointes sur S3 n'est pas encore implémenté"
+    "tooMany": "Cette transaction a déjà le maximum de {{ max }} pièces jointes"
   }
 }

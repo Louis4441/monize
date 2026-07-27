@@ -486,7 +486,6 @@
     "empty": "File yang diunggah kosong",
     "fileTooLarge": "File melebihi ukuran maksimum {{ max }} byte",
     "unsupportedType": "Jenis file tidak didukung. Jenis yang diizinkan: {{ types }}",
-    "tooMany": "Transaksi ini sudah memiliki maksimum {{ max }} lampiran",
-    "s3NotImplemented": "Penyimpanan lampiran S3 belum diterapkan"
+    "tooMany": "Transaksi ini sudah memiliki maksimum {{ max }} lampiran"
   }
 }

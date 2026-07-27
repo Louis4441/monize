@@ -486,7 +486,6 @@
     "empty": "Il file caricato è vuoto",
     "fileTooLarge": "Il file supera la dimensione massima di {{ max }} byte",
     "unsupportedType": "Tipo di file non supportato. Tipi consentiti: {{ types }}",
-    "tooMany": "Questa transazione ha già il numero massimo di {{ max }} allegati",
-    "s3NotImplemented": "L'archiviazione degli allegati su S3 non è ancora implementata"
+    "tooMany": "Questa transazione ha già il numero massimo di {{ max }} allegati"
   }
 }

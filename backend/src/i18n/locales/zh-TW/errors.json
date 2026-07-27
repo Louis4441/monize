@@ -486,7 +486,6 @@
     "empty": "上傳的檔案為空",
     "fileTooLarge": "檔案超過最大大小 {{ max }} 位元組",
     "unsupportedType": "不支援的檔案類型。允許的類型：{{ types }}",
-    "tooMany": "此交易已達到最多 {{ max }} 個附件的上限",
-    "s3NotImplemented": "S3 附件儲存尚未實作"
+    "tooMany": "此交易已達到最多 {{ max }} 個附件的上限"
   }
 }

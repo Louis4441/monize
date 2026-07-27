@@ -1,12 +1,12 @@
 -- Transaction Attachments: receipts, invoices, and supporting documents stored
--- directly in PostgreSQL (no external object storage required).
+-- by default directly in PostgreSQL (no external object storage required).
 --
 -- Two tables keep the bytes off the hot metadata path:
 --   * transaction_attachments -- provider-agnostic metadata (filename, MIME,
 --     size, checksum, storage provider + key). Always small and cheap to list.
 --   * attachment_blobs        -- the actual bytes, owned exclusively by the
---     built-in database storage provider. A future S3 provider stores nothing
---     here and points storage_key at the object instead.
+--     built-in database storage provider. The local and s3 providers store
+--     nothing here and point storage_key at the file or object instead.
 --
 -- ON DELETE CASCADE chains transactions -> transaction_attachments ->
 -- attachment_blobs so deleting a transaction removes its attachments and their
@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS transaction_attachments (
     content_type VARCHAR(100) NOT NULL, -- server-sniffed MIME, not the client's claim
     byte_size BIGINT NOT NULL,
     sha256 CHAR(64) NOT NULL, -- hex digest of the original bytes (integrity + dedup)
-    storage_provider VARCHAR(20) NOT NULL DEFAULT 'database', -- 'database' | 's3' | ...
-    storage_key VARCHAR(512) NOT NULL, -- database provider: attachment id; s3: object key
+    storage_provider VARCHAR(20) NOT NULL DEFAULT 'database', -- 'database' | 'local' | 's3'
+    storage_key VARCHAR(512) NOT NULL, -- database/local: attachment id; s3: object key
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
