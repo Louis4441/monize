@@ -13,6 +13,7 @@
     "priceAt": "Price at {date}",
     "noPrice": "No price recorded yet",
     "changeToday": "{change} ({percent}) today",
+    "changeLast": "{change} ({percent}) last move",
     "inactiveBadge": "Inactive",
     "watch": "Watch",
     "watching": "Watching",

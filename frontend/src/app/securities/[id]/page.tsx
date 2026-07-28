@@ -65,6 +65,24 @@ const SecurityPriceHistory = dynamic(
 const TAB_KEYS = ['overview', 'transactions', 'prices'] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
+/**
+ * How old the newest close may be and still describe "today's" move. Covers a
+ * long weekend plus a public holiday, which is the normal gap between sessions.
+ */
+const STALE_QUOTE_DAYS = 4;
+
+/** Whole days between an ISO `yyyy-MM-dd` and today. */
+function daysSince(isoDate: string): number {
+  const then = new Date(`${isoDate}T00:00:00`).getTime();
+  const today = new Date();
+  const midnight = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  ).getTime();
+  return Math.round((midnight - then) / 86_400_000);
+}
+
 export default function SecurityDetailPage() {
   return (
     <ProtectedRoute>
@@ -141,6 +159,11 @@ function SecurityDetailContent() {
         previous && previous.close !== 0 && change !== null
           ? roundToDecimals((change / previous.close) * 100, 2)
           : null,
+      // A move is only "today's" if the quote it came from is fresh. Prices are
+      // refreshed daily and there are no weekend closes, so anything within a
+      // few days still counts as the latest session; older than that and the
+      // header says "last move" instead of misdating it.
+      isCurrent: daysSince(latest.date) <= STALE_QUOTE_DAYS,
     };
   }, [priceSeries]);
 
@@ -287,7 +310,10 @@ function SecurityDetailContent() {
             <SecurityPositionState detail={detail} />
           )}
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* `items-start` so Key information keeps its natural height: it holds
+              a handful of rows against a 420px chart, and stretching it to match
+              left most of the card empty. */}
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <SecurityChartSection
                 security={security}
@@ -322,7 +348,9 @@ function SecurityDetailContent() {
               isActive={tab === 'overview'}
               className="mt-6 space-y-6"
             >
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+              {/* `items-start` again: the three cards hold different amounts,
+                  and stretching the short ones just pads them with blank space. */}
+              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-5">
                 <div className="lg:col-span-2">
                   <SecurityAboutCard security={security} />
                 </div>

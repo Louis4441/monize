@@ -96,17 +96,13 @@ const security: Security = {
 function detailFixture(overrides: Partial<SecurityDetail> = {}): SecurityDetail {
   return {
     security,
-    defaultCurrency: 'PLN',
     position: {
       quantity: 100,
       averageCost: 120,
       currentPrice: 150,
       costBasis: 12000,
-      costBasisDefaultCurrency: 48000,
       marketValue: 15000,
-      marketValueDefaultCurrency: 60000,
       gainLoss: 3000,
-      gainLossDefaultCurrency: 12000,
       gainLossPercent: 25,
     },
     accounts: [
@@ -120,9 +116,7 @@ function detailFixture(overrides: Partial<SecurityDetail> = {}): SecurityDetail 
         costBasis: 7200,
         costBasisAccountCurrency: 28800,
         marketValue: 9000,
-        marketValueAccountCurrency: 36000,
         gainLoss: 1800,
-        gainLossAccountCurrency: 7200,
         gainLossPercent: 25,
       },
       {
@@ -135,9 +129,7 @@ function detailFixture(overrides: Partial<SecurityDetail> = {}): SecurityDetail 
         costBasis: 4800,
         costBasisAccountCurrency: 19200,
         marketValue: 6000,
-        marketValueAccountCurrency: 24000,
         gainLoss: 1200,
-        gainLossAccountCurrency: 4800,
         gainLossPercent: 25,
       },
     ],
@@ -148,7 +140,8 @@ function detailFixture(overrides: Partial<SecurityDetail> = {}): SecurityDetail 
       totalSold: 0,
       dividends: 320.5,
       fees: 48.3,
-      realizedGain: 0,
+      realizedGain: null,
+      realizedGainCurrency: null,
       transactionCount: 4,
     },
     hasTransactions: true,
@@ -276,6 +269,7 @@ describe('SecurityDetailPage', () => {
           activity: {
             ...detailFixture().activity,
             realizedGain: 2340,
+            realizedGainCurrency: 'PLN',
           },
         }),
       );

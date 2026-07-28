@@ -18,6 +18,12 @@ export interface SecurityQuote {
   /** Change against the previous close; null when there is no earlier price. */
   change: number | null;
   changePercent: number | null;
+  /**
+   * True when the newest price is recent enough for its move to be "today's".
+   * A week-old close still has a delta against the close before it, but calling
+   * that today's move would misdate it.
+   */
+  isCurrent: boolean;
 }
 
 interface SecurityDetailHeaderProps {
@@ -185,15 +191,22 @@ export function SecurityDetailHeader({
                   <span
                     className={`text-sm font-medium ${gainLossColor(quote.change)}`}
                   >
-                    {t('header.changeToday', {
-                      // Explicitly signed: the colour alone must never be the
-                      // only thing telling a gain from a loss.
-                      change: `${quote.change >= 0 ? '+' : ''}${formatCurrencyPrecise(
-                        quote.change,
-                        security.currencyCode,
-                      )}`,
-                      percent: formatSignedPercent(quote.changePercent),
-                    })}
+                    {t(
+                      // A stale quote's delta is still the last move, but it did
+                      // not happen today, so it is not labelled as if it had.
+                      quote.isCurrent
+                        ? 'header.changeToday'
+                        : 'header.changeLast',
+                      {
+                        // Explicitly signed: the colour alone must never be the
+                        // only thing telling a gain from a loss.
+                        change: `${quote.change >= 0 ? '+' : ''}${formatCurrencyPrecise(
+                          quote.change,
+                          security.currencyCode,
+                        )}`,
+                        percent: formatSignedPercent(quote.changePercent),
+                      },
+                    )}
                   </span>
                 )}
               </div>
