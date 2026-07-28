@@ -7,6 +7,8 @@ import toast from 'react-hot-toast';
 import { useTourStore } from '@/store/tourStore';
 import { toursApi } from '@/lib/tours-api';
 import { ALL_TOURS, INTRO_TOUR } from '@/lib/tours/registry';
+import { isTourOfferable } from '@/lib/tours/requirements';
+import { useTourRequirements } from '@/hooks/useTourRequirements';
 import { createLogger } from '@/lib/logger';
 import type { TourDefinition } from '@/lib/tours/types';
 
@@ -49,10 +51,19 @@ export function TourSettingsRow() {
   };
 
   // The evergreen introduction first, then the release tours in registry order.
-  const tours: readonly TourDefinition[] = [
+  const candidates: readonly TourDefinition[] = [
     INTRO_TOUR,
     ...ALL_TOURS.filter((tour) => tour.id !== INTRO_TOUR.id),
   ];
+  // Only fetch when a listed tour is actually gated, which is the exception.
+  const requirements = useTourRequirements(
+    candidates.some((tour) => tour.requiresData),
+  );
+  // A tour of a page the user's data cannot reach is left off the list rather
+  // than offered as a dead end.
+  const tours = candidates.filter((tour) =>
+    isTourOfferable(tour, requirements),
+  );
 
   return (
     <div className="flex flex-col gap-1">

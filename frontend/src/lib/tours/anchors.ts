@@ -45,6 +45,12 @@ export const TOUR_ANCHORS = {
   transactionFxConversion: 'transaction-fx-conversion',
   transactionFormActions: 'transaction-form-actions',
 
+  // Securities (the detail page)
+  securityDetailSummary: 'security-detail-summary',
+  securityDetailChart: 'security-detail-chart',
+  securityDetailKeyInfo: 'security-detail-key-info',
+  securityDetailTabs: 'security-detail-tabs',
+
   // Reports
   reportForeignCurrencyFees: 'report-foreign-currency-fees',
 

@@ -25,6 +25,7 @@
     "accounts": "Accounts",
     "budgets": "Budgets",
     "reports": "Reports",
+    "investments": "Investments",
     "settings": "Settings"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "That's it",
             "body": "You can revisit these highlights whenever you like from here in Settings."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Security detail page",
+        "steps": {
+          "welcome": {
+            "title": "Every security on one page",
+            "body": "Securities used to be three separate dialogs. There is now a page per security that gathers the lot: what you hold, what it has done, and everything Monize knows about it. Here is the quick version."
+          },
+          "openDetail": {
+            "title": "Open a security",
+            "body": "Pick any security in the list and choose **Details**. On a narrow screen, press and hold the row to reach the same action."
+          },
+          "summary": {
+            "title": "Your position at a glance",
+            "body": "Market value, cost basis, unrealised gain, units held, and which accounts hold them. Amounts are in the security's own currency -- the one its price is quoted in.",
+            "fallbackBody": "This row normally shows your position. You no longer hold this security, so the page shows what you realised on it instead -- open one you still hold to see the figures."
+          },
+          "chart": {
+            "title": "Three ways to read the history",
+            "body": "Switch between the **price**, the **value of your position**, and the **return** over the window. The buttons on the right set how far back it goes. Try them now -- the chart stays live while you read."
+          },
+          "keyInfo": {
+            "title": "What the instrument is",
+            "body": "Beside the chart: security type, exchange, currency, the quote provider Monize uses, and the price it last recorded. Underneath, the **Breakdown** card shows what a fund is made of -- switch between its sector and country splits."
+          },
+          "tabs": {
+            "title": "The detail underneath",
+            "body": "**Overview** holds the description, the period returns and your holdings per account. **Transactions** and **Price history** are the same tables the old dialogs showed."
+          },
+          "finish": {
+            "title": "That is the tour",
+            "body": "The old dialogs are still on the securities list for a quick look. This page is the one you can link to and come back to."
           }
         }
       }

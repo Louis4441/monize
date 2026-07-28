@@ -6,13 +6,15 @@ import { useTranslations } from 'next-intl';
 import { useAuthStore } from '@/store/authStore';
 import { useTourStore } from '@/store/tourStore';
 import { toursApi } from '@/lib/tours-api';
-import { accountsApi } from '@/lib/accounts';
 import { createLogger } from '@/lib/logger';
 import { findTourAnchor } from '@/lib/tours/anchors';
 import { backTargetIndex } from '@/lib/tours/navigation';
+import {
+  resolveTourRequirements,
+  type TourRequirementMap,
+} from '@/lib/tours/requirements';
 import { useTourAnchor } from '@/hooks/useTourAnchor';
 import { useAnchorRect } from '@/hooks/useAnchorRect';
-import type { TourRequirement } from '@/lib/tours/types';
 import { TourSpotlight } from './TourSpotlight';
 import { TourTooltip } from './TourTooltip';
 
@@ -114,27 +116,21 @@ export function TourHost() {
   // against). Resolved lazily: nothing is fetched unless a running tour
   // actually has such a step. `null` = not resolved yet, so the step waits
   // rather than being omitted on a guess.
-  const [requirements, setRequirements] = useState<Record<
-    TourRequirement,
-    boolean
-  > | null>(null);
+  const [requirements, setRequirements] = useState<TourRequirementMap | null>(
+    null,
+  );
   const needsRequirements =
     !!active && active.steps.some((s) => s.requires) && requirements === null;
 
   useEffect(() => {
     if (!needsRequirements) return;
     let cancelled = false;
-    accountsApi
-      .getAll(false)
-      .then((accounts) => {
-        if (cancelled) return;
-        setRequirements({ transactionEntry: accounts.length > 0 });
-      })
-      // A failed lookup must not strand the tour: treat it as "requirement met"
-      // so the steps still show, rather than silently swallowing a section.
-      .catch(() => {
-        if (!cancelled) setRequirements({ transactionEntry: true });
-      });
+    // The shared resolver, so the engine and the offer surfaces cannot disagree
+    // about whether the user has the data a tour talks about. It treats a failed
+    // lookup as "requirement met" rather than silently swallowing a section.
+    resolveTourRequirements().then((resolved) => {
+      if (!cancelled) setRequirements(resolved);
+    });
     return () => {
       cancelled = true;
     };

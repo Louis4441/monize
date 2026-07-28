@@ -25,6 +25,7 @@
     "accounts": "[XX-Accounts-XX]",
     "budgets": "[XX-Budgets-XX]",
     "reports": "[XX-Reports-XX]",
+    "investments": "[XX-Investments-XX]",
     "settings": "[XX-Settings-XX]"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "[XX-That's it-XX]",
             "body": "[XX-You can revisit these highlights whenever you like from here in Settings.-XX]"
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "[XX-Security detail page-XX]",
+        "steps": {
+          "welcome": {
+            "title": "[XX-Every security on one page-XX]",
+            "body": "[XX-Securities used to be three separate dialogs. There is now a page per security that gathers the lot: what you hold, what it has done, and everything Monize knows about it. Here is the quick version.-XX]"
+          },
+          "openDetail": {
+            "title": "[XX-Open a security-XX]",
+            "body": "[XX-Pick any security in the list and choose **Details**. On a narrow screen, press and hold the row to reach the same action.-XX]"
+          },
+          "summary": {
+            "title": "[XX-Your position at a glance-XX]",
+            "body": "[XX-Market value, cost basis, unrealised gain, units held, and which accounts hold them. Amounts are in the security's own currency -- the one its price is quoted in.-XX]",
+            "fallbackBody": "[XX-This row normally shows your position. You no longer hold this security, so the page shows what you realised on it instead -- open one you still hold to see the figures.-XX]"
+          },
+          "chart": {
+            "title": "[XX-Three ways to read the history-XX]",
+            "body": "[XX-Switch between the **price**, the **value of your position**, and the **return** over the window. The buttons on the right set how far back it goes. Try them now -- the chart stays live while you read.-XX]"
+          },
+          "keyInfo": {
+            "title": "[XX-What the instrument is-XX]",
+            "body": "[XX-Beside the chart: security type, exchange, currency, the quote provider Monize uses, and the price it last recorded. Underneath, the **Breakdown** card shows what a fund is made of -- switch between its sector and country splits.-XX]"
+          },
+          "tabs": {
+            "title": "[XX-The detail underneath-XX]",
+            "body": "[XX-**Overview** holds the description, the period returns and your holdings per account. **Transactions** and **Price history** are the same tables the old dialogs showed.-XX]"
+          },
+          "finish": {
+            "title": "[XX-That is the tour-XX]",
+            "body": "[XX-The old dialogs are still on the securities list for a quick look. This page is the one you can link to and come back to.-XX]"
           }
         }
       }

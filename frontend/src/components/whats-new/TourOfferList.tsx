@@ -3,6 +3,8 @@
 import { useTranslations } from 'next-intl';
 import { useTourStore } from '@/store/tourStore';
 import { getReleaseTours, INTRO_TOUR } from '@/lib/tours/registry';
+import { isTourOfferable } from '@/lib/tours/requirements';
+import { useTourRequirements } from '@/hooks/useTourRequirements';
 import type { TourDefinition } from '@/lib/tours/types';
 
 interface TourOfferListProps {
@@ -33,9 +35,17 @@ export function TourOfferList({
 
   const releaseTours = getReleaseTours(currentVersion);
   const showIntro = !progress[INTRO_TOUR.id];
-  const rows: TourDefinition[] = showIntro
+  const candidates: TourDefinition[] = showIntro
     ? [INTRO_TOUR, ...releaseTours]
     : [...releaseTours];
+
+  // Only fetch when a candidate is actually gated, which is the exception.
+  const requirements = useTourRequirements(
+    candidates.some((tour) => tour.requiresData),
+  );
+  // A tour about data the user does not have would strand them on its first
+  // step, so it is left out rather than offered and then abandoned.
+  const rows = candidates.filter((tour) => isTourOfferable(tour, requirements));
 
   if (rows.length === 0) return null;
 
