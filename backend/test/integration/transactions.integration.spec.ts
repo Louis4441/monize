@@ -9,6 +9,7 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 import {
   createTestAccount,
   createTestCategory,
@@ -58,12 +59,14 @@ describe("TransactionsService (integration)", () => {
 
   describe("create()", () => {
     it("should create a transaction and update account balance atomically", async () => {
-      const result = await service.create(userId, {
-        accountId,
-        transactionDate: "2026-01-15",
-        amount: -50,
-        currencyCode: "USD",
-      });
+      const result = await withUserContext(userId, () =>
+        service.create(userId, {
+          accountId,
+          transactionDate: "2026-01-15",
+          amount: -50,
+          currencyCode: "USD",
+        }),
+      );
 
       expect(result.id).toBeDefined();
       expect(Number(result.amount)).toBe(-50);
@@ -85,17 +88,19 @@ describe("TransactionsService (integration)", () => {
         name: "Dining",
       });
 
-      const result = await service.create(userId, {
-        accountId,
-        transactionDate: "2026-01-15",
-        amount: -100,
-        currencyCode: "USD",
-        isSplit: true,
-        splits: [
-          { categoryId: category1.id, amount: -60 },
-          { categoryId: category2.id, amount: -40 },
-        ],
-      });
+      const result = await withUserContext(userId, () =>
+        service.create(userId, {
+          accountId,
+          transactionDate: "2026-01-15",
+          amount: -100,
+          currencyCode: "USD",
+          isSplit: true,
+          splits: [
+            { categoryId: category1.id, amount: -60 },
+            { categoryId: category2.id, amount: -40 },
+          ],
+        }),
+      );
 
       expect(result.isSplit).toBe(true);
       expect(result.categoryId).toBeNull();
@@ -114,13 +119,15 @@ describe("TransactionsService (integration)", () => {
     });
 
     it("should NOT update balance when status is VOID", async () => {
-      const result = await service.create(userId, {
-        accountId,
-        transactionDate: "2026-01-15",
-        amount: -200,
-        currencyCode: "USD",
-        status: TransactionStatus.VOID,
-      });
+      const result = await withUserContext(userId, () =>
+        service.create(userId, {
+          accountId,
+          transactionDate: "2026-01-15",
+          amount: -200,
+          currencyCode: "USD",
+          status: TransactionStatus.VOID,
+        }),
+      );
 
       expect(result.status).toBe(TransactionStatus.VOID);
 
@@ -134,17 +141,21 @@ describe("TransactionsService (integration)", () => {
 
   describe("update()", () => {
     it("should apply the correct balance delta when amount changes", async () => {
-      const tx = await service.create(userId, {
-        accountId,
-        transactionDate: "2026-01-15",
-        amount: -50,
-        currencyCode: "USD",
-      });
+      const tx = await withUserContext(userId, () =>
+        service.create(userId, {
+          accountId,
+          transactionDate: "2026-01-15",
+          amount: -50,
+          currencyCode: "USD",
+        }),
+      );
 
       // Balance is now 950
-      const updated = await service.update(userId, tx.id, {
-        amount: -80,
-      });
+      const updated = await withUserContext(userId, () =>
+        service.update(userId, tx.id, {
+          amount: -80,
+        }),
+      );
 
       expect(Number(updated.amount)).toBe(-80);
 
@@ -158,15 +169,17 @@ describe("TransactionsService (integration)", () => {
 
   describe("remove()", () => {
     it("should reverse the balance and delete the transaction", async () => {
-      const tx = await service.create(userId, {
-        accountId,
-        transactionDate: "2026-01-15",
-        amount: -75,
-        currencyCode: "USD",
-      });
+      const tx = await withUserContext(userId, () =>
+        service.create(userId, {
+          accountId,
+          transactionDate: "2026-01-15",
+          amount: -75,
+          currencyCode: "USD",
+        }),
+      );
 
       // Balance is now 925
-      await service.remove(userId, tx.id);
+      await withUserContext(userId, () => service.remove(userId, tx.id));
 
       // Balance should be restored to 1000
       const account = await dataSource.manager.findOne(Account, {
@@ -175,7 +188,9 @@ describe("TransactionsService (integration)", () => {
       expect(account!.currentBalance).toBe(1000);
 
       // Transaction should no longer exist
-      await expect(service.findOne(userId, tx.id)).rejects.toThrow("not found");
+      await expect(
+        withUserContext(userId, () => service.findOne(userId, tx.id)),
+      ).rejects.toThrow("not found");
     });
   });
 
@@ -185,16 +200,20 @@ describe("TransactionsService (integration)", () => {
         name: "Utilities",
       });
 
-      const tx = await service.create(userId, {
-        accountId,
-        transactionDate: "2026-01-15",
-        amount: -30,
-        currencyCode: "USD",
-        categoryId: category.id,
-        description: "Electric bill",
-      });
+      const tx = await withUserContext(userId, () =>
+        service.create(userId, {
+          accountId,
+          transactionDate: "2026-01-15",
+          amount: -30,
+          currencyCode: "USD",
+          categoryId: category.id,
+          description: "Electric bill",
+        }),
+      );
 
-      const found = await service.findOne(userId, tx.id);
+      const found = await withUserContext(userId, () =>
+        service.findOne(userId, tx.id),
+      );
 
       expect(found.account).toBeDefined();
       expect(found.account.id).toBe(accountId);

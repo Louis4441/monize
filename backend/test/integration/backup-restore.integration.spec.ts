@@ -13,6 +13,7 @@ import { User } from "@/users/entities/user.entity";
 import { OidcService } from "@/auth/oidc/oidc.service";
 import { AiEncryptionService } from "@/ai/ai-encryption.service";
 import { createTestUserDirect } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 
 /**
  * Full backup -> restore round-trip against a real PostgreSQL database.
@@ -335,7 +336,9 @@ describe("Backup export/restore round-trip (integration)", () => {
     });
     const seeded = await seedUserData(userA.id);
 
-    const buffer = await service.exportToBuffer(userA.id);
+    const buffer = await withUserContext(userA.id, () =>
+      service.exportToBuffer(userA.id),
+    );
 
     // The export is gzipped JSON with a version header.
     const parsed = JSON.parse(gunzipSync(buffer).toString("utf-8"));
@@ -347,10 +350,12 @@ describe("Backup export/restore round-trip (integration)", () => {
     expect(parsed.loan_rate_changes).toHaveLength(1);
     expect(parsed.loan_scenarios).toHaveLength(1);
 
-    const result = await service.restoreData(userB.id, {
-      compressedData: buffer,
-      password: PASSWORD,
-    });
+    const result = await withUserContext(userB.id, () =>
+      service.restoreData(userB.id, {
+        compressedData: buffer,
+        password: PASSWORD,
+      }),
+    );
 
     expect(result.message).toContain("restored");
     expect(result.restored.categories).toBe(2);
@@ -531,13 +536,17 @@ describe("Backup export/restore round-trip (integration)", () => {
     });
     await seedUserData(userA.id);
 
-    const encrypted = await service.exportToBuffer(userA.id, "backup-secret");
+    const encrypted = await withUserContext(userA.id, () =>
+      service.exportToBuffer(userA.id, "backup-secret"),
+    );
 
-    const result = await service.restoreData(userB.id, {
-      compressedData: encrypted,
-      password: PASSWORD,
-      backupPassword: "backup-secret",
-    });
+    const result = await withUserContext(userB.id, () =>
+      service.restoreData(userB.id, {
+        compressedData: encrypted,
+        password: PASSWORD,
+        backupPassword: "backup-secret",
+      }),
+    );
 
     expect(result.restored.accounts).toBe(2);
     expect(await countRows("transactions", userB.id)).toBe(4);
@@ -552,14 +561,18 @@ describe("Backup export/restore round-trip (integration)", () => {
     });
     await seedUserData(userA.id);
 
-    const encrypted = await service.exportToBuffer(userA.id, "backup-secret");
+    const encrypted = await withUserContext(userA.id, () =>
+      service.exportToBuffer(userA.id, "backup-secret"),
+    );
 
     await expect(
-      service.restoreData(userB.id, {
-        compressedData: encrypted,
-        password: PASSWORD,
-        backupPassword: "wrong-password",
-      }),
+      withUserContext(userB.id, () =>
+        service.restoreData(userB.id, {
+          compressedData: encrypted,
+          password: PASSWORD,
+          backupPassword: "wrong-password",
+        }),
+      ),
     ).rejects.toBeInstanceOf(BackupPasswordRequiredError);
 
     // A failed restore leaves the target user empty.
@@ -574,13 +587,17 @@ describe("Backup export/restore round-trip (integration)", () => {
       email: "auth-b@example.com",
     });
     await seedUserData(userA.id);
-    const buffer = await service.exportToBuffer(userA.id);
+    const buffer = await withUserContext(userA.id, () =>
+      service.exportToBuffer(userA.id),
+    );
 
     await expect(
-      service.restoreData(userB.id, {
-        compressedData: buffer,
-        password: "not-the-password",
-      }),
+      withUserContext(userB.id, () =>
+        service.restoreData(userB.id, {
+          compressedData: buffer,
+          password: "not-the-password",
+        }),
+      ),
     ).rejects.toThrow("Invalid password");
 
     expect(await countRows("accounts", userB.id)).toBe(0);

@@ -12,6 +12,7 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 import {
   createTestAccount,
   createTestCategory,
@@ -88,7 +89,9 @@ describe("TransactionsService.getFxFeeSummary (integration)", () => {
       exchangeRate: 1.602,
     });
 
-    const rows = await service.getFxFeeSummary(userId, accountId);
+    const rows = await withUserContext(userId, () =>
+      service.getFxFeeSummary(userId, accountId),
+    );
 
     expect(rows).toEqual([
       { month: "2026-07", currencyCode: "EUR", feeTotal: 4.01, count: 1 },
@@ -104,7 +107,9 @@ describe("TransactionsService.getFxFeeSummary (integration)", () => {
       exchangeRate: 1.602,
     });
 
-    const rows = await service.getFxFeeSummary(userId, accountId);
+    const rows = await withUserContext(userId, () =>
+      service.getFxFeeSummary(userId, accountId),
+    );
 
     expect(rows).toEqual([
       { month: "2026-07", currencyCode: "EUR", feeTotal: 0, count: 1 },
@@ -134,7 +139,9 @@ describe("TransactionsService.getFxFeeSummary (integration)", () => {
       exchangeRate: 1.34,
     });
 
-    const rows = await service.getFxFeeSummary(userId, accountId);
+    const rows = await withUserContext(userId, () =>
+      service.getFxFeeSummary(userId, accountId),
+    );
 
     // July EUR: fee 4.01 + fee (round(80.10)=80.10 - 82.10 = 2.00) = 6.01.
     // August USD: base 134.00 - 137.50 = 3.50.
@@ -171,7 +178,9 @@ describe("TransactionsService.getFxFeeSummary (integration)", () => {
       } as Partial<TransactionSplit>),
     );
 
-    const rows = await service.getFxFeeSummary(userId, accountId);
+    const rows = await withUserContext(userId, () =>
+      service.getFxFeeSummary(userId, accountId),
+    );
 
     expect(rows).toEqual([
       { month: "2026-07", currencyCode: "EUR", feeTotal: 4.01, count: 1 },
@@ -188,7 +197,9 @@ describe("TransactionsService.getFxFeeSummary (integration)", () => {
     });
     await insertTransaction({ amount: -25, currencyCode: "CAD" });
 
-    const rows = await service.getFxFeeSummary(userId, accountId);
+    const rows = await withUserContext(userId, () =>
+      service.getFxFeeSummary(userId, accountId),
+    );
 
     expect(rows).toEqual([]);
   });

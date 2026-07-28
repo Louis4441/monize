@@ -15,6 +15,7 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 import { createTestAccount } from "../helpers/test-factories";
 
 /**
@@ -83,36 +84,44 @@ describe("Security transaction history (integration)", () => {
     accountA = await brokerage("Account A");
     accountB = await brokerage("Account B");
 
-    const security = await securitiesService.create(userId, {
-      symbol: "ACME",
-      name: "Acme Corp",
-      securityType: "STOCK" as any,
-      currencyCode: "USD",
-    } as any);
+    const security = await withUserContext(userId, () =>
+      securitiesService.create(userId, {
+        symbol: "ACME",
+        name: "Acme Corp",
+        securityType: "STOCK" as any,
+        currencyCode: "USD",
+      } as any),
+    );
     securityId = security.id;
 
     // Account A: add 100, remove all but a 0.001 residual.
-    await service.create(userId, {
-      accountId: accountA,
-      action: InvestmentAction.ADD_SHARES,
-      transactionDate: "2025-01-01",
-      securityId,
-      quantity: 100,
-    } as any);
-    await service.create(userId, {
-      accountId: accountB,
-      action: InvestmentAction.ADD_SHARES,
-      transactionDate: "2025-02-01",
-      securityId,
-      quantity: 50,
-    } as any);
-    await service.create(userId, {
-      accountId: accountA,
-      action: InvestmentAction.REMOVE_SHARES,
-      transactionDate: "2025-03-01",
-      securityId,
-      quantity: 99.999,
-    } as any);
+    await withUserContext(userId, () =>
+      service.create(userId, {
+        accountId: accountA,
+        action: InvestmentAction.ADD_SHARES,
+        transactionDate: "2025-01-01",
+        securityId,
+        quantity: 100,
+      } as any),
+    );
+    await withUserContext(userId, () =>
+      service.create(userId, {
+        accountId: accountB,
+        action: InvestmentAction.ADD_SHARES,
+        transactionDate: "2025-02-01",
+        securityId,
+        quantity: 50,
+      } as any),
+    );
+    await withUserContext(userId, () =>
+      service.create(userId, {
+        accountId: accountA,
+        action: InvestmentAction.REMOVE_SHARES,
+        transactionDate: "2025-03-01",
+        securityId,
+        quantity: 99.999,
+      } as any),
+    );
 
     // Close Account B and mark the security inactive (set directly: the app
     // blocks deactivating a security that still has holdings, but legacy/import
@@ -123,9 +132,8 @@ describe("Security transaction history (integration)", () => {
   });
 
   it("reports running totals, closed accounts and exact residuals", async () => {
-    const history = await service.getSecurityTransactionHistory(
-      userId,
-      securityId,
+    const history = await withUserContext(userId, () =>
+      service.getSecurityTransactionHistory(userId, securityId),
     );
 
     expect(history.isActive).toBe(false);
@@ -151,17 +159,18 @@ describe("Security transaction history (integration)", () => {
 
   it("clears a residual via an adjustment on an inactive security", async () => {
     // Add a REMOVE_SHARES adjustment for the 0.001 residual in (open) A.
-    await service.create(userId, {
-      accountId: accountA,
-      action: InvestmentAction.REMOVE_SHARES,
-      transactionDate: "2025-05-01",
-      securityId,
-      quantity: 0.001,
-    } as any);
+    await withUserContext(userId, () =>
+      service.create(userId, {
+        accountId: accountA,
+        action: InvestmentAction.REMOVE_SHARES,
+        transactionDate: "2025-05-01",
+        securityId,
+        quantity: 0.001,
+      } as any),
+    );
 
-    const history = await service.getSecurityTransactionHistory(
-      userId,
-      securityId,
+    const history = await withUserContext(userId, () =>
+      service.getSecurityTransactionHistory(userId, securityId),
     );
     const a = history.accounts.find((x) => x.accountId === accountA)!;
     expect(a.currentQuantity).toBeCloseTo(0, 6);
@@ -169,17 +178,18 @@ describe("Security transaction history (integration)", () => {
 
   it("allows an adjustment against a closed account", async () => {
     // Remove the 50 shares stranded in the now-closed Account B.
-    await service.create(userId, {
-      accountId: accountB,
-      action: InvestmentAction.REMOVE_SHARES,
-      transactionDate: "2025-05-01",
-      securityId,
-      quantity: 50,
-    } as any);
+    await withUserContext(userId, () =>
+      service.create(userId, {
+        accountId: accountB,
+        action: InvestmentAction.REMOVE_SHARES,
+        transactionDate: "2025-05-01",
+        securityId,
+        quantity: 50,
+      } as any),
+    );
 
-    const history = await service.getSecurityTransactionHistory(
-      userId,
-      securityId,
+    const history = await withUserContext(userId, () =>
+      service.getSecurityTransactionHistory(userId, securityId),
     );
     const b = history.accounts.find((x) => x.accountId === accountB)!;
     expect(b.currentQuantity).toBeCloseTo(0, 6);
