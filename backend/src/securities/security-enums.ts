@@ -168,6 +168,17 @@ export function normalizeCountryName(input: string): string {
 }
 
 /**
+ * Tidy a free-text allocation name (asset classes) without snapping it to any
+ * canonical list: trims and collapses runs of internal whitespace so "Fixed
+ * Income" and "Fixed  Income" are the same value. Empty / blank input returns
+ * "". Unlike countries, asset classes have no canonical vocabulary -- the
+ * picker offers whatever the user has already saved.
+ */
+export function normalizeAssetName(input: string): string {
+  return (input ?? "").trim().replace(/\s+/g, " ");
+}
+
+/**
  * True when an allocation slice name is the catch-all "Other" bucket (which
  * providers often include in their breakdowns). Such slices must NOT be stored
  * or rendered as a country -- their weight is folded into the single computed

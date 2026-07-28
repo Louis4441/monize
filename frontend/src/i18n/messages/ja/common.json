@@ -121,7 +121,8 @@
     "selectedCount": "{count} 選択中"
   },
   "combobox": {
-    "createOption": "\"{value}\" を作成"
+    "createOption": "\"{value}\" を作成",
+    "deleteOption": "「{value}」を削除"
   },
   "passwordInput": {
     "show": "入力を表示",

@@ -182,6 +182,19 @@
       "overError": "L'allocazione supera il 100%.",
       "nameAriaLabel": "Paese",
       "weightAriaLabel": "Percentuale"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Allocazione per classe di attivo",
+      "help": "I fornitori di quotazioni non forniscono l'esposizione per classe di attivo di ETF e fondi. Aggiungila manualmente in percentuale: digita il nome che preferisci e sarà poi disponibile sugli altri tuoi titoli. Tutto ciò che resta sotto il 100% viene mostrato come «Altro».",
+      "placeholder": "Seleziona o digita una classe di attivo",
+      "addRow": "Aggiungi classe di attivo",
+      "nameAriaLabel": "Classe di attivo",
+      "deleteOption": "Elimina classe di attivo",
+      "deleteTitle": "Eliminare la classe di attivo?",
+      "deleteMessage": "«{name}» sarà rimossa dal tuo elenco e da ogni titolo che la usa. Quei titoli mantengono il resto della loro allocazione e la percentuale liberata diventa «Altro».",
+      "deleteConfirm": "Elimina",
+      "deleteSuccess": "Classe di attivo «{name}» eliminata",
+      "deleteFailed": "Impossibile eliminare la classe di attivo «{name}»"
     }
   },
   "priceForm": {

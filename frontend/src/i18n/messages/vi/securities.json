@@ -182,6 +182,19 @@
       "overError": "Tổng phân bổ vượt quá 100%.",
       "nameAriaLabel": "Quốc gia",
       "weightAriaLabel": "Phần trăm"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Phân bổ theo loại tài sản",
+      "help": "Các nhà cung cấp giá không cung cấp mức phân bổ theo loại tài sản cho ETF và quỹ. Hãy nhập thủ công theo tỷ lệ phần trăm -- gõ tên bất kỳ và tên đó sẽ dùng được cho các chứng khoán khác của bạn. Phần còn thiếu so với 100% được hiển thị là \"Khác\".",
+      "placeholder": "Chọn hoặc nhập loại tài sản",
+      "addRow": "Thêm loại tài sản",
+      "nameAriaLabel": "Loại tài sản",
+      "deleteOption": "Xóa loại tài sản",
+      "deleteTitle": "Xóa loại tài sản?",
+      "deleteMessage": "\"{name}\" sẽ bị xóa khỏi danh sách của bạn và khỏi mọi chứng khoán đang dùng nó. Các chứng khoán đó giữ nguyên phần phân bổ còn lại, và tỷ lệ được giải phóng trở thành \"Khác\".",
+      "deleteConfirm": "Xóa",
+      "deleteSuccess": "Đã xóa loại tài sản \"{name}\"",
+      "deleteFailed": "Không thể xóa loại tài sản \"{name}\""
     }
   },
   "priceForm": {

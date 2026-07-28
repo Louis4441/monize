@@ -351,6 +351,7 @@
     "splitRatioRequired": "[XX-Split ratio (quantity) must be greater than zero-XX]",
     "ambiguousSecurity": "[XX-\"{{ query }}\" matches multiple securities: {{ list }}. Use the exact ticker symbol.-XX]",
     "allocationExceedsTotal": "[XX-Allocation percentages add up to more than 100%.-XX]",
+    "assetOptionNameRequired": "[XX-An asset class name is required.-XX]",
     "invalidTagKey": "[XX-A tag key (1-100 characters) is required-XX]",
     "securityNotFoundByQuery": "[XX-No security matches \"{{ query }}\". Add the security first or check the ticker symbol.-XX]",
     "cannotHoldSecurities": "[XX-{{ label }} cannot hold securities-XX]",

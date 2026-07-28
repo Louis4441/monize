@@ -16,6 +16,7 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import { SecurityPriceService } from "./security-price.service";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { withUserContext } from "../common/db/with-context";
 
 describe("SecuritiesService", () => {
   let service: SecuritiesService;
@@ -28,6 +29,8 @@ describe("SecuritiesService", () => {
   let mockActionHistoryService: Record<string, jest.Mock>;
   let mockYahooFinanceService: Record<string, jest.Mock>;
   let queryRunnerManager: Record<string, jest.Mock>;
+  let scopedRepository: Record<string, any>;
+  let scopedManager: Record<string, jest.Mock>;
   let mockDataSource: Record<string, any>;
 
   const mockSecurity = {
@@ -127,8 +130,24 @@ describe("SecuritiesService", () => {
       find: jest.fn().mockResolvedValue([]),
     };
 
+    scopedRepository = {
+      createQueryBuilder: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      })),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+
+    scopedManager = {
+      getRepository: jest.fn(() => scopedRepository),
+    };
+
     mockDataSource = {
       manager: queryRunnerManager,
+      // withScopedDb (used by deleteAssetOption) runs its body inside a
+      // transaction and hands it the transaction's EntityManager.
+      transaction: jest.fn((cb) => cb(scopedManager)),
       createQueryRunner: jest.fn(() => ({
         connect: jest.fn().mockResolvedValue(undefined),
         startTransaction: jest.fn().mockResolvedValue(undefined),
@@ -464,6 +483,32 @@ describe("SecuritiesService", () => {
       expect(queryRunnerManager.save).toHaveBeenCalled();
     });
 
+    it("normalizes the manual asset allocation onto the new security", async () => {
+      queryRunnerManager.findOne.mockResolvedValue(null);
+
+      await service.create("user-1", {
+        symbol: "VBAL",
+        name: "Vanguard Balanced ETF",
+        securityType: "ETF",
+        currencyCode: "CAD",
+        assetWeightings: [
+          { name: " equity ", weight: 0.6 },
+          { name: "Equity", weight: 0.0 },
+          { name: "Fixed Income", weight: 0.4 },
+        ],
+      });
+
+      expect(queryRunnerManager.create).toHaveBeenCalledWith(
+        Security,
+        expect.objectContaining({
+          assetWeightings: [
+            { name: "equity", weight: 0.6 },
+            { name: "Fixed Income", weight: 0.4 },
+          ],
+        }),
+      );
+    });
+
     it("assigns tags atomically when tagIds are provided", async () => {
       queryRunnerManager.findOne.mockResolvedValue(null);
       queryRunnerManager.find.mockResolvedValue([{ id: "tag-1" }]);
@@ -595,6 +640,39 @@ describe("SecuritiesService", () => {
 
       expect(result.name).toBe("Apple Inc. Updated");
       expect(queryRunnerManager.save).toHaveBeenCalled();
+    });
+
+    it("normalizes a supplied asset allocation and clears it when emptied", async () => {
+      securitiesRepository.findOne.mockResolvedValue({
+        ...mockSecurity,
+        assetWeightings: [{ name: "Equity", weight: 1 }],
+      });
+
+      const updated = await service.update("user-1", "sec-1", {
+        assetWeightings: [{ name: "Cash", weight: 0.25 }],
+      });
+      expect(updated.assetWeightings).toEqual([{ name: "Cash", weight: 0.25 }]);
+
+      securitiesRepository.findOne.mockResolvedValue({
+        ...mockSecurity,
+        assetWeightings: [{ name: "Cash", weight: 0.25 }],
+      });
+      const cleared = await service.update("user-1", "sec-1", {
+        assetWeightings: [],
+      });
+      expect(cleared.assetWeightings).toBeNull();
+    });
+
+    it("leaves the asset allocation untouched when the field is omitted", async () => {
+      const existing = [{ name: "Equity", weight: 0.8 }];
+      securitiesRepository.findOne.mockResolvedValue({
+        ...mockSecurity,
+        assetWeightings: existing,
+      });
+
+      const result = await service.update("user-1", "sec-1", { name: "New" });
+
+      expect(result.assetWeightings).toEqual(existing);
     });
 
     it("throws ConflictException when updating to existing symbol", async () => {
@@ -1177,6 +1255,144 @@ describe("SecuritiesService", () => {
     });
   });
 
+  describe("getAssetOptions", () => {
+    const mockAssetQuery = (rows: { name: string | null }[]) => {
+      const getRawMany = jest.fn().mockResolvedValue(rows);
+      securitiesRepository.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany,
+      });
+      return getRawMany;
+    };
+
+    it("returns an empty list when the user has saved no asset classes", async () => {
+      mockAssetQuery([]);
+
+      expect(await service.getAssetOptions("user-1")).toEqual([]);
+    });
+
+    it("returns the user's saved classes alphabetically, de-duped case-insensitively", async () => {
+      mockAssetQuery([
+        { name: "Equity" },
+        { name: "  Cash  " },
+        { name: "equity" },
+        { name: "Other" }, // catch-all bucket, never offered
+        { name: "" },
+        { name: null },
+      ]);
+
+      const result = await service.getAssetOptions("user-1");
+
+      expect(result).toEqual(["Cash", "Equity"]);
+    });
+
+    it("scopes the query to the requesting user", async () => {
+      const where = jest.fn().mockReturnThis();
+      securitiesRepository.createQueryBuilder.mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        where,
+        andWhere: jest.fn().mockReturnThis(),
+        getRawMany: jest.fn().mockResolvedValue([]),
+      });
+
+      await service.getAssetOptions("user-1");
+
+      expect(where).toHaveBeenCalledWith("s.user_id = :userId", {
+        userId: "user-1",
+      });
+    });
+  });
+
+  describe("deleteAssetOption", () => {
+    // withScopedDb needs an ambient identity context, and it must be a UUID.
+    const userId = "11111111-1111-4111-8111-111111111111";
+    const runDelete = (name: string) =>
+      withUserContext(userId, () => service.deleteAssetOption(userId, name));
+
+    const mockOwnedSecurities = (securities: unknown[]) => {
+      scopedRepository.createQueryBuilder.mockReturnValue({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(securities),
+      });
+    };
+
+    it("removes the class from every security that uses it, leaving the rest", async () => {
+      mockOwnedSecurities([
+        {
+          id: "sec-1",
+          assetWeightings: [
+            { name: "Equity", weight: 0.6 },
+            { name: "Cash", weight: 0.1 },
+          ],
+        },
+        {
+          id: "sec-2",
+          assetWeightings: [{ name: "Bonds", weight: 0.4 }],
+        },
+      ]);
+
+      const result = await runDelete("Equity");
+
+      // The freed 60% is not re-apportioned: it becomes the computed "Other"
+      // remainder for sec-1, which now stores only its 10% cash slice.
+      expect(scopedRepository.update).toHaveBeenCalledTimes(1);
+      expect(scopedRepository.update).toHaveBeenCalledWith(
+        { id: "sec-1", userId },
+        { assetWeightings: [{ name: "Cash", weight: 0.1 }] },
+      );
+      expect(result).toEqual({ name: "Equity", removedFrom: 1 });
+    });
+
+    it("matches the name case- and whitespace-insensitively", async () => {
+      mockOwnedSecurities([
+        {
+          id: "sec-1",
+          assetWeightings: [{ name: "Fixed  Income", weight: 1 }],
+        },
+      ]);
+
+      const result = await runDelete("  fixed income ");
+
+      expect(scopedRepository.update).toHaveBeenCalledWith(
+        { id: "sec-1", userId },
+        { assetWeightings: null },
+      );
+      expect(result).toEqual({ name: "fixed income", removedFrom: 1 });
+    });
+
+    it("clears the column when the deleted class was the only slice", async () => {
+      mockOwnedSecurities([
+        { id: "sec-1", assetWeightings: [{ name: "Equity", weight: 0.5 }] },
+      ]);
+
+      await runDelete("Equity");
+
+      expect(scopedRepository.update).toHaveBeenCalledWith(
+        { id: "sec-1", userId },
+        { assetWeightings: null },
+      );
+    });
+
+    it("touches nothing when no security uses the class", async () => {
+      mockOwnedSecurities([
+        { id: "sec-1", assetWeightings: [{ name: "Cash", weight: 0.2 }] },
+      ]);
+
+      const result = await runDelete("Equity");
+
+      expect(scopedRepository.update).not.toHaveBeenCalled();
+      expect(result).toEqual({ name: "Equity", removedFrom: 0 });
+    });
+
+    it("rejects a blank name without touching the database", async () => {
+      await expect(runDelete("   ")).rejects.toThrow(BadRequestException);
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
+
   describe("resolveBySymbolOrName", () => {
     const secA = {
       ...mockSecurity,
@@ -1445,6 +1661,49 @@ describe("SecuritiesService", () => {
         service.normalizeAllocationWeightings([
           { name: "United States", weight: 0.7 },
           { name: "Canada", weight: 0.5 },
+        ]),
+      ).toThrow(BadRequestException);
+    });
+  });
+
+  describe("normalizeAssetWeightings", () => {
+    it("returns null for empty / undefined input", () => {
+      expect(service.normalizeAssetWeightings(undefined)).toBeNull();
+      expect(service.normalizeAssetWeightings([])).toBeNull();
+    });
+
+    it("keeps free-text names as typed, only tidying whitespace", () => {
+      const result = service.normalizeAssetWeightings([
+        { name: "  Fixed  Income ", weight: 0.4 },
+        { name: "Real Estate", weight: 0.1 },
+      ]);
+      expect(result).toEqual([
+        { name: "Fixed Income", weight: 0.4 },
+        { name: "Real Estate", weight: 0.1 },
+      ]);
+    });
+
+    it("sums names that differ only by case under the first spelling", () => {
+      const result = service.normalizeAssetWeightings([
+        { name: "Equity", weight: 0.5 },
+        { name: "equity", weight: 0.2 },
+      ]);
+      expect(result).toEqual([{ name: "Equity", weight: 0.7 }]);
+    });
+
+    it("drops an 'Other' slice so it folds into the computed remainder", () => {
+      const result = service.normalizeAssetWeightings([
+        { name: "Equity", weight: 0.6 },
+        { name: "Other", weight: 0.4 },
+      ]);
+      expect(result).toEqual([{ name: "Equity", weight: 0.6 }]);
+    });
+
+    it("throws when the weights total more than 100%", () => {
+      expect(() =>
+        service.normalizeAssetWeightings([
+          { name: "Equity", weight: 0.7 },
+          { name: "Cash", weight: 0.5 },
         ]),
       ).toThrow(BadRequestException);
     });

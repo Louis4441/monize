@@ -121,7 +121,8 @@
     "selectedCount": "{count} 선택됨"
   },
   "combobox": {
-    "createOption": "\"{value}\" 만들기"
+    "createOption": "\"{value}\" 만들기",
+    "deleteOption": "\"{value}\" 삭제"
   },
   "passwordInput": {
     "show": "입력 표시",

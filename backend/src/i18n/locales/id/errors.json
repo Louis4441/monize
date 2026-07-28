@@ -392,7 +392,8 @@
     "lookupNoCurrency": "Tidak dapat menentukan mata uang untuk \"{{ symbol }}\". Tambahkan sekuritas secara manual sebagai gantinya.",
     "noUpdateFields": "Berikan setidaknya satu kolom untuk diubah.",
     "allocationExceedsTotal": "Persentase alokasi berjumlah lebih dari 100%.",
-    "invalidTagKey": "Kunci tag (1-100 karakter) diperlukan"
+    "invalidTagKey": "Kunci tag (1-100 karakter) diperlukan",
+    "assetOptionNameRequired": "Nama kelas aset wajib diisi."
   },
   "tags": {
     "notFound": "Tag dengan ID {{ id }} tidak ditemukan",

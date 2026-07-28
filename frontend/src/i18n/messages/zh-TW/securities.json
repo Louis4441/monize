@@ -182,6 +182,19 @@
       "overError": "配置總和超過 100%。",
       "nameAriaLabel": "國家/地區",
       "weightAriaLabel": "百分比"
+    },
+    "assetAllocation": {
+      "sectionTitle": "資產類別配置",
+      "help": "報價提供商不提供 ETF 和基金的資產類別曝險。請以百分比手動新增——可輸入任意名稱，之後在你的其他證券上也能選用。低於 100% 的部分將顯示為「其他」。",
+      "placeholder": "選擇或輸入資產類別",
+      "addRow": "新增資產類別",
+      "nameAriaLabel": "資產類別",
+      "deleteOption": "刪除資產類別",
+      "deleteTitle": "刪除資產類別？",
+      "deleteMessage": "「{name}」將從你的清單以及所有使用它的證券中移除。這些證券會保留其餘的配置，釋出的百分比將計入「其他」。",
+      "deleteConfirm": "刪除",
+      "deleteSuccess": "已刪除資產類別「{name}」",
+      "deleteFailed": "無法刪除資產類別「{name}」"
     }
   },
   "priceForm": {

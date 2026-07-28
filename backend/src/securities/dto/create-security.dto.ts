@@ -149,4 +149,19 @@ export class CreateSecurityDto {
   @ValidateNested({ each: true })
   @Type(() => AllocationWeightDto)
   countryWeightings?: AllocationWeightDto[];
+
+  @ApiProperty({
+    description:
+      "Manual asset-class allocation for ETFs/funds: [{name, weight}] where " +
+      "weight is a decimal 0-1 and name is free text. Slices need not sum to " +
+      "1.0 (the remainder is 'Other').",
+    required: false,
+    type: [AllocationWeightDto],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(60)
+  @ValidateNested({ each: true })
+  @Type(() => AllocationWeightDto)
+  assetWeightings?: AllocationWeightDto[];
 }

@@ -49,6 +49,14 @@ interface ComboboxProps {
   valueIsId?: boolean;
   /** Accessible name for the input when there is no visible `label`. */
   'aria-label'?: string;
+  /**
+   * When set, each option row gets a delete control that calls this instead of
+   * selecting the option. For lists the user owns (e.g. free-text asset
+   * classes) -- the parent performs the deletion and refreshes `options`.
+   */
+  onDeleteOption?: (value: string, label: string) => void;
+  /** Accessible name for the per-option delete control. */
+  deleteOptionAriaLabel?: string;
 }
 
 export function Combobox({
@@ -69,6 +77,8 @@ export function Combobox({
   openOnFocus = true,
   valueIsId = false,
   'aria-label': ariaLabel,
+  onDeleteOption,
+  deleteOptionAriaLabel,
 }: ComboboxProps) {
   const t = useTranslations('common');
   const [isOpen, setIsOpen] = useState(false);
@@ -509,7 +519,8 @@ export function Combobox({
             data-option-index={optionIndex}
             onClick={() => handleSelectOption(option)}
             className={cn(
-              'cursor-pointer select-none relative py-2 pl-3 pr-9',
+              'cursor-pointer select-none relative py-2 pl-3',
+              onDeleteOption ? 'pr-16' : 'pr-9',
               isHighlighted ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-blue-50 dark:hover:bg-blue-900/50',
               isSelected && !isHighlighted && 'bg-blue-50 dark:bg-blue-900/30'
             )}
@@ -539,8 +550,49 @@ export function Combobox({
                 );
               })()}
             </div>
+            {onDeleteOption && (
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label={
+                  deleteOptionAriaLabel
+                    ? `${deleteOptionAriaLabel}: ${option.label}`
+                    : t('combobox.deleteOption', { value: option.label })
+                }
+                title={
+                  deleteOptionAriaLabel ??
+                  t('combobox.deleteOption', { value: option.label })
+                }
+                // Delete instead of select: mousedown is where the row's click
+                // would otherwise begin, so stop it there as well.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsOpen(false);
+                  onDeleteOption(option.value, option.label);
+                }}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2h12a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM5 8a1 1 0 012 0v7a1 1 0 11-2 0V8zm4-1a1 1 0 00-1 1v7a1 1 0 102 0V8a1 1 0 00-1-1zm4 1a1 1 0 112 0v7a1 1 0 11-2 0V8z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            )}
             {isSelected && (
-              <span className="absolute inset-y-0 right-0 flex items-center pr-4 text-blue-600 dark:text-blue-400">
+              <span
+                className={cn(
+                  'absolute inset-y-0 flex items-center text-blue-600 dark:text-blue-400',
+                  onDeleteOption ? 'right-8 pr-1' : 'right-0 pr-4',
+                )}
+              >
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>

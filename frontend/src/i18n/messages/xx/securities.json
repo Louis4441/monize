@@ -182,6 +182,19 @@
       "overError": "[XX-Allocation adds up to more than 100%.-XX]",
       "nameAriaLabel": "[XX-Country-XX]",
       "weightAriaLabel": "[XX-Percentage-XX]"
+    },
+    "assetAllocation": {
+      "sectionTitle": "[XX-Asset Allocation-XX]",
+      "help": "[XX-Price providers don't supply asset-class exposure for ETFs and funds. Add it manually as percentages -- type any class name you like and it is offered on your other securities afterwards. Anything under 100% is shown as \"Other\".-XX]",
+      "placeholder": "[XX-Select or type an asset class-XX]",
+      "addRow": "[XX-Add asset class-XX]",
+      "nameAriaLabel": "[XX-Asset class-XX]",
+      "deleteOption": "[XX-Delete asset class-XX]",
+      "deleteTitle": "[XX-Delete asset class?-XX]",
+      "deleteMessage": "[XX-\"{name}\" will be removed from your list and from every security that uses it. Those securities keep the rest of their allocation, and the freed percentage becomes \"Other\".-XX]",
+      "deleteConfirm": "[XX-Delete-XX]",
+      "deleteSuccess": "[XX-Deleted asset class \"{name}\"-XX]",
+      "deleteFailed": "[XX-Could not delete asset class \"{name}\"-XX]"
     }
   },
   "priceForm": {

@@ -57,6 +57,44 @@ describe('AllocationEditor', () => {
     expect(onChange).toHaveBeenCalledWith([{ name: 'Canada', weight: '25' }]);
   });
 
+  it('uses the caller-supplied add-row and name labels when given', () => {
+    render(
+      <AllocationEditor
+        value={[{ name: 'Equity', weight: '60' }]}
+        onChange={vi.fn()}
+        options={[{ value: 'Equity', label: 'Equity' }]}
+        namePlaceholder="Select or type an asset class"
+        addRowLabel="Add asset class"
+        nameAriaLabel="Asset class"
+      />,
+    );
+    expect(screen.getByText('Add asset class')).toBeInTheDocument();
+    expect(screen.getByLabelText('Asset class')).toBeInTheDocument();
+  });
+
+  it('reports a deleted option from the name dropdown to the caller', () => {
+    const onDeleteOption = vi.fn();
+    render(
+      <AllocationEditor
+        value={[{ name: 'Equity', weight: '60' }]}
+        onChange={vi.fn()}
+        options={[
+          { value: 'Equity', label: 'Equity' },
+          { value: 'Cash', label: 'Cash' },
+        ]}
+        namePlaceholder="Select or type an asset class"
+        nameAriaLabel="Asset class"
+        onDeleteOption={onDeleteOption}
+        deleteOptionAriaLabel="Delete asset class"
+      />,
+    );
+
+    fireEvent.focus(screen.getByLabelText('Asset class'));
+    fireEvent.click(screen.getByLabelText('Delete asset class: Cash'));
+
+    expect(onDeleteOption).toHaveBeenCalledWith('Cash');
+  });
+
   it('emits the new weight when the percentage input changes', () => {
     const onChange = renderEditor([{ name: 'United States', weight: '60' }]);
     fireEvent.change(screen.getByLabelText('Percentage'), {

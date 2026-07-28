@@ -121,7 +121,8 @@
     "selectedCount": "Wybrano {count}"
   },
   "combobox": {
-    "createOption": "Utwórz \"{value}\""
+    "createOption": "Utwórz \"{value}\"",
+    "deleteOption": "Usuń „{value}”"
   },
   "passwordInput": {
     "show": "Pokaż treść",

@@ -32,6 +32,8 @@ export interface Security {
   sectorWeightings: { sector: string; weight: number }[] | null;
   /** Manual ETF/fund country breakdown; weight is a decimal 0-1 (like sectorWeightings). */
   countryWeightings: { name: string; weight: number }[] | null;
+  /** Manual ETF/fund asset-class breakdown (free-text names); weight is a decimal 0-1. */
+  assetWeightings: { name: string; weight: number }[] | null;
   quoteProvider: QuoteProviderName | null;
   msnInstrumentId: string | null;
   /** Source of the most recent price row for this security (e.g. "yahoo_finance", "msn_finance", "manual"), or null if no prices exist. */
@@ -267,6 +269,8 @@ export interface CreateSecurityData {
   isFavourite?: boolean;
   /** Manual ETF/fund country breakdown; weight is a decimal 0-1 (like sectorWeightings). */
   countryWeightings?: { name: string; weight: number }[];
+  /** Manual ETF/fund asset-class breakdown (free-text names); weight is a decimal 0-1. */
+  assetWeightings?: { name: string; weight: number }[];
 }
 
 /** A favourite security decorated with its latest price and daily change. */

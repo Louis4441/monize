@@ -21,6 +21,18 @@ interface AllocationEditorProps {
   options: { value: string; label: string }[];
   /** Placeholder for the name combobox. */
   namePlaceholder: string;
+  /** Label for the "add a row" button. Defaults to the country wording. */
+  addRowLabel?: string;
+  /** Accessible name for the name combobox. Defaults to the country wording. */
+  nameAriaLabel?: string;
+  /**
+   * When set, each option in the name dropdown gets a delete control wired to
+   * this callback -- for lists the user owns (free-text asset classes) rather
+   * than a canonical list (countries).
+   */
+  onDeleteOption?: (name: string) => void;
+  /** Accessible name for the per-option delete control. */
+  deleteOptionAriaLabel?: string;
 }
 
 const parseWeight = (raw: string): number => {
@@ -41,6 +53,10 @@ export function AllocationEditor({
   onChange,
   options,
   namePlaceholder,
+  addRowLabel,
+  nameAriaLabel,
+  onDeleteOption,
+  deleteOptionAriaLabel,
 }: AllocationEditorProps) {
   const t = useTranslations('securities');
 
@@ -98,7 +114,13 @@ export function AllocationEditor({
                 placeholder={namePlaceholder}
                 allowCustomValue
                 usePortal
-                aria-label={t('form.allocation.nameAriaLabel')}
+                aria-label={nameAriaLabel ?? t('form.allocation.nameAriaLabel')}
+                onDeleteOption={
+                  onDeleteOption
+                    ? (optionValue, label) => onDeleteOption(optionValue || label)
+                    : undefined
+                }
+                deleteOptionAriaLabel={deleteOptionAriaLabel}
               />
             </div>
             <div className="w-28">
@@ -150,7 +172,7 @@ export function AllocationEditor({
         className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
       >
         <PlusIcon className="h-4 w-4" />
-        {t('form.allocation.addRow')}
+        {addRowLabel ?? t('form.allocation.addRow')}
       </button>
     </div>
   );

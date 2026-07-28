@@ -182,6 +182,19 @@
       "overError": "La asignación suma más del 100 %.",
       "nameAriaLabel": "País",
       "weightAriaLabel": "Porcentaje"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Asignación por clase de activo",
+      "help": "Los proveedores de cotizaciones no ofrecen la exposición por clase de activo de los ETF y fondos. Añádela manualmente en porcentajes: escribe el nombre que quieras y quedará disponible en tus demás valores. Todo lo que quede por debajo del 100 % se muestra como «Otros».",
+      "placeholder": "Selecciona o escribe una clase de activo",
+      "addRow": "Añadir clase de activo",
+      "nameAriaLabel": "Clase de activo",
+      "deleteOption": "Eliminar clase de activo",
+      "deleteTitle": "¿Eliminar la clase de activo?",
+      "deleteMessage": "«{name}» se eliminará de tu lista y de todos los valores que la usan. Esos valores conservan el resto de su asignación y el porcentaje liberado pasa a «Otros».",
+      "deleteConfirm": "Eliminar",
+      "deleteSuccess": "Clase de activo «{name}» eliminada",
+      "deleteFailed": "No se pudo eliminar la clase de activo «{name}»"
     }
   },
   "priceForm": {

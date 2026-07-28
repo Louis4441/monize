@@ -121,7 +121,8 @@
     "selectedCount": "{count} seleccionados"
   },
   "combobox": {
-    "createOption": "Crear \"{value}\""
+    "createOption": "Crear \"{value}\"",
+    "deleteOption": "Eliminar «{value}»"
   },
   "passwordInput": {
     "show": "Mostrar entrada",

@@ -373,6 +373,26 @@ export const investmentsApi = {
     return response.data;
   },
 
+  // Asset-class names for the manual ETF/fund allocation picker: exactly the
+  // free-text classes the user has already saved on a security.
+  getAssetOptions: async (): Promise<string[]> => {
+    const response = await apiClient.get<string[]>('/securities/asset-options');
+    return response.data;
+  },
+
+  // Remove an asset class from the picker list. It is also dropped from every
+  // security that used it; the freed weight becomes part of that security's
+  // computed "Other" remainder rather than being re-apportioned.
+  deleteAssetOption: async (
+    name: string,
+  ): Promise<{ name: string; removedFrom: number }> => {
+    const response = await apiClient.delete<{ name: string; removedFrom: number }>(
+      '/securities/asset-options',
+      { params: { name } },
+    );
+    return response.data;
+  },
+
   // Create security
   createSecurity: async (data: CreateSecurityData): Promise<Security> => {
     const response = await apiClient.post<Security>('/securities', data);

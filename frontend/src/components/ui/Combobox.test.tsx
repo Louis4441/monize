@@ -1434,4 +1434,48 @@ describe('Combobox', () => {
       expect(onChange).not.toHaveBeenCalledWith('', 'Unknown');
     });
   });
+
+  describe('deletable options', () => {
+    it('renders no delete control unless onDeleteOption is given', () => {
+      render(<Combobox options={options} onChange={onChange} />);
+      fireEvent.focus(screen.getByRole('textbox'));
+      expect(screen.queryByLabelText(/Delete/)).not.toBeInTheDocument();
+    });
+
+    it('deletes the option instead of selecting it', () => {
+      const onDeleteOption = vi.fn();
+      render(
+        <Combobox
+          options={options}
+          onChange={onChange}
+          onDeleteOption={onDeleteOption}
+        />,
+      );
+      fireEvent.focus(screen.getByRole('textbox'));
+
+      fireEvent.click(screen.getByLabelText('Delete "Banana"'));
+
+      expect(onDeleteOption).toHaveBeenCalledWith('2', 'Banana');
+      // The row's own click handler must not also fire.
+      expect(onChange).not.toHaveBeenCalled();
+      // The dropdown closes so the stale list is not left on screen.
+      expect(screen.queryByText('Cherry')).not.toBeInTheDocument();
+    });
+
+    it('uses the caller label for the delete control when provided', () => {
+      render(
+        <Combobox
+          options={options}
+          onChange={onChange}
+          onDeleteOption={vi.fn()}
+          deleteOptionAriaLabel="Delete asset class"
+        />,
+      );
+      fireEvent.focus(screen.getByRole('textbox'));
+
+      expect(
+        screen.getByLabelText('Delete asset class: Banana'),
+      ).toBeInTheDocument();
+    });
+  });
 });

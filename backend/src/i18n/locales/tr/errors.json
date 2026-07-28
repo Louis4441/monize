@@ -392,7 +392,8 @@
     "lookupNoCurrency": "\"{{ symbol }}\" için para birimi belirlenemedi. Bunun yerine menkul kıymeti elle ekleyin.",
     "noUpdateFields": "Değiştirmek için en az bir alan girin.",
     "allocationExceedsTotal": "Tahsis yüzdeleri toplamı %100'ü aşıyor.",
-    "invalidTagKey": "Bir etiket anahtarı (1-100 karakter) gereklidir"
+    "invalidTagKey": "Bir etiket anahtarı (1-100 karakter) gereklidir",
+    "assetOptionNameRequired": "Varlık sınıfı adı gerekli."
   },
   "tags": {
     "notFound": "{{ id }} kimliğine sahip etiket bulunamadı",
