@@ -169,21 +169,22 @@ describe('GroupedHoldingsList', () => {
     ).toBeInTheDocument();
   });
 
-  it('calls onSymbolClick when symbol button is clicked', () => {
-    const onSymbolClick = vi.fn();
+  it('reports the clicked holding by security id', () => {
+    const onSecurityClick = vi.fn();
     const holdingsByAccount = [
       {
         accountId: 'a1', accountName: 'RRSP', currencyCode: 'CAD',
         totalMarketValue: 500, totalCostBasis: 400, totalGainLoss: 100,
         totalGainLossPercent: 25, cashBalance: 0,
         holdings: [
-          { id: 'h1', symbol: 'XEQT', name: 'iShares', quantity: 10, averageCost: 40, currentPrice: 50, costBasis: 400, costBasisAccountCurrency: 400, marketValue: 500, gainLoss: 100, gainLossPercent: 25, currencyCode: 'CAD' },
+          { id: 'h1', securityId: 'sec-xeqt', symbol: 'XEQT', name: 'iShares', quantity: 10, averageCost: 40, currentPrice: 50, costBasis: 400, costBasisAccountCurrency: 400, marketValue: 500, gainLoss: 100, gainLossPercent: 25, currencyCode: 'CAD' },
         ],
       },
     ] as any[];
-    render(<GroupedHoldingsList holdingsByAccount={holdingsByAccount} isLoading={false} totalPortfolioValue={500} onSymbolClick={onSymbolClick} />);
+    render(<GroupedHoldingsList holdingsByAccount={holdingsByAccount} isLoading={false} totalPortfolioValue={500} onSecurityClick={onSecurityClick} />);
     fireEvent.click(screen.getByText('XEQT'));
-    expect(onSymbolClick).toHaveBeenCalledWith('XEQT');
+    // The id, not the symbol: the destination is that security's own page.
+    expect(onSecurityClick).toHaveBeenCalledWith('sec-xeqt');
   });
 
   it('calls onCashClick when Cash button is clicked', () => {

@@ -472,9 +472,11 @@ export function useInvestmentData() {
   const hasActiveCashFilters = cashFilterPayeeIds.length > 0 || cashFilterCategoryIds.length > 0 || !!cashFilterStartDate || !!cashFilterEndDate;
   const activeCashFilterCount = (cashFilterPayeeIds.length > 0 ? 1 : 0) + (cashFilterCategoryIds.length > 0 ? 1 : 0) + (cashFilterStartDate ? 1 : 0) + (cashFilterEndDate ? 1 : 0);
 
-  const handleSymbolClick = (symbol: string) => {
-    setTransactionFilters({ ...transactionFilters, symbol });
-    setCurrentPage(1);
+  // Clicking a holding opens that security's detail page (review of discussion
+  // #964). It used to filter the transaction list by symbol instead; the filters
+  // above that list still do that, and the page is the more useful destination.
+  const handleSecurityClick = (securityId: string) => {
+    router.push(`/securities/${securityId}`);
   };
 
   const handleCashClick = (cashAccountId: string) => {
@@ -520,7 +522,7 @@ export function useInvestmentData() {
     transactions, pagination, currentPage,
     transactionFilters, handleFiltersChange,
     handleDeleteTransaction, handleNewTransaction, handleEditTransaction, handleFormSuccess,
-    handleSymbolClick, goToPage,
+    handleSecurityClick, goToPage,
 
     // Transaction form modal
     showTransactionForm, editingTransaction,

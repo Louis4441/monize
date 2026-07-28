@@ -137,5 +137,14 @@
     "noPricesHint": "Add a price manually, or update prices from the provider.",
     "noTransactions": "No transactions yet",
     "noAccounts": "This security is not held in any account."
+  },
+  "weightings": {
+    "sectorTitle": "Sector breakdown",
+    "countryTitle": "Country breakdown",
+    "assetClassTitle": "Asset class breakdown",
+    "sectorEmpty": "No sector breakdown is stored for this security. Monize fills this in from the provider for funds and ETFs.",
+    "countryEmpty": "No country breakdown is stored. You can enter one when editing the security.",
+    "assetClassEmpty": "No asset class breakdown is stored yet.",
+    "remainder": "{percent} unclassified"
   }
 }

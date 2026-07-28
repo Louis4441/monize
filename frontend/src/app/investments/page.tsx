@@ -279,7 +279,7 @@ function InvestmentsContent() {
               holdingsByAccount={data.portfolioSummary?.holdingsByAccount || []}
               isLoading={data.isLoading}
               totalPortfolioValue={data.portfolioSummary?.totalPortfolioValue || 0}
-              onSymbolClick={data.handleSymbolClick}
+              onSecurityClick={data.handleSecurityClick}
               onCashClick={data.handleCashClick}
             />
           </div>

@@ -328,11 +328,42 @@ describe('SecurityDetailPage', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('gives Overview the two full-width sections', async () => {
+    it('gives Overview the description, the figures and the tables', async () => {
       await renderPage();
-      expect(screen.getByRole('heading', { name: 'About' })).toBeInTheDocument();
+      for (const name of [
+        'About',
+        'Performance',
+        'Position info',
+        'Sector breakdown',
+        'Country breakdown',
+        'Accounts',
+      ]) {
+        expect(screen.getByRole('heading', { name })).toBeInTheDocument();
+      }
+    });
+
+    it('surfaces the sector breakdown the provider supplies', async () => {
+      mockGetSecurityDetail.mockResolvedValue(
+        detailFixture({
+          security: {
+            ...security,
+            sectorWeightings: [
+              { sector: 'Technology', weight: 0.324 },
+              { sector: 'Financials', weight: 0.181 },
+            ],
+          },
+        }),
+      );
+      await renderPage();
+
+      // Until now the only place this data surfaced was a portfolio-wide report.
+      // Asserted via the bar's own label, since "Technology" is also this
+      // security's single sector in Key information and About.
       expect(
-        screen.getByRole('heading', { name: 'Accounts' }),
+        screen.getByRole('img', { name: 'Technology: 32.40%' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('img', { name: 'Financials: 18.10%' }),
       ).toBeInTheDocument();
     });
 
@@ -350,16 +381,18 @@ describe('SecurityDetailPage', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('keeps the cards beside the chart visible whichever tab is open', async () => {
+    it('keeps Key information visible whichever tab is open', async () => {
       await renderPage();
       await act(async () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Transactions' }));
       });
-      // They sit above the tabs, not inside Overview, so switching tab does not
-      // take the key figures off the screen.
-      for (const name of ['Key information', 'Performance', 'Position info']) {
-        expect(screen.getByRole('heading', { name })).toBeInTheDocument();
-      }
+      // It sits beside the chart, above the tabs, so switching tab does not take
+      // the instrument's identity off the screen. Performance and Position info
+      // are inside Overview and do go with it.
+      expect(
+        screen.getByRole('heading', { name: 'Key information' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Performance' })).toBeNull();
     });
   });
 

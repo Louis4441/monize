@@ -447,13 +447,15 @@ describe('useInvestmentData – pagination, filters, handlers', () => {
     expect(result.current.currentPage).toBe(1);
   });
 
-  it('handleSymbolClick sets symbol filter and resets page', async () => {
+  it('handleSecurityClick opens the security detail page', async () => {
     const { result } = renderHook(() => useInvestmentData(), { wrapper });
     await act(async () => { await new Promise(res => setTimeout(res, 0)); });
     await act(async () => {
-      result.current.handleSymbolClick('AAPL');
+      result.current.handleSecurityClick('sec-1');
     });
-    expect(result.current.transactionFilters.symbol).toBe('AAPL');
+    // It used to filter the transaction list by symbol; the detail page is the
+    // more useful destination, and the list's own filters still cover filtering.
+    expect(mockRouterPush).toHaveBeenCalledWith('/securities/sec-1');
   });
 
   it('handleFiltersChange updates filter and resets page', async () => {

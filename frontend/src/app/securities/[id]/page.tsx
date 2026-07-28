@@ -20,6 +20,7 @@ import { SecurityAboutCard } from '@/components/securities/detail/SecurityAboutC
 import { SecurityPerformanceCard } from '@/components/securities/detail/SecurityPerformanceCard';
 import { SecurityPositionInfoCard } from '@/components/securities/detail/SecurityPositionInfoCard';
 import { SecurityAccountsTable } from '@/components/securities/detail/SecurityAccountsTable';
+import { SecurityWeightingsCard } from '@/components/securities/detail/SecurityWeightingsCard';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { investmentsApi } from '@/lib/investments';
@@ -277,10 +278,19 @@ function SecurityDetailContent() {
         />
 
         <div className="space-y-6">
-          {/* The chart leads: it is what the page is for, and it is the one
-              element whose height is fixed. Two thirds chart, one third a stack
-              of three compact cards; `items-start` keeps each card at its
-              content height rather than stretching it to the chart's. */}
+          {/* Zero-filled cards would claim a position that is not there, so a
+              closed or never-held security gets its own panel instead. */}
+          {detail.accounts.length > 0 ? (
+            <SecuritySummaryCards detail={detail} />
+          ) : (
+            <SecurityPositionState detail={detail} />
+          )}
+
+          {/* Two thirds chart, one third Key information. The column stays a
+              single card: the breakdowns and the position totals live in
+              Overview, where they have the width to be read. `items-start` keeps
+              the card at its content height rather than stretching it to the
+              chart's. */}
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <SecurityChartSection
@@ -293,30 +303,13 @@ function SecurityDetailContent() {
                 onModeChange={setChartMode}
               />
             </div>
-            <div className="space-y-6">
-              <SecurityKeyInformation
-                security={security}
-                latestPrice={
-                  quote
-                    ? { price: quote.price, priceDate: quote.priceDate }
-                    : null
-                }
-              />
-              <SecurityPerformanceCard prices={priceSeries} />
-              <SecurityPositionInfoCard detail={detail} />
-            </div>
+            <SecurityKeyInformation
+              security={security}
+              latestPrice={
+                quote ? { price: quote.price, priceDate: quote.priceDate } : null
+              }
+            />
           </div>
-
-          {/* The position's key figures sit in the gap between the chart and the
-              tables, which puts everything that matters on one 1080p screen and
-              leaves the tables to be scrolled to. Zero-filled cards would claim
-              a position that is not there, so a closed or never-held security
-              gets its own panel here instead. */}
-          {detail.accounts.length > 0 ? (
-            <SecuritySummaryCards detail={detail} />
-          ) : (
-            <SecurityPositionState detail={detail} />
-          )}
 
           <div>
             <Tabs
@@ -333,10 +326,46 @@ function SecurityDetailContent() {
               isActive={tab === 'overview'}
               className="mt-6 space-y-6"
             >
-              {/* Performance and Position info moved up beside the chart, so
-                  Overview is the two things that want the full width: the prose
-                  description, and the per-account table. */}
-              <SecurityAboutCard security={security} />
+              {/* `items-start`: the three cards hold different amounts, and
+                  stretching the short ones just pads them with blank space. */}
+              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-5">
+                <div className="lg:col-span-2">
+                  <SecurityAboutCard security={security} />
+                </div>
+                <div className="lg:col-span-1">
+                  <SecurityPerformanceCard prices={priceSeries} />
+                </div>
+                <div className="lg:col-span-2">
+                  <SecurityPositionInfoCard detail={detail} />
+                </div>
+              </div>
+
+              {/* What the instrument is made of. Monize already stores both
+                  breakdowns -- sector from the provider, country by hand -- and
+                  until now surfaced sectors only in a portfolio-wide report. An
+                  asset-class breakdown joins them once that field exists. */}
+              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+                <SecurityWeightingsCard
+                  title={t('weightings.sectorTitle')}
+                  slices={security.sectorWeightings?.map((entry) => ({
+                    name: entry.sector,
+                    weight: entry.weight,
+                  }))}
+                  emptyMessage={t('weightings.sectorEmpty')}
+                  remainderLabel={(percent) =>
+                    t('weightings.remainder', { percent })
+                  }
+                />
+                <SecurityWeightingsCard
+                  title={t('weightings.countryTitle')}
+                  slices={security.countryWeightings}
+                  emptyMessage={t('weightings.countryEmpty')}
+                  remainderLabel={(percent) =>
+                    t('weightings.remainder', { percent })
+                  }
+                />
+              </div>
+
               <SecurityAccountsTable detail={detail} />
             </TabPanel>
 
