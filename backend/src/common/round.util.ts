@@ -52,16 +52,6 @@ export function roundToDecimals(value: number, decimalPlaces: number): number {
 export const MONEY_DECIMALS = 4;
 
 /**
- * Number of decimal places share quantities are stored at
- * (`holdings.quantity` is `decimal(20,8)`).
- *
- * Deliberately finer than money: a crypto or fractional-share position carries
- * real digits past the fourth, and rounding a quantity to the money precision
- * silently discards them.
- */
-export const QUANTITY_DECIMALS = 8;
-
-/**
  * Round a monetary value to the canonical storage precision (4 decimals).
  *
  * This is the single helper every service should use for money rounding,
@@ -102,22 +92,6 @@ export function toMoneyNumber(value: unknown): number {
  */
 export function sumMoney(values: number[]): number {
   const scale = 10 ** MONEY_DECIMALS;
-  const totalUnits = values.reduce((sum, v) => {
-    if (!isFinite(v)) return sum;
-    return sum + Math.round(v * scale);
-  }, 0);
-  return totalUnits / scale;
-}
-
-/**
- * Sum share quantities the same drift-free way `sumMoney` sums money, but at
- * the 8dp quantity precision.
- *
- * Summing quantities with `sumMoney` looks harmless and is not: it rounds each
- * term to 4dp, so 0.00000001 BTC held in two accounts totals zero.
- */
-export function sumQuantity(values: number[]): number {
-  const scale = 10 ** QUANTITY_DECIMALS;
   const totalUnits = values.reduce((sum, v) => {
     if (!isFinite(v)) return sum;
     return sum + Math.round(v * scale);

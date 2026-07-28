@@ -1,82 +1,75 @@
 import { Injectable } from "@nestjs/common";
-import { DataSource } from "typeorm";
-import { withScopedDb } from "../common/db/scoped-db";
-import {
-  roundMoney,
-  roundToDecimals,
-  sumMoney,
-  sumQuantity,
-} from "../common/round.util";
-import { UserPreference } from "../users/entities/user-preference.entity";
+import { roundMoney, roundToDecimals, sumMoney } from "../common/round.util";
 import { Security } from "./entities/security.entity";
 import { InvestmentAction } from "./entities/investment-transaction.entity";
 import { SecuritiesService } from "./securities.service";
 import { PortfolioService } from "./portfolio.service";
-import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import {
   InvestmentTransactionsService,
   SecurityHistoryTransaction,
 } from "./investment-transactions.service";
 
 /**
- * The position in one account holding this security. Money comes in two
- * currencies because a security has a single quote currency but can be held in
- * an account denominated in another: the security's own currency is what the
- * price and average cost are quoted in, the account's is what the holder's
- * statement shows. The detail page renders both (discussion #964).
+ * The position in one account holding this security.
+ *
+ * Every monetary field is in the **security's own currency** -- the currency its
+ * price and average cost are quoted in -- except `costBasisAccountCurrency`,
+ * which is the portfolio's historical-rate conversion and is named for it. This
+ * service deliberately converts nothing itself: FX belongs to the portfolio
+ * calculation, and a second conversion path here produced figures that
+ * disagreed with the Portfolio page and, worse, a gain whose amount and
+ * percentage could carry opposite signs.
  */
 export interface SecurityDetailAccountPosition {
   accountId: string;
   accountName: string;
-  accountCurrencyCode: string;
+  accountCurrencyCode: string | null;
+  /** True for a position still held in an account the user has closed. */
   isClosed: boolean;
+  /** Exact share balance, un-snapped, as the transaction history reports it. */
   quantity: number;
   /** Average cost per unit, in the security's currency. */
-  averageCost: number;
+  averageCost: number | null;
   /** Cost basis in the security's currency. */
-  costBasis: number;
+  costBasis: number | null;
   /**
    * Cost basis in the account's currency, from the historical rates on the buy
-   * legs (not a current-rate conversion) -- reused verbatim from the portfolio
-   * calculation so the two screens agree.
+   * legs. Taken verbatim from the portfolio calculation, so it matches what the
+   * Portfolio page shows.
    */
-  costBasisAccountCurrency: number;
-  /** Market value in the security's currency; null when no price is known. */
+  costBasisAccountCurrency: number | null;
+  /** Market value in the security's currency; null when it cannot be known. */
   marketValue: number | null;
-  /** Market value converted to the account's currency at the current rate. */
-  marketValueAccountCurrency: number | null;
-  /** Unrealized gain in the security's currency. */
   gainLoss: number | null;
-  /** Unrealized gain in the account's currency. */
-  gainLossAccountCurrency: number | null;
-  gainLossPercent: number | null;
-}
-
-/** The aggregate position across every account, for the summary cards. */
-export interface SecurityDetailPosition {
-  quantity: number;
-  /** Quantity-weighted average cost per unit, in the security's currency. */
-  averageCost: number;
-  /** Latest known price, in the security's currency. */
-  currentPrice: number | null;
-  costBasis: number;
-  costBasisDefaultCurrency: number;
-  marketValue: number | null;
-  marketValueDefaultCurrency: number | null;
-  gainLoss: number | null;
-  gainLossDefaultCurrency: number | null;
   gainLossPercent: number | null;
 }
 
 /**
- * Lifetime activity totals for the Position info card. All amounts are in the
- * security's currency, matching how the existing transaction-history modal
- * renders each row's `totalAmount`.
+ * The aggregate position across every account, for the summary cards. All
+ * amounts are in the security's currency, so they add up without conversion.
+ */
+export interface SecurityDetailPosition {
+  /** Exact total share balance, including any held in closed accounts. */
+  quantity: number;
+  /** Quantity-weighted average cost per unit, in the security's currency. */
+  averageCost: number | null;
+  currentPrice: number | null;
+  costBasis: number | null;
+  marketValue: number | null;
+  gainLoss: number | null;
+  gainLossPercent: number | null;
+}
+
+/**
+ * Lifetime activity totals for the Position info card. Amounts are in the
+ * security's currency, matching how the transaction table renders each row --
+ * except `realizedGain`, which the canonical replay denominates in the holding
+ * account's currency and which therefore travels with its own currency code.
  */
 export interface SecurityDetailActivity {
   firstTransactionDate: string | null;
   lastTransactionDate: string | null;
-  /** Cash paid in on BUY legs, commission included. */
+  /** Cost of every acquiring leg (buys, reinvestments, transfers in). */
   totalInvested: number;
   /** Cash taken out on SELL legs, commission deducted. */
   totalSold: number;
@@ -84,15 +77,19 @@ export interface SecurityDetailActivity {
   dividends: number;
   /** Commission across every leg. */
   fees: number;
-  /** Realized gain from the average-cost replay, this security only. */
-  realizedGain: number;
+  /**
+   * Realized gain from the average-cost replay, this security only, in
+   * `realizedGainCurrency`. Null when the security was sold from accounts of
+   * more than one currency: those gains are not addable, and their raw sum
+   * would be a number in no currency at all.
+   */
+  realizedGain: number | null;
+  realizedGainCurrency: string | null;
   transactionCount: number;
 }
 
 export interface SecurityDetail {
   security: Security;
-  /** The user's reporting currency, for the aggregate `*DefaultCurrency` fields. */
-  defaultCurrency: string;
   position: SecurityDetailPosition;
   accounts: SecurityDetailAccountPosition[];
   activity: SecurityDetailActivity;
@@ -102,9 +99,22 @@ export interface SecurityDetail {
   isPositionClosed: boolean;
 }
 
-/** Actions whose `totalAmount` is money paid to acquire shares. */
-const INVESTED_ACTIONS: ReadonlySet<InvestmentAction> = new Set([
+/** One realized-gain entry, narrowed to the fields this service reads. */
+interface RealizedGainRow {
+  securityId: string;
+  realizedGain: number;
+  accountCurrencyCode: string | null;
+}
+
+/**
+ * Actions that acquire shares, and so contribute to what was invested. Mirrors
+ * the set the canonical average-cost replay adds to cost basis, so "total
+ * invested" cannot read 0.00 beside a non-zero cost basis on the same card.
+ */
+const ACQUIRING_ACTIONS: ReadonlySet<InvestmentAction> = new Set([
   InvestmentAction.BUY,
+  InvestmentAction.REINVEST,
+  InvestmentAction.TRANSFER_IN,
 ]);
 
 /** Actions whose `totalAmount` is income rather than a change of position. */
@@ -123,14 +133,18 @@ const INCOME_ACTIONS: ReadonlySet<InvestmentAction> = new Set([
  * recomputing them here would let this page drift from the Portfolio and
  * Reports screens, which is exactly the class of bug the "shared logic lives on
  * the domain service" rule exists to prevent.
+ *
+ * Which accounts hold the security, and how much, comes from the transaction
+ * history rather than from the portfolio summary. The summary is built from open
+ * accounts only and drops residuals under 0.0001, so trusting it for existence
+ * would report a position still held in a closed account -- or a dust holding
+ * that the history view exists to help track down -- as "position closed".
  */
 @Injectable()
 export class SecurityDetailService {
   constructor(
-    private readonly dataSource: DataSource,
     private readonly securitiesService: SecuritiesService,
     private readonly portfolioService: PortfolioService,
-    private readonly calculationService: PortfolioCalculationService,
     private readonly investmentTransactionsService: InvestmentTransactionsService,
   ) {}
 
@@ -138,194 +152,161 @@ export class SecurityDetailService {
     // Validates ownership and existence, and works for inactive securities.
     const security = await this.securitiesService.findOne(userId, securityId);
 
-    const [defaultCurrency, history] = await Promise.all([
-      this.resolveDefaultCurrency(userId),
-      this.investmentTransactionsService.getSecurityTransactionHistory(
+    const history =
+      await this.investmentTransactionsService.getSecurityTransactionHistory(
         userId,
         securityId,
-      ),
-    ]);
+      );
 
     // The whole-portfolio summary is the only place cost basis and market value
-    // are computed canonically, so the position is filtered out of it rather
-    // than recalculated. It costs more work than a single-security query would,
-    // but it guarantees the figures here match the Portfolio page.
+    // are computed canonically, so those are filtered out of it rather than
+    // recalculated. It costs more work than a single-security query would, but
+    // it guarantees the figures here match the Portfolio page.
     const summary = await this.portfolioService.getPortfolioSummary(userId);
-
-    const closedByAccountId = new Map(
-      history.accounts.map((account) => [account.accountId, account.isClosed]),
+    const holdingByAccountId = new Map(
+      summary.holdingsByAccount.flatMap((group) => {
+        const holding = group.holdings.find((h) => h.securityId === securityId);
+        return holding
+          ? ([
+              [
+                group.accountId,
+                { holding, accountCurrencyCode: group.currencyCode },
+              ],
+            ] as const)
+          : [];
+      }),
     );
 
-    const rateCache = new Map<string, number>();
-    const accounts: SecurityDetailAccountPosition[] = [];
-
-    for (const accountGroup of summary.holdingsByAccount) {
-      const holding = accountGroup.holdings.find(
-        (h) => h.securityId === securityId,
-      );
-      if (!holding) continue;
-
-      const marketValueAccountCurrency =
-        holding.marketValue === null
-          ? null
-          : roundMoney(
-              await this.calculationService.convertToDefault(
-                holding.marketValue,
-                holding.currencyCode,
-                accountGroup.currencyCode,
-                rateCache,
-              ),
-            );
-
-      accounts.push({
-        accountId: accountGroup.accountId,
-        accountName: accountGroup.accountName,
-        accountCurrencyCode: accountGroup.currencyCode,
-        isClosed: closedByAccountId.get(accountGroup.accountId) ?? false,
-        quantity: holding.quantity,
-        averageCost: holding.averageCost,
-        costBasis: roundMoney(holding.costBasis),
-        costBasisAccountCurrency: roundMoney(holding.costBasisAccountCurrency),
-        marketValue:
-          holding.marketValue === null ? null : roundMoney(holding.marketValue),
-        marketValueAccountCurrency,
-        gainLoss:
-          holding.gainLoss === null ? null : roundMoney(holding.gainLoss),
-        gainLossAccountCurrency:
-          marketValueAccountCurrency === null
-            ? null
-            : roundMoney(
-                marketValueAccountCurrency - holding.costBasisAccountCurrency,
-              ),
-        gainLossPercent: holding.gainLossPercent,
+    const accounts: SecurityDetailAccountPosition[] = history.accounts
+      // An account that traded the security but holds none of it now belongs to
+      // the transaction history, not to a table of current positions.
+      .filter((account) => account.currentQuantity !== 0)
+      .map((account) => {
+        const enriched = holdingByAccountId.get(account.accountId);
+        const holding = enriched?.holding;
+        return {
+          accountId: account.accountId,
+          accountName: account.accountName,
+          accountCurrencyCode: enriched?.accountCurrencyCode ?? null,
+          isClosed: account.isClosed,
+          quantity: account.currentQuantity,
+          averageCost: holding?.averageCost ?? null,
+          costBasis:
+            holding === undefined ? null : roundMoney(holding.costBasis),
+          costBasisAccountCurrency:
+            holding === undefined
+              ? null
+              : roundMoney(holding.costBasisAccountCurrency),
+          marketValue:
+            holding?.marketValue == null
+              ? null
+              : roundMoney(holding.marketValue),
+          gainLoss:
+            holding?.gainLoss == null ? null : roundMoney(holding.gainLoss),
+          gainLossPercent: holding?.gainLossPercent ?? null,
+        };
       });
-    }
 
-    const position = await this.buildAggregatePosition(
-      accounts,
-      defaultCurrency,
-      summary.holdings.find((h) => h.securityId === securityId)?.currentPrice ??
-        null,
-      rateCache,
-    );
-
-    const activity = await this.buildActivity(
+    const realizedGains = await this.loadRealizedGains(
       userId,
-      securityId,
-      history.transactions,
-      history.accounts.map((a) => a.accountId),
+      history.accounts.map((account) => account.accountId),
     );
 
     return {
       security,
-      defaultCurrency,
-      position,
+      position: this.buildAggregatePosition(
+        accounts,
+        history.currentQuantityAll,
+        summary.holdings.find((h) => h.securityId === securityId)
+          ?.currentPrice ?? null,
+      ),
       accounts,
-      activity,
+      activity: this.buildActivity(
+        securityId,
+        history.transactions,
+        realizedGains,
+      ),
       hasTransactions: history.transactions.length > 0,
-      // "Closed" is specifically *was held, now isn't*: a security that was
-      // never traded gets the no-data state instead, not a closed-position one.
+      // "Closed" is specifically *was held, now isn't*, measured against the
+      // exact balance: a security never traded gets the no-data state instead.
       isPositionClosed:
-        history.transactions.length > 0 && accounts.length === 0,
+        history.transactions.length > 0 && history.currentQuantityAll === 0,
     };
   }
 
   /**
-   * Roll the per-account rows up into one position. Quantities and
-   * security-currency amounts add directly (same unit); the reporting-currency
-   * figures convert per account, because each account's holding may sit in a
-   * different currency.
+   * Roll the per-account rows up into one position. Every amount is already in
+   * the security's currency, so this is plain addition -- no conversion, and so
+   * no chance of a total disagreeing with the rows it came from.
    */
-  private async buildAggregatePosition(
+  private buildAggregatePosition(
     accounts: readonly SecurityDetailAccountPosition[],
-    defaultCurrency: string,
+    exactQuantity: number,
     currentPrice: number | null,
-    rateCache: Map<string, number>,
-  ): Promise<SecurityDetailPosition> {
-    // Quantities carry 8 decimals, money 4; summing the two the same way would
-    // round a fractional crypto position away.
-    const quantity = sumQuantity(accounts.map((a) => a.quantity));
-    const costBasis = sumMoney(accounts.map((a) => a.costBasis));
-
-    // A missing price anywhere makes the total meaningless, so the whole
-    // aggregate goes null rather than silently reporting a partial value.
-    const hasEveryPrice =
+  ): SecurityDetailPosition {
+    // A row the portfolio could not cost or price (a holding in a closed
+    // account, or a dust residual it filtered out) makes every total a partial
+    // one, and a partial total reads as a real value. Report nothing instead.
+    const isCostComplete = accounts.every((a) => a.costBasis !== null);
+    const isPriceComplete =
       accounts.length > 0 && accounts.every((a) => a.marketValue !== null);
-    const marketValue = hasEveryPrice
+
+    const costBasis = isCostComplete
+      ? sumMoney(accounts.map((a) => a.costBasis as number))
+      : null;
+    const marketValue = isPriceComplete
       ? sumMoney(accounts.map((a) => a.marketValue as number))
       : null;
-
-    const costBasisDefaultCurrency = sumMoney(
-      await Promise.all(
-        accounts.map((a) =>
-          this.calculationService.convertToDefault(
-            a.costBasisAccountCurrency,
-            a.accountCurrencyCode,
-            defaultCurrency,
-            rateCache,
-          ),
-        ),
-      ),
-    );
-
-    const marketValueDefaultCurrency = hasEveryPrice
-      ? sumMoney(
-          await Promise.all(
-            accounts.map((a) =>
-              this.calculationService.convertToDefault(
-                a.marketValueAccountCurrency as number,
-                a.accountCurrencyCode,
-                defaultCurrency,
-                rateCache,
-              ),
-            ),
-          ),
-        )
-      : null;
-
     const gainLoss =
-      marketValue === null ? null : roundMoney(marketValue - costBasis);
-    const gainLossDefaultCurrency =
-      marketValueDefaultCurrency === null
+      marketValue === null || costBasis === null
         ? null
-        : roundMoney(marketValueDefaultCurrency - costBasisDefaultCurrency);
+        : roundMoney(marketValue - costBasis);
 
     return {
-      quantity,
+      quantity: exactQuantity,
       // Weighted by construction: total cost over total units, not a mean of
       // per-account averages (which would misweight unequal positions). Kept at
       // the 6dp precision `holdings.average_cost` stores, because a sub-cent
       // quote (LSE pennies, a crypto pair) rounds to zero at the money 4dp.
       averageCost:
-        quantity === 0 ? 0 : roundToDecimals(costBasis / quantity, 6),
+        costBasis === null || exactQuantity === 0
+          ? null
+          : roundToDecimals(costBasis / exactQuantity, 6),
       currentPrice,
       costBasis,
-      costBasisDefaultCurrency,
       marketValue,
-      marketValueDefaultCurrency,
       gainLoss,
-      gainLossDefaultCurrency,
       gainLossPercent:
-        gainLoss === null || costBasis <= 0
+        gainLoss === null || costBasis === null || costBasis <= 0
           ? null
           : (gainLoss / costBasis) * 100,
     };
   }
 
-  private async buildActivity(
+  /**
+   * Realized gains for this security, scoped to the accounts it was traded in
+   * so a large portfolio does not pay for a full-history walk.
+   */
+  private async loadRealizedGains(
     userId: string,
+    accountIds: readonly string[],
+  ): Promise<RealizedGainRow[]> {
+    if (accountIds.length === 0) return [];
+    return this.investmentTransactionsService.getRealizedGains(userId, {
+      accountIds: [...accountIds],
+    });
+  }
+
+  private buildActivity(
     securityId: string,
     transactions: readonly SecurityHistoryTransaction[],
-    accountIds: readonly string[],
-  ): Promise<SecurityDetailActivity> {
-    // The replay is scoped to the accounts this security was actually traded
-    // in, so a large portfolio does not pay for a full-history walk here.
-    const realizedGains =
-      accountIds.length > 0
-        ? await this.investmentTransactionsService.getRealizedGains(userId, {
-            accountIds: [...accountIds],
-          })
-        : [];
+    realizedGains: readonly RealizedGainRow[],
+  ): SecurityDetailActivity {
+    const mine = realizedGains.filter(
+      (entry) => entry.securityId === securityId,
+    );
+    const currencies = new Set(mine.map((entry) => entry.accountCurrencyCode));
+    const hasOneCurrency = currencies.size === 1;
 
     const amountsFor = (
       predicate: (tx: SecurityHistoryTransaction) => boolean,
@@ -339,23 +320,26 @@ export class SecurityDetailService {
       firstTransactionDate: transactions[0]?.transactionDate ?? null,
       lastTransactionDate:
         transactions[transactions.length - 1]?.transactionDate ?? null,
-      totalInvested: amountsFor((tx) => INVESTED_ACTIONS.has(tx.action)),
+      // Cost, not cash out: `totalAmount` is zero on reinvestments and transfers
+      // in, which still acquire shares and still add to cost basis, so summing
+      // it would report nothing invested beside a real cost basis.
+      totalInvested: sumMoney(
+        transactions
+          .filter((tx) => ACQUIRING_ACTIONS.has(tx.action))
+          .map(
+            (tx) => Math.abs(Number(tx.quantity) || 0) * (Number(tx.price) || 0),
+          ),
+      ),
       totalSold: amountsFor((tx) => tx.action === InvestmentAction.SELL),
       dividends: amountsFor((tx) => INCOME_ACTIONS.has(tx.action)),
       fees: sumMoney(transactions.map((tx) => Number(tx.commission) || 0)),
-      realizedGain: sumMoney(
-        realizedGains
-          .filter((entry) => entry.securityId === securityId)
-          .map((entry) => entry.realizedGain),
-      ),
+      // One currency, or nothing: gains realized in a PLN account and in a EUR
+      // account are not addable, and their sum would be in no currency at all.
+      realizedGain: hasOneCurrency
+        ? sumMoney(mine.map((entry) => entry.realizedGain))
+        : null,
+      realizedGainCurrency: hasOneCurrency ? ([...currencies][0] ?? null) : null,
       transactionCount: transactions.length,
     };
-  }
-
-  private async resolveDefaultCurrency(userId: string): Promise<string> {
-    const pref = await withScopedDb(this.dataSource, (manager) =>
-      manager.getRepository(UserPreference).findOne({ where: { userId } }),
-    );
-    return pref?.defaultCurrency || "CAD";
   }
 }

@@ -2,7 +2,6 @@ import {
   roundToDecimals,
   roundMoney,
   sumMoney,
-  sumQuantity,
   toMoneyNumber,
 } from "./round.util";
 
@@ -181,30 +180,5 @@ describe("sumMoney", () => {
 
   it("ignores non-finite entries", () => {
     expect(sumMoney([1.5, NaN, 2.5, Infinity])).toBe(4);
-  });
-});
-
-describe("sumQuantity", () => {
-  it("sums without floating-point drift", () => {
-    expect(sumQuantity([0.1, 0.2])).toBe(0.3);
-  });
-
-  it("keeps the 8 decimals a share quantity is stored with", () => {
-    // The whole reason this exists: sumMoney rounds each term to 4dp, which
-    // would total these two satoshi-scale holdings to zero.
-    expect(sumQuantity([0.00000001, 0.00000002])).toBe(0.00000003);
-    expect(sumMoney([0.00000001, 0.00000002])).toBe(0);
-  });
-
-  it("returns 0 for an empty array", () => {
-    expect(sumQuantity([])).toBe(0);
-  });
-
-  it("handles negative values", () => {
-    expect(sumQuantity([10, -2.5, -7.5])).toBe(0);
-  });
-
-  it("ignores non-finite entries", () => {
-    expect(sumQuantity([1.5, NaN, 2.5, Infinity])).toBe(4);
   });
 });

@@ -231,39 +231,41 @@ export interface SecurityTransactionHistory {
 }
 
 /**
- * The position in one account holding a security. Money arrives in two
- * currencies: the security's own (what its price and average cost are quoted
- * in) and the account's (what the holder's statement shows). The detail page
- * renders both.
+ * The position in one account holding a security.
+ *
+ * Every amount is in the **security's own currency** -- what its price and
+ * average cost are quoted in -- except `costBasisAccountCurrency`, which is the
+ * portfolio's historical-rate conversion and is named for it. Nullable
+ * throughout: a position held in a closed account, or a dust residual, is known
+ * to exist from the transaction history but has no figures in the portfolio
+ * calculation, and a zero there would be a claim rather than an absence.
  */
 export interface SecurityDetailAccountPosition {
   accountId: string;
   accountName: string;
-  accountCurrencyCode: string;
+  accountCurrencyCode: string | null;
   isClosed: boolean;
   quantity: number;
   /** Average cost per unit, in the security's currency. */
-  averageCost: number;
-  costBasis: number;
-  costBasisAccountCurrency: number;
+  averageCost: number | null;
+  costBasis: number | null;
+  costBasisAccountCurrency: number | null;
   marketValue: number | null;
-  marketValueAccountCurrency: number | null;
   gainLoss: number | null;
-  gainLossAccountCurrency: number | null;
   gainLossPercent: number | null;
 }
 
-/** The aggregate position across every account, for the summary cards. */
+/**
+ * The aggregate position across every account, for the summary cards. All
+ * amounts are in the security's currency.
+ */
 export interface SecurityDetailPosition {
   quantity: number;
-  averageCost: number;
+  averageCost: number | null;
   currentPrice: number | null;
-  costBasis: number;
-  costBasisDefaultCurrency: number;
+  costBasis: number | null;
   marketValue: number | null;
-  marketValueDefaultCurrency: number | null;
   gainLoss: number | null;
-  gainLossDefaultCurrency: number | null;
   gainLossPercent: number | null;
 }
 
@@ -275,14 +277,19 @@ export interface SecurityDetailActivity {
   totalSold: number;
   dividends: number;
   fees: number;
-  realizedGain: number;
+  /**
+   * Realized gain in `realizedGainCurrency` -- the holding account's currency,
+   * which is how the canonical replay denominates it. Null when the security was
+   * sold from accounts of more than one currency, because those gains cannot be
+   * added into a single figure.
+   */
+  realizedGain: number | null;
+  realizedGainCurrency: string | null;
   transactionCount: number;
 }
 
 export interface SecurityDetail {
   security: Security;
-  /** The user's reporting currency, for the `*DefaultCurrency` amounts. */
-  defaultCurrency: string;
   position: SecurityDetailPosition;
   accounts: SecurityDetailAccountPosition[];
   activity: SecurityDetailActivity;

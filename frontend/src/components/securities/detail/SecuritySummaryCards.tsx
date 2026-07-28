@@ -23,11 +23,13 @@ interface SecuritySummaryCardsProps {
 const ICON_CLASS = 'h-4 w-4';
 
 /**
- * The five key figures, in the reporting currency with the security's own
- * currency underneath wherever the two differ.
+ * The five key figures, all in the security's own currency -- the currency its
+ * price and average cost are quoted in, and the only one they add up in without
+ * a conversion this page has no business making.
  *
- * A position with no price is reported as unpriced rather than as zero: a zero
- * market value is a claim about worth, and "we have no quote" is not that claim.
+ * A figure the portfolio could not compute is reported as unknown rather than as
+ * zero: a zero market value is a claim about worth, and "there is no quote" (or
+ * "this sits in a closed account") is not that claim.
  */
 export function SecuritySummaryCards({ detail }: SecuritySummaryCardsProps) {
   const t = useTranslations('securityDetail');
@@ -39,15 +41,17 @@ export function SecuritySummaryCards({ detail }: SecuritySummaryCardsProps) {
     formatSignedPercent,
   } = useNumberFormat();
 
-  const { position, security, defaultCurrency } = detail;
-  const securityCurrency = security.currencyCode;
-  // With one currency there is nothing to convert, so the second line is noise.
-  const showSecondary = securityCurrency !== defaultCurrency;
+  const { position, security } = detail;
+  const currency = security.currencyCode;
+  const unknown = (
+    <span className="text-gray-500 dark:text-gray-400">
+      {t('cards.valueUnknown')}
+    </span>
+  );
 
-  const secondary = (amount: number | null) =>
-    showSecondary && amount !== null
-      ? formatCurrency(amount, securityCurrency)
-      : undefined;
+  /** A signed money figure, so colour is never the only signal of a loss. */
+  const signedMoney = (amount: number) =>
+    `${amount >= 0 ? '+' : ''}${formatCurrency(amount, currency)}`;
 
   const totalUnits = position.quantity;
 
@@ -56,49 +60,32 @@ export function SecuritySummaryCards({ detail }: SecuritySummaryCardsProps) {
       label: t('cards.marketValue'),
       icon: <ChartPieIcon className={ICON_CLASS} />,
       value:
-        position.marketValueDefaultCurrency === null
-          ? t('cards.valueUnknown')
-          : formatCurrency(position.marketValueDefaultCurrency, defaultCurrency),
-      note: secondary(position.marketValue),
-      valueClass:
-        position.marketValueDefaultCurrency === null
-          ? 'text-gray-500 dark:text-gray-400'
-          : undefined,
+        position.marketValue === null
+          ? unknown
+          : formatCurrency(position.marketValue, currency),
     },
     {
       label: t('cards.costBasis'),
       icon: <BanknotesIcon className={ICON_CLASS} />,
-      value: formatCurrency(position.costBasisDefaultCurrency, defaultCurrency),
-      note: secondary(position.costBasis),
+      value:
+        position.costBasis === null
+          ? unknown
+          : formatCurrency(position.costBasis, currency),
     },
     {
       label: t('cards.unrealizedPl'),
       icon: <ArrowTrendingUpIcon className={ICON_CLASS} />,
       value:
-        position.gainLossDefaultCurrency === null
-          ? t('cards.valueUnknown')
-          : // Signed, so the figure reads as a gain or a loss without relying
-            // on its colour.
-            `${position.gainLossDefaultCurrency >= 0 ? '+' : ''}${formatCurrency(
-              position.gainLossDefaultCurrency,
-              defaultCurrency,
-            )}`,
+        position.gainLoss === null ? unknown : signedMoney(position.gainLoss),
       valueClass:
-        position.gainLossDefaultCurrency === null
-          ? 'text-gray-500 dark:text-gray-400'
-          : gainLossColor(position.gainLossDefaultCurrency),
+        position.gainLoss === null
+          ? undefined
+          : gainLossColor(position.gainLoss),
       note:
-        position.gainLossPercent === null ? (
-          secondary(position.gainLoss)
-        ) : (
-          <>
-            <span className={gainLossColor(position.gainLossPercent)}>
-              {formatSignedPercent(position.gainLossPercent)}
-            </span>
-            {secondary(position.gainLoss) && (
-              <div>{secondary(position.gainLoss)}</div>
-            )}
-          </>
+        position.gainLossPercent === null ? undefined : (
+          <span className={gainLossColor(position.gainLossPercent)}>
+            {formatSignedPercent(position.gainLossPercent)}
+          </span>
         ),
     },
     {
@@ -109,7 +96,9 @@ export function SecuritySummaryCards({ detail }: SecuritySummaryCardsProps) {
         <>
           <div>{t('cards.avgCostPerUnit')}</div>
           <div>
-            {formatCurrencyPrecise(position.averageCost, securityCurrency)}
+            {position.averageCost === null
+              ? t('cards.valueUnknown')
+              : formatCurrencyPrecise(position.averageCost, currency)}
           </div>
         </>
       ),
@@ -123,46 +112,52 @@ export function SecuritySummaryCards({ detail }: SecuritySummaryCardsProps) {
       value: null,
       body: (
         <div className="mt-1">
-          <ul className="space-y-0.5">
-            {detail.accounts.map((account) => (
-              <li
-                key={account.accountId}
-                className="flex items-baseline justify-between gap-3 text-sm"
-              >
-                <span
-                  className={`truncate ${
-                    account.isClosed
-                      ? 'text-gray-500 dark:text-gray-400'
-                      : 'text-gray-900 dark:text-gray-100'
-                  }`}
-                >
-                  {account.isClosed
-                    ? t('accounts.closedSuffix', { name: account.accountName })
-                    : account.accountName}
-                </span>
-                <span className="shrink-0 tabular-nums text-gray-900 dark:text-gray-100">
-                  {t('cards.unitsShare', {
-                    units: formatQuantity(account.quantity),
-                    // A share of the total, not a gain: no leading sign.
-                    share: formatPercent(
-                      totalUnits === 0
-                        ? 0
-                        : (account.quantity / totalUnits) * 100,
-                    ),
-                  })}
-                </span>
-              </li>
-            ))}
-          </ul>
           {detail.accounts.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {t('empty.noAccounts')}
             </p>
           ) : (
-            <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-gray-200 pt-1 text-sm font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
-              <span>{t('cards.total')}</span>
-              <span className="tabular-nums">{formatQuantity(totalUnits)}</span>
-            </div>
+            <>
+              <ul className="space-y-0.5">
+                {detail.accounts.map((account) => (
+                  <li
+                    key={account.accountId}
+                    className="flex items-baseline justify-between gap-3 text-sm"
+                  >
+                    <span
+                      className={`truncate ${
+                        account.isClosed
+                          ? 'text-gray-500 dark:text-gray-400'
+                          : 'text-gray-900 dark:text-gray-100'
+                      }`}
+                    >
+                      {account.isClosed
+                        ? t('accounts.closedSuffix', {
+                            name: account.accountName,
+                          })
+                        : account.accountName}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-gray-900 dark:text-gray-100">
+                      {t('cards.unitsShare', {
+                        units: formatQuantity(account.quantity),
+                        // A share of the total, not a gain: no leading sign.
+                        share: formatPercent(
+                          totalUnits === 0
+                            ? 0
+                            : (account.quantity / totalUnits) * 100,
+                        ),
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-gray-200 pt-1 text-sm font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
+                <span>{t('cards.total')}</span>
+                <span className="tabular-nums">
+                  {formatQuantity(totalUnits)}
+                </span>
+              </div>
+            </>
           )}
         </div>
       ),

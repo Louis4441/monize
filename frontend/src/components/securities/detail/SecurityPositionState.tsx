@@ -22,7 +22,7 @@ export function SecurityPositionState({ detail }: SecurityPositionStateProps) {
   const t = useTranslations('securityDetail');
   const { formatDate } = useDateFormat();
   const { formatCurrency } = useNumberFormat();
-  const { activity, security } = detail;
+  const { activity } = detail;
 
   if (!detail.hasTransactions) {
     return (
@@ -57,17 +57,26 @@ export function SecurityPositionState({ detail }: SecurityPositionStateProps) {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
-            {t('closed.realizedPl')}
-          </div>
-          <div
-            className={`text-lg font-bold ${gainLossColor(activity.realizedGain)}`}
-          >
-            {activity.realizedGain >= 0 ? '+' : ''}
-            {formatCurrency(activity.realizedGain, security.currencyCode)}
-          </div>
-        </div>
+        {/* In the holding account's currency, which is how the average-cost
+            replay denominates it; omitted when sales spanned currencies and no
+            single figure exists. */}
+        {activity.realizedGain !== null &&
+          activity.realizedGainCurrency !== null && (
+            <div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {t('closed.realizedPl')}
+              </div>
+              <div
+                className={`text-lg font-bold ${gainLossColor(activity.realizedGain)}`}
+              >
+                {activity.realizedGain >= 0 ? '+' : ''}
+                {formatCurrency(
+                  activity.realizedGain,
+                  activity.realizedGainCurrency,
+                )}
+              </div>
+            </div>
+          )}
         {heldRange && (
           <div>
             <div className="text-sm text-gray-500 dark:text-gray-400">

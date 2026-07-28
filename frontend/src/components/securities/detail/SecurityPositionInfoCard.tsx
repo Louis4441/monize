@@ -69,12 +69,21 @@ export function SecurityPositionInfoCard({
     {
       key: 'realizedPl',
       label: t('positionInfo.realizedPl'),
-      value: (
-        <span className={gainLossColor(activity.realizedGain)}>
-          {activity.realizedGain >= 0 ? '+' : ''}
-          {formatCurrency(activity.realizedGain, currency)}
-        </span>
-      ),
+      // Denominated in the holding account's currency, not the security's, and
+      // absent entirely when sales spanned several currencies -- KeyValueList
+      // drops the row rather than showing a figure in no currency at all.
+      value:
+        activity.realizedGain === null || activity.realizedGainCurrency === null
+          ? null
+          : (
+              <span className={gainLossColor(activity.realizedGain)}>
+                {activity.realizedGain >= 0 ? '+' : ''}
+                {formatCurrency(
+                  activity.realizedGain,
+                  activity.realizedGainCurrency,
+                )}
+              </span>
+            ),
     },
     {
       key: 'status',
