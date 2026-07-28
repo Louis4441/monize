@@ -37,8 +37,11 @@ export function SecurityKeyInformation({
   const rows: KeyValueRow[] = [
     { key: 'symbol', label: t('keyInfo.symbol'), value: security.symbol },
     {
-      key: 'assetClass',
-      label: t('keyInfo.assetClass'),
+      // "Security type", not "asset class": an ETF is a kind of instrument, not
+      // an asset class, and the latter term is needed for the percentage
+      // breakdown a security can carry (review of discussion #964).
+      key: 'securityType',
+      label: t('keyInfo.securityType'),
       value: security.securityType
         ? ts(`typeLabels.${security.securityType}` as Parameters<typeof ts>[0])
         : null,
