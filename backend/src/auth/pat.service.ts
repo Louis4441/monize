@@ -86,7 +86,7 @@ export class PatService {
     // personal_access_tokens across all users, before any req.user exists (all
     // MCP traffic authenticates here). Seed a system context so the lookup and
     // the lastUsedAt write have ambient identity once these repositories move
-    // to tenantTx (task R7). Inert until then.
+    // to withScopedDb (task R7). Inert until then.
     return withSystemContext(() => this.validateTokenWithinContext(rawToken));
   }
 

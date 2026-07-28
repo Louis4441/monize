@@ -1,5 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { MortgageReminderService } from "./mortgage-reminder.service";
@@ -69,21 +74,16 @@ describe("MortgageReminderService", () => {
         .mockImplementation((_key: string, fallback: string) => fallback),
     };
 
+    const { dataSource } = createScopedDbMocks([
+      [Account, accountsRepository],
+      [User, usersRepository],
+      [UserPreference, preferencesRepository],
+    ]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MortgageReminderService,
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
-        {
-          provide: getRepositoryToken(User),
-          useValue: usersRepository,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: preferencesRepository,
-        },
+        { provide: DataSource, useValue: dataSource },
         { provide: EmailService, useValue: emailService },
         { provide: ConfigService, useValue: configService },
         {

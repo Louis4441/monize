@@ -5,41 +5,39 @@ import {
   Logger,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, QueryRunner, In } from "typeorm";
+import { DataSource, EntityManager, QueryRunner, In } from "typeorm";
 import { Tag } from "./entities/tag.entity";
 import { TransactionTag } from "./entities/transaction-tag.entity";
 import { TransactionSplitTag } from "./entities/transaction-split-tag.entity";
 import { CreateTagDto } from "./dto/create-tag.dto";
 import { UpdateTagDto } from "./dto/update-tag.dto";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class TagsService {
   private readonly logger = new Logger(TagsService.name);
 
   constructor(
-    @InjectRepository(Tag)
-    private tagsRepository: Repository<Tag>,
-    @InjectRepository(TransactionTag)
-    private transactionTagsRepository: Repository<TransactionTag>,
-    @InjectRepository(TransactionSplitTag)
-    private transactionSplitTagsRepository: Repository<TransactionSplitTag>,
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
   ) {}
 
   async findAll(userId: string): Promise<Tag[]> {
-    return this.tagsRepository.find({
-      where: { userId },
-      order: { name: "ASC" },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Tag).find({
+        where: { userId },
+        order: { name: "ASC" },
+      }),
+    );
   }
 
   async findOne(userId: string, id: string): Promise<Tag> {
-    const tag = await this.tagsRepository.findOne({
-      where: { id, userId },
-    });
+    const tag = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Tag).findOne({
+        where: { id, userId },
+      }),
+    );
     if (!tag) {
       throw new NotFoundException(
         tr("errors.tags.notFound", `Tag with ID ${id} not found`, { id }),
@@ -48,30 +46,46 @@ export class TagsService {
     return tag;
   }
 
-  async create(userId: string, dto: CreateTagDto): Promise<Tag> {
-    const existing = await this.tagsRepository
+  private async findConflictingName(
+    m: EntityManager,
+    userId: string,
+    name: string,
+    excludeId?: string,
+  ): Promise<Tag | null> {
+    const qb = m
+      .getRepository(Tag)
       .createQueryBuilder("tag")
       .where("tag.userId = :userId", { userId })
-      .andWhere("LOWER(tag.name) = LOWER(:name)", { name: dto.name })
-      .getOne();
-
-    if (existing) {
-      throw new ConflictException(
-        tr(
-          "errors.tags.nameConflict",
-          `A tag named "${dto.name}" already exists`,
-          { name: dto.name },
-        ),
-      );
+      .andWhere("LOWER(tag.name) = LOWER(:name)", { name });
+    if (excludeId) {
+      qb.andWhere("tag.id != :id", { id: excludeId });
     }
+    return qb.getOne();
+  }
 
-    const tag = this.tagsRepository.create({
-      ...dto,
-      color: dto.color || null,
-      icon: dto.icon || null,
-      userId,
+  async create(userId: string, dto: CreateTagDto): Promise<Tag> {
+    const saved = await withScopedDb(this.dataSource, async (m) => {
+      const existing = await this.findConflictingName(m, userId, dto.name);
+      if (existing) {
+        throw new ConflictException(
+          tr(
+            "errors.tags.nameConflict",
+            `A tag named "${dto.name}" already exists`,
+            { name: dto.name },
+          ),
+        );
+      }
+
+      const repo = m.getRepository(Tag);
+      const tag = repo.create({
+        ...dto,
+        color: dto.color || null,
+        icon: dto.icon || null,
+        userId,
+      });
+      return repo.save(tag);
     });
-    const saved = await this.tagsRepository.save(tag);
+
     this.actionHistoryService.record(userId, {
       entityType: "tag",
       entityId: saved.id,
@@ -93,32 +107,34 @@ export class TagsService {
     const tag = await this.findOne(userId, id);
     const beforeData = { name: tag.name, color: tag.color, icon: tag.icon };
 
-    if (dto.name && dto.name.toLowerCase() !== tag.name.toLowerCase()) {
-      const existing = await this.tagsRepository
-        .createQueryBuilder("tag")
-        .where("tag.userId = :userId", { userId })
-        .andWhere("LOWER(tag.name) = LOWER(:name)", { name: dto.name })
-        .andWhere("tag.id != :id", { id })
-        .getOne();
-
-      if (existing) {
-        throw new ConflictException(
-          tr(
-            "errors.tags.nameConflict",
-            `A tag named "${dto.name}" already exists`,
-            { name: dto.name },
-          ),
+    const saved = await withScopedDb(this.dataSource, async (m) => {
+      if (dto.name && dto.name.toLowerCase() !== tag.name.toLowerCase()) {
+        const existing = await this.findConflictingName(
+          m,
+          userId,
+          dto.name,
+          id,
         );
+        if (existing) {
+          throw new ConflictException(
+            tr(
+              "errors.tags.nameConflict",
+              `A tag named "${dto.name}" already exists`,
+              { name: dto.name },
+            ),
+          );
+        }
       }
-    }
 
-    Object.assign(tag, {
-      ...(dto.name !== undefined && { name: dto.name }),
-      ...(dto.color !== undefined && { color: dto.color || null }),
-      ...(dto.icon !== undefined && { icon: dto.icon || null }),
+      Object.assign(tag, {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.color !== undefined && { color: dto.color || null }),
+        ...(dto.icon !== undefined && { icon: dto.icon || null }),
+      });
+
+      return m.getRepository(Tag).save(tag);
     });
 
-    const saved = await this.tagsRepository.save(tag);
     this.actionHistoryService.record(userId, {
       entityType: "tag",
       entityId: id,
@@ -140,7 +156,9 @@ export class TagsService {
       color: tag.color,
       icon: tag.icon,
     };
-    await this.tagsRepository.remove(tag);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Tag).remove(tag),
+    );
     this.actionHistoryService.record(userId, {
       entityType: "tag",
       entityId: id,
@@ -154,24 +172,30 @@ export class TagsService {
 
   async getTransactionCount(userId: string, id: string): Promise<number> {
     await this.findOne(userId, id);
-    return this.transactionTagsRepository.count({
-      where: { tagId: id },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(TransactionTag).count({
+        where: { tagId: id },
+      }),
+    );
   }
 
   async getAllTransactionCounts(
     userId: string,
   ): Promise<Record<string, number>> {
-    const rows: Array<{ tag_id: string; count: string }> =
-      await this.transactionTagsRepository
-        .createQueryBuilder("tt")
-        .select("tt.tag_id", "tag_id")
-        .addSelect("COUNT(*)", "count")
-        .innerJoin(Tag, "t", "t.id = tt.tag_id AND t.user_id = :userId", {
-          userId,
-        })
-        .groupBy("tt.tag_id")
-        .getRawMany();
+    const rows: Array<{ tag_id: string; count: string }> = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m
+          .getRepository(TransactionTag)
+          .createQueryBuilder("tt")
+          .select("tt.tag_id", "tag_id")
+          .addSelect("COUNT(*)", "count")
+          .innerJoin(Tag, "t", "t.id = tt.tag_id AND t.user_id = :userId", {
+            userId,
+          })
+          .groupBy("tt.tag_id")
+          .getRawMany(),
+    );
 
     const counts: Record<string, number> = {};
     for (const row of rows) {
@@ -180,35 +204,49 @@ export class TagsService {
     return counts;
   }
 
+  /**
+   * Run `fn` against the caller's QueryRunner transaction when one is passed
+   * (the transactions module's flows still manage their own QueryRunner until
+   * task R2), otherwise inside a `withScopedDb` of our own.
+   */
+  private withTagManager<T>(
+    queryRunner: QueryRunner | undefined,
+    fn: (m: EntityManager) => Promise<T>,
+  ): Promise<T> {
+    return queryRunner
+      ? fn(queryRunner.manager)
+      : withScopedDb(this.dataSource, fn);
+  }
+
   async setTransactionTags(
     transactionId: string,
     tagIds: string[],
     userId: string,
     queryRunner?: QueryRunner,
   ): Promise<void> {
-    const manager = queryRunner ? queryRunner.manager : this.dataSource.manager;
-
-    // Validate all tags belong to this user
-    if (tagIds.length > 0) {
-      const tags = await manager.find(Tag, {
-        where: { id: In(tagIds), userId },
-      });
-      if (tags.length !== tagIds.length) {
-        throw new NotFoundException(
-          tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
-        );
+    return this.withTagManager(queryRunner, async (manager) => {
+      // Validate all tags belong to this user
+      if (tagIds.length > 0) {
+        const tags = await manager.find(Tag, {
+          where: { id: In(tagIds), userId },
+        });
+        if (tags.length !== tagIds.length) {
+          throw new NotFoundException(
+            tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
+          );
+        }
       }
-    }
 
-    // Delete existing and insert new
-    await manager.delete(TransactionTag, { transactionId });
+      // Delete existing and insert new
+      await manager.delete(TransactionTag, { transactionId });
 
-    if (tagIds.length > 0) {
-      const newTags = tagIds.map((tagId) =>
-        manager.create(TransactionTag, { transactionId, tagId }),
-      );
-      await manager.save(TransactionTag, newTags);
-    }
+      if (tagIds.length > 0) {
+        const newTags = tagIds.map((tagId) =>
+          manager.create(TransactionTag, { transactionId, tagId }),
+        );
+        await manager.save(TransactionTag, newTags);
+      }
+    });
   }
 
   /**
@@ -226,33 +264,33 @@ export class TagsService {
     if (transactionIds.length === 0) {
       return;
     }
-    const manager = queryRunner ? queryRunner.manager : this.dataSource.manager;
-
-    // Validate the tag set once for all transactions
-    if (tagIds.length > 0) {
-      const tags = await manager.find(Tag, {
-        where: { id: In(tagIds), userId },
-      });
-      if (tags.length !== tagIds.length) {
-        throw new NotFoundException(
-          tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
-        );
+    return this.withTagManager(queryRunner, async (manager) => {
+      // Validate the tag set once for all transactions
+      if (tagIds.length > 0) {
+        const tags = await manager.find(Tag, {
+          where: { id: In(tagIds), userId },
+        });
+        if (tags.length !== tagIds.length) {
+          throw new NotFoundException(
+            tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
+          );
+        }
       }
-    }
 
-    // Replace existing tags for every target transaction in one statement
-    await manager.delete(TransactionTag, {
-      transactionId: In(transactionIds),
+      // Replace existing tags for every target transaction in one statement
+      await manager.delete(TransactionTag, {
+        transactionId: In(transactionIds),
+      });
+
+      if (tagIds.length > 0) {
+        const newTags = transactionIds.flatMap((transactionId) =>
+          tagIds.map((tagId) =>
+            manager.create(TransactionTag, { transactionId, tagId }),
+          ),
+        );
+        await manager.save(TransactionTag, newTags);
+      }
     });
-
-    if (tagIds.length > 0) {
-      const newTags = transactionIds.flatMap((transactionId) =>
-        tagIds.map((tagId) =>
-          manager.create(TransactionTag, { transactionId, tagId }),
-        ),
-      );
-      await manager.save(TransactionTag, newTags);
-    }
   }
 
   /**
@@ -269,31 +307,31 @@ export class TagsService {
     if (transactionSplitIds.length === 0) {
       return;
     }
-    const manager = queryRunner ? queryRunner.manager : this.dataSource.manager;
-
-    if (tagIds.length > 0) {
-      const tags = await manager.find(Tag, {
-        where: { id: In(tagIds), userId },
-      });
-      if (tags.length !== tagIds.length) {
-        throw new NotFoundException(
-          tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
-        );
+    return this.withTagManager(queryRunner, async (manager) => {
+      if (tagIds.length > 0) {
+        const tags = await manager.find(Tag, {
+          where: { id: In(tagIds), userId },
+        });
+        if (tags.length !== tagIds.length) {
+          throw new NotFoundException(
+            tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
+          );
+        }
       }
-    }
 
-    await manager.delete(TransactionSplitTag, {
-      transactionSplitId: In(transactionSplitIds),
+      await manager.delete(TransactionSplitTag, {
+        transactionSplitId: In(transactionSplitIds),
+      });
+
+      if (tagIds.length > 0) {
+        const newTags = transactionSplitIds.flatMap((transactionSplitId) =>
+          tagIds.map((tagId) =>
+            manager.create(TransactionSplitTag, { transactionSplitId, tagId }),
+          ),
+        );
+        await manager.save(TransactionSplitTag, newTags);
+      }
     });
-
-    if (tagIds.length > 0) {
-      const newTags = transactionSplitIds.flatMap((transactionSplitId) =>
-        tagIds.map((tagId) =>
-          manager.create(TransactionSplitTag, { transactionSplitId, tagId }),
-        ),
-      );
-      await manager.save(TransactionSplitTag, newTags);
-    }
   }
 
   async setSplitTags(
@@ -302,26 +340,26 @@ export class TagsService {
     userId: string,
     queryRunner?: QueryRunner,
   ): Promise<void> {
-    const manager = queryRunner ? queryRunner.manager : this.dataSource.manager;
-
-    if (tagIds.length > 0) {
-      const tags = await manager.find(Tag, {
-        where: { id: In(tagIds), userId },
-      });
-      if (tags.length !== tagIds.length) {
-        throw new NotFoundException(
-          tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
-        );
+    return this.withTagManager(queryRunner, async (manager) => {
+      if (tagIds.length > 0) {
+        const tags = await manager.find(Tag, {
+          where: { id: In(tagIds), userId },
+        });
+        if (tags.length !== tagIds.length) {
+          throw new NotFoundException(
+            tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
+          );
+        }
       }
-    }
 
-    await manager.delete(TransactionSplitTag, { transactionSplitId });
+      await manager.delete(TransactionSplitTag, { transactionSplitId });
 
-    if (tagIds.length > 0) {
-      const newTags = tagIds.map((tagId) =>
-        manager.create(TransactionSplitTag, { transactionSplitId, tagId }),
-      );
-      await manager.save(TransactionSplitTag, newTags);
-    }
+      if (tagIds.length > 0) {
+        const newTags = tagIds.map((tagId) =>
+          manager.create(TransactionSplitTag, { transactionSplitId, tagId }),
+        );
+        await manager.save(TransactionSplitTag, newTags);
+      }
+    });
   }
 }

@@ -1,5 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 import { BadRequestException } from "@nestjs/common";
 import { LoanMortgageAccountService } from "./loan-mortgage-account.service";
 import { Account, AccountType } from "./entities/account.entity";
@@ -64,17 +69,15 @@ describe("LoanMortgageAccountService", () => {
       ),
     };
 
+    const { dataSource } = createScopedDbMocks([
+      [Account, accountsRepository],
+      [Institution, institutionsRepository],
+    ]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LoanMortgageAccountService,
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
-        {
-          provide: getRepositoryToken(Institution),
-          useValue: institutionsRepository,
-        },
+        { provide: DataSource, useValue: dataSource },
         {
           provide: CategoriesService,
           useValue: categoriesService,

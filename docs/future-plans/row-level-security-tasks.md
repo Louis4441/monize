@@ -35,7 +35,7 @@ uses four classes:
 |-------|---------|
 | **none** | CI, tests, lint, or docs only — or code that ships but nothing calls yet. The running app is byte-for-byte behaviorally identical. |
 | **inert** | Ships real code or DB objects to prod, designed to change nothing at `RLS_MODE=off`: a role nothing connects as, policies without `ENABLE`, a GUC-aware trigger that behaves identically while the GUC is unset, context wrappers that only seed ALS. Safe, but verify the per-task acceptance that proves inertness. |
-| **neutral** | Rewrites live code paths (the `tenantTx` refactor, the restore swap). Designed behavior-preserving — same queries, same transaction boundaries — but carries normal regression risk. Full unit + module integration/e2e suites are the gate, not optional. |
+| **neutral** | Rewrites live code paths (the `withScopedDb` refactor, the restore swap). Designed behavior-preserving — same queries, same transaction boundaries — but carries normal regression risk. Full unit + module integration/e2e suites are the gate, not optional. |
 | **DO NOT DEPLOY** | M3 only. Merging to a branch is fine; deploying it to prod is flip B, an operator decision after flip A has soaked. |
 
 ## Task graph
@@ -43,7 +43,7 @@ uses four classes:
 | ID | Task | Depends on | Deploy impact | Status |
 |----|------|-----------|---------------|--------|
 | F1 | RLS_MODE flag, role creation + grants in db-init, env plumbing (compose + helm/k8s) | — | inert | done |
-| F2 | Request context extension (incl. `realUserId`) + `tenantTx` (re-entrant, both identity GUCs) + `with-context` helpers + exception-filter mapping | F1 | none | done |
+| F2 | Request context extension (incl. `realUserId`) + `withScopedDb` (re-entrant, both identity GUCs) + `with-context` helpers + exception-filter mapping | F1 | none | done |
 | F3 | CI ratchet on `@InjectRepository` / `createQueryRunner` counts | F2 | none | done |
 | M1 | Migration: helper functions + GUC-aware trigger (**no grants — they live in db-init, F1**) | — | inert | done |
 | M2 | Migrations: direct + indirect + special (users/delegation/emergency) policies (no enable) | M1 | inert | done |
@@ -55,8 +55,8 @@ uses four classes:
 | C3 | Seeders + demo reset under `withSystemContext` | F2 | inert | done |
 | C4 | Emergency-access claim + expiry monitor under `withSystemContext`; grantee-side read audit | F2 | inert | done |
 | C6 | Interceptor restructure: fire-and-forget writes moved inside the ALS scope | F2 | neutral | done |
-| R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral | not started |
-| R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral | not started |
+| R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral | done |
+| R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral | done |
 | R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral | not started |
 | R4 | Refactor: budgets | F3, C1–C4, C6 | neutral | not started |
 | R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral | not started |
@@ -66,10 +66,10 @@ uses four classes:
 | L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none | not started |
 | D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none | not started |
 
-**Why context wrapping (C1–C4, C6) comes BEFORE the refactors (R1–R7), not after.** `tenantTx` throws
+**Why context wrapping (C1–C4, C6) comes BEFORE the refactors (R1–R7), not after.** `withScopedDb` throws
 on missing ambient context in every mode, including `off`. `jwt.strategy` runs in the guard phase —
 before the interceptor's ALS scope exists — and `@Cron` handlers have no scope at all. If an R task
-converted those code paths to `tenantTx` while the wrapping was still a later task, every login (and
+converted those code paths to `withScopedDb` while the wrapping was still a later task, every login (and
 every cron firing) would throw at `RLS_MODE=off` from the moment the R task deployed until the C task
 landed — a broken window the old ordering (C depends on R) guaranteed. The fix is directional:
 wrapping call paths in `withUserContext`/`withSystemContext` *before* any refactor is **inert** (the
@@ -84,7 +84,7 @@ Notes on the subtle rows:
   grant statements** — a migration referencing `monize_app` would crash-loop any deployment where the
   role does not exist (role and grants are db-init's job, F1).
 - **C5 is neutral, not inert:** it swaps the restore mechanism itself. It must work at `RLS_MODE=off`,
-  which is why `tenantTx` emits `app.preserve_timestamps` in **every** mode (see F2) and why C5
+  which is why `withScopedDb` emits `app.preserve_timestamps` in **every** mode (see F2) and why C5
   requires M1's trigger to already be in the deployed DB (guaranteed: M1 ships earlier and migrations
   run before the app serves traffic).
 - **C6 is neutral, not inert:** it moves the interceptor's `touchLastActivity` / timezone-cache calls,
@@ -111,7 +111,7 @@ policy arm. None of them affects anything today (`RLS_MODE=off`, policies not en
    tokens instead of a single-id context. Blocks R7 as well as flip B.
 2. **`AccountDelegateGuard` needs the same two-GUC seeding** — already flagged in C1 as out of its
    scope, repeated here because it has the same root cause and the same fix. It must land **before**
-   R2/R7 convert `DelegationService` to `tenantTx`, or delegate requests throw at `off`.
+   R2/R7 convert `DelegationService` to `withScopedDb`, or delegate requests throw at `off`.
 3. **`backend/src/admin/` contains no `withSystemContext` at all.** Admin cross-user writes to
    `refresh_tokens`, `personal_access_tokens` and `user_preferences` run under the admin's own user
    context and would silently affect zero rows under enforcement. The design doc (Phase 4) assumes
@@ -150,7 +150,7 @@ CNPG `managed.roles` requirement and the kustomize-overlay ConfigMap/Secret keys
    `enforce` connect as `DATABASE_APP_USER`/`DATABASE_APP_PASSWORD`, else `DATABASE_USER`. Startup
    validation: `enforce` without `DATABASE_APP_PASSWORD` refuses to boot with a clear error. Invalid
    `RLS_MODE` value also refuses to boot. Expose the parsed mode via a small config provider (F2's
-   `tenantTx` reads it).
+   `withScopedDb` reads it).
 3. Env: add `RLS_MODE`, `DATABASE_APP_USER`, `DATABASE_APP_PASSWORD` to `.env.example` (documented,
    including the `log_statement` password-visibility caveat) and to every `docker-compose*.yml` with
    empty-safe defaults (`${DATABASE_APP_PASSWORD:-}`); add the same keys to the helm chart
@@ -163,17 +163,17 @@ exists with grants after boot; changing the var and restarting rotates the passw
 already-initialized DB** (proves placement before the early return); revoking a grant and restarting
 restores it (proves idempotent re-apply). No pool-size configuration added.
 
-### F2. Request context extension + `tenantTx` + `with-context` helpers
+### F2. Request context extension + `withScopedDb` + `with-context` helpers
 
 - [x] Status: done (branch `claude/rls-foundation-tasks-s8vgu4`)
 
-**Scope:** `backend/src/common/request-context.ts`, new `backend/src/common/db/tenant-tx.ts`, new
+**Scope:** `backend/src/common/request-context.ts`, new `backend/src/common/db/scoped-db.ts`, new
 `backend/src/common/db/with-context.ts`, their unit tests. **Do not refactor any service in this task.**
 
 **Do:**
 1. Extend `RequestContext` with `realUserId?: string; system?: boolean; preserveTimestamps?: boolean`.
    No `qr` field — the design has no pinned connection.
-2. `tenantTx(dataSource, fn)` exactly per design Phase 2b: throw
+2. `withScopedDb(dataSource, fn)` exactly per design Phase 2b: throw
    `"DB access outside request/user/system context -- wrap the call path in withUserContext/withSystemContext"`
    when no ambient `userId`/`system`. **Re-entrancy first:** if the ALS scope already carries an active
    `EntityManager`, call `fn` with it directly — join the ambient transaction, never open a second one
@@ -200,7 +200,7 @@ restores it (proves idempotent re-apply). No pool-size configuration added.
 
 **Accept:** unit tests assert — exact `set_config(..., true)` SQL per branch including both identity
 GUCs and the `realUserId ?? userId` default; throw on missing context in every mode including `off`;
-**nested `tenantTx` reuses the ambient manager and opens no second transaction**; no **identity**-GUC
+**nested `withScopedDb` reuses the ambient manager and opens no second transaction**; no **identity**-GUC
 emission at `off`; `preserveTimestamps` emission in **every** mode including `off`; system-vs-user
 branch selection; UUID validation in `withUserContext`; filter mapping. LSP diagnostics clean.
 
@@ -219,7 +219,7 @@ branch selection; UUID validation in `withUserContext`; filter mapping. LSP diag
 baseline file.
 
 **Do:** count `@InjectRepository(` and `createQueryRunner(` occurrences in `backend/src` (exclude
-`tenant-tx.ts`, tests, test helpers). Fail CI if either count exceeds the committed baseline; passing
+`scoped-db.ts`, tests, test helpers). Fail CI if either count exceeds the committed baseline; passing
 runs update instructions tell the agent to lower the baseline in the same PR as a refactor. Baselines
 start at current counts (measured 2026-07: 86 files with `@InjectRepository` / 61 `createQueryRunner`
 call sites — script counts call sites, measure
@@ -430,7 +430,7 @@ visibility; unset/empty GUC → **zero rows**; **non-UUID garbage GUC → the st
 `app.preserve_timestamps` trigger behavior; **delegation semantics** — with `current` = owner and
 `real` = delegate: the delegate's `users` row is visible, `delegate_account_favourites` rows are
 visible and insertable, `account_delegates` visible from both sides; and the **GUC scope test** —
-after a committed `tenantTx`, `current_setting('app.current_user_id', true)` on the same connection
+after a committed `withScopedDb`, `current_setting('app.current_user_id', true)` on the same connection
 is empty and a raw `SELECT` returns zero rows.
 
 **Accept:** suite green against M1–M3; deliberately dropping one policy in a scratch run makes it fail;
@@ -443,18 +443,18 @@ removed from any of the three special policies.
 
 Shared instructions for every R task — the per-task list only names the modules:
 
-- Replace injected-repository data access with `tenantTx(this.dataSource, (m) => ...)`; replace manual
+- Replace injected-repository data access with `withScopedDb(this.dataSource, (m) => ...)`; replace manual
   `createQueryRunner()`/`startTransaction()`/`release()` blocks with
-  `tenantTx(this.dataSource, async (m) => { ... })`. Helpers that took a `QueryRunner` take an
-  `EntityManager`. Scope each `tenantTx` to the unit the code transacts **today** — one read or one
+  `withScopedDb(this.dataSource, async (m) => { ... })`. Helpers that took a `QueryRunner` take an
+  `EntityManager`. Scope each `withScopedDb` to the unit the code transacts **today** — one read or one
   read-modify-write block; never a whole request handler. Cross-service calls need no special
-  handling: a nested `tenantTx` joins the ambient transaction (F2's re-entrancy).
+  handling: a nested `withScopedDb` joins the ambient transaction (F2's re-entrancy).
 - **Context precondition:** C1–C4 and C6 have already wrapped every out-of-request entry point
   (guards/strategies, crons, seeders, interceptor writes) — an R task only converts data access whose
   ambient context exists. If you find a call path reaching the module's services with no wrapping
-  (`tenantTx` would throw at `off`), **stop and note it** — do not add `withSystemContext` yourself
+  (`withScopedDb` would throw at `off`), **stop and note it** — do not add `withSystemContext` yourself
   and do not convert that path.
-- Keep the existing per-module unit tests green by mocking `tenantTx`/`DataSource.transaction` instead
+- Keep the existing per-module unit tests green by mocking `withScopedDb`/`DataSource.transaction` instead
   of repositories; update test helpers once, reuse across the batch.
 - Lower the F3 ratchet baselines in the same PR.
 - Out of scope: any *new* `withSystemContext`/`withUserContext` wrapping, any module not listed.
@@ -463,13 +463,86 @@ Shared instructions for every R task — the per-task list only names the module
   zero `@InjectRepository`/`createQueryRunner` left in the listed modules.
 
 ### R1. accounts, categories, payees, tags, institutions
-- [ ] Status: not started — ~13 service files. Includes the balance-update atomic SQL paths
-  (`UPDATE accounts SET current_balance = current_balance + $1 ...` stays raw, inside `tenantTx`).
+- [x] Status: done (branch `claude/row-level-security-r1-d6onbm`). All 13 service files converted
+  (accounts ×8, categories, payees ×2 + `insert-payee-alias.util`, tags, institutions); ratchet
+  lowered **251 → 214** `@InjectRepository` / **61 → 47** `createQueryRunner` (−51 sites, zero left
+  in the five modules). Raw SQL (balance updates, daily balances, statement figures, forecast,
+  favourite reorder, the due-balance cron's bulk UPDATE) stayed raw and moved inside `withScopedDb`
+  (`m.query`). Full `npm run test:unit` green (9153), build + lint clean.
+
+  **Boundary decisions (for R2/R6 and L1):**
+  - Helpers still called from unrefactored modules **keep their optional `queryRunner` parameter**
+    with today's semantics; only the no-runner fallback became `withScopedDb`:
+    `TagsService.setTransactionTags/setSplitTags/+Bulk` (callers: transactions, R2) and
+    `AccountsService.updateBalance/recalculateCurrentBalance` (callers: transactions/securities/
+    import). After R2 converts those callers, the parameters can be dropped -- a nested `withScopedDb`
+    joins the ambient transaction. `insertPayeeAliasIgnoringDuplicate` and the auto-merge private
+    helpers now take an `EntityManager` (all callers in-module);
+    `PayeesService.findPayeeByAlias` dropped its never-passed `queryRunner` param.
+  - **`getUsersByEffectiveTimezone` (`common/users-by-timezone.util.ts`) still queries the
+    DataSource directly** -- it is shared by other modules' crons (budgets, scheduled-transactions,
+    notifications), so converting it belongs with a later R task; the accounts cron's own reads and
+    the bulk UPDATE do run through `withScopedDb` (one transaction per timezone bucket).
+  - Module files keep their `TypeOrmModule.forFeature` registrations (inert unused providers);
+    dropping them can ride along with L1.
+
+  **Tests:** shared harness `backend/src/test-helpers/scoped-db-testing.ts` (+ its own spec):
+  specs `jest.mock` the scoped-db module so `withScopedDb(ds, fn)` delegates to the mock
+  `dataSource.transaction`, and `manager.getRepository(Entity)` routes to the same per-entity
+  repository mocks the specs already assert against (the directory is excluded from the F3 ratchet
+  by its existing `test-helpers/` rule). The cron/bootstrap smoke is encoded as
+  `src/accounts/rls-context-smoke.spec.ts`, which runs the two accounts crons under the **real**
+  `withScopedDb` + C2 wrappers at `RLS_MODE=off` (plus a negative control proving an unwrapped call
+  still throws), so the no-context-throw acceptance is CI-checked rather than a one-off dev run.
 
 ### R2. transactions, scheduled-transactions
-- [ ] Status: not started — ~9 service files; the heaviest QueryRunner users (create/update/remove,
-  transfers, splits, bulk, reconciliation in dedicated `transaction-*.service.ts` files). Preserve
-  transaction boundaries exactly.
+- [x] Status: done (branch `claude/row-level-security-r1-d6onbm`). All 9 service files converted
+  (transactions ×6: `transactions`, `transaction-split`, `transaction-transfer`,
+  `transaction-bulk-update`, `transaction-reconciliation`, `transaction-analytics`;
+  scheduled-transactions ×3: `scheduled-transactions`, `scheduled-transaction-loan`,
+  `scheduled-transaction-override`). Ratchet lowered **214 → 187** `@InjectRepository` /
+  **47 → 31** `createQueryRunner` (−43 sites, zero left in the two modules). Full
+  `npm run test:unit` green (9154), build + lint + `i18n:check` clean.
+
+  **Transaction boundaries preserved exactly.** Each former `createQueryRunner()` block became one
+  `withScopedDb`; each former autocommit read became its own short `withScopedDb`. So `removeTransfer` /
+  `updateTransfer` legitimately open **two** transactions (the split-parent lookup, then the write
+  block) — matching what they did pre-RLS, not a regression. Two boundaries that needed care:
+  - `findAll` wraps its whole read block in a single `withScopedDb` and threads the `EntityManager`
+    through every helper (`calculateStartingBalance`, `buildFilteredIdsSubquery`,
+    `computeSplitAwareSum`, `enrichWithInvestmentLinks`, …), so the page query, its balance
+    sub-queries and the attachment-count roll-up share one snapshot as before.
+  - The auto-post cron's per-timezone read `withScopedDb` **must commit before** the per-user posting
+    loop: each `post()` runs its own `withUserContext` transactions, which would otherwise join the
+    system-context one via F2 re-entrancy.
+
+  **Boundary decisions (for R3/R6 and L1):**
+  - The R1 helpers that kept an optional `queryRunner` for unrefactored callers **dropped it**:
+    `TagsService.setTransactionTags/setSplitTags/+Bulk` and
+    `AccountsService.updateBalance/recalculateCurrentBalance` are now called with no runner from
+    both modules — a nested `withScopedDb` joins the ambient transaction. Same for the in-module
+    helpers: `TransactionSplitService.createSplits`/`deleteSplitSideEffects` lost their
+    `externalQueryRunner` parameter, and `applySplitTags`/`removeParentTransaction`/
+    `ScheduledTransactionsService.createSplits` take an `EntityManager` (or nothing) instead.
+  - `InvestmentTransactionsService.createEmbeddedForSplit` / `reverseAndRemoveEmbedded` accept
+    `QueryRunner | EntityManager` for now (a two-line shim at the top of each): the split service
+    passes an `EntityManager` while securities-internal callers still pass a `QueryRunner`. **R3
+    should delete the shim** once those callers convert.
+  - `TransactionSplitService.deleteTransferSplitLinkedTransactions` was **removed** — dead
+    production code (a strict subset of `deleteSplitSideEffects`, which handles investment splits
+    too); its specs were re-pointed at `deleteSplitSideEffects`, so the transfer-leg reversal
+    coverage is unchanged.
+  - `getUsersByEffectiveTimezone` still queries the DataSource directly (unchanged from R1).
+
+  **Tests:** the R1 harness (`src/test-helpers/scoped-db-testing.ts`) carried the whole batch — the
+  specs `jest.mock` the scoped-db module and route `manager.getRepository(Entity)` to the same
+  per-entity mocks. Where a spec previously distinguished "injected repo" from "queryRunner.manager"
+  (bulk-update, transactions), those now resolve to one mock, so the per-phase overrides collapsed
+  into a single ordered `createQueryBuilder` chain. QueryRunner-lifecycle assertions
+  (`commitTransaction`/`release`) became `dataSource.transaction` grouping assertions. The
+  cron smoke is `src/scheduled-transactions/rls-context-smoke.spec.ts`, which runs the auto-post
+  cron end to end under the **real** `withScopedDb` + C2 wrappers at `RLS_MODE=off` (plus a negative
+  control proving an unwrapped call still throws).
 
 ### R3. securities, investment-reports, net-worth, monte-carlo, loan-rate-changes, loan-scenarios
 - [ ] Status: not started — ~14 service files; includes holdings rebuild and investment CRUD
@@ -480,11 +553,11 @@ Shared instructions for every R task — the per-task list only names the module
 
 ### R5. built-in-reports, reports
 - [ ] Status: not started — ~10 service files; read-heavy — watch that report queries stay
-  single-`tenantTx` (no per-row transactions in loops).
+  single-`withScopedDb` (no per-row transactions in loops).
 
 ### R6. ai, mcp, import, action-history, currencies, updates, notifications
 - [ ] Status: not started — ~12 service files. AI relay/query SSE and MCP HTTP must hold **no**
-  connection between queries (verify streaming paths call `tenantTx` per operation, not around the
+  connection between queries (verify streaming paths call `withScopedDb` per operation, not around the
   stream).
 
 ### R7. auth, users, delegation, admin, emergency-access, backup, database
@@ -541,7 +614,7 @@ Shared instructions for every R task — the per-task list only names the module
     GUCs (`current` = owner, `real` = delegate), which `withUserContext(userId)` alone cannot seed. It
     lives in the delegation module (outside C1's `auth/**` + `oauth/**` scope), so it is left for the
     delegation wrapping/refactor — **must land before R2/R7 convert `DelegationService` to
-    `tenantTx`**, or delegate requests throw at `off`.
+    `withScopedDb`**, or delegate requests throw at `off`.
   - `emergency-access-claim.controller` public routes → **C4**.
   - `RequestContextInterceptor`'s `touchLastActivity` / timezone reads run outside its own scope →
     **C6**.
@@ -550,7 +623,7 @@ Shared instructions for every R task — the per-task list only names the module
   in addition to the auth module.
 
 **Scope:** `backend/src/auth/**`, `backend/src/oauth/**`, PAT validation path, password-reset +
-email-verification lookups, plus the audit. Wrapping only — no repository-to-`tenantTx` conversion
+email-verification lookups, plus the audit. Wrapping only — no repository-to-`withScopedDb` conversion
 (that is R7). Wrapping before refactoring is inert: the helpers only seed ALS.
 
 **Do:** per design Phase 4:
@@ -672,20 +745,20 @@ grantee-side audit result in the PR description.
 
 - [ ] Status: **blocked** -- not started. Unlike C1-C4/C6 (which only depend on F2), C5 also depends
   on **M1** (the GUC-aware `update_updated_at_column()` trigger must be in the DB) and **R7** (the
-  restore path must already be on `tenantTx` to carry the `preserveTimestamps` flag). Both are not
+  restore path must already be on `withScopedDb` to carry the `preserveTimestamps` flag). Both are not
   started, so C5 cannot begin yet without a scope violation ("never start a task whose dependencies
   are unmerged").
 
 **Scope:** `backend/src/backup/backup.service.ts` (restore path, ~line 1317).
 
 **Do:** delete the `ALTER TABLE ... DISABLE TRIGGER` / `ENABLE TRIGGER` pair; run restore transactions
-with `preserveTimestamps: true` in the ambient context so `tenantTx` emits the GUC per transaction.
+with `preserveTimestamps: true` in the ambient context so `withScopedDb` emits the GUC per transaction.
 Restore runs under the requesting user's normal context — no system bypass, no DDL.
 
 **Deploy note (why this is "neutral", not "inert"):** this task changes how restore works **at
 `RLS_MODE=off`** — the GUC path becomes the only thing preserving restored timestamps. Two
 preconditions, both guaranteed by task order but verify anyway: M1's GUC-aware trigger is in the
-deployed DB (migrations run at startup, M1 ships earlier), and F2's `tenantTx` emits
+deployed DB (migrations run at startup, M1 ships earlier), and F2's `withScopedDb` emits
 `app.preserve_timestamps` unconditionally (not mode-gated).
 
 **Accept:** backup export + restore integration test **at `RLS_MODE=off`** proves restored
@@ -714,7 +787,7 @@ writes found by grep.
 only `next.handle()`). Converted naively in R7, all three sites would throw on every authenticated
 request. Restructure: move these calls inside the scope the interceptor establishes, or wrap each in
 `withUserContext(userId)`. Behavior at `off` must be preserved (same writes, same fire-and-forget
-semantics). Do not convert the repository calls to `tenantTx` here — R7 does that; this task only
+semantics). Do not convert the repository calls to `withScopedDb` here — R7 does that; this task only
 guarantees ambient context exists when it happens.
 
 **Accept:** unit tests cover both writes running inside a context scope; interceptor e2e/integration
@@ -730,7 +803,7 @@ behavior unchanged; no context-throw in dev smoke once R7 lands (verified again 
 
 **Do:** ESLint `no-restricted-imports`: `with-context.ts` importable only from the allowlist (admin,
 auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepository` and
-`createQueryRunner` outside `tenant-tx.ts` + test helpers. Remove the F3 ratchet script (superseded).
+`createQueryRunner` outside `scoped-db.ts` + test helpers. Remove the F3 ratchet script (superseded).
 
 **Accept:** lint fails on a synthetic violation of each rule; clean on the real tree.
 
@@ -738,7 +811,7 @@ auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepos
 
 - [ ] Status: not started
 
-**Do:** update root `CLAUDE.md` (QueryRunner section now points at `tenantTx` as the required pattern)
+**Do:** update root `CLAUDE.md` (QueryRunner section now points at `withScopedDb` as the required pattern)
 and `database/CLAUDE.md` (RLS migration conventions, "adding a new table" policy step — four buckets,
 no role/grants in migrations); fix `backend/CLAUDE.md`'s **stale scheduler claim** (crons run in the
 API process; there is no separate scheduler — delete or fix the dead `start:scheduler` script

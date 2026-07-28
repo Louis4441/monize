@@ -10,6 +10,7 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 import { createTestCategory } from "../helpers/test-factories";
 
 // Regression: CategoriesService.update/remove were converted to run inside a
@@ -63,10 +64,12 @@ describe("CategoriesService write paths (integration)", () => {
       parentId: parent.id,
     });
 
-    const updated = await service.update(user.id, parent.id, {
-      name: "Parent Renamed",
-      isIncome: true,
-    });
+    const updated = await withUserContext(user.id, () =>
+      service.update(user.id, parent.id, {
+        name: "Parent Renamed",
+        isIncome: true,
+      }),
+    );
 
     expect(updated.name).toBe("Parent Renamed");
     expect(updated.isIncome).toBe(true);
@@ -91,7 +94,9 @@ describe("CategoriesService write paths (integration)", () => {
       }),
     );
 
-    await expect(service.remove(user.id, category.id)).resolves.toBeUndefined();
+    await expect(
+      withUserContext(user.id, () => service.remove(user.id, category.id)),
+    ).resolves.toBeUndefined();
 
     // Category gone, and the payee's default reference nulled atomically.
     const reCategory = await dataSource.manager.findOneBy(Category, {

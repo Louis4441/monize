@@ -2,9 +2,9 @@ import { DataSource, EntityManager } from "typeorm";
 import { requestContextStorage, RequestContext } from "../request-context";
 import {
   MISSING_CONTEXT_MESSAGE,
-  getActiveTenantManager,
-  tenantTx,
-} from "./tenant-tx";
+  getActiveScopedManager,
+  withScopedDb,
+} from "./scoped-db";
 
 interface RecordedQuery {
   text: string;
@@ -40,14 +40,14 @@ afterEach(() => {
   }
 });
 
-describe("tenantTx -- context guard", () => {
+describe("withScopedDb -- context guard", () => {
   it.each(["off", "shadow", "enforce"])(
     "throws when there is no ambient context (mode %s)",
     async (mode) => {
       process.env.RLS_MODE = mode;
       const { dataSource, transaction } = makeDataSource();
       await expect(
-        tenantTx(dataSource, async () => "unreachable"),
+        withScopedDb(dataSource, async () => "unreachable"),
       ).rejects.toThrow(MISSING_CONTEXT_MESSAGE);
       expect(transaction).not.toHaveBeenCalled();
     },
@@ -58,18 +58,18 @@ describe("tenantTx -- context guard", () => {
     const { dataSource } = makeDataSource();
     await expect(
       run({ timezone: "UTC" }, () =>
-        tenantTx(dataSource, async () => "unreachable"),
+        withScopedDb(dataSource, async () => "unreachable"),
       ),
     ).rejects.toThrow(MISSING_CONTEXT_MESSAGE);
   });
 });
 
-describe("tenantTx -- identity GUC emission", () => {
+describe("withScopedDb -- identity GUC emission", () => {
   it("emits both identity GUCs for a user context (enforce)", async () => {
     process.env.RLS_MODE = "enforce";
     const { dataSource, queries } = makeDataSource();
     await run({ userId: "user-a", realUserId: "delegate-b" }, () =>
-      tenantTx(dataSource, async () => undefined),
+      withScopedDb(dataSource, async () => undefined),
     );
     expect(queries).toEqual([
       {
@@ -87,7 +87,7 @@ describe("tenantTx -- identity GUC emission", () => {
     process.env.RLS_MODE = "shadow";
     const { dataSource, queries } = makeDataSource();
     await run({ userId: "user-a" }, () =>
-      tenantTx(dataSource, async () => undefined),
+      withScopedDb(dataSource, async () => undefined),
     );
     expect(queries[1]).toEqual({
       text: "SELECT set_config('app.real_user_id', $1, true)",
@@ -99,7 +99,7 @@ describe("tenantTx -- identity GUC emission", () => {
     process.env.RLS_MODE = "enforce";
     const { dataSource, queries } = makeDataSource();
     await run({ system: true }, () =>
-      tenantTx(dataSource, async () => undefined),
+      withScopedDb(dataSource, async () => undefined),
     );
     expect(queries).toEqual([
       {
@@ -113,7 +113,7 @@ describe("tenantTx -- identity GUC emission", () => {
     process.env.RLS_MODE = "off";
     const { dataSource, queries, transaction } = makeDataSource();
     const result = await run({ userId: "user-a" }, () =>
-      tenantTx(dataSource, async () => "value"),
+      withScopedDb(dataSource, async () => "value"),
     );
     // Still wraps a transaction and runs fn, but sets no GUCs.
     expect(transaction).toHaveBeenCalledTimes(1);
@@ -125,20 +125,20 @@ describe("tenantTx -- identity GUC emission", () => {
     process.env.RLS_MODE = "off";
     const { dataSource, queries } = makeDataSource();
     await run({ system: true }, () =>
-      tenantTx(dataSource, async () => undefined),
+      withScopedDb(dataSource, async () => undefined),
     );
     expect(queries).toEqual([]);
   });
 });
 
-describe("tenantTx -- preserveTimestamps", () => {
+describe("withScopedDb -- preserveTimestamps", () => {
   it.each(["off", "shadow", "enforce"])(
     "emits app.preserve_timestamps in every mode including %s",
     async (mode) => {
       process.env.RLS_MODE = mode;
       const { dataSource, queries } = makeDataSource();
       await run({ userId: "user-a", preserveTimestamps: true }, () =>
-        tenantTx(dataSource, async () => undefined),
+        withScopedDb(dataSource, async () => undefined),
       );
       expect(queries).toContainEqual({
         text: "SELECT set_config('app.preserve_timestamps', 'on', true)",
@@ -151,7 +151,7 @@ describe("tenantTx -- preserveTimestamps", () => {
     process.env.RLS_MODE = "off";
     const { dataSource, queries } = makeDataSource();
     await run({ userId: "user-a", preserveTimestamps: true }, () =>
-      tenantTx(dataSource, async () => undefined),
+      withScopedDb(dataSource, async () => undefined),
     );
     expect(queries).toEqual([
       {
@@ -162,18 +162,18 @@ describe("tenantTx -- preserveTimestamps", () => {
   });
 });
 
-describe("tenantTx -- re-entrancy", () => {
+describe("withScopedDb -- re-entrancy", () => {
   it("joins the ambient transaction and opens no second one", async () => {
     process.env.RLS_MODE = "enforce";
     const { dataSource, transaction, manager } = makeDataSource();
 
     await run({ userId: "user-a" }, () =>
-      tenantTx(dataSource, async (outer) => {
+      withScopedDb(dataSource, async (outer) => {
         expect(outer).toBe(manager);
         expect(transaction).toHaveBeenCalledTimes(1);
-        expect(getActiveTenantManager()).toBe(manager);
+        expect(getActiveScopedManager()).toBe(manager);
 
-        const innerManager = await tenantTx(dataSource, async (inner) => {
+        const innerManager = await withScopedDb(dataSource, async (inner) => {
           // Same manager, no new transaction opened.
           expect(transaction).toHaveBeenCalledTimes(1);
           return inner;
@@ -189,10 +189,10 @@ describe("tenantTx -- re-entrancy", () => {
     process.env.RLS_MODE = "enforce";
     const { dataSource, queries } = makeDataSource();
     await run({ userId: "user-a" }, () =>
-      tenantTx(dataSource, async () => {
+      withScopedDb(dataSource, async () => {
         const before = queries.length;
-        await tenantTx(dataSource, async () => undefined);
-        // No additional set_config calls from the nested tenantTx.
+        await withScopedDb(dataSource, async () => undefined);
+        // No additional set_config calls from the nested withScopedDb.
         expect(queries.length).toBe(before);
       }),
     );
@@ -202,8 +202,8 @@ describe("tenantTx -- re-entrancy", () => {
     process.env.RLS_MODE = "enforce";
     const { dataSource } = makeDataSource();
     await run({ userId: "user-a" }, () =>
-      tenantTx(dataSource, async () => undefined),
+      withScopedDb(dataSource, async () => undefined),
     );
-    expect(getActiveTenantManager()).toBeUndefined();
+    expect(getActiveScopedManager()).toBeUndefined();
   });
 });

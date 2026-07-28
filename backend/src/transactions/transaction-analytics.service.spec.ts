@@ -1,11 +1,15 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
-import { Brackets } from "typeorm";
+import { Brackets, DataSource } from "typeorm";
 import { TransactionAnalyticsService } from "./transaction-analytics.service";
 import { Transaction } from "./entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { buildTransactionSearchClause } from "./transaction-search.util";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("TransactionAnalyticsService", () => {
   let service: TransactionAnalyticsService;
@@ -64,21 +68,16 @@ describe("TransactionAnalyticsService", () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
+    const { dataSource } = createScopedDbMocks([
+      [Transaction, transactionsRepository],
+      [Category, categoriesRepository],
+      [UserPreference, userPreferenceRepository],
+    ]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TransactionAnalyticsService,
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(Category),
-          useValue: categoriesRepository,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: userPreferenceRepository,
-        },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 

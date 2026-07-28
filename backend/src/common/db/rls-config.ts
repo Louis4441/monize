@@ -40,7 +40,7 @@ export function parseRlsMode(raw: string | undefined | null): RlsMode {
 
 /**
  * Resolve the current RLS mode from the environment. Read fresh from
- * `process.env` so `tenantTx` reflects the process's configured mode without
+ * `process.env` so `withScopedDb` reflects the process's configured mode without
  * threading a provider through every call site.
  */
 export function getRlsMode(): RlsMode {

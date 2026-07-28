@@ -1,9 +1,9 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Between, In, Repository } from "typeorm";
+import { Between, DataSource, In } from "typeorm";
 import { Account, AccountType } from "./entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
+import { withScopedDb } from "../common/db/scoped-db";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
 
@@ -67,12 +67,7 @@ export interface PaymentRecord {
 export class LoanPaymentDetectorService {
   private readonly logger = new Logger(LoanPaymentDetectorService.name);
 
-  constructor(
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(Transaction)
-    private transactionRepository: Repository<Transaction>,
-  ) {}
+  constructor(private dataSource: DataSource) {}
 
   /**
    * Analyze transactions on a loan/mortgage account to detect payment patterns.
@@ -83,9 +78,11 @@ export class LoanPaymentDetectorService {
     userId: string,
     accountId: string,
   ): Promise<DetectedLoanPayment | null> {
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId, userId },
-    });
+    const account = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id: accountId, userId },
+      }),
+    );
 
     if (!account) {
       throw new NotFoundException(
@@ -103,11 +100,13 @@ export class LoanPaymentDetectorService {
 
     // Find all transactions on this loan account that look like payments
     // Payments to a loan are positive amounts (reducing the negative balance)
-    const transactions = await this.transactionRepository.find({
-      where: { accountId, userId },
-      relations: ["account"],
-      order: { transactionDate: "ASC" },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Transaction).find({
+        where: { accountId, userId },
+        relations: ["account"],
+        order: { transactionDate: "ASC" },
+      }),
+    );
 
     if (transactions.length === 0) {
       return null;
@@ -250,145 +249,148 @@ export class LoanPaymentDetectorService {
     accountId: string,
     transactions: Transaction[],
   ): Promise<PaymentRecord[]> {
-    const payments: PaymentRecord[] = [];
-    // Track processed linked source transactions to avoid duplicates.
-    // When extra principal is a second transfer split, each split creates its
-    // own transaction on the loan side. We only want one payment record per
-    // source transaction -- the first one will discover all splits.
-    const processedLinkedIds = new Set<string>();
+    // One read block: the linked-transfer and split lookups below are a
+    // per-transaction walk over the same snapshot of data.
+    return withScopedDb(this.dataSource, async (m) => {
+      const payments: PaymentRecord[] = [];
+      // Track processed linked source transactions to avoid duplicates.
+      // When extra principal is a second transfer split, each split creates its
+      // own transaction on the loan side. We only want one payment record per
+      // source transaction -- the first one will discover all splits.
+      const processedLinkedIds = new Set<string>();
 
-    for (const tx of transactions) {
-      const loanSideAmount = Number(tx.amount);
+      for (const tx of transactions) {
+        const loanSideAmount = Number(tx.amount);
 
-      // Payments to a loan account are positive (reducing the negative liability)
-      if (loanSideAmount <= 0) continue;
+        // Payments to a loan account are positive (reducing the negative liability)
+        if (loanSideAmount <= 0) continue;
 
-      // Skip if we already processed another loan-side transaction from the same source
-      if (
-        tx.linkedTransactionId &&
-        processedLinkedIds.has(tx.linkedTransactionId)
-      ) {
-        continue;
-      }
+        // Skip if we already processed another loan-side transaction from the same source
+        if (
+          tx.linkedTransactionId &&
+          processedLinkedIds.has(tx.linkedTransactionId)
+        ) {
+          continue;
+        }
 
-      let sourceAccountId: string | null = null;
-      let sourceAccountName: string | null = null;
-      let interestAmount: number | null = null;
-      let principalAmount: number | null = null;
-      let extraPrincipalAmount: number | null = null;
-      let principalSplitAmounts: number[] = [];
-      let interestCategoryId: string | null = null;
-      let interestCategoryName: string | null = null;
-      // Default to loan-side amount; override with source amount when available
-      let totalPaymentAmount = loanSideAmount;
+        let sourceAccountId: string | null = null;
+        let sourceAccountName: string | null = null;
+        let interestAmount: number | null = null;
+        let principalAmount: number | null = null;
+        let extraPrincipalAmount: number | null = null;
+        let principalSplitAmounts: number[] = [];
+        let interestCategoryId: string | null = null;
+        let interestCategoryName: string | null = null;
+        // Default to loan-side amount; override with source amount when available
+        let totalPaymentAmount = loanSideAmount;
 
-      // Check if this is a transfer - find the linked source transaction
-      if (tx.isTransfer && tx.linkedTransactionId) {
-        processedLinkedIds.add(tx.linkedTransactionId);
-        const linkedTx = await this.transactionRepository.findOne({
-          where: { id: tx.linkedTransactionId, userId },
-          relations: ["account"],
-        });
-        if (linkedTx) {
-          sourceAccountId = linkedTx.accountId;
-          sourceAccountName = linkedTx.account?.name || null;
+        // Check if this is a transfer - find the linked source transaction
+        if (tx.isTransfer && tx.linkedTransactionId) {
+          processedLinkedIds.add(tx.linkedTransactionId);
+          const linkedTx = await m.findOne(Transaction, {
+            where: { id: tx.linkedTransactionId, userId },
+            relations: ["account"],
+          });
+          if (linkedTx) {
+            sourceAccountId = linkedTx.accountId;
+            sourceAccountName = linkedTx.account?.name || null;
 
-          // The source transaction amount is the total payment (negative outflow).
-          // Use its absolute value as the total payment amount.
-          const sourceAmount = Math.abs(Number(linkedTx.amount));
-          if (sourceAmount > 0) {
-            totalPaymentAmount = sourceAmount;
-          }
-
-          // Check if the source transaction has splits (principal + interest)
-          if (linkedTx.isSplit) {
-            const splits = await this.transactionRepository.manager.find(
-              TransactionSplit,
-              {
-                where: { transactionId: linkedTx.id },
-                relations: ["category"],
-              },
-            );
-
-            // Collect all principal splits (transfers to the loan account)
-            const principalSplits: Array<{
-              amount: number;
-              memo: string | null;
-            }> = [];
-
-            for (const split of splits) {
-              const splitAmount = Math.abs(Number(split.amount));
-              if (split.transferAccountId === accountId) {
-                principalSplits.push({
-                  amount: splitAmount,
-                  memo: split.memo,
-                });
-              } else if (split.categoryId) {
-                // Categorized split = interest expense
-                interestAmount = splitAmount;
-                interestCategoryId = split.categoryId;
-                interestCategoryName = split.category?.name || null;
-              }
+            // The source transaction amount is the total payment (negative outflow).
+            // Use its absolute value as the total payment amount.
+            const sourceAmount = Math.abs(Number(linkedTx.amount));
+            if (sourceAmount > 0) {
+              totalPaymentAmount = sourceAmount;
             }
 
-            // Separate regular principal from extra principal using memo cues.
-            // Regular principal varies with amortization; extra is typically static.
-            if (principalSplits.length === 1) {
-              // Single principal split -- check memo for "extra"/"additional"
-              const memo = (principalSplits[0].memo || "").toLowerCase();
-              if (memo.includes("extra") || memo.includes("additional")) {
-                extraPrincipalAmount = principalSplits[0].amount;
-              } else {
-                principalAmount = principalSplits[0].amount;
-              }
-            } else if (principalSplits.length > 1) {
-              // Multiple principal splits -- use memo cues to separate
-              let regular = 0;
-              let extra = 0;
-              let hasMemoCues = false;
+            // Check if the source transaction has splits (principal + interest)
+            if (linkedTx.isSplit) {
+              const splits = await m.find(TransactionSplit, {
+                where: { transactionId: linkedTx.id },
+                relations: ["category"],
+              });
 
-              for (const ps of principalSplits) {
-                const memo = (ps.memo || "").toLowerCase();
-                if (memo.includes("extra") || memo.includes("additional")) {
-                  extra += ps.amount;
-                  hasMemoCues = true;
-                } else {
-                  regular += ps.amount;
+              // Collect all principal splits (transfers to the loan account)
+              const principalSplits: Array<{
+                amount: number;
+                memo: string | null;
+              }> = [];
+
+              for (const split of splits) {
+                const splitAmount = Math.abs(Number(split.amount));
+                if (split.transferAccountId === accountId) {
+                  principalSplits.push({
+                    amount: splitAmount,
+                    memo: split.memo,
+                  });
+                } else if (split.categoryId) {
+                  // Categorized split = interest expense
+                  interestAmount = splitAmount;
+                  interestCategoryId = split.categoryId;
+                  interestCategoryName = split.category?.name || null;
                 }
               }
 
-              if (hasMemoCues) {
-                principalAmount = regular > 0 ? regular : null;
-                extraPrincipalAmount = extra > 0 ? extra : null;
-              } else {
-                // No memo cues -- keep individual split amounts for cross-payment
-                // analysis. The largest split is likely regular principal (varies),
-                // smaller splits may be extra principal (static).
-                // Sum all into principalAmount for now; detectExtraPrincipal will
-                // use principalSplitAmounts to separate them.
-                principalSplitAmounts = principalSplits.map((ps) => ps.amount);
-                principalAmount = sumMoney(principalSplitAmounts);
+              // Separate regular principal from extra principal using memo cues.
+              // Regular principal varies with amortization; extra is typically static.
+              if (principalSplits.length === 1) {
+                // Single principal split -- check memo for "extra"/"additional"
+                const memo = (principalSplits[0].memo || "").toLowerCase();
+                if (memo.includes("extra") || memo.includes("additional")) {
+                  extraPrincipalAmount = principalSplits[0].amount;
+                } else {
+                  principalAmount = principalSplits[0].amount;
+                }
+              } else if (principalSplits.length > 1) {
+                // Multiple principal splits -- use memo cues to separate
+                let regular = 0;
+                let extra = 0;
+                let hasMemoCues = false;
+
+                for (const ps of principalSplits) {
+                  const memo = (ps.memo || "").toLowerCase();
+                  if (memo.includes("extra") || memo.includes("additional")) {
+                    extra += ps.amount;
+                    hasMemoCues = true;
+                  } else {
+                    regular += ps.amount;
+                  }
+                }
+
+                if (hasMemoCues) {
+                  principalAmount = regular > 0 ? regular : null;
+                  extraPrincipalAmount = extra > 0 ? extra : null;
+                } else {
+                  // No memo cues -- keep individual split amounts for cross-payment
+                  // analysis. The largest split is likely regular principal (varies),
+                  // smaller splits may be extra principal (static).
+                  // Sum all into principalAmount for now; detectExtraPrincipal will
+                  // use principalSplitAmounts to separate them.
+                  principalSplitAmounts = principalSplits.map(
+                    (ps) => ps.amount,
+                  );
+                  principalAmount = sumMoney(principalSplitAmounts);
+                }
               }
             }
           }
         }
+
+        payments.push({
+          date: tx.transactionDate,
+          amount: totalPaymentAmount,
+          sourceAccountId,
+          sourceAccountName,
+          interestAmount,
+          principalAmount,
+          extraPrincipalAmount,
+          principalSplitAmounts,
+          interestCategoryId,
+          interestCategoryName,
+        });
       }
 
-      payments.push({
-        date: tx.transactionDate,
-        amount: totalPaymentAmount,
-        sourceAccountId,
-        sourceAccountName,
-        interestAmount,
-        principalAmount,
-        extraPrincipalAmount,
-        principalSplitAmounts,
-        interestCategoryId,
-        interestCategoryName,
-      });
-    }
-
-    return payments;
+      return payments;
+    });
   }
 
   /**
@@ -417,7 +419,8 @@ export class LoanPaymentDetectorService {
     account: Account,
     payments: PaymentRecord[],
   ): Promise<PaymentRecord[]> {
-    if (!account.interestCategoryId || payments.length === 0) return payments;
+    const interestCategoryId = account.interestCategoryId;
+    if (!interestCategoryId || payments.length === 0) return payments;
     // Nothing to fill if every payment already has split-based interest.
     if (payments.every((p) => p.interestAmount != null)) return payments;
 
@@ -436,14 +439,16 @@ export class LoanPaymentDetectorService {
     const rangeStart = this.shiftDateKey(dateKeys[0], -45);
     const rangeEnd = this.shiftDateKey(dateKeys[dateKeys.length - 1], 45);
 
-    const interestTxns = await this.transactionRepository.find({
-      where: {
-        userId,
-        accountId: In(sourceIds),
-        categoryId: account.interestCategoryId,
-        transactionDate: Between(rangeStart, rangeEnd),
-      },
-    });
+    const interestTxns = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Transaction).find({
+        where: {
+          userId,
+          accountId: In(sourceIds),
+          categoryId: interestCategoryId,
+          transactionDate: Between(rangeStart, rangeEnd),
+        },
+      }),
+    );
     if (interestTxns.length === 0) return payments;
 
     const tolerance = this.paymentPeriodToleranceDays(payments);

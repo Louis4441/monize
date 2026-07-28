@@ -4,14 +4,7 @@ import {
   ConflictException,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import {
-  DataSource,
-  In,
-  QueryFailedError,
-  QueryRunner,
-  Repository,
-} from "typeorm";
+import { DataSource, EntityManager, In, QueryFailedError } from "typeorm";
 import { tr } from "../i18n/translate";
 import { Payee } from "./entities/payee.entity";
 import { PayeeAlias } from "./entities/payee-alias.entity";
@@ -31,6 +24,7 @@ import {
   backfillPayeeCategory,
   countUncategorizedTransactionsByPayee,
 } from "./payee-backfill.util";
+import { withScopedDb } from "../common/db/scoped-db";
 
 export type CategoryMatchMode = "off" | "category" | "subcategory";
 
@@ -147,10 +141,6 @@ export class PayeeAutoMergeService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly payeesService: PayeesService,
-    @InjectRepository(Category)
-    private readonly categoriesRepository: Repository<Category>,
-    @InjectRepository(Transaction)
-    private readonly transactionsRepository: Repository<Transaction>,
   ) {}
 
   /**
@@ -178,9 +168,8 @@ export class PayeeAutoMergeService {
 
     // Per-payee count of transactions a default-category backfill would touch,
     // surfaced per group so the UI can offer the optional backfill with a count.
-    const uncategorizedCounts = await countUncategorizedTransactionsByPayee(
-      this.transactionsRepository.manager,
-      userId,
+    const uncategorizedCounts = await withScopedDb(this.dataSource, (m) =>
+      countUncategorizedTransactionsByPayee(m, userId),
     );
 
     // Resolve each payee's effective category when the filter is on: prefer the
@@ -387,10 +376,12 @@ export class PayeeAutoMergeService {
   private async buildRootCategoryMap(
     userId: string,
   ): Promise<Map<string, string>> {
-    const categories = await this.categoriesRepository.find({
-      where: { userId },
-      select: ["id", "parentId"],
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId },
+        select: ["id", "parentId"],
+      }),
+    );
     const parentOf = new Map<string, string | null>(
       categories.map((c) => [c.id, c.parentId]),
     );
@@ -419,18 +410,21 @@ export class PayeeAutoMergeService {
   private async buildCategoryCountsMap(
     userId: string,
   ): Promise<Map<string, Map<string, number>>> {
-    const rows = await this.transactionsRepository
-      .createQueryBuilder("t")
-      .select("t.payee_id", "payeeId")
-      .addSelect("t.category_id", "categoryId")
-      .addSelect("COUNT(*)", "cnt")
-      .where("t.user_id = :userId", { userId })
-      .andWhere("t.payee_id IS NOT NULL")
-      .andWhere("t.category_id IS NOT NULL")
-      .andWhere("t.is_transfer = false")
-      .groupBy("t.payee_id")
-      .addGroupBy("t.category_id")
-      .getRawMany<{ payeeId: string; categoryId: string; cnt: string }>();
+    const rows = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("t")
+        .select("t.payee_id", "payeeId")
+        .addSelect("t.category_id", "categoryId")
+        .addSelect("COUNT(*)", "cnt")
+        .where("t.user_id = :userId", { userId })
+        .andWhere("t.payee_id IS NOT NULL")
+        .andWhere("t.category_id IS NOT NULL")
+        .andWhere("t.is_transfer = false")
+        .groupBy("t.payee_id")
+        .addGroupBy("t.category_id")
+        .getRawMany<{ payeeId: string; categoryId: string; cnt: string }>(),
+    );
 
     const map = new Map<string, Map<string, number>>();
     for (const row of rows) {
@@ -623,10 +617,12 @@ export class PayeeAutoMergeService {
       ),
     ];
     if (categoryIds.length > 0) {
-      const owned = await this.categoriesRepository.find({
-        where: { id: In(categoryIds), userId },
-        select: ["id"],
-      });
+      const owned = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Category).find({
+          where: { id: In(categoryIds), userId },
+          select: ["id"],
+        }),
+      );
       const ownedIds = new Set(owned.map((c) => c.id));
       const invalidIds = categoryIds.filter((id) => !ownedIds.has(id));
       if (invalidIds.length > 0) {
@@ -746,12 +742,8 @@ export class PayeeAutoMergeService {
     aliasSkipped: boolean;
     transactionsBackfilled: number;
   }> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const canonical = await queryRunner.manager.findOne(Payee, {
+    return withScopedDb(this.dataSource, async (m) => {
+      const canonical = await m.findOne(Payee, {
         where: { id: group.canonicalPayeeId, userId },
       });
       if (!canonical) {
@@ -764,7 +756,7 @@ export class PayeeAutoMergeService {
         );
       }
 
-      const sources = await queryRunner.manager.find(Payee, {
+      const sources = await m.find(Payee, {
         where: group.sourcePayeeIds.map((id) => ({ id, userId })),
       });
       if (sources.length !== group.sourcePayeeIds.length) {
@@ -778,7 +770,7 @@ export class PayeeAutoMergeService {
 
       // Optional rename of the canonical payee.
       const canonicalName = await this.maybeRenameCanonical(
-        queryRunner,
+        m,
         userId,
         canonical,
         group,
@@ -787,7 +779,7 @@ export class PayeeAutoMergeService {
       // Optionally set the chosen default category on the canonical. Ownership
       // was validated up front in applyAutoMerge.
       if (group.defaultCategoryId) {
-        await queryRunner.manager.update(
+        await m.update(
           Payee,
           { id: canonical.id, userId },
           { defaultCategoryId: group.defaultCategoryId },
@@ -797,31 +789,31 @@ export class PayeeAutoMergeService {
       // Reassign each source's data to the canonical, then delete the source.
       let transactionsMigrated = 0;
       for (const source of sources) {
-        const txResult = await queryRunner.manager.update(
+        const txResult = await m.update(
           Transaction,
           { payeeId: source.id, userId },
           { payeeId: canonical.id, payeeName: canonicalName },
         );
         transactionsMigrated += txResult.affected || 0;
 
-        await queryRunner.manager.update(
+        await m.update(
           ScheduledTransaction,
           { payeeId: source.id, userId },
           { payeeId: canonical.id, payeeName: canonicalName },
         );
 
-        await queryRunner.manager.update(
+        await m.update(
           PayeeAlias,
           { payeeId: source.id, userId },
           { payeeId: canonical.id },
         );
 
-        await queryRunner.manager.remove(Payee, source);
+        await m.remove(Payee, source);
       }
 
       // Create the wildcard alias on the canonical.
       const aliasOutcome = await this.createGroupAlias(
-        queryRunner,
+        m,
         userId,
         canonical.id,
         group.alias,
@@ -833,14 +825,12 @@ export class PayeeAutoMergeService {
       let transactionsBackfilled = 0;
       if (group.backfillTransactions && group.defaultCategoryId) {
         transactionsBackfilled = await backfillPayeeCategory(
-          queryRunner.manager,
+          m,
           userId,
           canonical.id,
           group.defaultCategoryId,
         );
       }
-
-      await queryRunner.commitTransaction();
 
       return {
         payeesMerged: sources.length,
@@ -849,16 +839,11 @@ export class PayeeAutoMergeService {
         aliasSkipped: aliasOutcome === "skipped",
         transactionsBackfilled,
       };
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   private async maybeRenameCanonical(
-    queryRunner: QueryRunner,
+    m: EntityManager,
     userId: string,
     canonical: Payee,
     group: ApplyAutoMergeGroup,
@@ -871,7 +856,7 @@ export class PayeeAutoMergeService {
     // Reject a rename that collides with a payee that is not part of this
     // group (the sources are deleted, so colliding with them is harmless).
     const excludedIds = new Set([canonical.id, ...group.sourcePayeeIds]);
-    const conflict = await queryRunner.manager
+    const conflict = await m
       .createQueryBuilder(Payee, "payee")
       .where("payee.user_id = :userId", { userId })
       .andWhere("LOWER(payee.name) = LOWER(:name)", { name: desired })
@@ -886,18 +871,14 @@ export class PayeeAutoMergeService {
       );
     }
 
-    await queryRunner.manager.update(
-      Payee,
-      { id: canonical.id, userId },
-      { name: desired },
-    );
+    await m.update(Payee, { id: canonical.id, userId }, { name: desired });
     // Keep the denormalized snapshot in sync on the canonical's own rows.
-    await queryRunner.manager.update(
+    await m.update(
       Transaction,
       { payeeId: canonical.id, userId },
       { payeeName: desired },
     );
-    await queryRunner.manager.update(
+    await m.update(
       ScheduledTransaction,
       { payeeId: canonical.id, userId },
       { payeeName: desired },
@@ -907,7 +888,7 @@ export class PayeeAutoMergeService {
   }
 
   private async createGroupAlias(
-    queryRunner: QueryRunner,
+    m: EntityManager,
     userId: string,
     canonicalId: string,
     rawAlias: string | undefined,
@@ -915,7 +896,7 @@ export class PayeeAutoMergeService {
     const alias = rawAlias?.trim();
     if (!alias) return "none";
 
-    const allAliases = await queryRunner.manager.find(PayeeAlias, {
+    const allAliases = await m.find(PayeeAlias, {
       where: { userId },
     });
 
@@ -928,7 +909,7 @@ export class PayeeAutoMergeService {
         matchesAliasPattern(a.alias, alias),
     );
     if (redundant.length > 0) {
-      await queryRunner.manager.remove(PayeeAlias, redundant);
+      await m.remove(PayeeAlias, redundant);
     }
 
     // If the exact alias already exists on the canonical, nothing to do.
@@ -954,7 +935,7 @@ export class PayeeAutoMergeService {
       return "skipped";
     }
 
-    const newAlias = queryRunner.manager.create(PayeeAlias, {
+    const newAlias = m.create(PayeeAlias, {
       payeeId: canonicalId,
       userId,
       alias,
@@ -966,7 +947,7 @@ export class PayeeAutoMergeService {
     // point of the merge, so a unique violation is downgraded to "skipped"
     // (via a savepoint) instead of aborting the whole group transaction.
     const created = await insertPayeeAliasIgnoringDuplicate(
-      queryRunner,
+      m,
       newAlias,
       "create_group_alias",
     );

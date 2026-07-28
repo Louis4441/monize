@@ -9,6 +9,7 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 import { createTestAccount } from "../helpers/test-factories";
 
 describe("TransactionsService transfers (integration)", () => {
@@ -64,13 +65,15 @@ describe("TransactionsService transfers (integration)", () => {
 
   describe("createTransfer()", () => {
     it("should create linked transactions and update both balances", async () => {
-      const result = await service.createTransfer(userId, {
-        fromAccountId,
-        toAccountId,
-        transactionDate: "2026-01-15",
-        amount: 500,
-        fromCurrencyCode: "USD",
-      });
+      const result = await withUserContext(userId, () =>
+        service.createTransfer(userId, {
+          fromAccountId,
+          toAccountId,
+          transactionDate: "2026-01-15",
+          amount: 500,
+          fromCurrencyCode: "USD",
+        }),
+      );
 
       // Verify two linked transactions created
       expect(result.fromTransaction).toBeDefined();
@@ -105,15 +108,17 @@ describe("TransactionsService transfers (integration)", () => {
         currentBalance: 0,
       });
 
-      const result = await service.createTransfer(userId, {
-        fromAccountId,
-        toAccountId: cadAccount.id,
-        transactionDate: "2026-01-15",
-        amount: 100,
-        fromCurrencyCode: "USD",
-        toCurrencyCode: "CAD",
-        exchangeRate: 1.35,
-      });
+      const result = await withUserContext(userId, () =>
+        service.createTransfer(userId, {
+          fromAccountId,
+          toAccountId: cadAccount.id,
+          transactionDate: "2026-01-15",
+          amount: 100,
+          fromCurrencyCode: "USD",
+          toCurrencyCode: "CAD",
+          exchangeRate: 1.35,
+        }),
+      );
 
       expect(Number(result.fromTransaction.amount)).toBe(-100);
       expect(Number(result.toTransaction.amount)).toBe(135);
@@ -133,16 +138,20 @@ describe("TransactionsService transfers (integration)", () => {
 
   describe("removeTransfer()", () => {
     it("should delete both transactions and reverse both balances", async () => {
-      const result = await service.createTransfer(userId, {
-        fromAccountId,
-        toAccountId,
-        transactionDate: "2026-01-15",
-        amount: 300,
-        fromCurrencyCode: "USD",
-      });
+      const result = await withUserContext(userId, () =>
+        service.createTransfer(userId, {
+          fromAccountId,
+          toAccountId,
+          transactionDate: "2026-01-15",
+          amount: 300,
+          fromCurrencyCode: "USD",
+        }),
+      );
 
       // Balances: from=4700, to=2300
-      await service.removeTransfer(userId, result.fromTransaction.id);
+      await withUserContext(userId, () =>
+        service.removeTransfer(userId, result.fromTransaction.id),
+      );
 
       // Balances should be restored
       const fromAccount = await dataSource.manager.findOne(Account, {

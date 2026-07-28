@@ -1,11 +1,11 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
-import { Account, AccountType } from "./entities/account.entity";
+import { AccountType } from "./entities/account.entity";
 import { AccountsService } from "./accounts.service";
 import { roundMoney } from "../common/round.util";
+import { withScopedDb } from "../common/db/scoped-db";
 
 interface ExportTransaction {
   date: string;
@@ -44,12 +44,7 @@ export class AccountExportService {
   private readonly logger = new Logger(AccountExportService.name);
 
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
+    private dataSource: DataSource,
     private accountsService: AccountsService,
   ) {}
 
@@ -189,21 +184,24 @@ export class AccountExportService {
     userId: string,
     accountId: string,
   ): Promise<ExportTransaction[]> {
-    const rawTransactions = await this.transactionsRepository
-      .createQueryBuilder("transaction")
-      .leftJoinAndSelect("transaction.payee", "payee")
-      .leftJoinAndSelect("transaction.category", "category")
-      .leftJoinAndSelect("transaction.splits", "splits")
-      .leftJoinAndSelect("splits.category", "splitCategory")
-      .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
-      .leftJoinAndSelect("transaction.linkedTransaction", "linkedTransaction")
-      .leftJoinAndSelect("linkedTransaction.account", "linkedAccount")
-      .where("transaction.userId = :userId", { userId })
-      .andWhere("transaction.accountId = :accountId", { accountId })
-      .orderBy("transaction.transactionDate", "ASC")
-      .addOrderBy("transaction.createdAt", "ASC")
-      .addOrderBy("transaction.id", "ASC")
-      .getMany();
+    const rawTransactions = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .leftJoinAndSelect("transaction.payee", "payee")
+        .leftJoinAndSelect("transaction.category", "category")
+        .leftJoinAndSelect("transaction.splits", "splits")
+        .leftJoinAndSelect("splits.category", "splitCategory")
+        .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
+        .leftJoinAndSelect("transaction.linkedTransaction", "linkedTransaction")
+        .leftJoinAndSelect("linkedTransaction.account", "linkedAccount")
+        .where("transaction.userId = :userId", { userId })
+        .andWhere("transaction.accountId = :accountId", { accountId })
+        .orderBy("transaction.transactionDate", "ASC")
+        .addOrderBy("transaction.createdAt", "ASC")
+        .addOrderBy("transaction.id", "ASC")
+        .getMany(),
+    );
 
     const categoryMap = await this.buildCategoryPathMap(userId);
 
@@ -236,9 +234,11 @@ export class AccountExportService {
   private async buildCategoryPathMap(
     userId: string,
   ): Promise<Map<string, string>> {
-    const categories = await this.categoriesRepository.find({
-      where: { userId },
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId },
+      }),
+    );
 
     const map = new Map<string, Category>();
     for (const cat of categories) {

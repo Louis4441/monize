@@ -141,7 +141,7 @@ export class UserPreference {
   showWhatsNew: boolean;
 
   // Guided-tour completion state, keyed by opaque tour id. Server-managed and
-  // written only via the tenantTx atomic jsonb-merge in ToursService, so it is
+  // written only via the withScopedDb atomic jsonb-merge in ToursService, so it is
   // excluded from the serialized preferences response (the global
   // ClassSerializerInterceptor honours @Exclude()) and from the editable DTO --
   // GET /updates/tours/progress is the single source of truth.

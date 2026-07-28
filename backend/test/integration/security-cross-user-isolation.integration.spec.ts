@@ -40,6 +40,7 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 import {
   createTestAccount,
   createTestCategory,
@@ -162,15 +163,19 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("findOne(userB, userA.account.id) throws NotFoundException", async () => {
       await expect(
-        accountsService.findOne(userBId, userAAccount.id),
+        withUserContext(userBId, () =>
+          accountsService.findOne(userBId, userAAccount.id),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("update(userB, userA.account.id) throws NotFoundException and leaves the account untouched", async () => {
       await expect(
-        accountsService.update(userBId, userAAccount.id, {
-          name: "PWNED",
-        } as any),
+        withUserContext(userBId, () =>
+          accountsService.update(userBId, userAAccount.id, {
+            name: "PWNED",
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(Account, {
@@ -182,7 +187,9 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("delete(userB, userA.account.id) throws NotFoundException and the account still exists", async () => {
       await expect(
-        accountsService.delete(userBId, userAAccount.id),
+        withUserContext(userBId, () =>
+          accountsService.delete(userBId, userAAccount.id),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(Account, {
@@ -195,7 +202,9 @@ describe("Cross-user data isolation (integration)", () => {
       await createTestAccount(dataSource, userAId, { name: "userA savings" });
       await createTestAccount(dataSource, userBId, { name: "userB chequing" });
 
-      const result = await accountsService.findAll(userBId, true);
+      const result = await withUserContext(userBId, () =>
+        accountsService.findAll(userBId, true),
+      );
 
       expect(result.find((a) => a.userId === userAId)).toBeUndefined();
       expect(result.find((a) => a.id === userAAccount.id)).toBeUndefined();
@@ -220,28 +229,34 @@ describe("Cross-user data isolation (integration)", () => {
         currentBalance: 0,
       });
 
-      const created = await transactionsService.create(userAId, {
-        accountId: userAAccount.id,
-        transactionDate: "2026-01-15",
-        amount: -50,
-        currencyCode: "USD",
-        description: "userA grocery run",
-      } as any);
+      const created = await withUserContext(userAId, () =>
+        transactionsService.create(userAId, {
+          accountId: userAAccount.id,
+          transactionDate: "2026-01-15",
+          amount: -50,
+          currencyCode: "USD",
+          description: "userA grocery run",
+        } as any),
+      );
       userATransaction = created;
     });
 
     it("findOne(userB, userA.tx.id) throws NotFoundException", async () => {
       await expect(
-        transactionsService.findOne(userBId, userATransaction.id),
+        withUserContext(userBId, () =>
+          transactionsService.findOne(userBId, userATransaction.id),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("update(userB, userA.tx.id) throws NotFoundException and leaves the row untouched", async () => {
       await expect(
-        transactionsService.update(userBId, userATransaction.id, {
-          description: "PWNED",
-          amount: 999999,
-        } as any),
+        withUserContext(userBId, () =>
+          transactionsService.update(userBId, userATransaction.id, {
+            description: "PWNED",
+            amount: 999999,
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(Transaction, {
@@ -254,7 +269,9 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("remove(userB, userA.tx.id) throws NotFoundException and the row still exists", async () => {
       await expect(
-        transactionsService.remove(userBId, userATransaction.id),
+        withUserContext(userBId, () =>
+          transactionsService.remove(userBId, userATransaction.id),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(Transaction, {
@@ -265,13 +282,15 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("create(userB, { accountId: userA.account.id }) is rejected: userB cannot post into userA's account", async () => {
       await expect(
-        transactionsService.create(userBId, {
-          accountId: userAAccount.id,
-          transactionDate: "2026-01-15",
-          amount: -10,
-          currencyCode: "USD",
-          description: "siphon attempt",
-        } as any),
+        withUserContext(userBId, () =>
+          transactionsService.create(userBId, {
+            accountId: userAAccount.id,
+            transactionDate: "2026-01-15",
+            amount: -10,
+            currencyCode: "USD",
+            description: "siphon attempt",
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       // No transaction should have been created on userA's account from userB.
@@ -284,11 +303,13 @@ describe("Cross-user data isolation (integration)", () => {
     it("findAll(userB, accountIds=[userA.account.id]) does NOT return userA's transactions", async () => {
       // Even when userB tries to filter by userA's accountId, the userId
       // predicate prevents the leak.
-      const result = await transactionsService.findAll(
-        userBId,
-        [userAAccount.id],
-        undefined,
-        undefined,
+      const result = await withUserContext(userBId, () =>
+        transactionsService.findAll(
+          userBId,
+          [userAAccount.id],
+          undefined,
+          undefined,
+        ),
       );
       expect(
         result.data.find((t) => t.id === userATransaction.id),
@@ -297,15 +318,19 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("findAll(userB) only returns userB's own transactions", async () => {
-      await transactionsService.create(userBId, {
-        accountId: userBAccount.id,
-        transactionDate: "2026-01-16",
-        amount: -7,
-        currencyCode: "USD",
-        description: "userB transaction",
-      } as any);
+      await withUserContext(userBId, () =>
+        transactionsService.create(userBId, {
+          accountId: userBAccount.id,
+          transactionDate: "2026-01-16",
+          amount: -7,
+          currencyCode: "USD",
+          description: "userB transaction",
+        } as any),
+      );
 
-      const result = await transactionsService.findAll(userBId);
+      const result = await withUserContext(userBId, () =>
+        transactionsService.findAll(userBId),
+      );
       expect(
         result.data.find((t) => t.id === userATransaction.id),
       ).toBeUndefined();
@@ -326,15 +351,19 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("findOne(userB, userA.cat.id) throws NotFoundException", async () => {
       await expect(
-        categoriesService.findOne(userBId, userACategory.id),
+        withUserContext(userBId, () =>
+          categoriesService.findOne(userBId, userACategory.id),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("update(userB, userA.cat.id) throws NotFoundException and leaves the row untouched", async () => {
       await expect(
-        categoriesService.update(userBId, userACategory.id, {
-          name: "PWNED",
-        } as any),
+        withUserContext(userBId, () =>
+          categoriesService.update(userBId, userACategory.id, {
+            name: "PWNED",
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(Category, {
@@ -346,7 +375,9 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("remove(userB, userA.cat.id) throws NotFoundException and the row still exists", async () => {
       await expect(
-        categoriesService.remove(userBId, userACategory.id),
+        withUserContext(userBId, () =>
+          categoriesService.remove(userBId, userACategory.id),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(Category, {
@@ -361,9 +392,11 @@ describe("Cross-user data isolation (integration)", () => {
       });
 
       await expect(
-        categoriesService.update(userBId, userBCategory.id, {
-          parentId: userACategory.id,
-        } as any),
+        withUserContext(userBId, () =>
+          categoriesService.update(userBId, userBCategory.id, {
+            parentId: userACategory.id,
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(Category, {
@@ -375,7 +408,9 @@ describe("Cross-user data isolation (integration)", () => {
     it("findAll(userB) does not include any of userA's categories", async () => {
       await createTestCategory(dataSource, userBId, { name: "userB dining" });
 
-      const result = await categoriesService.findAll(userBId);
+      const result = await withUserContext(userBId, () =>
+        categoriesService.findAll(userBId),
+      );
       expect(result.find((c) => c.id === userACategory.id)).toBeUndefined();
       expect(result.every((c) => c.userId === userBId)).toBe(true);
     });
@@ -394,15 +429,19 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("findOne(userB, userA.payee.id) throws NotFoundException", async () => {
       await expect(
-        payeesService.findOne(userBId, userAPayee.id),
+        withUserContext(userBId, () =>
+          payeesService.findOne(userBId, userAPayee.id),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("update(userB, userA.payee.id) throws NotFoundException and leaves the row untouched", async () => {
       await expect(
-        payeesService.update(userBId, userAPayee.id, {
-          name: "PWNED",
-        } as any),
+        withUserContext(userBId, () =>
+          payeesService.update(userBId, userAPayee.id, {
+            name: "PWNED",
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(Payee, {
@@ -414,7 +453,9 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("remove(userB, userA.payee.id) throws NotFoundException and the row still exists", async () => {
       await expect(
-        payeesService.remove(userBId, userAPayee.id),
+        withUserContext(userBId, () =>
+          payeesService.remove(userBId, userAPayee.id),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(Payee, {
@@ -428,7 +469,9 @@ describe("Cross-user data isolation (integration)", () => {
         name: "userB hardware store",
       });
 
-      const result = await payeesService.findAll(userBId);
+      const result = await withUserContext(userBId, () =>
+        payeesService.findAll(userBId),
+      );
       expect(result.find((p) => p.id === userAPayee.id)).toBeUndefined();
       expect(result.every((p) => p.userId === userBId)).toBe(true);
     });
@@ -440,21 +483,27 @@ describe("Cross-user data isolation (integration)", () => {
     let userATag: Tag;
 
     beforeEach(async () => {
-      userATag = await tagsService.create(userAId, {
-        name: "userA-vacation",
-        color: "#ff0000",
-      } as any);
+      userATag = await withUserContext(userAId, () =>
+        tagsService.create(userAId, {
+          name: "userA-vacation",
+          color: "#ff0000",
+        } as any),
+      );
     });
 
     it("findOne(userB, userA.tag.id) throws NotFoundException", async () => {
-      await expect(tagsService.findOne(userBId, userATag.id)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        withUserContext(userBId, () =>
+          tagsService.findOne(userBId, userATag.id),
+        ),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it("update(userB, userA.tag.id) throws NotFoundException and leaves the row untouched", async () => {
       await expect(
-        tagsService.update(userBId, userATag.id, { name: "PWNED" } as any),
+        withUserContext(userBId, () =>
+          tagsService.update(userBId, userATag.id, { name: "PWNED" } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(Tag, {
@@ -465,9 +514,11 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("remove(userB, userA.tag.id) throws NotFoundException and the row still exists", async () => {
-      await expect(tagsService.remove(userBId, userATag.id)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        withUserContext(userBId, () =>
+          tagsService.remove(userBId, userATag.id),
+        ),
+      ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(Tag, {
         where: { id: userATag.id },
@@ -476,12 +527,16 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("findAll(userB) does not include any of userA's tags", async () => {
-      await tagsService.create(userBId, {
-        name: "userB-business",
-        color: "#00ff00",
-      } as any);
+      await withUserContext(userBId, () =>
+        tagsService.create(userBId, {
+          name: "userB-business",
+          color: "#00ff00",
+        } as any),
+      );
 
-      const result = await tagsService.findAll(userBId);
+      const result = await withUserContext(userBId, () =>
+        tagsService.findAll(userBId),
+      );
       expect(result.find((t) => t.id === userATag.id)).toBeUndefined();
       expect(result.every((t) => t.userId === userBId)).toBe(true);
     });
@@ -493,25 +548,31 @@ describe("Cross-user data isolation (integration)", () => {
     let userABudget: Budget;
 
     beforeEach(async () => {
-      userABudget = await budgetsService.create(userAId, {
-        name: "userA monthly budget",
-        currencyCode: "USD",
-        periodStart: "2026-01-01",
-        budgetType: BudgetType.MONTHLY,
-      } as any);
+      userABudget = await withUserContext(userAId, () =>
+        budgetsService.create(userAId, {
+          name: "userA monthly budget",
+          currencyCode: "USD",
+          periodStart: "2026-01-01",
+          budgetType: BudgetType.MONTHLY,
+        } as any),
+      );
     });
 
     it("findOne(userB, userA.budget.id) throws NotFoundException", async () => {
       await expect(
-        budgetsService.findOne(userBId, userABudget.id),
+        withUserContext(userBId, () =>
+          budgetsService.findOne(userBId, userABudget.id),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("update(userB, userA.budget.id) throws NotFoundException and leaves the row untouched", async () => {
       await expect(
-        budgetsService.update(userBId, userABudget.id, {
-          name: "PWNED",
-        } as any),
+        withUserContext(userBId, () =>
+          budgetsService.update(userBId, userABudget.id, {
+            name: "PWNED",
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(Budget, {
@@ -523,7 +584,9 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("remove(userB, userA.budget.id) throws NotFoundException and the row still exists", async () => {
       await expect(
-        budgetsService.remove(userBId, userABudget.id),
+        withUserContext(userBId, () =>
+          budgetsService.remove(userBId, userABudget.id),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(Budget, {
@@ -533,14 +596,18 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("findAll(userB) does not include any of userA's budgets", async () => {
-      await budgetsService.create(userBId, {
-        name: "userB monthly budget",
-        currencyCode: "USD",
-        periodStart: "2026-01-01",
-        budgetType: BudgetType.MONTHLY,
-      } as any);
+      await withUserContext(userBId, () =>
+        budgetsService.create(userBId, {
+          name: "userB monthly budget",
+          currencyCode: "USD",
+          periodStart: "2026-01-01",
+          budgetType: BudgetType.MONTHLY,
+        } as any),
+      );
 
-      const result = await budgetsService.findAll(userBId);
+      const result = await withUserContext(userBId, () =>
+        budgetsService.findAll(userBId),
+      );
       expect(result.find((b) => b.id === userABudget.id)).toBeUndefined();
       expect(result.every((b) => b.userId === userBId)).toBe(true);
     });
@@ -552,25 +619,31 @@ describe("Cross-user data isolation (integration)", () => {
     let userASecurity: Security;
 
     beforeEach(async () => {
-      userASecurity = await securitiesService.create(userAId, {
-        symbol: "ACME",
-        name: "Acme Corp",
-        securityType: "STOCK" as any,
-        currencyCode: "USD",
-      } as any);
+      userASecurity = await withUserContext(userAId, () =>
+        securitiesService.create(userAId, {
+          symbol: "ACME",
+          name: "Acme Corp",
+          securityType: "STOCK" as any,
+          currencyCode: "USD",
+        } as any),
+      );
     });
 
     it("findOne(userB, userA.sec.id) throws NotFoundException", async () => {
       await expect(
-        securitiesService.findOne(userBId, userASecurity.id),
+        withUserContext(userBId, () =>
+          securitiesService.findOne(userBId, userASecurity.id),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("update(userB, userA.sec.id) throws NotFoundException and leaves the row untouched", async () => {
       await expect(
-        securitiesService.update(userBId, userASecurity.id, {
-          name: "PWNED Corp",
-        } as any),
+        withUserContext(userBId, () =>
+          securitiesService.update(userBId, userASecurity.id, {
+            name: "PWNED Corp",
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(Security, {
@@ -582,7 +655,9 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("remove(userB, userA.sec.id) throws NotFoundException and the row still exists", async () => {
       await expect(
-        securitiesService.remove(userBId, userASecurity.id),
+        withUserContext(userBId, () =>
+          securitiesService.remove(userBId, userASecurity.id),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(Security, {
@@ -592,14 +667,18 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("findAll(userB) does not include any of userA's securities", async () => {
-      await securitiesService.create(userBId, {
-        symbol: "BEEP",
-        name: "Beep Corp",
-        securityType: "STOCK" as any,
-        currencyCode: "USD",
-      } as any);
+      await withUserContext(userBId, () =>
+        securitiesService.create(userBId, {
+          symbol: "BEEP",
+          name: "Beep Corp",
+          securityType: "STOCK" as any,
+          currencyCode: "USD",
+        } as any),
+      );
 
-      const result = await securitiesService.findAll(userBId, true);
+      const result = await withUserContext(userBId, () =>
+        securitiesService.findAll(userBId, true),
+      );
       expect(result.find((s) => s.id === userASecurity.id)).toBeUndefined();
       expect(result.every((s) => s.userId === userBId)).toBe(true);
     });
@@ -629,30 +708,38 @@ describe("Cross-user data isolation (integration)", () => {
 
     beforeEach(async () => {
       userABrokerage = await makeBrokerage(userAId, "userA brokerage");
-      const sec = await securitiesService.create(userAId, {
-        symbol: "ACME",
-        name: "Acme Corp",
-        securityType: "STOCK" as any,
-        currencyCode: "USD",
-      } as any);
-      userATx = await investmentTransactionsService.create(userAId, {
-        accountId: userABrokerage,
-        action: InvestmentAction.ADD_SHARES,
-        transactionDate: "2026-01-01",
-        securityId: sec.id,
-        quantity: 100,
-      } as any);
+      const sec = await withUserContext(userAId, () =>
+        securitiesService.create(userAId, {
+          symbol: "ACME",
+          name: "Acme Corp",
+          securityType: "STOCK" as any,
+          currencyCode: "USD",
+        } as any),
+      );
+      userATx = await withUserContext(userAId, () =>
+        investmentTransactionsService.create(userAId, {
+          accountId: userABrokerage,
+          action: InvestmentAction.ADD_SHARES,
+          transactionDate: "2026-01-01",
+          securityId: sec.id,
+          quantity: 100,
+        } as any),
+      );
     });
 
     it("findOne(userB, userA.invTx.id) throws NotFoundException", async () => {
       await expect(
-        investmentTransactionsService.findOne(userBId, userATx.id),
+        withUserContext(userBId, () =>
+          investmentTransactionsService.findOne(userBId, userATx.id),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("remove(userB, userA.invTx.id) throws NotFoundException and the row still exists", async () => {
       await expect(
-        investmentTransactionsService.remove(userBId, userATx.id),
+        withUserContext(userBId, () =>
+          investmentTransactionsService.remove(userBId, userATx.id),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(
@@ -665,21 +752,25 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("create(userB, { accountId: userA.brokerage }) is rejected: userB cannot post into userA's brokerage", async () => {
-      const userBSec = await securitiesService.create(userBId, {
-        symbol: "BEEP",
-        name: "Beep Corp",
-        securityType: "STOCK" as any,
-        currencyCode: "USD",
-      } as any);
+      const userBSec = await withUserContext(userBId, () =>
+        securitiesService.create(userBId, {
+          symbol: "BEEP",
+          name: "Beep Corp",
+          securityType: "STOCK" as any,
+          currencyCode: "USD",
+        } as any),
+      );
 
       await expect(
-        investmentTransactionsService.create(userBId, {
-          accountId: userABrokerage,
-          action: InvestmentAction.ADD_SHARES,
-          transactionDate: "2026-01-02",
-          securityId: userBSec.id,
-          quantity: 1,
-        } as any),
+        withUserContext(userBId, () =>
+          investmentTransactionsService.create(userBId, {
+            accountId: userABrokerage,
+            action: InvestmentAction.ADD_SHARES,
+            transactionDate: "2026-01-02",
+            securityId: userBSec.id,
+            quantity: 1,
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -690,25 +781,31 @@ describe("Cross-user data isolation (integration)", () => {
     let userAReport: CustomReport;
 
     beforeEach(async () => {
-      userAReport = await reportsService.create(userAId, {
-        name: "userA spend by category",
-        viewType: "TABLE" as any,
-        timeframeType: "LAST_30_DAYS" as any,
-        groupBy: "CATEGORY" as any,
-      } as any);
+      userAReport = await withUserContext(userAId, () =>
+        reportsService.create(userAId, {
+          name: "userA spend by category",
+          viewType: "TABLE" as any,
+          timeframeType: "LAST_30_DAYS" as any,
+          groupBy: "CATEGORY" as any,
+        } as any),
+      );
     });
 
     it("findOne(userB, userA.report.id) throws NotFoundException", async () => {
       await expect(
-        reportsService.findOne(userBId, userAReport.id),
+        withUserContext(userBId, () =>
+          reportsService.findOne(userBId, userAReport.id),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("update(userB, userA.report.id) throws NotFoundException and leaves the row untouched", async () => {
       await expect(
-        reportsService.update(userBId, userAReport.id, {
-          name: "PWNED",
-        } as any),
+        withUserContext(userBId, () =>
+          reportsService.update(userBId, userAReport.id, {
+            name: "PWNED",
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(CustomReport, {
@@ -720,7 +817,9 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("remove(userB, userA.report.id) throws NotFoundException and the row still exists", async () => {
       await expect(
-        reportsService.remove(userBId, userAReport.id),
+        withUserContext(userBId, () =>
+          reportsService.remove(userBId, userAReport.id),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(CustomReport, {
@@ -730,14 +829,18 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("findAll(userB) does not include any of userA's reports", async () => {
-      await reportsService.create(userBId, {
-        name: "userB spend by category",
-        viewType: "TABLE" as any,
-        timeframeType: "LAST_30_DAYS" as any,
-        groupBy: "CATEGORY" as any,
-      } as any);
+      await withUserContext(userBId, () =>
+        reportsService.create(userBId, {
+          name: "userB spend by category",
+          viewType: "TABLE" as any,
+          timeframeType: "LAST_30_DAYS" as any,
+          groupBy: "CATEGORY" as any,
+        } as any),
+      );
 
-      const result = await reportsService.findAll(userBId);
+      const result = await withUserContext(userBId, () =>
+        reportsService.findAll(userBId),
+      );
       expect(result.find((r) => r.id === userAReport.id)).toBeUndefined();
       expect(result.every((r) => r.userId === userBId)).toBe(true);
     });
@@ -749,23 +852,29 @@ describe("Cross-user data isolation (integration)", () => {
     let userAReport: InvestmentReport;
 
     beforeEach(async () => {
-      userAReport = await investmentReportsService.create(userAId, {
-        name: "userA holdings",
-        config: { columns: ["symbol"] },
-      } as any);
+      userAReport = await withUserContext(userAId, () =>
+        investmentReportsService.create(userAId, {
+          name: "userA holdings",
+          config: { columns: ["symbol"] },
+        } as any),
+      );
     });
 
     it("findOne(userB, userA.invReport.id) throws NotFoundException", async () => {
       await expect(
-        investmentReportsService.findOne(userBId, userAReport.id),
+        withUserContext(userBId, () =>
+          investmentReportsService.findOne(userBId, userAReport.id),
+        ),
       ).rejects.toThrow(NotFoundException);
     });
 
     it("update(userB, userA.invReport.id) throws NotFoundException and leaves the row untouched", async () => {
       await expect(
-        investmentReportsService.update(userBId, userAReport.id, {
-          name: "PWNED",
-        } as any),
+        withUserContext(userBId, () =>
+          investmentReportsService.update(userBId, userAReport.id, {
+            name: "PWNED",
+          } as any),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const reloaded = await dataSource.manager.findOneOrFail(
@@ -780,7 +889,9 @@ describe("Cross-user data isolation (integration)", () => {
 
     it("remove(userB, userA.invReport.id) throws NotFoundException and the row still exists", async () => {
       await expect(
-        investmentReportsService.remove(userBId, userAReport.id),
+        withUserContext(userBId, () =>
+          investmentReportsService.remove(userBId, userAReport.id),
+        ),
       ).rejects.toThrow(NotFoundException);
 
       const stillThere = await dataSource.manager.findOne(InvestmentReport, {
@@ -790,12 +901,16 @@ describe("Cross-user data isolation (integration)", () => {
     });
 
     it("findAll(userB) does not include any of userA's investment reports", async () => {
-      await investmentReportsService.create(userBId, {
-        name: "userB holdings",
-        config: { columns: ["symbol"] },
-      } as any);
+      await withUserContext(userBId, () =>
+        investmentReportsService.create(userBId, {
+          name: "userB holdings",
+          config: { columns: ["symbol"] },
+        } as any),
+      );
 
-      const result = await investmentReportsService.findAll(userBId);
+      const result = await withUserContext(userBId, () =>
+        investmentReportsService.findAll(userBId),
+      );
       expect(result.find((r) => r.id === userAReport.id)).toBeUndefined();
       expect(result.every((r) => r.userId === userBId)).toBe(true);
     });

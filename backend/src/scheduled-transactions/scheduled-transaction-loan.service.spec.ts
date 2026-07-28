@@ -1,9 +1,14 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
 import { Account } from "../accounts/entities/account.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("ScheduledTransactionLoanService", () => {
   let service: ScheduledTransactionLoanService;
@@ -74,21 +79,16 @@ describe("ScheduledTransactionLoanService", () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
+    const { dataSource } = createScopedDbMocks([
+      [ScheduledTransaction, scheduledTransactionsRepository],
+      [ScheduledTransactionSplit, splitsRepository],
+      [Account, accountsRepository],
+    ]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ScheduledTransactionLoanService,
-        {
-          provide: getRepositoryToken(ScheduledTransaction),
-          useValue: scheduledTransactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(ScheduledTransactionSplit),
-          useValue: splitsRepository,
-        },
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 

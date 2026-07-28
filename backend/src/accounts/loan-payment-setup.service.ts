@@ -6,8 +6,7 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { Account, AccountType } from "./entities/account.entity";
 import {
   SetupLoanPaymentsDto,
@@ -24,14 +23,14 @@ import {
   MortgagePaymentFrequency,
 } from "./mortgage-amortization.util";
 import { tr } from "../i18n/translate";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class LoanPaymentSetupService {
   private readonly logger = new Logger(LoanPaymentSetupService.name);
 
   constructor(
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
+    private dataSource: DataSource,
     @Inject(forwardRef(() => CategoriesService))
     private categoriesService: CategoriesService,
     @Inject(forwardRef(() => ScheduledTransactionsService))
@@ -48,9 +47,11 @@ export class LoanPaymentSetupService {
     accountId: string,
     dto: SetupLoanPaymentsDto,
   ): Promise<SetupLoanPaymentsResponseDto> {
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId, userId },
-    });
+    const account = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id: accountId, userId },
+      }),
+    );
 
     if (!account) {
       throw new NotFoundException(
@@ -81,9 +82,11 @@ export class LoanPaymentSetupService {
     }
 
     // Verify source account exists and belongs to user
-    const sourceAccount = await this.accountsRepository.findOne({
-      where: { id: dto.sourceAccountId, userId },
-    });
+    const sourceAccount = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id: dto.sourceAccountId, userId },
+      }),
+    );
     if (!sourceAccount) {
       throw new BadRequestException(
         tr("errors.accounts.sourceNotFound", "Source account not found"),
@@ -254,7 +257,9 @@ export class LoanPaymentSetupService {
       }
     }
 
-    await this.accountsRepository.update(accountId, updateData);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).update(accountId, updateData),
+    );
 
     this.logger.log(
       `Set up ${accountLabel.toLowerCase()} payments for account ${account.name}: ` +

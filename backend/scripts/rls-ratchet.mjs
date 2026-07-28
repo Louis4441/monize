@@ -3,7 +3,7 @@
  * RLS ratchet: a CI gate on the number of remaining injected-repository and
  * hand-rolled QueryRunner data-access sites under `src/`.
  *
- * Row-Level Security requires every DB operation to run through `tenantTx`
+ * Row-Level Security requires every DB operation to run through `withScopedDb`
  * (which sets the identity GUC transaction-locally). A leftover
  * `@InjectRepository(...)` repo or a raw `dataSource.createQueryRunner()` runs
  * with NO GUC -- under enforcement that is a silent fail-closed zero-row result.
@@ -42,14 +42,14 @@ export const PATTERNS = [
 
 /**
  * Files that legitimately hold these tokens and must never count against the
- * ratchet: tests (mocks/fixtures), type decls, and `tenant-tx.ts` itself (the
+ * ratchet: tests (mocks/fixtures), type decls, and `scoped-db.ts` itself (the
  * one sanctioned door to the DB, on the L1 lint allowlist). Paths are `src`-
  * relative with `/` separators.
  */
 export function isExcluded(relPath) {
   if (relPath.endsWith(".spec.ts")) return true;
   if (relPath.endsWith(".d.ts")) return true;
-  if (relPath === "common/db/tenant-tx.ts") return true;
+  if (relPath === "common/db/scoped-db.ts") return true;
   // Test-support directories, should any ever live under src/.
   if (/(^|\/)(__tests__|__mocks__|test|test-helpers)\//.test(relPath)) return true;
   return false;
@@ -167,7 +167,7 @@ function main() {
       console.error(
         `FAIL: ${r.label} increased to ${r.actual} (baseline ${r.expected}). ` +
           "New injected repositories / hand-rolled QueryRunners are banned by the RLS ratchet -- " +
-          "route DB access through tenantTx(this.dataSource, (m) => ...) instead. See F3.",
+          "route DB access through withScopedDb(this.dataSource, (m) => ...) instead. See F3.",
       );
     } else if (r.status === "stale") {
       console.error(

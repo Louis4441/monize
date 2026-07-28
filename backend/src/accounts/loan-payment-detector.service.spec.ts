@@ -1,5 +1,10 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 import { NotFoundException } from "@nestjs/common";
 import { LoanPaymentDetectorService } from "./loan-payment-detector.service";
 import { Account, AccountType } from "./entities/account.entity";
@@ -54,17 +59,23 @@ describe("LoanPaymentDetectorService", () => {
       },
     };
 
+    const { manager, dataSource } = createScopedDbMocks([
+      [Account, accountsRepository],
+      [Transaction, transactionRepository],
+    ]);
+    // The linked-transfer walk and the split lookup run on the transaction
+    // manager now; route them at the same per-test mocks.
+    manager.findOne.mockImplementation((_entity, opts) =>
+      transactionRepository.findOne(opts),
+    );
+    manager.find.mockImplementation((_entity, opts) =>
+      transactionRepository.manager.find(_entity, opts),
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LoanPaymentDetectorService,
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionRepository,
-        },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 

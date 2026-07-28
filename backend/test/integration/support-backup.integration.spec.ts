@@ -20,6 +20,7 @@ import {
   createTestUserDirect,
   INTEGRATION_TYPEORM_OPTIONS,
 } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 
 /**
  * Support (de-identified) backup against a real database. Covers the two
@@ -187,14 +188,18 @@ describe("Support backup (integration)", () => {
       [txId, userA.id, accountId, payeeId, categoryId],
     );
 
-    const { buffer } = await supportService.generate(userA.id, {
-      multiplier: 2.5,
-    });
+    const { buffer } = await withUserContext(userA.id, () =>
+      supportService.generate(userA.id, {
+        multiplier: 2.5,
+      }),
+    );
 
-    const result = await backupService.restoreData(userB.id, {
-      compressedData: buffer,
-      password: PASSWORD,
-    });
+    const result = await withUserContext(userB.id, () =>
+      backupService.restoreData(userB.id, {
+        compressedData: buffer,
+        password: PASSWORD,
+      }),
+    );
     expect(result.restored.accounts).toBe(1);
 
     const [account] = await dataSource.query(
@@ -247,13 +252,17 @@ describe("Support backup (integration)", () => {
       [randomUUID(), visaId, userA.id, randomUUID(), amexId],
     );
 
-    const { buffer } = await supportService.generate(userA.id, {
-      multiplier: 2.5,
-    });
-    const result = await backupService.restoreData(userB.id, {
-      compressedData: buffer,
-      password: PASSWORD,
-    });
+    const { buffer } = await withUserContext(userA.id, () =>
+      supportService.generate(userA.id, {
+        multiplier: 2.5,
+      }),
+    );
+    const result = await withUserContext(userB.id, () =>
+      backupService.restoreData(userB.id, {
+        compressedData: buffer,
+        password: PASSWORD,
+      }),
+    );
 
     // Both payees and both aliases survive the round trip.
     expect(result.restored.payees).toBe(2);

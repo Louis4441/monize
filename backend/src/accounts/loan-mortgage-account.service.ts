@@ -5,8 +5,7 @@ import {
   forwardRef,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { Account, AccountType } from "./entities/account.entity";
 import { Institution } from "../institutions/entities/institution.entity";
 import { CreateAccountDto } from "./dto/create-account.dto";
@@ -29,16 +28,14 @@ import { formatDateYMD } from "../common/date-utils";
 import { roundMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
 import { LoanRateChangesService } from "../loan-rate-changes/loan-rate-changes.service";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class LoanMortgageAccountService {
   private readonly logger = new Logger(LoanMortgageAccountService.name);
 
   constructor(
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(Institution)
-    private institutionsRepository: Repository<Institution>,
+    private dataSource: DataSource,
     @Inject(forwardRef(() => CategoriesService))
     private categoriesService: CategoriesService,
     @Inject(forwardRef(() => ScheduledTransactionsService))
@@ -65,9 +62,11 @@ export class LoanMortgageAccountService {
       return institution.trim();
     }
     if (institutionId) {
-      const found = await this.institutionsRepository.findOne({
-        where: { id: institutionId, userId },
-      });
+      const found = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Institution).findOne({
+          where: { id: institutionId, userId },
+        }),
+      );
       return found?.name ?? null;
     }
     return null;
@@ -143,21 +142,23 @@ export class LoanMortgageAccountService {
       new Date(paymentStartDate),
     );
 
-    const account = this.accountsRepository.create({
-      ...accountData,
-      userId,
-      openingBalance: -loanAmount,
-      currentBalance: -loanAmount,
-      interestRate,
-      institution,
-      paymentAmount,
-      paymentFrequency,
-      paymentStartDate: new Date(paymentStartDate),
-      sourceAccountId,
-      interestCategoryId: interestCatId || null,
+    const savedAccount = await withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(Account);
+      const account = repo.create({
+        ...accountData,
+        userId,
+        openingBalance: -loanAmount,
+        currentBalance: -loanAmount,
+        interestRate,
+        institution,
+        paymentAmount,
+        paymentFrequency,
+        paymentStartDate: new Date(paymentStartDate),
+        sourceAccountId,
+        interestCategoryId: interestCatId || null,
+      });
+      return repo.save(account);
     });
-
-    const savedAccount = await this.accountsRepository.save(account);
 
     const endDateStr =
       amortization.totalPayments > 0 && amortization.totalPayments < 10000
@@ -194,7 +195,9 @@ export class LoanMortgageAccountService {
     );
 
     savedAccount.scheduledTransactionId = scheduledTransaction.id;
-    await this.accountsRepository.save(savedAccount);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).save(savedAccount),
+    );
 
     return savedAccount;
   }
@@ -281,27 +284,29 @@ export class LoanMortgageAccountService {
       termEndDate.setMonth(termEndDate.getMonth() + termMonths);
     }
 
-    const account = this.accountsRepository.create({
-      ...accountData,
-      userId,
-      openingBalance: -mortgageAmount,
-      currentBalance: -mortgageAmount,
-      interestRate,
-      institution,
-      paymentAmount: amortization.paymentAmount,
-      paymentFrequency: mortgagePaymentFrequency,
-      paymentStartDate: new Date(paymentStartDate),
-      sourceAccountId,
-      interestCategoryId: interestCatId || null,
-      isCanadianMortgage,
-      isVariableRate,
-      termMonths: termMonths || null,
-      termEndDate,
-      amortizationMonths,
-      originalPrincipal: mortgageAmount,
+    const savedAccount = await withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(Account);
+      const account = repo.create({
+        ...accountData,
+        userId,
+        openingBalance: -mortgageAmount,
+        currentBalance: -mortgageAmount,
+        interestRate,
+        institution,
+        paymentAmount: amortization.paymentAmount,
+        paymentFrequency: mortgagePaymentFrequency,
+        paymentStartDate: new Date(paymentStartDate),
+        sourceAccountId,
+        interestCategoryId: interestCatId || null,
+        isCanadianMortgage,
+        isVariableRate,
+        termMonths: termMonths || null,
+        termEndDate,
+        amortizationMonths,
+        originalPrincipal: mortgageAmount,
+      });
+      return repo.save(account);
     });
-
-    const savedAccount = await this.accountsRepository.save(account);
 
     const frequencyMap: Record<string, string> = {
       MONTHLY: "MONTHLY",
@@ -349,7 +354,9 @@ export class LoanMortgageAccountService {
     );
 
     savedAccount.scheduledTransactionId = scheduledTransaction.id;
-    await this.accountsRepository.save(savedAccount);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).save(savedAccount),
+    );
 
     return savedAccount;
   }

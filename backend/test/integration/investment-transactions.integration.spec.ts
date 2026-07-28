@@ -18,6 +18,7 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 import { createTestAccount } from "../helpers/test-factories";
 
 describe("InvestmentTransactionsService funding account changes (integration)", () => {
@@ -103,26 +104,30 @@ describe("InvestmentTransactionsService funding account changes (integration)", 
     fundingAccountB = accountB.id;
 
     const securitiesService = module.get(SecuritiesService);
-    const security = await securitiesService.create(userId, {
-      symbol: "AAPL",
-      name: "Apple Inc.",
-      securityType: "STOCK" as any,
-      currencyCode: "USD",
-    } as any);
+    const security = await withUserContext(userId, () =>
+      securitiesService.create(userId, {
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        securityType: "STOCK" as any,
+        currencyCode: "USD",
+      } as any),
+    );
     securityId = security.id;
   });
 
   it("moves the debit from old funding account to new funding account when fundingAccountId is changed", async () => {
-    const buy = await service.create(userId, {
-      accountId: brokerageAccountId,
-      action: InvestmentAction.BUY,
-      transactionDate: "2026-01-15",
-      securityId,
-      fundingAccountId: fundingAccountA,
-      quantity: 10,
-      price: 100,
-      commission: 0,
-    });
+    const buy = await withUserContext(userId, () =>
+      service.create(userId, {
+        accountId: brokerageAccountId,
+        action: InvestmentAction.BUY,
+        transactionDate: "2026-01-15",
+        securityId,
+        fundingAccountId: fundingAccountA,
+        quantity: 10,
+        price: 100,
+        commission: 0,
+      }),
+    );
 
     // After buy: A should be debited by 1000, B unchanged, linked cash unchanged
     let a = await dataSource.manager.findOneOrFail(Account, {
@@ -145,9 +150,11 @@ describe("InvestmentTransactionsService funding account changes (integration)", 
     expect(Number(txInA[0].amount)).toBe(-1000);
 
     // Now switch funding account to B
-    await service.update(userId, buy.id, {
-      fundingAccountId: fundingAccountB,
-    });
+    await withUserContext(userId, () =>
+      service.update(userId, buy.id, {
+        fundingAccountId: fundingAccountB,
+      }),
+    );
 
     a = await dataSource.manager.findOneOrFail(Account, {
       where: { id: fundingAccountA },

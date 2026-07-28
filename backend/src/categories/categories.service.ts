@@ -6,8 +6,7 @@ import {
 import { I18nService } from "nestjs-i18n";
 import { tr, translateInLocale } from "../i18n/translate";
 import { resolveUserEmailLocale } from "../i18n/resolve-user-email-locale";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull, DataSource, EntityManager } from "typeorm";
+import { IsNull, DataSource, EntityManager } from "typeorm";
 import { Category } from "./entities/category.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
@@ -26,24 +25,11 @@ import { toCountMap } from "../common/count-map.util";
 import { getDefaultCategories } from "./country-category-additions";
 import { isSupportedLocale } from "../i18n/config";
 import { ImportDefaultsDto } from "./dto/import-defaults.dto";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class CategoriesService {
   constructor(
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(TransactionSplit)
-    private splitsRepository: Repository<TransactionSplit>,
-    @InjectRepository(Payee)
-    private payeesRepository: Repository<Payee>,
-    @InjectRepository(ScheduledTransaction)
-    private scheduledTransactionsRepository: Repository<ScheduledTransaction>,
-    @InjectRepository(ScheduledTransactionSplit)
-    private scheduledSplitsRepository: Repository<ScheduledTransactionSplit>,
-    @InjectRepository(UserPreference)
-    private preferencesRepository: Repository<UserPreference>,
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
     private readonly i18n: I18nService,
@@ -60,13 +46,16 @@ export class CategoriesService {
       isIncome = parent.isIncome;
     }
 
-    const category = this.categoriesRepository.create({
-      ...createCategoryDto,
-      isIncome,
-      userId,
+    const saved = await withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(Category);
+      const category = repo.create({
+        ...createCategoryDto,
+        isIncome,
+        userId,
+      });
+      return repo.save(category);
     });
 
-    const saved = await this.categoriesRepository.save(category);
     this.actionHistoryService.record(userId, {
       entityType: "category",
       entityId: saved.id,
@@ -124,52 +113,60 @@ export class CategoriesService {
     userId: string,
     includeSystem = false,
   ): Promise<(Category & { transactionCount: number })[]> {
-    const queryBuilder = this.categoriesRepository
-      .createQueryBuilder("category")
-      .where("category.userId = :userId", { userId })
-      .orderBy("category.name", "ASC");
+    const categoriesWithCounts = await withScopedDb(
+      this.dataSource,
+      async (m) => {
+        const queryBuilder = m
+          .getRepository(Category)
+          .createQueryBuilder("category")
+          .where("category.userId = :userId", { userId })
+          .orderBy("category.name", "ASC");
 
-    if (!includeSystem) {
-      queryBuilder.andWhere("category.isSystem = :isSystem", {
-        isSystem: false,
-      });
-    }
+        if (!includeSystem) {
+          queryBuilder.andWhere("category.isSystem = :isSystem", {
+            isSystem: false,
+          });
+        }
 
-    const categories = await queryBuilder.getMany();
+        const categories = await queryBuilder.getMany();
 
-    if (categories.length === 0) {
-      return [];
-    }
+        if (categories.length === 0) {
+          return [];
+        }
 
-    const categoryIds = categories.map((c) => c.id);
+        const categoryIds = categories.map((c) => c.id);
 
-    const [directCounts, splitCounts] = await Promise.all([
-      this.transactionsRepository
-        .createQueryBuilder("t")
-        .select("t.category_id", "categoryId")
-        .addSelect("COUNT(t.id)", "count")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("t.category_id IN (:...categoryIds)", { categoryIds })
-        .groupBy("t.category_id")
-        .getRawMany(),
-      this.splitsRepository
-        .createQueryBuilder("s")
-        .innerJoin("s.transaction", "t")
-        .select("s.category_id", "categoryId")
-        .addSelect("COUNT(s.id)", "count")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("s.category_id IN (:...categoryIds)", { categoryIds })
-        .groupBy("s.category_id")
-        .getRawMany(),
-    ]);
+        const [directCounts, splitCounts] = await Promise.all([
+          m
+            .getRepository(Transaction)
+            .createQueryBuilder("t")
+            .select("t.category_id", "categoryId")
+            .addSelect("COUNT(t.id)", "count")
+            .where("t.user_id = :userId", { userId })
+            .andWhere("t.category_id IN (:...categoryIds)", { categoryIds })
+            .groupBy("t.category_id")
+            .getRawMany(),
+          m
+            .getRepository(TransactionSplit)
+            .createQueryBuilder("s")
+            .innerJoin("s.transaction", "t")
+            .select("s.category_id", "categoryId")
+            .addSelect("COUNT(s.id)", "count")
+            .where("t.user_id = :userId", { userId })
+            .andWhere("s.category_id IN (:...categoryIds)", { categoryIds })
+            .groupBy("s.category_id")
+            .getRawMany(),
+        ]);
 
-    const countMap = toCountMap(directCounts, { keyField: "categoryId" });
-    toCountMap(splitCounts, { keyField: "categoryId", into: countMap });
+        const countMap = toCountMap(directCounts, { keyField: "categoryId" });
+        toCountMap(splitCounts, { keyField: "categoryId", into: countMap });
 
-    const categoriesWithCounts = categories.map((category) => ({
-      ...category,
-      transactionCount: countMap.get(category.id) || 0,
-    }));
+        return categories.map((category) => ({
+          ...category,
+          transactionCount: countMap.get(category.id) || 0,
+        }));
+      },
+    );
 
     return this.resolveEffectiveColors(categoriesWithCounts);
   }
@@ -213,10 +210,12 @@ export class CategoriesService {
     userId: string,
     isIncome: boolean,
   ): Promise<(Category & { effectiveColor: string | null })[]> {
-    const categories = await this.categoriesRepository.find({
-      where: { userId, isIncome },
-      order: { name: "ASC" },
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId, isIncome },
+        order: { name: "ASC" },
+      }),
+    );
 
     return this.resolveEffectiveColors(categories);
   }
@@ -302,37 +301,40 @@ export class CategoriesService {
     userId: string,
     id: string,
   ): Promise<Category & { effectiveColor: string | null }> {
-    const category = await this.categoriesRepository.findOne({
-      where: { id, userId },
-      relations: ["children"],
-    });
+    return withScopedDb(this.dataSource, async (m) => {
+      const repo = m.getRepository(Category);
+      const category = await repo.findOne({
+        where: { id, userId },
+        relations: ["children"],
+      });
 
-    if (!category) {
-      throw new NotFoundException(
-        tr("errors.categories.notFound", `Category with ID ${id} not found`, {
-          id,
-        }),
-      );
-    }
+      if (!category) {
+        throw new NotFoundException(
+          tr("errors.categories.notFound", `Category with ID ${id} not found`, {
+            id,
+          }),
+        );
+      }
 
-    let effectiveColor = category.color;
-    if (effectiveColor === null && category.parentId) {
-      let currentParentId: string | null = category.parentId;
-      while (currentParentId !== null && effectiveColor === null) {
-        const parent = await this.categoriesRepository.findOne({
-          where: { id: currentParentId, userId },
-          select: ["id", "color", "parentId"],
-        });
-        if (parent) {
-          effectiveColor = parent.color;
-          currentParentId = parent.parentId;
-        } else {
-          break;
+      let effectiveColor = category.color;
+      if (effectiveColor === null && category.parentId) {
+        let currentParentId: string | null = category.parentId;
+        while (currentParentId !== null && effectiveColor === null) {
+          const parent = await repo.findOne({
+            where: { id: currentParentId, userId },
+            select: ["id", "color", "parentId"],
+          });
+          if (parent) {
+            effectiveColor = parent.color;
+            currentParentId = parent.parentId;
+          } else {
+            break;
+          }
         }
       }
-    }
 
-    return { ...category, effectiveColor };
+      return { ...category, effectiveColor };
+    });
   }
 
   async update(
@@ -371,10 +373,12 @@ export class CategoriesService {
       await this.findOne(userId, updateCategoryDto.parentId);
 
       // H16: Check for circular parent reference through the hierarchy
-      const allCategories = await this.categoriesRepository.find({
-        where: { userId },
-        select: ["id", "parentId"],
-      });
+      const allCategories = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Category).find({
+          where: { userId },
+          select: ["id", "parentId"],
+        }),
+      );
       const categoryMap = new Map(allCategories.map((c) => [c.id, c.parentId]));
       categoryMap.set(id, updateCategoryDto.parentId);
       let current: string | null | undefined = updateCategoryDto.parentId;
@@ -416,36 +420,23 @@ export class CategoriesService {
     // Save the category and cascade any type change to all descendant
     // subcategories atomically, so a partial failure cannot leave children
     // with a type that disagrees with their parent.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    let saved: Category;
-    try {
+    const saved = await withScopedDb(this.dataSource, async (m) => {
       // Pass the explicit entity target: findOne returns a plain object
       // (spread with effectiveColor), not a Category instance, so the
       // single-arg form would throw CannotDetermineEntityError.
-      saved = await queryRunner.manager.save(Category, category);
+      const savedCategory = await m.save(Category, category);
 
       if (
         !category.parentId &&
         updateCategoryDto.isIncome !== undefined &&
         updateCategoryDto.isIncome !== beforeData.isIncome
       ) {
-        await this.updateDescendantTypes(
-          userId,
-          id,
-          saved.isIncome,
-          queryRunner.manager,
-        );
+        await this.updateDescendantTypes(userId, id, savedCategory.isIncome, m);
       }
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      return savedCategory;
+    });
+
     this.actionHistoryService.record(userId, {
       entityType: "category",
       entityId: id,
@@ -499,9 +490,11 @@ export class CategoriesService {
       );
     }
 
-    const childCount = await this.categoriesRepository.count({
-      where: { parentId: id, userId },
-    });
+    const childCount = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).count({
+        where: { parentId: id, userId },
+      }),
+    );
 
     if (childCount > 0) {
       throw new BadRequestException(
@@ -538,26 +531,17 @@ export class CategoriesService {
     // Clear the default-category reference on any payees and delete the
     // category atomically, so a failure cannot leave payees pointing at a
     // category that no longer exists.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      await queryRunner.manager.update(
+    await withScopedDb(this.dataSource, async (m) => {
+      await m.update(
         Payee,
         { userId, defaultCategoryId: id },
         { defaultCategoryId: null },
       );
       // Explicit entity target: `category` here is a plain object from
       // findOne (spread with effectiveColor), not a Category instance.
-      await queryRunner.manager.remove(Category, category);
+      await m.remove(Category, category);
+    });
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
     this.actionHistoryService.record(userId, {
       entityType: "category",
       entityId: id,
@@ -575,38 +559,45 @@ export class CategoriesService {
   ): Promise<number> {
     await this.findOne(userId, categoryId);
 
-    const [transactionCount, splitCount, scheduledCount, userScheduledTxIds] =
-      await Promise.all([
-        this.transactionsRepository.count({ where: { userId, categoryId } }),
-        this.splitsRepository
-          .createQueryBuilder("split")
-          .innerJoin("split.transaction", "transaction")
-          .where("split.categoryId = :categoryId", { categoryId })
-          .andWhere("transaction.userId = :userId", { userId })
-          .getCount(),
-        this.scheduledTransactionsRepository.count({
-          where: { userId, categoryId },
-        }),
-        this.scheduledTransactionsRepository
-          .createQueryBuilder("st")
-          .select("st.id")
-          .where("st.userId = :userId", { userId })
-          .getMany(),
-      ]);
+    return withScopedDb(this.dataSource, async (m) => {
+      const [transactionCount, splitCount, scheduledCount, userScheduledTxIds] =
+        await Promise.all([
+          m.getRepository(Transaction).count({ where: { userId, categoryId } }),
+          m
+            .getRepository(TransactionSplit)
+            .createQueryBuilder("split")
+            .innerJoin("split.transaction", "transaction")
+            .where("split.categoryId = :categoryId", { categoryId })
+            .andWhere("transaction.userId = :userId", { userId })
+            .getCount(),
+          m.getRepository(ScheduledTransaction).count({
+            where: { userId, categoryId },
+          }),
+          m
+            .getRepository(ScheduledTransaction)
+            .createQueryBuilder("st")
+            .select("st.id")
+            .where("st.userId = :userId", { userId })
+            .getMany(),
+        ]);
 
-    let scheduledSplitCount = 0;
-    if (userScheduledTxIds.length > 0) {
-      const scheduledTxIds = userScheduledTxIds.map((st) => st.id);
-      scheduledSplitCount = await this.scheduledSplitsRepository
-        .createQueryBuilder("ss")
-        .where("ss.categoryId = :categoryId", { categoryId })
-        .andWhere("ss.scheduledTransactionId IN (:...scheduledTxIds)", {
-          scheduledTxIds,
-        })
-        .getCount();
-    }
+      let scheduledSplitCount = 0;
+      if (userScheduledTxIds.length > 0) {
+        const scheduledTxIds = userScheduledTxIds.map((st) => st.id);
+        scheduledSplitCount = await m
+          .getRepository(ScheduledTransactionSplit)
+          .createQueryBuilder("ss")
+          .where("ss.categoryId = :categoryId", { categoryId })
+          .andWhere("ss.scheduledTransactionId IN (:...scheduledTxIds)", {
+            scheduledTxIds,
+          })
+          .getCount();
+      }
 
-    return transactionCount + splitCount + scheduledCount + scheduledSplitCount;
+      return (
+        transactionCount + splitCount + scheduledCount + scheduledSplitCount
+      );
+    });
   }
 
   async reassignTransactions(
@@ -624,19 +615,15 @@ export class CategoriesService {
       await this.findOne(userId, toCategoryId);
     }
 
-    // M22: Wrap all UPDATE operations in a single QueryRunner transaction
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const transactionResult = await queryRunner.manager.update(
+    // M22: All UPDATE operations run in a single transaction.
+    return withScopedDb(this.dataSource, async (m) => {
+      const transactionResult = await m.update(
         Transaction,
         { userId, categoryId: fromCategoryId },
         { categoryId: toCategoryId },
       );
 
-      const userTransactionIds = await queryRunner.manager
+      const userTransactionIds = await m
         .createQueryBuilder(Transaction, "t")
         .select("t.id")
         .where("t.userId = :userId", { userId })
@@ -646,7 +633,7 @@ export class CategoriesService {
 
       let splitsUpdated = 0;
       if (transactionIds.length > 0) {
-        const splitResult = await queryRunner.manager
+        const splitResult = await m
           .createQueryBuilder()
           .update(TransactionSplit)
           .set({ categoryId: toCategoryId })
@@ -657,13 +644,13 @@ export class CategoriesService {
         splitsUpdated = splitResult.affected || 0;
       }
 
-      const scheduledResult = await queryRunner.manager.update(
+      const scheduledResult = await m.update(
         ScheduledTransaction,
         { userId, categoryId: fromCategoryId },
         { categoryId: toCategoryId },
       );
 
-      const userScheduledTxIds = await queryRunner.manager
+      const userScheduledTxIds = await m
         .createQueryBuilder(ScheduledTransaction, "st")
         .select("st.id")
         .where("st.userId = :userId", { userId })
@@ -671,7 +658,7 @@ export class CategoriesService {
 
       if (userScheduledTxIds.length > 0) {
         const scheduledTxIds = userScheduledTxIds.map((st) => st.id);
-        await queryRunner.manager
+        await m
           .createQueryBuilder()
           .update(ScheduledTransactionSplit)
           .set({ categoryId: toCategoryId })
@@ -682,19 +669,12 @@ export class CategoriesService {
           .execute();
       }
 
-      await queryRunner.commitTransaction();
-
       return {
         transactionsUpdated: transactionResult.affected || 0,
         splitsUpdated,
         scheduledUpdated: scheduledResult.affected || 0,
       };
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   async getStats(userId: string): Promise<{
@@ -722,22 +702,25 @@ export class CategoriesService {
     name: string,
     parentName?: string,
   ): Promise<Category | null> {
-    if (parentName) {
-      const parent = await this.categoriesRepository.findOne({
-        where: { userId, name: parentName, parentId: IsNull() },
-      });
+    return withScopedDb(this.dataSource, async (m) => {
+      const repo = m.getRepository(Category);
+      if (parentName) {
+        const parent = await repo.findOne({
+          where: { userId, name: parentName, parentId: IsNull() },
+        });
 
-      if (!parent) {
-        return null;
+        if (!parent) {
+          return null;
+        }
+
+        return repo.findOne({
+          where: { userId, name, parentId: parent.id },
+        });
       }
 
-      return this.categoriesRepository.findOne({
-        where: { userId, name, parentId: parent.id },
+      return repo.findOne({
+        where: { userId, name },
       });
-    }
-
-    return this.categoriesRepository.findOne({
-      where: { userId, name },
     });
   }
 
@@ -745,36 +728,41 @@ export class CategoriesService {
     principalCategory: Category | null;
     interestCategory: Category | null;
   }> {
-    const loanParent = await this.categoriesRepository.findOne({
-      where: { userId, name: "Loan", parentId: IsNull() },
+    return withScopedDb(this.dataSource, async (m) => {
+      const repo = m.getRepository(Category);
+      const loanParent = await repo.findOne({
+        where: { userId, name: "Loan", parentId: IsNull() },
+      });
+
+      if (!loanParent) {
+        return {
+          principalCategory: null,
+          interestCategory: null,
+        };
+      }
+
+      const [principalCategory, interestCategory] = await Promise.all([
+        repo.findOne({
+          where: { userId, name: "Loan Principal", parentId: loanParent.id },
+        }),
+        repo.findOne({
+          where: { userId, name: "Loan Interest", parentId: loanParent.id },
+        }),
+      ]);
+
+      return { principalCategory, interestCategory };
     });
-
-    if (!loanParent) {
-      return {
-        principalCategory: null,
-        interestCategory: null,
-      };
-    }
-
-    const [principalCategory, interestCategory] = await Promise.all([
-      this.categoriesRepository.findOne({
-        where: { userId, name: "Loan Principal", parentId: loanParent.id },
-      }),
-      this.categoriesRepository.findOne({
-        where: { userId, name: "Loan Interest", parentId: loanParent.id },
-      }),
-    ]);
-
-    return { principalCategory, interestCategory };
   }
 
   async importDefaults(
     userId: string,
     options: ImportDefaultsDto = {},
   ): Promise<{ categoriesCreated: number }> {
-    const existingCount = await this.categoriesRepository.count({
-      where: { userId, isSystem: false },
-    });
+    const existingCount = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).count({
+        where: { userId, isSystem: false },
+      }),
+    );
 
     if (existingCount > 0) {
       throw new BadRequestException(
@@ -792,7 +780,9 @@ export class CategoriesService {
     // keys fall back to the English source.
     const lang = isSupportedLocale(options.language)
       ? (options.language as string)
-      : await resolveUserEmailLocale(this.preferencesRepository, userId);
+      : await withScopedDb(this.dataSource, (m) =>
+          resolveUserEmailLocale(m.getRepository(UserPreference), userId),
+        );
     const localizeCategory = (name: string): string =>
       translateInLocale(this.i18n, lang, defaultCategoryNameKey(name), name);
     const localizeSubcategory = (parentName: string, name: string): string =>
@@ -808,12 +798,8 @@ export class CategoriesService {
     // yields the generic catalog.
     const { income, expense } = getDefaultCategories(options.country);
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const repo = queryRunner.manager.getRepository(Category);
+    return withScopedDb(this.dataSource, async (m) => {
+      const repo = m.getRepository(Category);
       let categoryCount = 0;
 
       for (const cat of income) {
@@ -858,13 +844,7 @@ export class CategoriesService {
         }
       }
 
-      await queryRunner.commitTransaction();
       return { categoriesCreated: categoryCount };
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 }

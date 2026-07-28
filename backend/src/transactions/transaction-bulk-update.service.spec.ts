@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { BadRequestException } from "@nestjs/common";
 import { TransactionBulkUpdateService } from "./transaction-bulk-update.service";
 import { buildTransactionSearchClause } from "./transaction-search.util";
@@ -12,6 +11,14 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { TagsService } from "../tags/tags.service";
 import { BulkUpdateDto, BulkDeleteDto } from "./dto/bulk-update.dto";
 import { Brackets, DataSource } from "typeorm";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 jest.mock("../common/date-utils", () => ({
   ...jest.requireActual("../common/date-utils"),
@@ -27,7 +34,7 @@ describe("TransactionBulkUpdateService", () => {
   let accountsService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
   let tagsService: Record<string, jest.Mock>;
-  let mockQueryRunner: Record<string, any>;
+  let mockDataSource: DataSourceMock;
   let mockManagerCreateQueryBuilder: jest.Mock;
   let mockManagerGetRepository: jest.Mock;
   let mockManagerFind: jest.Mock;
@@ -86,7 +93,11 @@ describe("TransactionBulkUpdateService", () => {
 
   beforeEach(async () => {
     transactionsRepository = {
-      createQueryBuilder: jest.fn(),
+      createQueryBuilder: jest.fn().mockImplementation(() =>
+        createMockQueryBuilder({
+          getMany: jest.fn().mockResolvedValue([]),
+        }),
+      ),
     };
 
     categoriesRepository = {
@@ -118,55 +129,42 @@ describe("TransactionBulkUpdateService", () => {
       setSplitTagsBulk: jest.fn().mockResolvedValue(undefined),
     };
 
-    // Mock QueryRunner with manager that has createQueryBuilder and getRepository
+    // withScopedDb EntityManager with createQueryBuilder and entity-routed
+    // getRepository.
     mockManagerCreateQueryBuilder = jest.fn();
     mockManagerFind = jest.fn().mockResolvedValue([]);
-    mockManagerGetRepository = jest.fn().mockReturnValue({
-      createQueryBuilder: jest.fn().mockReturnValue(
-        createMockQueryBuilder({
-          getMany: jest.fn().mockResolvedValue([]),
-        }),
-      ),
+    // Entities with their own mock repositories route to them; anything else
+    // (notably Transaction) falls back to a generic empty query builder.
+    const routedRepos = new Map<unknown, Record<string, jest.Mock>>([
+      [Transaction, transactionsRepository],
+      [Category, categoriesRepository],
+      [Payee, payeesRepository],
+      [UserPreference, userPreferenceRepository],
+    ]);
+    mockManagerGetRepository = jest.fn().mockImplementation((entity: any) => {
+      const routed = routedRepos.get(entity);
+      if (routed) return routed;
+      return {
+        createQueryBuilder: jest.fn().mockReturnValue(
+          createMockQueryBuilder({
+            getMany: jest.fn().mockResolvedValue([]),
+          }),
+        ),
+      };
     });
 
-    mockQueryRunner = {
-      connect: jest.fn().mockResolvedValue(undefined),
-      startTransaction: jest.fn().mockResolvedValue(undefined),
-      commitTransaction: jest.fn().mockResolvedValue(undefined),
-      rollbackTransaction: jest.fn().mockResolvedValue(undefined),
-      release: jest.fn().mockResolvedValue(undefined),
-      manager: {
-        createQueryBuilder: mockManagerCreateQueryBuilder,
-        getRepository: mockManagerGetRepository,
-        // syncLinkedTransfers looks up owning splits to tell split-transfer
-        // legs apart from plain transfer legs. Default: none (plain transfers).
-        find: mockManagerFind,
-      },
-    };
-
-    const mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    };
+    const tenantMocks = createScopedDbMocks();
+    mockDataSource = tenantMocks.dataSource;
+    const manager = tenantMocks.manager;
+    manager.createQueryBuilder = mockManagerCreateQueryBuilder;
+    manager.getRepository = mockManagerGetRepository;
+    // syncLinkedTransfers looks up owning splits to tell split-transfer
+    // legs apart from plain transfer legs. Default: none (plain transfers).
+    manager.find = mockManagerFind;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TransactionBulkUpdateService,
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(Category),
-          useValue: categoriesRepository,
-        },
-        {
-          provide: getRepositoryToken(Payee),
-          useValue: payeesRepository,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: userPreferenceRepository,
-        },
         { provide: AccountsService, useValue: accountsService },
         { provide: NetWorthService, useValue: netWorthService },
         { provide: TagsService, useValue: tagsService },
@@ -317,10 +315,7 @@ describe("TransactionBulkUpdateService", () => {
       const syncUpdateQb = createMockQueryBuilder({
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       });
-      const mockRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(syncFindQb),
-      };
-      mockManagerGetRepository.mockReturnValue(mockRepo);
+      transactionsRepository.createQueryBuilder.mockReturnValue(syncFindQb);
       mockManagerCreateQueryBuilder
         .mockReturnValueOnce(updateQb)
         .mockReturnValueOnce(syncUpdateQb);
@@ -488,10 +483,7 @@ describe("TransactionBulkUpdateService", () => {
       const syncUpdateQb = createMockQueryBuilder({
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       });
-      const mockRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(syncFindQb),
-      };
-      mockManagerGetRepository.mockReturnValue(mockRepo);
+      transactionsRepository.createQueryBuilder.mockReturnValue(syncFindQb);
       mockManagerCreateQueryBuilder
         .mockReturnValueOnce(updateQb)
         .mockReturnValueOnce(syncUpdateQb);
@@ -542,9 +534,7 @@ describe("TransactionBulkUpdateService", () => {
       const memoUpdateQb = createMockQueryBuilder({
         execute: jest.fn().mockResolvedValue({ affected: 1 }),
       });
-      mockManagerGetRepository.mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue(syncFindQb),
-      });
+      transactionsRepository.createQueryBuilder.mockReturnValue(syncFindQb);
       // The owning-split lookup identifies tx-1 as a split-transfer leg.
       mockManagerFind.mockResolvedValue([
         { id: "split-1", linkedTransactionId: "tx-1" },
@@ -598,10 +588,7 @@ describe("TransactionBulkUpdateService", () => {
       const syncFindQb = createMockQueryBuilder({
         getMany: jest.fn().mockResolvedValue([]),
       });
-      const mockRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(syncFindQb),
-      };
-      mockManagerGetRepository.mockReturnValue(mockRepo);
+      transactionsRepository.createQueryBuilder.mockReturnValue(syncFindQb);
       mockManagerCreateQueryBuilder.mockReturnValueOnce(updateQb);
 
       const dto: BulkUpdateDto = {
@@ -641,21 +628,18 @@ describe("TransactionBulkUpdateService", () => {
         getRawMany: jest.fn().mockResolvedValue([{ accountId: "acc-1" }]),
       });
 
-      transactionsRepository.createQueryBuilder
-        .mockReturnValueOnce(resolveQb)
-        .mockReturnValueOnce(exclusionsQb)
-        .mockReturnValueOnce(accountIdsQb);
-
       // Balance deltas query goes through queryRunner.manager.getRepository(Transaction).createQueryBuilder()
       const balanceQb = createMockQueryBuilder({
         getRawMany: jest
           .fn()
           .mockResolvedValue([{ accountId: "acc-1", totalAmount: "20" }]),
       });
-      const mockTxRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(balanceQb),
-      };
-      mockManagerGetRepository.mockReturnValue(mockTxRepo);
+
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(exclusionsQb)
+        .mockReturnValueOnce(balanceQb)
+        .mockReturnValueOnce(accountIdsQb);
 
       // Batch update goes through queryRunner.manager.createQueryBuilder()
       const updateQb = createMockQueryBuilder({
@@ -672,11 +656,7 @@ describe("TransactionBulkUpdateService", () => {
       const result = await service.bulkUpdate(userId, dto);
 
       expect(result.updated).toBe(2);
-      expect(accountsService.updateBalance).toHaveBeenCalledWith(
-        "acc-1",
-        -20,
-        expect.anything(),
-      );
+      expect(accountsService.updateBalance).toHaveBeenCalledWith("acc-1", -20);
       expect(netWorthService.triggerDebouncedRecalc).toHaveBeenCalledWith(
         "acc-1",
         userId,
@@ -702,21 +682,18 @@ describe("TransactionBulkUpdateService", () => {
         getRawMany: jest.fn().mockResolvedValue([{ accountId: "acc-1" }]),
       });
 
-      transactionsRepository.createQueryBuilder
-        .mockReturnValueOnce(resolveQb)
-        .mockReturnValueOnce(exclusionsQb)
-        .mockReturnValueOnce(accountIdsQb);
-
       // Balance deltas via queryRunner.manager.getRepository
       const balanceQb = createMockQueryBuilder({
         getRawMany: jest
           .fn()
           .mockResolvedValue([{ accountId: "acc-1", totalAmount: "100" }]),
       });
-      const mockTxRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(balanceQb),
-      };
-      mockManagerGetRepository.mockReturnValue(mockTxRepo);
+
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(exclusionsQb)
+        .mockReturnValueOnce(balanceQb)
+        .mockReturnValueOnce(accountIdsQb);
 
       // Batch update via queryRunner.manager.createQueryBuilder
       const updateQb = createMockQueryBuilder({
@@ -733,11 +710,7 @@ describe("TransactionBulkUpdateService", () => {
       const result = await service.bulkUpdate(userId, dto);
 
       expect(result.updated).toBe(1);
-      expect(accountsService.updateBalance).toHaveBeenCalledWith(
-        "acc-1",
-        100,
-        expect.anything(),
-      );
+      expect(accountsService.updateBalance).toHaveBeenCalledWith("acc-1", 100);
     });
 
     it("only updates specified fields (partial update)", async () => {
@@ -840,7 +813,6 @@ describe("TransactionBulkUpdateService", () => {
         ["tx-1", "tx-2"],
         ["tag-a", "tag-b"],
         userId,
-        mockQueryRunner,
       );
     });
 
@@ -870,7 +842,6 @@ describe("TransactionBulkUpdateService", () => {
         ["tx-1"],
         [],
         userId,
-        mockQueryRunner,
       );
     });
 
@@ -899,9 +870,7 @@ describe("TransactionBulkUpdateService", () => {
             { id: "tx-1", linkedTransactionId: "parent-tx" },
           ]),
       });
-      mockManagerGetRepository.mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue(syncFindQb),
-      });
+      transactionsRepository.createQueryBuilder.mockReturnValue(syncFindQb);
       // ...is owned by a split row, so it is a split-transfer leg.
       mockManagerFind.mockResolvedValue([
         { id: "split-1", linkedTransactionId: "tx-1" },
@@ -921,14 +890,12 @@ describe("TransactionBulkUpdateService", () => {
         ["tx-1"],
         ["tag-a"],
         userId,
-        mockQueryRunner,
       );
       // ...and the owning split mirrors them; the parent is never tagged.
       expect(tagsService.setSplitTagsBulk).toHaveBeenCalledWith(
         ["split-1"],
         ["tag-a"],
         userId,
-        mockQueryRunner,
       );
     });
 
@@ -956,9 +923,7 @@ describe("TransactionBulkUpdateService", () => {
             { id: "tx-1", linkedTransactionId: "tx-1-linked" },
           ]),
       });
-      mockManagerGetRepository.mockReturnValue({
-        createQueryBuilder: jest.fn().mockReturnValue(syncFindQb),
-      });
+      transactionsRepository.createQueryBuilder.mockReturnValue(syncFindQb);
       // No owning split: a plain transfer leg.
       mockManagerFind.mockResolvedValue([]);
 
@@ -976,7 +941,6 @@ describe("TransactionBulkUpdateService", () => {
         ["tx-1-linked"],
         ["tag-a"],
         userId,
-        mockQueryRunner,
       );
       expect(tagsService.setSplitTagsBulk).not.toHaveBeenCalled();
     });
@@ -1077,21 +1041,18 @@ describe("TransactionBulkUpdateService", () => {
         getRawMany: jest.fn().mockResolvedValue([{ accountId: "acc-1" }]),
       });
 
-      transactionsRepository.createQueryBuilder
-        .mockReturnValueOnce(resolveQb)
-        .mockReturnValueOnce(exclusionsQb)
-        .mockReturnValueOnce(accountIdsQb);
-
       // Balance deltas query via queryRunner.manager.getRepository
       const balanceQb = createMockQueryBuilder({
         getRawMany: jest
           .fn()
           .mockResolvedValue([{ accountId: "acc-1", totalAmount: "50" }]),
       });
-      const mockTxRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(balanceQb),
-      };
-      mockManagerGetRepository.mockReturnValue(mockTxRepo);
+
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(exclusionsQb)
+        .mockReturnValueOnce(balanceQb)
+        .mockReturnValueOnce(accountIdsQb);
 
       // Batch update via queryRunner.manager.createQueryBuilder
       const updateQb = createMockQueryBuilder({
@@ -1114,11 +1075,7 @@ describe("TransactionBulkUpdateService", () => {
         expect.objectContaining({ today: expect.any(String) }),
       );
       // Only the past transaction's amount (50) should be used for balance update
-      expect(accountsService.updateBalance).toHaveBeenCalledWith(
-        "acc-1",
-        -50,
-        expect.anything(),
-      );
+      expect(accountsService.updateBalance).toHaveBeenCalledWith("acc-1", -50);
     });
 
     it("excludes future-dated transactions from balance updates when unvoiding", async () => {
@@ -1148,21 +1105,18 @@ describe("TransactionBulkUpdateService", () => {
         getRawMany: jest.fn().mockResolvedValue([{ accountId: "acc-1" }]),
       });
 
-      transactionsRepository.createQueryBuilder
-        .mockReturnValueOnce(resolveQb)
-        .mockReturnValueOnce(exclusionsQb)
-        .mockReturnValueOnce(accountIdsQb);
-
       // Balance deltas via queryRunner.manager.getRepository
       const balanceQb = createMockQueryBuilder({
         getRawMany: jest
           .fn()
           .mockResolvedValue([{ accountId: "acc-1", totalAmount: "100" }]),
       });
-      const mockTxRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(balanceQb),
-      };
-      mockManagerGetRepository.mockReturnValue(mockTxRepo);
+
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(exclusionsQb)
+        .mockReturnValueOnce(balanceQb)
+        .mockReturnValueOnce(accountIdsQb);
 
       // Batch update via queryRunner.manager.createQueryBuilder
       const updateQb = createMockQueryBuilder({
@@ -1184,11 +1138,7 @@ describe("TransactionBulkUpdateService", () => {
         expect.objectContaining({ today: expect.any(String) }),
       );
       // Only the past transaction's amount (100) should be added back
-      expect(accountsService.updateBalance).toHaveBeenCalledWith(
-        "acc-1",
-        100,
-        expect.anything(),
-      );
+      expect(accountsService.updateBalance).toHaveBeenCalledWith("acc-1", 100);
     });
   });
 
@@ -1243,7 +1193,7 @@ describe("TransactionBulkUpdateService", () => {
       const result = await service.bulkDelete(userId, dto);
 
       expect(result.deleted).toBe(2);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("adjusts balances for non-VOID, non-future transactions", async () => {
@@ -1279,11 +1229,7 @@ describe("TransactionBulkUpdateService", () => {
 
       await service.bulkDelete(userId, dto);
 
-      expect(accountsService.updateBalance).toHaveBeenCalledWith(
-        "acc-1",
-        -100,
-        expect.anything(),
-      );
+      expect(accountsService.updateBalance).toHaveBeenCalledWith("acc-1", -100);
     });
 
     it("does not adjust balance for VOID transactions", async () => {
@@ -1365,7 +1311,7 @@ describe("TransactionBulkUpdateService", () => {
       // 2. Delete linked transactions
       // 3. Delete primary transactions
       expect(mockManagerCreateQueryBuilder).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("triggers net worth recalc for affected accounts", async () => {
@@ -1433,8 +1379,7 @@ describe("TransactionBulkUpdateService", () => {
         }),
       ).rejects.toThrow("DB error");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("returns zero deleted when loaded transactions are empty", async () => {
@@ -1457,7 +1402,9 @@ describe("TransactionBulkUpdateService", () => {
       });
 
       expect(result).toEqual({ deleted: 0 });
-      expect(mockQueryRunner.connect).not.toHaveBeenCalled();
+      // Only the two read transactions (id resolve + detail load) ran: the
+      // delete block is skipped entirely when nothing loads.
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(2);
     });
 
     it("deletes linked transactions from split transfers", async () => {
@@ -1510,7 +1457,7 @@ describe("TransactionBulkUpdateService", () => {
 
       // Should have balance adjustment for linked tx
       expect(accountsService.updateBalance).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("does not adjust balance for future-dated transactions", async () => {
@@ -1595,7 +1542,7 @@ describe("TransactionBulkUpdateService", () => {
 
       // Only one delete call (no separate linked deletion since both are primary)
       expect(mockManagerCreateQueryBuilder).toHaveBeenCalledTimes(1);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
   });
 
@@ -1670,8 +1617,7 @@ describe("TransactionBulkUpdateService", () => {
         "Update failed",
       );
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("pluralizes skipped reasons correctly for multiple split transactions", async () => {
@@ -2151,21 +2097,18 @@ describe("TransactionBulkUpdateService", () => {
         getRawMany: jest.fn().mockResolvedValue([{ accountId: "acc-1" }]),
       });
 
-      transactionsRepository.createQueryBuilder
-        .mockReturnValueOnce(resolveQb)
-        .mockReturnValueOnce(exclusionsQb)
-        .mockReturnValueOnce(accountIdsQb);
-
       // Balance deltas query returns zero totalAmount
       const balanceQb = createMockQueryBuilder({
         getRawMany: jest
           .fn()
           .mockResolvedValue([{ accountId: "acc-1", totalAmount: "0" }]),
       });
-      const mockTxRepo = {
-        createQueryBuilder: jest.fn().mockReturnValue(balanceQb),
-      };
-      mockManagerGetRepository.mockReturnValue(mockTxRepo);
+
+      transactionsRepository.createQueryBuilder
+        .mockReturnValueOnce(resolveQb)
+        .mockReturnValueOnce(exclusionsQb)
+        .mockReturnValueOnce(balanceQb)
+        .mockReturnValueOnce(accountIdsQb);
 
       const updateQb = createMockQueryBuilder({
         execute: jest.fn().mockResolvedValue({ affected: 1 }),

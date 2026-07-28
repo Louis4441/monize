@@ -19,6 +19,7 @@ import {
   cleanTables,
   createTestUserDirect,
 } from "../helpers/integration-setup";
+import { withUserContext } from "@/common/db/with-context";
 import { createTestAccount } from "../helpers/test-factories";
 
 /**
@@ -97,26 +98,30 @@ describe("Security transfer between accounts (integration)", () => {
     brokerageB = b.id;
 
     const securitiesService = module.get(SecuritiesService);
-    const security = await securitiesService.create(userId, {
-      symbol: "ACME",
-      name: "Acme Corp",
-      securityType: "STOCK" as any,
-      currencyCode: "USD",
-    } as any);
+    const security = await withUserContext(userId, () =>
+      securitiesService.create(userId, {
+        symbol: "ACME",
+        name: "Acme Corp",
+        securityType: "STOCK" as any,
+        currencyCode: "USD",
+      } as any),
+    );
     securityId = security.id;
   });
 
   // Buy 100 shares in Brokerage A at a discounted 1.67/share.
   async function buy100At167() {
-    await service.create(userId, {
-      accountId: brokerageA,
-      action: InvestmentAction.BUY,
-      transactionDate: "2026-01-10",
-      securityId,
-      quantity: 100,
-      price: 1.67,
-      commission: 0,
-    } as any);
+    await withUserContext(userId, () =>
+      service.create(userId, {
+        accountId: brokerageA,
+        action: InvestmentAction.BUY,
+        transactionDate: "2026-01-10",
+        securityId,
+        quantity: 100,
+        price: 1.67,
+        commission: 0,
+      } as any),
+    );
   }
 
   it("carries cost basis to the destination and links the two legs", async () => {
@@ -125,14 +130,16 @@ describe("Security transfer between accounts (integration)", () => {
       where: { userId },
     });
 
-    const { transferOut, transferIn } = await service.transferSecurity(userId, {
-      fromAccountId: brokerageA,
-      toAccountId: brokerageB,
-      securityId,
-      transactionDate: "2026-02-01",
-      quantity: 100,
-      costPerShare: 1.67,
-    });
+    const { transferOut, transferIn } = await withUserContext(userId, () =>
+      service.transferSecurity(userId, {
+        fromAccountId: brokerageA,
+        toAccountId: brokerageB,
+        securityId,
+        transactionDate: "2026-02-01",
+        quantity: 100,
+        costPerShare: 1.67,
+      }),
+    );
 
     // Source emptied, destination holds the shares at the original cost.
     const aHolding = await holdingsService.findByAccountAndSecurity(
@@ -161,17 +168,19 @@ describe("Security transfer between accounts (integration)", () => {
 
   it("deleting one leg removes both and restores the source holding", async () => {
     await buy100At167();
-    const { transferOut, transferIn } = await service.transferSecurity(userId, {
-      fromAccountId: brokerageA,
-      toAccountId: brokerageB,
-      securityId,
-      transactionDate: "2026-02-01",
-      quantity: 100,
-      costPerShare: 1.67,
-    });
+    const { transferOut, transferIn } = await withUserContext(userId, () =>
+      service.transferSecurity(userId, {
+        fromAccountId: brokerageA,
+        toAccountId: brokerageB,
+        securityId,
+        transactionDate: "2026-02-01",
+        quantity: 100,
+        costPerShare: 1.67,
+      }),
+    );
 
     // Delete the destination leg; the source leg must go too.
-    await service.remove(userId, transferIn.id);
+    await withUserContext(userId, () => service.remove(userId, transferIn.id));
 
     const remaining = await dataSource.manager.find(InvestmentTransaction, {
       where: { userId, action: InvestmentAction.TRANSFER_OUT },
@@ -200,17 +209,21 @@ describe("Security transfer between accounts (integration)", () => {
 
   it("editing the quantity on one leg updates both legs and holdings", async () => {
     await buy100At167();
-    const { transferOut, transferIn } = await service.transferSecurity(userId, {
-      fromAccountId: brokerageA,
-      toAccountId: brokerageB,
-      securityId,
-      transactionDate: "2026-02-01",
-      quantity: 100,
-      costPerShare: 1.67,
-    });
+    const { transferOut, transferIn } = await withUserContext(userId, () =>
+      service.transferSecurity(userId, {
+        fromAccountId: brokerageA,
+        toAccountId: brokerageB,
+        securityId,
+        transactionDate: "2026-02-01",
+        quantity: 100,
+        costPerShare: 1.67,
+      }),
+    );
 
     // Reduce the transferred quantity by editing the OUT leg.
-    await service.update(userId, transferOut.id, { quantity: 60 });
+    await withUserContext(userId, () =>
+      service.update(userId, transferOut.id, { quantity: 60 }),
+    );
 
     const outAfter = await dataSource.manager.findOneOrFail(
       InvestmentTransaction,
@@ -239,14 +252,16 @@ describe("Security transfer between accounts (integration)", () => {
 
   it("reroutes the destination account when editing a transfer", async () => {
     await buy100At167();
-    const { transferOut } = await service.transferSecurity(userId, {
-      fromAccountId: brokerageA,
-      toAccountId: brokerageB,
-      securityId,
-      transactionDate: "2026-02-01",
-      quantity: 100,
-      costPerShare: 1.67,
-    });
+    const { transferOut } = await withUserContext(userId, () =>
+      service.transferSecurity(userId, {
+        fromAccountId: brokerageA,
+        toAccountId: brokerageB,
+        securityId,
+        transactionDate: "2026-02-01",
+        quantity: 100,
+        costPerShare: 1.67,
+      }),
+    );
 
     // Add a third brokerage and reroute the destination to it.
     const c = await createTestAccount(dataSource, userId, {
@@ -259,9 +274,11 @@ describe("Security transfer between accounts (integration)", () => {
       accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
     });
 
-    await service.update(userId, transferOut.id, {
-      destinationAccountId: c.id,
-    });
+    await withUserContext(userId, () =>
+      service.update(userId, transferOut.id, {
+        destinationAccountId: c.id,
+      }),
+    );
 
     // Shares now sit in C, not B; cost basis preserved.
     const bHolding = await holdingsService.findByAccountAndSecurity(
@@ -280,14 +297,16 @@ describe("Security transfer between accounts (integration)", () => {
   it("rejects transferring more shares than the source holds", async () => {
     await buy100At167();
     await expect(
-      service.transferSecurity(userId, {
-        fromAccountId: brokerageA,
-        toAccountId: brokerageB,
-        securityId,
-        transactionDate: "2026-02-01",
-        quantity: 150,
-        costPerShare: 1.67,
-      }),
+      withUserContext(userId, () =>
+        service.transferSecurity(userId, {
+          fromAccountId: brokerageA,
+          toAccountId: brokerageB,
+          securityId,
+          transactionDate: "2026-02-01",
+          quantity: 150,
+          costPerShare: 1.67,
+        }),
+      ),
     ).rejects.toBeDefined();
 
     // Nothing moved.

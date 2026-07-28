@@ -5,8 +5,7 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, QueryRunner, In } from "typeorm";
+import { DataSource, EntityManager, In } from "typeorm";
 import { Transaction } from "./entities/transaction.entity";
 import { TransactionSplit } from "./entities/transaction-split.entity";
 import { SplitKind } from "./entities/split-kind.enum";
@@ -24,6 +23,7 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { validateSplitAmountSum } from "../common/split-amount.util";
 import { tr } from "../i18n/translate";
+import { withScopedDb } from "../common/db/scoped-db";
 
 function inferSplitKind(split: CreateTransactionSplitDto): SplitKind {
   if (split.splitKind) return split.splitKind;
@@ -35,12 +35,6 @@ function inferSplitKind(split: CreateTransactionSplitDto): SplitKind {
 @Injectable()
 export class TransactionSplitService {
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(TransactionSplit)
-    private splitsRepository: Repository<TransactionSplit>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     @Inject(forwardRef(() => InvestmentTransactionsService))
@@ -54,9 +48,11 @@ export class TransactionSplitService {
     userId: string,
     categoryId: string,
   ): Promise<void> {
-    const category = await this.categoriesRepository.findOne({
-      where: { id: categoryId, userId },
-    });
+    const category = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).findOne({
+        where: { id: categoryId, userId },
+      }),
+    );
     if (!category) {
       throw new NotFoundException(
         tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -142,6 +138,12 @@ export class TransactionSplitService {
     }
   }
 
+  /**
+   * Create the split rows (and their transfer counterparts / embedded
+   * investment rows). Runs in its own transaction when called standalone;
+   * called from inside a caller's `withScopedDb` (transaction create/update,
+   * updateSplits) it joins that transaction via re-entrancy.
+   */
   async createSplits(
     transactionId: string,
     splits: CreateTransactionSplitDto[],
@@ -149,21 +151,11 @@ export class TransactionSplitService {
     sourceAccountId?: string,
     transactionDate?: Date,
     parentPayeeName?: string | null,
-    externalQueryRunner?: QueryRunner,
     parentPayeeId?: string | null,
   ): Promise<TransactionSplit[]> {
-    const ownTransaction = !externalQueryRunner;
-    const queryRunner =
-      externalQueryRunner ?? this.dataSource.createQueryRunner();
-
-    if (ownTransaction) {
-      await queryRunner.connect();
-      await queryRunner.startTransaction();
-    }
-
-    try {
-      const savedSplits = await this.createSplitsInternal(
-        queryRunner,
+    return withScopedDb(this.dataSource, (m) =>
+      this.createSplitsInternal(
+        m,
         transactionId,
         splits,
         userId,
@@ -171,27 +163,12 @@ export class TransactionSplitService {
         transactionDate,
         parentPayeeName,
         parentPayeeId,
-      );
-
-      if (ownTransaction) {
-        await queryRunner.commitTransaction();
-      }
-
-      return savedSplits;
-    } catch (error) {
-      if (ownTransaction) {
-        await queryRunner.rollbackTransaction();
-      }
-      throw error;
-    } finally {
-      if (ownTransaction) {
-        await queryRunner.release();
-      }
-    }
+      ),
+    );
   }
 
   private async createSplitsInternal(
-    queryRunner: QueryRunner,
+    m: EntityManager,
     transactionId: string,
     splits: CreateTransactionSplitDto[],
     userId?: string,
@@ -207,7 +184,7 @@ export class TransactionSplitService {
         ),
       ];
       if (categoryIds.length > 0) {
-        const found = await queryRunner.manager.find(Category, {
+        const found = await m.find(Category, {
           where: { id: In(categoryIds), userId },
           select: ["id"],
         });
@@ -305,7 +282,7 @@ export class TransactionSplitService {
         const kind = split.transferAccountId
           ? SplitKind.TRANSFER
           : SplitKind.CATEGORY;
-        return queryRunner.manager.create(TransactionSplit, {
+        return m.create(TransactionSplit, {
           transactionId,
           kind,
           categoryId: split.categoryId || null,
@@ -314,14 +291,14 @@ export class TransactionSplitService {
           memo: split.memo || null,
         });
       });
-      const batchSaved = await queryRunner.manager.save(regularEntities);
+      const batchSaved = await m.save(regularEntities);
       batchSaved.forEach((saved, j) => {
         savedSplits[regularSplits[j].index] = saved;
       });
     }
 
     for (const { split, index } of transferSplits) {
-      const splitEntity = queryRunner.manager.create(TransactionSplit, {
+      const splitEntity = m.create(TransactionSplit, {
         transactionId,
         kind: SplitKind.TRANSFER,
         categoryId: null,
@@ -330,7 +307,7 @@ export class TransactionSplitService {
         memo: split.memo || null,
       });
 
-      const savedSplit = await queryRunner.manager.save(splitEntity);
+      const savedSplit = await m.save(splitEntity);
 
       const targetAccount = await this.accountsService.findOne(
         userId!,
@@ -352,7 +329,7 @@ export class TransactionSplitService {
         ? transactionDate.toISOString().substring(0, 10)
         : "";
 
-      const linkedTransaction = queryRunner.manager.create(Transaction, {
+      const linkedTransaction = m.create(Transaction, {
         userId,
         accountId: split.transferAccountId,
         transactionDate: (dateStr || null) as any,
@@ -365,27 +342,24 @@ export class TransactionSplitService {
         payeeName: parentPayeeName || `Transfer from ${sourceAccount.name}`,
       });
 
-      const savedLinkedTransaction =
-        await queryRunner.manager.save(linkedTransaction);
+      const savedLinkedTransaction = await m.save(linkedTransaction);
 
-      await queryRunner.manager.update(TransactionSplit, savedSplit.id, {
+      await m.update(TransactionSplit, savedSplit.id, {
         linkedTransactionId: savedLinkedTransaction.id,
       });
 
-      await queryRunner.manager.update(Transaction, savedLinkedTransaction.id, {
+      await m.update(Transaction, savedLinkedTransaction.id, {
         linkedTransactionId: transactionId,
       });
 
       if (dateStr && isTransactionInFuture(dateStr)) {
         await this.accountsService.recalculateCurrentBalance(
           split.transferAccountId!,
-          queryRunner,
         );
       } else {
         await this.accountsService.updateBalance(
           split.transferAccountId!,
           -split.amount,
-          queryRunner,
         );
       }
 
@@ -394,7 +368,7 @@ export class TransactionSplitService {
     }
 
     for (const { split, index } of investmentSplits) {
-      const splitEntity = queryRunner.manager.create(TransactionSplit, {
+      const splitEntity = m.create(TransactionSplit, {
         transactionId,
         kind: SplitKind.INVESTMENT,
         categoryId: null,
@@ -402,10 +376,10 @@ export class TransactionSplitService {
         amount: split.amount,
         memo: split.memo || null,
       });
-      const savedSplit = await queryRunner.manager.save(splitEntity);
+      const savedSplit = await m.save(splitEntity);
 
       await this.investmentTransactionsService.createEmbeddedForSplit(
-        queryRunner,
+        m,
         userId!,
         parentDateStr,
         savedSplit.id,
@@ -424,115 +398,60 @@ export class TransactionSplitService {
     return savedSplits;
   }
 
+  /**
+   * Reverse a split transaction's side effects (embedded investment holdings,
+   * transfer counterpart rows and their balance impact) ahead of deleting or
+   * rebuilding its splits. Joins the caller's ambient transaction; every call
+   * site runs inside one (transaction update/remove, updateSplits).
+   */
   async deleteSplitSideEffects(
     transactionId: string,
     userId: string,
-    externalQueryRunner?: QueryRunner,
   ): Promise<void> {
-    const repo = externalQueryRunner
-      ? externalQueryRunner.manager.getRepository(TransactionSplit)
-      : this.splitsRepository;
-    const txRepo = externalQueryRunner
-      ? externalQueryRunner.manager.getRepository(Transaction)
-      : this.transactionsRepository;
+    return withScopedDb(this.dataSource, async (m) => {
+      const splits = await m.getRepository(TransactionSplit).find({
+        where: { transactionId },
+        relations: ["linkedTransaction", "investmentTransaction"],
+      });
 
-    const splits = await repo.find({
-      where: { transactionId },
-      relations: ["linkedTransaction", "investmentTransaction"],
-    });
-
-    // Reverse investment splits' holdings effects before the split rows are deleted.
-    if (externalQueryRunner) {
+      // Reverse investment splits' holdings effects before the split rows are
+      // deleted.
       for (const s of splits) {
         if (s.kind === SplitKind.INVESTMENT && s.investmentTransaction) {
           await this.investmentTransactionsService.reverseAndRemoveEmbedded(
-            externalQueryRunner,
+            m,
             userId,
             s.investmentTransaction,
           );
         }
       }
-    }
 
-    const linkedTxIds = splits
-      .filter((s) => s.linkedTransactionId && s.transferAccountId)
-      .map((s) => s.linkedTransactionId!);
+      const linkedTxIds = splits
+        .filter((s) => s.linkedTransactionId && s.transferAccountId)
+        .map((s) => s.linkedTransactionId!);
 
-    if (linkedTxIds.length === 0) return;
+      if (linkedTxIds.length === 0) return;
 
-    const linkedTransactions = await txRepo.find({
-      where: { id: In(linkedTxIds) },
+      const txRepo = m.getRepository(Transaction);
+      const linkedTransactions = await txRepo.find({
+        where: { id: In(linkedTxIds) },
+      });
+
+      for (const linkedTx of linkedTransactions) {
+        const linkedIsFuture = isTransactionInFuture(linkedTx.transactionDate);
+        const linkedAccId = linkedTx.accountId;
+        if (!linkedIsFuture) {
+          await this.accountsService.updateBalance(
+            linkedAccId,
+            -Number(linkedTx.amount),
+          );
+        }
+        await txRepo.remove(linkedTx);
+        if (linkedIsFuture) {
+          await this.accountsService.recalculateCurrentBalance(linkedAccId);
+        }
+      }
     });
-
-    for (const linkedTx of linkedTransactions) {
-      const linkedIsFuture = isTransactionInFuture(linkedTx.transactionDate);
-      const linkedAccId = linkedTx.accountId;
-      if (!linkedIsFuture) {
-        await this.accountsService.updateBalance(
-          linkedAccId,
-          -Number(linkedTx.amount),
-          externalQueryRunner,
-        );
-      }
-      await txRepo.remove(linkedTx);
-      if (linkedIsFuture) {
-        await this.accountsService.recalculateCurrentBalance(
-          linkedAccId,
-          externalQueryRunner,
-        );
-      }
-    }
-  }
-
-  /**
-   * @deprecated use deleteSplitSideEffects
-   * Kept as a thin wrapper for callers that don't have a userId in scope and
-   * only need transfer-side cleanup.
-   */
-  async deleteTransferSplitLinkedTransactions(
-    transactionId: string,
-    externalQueryRunner?: QueryRunner,
-  ): Promise<void> {
-    const repo = externalQueryRunner
-      ? externalQueryRunner.manager.getRepository(TransactionSplit)
-      : this.splitsRepository;
-    const txRepo = externalQueryRunner
-      ? externalQueryRunner.manager.getRepository(Transaction)
-      : this.transactionsRepository;
-
-    const transferSplits = await repo.find({
-      where: { transactionId },
-      relations: ["linkedTransaction"],
-    });
-
-    const linkedTxIds = transferSplits
-      .filter((s) => s.linkedTransactionId && s.transferAccountId)
-      .map((s) => s.linkedTransactionId!);
-
-    if (linkedTxIds.length === 0) return;
-
-    const linkedTransactions = await txRepo.find({
-      where: { id: In(linkedTxIds) },
-    });
-
-    for (const linkedTx of linkedTransactions) {
-      const linkedIsFuture = isTransactionInFuture(linkedTx.transactionDate);
-      const linkedAccId = linkedTx.accountId;
-      if (!linkedIsFuture) {
-        await this.accountsService.updateBalance(
-          linkedAccId,
-          -Number(linkedTx.amount),
-          externalQueryRunner,
-        );
-      }
-      await txRepo.remove(linkedTx);
-      if (linkedIsFuture) {
-        await this.accountsService.recalculateCurrentBalance(
-          linkedAccId,
-          externalQueryRunner,
-        );
-      }
-    }
   }
 
   /**
@@ -543,17 +462,21 @@ export class TransactionSplitService {
   async getTransferSplitByLinkedTransaction(
     linkedTransactionId: string,
   ): Promise<TransactionSplit | null> {
-    return this.splitsRepository.findOne({
-      where: { linkedTransactionId },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(TransactionSplit).findOne({
+        where: { linkedTransactionId },
+      }),
+    );
   }
 
   async getSplits(transactionId: string): Promise<TransactionSplit[]> {
-    return this.splitsRepository.find({
-      where: { transactionId },
-      relations: ["category", "transferAccount", "investmentTransaction"],
-      order: { createdAt: "ASC" },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(TransactionSplit).find({
+        where: { transactionId },
+        relations: ["category", "transferAccount", "investmentTransaction"],
+        order: { createdAt: "ASC" },
+      }),
+    );
   }
 
   async updateSplits(
@@ -563,14 +486,10 @@ export class TransactionSplitService {
   ): Promise<TransactionSplit[]> {
     this.validateSplits(splits, transaction.amount);
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    return withScopedDb(this.dataSource, async (m) => {
+      await this.deleteSplitSideEffects(transaction.id, userId);
 
-    try {
-      await this.deleteSplitSideEffects(transaction.id, userId, queryRunner);
-
-      await queryRunner.manager.delete(TransactionSplit, {
+      await m.delete(TransactionSplit, {
         transactionId: transaction.id,
       });
 
@@ -581,23 +500,16 @@ export class TransactionSplitService {
         transaction.accountId,
         new Date(transaction.transactionDate),
         transaction.payeeName,
-        queryRunner,
         transaction.payeeId,
       );
 
-      await queryRunner.manager.update(Transaction, transaction.id, {
+      await m.update(Transaction, transaction.id, {
         isSplit: true,
         categoryId: null,
       });
 
-      await queryRunner.commitTransaction();
       return newSplits;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   async addSplit(
@@ -638,17 +550,11 @@ export class TransactionSplitService {
       );
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    let savedSplitId: string;
-
-    try {
+    const savedSplitId = await withScopedDb(this.dataSource, async (m) => {
       const splitKind = splitDto.transferAccountId
         ? SplitKind.TRANSFER
         : SplitKind.CATEGORY;
-      const split = queryRunner.manager.create(TransactionSplit, {
+      const split = m.create(TransactionSplit, {
         transactionId: transaction.id,
         kind: splitKind,
         categoryId: splitDto.categoryId || null,
@@ -657,8 +563,7 @@ export class TransactionSplitService {
         memo: splitDto.memo || null,
       });
 
-      const savedSplit = await queryRunner.manager.save(split);
-      savedSplitId = savedSplit.id;
+      const savedSplit = await m.save(split);
 
       if (splitDto.transferAccountId) {
         const targetAccount = await this.accountsService.findOne(
@@ -670,7 +575,7 @@ export class TransactionSplitService {
           transaction.accountId,
         );
 
-        const linkedTransaction = queryRunner.manager.create(Transaction, {
+        const linkedTransaction = m.create(Transaction, {
           userId,
           accountId: splitDto.transferAccountId,
           transactionDate: transaction.transactionDate,
@@ -684,47 +589,41 @@ export class TransactionSplitService {
             transaction.payeeName || `Transfer from ${sourceAccount.name}`,
         });
 
-        const savedLinkedTransaction =
-          await queryRunner.manager.save(linkedTransaction);
+        const savedLinkedTransaction = await m.save(linkedTransaction);
 
-        await queryRunner.manager.update(TransactionSplit, savedSplit.id, {
+        await m.update(TransactionSplit, savedSplit.id, {
           linkedTransactionId: savedLinkedTransaction.id,
         });
 
         if (isTransactionInFuture(transaction.transactionDate)) {
           await this.accountsService.recalculateCurrentBalance(
             splitDto.transferAccountId,
-            queryRunner,
           );
         } else {
           await this.accountsService.updateBalance(
             splitDto.transferAccountId,
             -splitDto.amount,
-            queryRunner,
           );
         }
       }
 
       const totalSplits = existingSplits.length + 1;
       if (totalSplits >= 2 && !transaction.isSplit) {
-        await queryRunner.manager.update(Transaction, transaction.id, {
+        await m.update(Transaction, transaction.id, {
           isSplit: true,
           categoryId: null,
         });
       }
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
-
-    const splitWithRelations = await this.splitsRepository.findOne({
-      where: { id: savedSplitId },
-      relations: ["category", "transferAccount"],
+      return savedSplit.id;
     });
+
+    const splitWithRelations = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(TransactionSplit).findOne({
+        where: { id: savedSplitId },
+        relations: ["category", "transferAccount"],
+      }),
+    );
 
     if (!splitWithRelations) {
       throw new NotFoundException(
@@ -744,10 +643,12 @@ export class TransactionSplitService {
     splitId: string,
     userId: string,
   ): Promise<void> {
-    const split = await this.splitsRepository.findOne({
-      where: { id: splitId, transactionId: transaction.id },
-      relations: ["investmentTransaction"],
-    });
+    const split = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(TransactionSplit).findOne({
+        where: { id: splitId, transactionId: transaction.id },
+        relations: ["investmentTransaction"],
+      }),
+    );
 
     if (!split) {
       throw new NotFoundException(
@@ -759,19 +660,15 @@ export class TransactionSplitService {
       );
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    return withScopedDb(this.dataSource, async (m) => {
       if (split.kind === SplitKind.INVESTMENT && split.investmentTransaction) {
         await this.investmentTransactionsService.reverseAndRemoveEmbedded(
-          queryRunner,
+          m,
           userId,
           split.investmentTransaction,
         );
       } else if (split.linkedTransactionId && split.transferAccountId) {
-        const linkedTx = await queryRunner.manager.findOne(Transaction, {
+        const linkedTx = await m.findOne(Transaction, {
           where: { id: split.linkedTransactionId },
         });
 
@@ -784,22 +681,18 @@ export class TransactionSplitService {
             await this.accountsService.updateBalance(
               linkedAccId,
               -Number(linkedTx.amount),
-              queryRunner,
             );
           }
-          await queryRunner.manager.remove(linkedTx);
+          await m.remove(linkedTx);
           if (linkedIsFuture) {
-            await this.accountsService.recalculateCurrentBalance(
-              linkedAccId,
-              queryRunner,
-            );
+            await this.accountsService.recalculateCurrentBalance(linkedAccId);
           }
         }
       }
 
-      await queryRunner.manager.remove(split);
+      await m.remove(split);
 
-      const remainingSplits = await queryRunner.manager.find(TransactionSplit, {
+      const remainingSplits = await m.find(TransactionSplit, {
         where: { transactionId: transaction.id },
         relations: ["category", "transferAccount", "investmentTransaction"],
         order: { createdAt: "ASC" },
@@ -812,12 +705,11 @@ export class TransactionSplitService {
           // Don't auto-collapse if the last remaining split is investment-kind
           // — that representation only makes sense as part of a split parent.
           if (lastSplit.kind === SplitKind.INVESTMENT) {
-            await queryRunner.commitTransaction();
             return;
           }
 
           if (lastSplit.linkedTransactionId && lastSplit.transferAccountId) {
-            const linkedTx = await queryRunner.manager.findOne(Transaction, {
+            const linkedTx = await m.findOne(Transaction, {
               where: { id: lastSplit.linkedTransactionId },
             });
 
@@ -830,37 +722,28 @@ export class TransactionSplitService {
                 await this.accountsService.updateBalance(
                   lastLinkedAccId,
                   -Number(linkedTx.amount),
-                  queryRunner,
                 );
               }
-              await queryRunner.manager.remove(linkedTx);
+              await m.remove(linkedTx);
               if (lastLinkedIsFuture) {
                 await this.accountsService.recalculateCurrentBalance(
                   lastLinkedAccId,
-                  queryRunner,
                 );
               }
             }
           }
 
-          await queryRunner.manager.update(Transaction, transaction.id, {
+          await m.update(Transaction, transaction.id, {
             isSplit: false,
             categoryId: lastSplit.categoryId,
           });
-          await queryRunner.manager.remove(lastSplit);
+          await m.remove(lastSplit);
         } else {
-          await queryRunner.manager.update(Transaction, transaction.id, {
+          await m.update(Transaction, transaction.id, {
             isSplit: false,
           });
         }
       }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 }

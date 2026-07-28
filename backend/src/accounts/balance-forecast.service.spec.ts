@@ -1,10 +1,14 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { NotFoundException } from "@nestjs/common";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { BalanceForecastService } from "./balance-forecast.service";
 import { Account } from "./entities/account.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 jest.mock("../common/date-utils", () => ({
   todayYMD: jest.fn(() => "2024-07-08"),
@@ -19,17 +23,17 @@ describe("BalanceForecastService", () => {
   beforeEach(async () => {
     accountsRepo = { findOne: jest.fn() };
     scheduledRepo = { find: jest.fn() };
-    dataSource = { query: jest.fn() };
+    const mocks = createScopedDbMocks([
+      [Account, accountsRepo],
+      [ScheduledTransaction, scheduledRepo],
+    ]);
+    // Raw SQL runs through the transaction manager; tests program it here.
+    dataSource = { query: mocks.manager.query };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BalanceForecastService,
-        { provide: getRepositoryToken(Account), useValue: accountsRepo },
-        {
-          provide: getRepositoryToken(ScheduledTransaction),
-          useValue: scheduledRepo,
-        },
-        { provide: DataSource, useValue: dataSource },
+        { provide: DataSource, useValue: mocks.dataSource },
       ],
     }).compile();
 

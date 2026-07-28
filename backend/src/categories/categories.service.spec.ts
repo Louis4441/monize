@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { CategoriesService } from "./categories.service";
@@ -12,6 +11,15 @@ import { ScheduledTransaction } from "../scheduled-transactions/entities/schedul
 import { ScheduledTransactionSplit } from "../scheduled-transactions/entities/scheduled-transaction-split.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { I18nService } from "nestjs-i18n";
+import {
+  createScopedDbMocks,
+  ManagerMock,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("CategoriesService", () => {
   let service: CategoriesService;
@@ -22,7 +30,8 @@ describe("CategoriesService", () => {
   let scheduledTransactionsRepository: Record<string, jest.Mock>;
   let scheduledSplitsRepository: Record<string, jest.Mock>;
   let preferencesRepository: Record<string, jest.Mock>;
-  let mockDataSource: Record<string, jest.Mock>;
+  let mockDataSource: DataSourceMock;
+  let txManager: ManagerMock;
 
   const mockCategory: Category = {
     id: "cat-1",
@@ -126,70 +135,34 @@ describe("CategoriesService", () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue({
-        connect: jest.fn(),
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        rollbackTransaction: jest.fn(),
-        release: jest.fn(),
-        manager: {
-          update: jest.fn().mockResolvedValue({ affected: 0 }),
-          find: jest.fn().mockResolvedValue([]),
-          // Mirror real TypeORM: save/remove require an explicit entity target
-          // when the value is a plain object (as findOne returns here). Return
-          // the data arg (2nd) so a single-arg call yields undefined and fails
-          // loudly, matching production's CannotDetermineEntityError.
-          remove: jest
-            .fn()
-            .mockImplementation((_target: unknown, entity: unknown) => entity),
-          createQueryBuilder: jest.fn((..._args: unknown[]) =>
-            createMockQueryBuilder(),
-          ),
-          save: jest
-            .fn()
-            .mockImplementation((_target: unknown, data: unknown) => data),
-          getRepository: jest.fn().mockReturnValue({
-            create: jest.fn().mockImplementation((data: unknown) => ({
-              ...(data as Record<string, unknown>),
-              id: `gen-${Date.now()}-${Math.random()}`,
-            })),
-            save: jest
-              .fn()
-              .mockImplementation((data: unknown) => Promise.resolve(data)),
-          }),
-        },
-      }),
-    };
+    ({ manager: txManager, dataSource: mockDataSource } = createScopedDbMocks([
+      [Category, categoriesRepository],
+      [Transaction, transactionsRepository],
+      [TransactionSplit, splitsRepository],
+      [Payee, payeesRepository],
+      [ScheduledTransaction, scheduledTransactionsRepository],
+      [ScheduledTransactionSplit, scheduledSplitsRepository],
+      [UserPreference, preferencesRepository],
+    ]));
+    txManager.update.mockResolvedValue({ affected: 0 });
+    txManager.find.mockResolvedValue([]);
+    // Mirror real TypeORM: save/remove require an explicit entity target
+    // when the value is a plain object (as findOne returns here). Return
+    // the data arg (2nd) so a single-arg call yields undefined and fails
+    // loudly, matching production's CannotDetermineEntityError.
+    txManager.remove.mockImplementation(
+      (_target: unknown, entity: unknown) => entity,
+    );
+    txManager.save.mockImplementation(
+      (_target: unknown, data: unknown) => data,
+    );
+    txManager.createQueryBuilder.mockImplementation((..._args: unknown[]) =>
+      createMockQueryBuilder(),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CategoriesService,
-        {
-          provide: getRepositoryToken(Category),
-          useValue: categoriesRepository,
-        },
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(TransactionSplit),
-          useValue: splitsRepository,
-        },
-        { provide: getRepositoryToken(Payee), useValue: payeesRepository },
-        {
-          provide: getRepositoryToken(ScheduledTransaction),
-          useValue: scheduledTransactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(ScheduledTransactionSplit),
-          useValue: scheduledSplitsRepository,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: preferencesRepository,
-        },
         { provide: DataSource, useValue: mockDataSource },
         {
           provide: ActionHistoryService,
@@ -905,10 +878,10 @@ describe("CategoriesService", () => {
       });
       categoriesRepository.save.mockImplementation((data) => data);
 
-      // The cascade now runs inside the update transaction via the
-      // queryRunner manager. First call: direct children of cat-1; subsequent
-      // calls: grandchildren (none).
-      const manager = mockDataSource.createQueryRunner().manager;
+      // The cascade runs inside the update transaction via the transaction
+      // manager. First call: direct children of cat-1; subsequent calls:
+      // grandchildren (none).
+      const manager = txManager;
       manager.find
         .mockResolvedValueOnce([{ id: "child-1" }, { id: "child-2" }])
         .mockResolvedValueOnce([])
@@ -937,9 +910,7 @@ describe("CategoriesService", () => {
       await service.update("user-1", "cat-1", { name: "Renamed" });
 
       // update should not be called for children
-      expect(
-        mockDataSource.createQueryRunner().manager.update,
-      ).not.toHaveBeenCalled();
+      expect(txManager.update).not.toHaveBeenCalled();
     });
   });
 
@@ -964,7 +935,7 @@ describe("CategoriesService", () => {
 
       await service.remove("user-1", "cat-1");
 
-      const manager = mockDataSource.createQueryRunner().manager;
+      const manager = txManager;
       expect(manager.update).toHaveBeenCalledWith(
         Payee,
         { userId: "user-1", defaultCategoryId: "cat-1" },
@@ -1087,6 +1058,9 @@ describe("CategoriesService", () => {
 
       let createQbCallCount = 0;
       const mockManager = {
+        // findOne() runs through the same re-mocked transaction, so route
+        // getRepository at the shared Category repo mock.
+        getRepository: jest.fn(() => categoriesRepository),
         update: jest
           .fn()
           .mockResolvedValueOnce({ affected: 5 }) // Transaction update
@@ -1106,14 +1080,9 @@ describe("CategoriesService", () => {
           }),
         save: jest.fn(),
       };
-      mockDataSource.createQueryRunner.mockReturnValue({
-        connect: jest.fn(),
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        rollbackTransaction: jest.fn(),
-        release: jest.fn(),
-        manager: mockManager,
-      });
+      mockDataSource.transaction.mockImplementation(
+        async (fn: (m: unknown) => unknown) => fn(mockManager),
+      );
 
       const result = await service.reassignTransactions(
         "user-1",
@@ -1138,6 +1107,9 @@ describe("CategoriesService", () => {
 
       let createQbCallCount = 0;
       const mockManager = {
+        // findOne() runs through the same re-mocked transaction, so route
+        // getRepository at the shared Category repo mock.
+        getRepository: jest.fn(() => categoriesRepository),
         update: jest
           .fn()
           .mockResolvedValueOnce({ affected: 3 }) // Transaction update
@@ -1151,14 +1123,9 @@ describe("CategoriesService", () => {
           }),
         save: jest.fn(),
       };
-      mockDataSource.createQueryRunner.mockReturnValue({
-        connect: jest.fn(),
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        rollbackTransaction: jest.fn(),
-        release: jest.fn(),
-        manager: mockManager,
-      });
+      mockDataSource.transaction.mockImplementation(
+        async (fn: (m: unknown) => unknown) => fn(mockManager),
+      );
 
       const result = await service.reassignTransactions(
         "user-1",
@@ -1185,6 +1152,9 @@ describe("CategoriesService", () => {
 
       let createQbCallCount = 0;
       const mockManager = {
+        // findOne() runs through the same re-mocked transaction, so route
+        // getRepository at the shared Category repo mock.
+        getRepository: jest.fn(() => categoriesRepository),
         update: jest
           .fn()
           .mockResolvedValueOnce({ affected: 0 }) // Transaction update
@@ -1198,14 +1168,9 @@ describe("CategoriesService", () => {
           }),
         save: jest.fn(),
       };
-      mockDataSource.createQueryRunner.mockReturnValue({
-        connect: jest.fn(),
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        rollbackTransaction: jest.fn(),
-        release: jest.fn(),
-        manager: mockManager,
-      });
+      mockDataSource.transaction.mockImplementation(
+        async (fn: (m: unknown) => unknown) => fn(mockManager),
+      );
 
       const result = await service.reassignTransactions(
         "user-1",
@@ -1373,8 +1338,7 @@ describe("CategoriesService", () => {
     it("imports default categories when user has none", async () => {
       categoriesRepository.count.mockResolvedValue(0);
       let idCounter = 0;
-      const qr = mockDataSource.createQueryRunner();
-      const qrRepo = qr.manager.getRepository();
+      const qrRepo = categoriesRepository;
       qrRepo.create.mockImplementation((data: unknown) => ({
         ...(data as Record<string, unknown>),
         id: `gen-${++idCounter}`,
@@ -1399,8 +1363,7 @@ describe("CategoriesService", () => {
     it("creates both income and expense parent categories", async () => {
       categoriesRepository.count.mockResolvedValue(0);
       let idCounter = 0;
-      const qr = mockDataSource.createQueryRunner();
-      const qrRepo = qr.manager.getRepository();
+      const qrRepo = categoriesRepository;
       qrRepo.create.mockImplementation((data: unknown) => ({
         ...(data as Record<string, unknown>),
         id: `gen-${++idCounter}`,
@@ -1424,8 +1387,7 @@ describe("CategoriesService", () => {
     it("sets correct parentId on subcategories", async () => {
       categoriesRepository.count.mockResolvedValue(0);
       let idCounter = 0;
-      const qr = mockDataSource.createQueryRunner();
-      const qrRepo = qr.manager.getRepository();
+      const qrRepo = categoriesRepository;
       qrRepo.create.mockImplementation((data: unknown) => ({
         ...(data as Record<string, unknown>),
         id: `gen-${++idCounter}`,
@@ -1451,8 +1413,7 @@ describe("CategoriesService", () => {
     }): Promise<string[]> => {
       categoriesRepository.count.mockResolvedValue(0);
       let idCounter = 0;
-      const qr = mockDataSource.createQueryRunner();
-      const qrRepo = qr.manager.getRepository();
+      const qrRepo = categoriesRepository;
       qrRepo.create.mockImplementation((data: unknown) => ({
         ...(data as Record<string, unknown>),
         id: `gen-${++idCounter}`,

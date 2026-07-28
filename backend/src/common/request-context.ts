@@ -13,9 +13,9 @@ import { AsyncLocalStorage } from "node:async_hooks";
  *                      `app.real_user_id` GUC so delegate-keyed rows (the
  *                      delegate's own `users` row, `delegate_account_favourites`,
  *                      the delegate side of `account_delegates`) stay reachable.
- *   - `system`      -- set by `withSystemContext`; makes `tenantTx` emit
+ *   - `system`      -- set by `withSystemContext`; makes `withScopedDb` emit
  *                      `app.bypass_rls` instead of an identity GUC.
- *   - `preserveTimestamps` -- set by the backup restore path; makes `tenantTx`
+ *   - `preserveTimestamps` -- set by the backup restore path; makes `withScopedDb`
  *                      emit `app.preserve_timestamps` (in every mode) so the
  *                      GUC-aware `updated_at` trigger keeps restored values.
  */

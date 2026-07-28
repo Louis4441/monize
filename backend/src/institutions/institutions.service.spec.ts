@@ -1,11 +1,21 @@
 import { ConflictException, NotFoundException } from "@nestjs/common";
 import { InstitutionsService } from "./institutions.service";
+import { Institution } from "./entities/institution.entity";
+import { Account } from "../accounts/entities/account.entity";
+import {
+  createScopedDbMocks,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("InstitutionsService", () => {
   let service: InstitutionsService;
   let institutionsRepo: Record<string, jest.Mock>;
   let accountsRepo: Record<string, jest.Mock>;
-  let qrManager: Record<string, jest.Mock>;
+  let qrManager: ManagerMock;
   let logoService: { fetchFavicon: jest.Mock };
   let actionHistory: { record: jest.Mock };
 
@@ -57,23 +67,14 @@ describe("InstitutionsService", () => {
     logoService = { fetchFavicon: jest.fn().mockResolvedValue(null) };
     actionHistory = { record: jest.fn() };
 
-    qrManager = {
-      findOne: jest.fn(),
-      save: jest.fn((x) => Promise.resolve(x)),
-    };
-    const queryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      manager: qrManager,
-    };
-    const dataSource = { createQueryRunner: jest.fn(() => queryRunner) };
+    const { manager, dataSource } = createScopedDbMocks([
+      [Institution, institutionsRepo],
+      [Account, accountsRepo],
+    ]);
+    qrManager = manager;
+    qrManager.save.mockImplementation((x) => Promise.resolve(x));
 
     service = new InstitutionsService(
-      institutionsRepo as any,
-      accountsRepo as any,
       dataSource as any,
       logoService as any,
       actionHistory as any,

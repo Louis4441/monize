@@ -34,11 +34,11 @@ test("countOccurrences counts every call site, including multiple per line", () 
   );
 });
 
-test("isExcluded skips tests, type decls, and tenant-tx.ts but keeps services", () => {
+test("isExcluded skips tests, type decls, and scoped-db.ts but keeps services", () => {
   assert.equal(isExcluded("accounts/accounts.service.ts"), false);
   assert.equal(isExcluded("accounts/accounts.service.spec.ts"), true);
-  assert.equal(isExcluded("common/db/tenant-tx.ts"), true);
-  assert.equal(isExcluded("common/db/tenant-tx.spec.ts"), true);
+  assert.equal(isExcluded("common/db/scoped-db.ts"), true);
+  assert.equal(isExcluded("common/db/scoped-db.spec.ts"), true);
   assert.equal(isExcluded("types/foo.d.ts"), true);
   assert.equal(isExcluded("__tests__/helper.ts"), true);
   assert.equal(isExcluded("test/factory.ts"), true);
@@ -109,10 +109,10 @@ test("computeCounts honors exclusions on a fixture tree", () => {
   );
   // Excluded: a spec file with tokens must not be counted.
   writeFileSync(join(root, "one.spec.ts"), "@InjectRepository(Z)\n");
-  // Excluded: tenant-tx.ts at its canonical relative path.
+  // Excluded: scoped-db.ts at its canonical relative path.
   mkdirSync(join(root, "common", "db"), { recursive: true });
   writeFileSync(
-    join(root, "common", "db", "tenant-tx.ts"),
+    join(root, "common", "db", "scoped-db.ts"),
     "@InjectRepository(Q) x.createQueryRunner();\n",
   );
 

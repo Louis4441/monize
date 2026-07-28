@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { BadRequestException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { TransactionTransferService } from "./transaction-transfer.service";
@@ -11,6 +10,14 @@ import { PayeesService } from "../payees/payees.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { isTransactionInFuture } from "../common/date-utils";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 jest.mock("../common/date-utils", () => ({
   isTransactionInFuture: jest.fn().mockReturnValue(false),
@@ -27,8 +34,10 @@ describe("TransactionTransferService", () => {
   let accountsService: Record<string, jest.Mock>;
   let payeesService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
+  // The withScopedDb EntityManager, under the legacy `mockQueryRunner.manager`
+  // shape so the pre-RLS manager assertions still read naturally.
   let mockQueryRunner: Record<string, any>;
-  let mockDataSource: Record<string, jest.Mock>;
+  let mockDataSource: DataSourceMock;
 
   const mockFindOne = jest.fn();
 
@@ -119,66 +128,43 @@ describe("TransactionTransferService", () => {
 
     mockFindOne.mockReset();
 
-    mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      query: jest.fn().mockResolvedValue([]),
-      manager: {
-        create: jest
-          .fn()
-          .mockImplementation((_Entity: any, data: any) =>
-            transactionsRepository.create(data),
-          ),
-        save: jest
-          .fn()
-          .mockImplementation((data: any) => transactionsRepository.save(data)),
-        update: jest
-          .fn()
-          .mockImplementation((_Entity: any, id: any, data: any) =>
-            transactionsRepository.update(id, data),
-          ),
-        findOne: jest
-          .fn()
-          .mockImplementation((_Entity: any, opts: any) =>
-            transactionsRepository.findOne(opts),
-          ),
-        find: jest
-          .fn()
-          .mockImplementation((_Entity: any, opts: any) =>
-            splitsRepository.find(opts),
-          ),
-        remove: jest.fn().mockImplementation((data: any) => {
-          const item = Array.isArray(data) ? data[0] : data;
-          if (item && "transactionId" in item && !("accountId" in item)) {
-            return splitsRepository.remove(data);
-          }
-          return transactionsRepository.remove(data);
-        }),
-      },
-    };
+    const tenantMocks = createScopedDbMocks([
+      [Transaction, transactionsRepository],
+      [TransactionSplit, splitsRepository],
+      [Category, categoriesRepository],
+    ]);
+    mockDataSource = tenantMocks.dataSource;
 
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    };
+    const manager = tenantMocks.manager;
+    manager.create.mockImplementation((_Entity: any, data: any) =>
+      transactionsRepository.create(data),
+    );
+    manager.save.mockImplementation((data: any) =>
+      transactionsRepository.save(data),
+    );
+    manager.update.mockImplementation((_Entity: any, id: any, data: any) =>
+      transactionsRepository.update(id, data),
+    );
+    manager.findOne.mockImplementation((_Entity: any, opts: any) =>
+      transactionsRepository.findOne(opts),
+    );
+    manager.find.mockImplementation((_Entity: any, opts: any) =>
+      splitsRepository.find(opts),
+    );
+    manager.remove.mockImplementation((data: any) => {
+      const item = Array.isArray(data) ? data[0] : data;
+      if (item && "transactionId" in item && !("accountId" in item)) {
+        return splitsRepository.remove(data);
+      }
+      return transactionsRepository.remove(data);
+    });
+    manager.query.mockResolvedValue([]);
+
+    mockQueryRunner = { manager };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TransactionTransferService,
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(TransactionSplit),
-          useValue: splitsRepository,
-        },
-        {
-          provide: getRepositoryToken(Category),
-          useValue: categoriesRepository,
-        },
         { provide: AccountsService, useValue: accountsService },
         { provide: PayeesService, useValue: payeesService },
         { provide: NetWorthService, useValue: netWorthService },
@@ -239,12 +225,10 @@ describe("TransactionTransferService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "from-account",
         -500,
-        expect.anything(),
       );
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "to-account",
         500,
-        expect.anything(),
       );
 
       expect(result.fromTransaction.id).toBe("from-tx-id");
@@ -314,7 +298,6 @@ describe("TransactionTransferService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "to-account",
         680,
-        expect.anything(),
       );
     });
 
@@ -646,13 +629,11 @@ describe("TransactionTransferService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "from-account",
         500,
-        expect.anything(),
       );
       // Reverse to transaction balance
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "to-account",
         -500,
-        expect.anything(),
       );
       // Both transactions removed
       expect(transactionsRepository.remove).toHaveBeenCalledWith(toTx);
@@ -690,7 +671,6 @@ describe("TransactionTransferService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "from-account",
         500,
-        expect.anything(),
       );
       expect(transactionsRepository.remove).toHaveBeenCalledTimes(1);
       expect(transactionsRepository.remove).toHaveBeenCalledWith(tx);
@@ -812,15 +792,12 @@ describe("TransactionTransferService", () => {
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
       expect(accountsService.recalculateCurrentBalance).toHaveBeenCalledWith(
         "account-3",
-        expect.anything(),
       );
       expect(accountsService.recalculateCurrentBalance).toHaveBeenCalledWith(
         "account-1",
-        expect.anything(),
       );
       expect(accountsService.recalculateCurrentBalance).toHaveBeenCalledWith(
         "account-2",
-        expect.anything(),
       );
     });
   });
@@ -895,23 +872,19 @@ describe("TransactionTransferService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "from-account",
         500,
-        expect.anything(),
       );
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "to-account",
         -500,
-        expect.anything(),
       );
       // New balances applied
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "from-account",
         -750,
-        expect.anything(),
       );
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "to-account",
         750,
-        expect.anything(),
       );
 
       expect(transactionsRepository.update).toHaveBeenCalledWith(
@@ -1063,12 +1036,10 @@ describe("TransactionTransferService", () => {
         expect(accountsService.updateBalance).toHaveBeenCalledWith(
           "to-account",
           100,
-          expect.anything(),
         );
         expect(accountsService.updateBalance).toHaveBeenCalledWith(
           "from-account",
           -100,
-          expect.anything(),
         );
       });
 
@@ -1105,7 +1076,7 @@ describe("TransactionTransferService", () => {
         mockFindOne,
       );
 
-      const createdAtCalls = mockQueryRunner.query.mock.calls.filter(
+      const createdAtCalls = mockQueryRunner.manager.query.mock.calls.filter(
         (c: any[]) =>
           typeof c[0] === "string" && c[0].includes("SET created_at"),
       );
@@ -1213,7 +1184,6 @@ describe("TransactionTransferService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "to-account",
         675,
-        expect.anything(),
       );
     });
 
@@ -1689,11 +1659,9 @@ describe("TransactionTransferService", () => {
         // When any future date is involved, recalculate from scratch
         expect(accountsService.recalculateCurrentBalance).toHaveBeenCalledWith(
           "from-account",
-          expect.anything(),
         );
         expect(accountsService.recalculateCurrentBalance).toHaveBeenCalledWith(
           "to-account",
-          expect.anything(),
         );
         expect(accountsService.updateBalance).not.toHaveBeenCalled();
       });
@@ -1720,11 +1688,9 @@ describe("TransactionTransferService", () => {
         // When any future date is involved, recalculate from scratch
         expect(accountsService.recalculateCurrentBalance).toHaveBeenCalledWith(
           "from-account",
-          expect.anything(),
         );
         expect(accountsService.recalculateCurrentBalance).toHaveBeenCalledWith(
           "to-account",
-          expect.anything(),
         );
         expect(accountsService.updateBalance).not.toHaveBeenCalled();
       });
@@ -1732,7 +1698,7 @@ describe("TransactionTransferService", () => {
   });
 
   describe("transaction atomicity", () => {
-    it("createTransfer commits transaction on success and releases queryRunner", async () => {
+    it("createTransfer runs its writes in a single tenant transaction", async () => {
       transactionsRepository.save
         .mockReset()
         .mockResolvedValueOnce({ id: "from-tx-id" })
@@ -1744,14 +1710,11 @@ describe("TransactionTransferService", () => {
 
       await service.createTransfer("user-1", baseTransferDto, mockFindOne);
 
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // All the writes are grouped into a single tenant transaction.
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
     });
 
-    it("createTransfer rolls back on error and releases queryRunner", async () => {
+    it("createTransfer propagates write errors so the tenant transaction rolls back", async () => {
       transactionsRepository.save
         .mockReset()
         .mockRejectedValue(new Error("DB error"));
@@ -1760,13 +1723,12 @@ describe("TransactionTransferService", () => {
         service.createTransfer("user-1", baseTransferDto, mockFindOne),
       ).rejects.toThrow("DB error");
 
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // One withScopedDb groups every write; the rejection above is what makes
+      // the surrounding transaction roll back.
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
     });
 
-    it("removeTransfer commits transaction on success and releases queryRunner", async () => {
+    it("removeTransfer runs its writes in a single tenant transaction", async () => {
       const fromTx = {
         id: "from-tx",
         isTransfer: true,
@@ -1780,14 +1742,12 @@ describe("TransactionTransferService", () => {
 
       await service.removeTransfer("user-1", "from-tx", mockFindOne);
 
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // The split-parent lookup is its own short read transaction (as the
+      // pre-RLS autocommit read was); every write lands in one withScopedDb.
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(2);
     });
 
-    it("removeTransfer rolls back on error and releases queryRunner", async () => {
+    it("removeTransfer propagates write errors so the tenant transaction rolls back", async () => {
       const fromTx = {
         id: "from-tx",
         isTransfer: true,
@@ -1806,12 +1766,12 @@ describe("TransactionTransferService", () => {
         service.removeTransfer("user-1", "from-tx", mockFindOne),
       ).rejects.toThrow("Balance error");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // Lookup + write block; the rejection above is what makes the
+      // surrounding write transaction roll back.
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(2);
     });
 
-    it("updateTransfer commits transaction on success and releases queryRunner", async () => {
+    it("updateTransfer runs its writes in a single tenant transaction", async () => {
       const fromTx = {
         id: "from-tx",
         accountId: "from-account",
@@ -1847,14 +1807,12 @@ describe("TransactionTransferService", () => {
         mockFindOne,
       );
 
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // The split-parent lookup is its own short read transaction (as the
+      // pre-RLS autocommit read was); every write lands in one withScopedDb.
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(2);
     });
 
-    it("updateTransfer rolls back on error and releases queryRunner", async () => {
+    it("updateTransfer propagates write errors so the tenant transaction rolls back", async () => {
       const fromTx = {
         id: "from-tx",
         accountId: "from-account",
@@ -1892,9 +1850,9 @@ describe("TransactionTransferService", () => {
         ),
       ).rejects.toThrow("DB error");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // Lookup + write block; the rejection above is what makes the
+      // surrounding write transaction roll back.
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -1,6 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { BadRequestException } from "@nestjs/common";
 import { PayeeAutoMergeService } from "./payee-auto-merge.service";
 import { PayeesService } from "./payees.service";
@@ -8,6 +7,14 @@ import { Payee } from "./entities/payee.entity";
 import { PayeeAlias } from "./entities/payee-alias.entity";
 import { Category } from "../categories/entities/category.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 const userId = "user-1";
 
@@ -37,7 +44,7 @@ describe("PayeeAutoMergeService", () => {
   // Rows returned by the uncategorized-count query (manager builder); per test.
   let uncategorizedRows: Array<{ payeeId: string; cnt: string }>;
   let mockQueryRunner: any;
-  let mockDataSource: { createQueryRunner: jest.Mock };
+  let mockDataSource: DataSourceMock;
 
   beforeEach(async () => {
     mockPayeesService = { findAll: jest.fn() };
@@ -69,46 +76,30 @@ describe("PayeeAutoMergeService", () => {
     };
     mockTransactionsRepository = {
       createQueryBuilder: jest.fn().mockReturnValue(txQueryBuilder),
-      manager: {
-        createQueryBuilder: jest.fn().mockReturnValue(uncatQueryBuilder),
-      } as any,
     };
 
-    mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      query: jest.fn().mockResolvedValue(undefined),
-      manager: {
-        findOne: jest.fn(),
-        find: jest.fn().mockResolvedValue([]),
-        update: jest.fn().mockResolvedValue({ affected: 3 }),
-        remove: jest.fn().mockResolvedValue(undefined),
-        create: jest.fn().mockImplementation((_entity, data) => data),
-        save: jest.fn().mockImplementation((data) => data),
-        createQueryBuilder: jest.fn(),
-      },
-    };
-
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    };
+    const { manager: txManager, dataSource } = createScopedDbMocks([
+      [Category, mockCategoriesRepository],
+      [Transaction, mockTransactionsRepository],
+    ]);
+    mockDataSource = dataSource;
+    txManager.findOne.mockResolvedValue(undefined);
+    txManager.find.mockResolvedValue([]);
+    txManager.update.mockResolvedValue({ affected: 3 });
+    txManager.remove.mockResolvedValue(undefined);
+    txManager.create.mockImplementation((_entity, data) => data);
+    txManager.save.mockImplementation((data) => data);
+    // The uncategorized-count helper queries through the manager directly
+    // (m.createQueryBuilder); rename-conflict tests override this per test.
+    txManager.createQueryBuilder.mockReturnValue(uncatQueryBuilder);
+    // Transaction-block tests address the manager through this legacy alias.
+    mockQueryRunner = { manager: txManager, query: txManager.query };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PayeeAutoMergeService,
         { provide: DataSource, useValue: mockDataSource },
         { provide: PayeesService, useValue: mockPayeesService },
-        {
-          provide: getRepositoryToken(Category),
-          useValue: mockCategoriesRepository,
-        },
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: mockTransactionsRepository,
-        },
       ],
     }).compile();
 
@@ -588,7 +579,7 @@ describe("PayeeAutoMergeService", () => {
         skippedAliasDetails: [],
         failures: [],
       });
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockQueryRunner.manager.save).toHaveBeenCalled();
     });
 
@@ -670,8 +661,9 @@ describe("PayeeAutoMergeService", () => {
           },
         ]),
       ).rejects.toThrow(BadRequestException);
-      // Fails fast, before opening a transaction.
-      expect(mockQueryRunner.startTransaction).not.toHaveBeenCalled();
+      // Fails fast, before any group merge work starts.
+      expect(mockQueryRunner.manager.findOne).not.toHaveBeenCalled();
+      expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
     });
 
     it("renames the canonical and cascades the name", async () => {
@@ -724,7 +716,7 @@ describe("PayeeAutoMergeService", () => {
         canonicalPayeeId: "p1",
         canonicalName: "Lidl",
       });
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("skips an alias that overlaps another payee's alias", async () => {
@@ -751,7 +743,7 @@ describe("PayeeAutoMergeService", () => {
       expect(result.skippedAliasDetails).toEqual([
         { canonicalPayeeId: "p1", canonicalName: "p1", alias: "*LIDL*" },
       ]);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("throws when a payee appears in more than one group", async () => {
@@ -781,7 +773,7 @@ describe("PayeeAutoMergeService", () => {
       expect(result.groupsMerged).toBe(0);
       expect(result.failures).toHaveLength(1);
       expect(result.failures[0].reason).toContain("DB error");
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("continues merging the remaining groups when one group fails", async () => {

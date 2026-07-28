@@ -4,13 +4,13 @@ import { DemoModeService } from "../common/demo-mode.service";
 import { ReleaseNotesService } from "./release-notes.service";
 import { ReleaseNotes } from "./release-notes.parser";
 import { WhatsNewService } from "./whats-new.service";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
-// Unit-test the service against a mocked tenantTx (its own behaviour -- context
-// requirement, GUCs, re-entrancy -- is covered by tenant-tx.spec.ts). The mock
+// Unit-test the service against a mocked withScopedDb (its own behaviour -- context
+// requirement, GUCs, re-entrancy -- is covered by scoped-db.spec.ts). The mock
 // simply runs the callback with a manager whose repository is our mock repo.
-jest.mock("../common/db/tenant-tx");
-const mockedTenantTx = tenantTx as jest.MockedFunction<typeof tenantTx>;
+jest.mock("../common/db/scoped-db");
+const mockedTenantTx = withScopedDb as jest.MockedFunction<typeof withScopedDb>;
 
 const CURRENT_VERSION = "1.12.1";
 
@@ -41,7 +41,7 @@ describe("WhatsNewService", () => {
       getRepository: jest.fn(() => repo),
     } as unknown as EntityManager;
 
-    // Run the tenantTx callback immediately with our mock manager.
+    // Run the withScopedDb callback immediately with our mock manager.
     mockedTenantTx.mockImplementation((_dataSource, fn) => fn(manager));
 
     releaseNotes = {

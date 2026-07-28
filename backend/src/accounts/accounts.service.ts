@@ -6,8 +6,7 @@ import {
   forwardRef,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, QueryRunner, In } from "typeorm";
+import { DataSource, QueryRunner, In } from "typeorm";
 import {
   Account,
   AccountType,
@@ -40,20 +39,13 @@ import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { didYouMean } from "../common/name-suggestions.util";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { withSystemContext } from "../common/db/with-context";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class AccountsService {
   private readonly logger = new Logger(AccountsService.name);
 
   constructor(
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(Transaction)
-    private transactionRepository: Repository<Transaction>,
-    @InjectRepository(InvestmentTransaction)
-    private investmentTransactionRepository: Repository<InvestmentTransaction>,
-    @InjectRepository(Institution)
-    private institutionsRepository: Repository<Institution>,
     @Inject(forwardRef(() => ScheduledTransactionsService))
     private scheduledTransactionsService: ScheduledTransactionsService,
     @Inject(forwardRef(() => NetWorthService))
@@ -74,10 +66,12 @@ export class AccountsService {
     institutionId: string | null | undefined,
   ): Promise<void> {
     if (!institutionId) return;
-    const institution = await this.institutionsRepository.findOne({
-      where: { id: institutionId, userId },
-      select: { id: true },
-    });
+    const institution = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Institution).findOne({
+        where: { id: institutionId, userId },
+        select: { id: true },
+      }),
+    );
     if (!institution) {
       throw new BadRequestException(
         tr("errors.accounts.institutionNotFound", "Institution not found", {
@@ -138,14 +132,16 @@ export class AccountsService {
       delete accountData.statementSettlementDay;
     }
 
-    const account = this.accountsRepository.create({
-      ...accountData,
-      userId,
-      openingBalance,
-      currentBalance: openingBalance,
+    const saved = await withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(Account);
+      const account = repo.create({
+        ...accountData,
+        userId,
+        openingBalance,
+        currentBalance: openingBalance,
+      });
+      return repo.save(account);
     });
-
-    const saved = await this.accountsRepository.save(account);
 
     this.actionHistoryService.record(userId, {
       entityType: "account",
@@ -170,12 +166,8 @@ export class AccountsService {
   ): Promise<{ cashAccount: Account; brokerageAccount: Account }> {
     const { openingBalance = 0, name, ...accountData } = createAccountDto;
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const repo = queryRunner.manager.getRepository(Account);
+    return withScopedDb(this.dataSource, async (m) => {
+      const repo = m.getRepository(Account);
 
       // Suffixes are localized to the requester's language so the generated
       // pair names read naturally (e.g. "TFSA - Bargeld") instead of always
@@ -212,15 +204,8 @@ export class AccountsService {
       cashAccount.linkedAccountId = brokerageAccount.id;
       await repo.save(cashAccount);
 
-      await queryRunner.commitTransaction();
-
       return { cashAccount, brokerageAccount };
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   /**
@@ -232,43 +217,48 @@ export class AccountsService {
   ): Promise<
     (Account & { canDelete?: boolean; futureTransactionsSum?: number })[]
   > {
-    const queryBuilder = this.accountsRepository
-      .createQueryBuilder("account")
-      .where("account.userId = :userId", { userId })
-      .orderBy("account.createdAt", "DESC");
+    return withScopedDb(this.dataSource, async (m) => {
+      const queryBuilder = m
+        .getRepository(Account)
+        .createQueryBuilder("account")
+        .where("account.userId = :userId", { userId })
+        .orderBy("account.createdAt", "DESC");
 
-    if (!includeInactive) {
-      queryBuilder.andWhere("account.isClosed = :isClosed", {
-        isClosed: false,
-      });
-    }
+      if (!includeInactive) {
+        queryBuilder.andWhere("account.isClosed = :isClosed", {
+          isClosed: false,
+        });
+      }
 
-    const accounts = await queryBuilder.getMany();
+      const accounts = await queryBuilder.getMany();
 
-    if (accounts.length === 0) return [];
+      if (accounts.length === 0) return [];
 
-    // Batch check deletability: count transactions + investment transactions per account in 2 queries
-    const accountIds = accounts.map((a) => a.id);
+      // Batch check deletability: count transactions + investment transactions per account in 2 queries
+      const accountIds = accounts.map((a) => a.id);
 
-    const today = todayYMD();
+      const today = todayYMD();
 
-    const [txCounts, invTxCounts, futureSums, currentSums] = await Promise.all([
-      this.transactionRepository
-        .createQueryBuilder("t")
-        .select("t.accountId", "accountId")
-        .addSelect("COUNT(t.id)", "cnt")
-        .where("t.accountId IN (:...accountIds)", { accountIds })
-        .groupBy("t.accountId")
-        .getRawMany(),
-      this.investmentTransactionRepository
-        .createQueryBuilder("it")
-        .select("it.accountId", "accountId")
-        .addSelect("COUNT(it.id)", "cnt")
-        .where("it.accountId IN (:...accountIds)", { accountIds })
-        .groupBy("it.accountId")
-        .getRawMany(),
-      this.dataSource.query(
-        `SELECT t.account_id as "accountId",
+      const [txCounts, invTxCounts, futureSums, currentSums] =
+        await Promise.all([
+          m
+            .getRepository(Transaction)
+            .createQueryBuilder("t")
+            .select("t.accountId", "accountId")
+            .addSelect("COUNT(t.id)", "cnt")
+            .where("t.accountId IN (:...accountIds)", { accountIds })
+            .groupBy("t.accountId")
+            .getRawMany(),
+          m
+            .getRepository(InvestmentTransaction)
+            .createQueryBuilder("it")
+            .select("it.accountId", "accountId")
+            .addSelect("COUNT(it.id)", "cnt")
+            .where("it.accountId IN (:...accountIds)", { accountIds })
+            .groupBy("it.accountId")
+            .getRawMany(),
+          m.query(
+            `SELECT t.account_id as "accountId",
                 COALESCE(SUM(t.amount), 0) as "futureSum"
          FROM transactions t
          WHERE t.account_id = ANY($1)
@@ -276,16 +266,16 @@ export class AccountsService {
            AND (t.status IS NULL OR t.status != 'VOID')
            AND t.parent_transaction_id IS NULL
          GROUP BY t.account_id`,
-        [accountIds, today],
-      ) as Promise<Array<{ accountId: string; futureSum: string }>>,
-      // Compute currentBalance live rather than trusting the stored column.
-      // The stored value can lag the TZ-aware definition of "today" (e.g.
-      // after a timezone change, or after a future-dated create that ran
-      // under the old server-UTC logic), and if it does, adding it to the
-      // live futureTransactionsSum below would double-count any transactions
-      // that wandered across the boundary.
-      this.dataSource.query(
-        `SELECT a.id as "accountId",
+            [accountIds, today],
+          ) as Promise<Array<{ accountId: string; futureSum: string }>>,
+          // Compute currentBalance live rather than trusting the stored column.
+          // The stored value can lag the TZ-aware definition of "today" (e.g.
+          // after a timezone change, or after a future-dated create that ran
+          // under the old server-UTC logic), and if it does, adding it to the
+          // live futureTransactionsSum below would double-count any transactions
+          // that wandered across the boundary.
+          m.query(
+            `SELECT a.id as "accountId",
                 COALESCE(a.opening_balance, 0) + COALESCE(SUM(t.amount), 0) as "currentBalance"
          FROM accounts a
          LEFT JOIN transactions t ON t.account_id = a.id
@@ -294,35 +284,36 @@ export class AccountsService {
            AND t.transaction_date <= $2
          WHERE a.id = ANY($1)
          GROUP BY a.id, a.opening_balance`,
-        [accountIds, today],
-      ) as Promise<Array<{ accountId: string; currentBalance: string }>>,
-    ]);
+            [accountIds, today],
+          ) as Promise<Array<{ accountId: string; currentBalance: string }>>,
+        ]);
 
-    const txCountMap = new Map<string, number>();
-    for (const row of txCounts)
-      txCountMap.set(row.accountId, parseInt(row.cnt, 10));
-    const invTxCountMap = new Map<string, number>();
-    for (const row of invTxCounts)
-      invTxCountMap.set(row.accountId, parseInt(row.cnt, 10));
-    const futureSumMap = new Map<string, number>();
-    for (const row of futureSums)
-      futureSumMap.set(row.accountId, roundMoney(Number(row.futureSum)));
-    const currentBalanceMap = new Map<string, number>();
-    for (const row of currentSums)
-      currentBalanceMap.set(
-        row.accountId,
-        roundMoney(Number(row.currentBalance)),
-      );
+      const txCountMap = new Map<string, number>();
+      for (const row of txCounts)
+        txCountMap.set(row.accountId, parseInt(row.cnt, 10));
+      const invTxCountMap = new Map<string, number>();
+      for (const row of invTxCounts)
+        invTxCountMap.set(row.accountId, parseInt(row.cnt, 10));
+      const futureSumMap = new Map<string, number>();
+      for (const row of futureSums)
+        futureSumMap.set(row.accountId, roundMoney(Number(row.futureSum)));
+      const currentBalanceMap = new Map<string, number>();
+      for (const row of currentSums)
+        currentBalanceMap.set(
+          row.accountId,
+          roundMoney(Number(row.currentBalance)),
+        );
 
-    return accounts.map((account) => ({
-      ...account,
-      currentBalance:
-        currentBalanceMap.get(account.id) ?? account.currentBalance,
-      canDelete:
-        !(txCountMap.get(account.id) || 0) &&
-        !(invTxCountMap.get(account.id) || 0),
-      futureTransactionsSum: futureSumMap.get(account.id) ?? 0,
-    }));
+      return accounts.map((account) => ({
+        ...account,
+        currentBalance:
+          currentBalanceMap.get(account.id) ?? account.currentBalance,
+        canDelete:
+          !(txCountMap.get(account.id) || 0) &&
+          !(invTxCountMap.get(account.id) || 0),
+        futureTransactionsSum: futureSumMap.get(account.id) ?? 0,
+      }));
+    });
   }
 
   /**
@@ -448,9 +439,11 @@ export class AccountsService {
    * Find a single account by ID
    */
   async findOne(userId: string, id: string): Promise<Account> {
-    const account = await this.accountsRepository.findOne({
-      where: { id, userId },
-    });
+    const account = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id, userId },
+      }),
+    );
 
     if (!account) {
       throw new NotFoundException(
@@ -471,9 +464,11 @@ export class AccountsService {
    */
   async findByIds(userId: string, ids: string[]): Promise<Account[]> {
     if (ids.length === 0) return [];
-    return this.accountsRepository.find({
-      where: { id: In(ids), userId },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { id: In(ids), userId },
+      }),
+    );
   }
 
   /**
@@ -598,236 +593,236 @@ export class AccountsService {
     id: string,
     updateAccountDto: UpdateAccountDto,
   ): Promise<Account> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    const { savedAccount, beforeData } = await withScopedDb(
+      this.dataSource,
+      async (m) => {
+        // Use pessimistic lock to prevent concurrent balance modifications
+        const account = await m.findOne(Account, {
+          where: { id, userId },
+          lock: { mode: "pessimistic_write" },
+        });
 
-    try {
-      // Use pessimistic lock to prevent concurrent balance modifications
-      const account = await queryRunner.manager.findOne(Account, {
-        where: { id, userId },
-        lock: { mode: "pessimistic_write" },
-      });
+        if (!account) {
+          throw new NotFoundException(
+            tr("errors.accounts.notFound", "Account not found"),
+          );
+        }
 
-      if (!account) {
-        throw new NotFoundException(
-          tr("errors.accounts.notFound", "Account not found"),
-        );
-      }
-
-      if (account.isClosed) {
-        throw new BadRequestException(
-          tr("errors.accounts.updateClosed", "Cannot update a closed account"),
-        );
-      }
-
-      // Currency is locked once the account has transactions. Allowing it to
-      // change after that would silently re-denominate existing balances.
-      if (
-        updateAccountDto.currencyCode !== undefined &&
-        updateAccountDto.currencyCode !== account.currencyCode
-      ) {
-        const [transactionCount, investmentTransactionCount] =
-          await Promise.all([
-            queryRunner.manager.count(Transaction, {
-              where: { accountId: id },
-            }),
-            queryRunner.manager.count(InvestmentTransaction, {
-              where: { accountId: id },
-            }),
-          ]);
-
-        if (transactionCount > 0 || investmentTransactionCount > 0) {
+        if (account.isClosed) {
           throw new BadRequestException(
             tr(
-              "errors.accounts.changeCurrencyWithTransactions",
-              "Cannot change the currency of an account that has transactions.",
+              "errors.accounts.updateClosed",
+              "Cannot update a closed account",
             ),
           );
         }
-      }
 
-      const beforeData = { ...account };
+        // Currency is locked once the account has transactions. Allowing it to
+        // change after that would silently re-denominate existing balances.
+        if (
+          updateAccountDto.currencyCode !== undefined &&
+          updateAccountDto.currencyCode !== account.currencyCode
+        ) {
+          const [transactionCount, investmentTransactionCount] =
+            await Promise.all([
+              m.count(Transaction, {
+                where: { accountId: id },
+              }),
+              m.count(InvestmentTransaction, {
+                where: { accountId: id },
+              }),
+            ]);
 
-      // If openingBalance is being changed, we need to recalculate currentBalance
-      // currentBalance = openingBalance + sum(all transaction amounts)
-      if (
-        updateAccountDto.openingBalance !== undefined &&
-        updateAccountDto.openingBalance !== account.openingBalance
-      ) {
-        const oldOpeningBalance = Number(account.openingBalance) || 0;
-        const newOpeningBalance = Number(updateAccountDto.openingBalance) || 0;
-        const difference = newOpeningBalance - oldOpeningBalance;
+          if (transactionCount > 0 || investmentTransactionCount > 0) {
+            throw new BadRequestException(
+              tr(
+                "errors.accounts.changeCurrencyWithTransactions",
+                "Cannot change the currency of an account that has transactions.",
+              ),
+            );
+          }
+        }
 
-        // Adjust currentBalance by the difference
-        account.currentBalance = roundMoney(
-          Number(account.currentBalance) + difference,
-        );
-      }
+        const before = { ...account };
 
-      // SECURITY: Explicit property mapping instead of Object.assign to prevent mass assignment
-      if (updateAccountDto.name !== undefined)
-        account.name = updateAccountDto.name;
-      if (updateAccountDto.accountType !== undefined)
-        account.accountType = updateAccountDto.accountType;
-      if (updateAccountDto.currencyCode !== undefined)
-        account.currencyCode = updateAccountDto.currencyCode;
-      if (updateAccountDto.openingBalance !== undefined)
-        account.openingBalance = updateAccountDto.openingBalance;
-      if (updateAccountDto.description !== undefined)
-        account.description = updateAccountDto.description;
-      if (updateAccountDto.accountNumber !== undefined)
-        account.accountNumber = updateAccountDto.accountNumber;
-      if (updateAccountDto.institution !== undefined)
-        account.institution = updateAccountDto.institution;
-      if (updateAccountDto.institutionId !== undefined) {
-        await this.assertInstitutionOwned(
-          userId,
-          updateAccountDto.institutionId,
-        );
-        account.institutionId = updateAccountDto.institutionId;
-        // Clear the loaded relation so TypeORM persists the scalar FK change
-        // rather than re-deriving it from a stale relation object.
-        account.institutionRef = null;
-      }
-      if (updateAccountDto.creditLimit !== undefined)
-        account.creditLimit = updateAccountDto.creditLimit;
-      if (updateAccountDto.interestRate !== undefined)
-        account.interestRate = updateAccountDto.interestRate;
-      if (updateAccountDto.isFavourite !== undefined)
-        account.isFavourite = updateAccountDto.isFavourite;
-      if (updateAccountDto.excludeFromNetWorth !== undefined)
-        account.excludeFromNetWorth = updateAccountDto.excludeFromNetWorth;
-      if (updateAccountDto.favouriteSortOrder !== undefined)
-        account.favouriteSortOrder = updateAccountDto.favouriteSortOrder;
-      // Credit card statement fields (only for credit card accounts)
-      const effectiveType = updateAccountDto.accountType ?? account.accountType;
-      if (effectiveType === AccountType.CREDIT_CARD) {
-        if (updateAccountDto.statementDueDay !== undefined)
-          account.statementDueDay = updateAccountDto.statementDueDay;
-        if (updateAccountDto.statementSettlementDay !== undefined)
-          account.statementSettlementDay =
-            updateAccountDto.statementSettlementDay;
-      } else {
-        // Clear statement fields if account type is changed away from credit card
-        account.statementDueDay = null;
-        account.statementSettlementDay = null;
-      }
-      if (updateAccountDto.paymentAmount !== undefined)
-        account.paymentAmount = updateAccountDto.paymentAmount;
-      if (updateAccountDto.paymentFrequency !== undefined)
-        account.paymentFrequency = updateAccountDto.paymentFrequency;
-      if (updateAccountDto.paymentStartDate !== undefined)
-        account.paymentStartDate = updateAccountDto.paymentStartDate
-          ? new Date(updateAccountDto.paymentStartDate)
-          : null;
-      if (updateAccountDto.sourceAccountId !== undefined)
-        account.sourceAccountId = updateAccountDto.sourceAccountId;
-      if (updateAccountDto.principalCategoryId !== undefined)
-        account.principalCategoryId = updateAccountDto.principalCategoryId;
-      if (updateAccountDto.interestCategoryId !== undefined)
-        account.interestCategoryId = updateAccountDto.interestCategoryId;
-      if (updateAccountDto.interestBookingMode !== undefined)
-        account.interestBookingMode = updateAccountDto.interestBookingMode;
-      if (updateAccountDto.overpaymentCategoryId !== undefined)
-        account.overpaymentCategoryId = updateAccountDto.overpaymentCategoryId;
-      if (updateAccountDto.overpaymentMemo !== undefined)
-        account.overpaymentMemo = updateAccountDto.overpaymentMemo?.trim()
-          ? updateAccountDto.overpaymentMemo.trim()
-          : null;
-      if (updateAccountDto.overpaymentPayeeId !== undefined)
-        account.overpaymentPayeeId = updateAccountDto.overpaymentPayeeId;
-      if (updateAccountDto.fxFeePercent !== undefined)
-        account.fxFeePercent = updateAccountDto.fxFeePercent;
-      if (updateAccountDto.assetCategoryId !== undefined)
-        account.assetCategoryId = updateAccountDto.assetCategoryId;
-      if (updateAccountDto.dateAcquired !== undefined)
-        account.dateAcquired = updateAccountDto.dateAcquired
-          ? new Date(updateAccountDto.dateAcquired)
-          : null;
-      if (updateAccountDto.linkedLoanAccountId !== undefined)
-        account.linkedLoanAccountId = updateAccountDto.linkedLoanAccountId;
-      // Mortgage-specific fields
-      if (updateAccountDto.isCanadianMortgage !== undefined)
-        account.isCanadianMortgage = updateAccountDto.isCanadianMortgage;
-      if (updateAccountDto.isVariableRate !== undefined)
-        account.isVariableRate = updateAccountDto.isVariableRate;
-      if (updateAccountDto.termMonths !== undefined) {
-        account.termMonths = updateAccountDto.termMonths || null;
-        // Recalculate termEndDate when termMonths changes
-        if (updateAccountDto.termMonths > 0 && account.paymentStartDate) {
-          const termEndDate = new Date(account.paymentStartDate);
-          termEndDate.setMonth(
-            termEndDate.getMonth() + updateAccountDto.termMonths,
+        // If openingBalance is being changed, we need to recalculate currentBalance
+        // currentBalance = openingBalance + sum(all transaction amounts)
+        if (
+          updateAccountDto.openingBalance !== undefined &&
+          updateAccountDto.openingBalance !== account.openingBalance
+        ) {
+          const oldOpeningBalance = Number(account.openingBalance) || 0;
+          const newOpeningBalance =
+            Number(updateAccountDto.openingBalance) || 0;
+          const difference = newOpeningBalance - oldOpeningBalance;
+
+          // Adjust currentBalance by the difference
+          account.currentBalance = roundMoney(
+            Number(account.currentBalance) + difference,
           );
-          account.termEndDate = termEndDate;
+        }
+
+        // SECURITY: Explicit property mapping instead of Object.assign to prevent mass assignment
+        if (updateAccountDto.name !== undefined)
+          account.name = updateAccountDto.name;
+        if (updateAccountDto.accountType !== undefined)
+          account.accountType = updateAccountDto.accountType;
+        if (updateAccountDto.currencyCode !== undefined)
+          account.currencyCode = updateAccountDto.currencyCode;
+        if (updateAccountDto.openingBalance !== undefined)
+          account.openingBalance = updateAccountDto.openingBalance;
+        if (updateAccountDto.description !== undefined)
+          account.description = updateAccountDto.description;
+        if (updateAccountDto.accountNumber !== undefined)
+          account.accountNumber = updateAccountDto.accountNumber;
+        if (updateAccountDto.institution !== undefined)
+          account.institution = updateAccountDto.institution;
+        if (updateAccountDto.institutionId !== undefined) {
+          await this.assertInstitutionOwned(
+            userId,
+            updateAccountDto.institutionId,
+          );
+          account.institutionId = updateAccountDto.institutionId;
+          // Clear the loaded relation so TypeORM persists the scalar FK change
+          // rather than re-deriving it from a stale relation object.
+          account.institutionRef = null;
+        }
+        if (updateAccountDto.creditLimit !== undefined)
+          account.creditLimit = updateAccountDto.creditLimit;
+        if (updateAccountDto.interestRate !== undefined)
+          account.interestRate = updateAccountDto.interestRate;
+        if (updateAccountDto.isFavourite !== undefined)
+          account.isFavourite = updateAccountDto.isFavourite;
+        if (updateAccountDto.excludeFromNetWorth !== undefined)
+          account.excludeFromNetWorth = updateAccountDto.excludeFromNetWorth;
+        if (updateAccountDto.favouriteSortOrder !== undefined)
+          account.favouriteSortOrder = updateAccountDto.favouriteSortOrder;
+        // Credit card statement fields (only for credit card accounts)
+        const effectiveType =
+          updateAccountDto.accountType ?? account.accountType;
+        if (effectiveType === AccountType.CREDIT_CARD) {
+          if (updateAccountDto.statementDueDay !== undefined)
+            account.statementDueDay = updateAccountDto.statementDueDay;
+          if (updateAccountDto.statementSettlementDay !== undefined)
+            account.statementSettlementDay =
+              updateAccountDto.statementSettlementDay;
         } else {
-          account.termEndDate = null;
+          // Clear statement fields if account type is changed away from credit card
+          account.statementDueDay = null;
+          account.statementSettlementDay = null;
         }
-      }
-      if (updateAccountDto.amortizationMonths !== undefined)
-        account.amortizationMonths = updateAccountDto.amortizationMonths;
-
-      const savedAccount = await queryRunner.manager.save(account);
-
-      // Keep a linked investment pair (cash <-> brokerage) in sync. Both halves
-      // represent one real-world account, so shared attributes -- currency and
-      // institution -- propagate to the partner automatically.
-      const currencyChanged = updateAccountDto.currencyCode !== undefined;
-      const institutionChanged = updateAccountDto.institutionId !== undefined;
-      if (
-        (currencyChanged || institutionChanged) &&
-        account.linkedAccountId &&
-        account.accountType === AccountType.INVESTMENT
-      ) {
-        const linkedAccount = await queryRunner.manager.findOne(Account, {
-          where: { id: account.linkedAccountId, userId },
-        });
-        if (linkedAccount) {
-          if (updateAccountDto.currencyCode !== undefined) {
-            linkedAccount.currencyCode = updateAccountDto.currencyCode;
+        if (updateAccountDto.paymentAmount !== undefined)
+          account.paymentAmount = updateAccountDto.paymentAmount;
+        if (updateAccountDto.paymentFrequency !== undefined)
+          account.paymentFrequency = updateAccountDto.paymentFrequency;
+        if (updateAccountDto.paymentStartDate !== undefined)
+          account.paymentStartDate = updateAccountDto.paymentStartDate
+            ? new Date(updateAccountDto.paymentStartDate)
+            : null;
+        if (updateAccountDto.sourceAccountId !== undefined)
+          account.sourceAccountId = updateAccountDto.sourceAccountId;
+        if (updateAccountDto.principalCategoryId !== undefined)
+          account.principalCategoryId = updateAccountDto.principalCategoryId;
+        if (updateAccountDto.interestCategoryId !== undefined)
+          account.interestCategoryId = updateAccountDto.interestCategoryId;
+        if (updateAccountDto.interestBookingMode !== undefined)
+          account.interestBookingMode = updateAccountDto.interestBookingMode;
+        if (updateAccountDto.overpaymentCategoryId !== undefined)
+          account.overpaymentCategoryId =
+            updateAccountDto.overpaymentCategoryId;
+        if (updateAccountDto.overpaymentMemo !== undefined)
+          account.overpaymentMemo = updateAccountDto.overpaymentMemo?.trim()
+            ? updateAccountDto.overpaymentMemo.trim()
+            : null;
+        if (updateAccountDto.overpaymentPayeeId !== undefined)
+          account.overpaymentPayeeId = updateAccountDto.overpaymentPayeeId;
+        if (updateAccountDto.fxFeePercent !== undefined)
+          account.fxFeePercent = updateAccountDto.fxFeePercent;
+        if (updateAccountDto.assetCategoryId !== undefined)
+          account.assetCategoryId = updateAccountDto.assetCategoryId;
+        if (updateAccountDto.dateAcquired !== undefined)
+          account.dateAcquired = updateAccountDto.dateAcquired
+            ? new Date(updateAccountDto.dateAcquired)
+            : null;
+        if (updateAccountDto.linkedLoanAccountId !== undefined)
+          account.linkedLoanAccountId = updateAccountDto.linkedLoanAccountId;
+        // Mortgage-specific fields
+        if (updateAccountDto.isCanadianMortgage !== undefined)
+          account.isCanadianMortgage = updateAccountDto.isCanadianMortgage;
+        if (updateAccountDto.isVariableRate !== undefined)
+          account.isVariableRate = updateAccountDto.isVariableRate;
+        if (updateAccountDto.termMonths !== undefined) {
+          account.termMonths = updateAccountDto.termMonths || null;
+          // Recalculate termEndDate when termMonths changes
+          if (updateAccountDto.termMonths > 0 && account.paymentStartDate) {
+            const termEndDate = new Date(account.paymentStartDate);
+            termEndDate.setMonth(
+              termEndDate.getMonth() + updateAccountDto.termMonths,
+            );
+            account.termEndDate = termEndDate;
+          } else {
+            account.termEndDate = null;
           }
-          if (updateAccountDto.institutionId !== undefined) {
-            linkedAccount.institutionId = updateAccountDto.institutionId;
-          }
-          await queryRunner.manager.save(linkedAccount);
         }
-      }
+        if (updateAccountDto.amortizationMonths !== undefined)
+          account.amortizationMonths = updateAccountDto.amortizationMonths;
 
-      await queryRunner.commitTransaction();
+        const saved = await m.save(account);
 
-      this.actionHistoryService.record(userId, {
-        entityType: "account",
-        entityId: id,
-        action: "update",
-        beforeData,
-        afterData: { ...savedAccount },
-        description: `Updated account "${savedAccount.name}"`,
-        descriptionKey: "updatedAccount",
-        descriptionParams: { name: savedAccount.name },
-      });
+        // Keep a linked investment pair (cash <-> brokerage) in sync. Both halves
+        // represent one real-world account, so shared attributes -- currency and
+        // institution -- propagate to the partner automatically.
+        const currencyChanged = updateAccountDto.currencyCode !== undefined;
+        const institutionChanged = updateAccountDto.institutionId !== undefined;
+        if (
+          (currencyChanged || institutionChanged) &&
+          account.linkedAccountId &&
+          account.accountType === AccountType.INVESTMENT
+        ) {
+          const linkedAccount = await m.findOne(Account, {
+            where: { id: account.linkedAccountId, userId },
+          });
+          if (linkedAccount) {
+            if (updateAccountDto.currencyCode !== undefined) {
+              linkedAccount.currencyCode = updateAccountDto.currencyCode;
+            }
+            if (updateAccountDto.institutionId !== undefined) {
+              linkedAccount.institutionId = updateAccountDto.institutionId;
+            }
+            await m.save(linkedAccount);
+          }
+        }
 
-      // Trigger net worth recalculation if balance-affecting fields changed
-      const needsRecalc =
-        updateAccountDto.openingBalance !== undefined ||
-        updateAccountDto.dateAcquired !== undefined;
-      if (needsRecalc) {
-        this.netWorthService
-          .recalculateAccount(userId, id)
-          .catch((err) =>
-            this.logger.warn(
-              `Net worth recalc failed for account ${id}: ${err.message}`,
-            ),
-          );
-      }
+        return { savedAccount: saved, beforeData: before };
+      },
+    );
 
-      return savedAccount;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
+    this.actionHistoryService.record(userId, {
+      entityType: "account",
+      entityId: id,
+      action: "update",
+      beforeData,
+      afterData: { ...savedAccount },
+      description: `Updated account "${savedAccount.name}"`,
+      descriptionKey: "updatedAccount",
+      descriptionParams: { name: savedAccount.name },
+    });
+
+    // Trigger net worth recalculation if balance-affecting fields changed
+    const needsRecalc =
+      updateAccountDto.openingBalance !== undefined ||
+      updateAccountDto.dateAcquired !== undefined;
+    if (needsRecalc) {
+      this.netWorthService
+        .recalculateAccount(userId, id)
+        .catch((err) =>
+          this.logger.warn(
+            `Net worth recalc failed for account ${id}: ${err.message}`,
+          ),
+        );
     }
+
+    return savedAccount;
   }
 
   /**
@@ -836,12 +831,8 @@ export class AccountsService {
   async close(userId: string, id: string): Promise<Account> {
     // M19: Use pessimistic_write lock to prevent race condition
     // between balance check and close
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const account = await queryRunner.manager.findOne(Account, {
+    return withScopedDb(this.dataSource, async (m) => {
+      const account = await m.findOne(Account, {
         where: { id, userId },
         lock: { mode: "pessimistic_write" },
       });
@@ -876,31 +867,25 @@ export class AccountsService {
       account.isClosed = true;
       account.closedDate = new Date();
 
-      const saved = await queryRunner.manager.save(account);
+      const saved = await m.save(account);
 
       // If this is an investment cash account, also close the linked brokerage account
       if (
         account.accountSubType === AccountSubType.INVESTMENT_CASH &&
         account.linkedAccountId
       ) {
-        const brokerageAccount = await queryRunner.manager.findOne(Account, {
+        const brokerageAccount = await m.findOne(Account, {
           where: { id: account.linkedAccountId, userId },
         });
         if (brokerageAccount && !brokerageAccount.isClosed) {
           brokerageAccount.isClosed = true;
           brokerageAccount.closedDate = new Date();
-          await queryRunner.manager.save(brokerageAccount);
+          await m.save(brokerageAccount);
         }
       }
 
-      await queryRunner.commitTransaction();
       return saved;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   /**
@@ -909,12 +894,8 @@ export class AccountsService {
   async reopen(userId: string, id: string): Promise<Account> {
     // Mirror close(): reopen the account and any linked brokerage account in a
     // single transaction so the pair cannot end up in mismatched states.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const account = await queryRunner.manager.findOne(Account, {
+    return withScopedDb(this.dataSource, async (m) => {
+      const account = await m.findOne(Account, {
         where: { id, userId },
       });
 
@@ -937,31 +918,25 @@ export class AccountsService {
       account.isClosed = false;
       account.closedDate = null;
 
-      const saved = await queryRunner.manager.save(account);
+      const saved = await m.save(account);
 
       // If this is an investment cash account, also reopen the linked brokerage account
       if (
         account.accountSubType === AccountSubType.INVESTMENT_CASH &&
         account.linkedAccountId
       ) {
-        const brokerageAccount = await queryRunner.manager.findOne(Account, {
+        const brokerageAccount = await m.findOne(Account, {
           where: { id: account.linkedAccountId, userId },
         });
         if (brokerageAccount && brokerageAccount.isClosed) {
           brokerageAccount.isClosed = false;
           brokerageAccount.closedDate = null;
-          await queryRunner.manager.save(brokerageAccount);
+          await m.save(brokerageAccount);
         }
       }
 
-      await queryRunner.commitTransaction();
       return saved;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   /**
@@ -981,9 +956,11 @@ export class AccountsService {
     amount: number,
     queryRunner?: QueryRunner,
   ): Promise<Account> {
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId },
-    });
+    const account = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id: accountId },
+      }),
+    );
 
     if (!account) {
       throw new NotFoundException(
@@ -1016,9 +993,12 @@ export class AccountsService {
     }
 
     // Atomic update at the database level to avoid read-modify-write race conditions
-    await this.accountsRepository.query(sql, [amount, accountId]);
-
-    return this.accountsRepository.findOneOrFail({ where: { id: accountId } });
+    return withScopedDb(this.dataSource, async (m) => {
+      await m.query(sql, [amount, accountId]);
+      return m.getRepository(Account).findOneOrFail({
+        where: { id: accountId },
+      });
+    });
   }
 
   /**
@@ -1031,9 +1011,11 @@ export class AccountsService {
     accountId: string,
     queryRunner?: QueryRunner,
   ): Promise<Account> {
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId },
-    });
+    const account = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id: accountId },
+      }),
+    );
 
     if (!account) {
       throw new NotFoundException(
@@ -1053,24 +1035,16 @@ export class AccountsService {
          AND t.transaction_date <= $3`;
 
     const today = todayYMD();
-    const result: { balance: string }[] = queryRunner
-      ? await queryRunner.query(balanceSql, [
-          accountId,
-          account.openingBalance,
-          today,
-        ])
-      : await this.dataSource.query(balanceSql, [
-          accountId,
-          account.openingBalance,
-          today,
-        ]);
-
-    const newBalance =
-      result.length > 0
-        ? roundMoney(Number(result[0].balance))
-        : roundMoney(Number(account.openingBalance));
 
     if (queryRunner) {
+      const result: { balance: string }[] = await queryRunner.query(
+        balanceSql,
+        [accountId, account.openingBalance, today],
+      );
+      const newBalance =
+        result.length > 0
+          ? roundMoney(Number(result[0].balance))
+          : roundMoney(Number(account.openingBalance));
       await queryRunner.query(
         `UPDATE accounts SET current_balance = $1 WHERE id = $2`,
         [newBalance, accountId],
@@ -1078,8 +1052,19 @@ export class AccountsService {
       return { ...account, currentBalance: newBalance } as Account;
     }
 
-    account.currentBalance = newBalance;
-    return this.accountsRepository.save(account);
+    return withScopedDb(this.dataSource, async (m) => {
+      const result: { balance: string }[] = await m.query(balanceSql, [
+        accountId,
+        account.openingBalance,
+        today,
+      ]);
+      const newBalance =
+        result.length > 0
+          ? roundMoney(Number(result[0].balance))
+          : roundMoney(Number(account.openingBalance));
+      account.currentBalance = newBalance;
+      return m.getRepository(Account).save(account);
+    });
   }
 
   /**
@@ -1093,8 +1078,11 @@ export class AccountsService {
     userId: string,
     accountId: string,
   ): Promise<number> {
-    const result: { balance: string }[] = await this.dataSource.query(
-      `SELECT COALESCE(a.opening_balance, 0) + COALESCE(SUM(t.amount), 0) AS balance
+    const result: { balance: string }[] = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT COALESCE(a.opening_balance, 0) + COALESCE(SUM(t.amount), 0) AS balance
          FROM accounts a
          LEFT JOIN transactions t ON t.account_id = a.id
            AND t.user_id = $2
@@ -1102,7 +1090,8 @@ export class AccountsService {
            AND t.parent_transaction_id IS NULL
         WHERE a.id = $1 AND a.user_id = $2
         GROUP BY a.id, a.opening_balance`,
-      [accountId, userId],
+          [accountId, userId],
+        ),
     );
     return roundMoney(Number(result?.[0]?.balance ?? 0));
   }
@@ -1251,10 +1240,12 @@ export class AccountsService {
     );
     const institutionNameMap = new Map<string, string>();
     if (institutionIds.length > 0) {
-      const institutions = await this.institutionsRepository.find({
-        where: { id: In(institutionIds), userId },
-        select: { id: true, name: true },
-      });
+      const institutions = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Institution).find({
+          where: { id: In(institutionIds), userId },
+          select: { id: true, name: true },
+        }),
+      );
       for (const inst of institutions) {
         institutionNameMap.set(inst.id, inst.name);
       }
@@ -1318,20 +1309,23 @@ export class AccountsService {
     // Verify account belongs to user
     await this.findOne(userId, accountId);
 
-    const transactionCount = await this.transactionRepository.count({
-      where: { accountId },
-    });
-
-    const investmentTransactionCount =
-      await this.investmentTransactionRepository.count({
+    return withScopedDb(this.dataSource, async (m) => {
+      const transactionCount = await m.getRepository(Transaction).count({
         where: { accountId },
       });
 
-    return {
-      transactionCount,
-      investmentTransactionCount,
-      canDelete: transactionCount === 0 && investmentTransactionCount === 0,
-    };
+      const investmentTransactionCount = await m
+        .getRepository(InvestmentTransaction)
+        .count({
+          where: { accountId },
+        });
+
+      return {
+        transactionCount,
+        investmentTransactionCount,
+        canDelete: transactionCount === 0 && investmentTransactionCount === 0,
+      };
+    });
   }
 
   /**
@@ -1341,9 +1335,11 @@ export class AccountsService {
     const account = await this.findOne(userId, id);
 
     // Check for regular transactions
-    const transactionCount = await this.transactionRepository.count({
-      where: { accountId: id },
-    });
+    const transactionCount = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Transaction).count({
+        where: { accountId: id },
+      }),
+    );
 
     if (transactionCount > 0) {
       throw new BadRequestException(
@@ -1356,10 +1352,13 @@ export class AccountsService {
     }
 
     // Check for investment transactions
-    const investmentTransactionCount =
-      await this.investmentTransactionRepository.count({
-        where: { accountId: id },
-      });
+    const investmentTransactionCount = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.getRepository(InvestmentTransaction).count({
+          where: { accountId: id },
+        }),
+    );
 
     if (investmentTransactionCount > 0) {
       throw new BadRequestException(
@@ -1397,29 +1396,19 @@ export class AccountsService {
 
     // Unlink the paired account and remove this account atomically, so a
     // failure cannot leave a dangling link pointing at a deleted account.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
+    await withScopedDb(this.dataSource, async (m) => {
       if (account.linkedAccountId) {
-        const linkedAccount = await queryRunner.manager.findOne(Account, {
+        const linkedAccount = await m.findOne(Account, {
           where: { id: account.linkedAccountId },
         });
         if (linkedAccount) {
           linkedAccount.linkedAccountId = null;
-          await queryRunner.manager.save(linkedAccount);
+          await m.save(linkedAccount);
         }
       }
 
-      await queryRunner.manager.remove(account);
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      await m.remove(account);
+    });
 
     this.actionHistoryService.record(userId, {
       entityType: "account",
@@ -1437,13 +1426,15 @@ export class AccountsService {
    * Used when clearing investment data for re-import.
    */
   async resetBrokerageBalances(userId: string): Promise<number> {
-    const result = await this.accountsRepository.update(
-      {
-        userId,
-        accountType: AccountType.INVESTMENT,
-        accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
-      },
-      { currentBalance: 0 },
+    const result = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).update(
+        {
+          userId,
+          accountType: AccountType.INVESTMENT,
+          accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+        },
+        { currentBalance: 0 },
+      ),
     );
 
     return result.affected ?? 0;
@@ -1476,8 +1467,9 @@ export class AccountsService {
     // in all-time mode, where the MIN/MAX probe below already yields the last
     // transaction date (future-dated ones included) and clamps `end` to it.
     if (!endDate && !allTime) {
-      const maxDateResult = await this.dataSource.query(
-        `SELECT MAX(t.transaction_date)::TEXT as max_date
+      const maxDateResult = await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `SELECT MAX(t.transaction_date)::TEXT as max_date
          FROM transactions t
          JOIN accounts a ON a.id = t.account_id
          WHERE a.user_id = $1
@@ -1485,7 +1477,8 @@ export class AccountsService {
            AND (t.status IS NULL OR t.status != 'VOID')
            AND t.parent_transaction_id IS NULL
            AND t.transaction_date > $3`,
-        [userId, accountIdsParam, end],
+          [userId, accountIdsParam, end],
+        ),
       );
       const maxFutureDate = maxDateResult?.[0]?.max_date;
       if (maxFutureDate && maxFutureDate > end) {
@@ -1510,8 +1503,9 @@ export class AccountsService {
       // unbounded MAX still includes future-dated transactions, so projections
       // remain visible. Both fall back to the one-year default / today when the
       // account has no transactions yet.
-      const range = await this.dataSource.query(
-        `SELECT MIN(t.transaction_date)::TEXT as min_date,
+      const range = await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `SELECT MIN(t.transaction_date)::TEXT as min_date,
                 MAX(t.transaction_date)::TEXT as max_date
          FROM transactions t
          JOIN accounts a ON a.id = t.account_id
@@ -1519,7 +1513,8 @@ export class AccountsService {
            AND ($2::UUID[] IS NULL OR t.account_id = ANY($2::UUID[]))
            AND (t.status IS NULL OR t.status != 'VOID')
            AND t.parent_transaction_id IS NULL`,
-        [userId, accountIdsParam],
+          [userId, accountIdsParam],
+        ),
       );
       start = range?.[0]?.min_date || oneYearAgo();
       const maxDate = range?.[0]?.max_date;
@@ -1550,8 +1545,9 @@ export class AccountsService {
       balance: string;
       account_id: string;
       currency_code: string;
-    }> = await this.dataSource.query(
-      `WITH target_accounts AS (
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `WITH target_accounts AS (
           SELECT id, opening_balance, currency_code
           FROM accounts
           WHERE user_id = $1
@@ -1606,7 +1602,8 @@ export class AccountsService {
         FROM numbered
         WHERE $5::int <= 1 OR idx % $5::int = 0 OR idx = cnt - 1
         ORDER BY date, account_id`,
-      [userId, accountIdsParam, start, end, step],
+        [userId, accountIdsParam, start, end, step],
+      ),
     );
 
     return rows.map((r) => ({
@@ -1653,8 +1650,10 @@ export class AccountsService {
           continue;
         }
 
-        const accountRows: { account_id: string }[] =
-          await this.dataSource.query(
+        // One read-modify-write block per timezone bucket: find due accounts,
+        // recompute their balances, apply them in a single UPDATE.
+        const applied = await withScopedDb(this.dataSource, async (m) => {
+          const accountRows: { account_id: string }[] = await m.query(
             `SELECT DISTINCT t.account_id
                FROM transactions t
                JOIN accounts a ON a.id = t.account_id
@@ -1665,12 +1664,12 @@ export class AccountsService {
             [userIds, today],
           );
 
-        if (accountRows.length === 0) continue;
+          if (accountRows.length === 0) return 0;
 
-        const accountIds = accountRows.map((r) => r.account_id);
-        const balances: { account_id: string; balance: string }[] =
-          await this.dataSource.query(
-            `SELECT a.id as account_id,
+          const accountIds = accountRows.map((r) => r.account_id);
+          const balances: { account_id: string; balance: string }[] =
+            await m.query(
+              `SELECT a.id as account_id,
                     COALESCE(a.opening_balance, 0) + COALESCE(SUM(t.amount), 0) as balance
                FROM accounts a
                LEFT JOIN transactions t ON t.account_id = a.id
@@ -1679,28 +1678,31 @@ export class AccountsService {
                  AND t.transaction_date <= $2
                WHERE a.id = ANY($1)
                GROUP BY a.id, a.opening_balance`,
-            [accountIds, today],
-          );
+              [accountIds, today],
+            );
 
-        if (balances.length > 0) {
-          // Apply all recomputed balances in a single statement instead of one
-          // UPDATE per account.
-          const valuesClause = balances
-            .map((_, i) => `($${i * 2 + 1}::uuid, $${i * 2 + 2}::numeric)`)
-            .join(", ");
-          const params = balances.flatMap((row) => [
-            row.account_id,
-            roundMoney(Number(row.balance)),
-          ]);
-          await this.dataSource.query(
-            `UPDATE accounts SET current_balance = v.balance
+          if (balances.length > 0) {
+            // Apply all recomputed balances in a single statement instead of
+            // one UPDATE per account.
+            const valuesClause = balances
+              .map((_, i) => `($${i * 2 + 1}::uuid, $${i * 2 + 2}::numeric)`)
+              .join(", ");
+            const params = balances.flatMap((row) => [
+              row.account_id,
+              roundMoney(Number(row.balance)),
+            ]);
+            await m.query(
+              `UPDATE accounts SET current_balance = v.balance
                FROM (VALUES ${valuesClause}) AS v(id, balance)
                WHERE accounts.id = v.id`,
-            params,
-          );
-        }
+              params,
+            );
+          }
 
-        totalApplied += balances.length;
+          return balances.length;
+        });
+
+        totalApplied += applied;
       }
 
       if (totalApplied > 0) {
@@ -1742,6 +1744,8 @@ export class AccountsService {
     const sql = `UPDATE accounts SET favourite_sort_order = c.ord
        FROM (VALUES ${valuesClause}) AS c(id, ord)
        WHERE accounts.id = c.id AND accounts.user_id = ${userParam}`;
-    await this.accountsRepository.query(sql, [...accountIds, userId]);
+    await withScopedDb(this.dataSource, (m) =>
+      m.query(sql, [...accountIds, userId]),
+    );
   }
 }
