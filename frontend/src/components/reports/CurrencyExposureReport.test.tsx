@@ -358,4 +358,17 @@ describe('CurrencyExposureReport', () => {
     expect(arg.chartLegend.length).toBeGreaterThan(0);
   });
 
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-currency-exposure-accounts',
+      JSON.stringify(['acc-1']),
+    );
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: [] });
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_BROKERAGE' }]);
+    render(<CurrencyExposureReport />);
+    await waitFor(() => {
+      expect(mockGetPortfolioSummary).toHaveBeenCalledWith(['acc-1']);
+    });
+  });
 });

@@ -4,6 +4,10 @@ import { afterEach, vi } from 'vitest';
 
 afterEach(() => {
   cleanup();
+  // Persisted UI preferences must not leak between tests: e.g. an account
+  // filter a test selects is written to localStorage, and without this the
+  // next test in the file would start with that filter still applied.
+  window.localStorage?.clear();
 });
 
 // Suppress known-harmless jsdom warnings for SVG elements used by Recharts.

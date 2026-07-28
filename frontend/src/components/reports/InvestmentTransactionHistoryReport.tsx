@@ -11,6 +11,7 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { MultiSelect } from '@/components/ui/MultiSelect';
@@ -50,13 +51,19 @@ interface ActionSummary {
   totalAmount: number;
 }
 
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-transactions-accounts';
+
 export function InvestmentTransactionHistoryReport() {
   const t = useTranslations('reports');
   const mainAccountName = useMainAccountName();
   const { formatCurrency: formatCurrencyFull } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  // Persisted so the report opens on the accounts the user last chose.
+  const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
+    ACCOUNTS_STORAGE_KEY,
+    accounts,
+  );
   const [selectedActions, setSelectedActions] = useState<string[]>([]);
 
   const actionLabels = useMemo<Record<InvestmentAction, string>>(() => ({

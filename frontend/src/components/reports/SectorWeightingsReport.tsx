@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
 import {
   BarChart,
@@ -61,13 +62,19 @@ function CustomTooltip({ active, payload, formatCurrencyFull, defaultCurrency, l
   );
 }
 
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-sector-weightings-accounts';
+
 export function SectorWeightingsReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatCurrency: formatCurrencyFull } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [securities, setSecurities] = useState<Security[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  // Persisted so the report opens on the accounts the user last chose.
+  const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
+    ACCOUNTS_STORAGE_KEY,
+    accounts,
+  );
   const [selectedSecurityIds, setSelectedSecurityIds] = useState<string[]>([]);
   const chartRef = useRef<HTMLDivElement>(null);
 

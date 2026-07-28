@@ -756,4 +756,71 @@ describe('LoanAmortizationReport', () => {
       await act(async () => { fireEvent.click(__ths[__i]); });
     }
   });
+
+  it('restores the persisted loan selection instead of the first loan', async () => {
+    window.localStorage.setItem(
+      'monize-reports-loan-amortization-account',
+      JSON.stringify('loan-2'),
+    );
+    mockGetAllAccounts.mockResolvedValue([
+      {
+        id: 'loan-1',
+        name: 'Car Loan',
+        accountType: 'LOAN',
+        currentBalance: -10000,
+        openingBalance: -20000,
+        interestRate: 5.0,
+        paymentAmount: 400,
+        paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      },
+      {
+        id: 'loan-2',
+        name: 'Mortgage',
+        accountType: 'MORTGAGE',
+        currentBalance: -10000,
+        openingBalance: -20000,
+        interestRate: 5.0,
+        paymentAmount: 400,
+        paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      },
+    ]);
+    mockGetAllTransactions.mockResolvedValue({ data: [] });
+    mockGetAllPages.mockResolvedValue([]);
+    render(<LoanAmortizationReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toHaveValue('loan-2');
+    });
+  });
+
+  it('falls back to the first loan when the persisted account is gone', async () => {
+    window.localStorage.setItem(
+      'monize-reports-loan-amortization-account',
+      JSON.stringify('deleted-loan'),
+    );
+    mockGetAllAccounts.mockResolvedValue([{
+        id: 'loan-1',
+        name: 'Car Loan',
+        accountType: 'LOAN',
+        currentBalance: -10000,
+        openingBalance: -20000,
+        interestRate: 5.0,
+        paymentAmount: 400,
+        paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      }]);
+    mockGetAllTransactions.mockResolvedValue({ data: [] });
+    mockGetAllPages.mockResolvedValue([]);
+    render(<LoanAmortizationReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toHaveValue('loan-1');
+    });
+  });
 });

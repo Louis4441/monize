@@ -26,6 +26,7 @@ import { gainLossColor } from '@/lib/format';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useDateRange } from '@/hooks/useDateRange';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ChartViewToggle } from '@/components/ui/ChartViewToggle';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
@@ -62,6 +63,7 @@ const logger = createLogger('PortfolioValueReport');
 
 const DAILY_RANGES = new Set(['1w', '1m', '3m', 'ytd', '1y']);
 const RANGE_STORAGE_KEY = 'monize-reports-portfolio-value-range';
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-portfolio-value-accounts';
 
 function CustomTooltip({ active, payload, fmtFull, portfolioLabel }: {
   active?: boolean;
@@ -123,7 +125,12 @@ export function PortfolioValueReport() {
   const [chartPoints, setChartPoints] = useState<Array<{ name: string; Value: number }>>([]);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  // Account filter is persisted so the report opens on the same set of accounts
+  // the user last looked at, matching the investments page.
+  const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
+    ACCOUNTS_STORAGE_KEY,
+    accounts,
+  );
   const [reloadKey, setReloadKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [chartViewType, setChartViewType] = useState<'area' | 'table'>('area');

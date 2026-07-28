@@ -499,4 +499,19 @@ describe('RealizedGainsReport', () => {
       }
     }
   });
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-realized-gains-accounts',
+      JSON.stringify(['acc-1']),
+    );
+    mockGetRealizedGains.mockResolvedValue([]);
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' }]);
+    render(<RealizedGainsReport />);
+    await waitFor(() => {
+      expect(mockGetRealizedGains).toHaveBeenCalledWith(
+        expect.objectContaining({ accountIds: 'acc-1' }),
+      );
+    });
+  });
 });

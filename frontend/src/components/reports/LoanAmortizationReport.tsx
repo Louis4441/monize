@@ -18,6 +18,7 @@ import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountId } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -36,6 +37,8 @@ interface PaymentRow {
   isProjected: boolean;
 }
 
+const ACCOUNT_STORAGE_KEY = 'monize-reports-loan-amortization-account';
+
 export function LoanAmortizationReport() {
   const t = useTranslations('reports');
   const { formatCurrency } = useNumberFormat();
@@ -48,7 +51,6 @@ export function LoanAmortizationReport() {
       default: return type.charAt(0) + type.slice(1).toLowerCase();
     }
   };
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [interestTransactions, setInterestTransactions] = useState<Transaction[]>([]);
   const [showAllRows, setShowAllRows] = useState(false);
@@ -71,12 +73,19 @@ export function LoanAmortizationReport() {
     [fetchedAccounts],
   );
 
-  // Default the selection to the first loan once accounts arrive. Seeded during
-  // render (not in an effect) so the transactions fetch carries it immediately.
+  // Persisted so the report reopens on the loan the user last looked at.
+  const [selectedAccountId, setSelectedAccountId] = usePersistedAccountId(
+    ACCOUNT_STORAGE_KEY,
+    accounts,
+  );
+
+  // Default the selection to the first loan once accounts arrive and nothing
+  // usable is persisted. Seeded during render (not in an effect) so the
+  // transactions fetch carries it immediately.
   const [seededAccounts, setSeededAccounts] = useState(false);
   if (!seededAccounts && accounts.length > 0) {
     setSeededAccounts(true);
-    setSelectedAccountId(accounts[0].id);
+    if (!selectedAccountId) setSelectedAccountId(accounts[0].id);
   }
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);

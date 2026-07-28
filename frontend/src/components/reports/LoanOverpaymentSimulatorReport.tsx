@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +10,7 @@ import { loanScenariosApi } from '@/lib/loan-scenarios';
 import { loanRateChangesApi } from '@/lib/loan-rate-changes';
 import { fetchAllAccountTransactions, fetchLoanInterestTransactions } from '@/lib/loan-history';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountId } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
 import { LoanDetailView } from '@/components/accounts/loan-detail/LoanDetailView';
 import { LineOfCreditView } from '@/components/accounts/loan-detail/LineOfCreditView';
@@ -20,6 +21,8 @@ import type { LoanRateChange } from '@/types/loan-rate-change';
 
 const DEBT_ACCOUNT_TYPES: AccountType[] = ['LOAN', 'MORTGAGE', 'LINE_OF_CREDIT'];
 
+const ACCOUNT_STORAGE_KEY = 'monize-reports-loan-overpayment-simulator-account';
+
 /**
  * Reports-section entry point for the loan overpayment simulator. Owns an
  * account selector and reuses the same detail views as the /accounts/[id]
@@ -29,7 +32,6 @@ const DEBT_ACCOUNT_TYPES: AccountType[] = ['LOAN', 'MORTGAGE', 'LINE_OF_CREDIT']
 export function LoanOverpaymentSimulatorReport() {
   const t = useTranslations('reports');
   const router = useRouter();
-  const [selectedAccountIdState, setSelectedAccountId] = useState<string>('');
 
   const {
     data: accountsData,
@@ -45,7 +47,12 @@ export function LoanOverpaymentSimulatorReport() {
   );
 
   const accounts = useMemo(() => accountsData ?? [], [accountsData]);
-  const selectedAccountId = selectedAccountIdState || accounts[0]?.id || '';
+  // Persisted so the report reopens on the account the user last looked at.
+  const [persistedAccountId, setSelectedAccountId] = usePersistedAccountId(
+    ACCOUNT_STORAGE_KEY,
+    accounts,
+  );
+  const selectedAccountId = persistedAccountId || accounts[0]?.id || '';
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
   const isRevolving = selectedAccount?.accountType === 'LINE_OF_CREDIT';
 

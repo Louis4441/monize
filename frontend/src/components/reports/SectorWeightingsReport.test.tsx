@@ -308,4 +308,46 @@ describe('SectorWeightingsReport', () => {
       await act(async () => { fireEvent.click(__ths[__i]); });
     }
   });
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-sector-weightings-accounts',
+      JSON.stringify(['acc-1']),
+    );
+    mockGetSectorWeightings.mockResolvedValue({
+      items: [],
+      totalPortfolioValue: 0,
+      totalDirectValue: 0,
+      totalEtfValue: 0,
+      unclassifiedValue: 0,
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_BROKERAGE' }]);
+    mockGetSecurities.mockResolvedValue([]);
+    render(<SectorWeightingsReport />);
+    await waitFor(() => {
+      expect(mockGetSectorWeightings).toHaveBeenCalledWith(['acc-1'], undefined);
+    });
+  });
+
+  it('drops persisted account IDs that no longer exist', async () => {
+    window.localStorage.setItem(
+      'monize-reports-sector-weightings-accounts',
+      JSON.stringify(['acc-1', 'gone']),
+    );
+    mockGetSectorWeightings.mockResolvedValue({
+      items: [],
+      totalPortfolioValue: 0,
+      totalDirectValue: 0,
+      totalEtfValue: 0,
+      unclassifiedValue: 0,
+    });
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_BROKERAGE' }]);
+    mockGetSecurities.mockResolvedValue([]);
+    render(<SectorWeightingsReport />);
+    await waitFor(() => {
+      expect(
+        window.localStorage.getItem('monize-reports-sector-weightings-accounts'),
+      ).toBe(JSON.stringify(['acc-1']));
+    });
+  });
 });

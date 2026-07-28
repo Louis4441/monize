@@ -182,4 +182,31 @@ describe('ForeignCurrencyFeesReport', () => {
       currencyCodes: ['EUR', 'USD'],
     });
   });
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-foreign-currency-fees-accounts',
+      JSON.stringify(['usd-1']),
+    );
+    await renderReport();
+    await waitFor(() => {
+      expect(mockGetFxFeeSummary).toHaveBeenCalled();
+    });
+    // Fee summaries are only fetched for the persisted account.
+    expect(mockGetFxFeeSummary.mock.calls.map((call) => call[0])).toEqual(['usd-1']);
+  });
+
+  it('drops persisted account IDs that are no longer eligible', async () => {
+    window.localStorage.setItem(
+      'monize-reports-foreign-currency-fees-accounts',
+      JSON.stringify(['usd-1', 'plain']),
+    );
+    await renderReport();
+    // 'plain' has no FX fee, so it is not an option and is dropped.
+    await waitFor(() => {
+      expect(
+        window.localStorage.getItem('monize-reports-foreign-currency-fees-accounts'),
+      ).toBe(JSON.stringify(['usd-1']));
+    });
+  });
 });

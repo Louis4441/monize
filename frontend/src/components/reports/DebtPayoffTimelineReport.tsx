@@ -26,6 +26,7 @@ import {
 } from '@/lib/loan-history';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountId } from '@/hooks/usePersistedAccountFilter';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { ReportError } from '@/components/reports/ReportError';
 import { chartColors } from '@/lib/chart-colors';
@@ -45,12 +46,13 @@ interface PayoffScheduleItem {
   isProjected: boolean;
 }
 
+const ACCOUNT_STORAGE_KEY = 'monize-reports-debt-payoff-timeline-account';
+
 export function DebtPayoffTimelineReport() {
   const t = useTranslations('reports');
   const formatChartDate = useChartDateFormat();
   const { formatCurrencyCompact: formatCurrency, formatCurrencyAxis } = useNumberFormat();
   const chartRef = useRef<HTMLDivElement>(null);
-  const [selectedAccountIdState, setSelectedAccountId] = useState<string>('');
   const [viewType, setViewType] = useState<'balance' | 'breakdown' | 'distribution'>('balance');
 
   const {
@@ -73,9 +75,15 @@ export function DebtPayoffTimelineReport() {
 
   const accounts = useMemo(() => accountsData ?? [], [accountsData]);
 
+  // Persisted so the report reopens on the account the user last looked at.
+  const [persistedAccountId, setSelectedAccountId] = usePersistedAccountId(
+    ACCOUNT_STORAGE_KEY,
+    accounts,
+  );
+
   // Auto-select the first debt account until the user picks one. Derived during
   // render rather than via setState-in-effect.
-  const selectedAccountId = selectedAccountIdState || accounts[0]?.id || '';
+  const selectedAccountId = persistedAccountId || accounts[0]?.id || '';
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId);
 
   // Load transactions from the loan account, paginating through all pages

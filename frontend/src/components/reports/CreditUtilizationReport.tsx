@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   BarChart,
   Bar,
@@ -20,6 +20,7 @@ import { Account } from '@/types/account';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportAccountMultiSelect } from '@/components/reports/ReportAccountMultiSelect';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { SortableHeader } from '@/components/ui/SortableHeader';
@@ -75,12 +76,13 @@ interface TotalUtilizationSlice {
   color: string;
 }
 
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-credit-utilization-accounts';
+
 export function CreditUtilizationReport() {
   const t = useTranslations('reports');
   const { formatCurrency } = useNumberFormat();
   const { convert, defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
 
   const { sortField, sortDirection, handleSort } = useSortableTable<CreditUtilizationSortField>(
     'reports.credit-utilization.sort',
@@ -98,6 +100,12 @@ export function CreditUtilizationReport() {
   );
 
   const creditAccounts = useMemo(() => accountsData ?? [], [accountsData]);
+
+  // Persisted so the report opens on the accounts the user last chose.
+  const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
+    ACCOUNTS_STORAGE_KEY,
+    creditAccounts,
+  );
 
   // An empty selection means "all credit accounts", matching the other reports.
   const activeAccounts = useMemo(

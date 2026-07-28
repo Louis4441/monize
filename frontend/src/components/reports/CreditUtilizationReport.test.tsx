@@ -240,4 +240,33 @@ describe('CreditUtilizationReport', () => {
       expect(screen.getByText(/Failed to load report data/)).toBeInTheDocument();
     });
   });
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-credit-utilization-accounts',
+      JSON.stringify(['a-2']),
+    );
+    mockGetAll.mockResolvedValue(cadAccounts);
+    render(<CreditUtilizationReport />);
+    await waitFor(() => {
+      // Shown twice: as the picker's selected label and as the single row.
+      expect(screen.getAllByText('Home LOC').length).toBeGreaterThan(0);
+    });
+    // Only the persisted account feeds the report.
+    expect(screen.queryByText('Visa')).not.toBeInTheDocument();
+  });
+
+  it('drops persisted account IDs that no longer exist', async () => {
+    window.localStorage.setItem(
+      'monize-reports-credit-utilization-accounts',
+      JSON.stringify(['a-2', 'gone']),
+    );
+    mockGetAll.mockResolvedValue(cadAccounts);
+    render(<CreditUtilizationReport />);
+    await waitFor(() => {
+      expect(
+        window.localStorage.getItem('monize-reports-credit-utilization-accounts'),
+      ).toBe(JSON.stringify(['a-2']));
+    });
+  });
 });
