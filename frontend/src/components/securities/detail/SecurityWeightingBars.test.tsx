@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import { render } from '@/test/render';
-import { SecurityWeightingsCard } from './SecurityWeightingsCard';
+import { SecurityWeightingBars } from './SecurityWeightingBars';
 
 const EMPTY = 'No breakdown stored';
 
@@ -10,8 +10,7 @@ function renderCard(
   remainderLabel?: (percent: string) => string,
 ) {
   return render(
-    <SecurityWeightingsCard
-      title="Sector breakdown"
+    <SecurityWeightingBars
       slices={slices}
       emptyMessage={EMPTY}
       remainderLabel={remainderLabel}
@@ -26,7 +25,7 @@ function bars(container: HTMLElement): HTMLElement[] {
   ) as HTMLElement[];
 }
 
-describe('SecurityWeightingsCard', () => {
+describe('SecurityWeightingBars', () => {
   it('lists each share with its percentage', () => {
     renderCard([
       { name: 'Technology', weight: 0.324 },

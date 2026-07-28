@@ -334,8 +334,6 @@ describe('SecurityDetailPage', () => {
         'About',
         'Performance',
         'Position info',
-        'Sector breakdown',
-        'Country breakdown',
         'Accounts',
       ]) {
         expect(screen.getByRole('heading', { name })).toBeInTheDocument();
@@ -356,9 +354,12 @@ describe('SecurityDetailPage', () => {
       );
       await renderPage();
 
-      // Until now the only place this data surfaced was a portfolio-wide report.
-      // Asserted via the bar's own label, since "Technology" is also this
-      // security's single sector in Key information and About.
+      // Beside the chart, not in Overview: it shares a card with the country
+      // breakdown and opens on Sector. Asserted via the bar's own label, since
+      // "Technology" is also this security's single sector elsewhere.
+      expect(
+        screen.getByRole('heading', { name: 'Breakdown' }),
+      ).toBeInTheDocument();
       expect(
         screen.getByRole('img', { name: 'Technology: 32.40%' }),
       ).toBeInTheDocument();

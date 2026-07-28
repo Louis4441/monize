@@ -162,6 +162,9 @@ export function SecurityChartSection({
         valueFormat={mode === 'return' ? 'percent' : 'currency'}
         // None of these three series is a balance, so the footer must not call
         // its lowest point a "Min Balance".
+        // Taller, so the two cards beside it have room without running past
+        // the chart's bottom edge.
+        plotHeight="tall"
         summaryLabels={{
           starting: t('chart.summary.first'),
           current: t('chart.summary.latest'),

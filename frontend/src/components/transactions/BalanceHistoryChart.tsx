@@ -107,6 +107,12 @@ interface BalanceHistoryChartProps {
     ending: string;
     lowest: string;
   };
+  /**
+   * How tall the plot area is. `tall` is for a chart sharing a row with a column
+   * of cards, where the extra height is what lets those cards breathe without
+   * running past the chart's bottom edge.
+   */
+  plotHeight?: 'default' | 'tall';
 }
 
 interface ChartPoint {
@@ -177,6 +183,7 @@ export function BalanceHistoryChart({
   markers,
   valueFormat = 'currency',
   summaryLabels,
+  plotHeight = 'default',
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
@@ -192,6 +199,10 @@ export function BalanceHistoryChart({
   // A caller that names its own figures is not plotting a balance, so the
   // overdrawn-account alarm below does not apply to it.
   const isBalanceSeries = summaryLabels === undefined;
+  const isTall = plotHeight === 'tall';
+  // Both literals stay in this file so Tailwind sees them.
+  const plotClass = isTall ? 'h-96' : 'h-72';
+  const cardMinHeight = isTall ? 'min-h-[520px]' : 'min-h-[420px]';
   const formatChartDate = useChartDateFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   // High/low value bubbles a user has temporarily dismissed, keyed by the value
@@ -373,13 +384,13 @@ export function BalanceHistoryChart({
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
+      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 ${cardMinHeight}`}>
         {!hideTitle && (
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             {chartTitle}
           </h3>
         )}
-        <div className="h-72 flex items-center justify-center">
+        <div className={`${plotClass} flex items-center justify-center`}>
           <Skeleton className="w-full h-full" />
         </div>
       </div>
@@ -388,13 +399,13 @@ export function BalanceHistoryChart({
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
+      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 ${cardMinHeight}`}>
         {!hideTitle && (
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             {chartTitle}
           </h3>
         )}
-        <div className="h-72 flex items-center justify-center text-gray-500 dark:text-gray-400">
+        <div className={`${plotClass} flex items-center justify-center text-gray-500 dark:text-gray-400`}>
           <p>{t('charts.balanceHistory.noData')}</p>
         </div>
       </div>
@@ -409,7 +420,7 @@ export function BalanceHistoryChart({
   const lowDismissed = lowValue !== null && lowValue === dismissedLow;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
+    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 ${cardMinHeight}`}>
       <div className="flex items-start justify-between mb-4">
         <div>
           {!hideTitle && (
@@ -429,7 +440,11 @@ export function BalanceHistoryChart({
       {/* overflow-hidden: while the account-widget column animates the card's
           width, the recharts SVG keeps its last measured size until it
           re-measures, so clip it to the card instead of painting outside. */}
-      <div ref={chartRef} className="h-72 overflow-hidden" style={{ minHeight: 288 }}>
+      <div
+        ref={chartRef}
+        className={`${plotClass} overflow-hidden`}
+        style={{ minHeight: isTall ? 384 : 288 }}
+      >
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           {/* top margin leaves headroom for the high-value bubble callout */}
           <AreaChart data={chartData} margin={{ left: 0, right: 8, top: 20, bottom: 0 }}>

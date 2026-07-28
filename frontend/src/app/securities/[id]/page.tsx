@@ -20,7 +20,7 @@ import { SecurityAboutCard } from '@/components/securities/detail/SecurityAboutC
 import { SecurityPerformanceCard } from '@/components/securities/detail/SecurityPerformanceCard';
 import { SecurityPositionInfoCard } from '@/components/securities/detail/SecurityPositionInfoCard';
 import { SecurityAccountsTable } from '@/components/securities/detail/SecurityAccountsTable';
-import { SecurityWeightingsCard } from '@/components/securities/detail/SecurityWeightingsCard';
+import { SecurityBreakdownCard } from '@/components/securities/detail/SecurityBreakdownCard';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { investmentsApi } from '@/lib/investments';
@@ -286,11 +286,11 @@ function SecurityDetailContent() {
             <SecurityPositionState detail={detail} />
           )}
 
-          {/* Two thirds chart, one third Key information. The column stays a
-              single card: the breakdowns and the position totals live in
-              Overview, where they have the width to be read. `items-start` keeps
-              the card at its content height rather than stretching it to the
-              chart's. */}
+          {/* Two thirds chart, one third a column of two cards: what the
+              instrument is, and what it is made of. The chart runs tall so that
+              column has the room, and the breakdown's bars are capped and
+              scrollable so an eleven-sector fund cannot outgrow it.
+              `items-start` keeps the cards at their content height. */}
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <SecurityChartSection
@@ -303,12 +303,17 @@ function SecurityDetailContent() {
                 onModeChange={setChartMode}
               />
             </div>
-            <SecurityKeyInformation
-              security={security}
-              latestPrice={
-                quote ? { price: quote.price, priceDate: quote.priceDate } : null
-              }
-            />
+            <div className="space-y-6">
+              <SecurityKeyInformation
+                security={security}
+                latestPrice={
+                  quote
+                    ? { price: quote.price, priceDate: quote.priceDate }
+                    : null
+                }
+              />
+              <SecurityBreakdownCard security={security} />
+            </div>
           </div>
 
           <div>
@@ -338,32 +343,6 @@ function SecurityDetailContent() {
                 <div className="lg:col-span-2">
                   <SecurityPositionInfoCard detail={detail} />
                 </div>
-              </div>
-
-              {/* What the instrument is made of. Monize already stores both
-                  breakdowns -- sector from the provider, country by hand -- and
-                  until now surfaced sectors only in a portfolio-wide report. An
-                  asset-class breakdown joins them once that field exists. */}
-              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-                <SecurityWeightingsCard
-                  title={t('weightings.sectorTitle')}
-                  slices={security.sectorWeightings?.map((entry) => ({
-                    name: entry.sector,
-                    weight: entry.weight,
-                  }))}
-                  emptyMessage={t('weightings.sectorEmpty')}
-                  remainderLabel={(percent) =>
-                    t('weightings.remainder', { percent })
-                  }
-                />
-                <SecurityWeightingsCard
-                  title={t('weightings.countryTitle')}
-                  slices={security.countryWeightings}
-                  emptyMessage={t('weightings.countryEmpty')}
-                  remainderLabel={(percent) =>
-                    t('weightings.remainder', { percent })
-                  }
-                />
               </div>
 
               <SecurityAccountsTable detail={detail} />

@@ -139,10 +139,12 @@
     "noAccounts": "[XX-This security is not held in any account.-XX]"
   },
   "weightings": {
-    "sectorTitle": "[XX-Sector breakdown-XX]",
-    "countryTitle": "[XX-Country breakdown-XX]",
-    "assetClassTitle": "[XX-Asset class breakdown-XX]",
-    "sectorEmpty": "[XX-No sector breakdown is stored for this security. Monize fills this in from the provider for funds and ETFs.-XX]",
+    "title": "[XX-Breakdown-XX]",
+    "ariaLabel": "[XX-Breakdown dimension-XX]",
+    "sectorTab": "[XX-Sector-XX]",
+    "countryTab": "[XX-Country-XX]",
+    "assetClassTab": "[XX-Asset class-XX]",
+    "sectorEmpty": "[XX-No sector breakdown is stored. Monize fills this in from the provider for funds and ETFs.-XX]",
     "countryEmpty": "[XX-No country breakdown is stored. You can enter one when editing the security.-XX]",
     "assetClassEmpty": "[XX-No asset class breakdown is stored yet.-XX]",
     "remainder": "[XX-{percent} unclassified-XX]"
