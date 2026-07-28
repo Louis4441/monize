@@ -12,13 +12,13 @@ import { ScheduledTransactionSplit } from "../scheduled-transactions/entities/sc
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { I18nService } from "nestjs-i18n";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   ManagerMock,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 describe("CategoriesService", () => {
@@ -135,7 +135,7 @@ describe("CategoriesService", () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
-    ({ manager: txManager, dataSource: mockDataSource } = createTenantTxMocks([
+    ({ manager: txManager, dataSource: mockDataSource } = createScopedDbMocks([
       [Category, categoriesRepository],
       [Transaction, transactionsRepository],
       [TransactionSplit, splitsRepository],

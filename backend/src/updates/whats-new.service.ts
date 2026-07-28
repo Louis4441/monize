@@ -4,7 +4,7 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import { buildDefaultPreferences } from "../users/user-preference.factory";
 import { currentRequestLocale } from "../i18n/request-locale";
 import { DemoModeService } from "../common/demo-mode.service";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 import { ReleaseNotesService } from "./release-notes.service";
 import { ReleaseNotes } from "./release-notes.parser";
 
@@ -26,10 +26,10 @@ export interface WhatsNewStatus {
  * ReleaseNotesService. Decides whether the release-notes popup should open
  * automatically and records when a user acknowledges the current version.
  *
- * All user_preferences access goes through `tenantTx` (the RLS-compliant door
+ * All user_preferences access goes through `withScopedDb` (the RLS-compliant door
  * to the DB), never a new injected repository -- see the RLS ratchet note in
  * the root CLAUDE.md. These methods run from authenticated controllers, so the
- * request context supplies the identity `tenantTx` needs.
+ * request context supplies the identity `withScopedDb` needs.
  */
 @Injectable()
 export class WhatsNewService {
@@ -43,7 +43,7 @@ export class WhatsNewService {
     const currentVersion = this.releaseNotesService.currentVersion;
     const notes = this.releaseNotesService.getForCurrentVersion();
 
-    const prefs = await tenantTx(this.dataSource, (manager) =>
+    const prefs = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(UserPreference).findOne({ where: { userId } }),
     );
 
@@ -83,7 +83,7 @@ export class WhatsNewService {
   async markSeen(userId: string): Promise<{ seen: boolean; version: string }> {
     const currentVersion = this.releaseNotesService.currentVersion;
 
-    await tenantTx(this.dataSource, async (manager) => {
+    await withScopedDb(this.dataSource, async (manager) => {
       const repo = manager.getRepository(UserPreference);
       const prefs = await repo.findOne({ where: { userId } });
       if (prefs) {
@@ -111,7 +111,7 @@ export class WhatsNewService {
    * would never arrive.
    */
   async remindNextLogin(userId: string): Promise<{ reminded: boolean }> {
-    await tenantTx(this.dataSource, async (manager) => {
+    await withScopedDb(this.dataSource, async (manager) => {
       const repo = manager.getRepository(UserPreference);
       const prefs = await repo.findOne({ where: { userId } });
       if (prefs) {

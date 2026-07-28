@@ -14,7 +14,7 @@ import { ATTACHMENT_STORAGE_PROVIDER } from "./storage/attachment-storage.interf
  * Postgres BYTEA; "local" writes them to a filesystem directory; "s3" stores
  * them in S3-compatible object storage. Entities are auto-registered via the
  * datasource glob, so no forFeature is needed -- the service reads repositories
- * from the tenantTx EntityManager.
+ * from the withScopedDb EntityManager.
  */
 @Module({
   imports: [ConfigModule],

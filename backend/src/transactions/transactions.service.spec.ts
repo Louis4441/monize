@@ -22,12 +22,12 @@ import { isTransactionInFuture } from "../common/date-utils";
 import { buildTransactionSearchClause } from "./transaction-search.util";
 import { TransactionAttachment } from "../attachments/entities/transaction-attachment.entity";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 jest.mock("../common/date-utils", () => ({
@@ -52,7 +52,7 @@ describe("TransactionsService", () => {
   let payeesService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
   let tagsService: Record<string, jest.Mock>;
-  // The tenantTx EntityManager, under the legacy `mockQueryRunner.manager`
+  // The withScopedDb EntityManager, under the legacy `mockQueryRunner.manager`
   // shape so the pre-RLS manager assertions still read naturally.
   let mockQueryRunner: Record<string, any>;
   let mockDataSource: DataSourceMock;
@@ -143,7 +143,7 @@ describe("TransactionsService", () => {
     };
 
     const payeesRepository = { findOne: jest.fn().mockResolvedValue(null) };
-    const tenantMocks = createTenantTxMocks([
+    const tenantMocks = createScopedDbMocks([
       [TransactionSplit, splitsRepository],
       [Category, categoriesRepository],
       [InvestmentTransaction, investmentTxRepository],
@@ -5163,7 +5163,7 @@ describe("TransactionsService", () => {
         { amount: -50, categoryId: "cat-1", tagIds: ["tag-a"] },
         { amount: -50, transferAccountId: "acc-2", tagIds: ["tag-b"] },
       ];
-      // The tag writes join the caller's ambient tenantTx, so no runner is
+      // The tag writes join the caller's ambient withScopedDb, so no runner is
       // threaded through any more.
       await (service as any).applySplitTags(savedSplits, splits, "user-1");
 

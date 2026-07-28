@@ -3,12 +3,12 @@ import { InstitutionsService } from "./institutions.service";
 import { Institution } from "./entities/institution.entity";
 import { Account } from "../accounts/entities/account.entity";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   ManagerMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 describe("InstitutionsService", () => {
@@ -67,7 +67,7 @@ describe("InstitutionsService", () => {
     logoService = { fetchFavicon: jest.fn().mockResolvedValue(null) };
     actionHistory = { record: jest.fn() };
 
-    const { manager, dataSource } = createTenantTxMocks([
+    const { manager, dataSource } = createScopedDbMocks([
       [Institution, institutionsRepo],
       [Account, accountsRepo],
     ]);

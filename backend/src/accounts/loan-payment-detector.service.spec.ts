@@ -1,9 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
-import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 import { NotFoundException } from "@nestjs/common";
 import { LoanPaymentDetectorService } from "./loan-payment-detector.service";
@@ -59,7 +59,7 @@ describe("LoanPaymentDetectorService", () => {
       },
     };
 
-    const { manager, dataSource } = createTenantTxMocks([
+    const { manager, dataSource } = createScopedDbMocks([
       [Account, accountsRepository],
       [Transaction, transactionRepository],
     ]);

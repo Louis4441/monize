@@ -5,7 +5,7 @@ import { UUID_REGEX } from "../query-param-utils";
 /**
  * Ambient-context helpers for code with no HTTP request (guards/strategies,
  * cron jobs, seeders, backup restore). They seed the same AsyncLocalStorage
- * scope the RequestContextInterceptor does, so every `tenantTx` inside `fn`
+ * scope the RequestContextInterceptor does, so every `withScopedDb` inside `fn`
  * emits the matching GUC. They hold no connection and need no cleanup.
  *
  * Importing this module is restricted to an allowlist by lint (task L1) so the
@@ -21,7 +21,7 @@ const BYPASS_LOG_INTERVAL_MS = 60 * 1000;
 const lastBypassLogByCallSite = new Map<string, number>();
 
 /**
- * Seed a *user* context: `tenantTx` will emit `app.current_user_id` /
+ * Seed a *user* context: `withScopedDb` will emit `app.current_user_id` /
  * `app.real_user_id` for this user. Validates the id is a UUID -- a garbage
  * value would make every policied statement raise 22P02 at enforcement, so we
  * fail here, at the wrap site, instead.
@@ -36,7 +36,7 @@ export function withUserContext<T>(userId: string, fn: () => T): T {
 }
 
 /**
- * Seed a *system* context: `tenantTx` will emit `app.bypass_rls` so the body
+ * Seed a *system* context: `withScopedDb` will emit `app.bypass_rls` so the body
  * can read/write across users (admin, auth bootstrap, cron fan-out, seeders,
  * emergency-access claim, expiry sweeps). Each invocation is logged (rate-
  * limited, with its call site) so bypass usage is auditable in prod.

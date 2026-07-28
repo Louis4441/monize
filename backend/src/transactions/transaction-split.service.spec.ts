@@ -8,12 +8,12 @@ import { Category } from "../categories/entities/category.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { isTransactionInFuture } from "../common/date-utils";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 jest.mock("../common/date-utils", () => ({
@@ -30,7 +30,7 @@ describe("TransactionSplitService", () => {
   let categoriesRepository: Record<string, jest.Mock>;
   let accountsService: Record<string, jest.Mock>;
   let mockDataSource: DataSourceMock;
-  // The tenantTx EntityManager, kept under the legacy `mockQueryRunner.manager`
+  // The withScopedDb EntityManager, kept under the legacy `mockQueryRunner.manager`
   // shape so the pre-RLS manager assertions below still read naturally.
   let mockQueryRunner: Record<string, any>;
 
@@ -117,7 +117,7 @@ describe("TransactionSplitService", () => {
       recalculateCurrentBalance: jest.fn().mockResolvedValue(undefined),
     };
 
-    const tenantMocks = createTenantTxMocks([
+    const tenantMocks = createScopedDbMocks([
       [Transaction, transactionsRepository],
       [TransactionSplit, splitsRepository],
       [Category, categoriesRepository],
@@ -1220,7 +1220,7 @@ describe("TransactionSplitService", () => {
 
       await service.createSplits("tx-1", splits, "user-1", "account-1");
 
-      // A single tenantTx wraps the category check and both split writes;
+      // A single withScopedDb wraps the category check and both split writes;
       // callers already inside one join it via re-entrancy rather than
       // opening a second connection.
       expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
@@ -1632,7 +1632,7 @@ describe("TransactionSplitService", () => {
       expect(investmentService.reverseAndRemoveEmbedded).toHaveBeenCalledTimes(
         2,
       );
-      // The reversal now receives the tenantTx EntityManager, not a QueryRunner.
+      // The reversal now receives the withScopedDb EntityManager, not a QueryRunner.
       expect(investmentService.reverseAndRemoveEmbedded).toHaveBeenCalledWith(
         mockQueryRunner.manager,
         "user-1",

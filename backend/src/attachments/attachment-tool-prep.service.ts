@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { createHash } from "crypto";
 import { DataSource } from "typeorm";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 import { tr } from "../i18n/translate";
 import {
   ALLOWED_ATTACHMENT_MIME_TYPES,
@@ -64,7 +64,7 @@ export class AttachmentToolPrepService {
     }
 
     const existing = existingTransactionId
-      ? await tenantTx(this.dataSource, (m) =>
+      ? await withScopedDb(this.dataSource, (m) =>
           m.getRepository(TransactionAttachment).count({
             where: { transactionId: existingTransactionId, userId },
           }),

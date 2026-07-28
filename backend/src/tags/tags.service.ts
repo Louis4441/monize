@@ -12,7 +12,7 @@ import { TransactionSplitTag } from "./entities/transaction-split-tag.entity";
 import { CreateTagDto } from "./dto/create-tag.dto";
 import { UpdateTagDto } from "./dto/update-tag.dto";
 import { ActionHistoryService } from "../action-history/action-history.service";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class TagsService {
@@ -24,7 +24,7 @@ export class TagsService {
   ) {}
 
   async findAll(userId: string): Promise<Tag[]> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(Tag).find({
         where: { userId },
         order: { name: "ASC" },
@@ -33,7 +33,7 @@ export class TagsService {
   }
 
   async findOne(userId: string, id: string): Promise<Tag> {
-    const tag = await tenantTx(this.dataSource, (m) =>
+    const tag = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Tag).findOne({
         where: { id, userId },
       }),
@@ -64,7 +64,7 @@ export class TagsService {
   }
 
   async create(userId: string, dto: CreateTagDto): Promise<Tag> {
-    const saved = await tenantTx(this.dataSource, async (m) => {
+    const saved = await withScopedDb(this.dataSource, async (m) => {
       const existing = await this.findConflictingName(m, userId, dto.name);
       if (existing) {
         throw new ConflictException(
@@ -107,7 +107,7 @@ export class TagsService {
     const tag = await this.findOne(userId, id);
     const beforeData = { name: tag.name, color: tag.color, icon: tag.icon };
 
-    const saved = await tenantTx(this.dataSource, async (m) => {
+    const saved = await withScopedDb(this.dataSource, async (m) => {
       if (dto.name && dto.name.toLowerCase() !== tag.name.toLowerCase()) {
         const existing = await this.findConflictingName(
           m,
@@ -156,7 +156,9 @@ export class TagsService {
       color: tag.color,
       icon: tag.icon,
     };
-    await tenantTx(this.dataSource, (m) => m.getRepository(Tag).remove(tag));
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Tag).remove(tag),
+    );
     this.actionHistoryService.record(userId, {
       entityType: "tag",
       entityId: id,
@@ -170,7 +172,7 @@ export class TagsService {
 
   async getTransactionCount(userId: string, id: string): Promise<number> {
     await this.findOne(userId, id);
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionTag).count({
         where: { tagId: id },
       }),
@@ -180,7 +182,7 @@ export class TagsService {
   async getAllTransactionCounts(
     userId: string,
   ): Promise<Record<string, number>> {
-    const rows: Array<{ tag_id: string; count: string }> = await tenantTx(
+    const rows: Array<{ tag_id: string; count: string }> = await withScopedDb(
       this.dataSource,
       (m) =>
         m
@@ -205,7 +207,7 @@ export class TagsService {
   /**
    * Run `fn` against the caller's QueryRunner transaction when one is passed
    * (the transactions module's flows still manage their own QueryRunner until
-   * task R2), otherwise inside a `tenantTx` of our own.
+   * task R2), otherwise inside a `withScopedDb` of our own.
    */
   private withTagManager<T>(
     queryRunner: QueryRunner | undefined,
@@ -213,7 +215,7 @@ export class TagsService {
   ): Promise<T> {
     return queryRunner
       ? fn(queryRunner.manager)
-      : tenantTx(this.dataSource, fn);
+      : withScopedDb(this.dataSource, fn);
   }
 
   async setTransactionTags(

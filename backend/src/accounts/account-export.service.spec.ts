@@ -1,9 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
-import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 import { AccountExportService } from "./account-export.service";
 import { AccountsService } from "./accounts.service";
@@ -152,7 +152,7 @@ describe("AccountExportService", () => {
       findOne: jest.fn().mockResolvedValue(mockAccount),
     };
 
-    const { dataSource } = createTenantTxMocks([
+    const { dataSource } = createScopedDbMocks([
       [Transaction, mockTransactionRepo],
       [Category, mockCategoryRepo],
     ]);

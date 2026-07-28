@@ -40,7 +40,7 @@ import {
   ParsedSearchTerm,
 } from "./transaction-search-parse.util";
 import { tr } from "../i18n/translate";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 export interface BulkDeleteResult {
   deleted: number;
@@ -74,7 +74,7 @@ export class TransactionBulkUpdateService {
     term?: string,
   ): Promise<ParsedSearchTerm> {
     if (!term || !term.trim()) return { amount: null, date: null };
-    const prefs = await tenantTx(this.dataSource, (m) =>
+    const prefs = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({
         where: { userId },
       }),
@@ -103,7 +103,7 @@ export class TransactionBulkUpdateService {
     // H4: Validate ownership of categoryId and payeeId before applying
     if ("categoryId" in dto && dto.categoryId) {
       const categoryId = dto.categoryId;
-      const cat = await tenantTx(this.dataSource, (m) =>
+      const cat = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).findOne({
           where: { id: categoryId, userId },
         }),
@@ -116,7 +116,7 @@ export class TransactionBulkUpdateService {
     }
     if ("payeeId" in dto && dto.payeeId) {
       const payeeId = dto.payeeId;
-      const payee = await tenantTx(this.dataSource, (m) =>
+      const payee = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Payee).findOne({
           where: { id: payeeId, userId },
         }),
@@ -151,7 +151,7 @@ export class TransactionBulkUpdateService {
     }
 
     // Balance changes and the batch update commit in a single transaction.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       // Step 3: Handle balance adjustments for VOID status changes
       if (isUpdatingStatus) {
         await this.handleStatusBalanceChanges(
@@ -215,7 +215,7 @@ export class TransactionBulkUpdateService {
     }
 
     // Load transaction details needed for balance adjustments and linked transfers
-    const transactions = await tenantTx(this.dataSource, (m) =>
+    const transactions = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Transaction)
         .createQueryBuilder("transaction")
@@ -240,7 +240,7 @@ export class TransactionBulkUpdateService {
     }
 
     // Balance adjustments and both delete passes commit atomically.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       // Collect linked transaction IDs from transfers and split transfers
       const linkedIdsToDelete = new Set<string>();
       const transactionIdsSet = new Set(transactions.map((t) => t.id));
@@ -364,7 +364,7 @@ export class TransactionBulkUpdateService {
         return [];
       }
 
-      const transactions = await tenantTx(this.dataSource, (m) =>
+      const transactions = await withScopedDb(this.dataSource, (m) =>
         m
           .getRepository(Transaction)
           .createQueryBuilder("transaction")
@@ -378,7 +378,7 @@ export class TransactionBulkUpdateService {
     }
 
     // Filter mode
-    const transactions = await tenantTx(this.dataSource, async (m) => {
+    const transactions = await withScopedDb(this.dataSource, async (m) => {
       const queryBuilder = m
         .getRepository(Transaction)
         .createQueryBuilder("transaction")
@@ -409,7 +409,7 @@ export class TransactionBulkUpdateService {
     skippedReasons: string[];
   }> {
     // Fetch transaction details needed for exclusion logic
-    const transactions = await tenantTx(this.dataSource, (m) =>
+    const transactions = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Transaction)
         .createQueryBuilder("transaction")
@@ -621,7 +621,7 @@ export class TransactionBulkUpdateService {
     userId: string,
     transactionIds: string[],
   ): Promise<void> {
-    const accountIds = await tenantTx(this.dataSource, (m) =>
+    const accountIds = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Transaction)
         .createQueryBuilder("transaction")

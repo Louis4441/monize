@@ -19,7 +19,7 @@ import {
   FetchedLogo,
 } from "./institution-logo.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 /**
  * Client-facing institution shape. The cached favicon bytes
@@ -114,7 +114,7 @@ export class InstitutionsService {
     userId: string,
     institutionId: string,
   ): Promise<number> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       this.logicalAccountsQuery(m, userId)
         .andWhere("account.institution_id = :institutionId", { institutionId })
         .getCount(),
@@ -125,7 +125,7 @@ export class InstitutionsService {
     userId: string,
     dto: CreateInstitutionDto,
   ): Promise<InstitutionView> {
-    const existing = await tenantTx(this.dataSource, (m) =>
+    const existing = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Institution).findOne({
         where: { userId, name: dto.name },
       }),
@@ -147,7 +147,7 @@ export class InstitutionsService {
     // host cannot hold a database connection open.
     const logo = await this.logoService.fetchFavicon(website);
 
-    const saved = await tenantTx(this.dataSource, (m) => {
+    const saved = await withScopedDb(this.dataSource, (m) => {
       const repo = m.getRepository(Institution);
       const institution = repo.create({
         userId,
@@ -178,7 +178,7 @@ export class InstitutionsService {
   }
 
   async findAll(userId: string): Promise<InstitutionView[]> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const institutions = await m.getRepository(Institution).find({
         where: { userId },
         order: { name: "ASC" },
@@ -214,7 +214,7 @@ export class InstitutionsService {
     userId: string,
     id: string,
   ): Promise<Institution> {
-    const institution = await tenantTx(this.dataSource, (m) =>
+    const institution = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Institution).findOne({
         where: { id, userId },
       }),
@@ -245,7 +245,7 @@ export class InstitutionsService {
     const institution = await this.getOwnedEntity(userId, id);
 
     if (dto.name !== undefined && dto.name !== institution.name) {
-      const existing = await tenantTx(this.dataSource, (m) =>
+      const existing = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Institution).findOne({
           where: { userId, name: dto.name },
         }),
@@ -277,7 +277,7 @@ export class InstitutionsService {
       }
     }
 
-    const saved = await tenantTx(this.dataSource, (m) =>
+    const saved = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Institution).save(institution),
     );
 
@@ -302,7 +302,7 @@ export class InstitutionsService {
 
   async remove(userId: string, id: string): Promise<void> {
     const institution = await this.getOwnedEntity(userId, id);
-    await tenantTx(this.dataSource, (m) =>
+    await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Institution).remove(institution),
     );
 
@@ -329,7 +329,7 @@ export class InstitutionsService {
     const institution = await this.getOwnedEntity(userId, id);
     const logo = await this.logoService.fetchFavicon(institution.website);
     this.applyLogo(institution, logo);
-    const saved = await tenantTx(this.dataSource, (m) =>
+    const saved = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Institution).save(institution),
     );
     const accountCount = await this.countAccounts(userId, id);
@@ -341,7 +341,7 @@ export class InstitutionsService {
    * institution is missing or has no cached logo.
    */
   async getLogo(userId: string, id: string): Promise<FetchedLogo> {
-    const institution = await tenantTx(this.dataSource, (m) =>
+    const institution = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Institution)
         .createQueryBuilder("institution")
@@ -381,7 +381,7 @@ export class InstitutionsService {
    */
   async getAccounts(userId: string, id: string): Promise<Account[]> {
     await this.getOwnedEntity(userId, id);
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).find({
         where: { userId, institutionId: id },
         order: { name: "ASC" },
@@ -403,7 +403,7 @@ export class InstitutionsService {
     institutionId: string | null,
     expectedInstitutionId?: string,
   ): Promise<Account> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const account = await m.findOne(Account, {
         where: { id: accountId, userId },
       });

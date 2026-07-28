@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
 import { createHash } from "crypto";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionAttachment } from "./entities/transaction-attachment.entity";
 import {
@@ -18,8 +18,8 @@ import {
 } from "./attachments.service";
 import { AttachmentStorageProvider } from "./storage/attachment-storage.interface";
 
-jest.mock("../common/db/tenant-tx");
-const mockedTenantTx = tenantTx as jest.MockedFunction<typeof tenantTx>;
+jest.mock("../common/db/scoped-db");
+const mockedTenantTx = withScopedDb as jest.MockedFunction<typeof withScopedDb>;
 
 const PNG_BYTES = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01,

@@ -9,22 +9,22 @@ import { InvestmentTransactionsService } from "../securities/investment-transact
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
-import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 /**
  * RLS smoke for the scheduled-transactions module's out-of-request entry point
  * (task R2).
  *
- * Unlike the per-service specs, this suite does NOT mock `tenantTx`: the real
+ * Unlike the per-service specs, this suite does NOT mock `withScopedDb`: the real
  * implementation runs (at the default RLS_MODE=off), so every DB access on the
  * auto-post cron path must find the ambient context seeded by the C2 wrappers
  * (withSystemContext for the cross-user fan-out, withUserContext for each
- * post) or tenantTx throws its missing-context error. This is the CI stand-in
+ * post) or withScopedDb throws its missing-context error. This is the CI stand-in
  * for the "dev smoke of the module's cron paths shows no context throws"
  * acceptance.
  */
 
-describe("scheduled-transactions module RLS context smoke (real tenantTx)", () => {
+describe("scheduled-transactions module RLS context smoke (real withScopedDb)", () => {
   const OWNER_ID = "7c2f4c1e-5b3a-4d21-9f08-2a6d4e7b1c93";
   const SCHEDULED_ID = "1b9e6f30-8c47-4a52-b0d3-6e5f2c8a4d17";
 
@@ -32,7 +32,7 @@ describe("scheduled-transactions module RLS context smoke (real tenantTx)", () =
     scheduledRepo: Record<string, jest.Mock>,
     overridesRepo: Record<string, jest.Mock>,
   ) => {
-    const { manager, dataSource } = createTenantTxMocks([
+    const { manager, dataSource } = createScopedDbMocks([
       [ScheduledTransaction, scheduledRepo],
       [ScheduledTransactionOverride, overridesRepo],
     ]);
@@ -145,7 +145,7 @@ describe("scheduled-transactions module RLS context smoke (real tenantTx)", () =
     );
   });
 
-  it("real tenantTx still refuses these paths without their context wrappers", async () => {
+  it("real withScopedDb still refuses these paths without their context wrappers", async () => {
     const { service } = await buildModule(
       { findOne: jest.fn() },
       {
@@ -154,7 +154,7 @@ describe("scheduled-transactions module RLS context smoke (real tenantTx)", () =
     );
 
     // Called with no ambient scope at all (no interceptor, no wrapper): the
-    // real tenantTx must throw, proving the smoke above passes because of the
+    // real withScopedDb must throw, proving the smoke above passes because of the
     // C1/C2 wrappers and not because the check is inert.
     await expect(service.findOne(OWNER_ID, SCHEDULED_ID)).rejects.toThrow(
       "DB access outside request/user/system context",

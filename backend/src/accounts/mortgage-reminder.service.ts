@@ -12,7 +12,7 @@ import { formatDateYMD } from "../common/date-utils";
 import { emailTranslator } from "../i18n/email-translator";
 import { DEFAULT_LOCALE } from "../i18n/config";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 /**
  * Service for handling mortgage term renewal reminders
@@ -88,7 +88,7 @@ export class MortgageReminderService {
       try {
         // RLS (task C2): per-user reads run under the user's own context.
         const prefs = await withUserContext(userId, () =>
-          tenantTx(this.dataSource, (m) =>
+          withScopedDb(this.dataSource, (m) =>
             m.getRepository(UserPreference).findOne({
               where: { userId },
             }),
@@ -100,7 +100,7 @@ export class MortgageReminderService {
         }
 
         const user = await withUserContext(userId, () =>
-          tenantTx(this.dataSource, (m) =>
+          withScopedDb(this.dataSource, (m) =>
             m.getRepository(User).findOne({
               where: { id: userId },
             }),
@@ -162,7 +162,7 @@ export class MortgageReminderService {
     const futureDate = new Date(today);
     futureDate.setDate(futureDate.getDate() + daysAhead);
 
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).find({
         where: {
           accountType: AccountType.MORTGAGE,

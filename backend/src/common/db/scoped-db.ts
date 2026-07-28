@@ -6,7 +6,7 @@ import { getRlsMode } from "./rls-config";
 /**
  * The single sanctioned door to the database under Row-Level Security.
  *
- * `tenantTx` opens a transaction, sets the identity GUC transaction-locally
+ * `withScopedDb` opens a transaction, sets the identity GUC transaction-locally
  * (`set_config(..., true)`, i.e. `SET LOCAL` semantics) as its first statement,
  * and runs `fn` with the transaction's EntityManager. Because the GUC dies with
  * the transaction, no pooled connection can ever carry a prior request's
@@ -17,24 +17,29 @@ import { getRlsMode } from "./rls-config";
  * `dataSource.manager` would run a query with no GUC under enforcement (zero
  * rows that look exactly like empty data). Refusing instead moves that whole
  * failure class to dev/CI at `RLS_MODE=off`, long before enforcement.
+ *
+ * The "scope" is whatever identity `withUserContext`/`withSystemContext` (or the
+ * RequestContextInterceptor) put in the ambient context: those establish an
+ * identity, this spends it on a database handle. Formerly named `tenantTx` --
+ * older commits, the 1.13.0 release note and migration 107 still say that.
  */
 
 // The active transaction's EntityManager, carried in its own ALS scope so a
-// nested tenantTx can join the ambient transaction instead of opening a second
-// one. A second `dataSource.transaction` would take a second pooled connection
-// inside the first and deadlock the pool under load (see design Phase 2b).
+// nested withScopedDb can join the ambient transaction instead of opening a
+// second one. A second `dataSource.transaction` would take a second pooled
+// connection inside the first and deadlock the pool under load (design 2b).
 const activeManagerStorage = new AsyncLocalStorage<EntityManager>();
 
-export function getActiveTenantManager(): EntityManager | undefined {
+export function getActiveScopedManager(): EntityManager | undefined {
   return activeManagerStorage.getStore();
 }
 
 /**
  * Run `fn` while `manager` is registered as the ambient transaction. Exported
  * for tests and for advanced callers that already hold a manager; ordinary code
- * should use `tenantTx`.
+ * should use `withScopedDb`.
  */
-export function runWithActiveTenantManager<T>(
+export function runWithActiveScopedManager<T>(
   manager: EntityManager,
   fn: () => T,
 ): T {
@@ -44,7 +49,7 @@ export function runWithActiveTenantManager<T>(
 export const MISSING_CONTEXT_MESSAGE =
   "DB access outside request/user/system context -- wrap the call path in withUserContext/withSystemContext";
 
-export async function tenantTx<T>(
+export async function withScopedDb<T>(
   dataSource: DataSource,
   fn: (manager: EntityManager) => Promise<T>,
 ): Promise<T> {
@@ -53,7 +58,7 @@ export async function tenantTx<T>(
     throw new Error(MISSING_CONTEXT_MESSAGE);
   }
 
-  const active = getActiveTenantManager();
+  const active = getActiveScopedManager();
   if (active) {
     // Re-entrant call: join the ambient transaction (same connection, same
     // GUCs, same atomicity). Never open a second transaction.
@@ -87,6 +92,6 @@ export async function tenantTx<T>(
       );
     }
 
-    return runWithActiveTenantManager(manager, () => fn(manager));
+    return runWithActiveScopedManager(manager, () => fn(manager));
   });
 }

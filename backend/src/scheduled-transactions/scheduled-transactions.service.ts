@@ -39,7 +39,7 @@ import {
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 import { validateSplitAmountSum } from "../common/split-amount.util";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
@@ -170,54 +170,59 @@ export class ScheduledTransactionsService {
         // One read block per timezone bucket. It must COMMIT before the
         // per-user posting loop below: each post() runs its own user-context
         // transactions, which would otherwise join this system-context one.
-        const dueTransactions = await tenantTx(this.dataSource, async (m) => {
-          const candidates = await m.getRepository(ScheduledTransaction).find({
-            where: {
-              userId: In(userIds),
-              isActive: true,
-              autoPost: true,
-              nextDueDate: LessThanOrEqual(today) as any,
-            },
-            relations: INVESTMENT_RELATIONS,
-            order: { nextDueDate: "ASC" },
-          });
-
-          const postponedIds = await this.findPostponedIds(
-            candidates.map((t) => t.id),
-            today,
-          );
-          const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
-
-          const overrideDueIds = await m
-            .getRepository(ScheduledTransactionOverride)
-            .createQueryBuilder("o")
-            .innerJoin("o.scheduledTransaction", "st")
-            .where("st.userId IN (:...userIds)", { userIds })
-            .andWhere("o.overrideDate <= :today", { today })
-            .andWhere("o.originalDate = st.nextDueDate")
-            .andWhere("st.isActive = :active", { active: true })
-            .andWhere("st.autoPost = :autoPost", { autoPost: true })
-            .select("st.id", "id")
-            .distinct(true)
-            .getRawMany();
-
-          const dueByDateIds = new Set(dueByDate.map((t) => t.id));
-          const overrideOnlyIds = overrideDueIds
-            .map((r) => r.id as string)
-            .filter((id) => !dueByDateIds.has(id));
-
-          let overrideDueTransactions: ScheduledTransaction[] = [];
-          if (overrideOnlyIds.length > 0) {
-            overrideDueTransactions = await m
+        const dueTransactions = await withScopedDb(
+          this.dataSource,
+          async (m) => {
+            const candidates = await m
               .getRepository(ScheduledTransaction)
               .find({
-                where: overrideOnlyIds.map((id) => ({ id })),
+                where: {
+                  userId: In(userIds),
+                  isActive: true,
+                  autoPost: true,
+                  nextDueDate: LessThanOrEqual(today) as any,
+                },
                 relations: INVESTMENT_RELATIONS,
+                order: { nextDueDate: "ASC" },
               });
-          }
 
-          return [...dueByDate, ...overrideDueTransactions];
-        });
+            const postponedIds = await this.findPostponedIds(
+              candidates.map((t) => t.id),
+              today,
+            );
+            const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
+
+            const overrideDueIds = await m
+              .getRepository(ScheduledTransactionOverride)
+              .createQueryBuilder("o")
+              .innerJoin("o.scheduledTransaction", "st")
+              .where("st.userId IN (:...userIds)", { userIds })
+              .andWhere("o.overrideDate <= :today", { today })
+              .andWhere("o.originalDate = st.nextDueDate")
+              .andWhere("st.isActive = :active", { active: true })
+              .andWhere("st.autoPost = :autoPost", { autoPost: true })
+              .select("st.id", "id")
+              .distinct(true)
+              .getRawMany();
+
+            const dueByDateIds = new Set(dueByDate.map((t) => t.id));
+            const overrideOnlyIds = overrideDueIds
+              .map((r) => r.id as string)
+              .filter((id) => !dueByDateIds.has(id));
+
+            let overrideDueTransactions: ScheduledTransaction[] = [];
+            if (overrideOnlyIds.length > 0) {
+              overrideDueTransactions = await m
+                .getRepository(ScheduledTransaction)
+                .find({
+                  where: overrideOnlyIds.map((id) => ({ id })),
+                  relations: INVESTMENT_RELATIONS,
+                });
+            }
+
+            return [...dueByDate, ...overrideDueTransactions];
+          },
+        );
         if (dueTransactions.length === 0) continue;
 
         for (const scheduled of dueTransactions) {
@@ -252,7 +257,7 @@ export class ScheduledTransactionsService {
       return new Set();
     }
 
-    const rows = await tenantTx(this.dataSource, (m) =>
+    const rows = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(ScheduledTransactionOverride)
         .createQueryBuilder("o")
@@ -329,7 +334,7 @@ export class ScheduledTransactionsService {
       this.validateSplits(splits, createDto.amount);
     }
 
-    const saved = await tenantTx(this.dataSource, async (m) => {
+    const saved = await withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(ScheduledTransaction);
       const scheduledTransaction = repo.create({
         ...transactionData,
@@ -587,7 +592,7 @@ export class ScheduledTransactionsService {
       futureOverrides?: ScheduledTransactionOverride[];
     })[]
   > {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const transactions = await m
         .getRepository(ScheduledTransaction)
         .createQueryBuilder("st")
@@ -685,7 +690,7 @@ export class ScheduledTransactionsService {
   }
 
   async findOne(userId: string, id: string): Promise<ScheduledTransaction> {
-    const scheduled = await tenantTx(this.dataSource, (m) =>
+    const scheduled = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransaction).findOne({
         where: { id, userId },
         relations: INVESTMENT_RELATIONS,
@@ -708,7 +713,7 @@ export class ScheduledTransactionsService {
   async findDue(userId: string): Promise<ScheduledTransaction[]> {
     const today = todayYMD();
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const candidates = await m.getRepository(ScheduledTransaction).find({
         where: {
           userId,
@@ -767,7 +772,7 @@ export class ScheduledTransactionsService {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + days);
 
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(ScheduledTransaction)
         .createQueryBuilder("st")
@@ -1030,7 +1035,7 @@ export class ScheduledTransactionsService {
     // Apply the split rewrite, any mode-switch split clearing, and the main
     // row update atomically so a partial failure cannot leave the row and its
     // splits in an inconsistent state.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       if (splits !== undefined) {
         if (Array.isArray(splits) && splits.length > 0) {
           await m.delete(ScheduledTransactionSplit, {
@@ -1081,7 +1086,7 @@ export class ScheduledTransactionsService {
   async remove(userId: string, id: string): Promise<void> {
     const scheduled = await this.findOne(userId, id);
     const beforeData = { ...scheduled };
-    await tenantTx(this.dataSource, (m) =>
+    await withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransaction).remove(scheduled),
     );
 
@@ -1125,7 +1130,7 @@ export class ScheduledTransactionsService {
       updateFields.isActive = false;
     }
 
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       await m.getRepository(ScheduledTransactionOverride).delete({
         scheduledTransactionId: id,
         originalDate: nextDueDateStr,
@@ -1144,7 +1149,7 @@ export class ScheduledTransactionsService {
 
     const nextDueDateStr = ensureYMD(scheduled.nextDueDate);
 
-    const storedOverride = await tenantTx(this.dataSource, (m) =>
+    const storedOverride = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(ScheduledTransactionOverride)
         .createQueryBuilder("override")
@@ -1312,8 +1317,8 @@ export class ScheduledTransactionsService {
 
     // Wrap all bookkeeping in a transaction for atomicity. The posted
     // transaction/transfer/investment above has already committed in its own
-    // tenantTx, matching the pre-RLS boundary.
-    const removedAfterOnce = await tenantTx(this.dataSource, async (m) => {
+    // withScopedDb, matching the pre-RLS boundary.
+    const removedAfterOnce = await withScopedDb(this.dataSource, async (m) => {
       if (storedOverride) {
         await m.remove(storedOverride);
       }

@@ -11,7 +11,7 @@ import {
 } from "../accounts/mortgage-amortization.util";
 import { getPeriodsPerYear } from "../accounts/loan-amortization.util";
 import { roundMoney } from "../common/round.util";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class ScheduledTransactionLoanService {
@@ -23,7 +23,7 @@ export class ScheduledTransactionLoanService {
     scheduledTransactionId: string,
     loanAccountId: string,
   ): Promise<void> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const loanAccount = await m.getRepository(Account).findOne({
         where: { id: loanAccountId },
       });
@@ -175,7 +175,7 @@ export class ScheduledTransactionLoanService {
   async findLoanAccountFromSplits(
     splits: ScheduledTransactionSplit[],
   ): Promise<string | null> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       for (const split of splits) {
         if (split.transferAccountId) {
           const account = await m.getRepository(Account).findOne({

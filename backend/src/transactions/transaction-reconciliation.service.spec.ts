@@ -6,12 +6,12 @@ import { Transaction, TransactionStatus } from "./entities/transaction.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { isTransactionInFuture } from "../common/date-utils";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 jest.mock("../common/date-utils", () => ({
@@ -74,10 +74,10 @@ describe("TransactionReconciliationService", () => {
       createQueryBuilder: jest.fn(),
     };
 
-    // The tenantTx status writes go through the manager's entity-level update;
+    // The withScopedDb status writes go through the manager's entity-level update;
     // forward them to the repository mock (dropping the entity arg) so the
     // existing two-arg `transactionsRepository.update` assertions still hold.
-    const tenantMocks = createTenantTxMocks([
+    const tenantMocks = createScopedDbMocks([
       [Transaction, transactionsRepository],
     ]);
     dataSource = tenantMocks.dataSource;
@@ -362,7 +362,7 @@ describe("TransactionReconciliationService", () => {
         mockFindOne,
       );
 
-      // A single tenantTx groups the status write and the balance update.
+      // A single withScopedDb groups the status write and the balance update.
       expect(dataSource.transaction).toHaveBeenCalledTimes(1);
     });
 

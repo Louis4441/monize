@@ -5,10 +5,10 @@ import {
 } from "../users/entities/user-preference.entity";
 import { ReleaseNotesService } from "./release-notes.service";
 import { ToursService } from "./tours.service";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
-jest.mock("../common/db/tenant-tx");
-const mockedTenantTx = tenantTx as jest.MockedFunction<typeof tenantTx>;
+jest.mock("../common/db/scoped-db");
+const mockedTenantTx = withScopedDb as jest.MockedFunction<typeof withScopedDb>;
 
 const CURRENT_VERSION = "1.13.0";
 

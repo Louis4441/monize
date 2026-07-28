@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { Brackets, DataSource, EntityManager } from "typeorm";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Transaction, TransactionStatus } from "./entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
@@ -183,7 +183,7 @@ export class TransactionAnalyticsService {
     term?: string,
   ): Promise<ParsedSearchTerm> {
     if (!term || !term.trim()) return { amount: null, date: null };
-    const prefs = await tenantTx(this.dataSource, (mgr) =>
+    const prefs = await withScopedDb(this.dataSource, (mgr) =>
       mgr.getRepository(UserPreference).findOne({
         where: { userId },
       }),
@@ -209,7 +209,7 @@ export class TransactionAnalyticsService {
     endDate: string,
     accountIds?: string[],
   ): Promise<TransfersByAccountResult> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const qb = m
         .getRepository(Transaction)
         .createQueryBuilder("t")
@@ -295,7 +295,7 @@ export class TransactionAnalyticsService {
       }
     >;
   }> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const queryBuilder = await this.createFilteredAnalyticsQuery(m, userId, {
         accountIds,
         startDate,
@@ -668,7 +668,7 @@ export class TransactionAnalyticsService {
       count: number;
     }>
   > {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const { groupBy, limit, ...filters } = params;
 
       const queryBuilder = await this.createFilteredAnalyticsQuery(
@@ -766,7 +766,7 @@ export class TransactionAnalyticsService {
       count: number;
     }>
   > {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const { limit, ...filters } = params;
       const queryBuilder = await this.createFilteredAnalyticsQuery(
         m,
@@ -821,7 +821,7 @@ export class TransactionAnalyticsService {
     amountTo?: number,
     tagIds?: string[],
   ): Promise<Array<{ month: string; total: number; count: number }>> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       // Reuse the same filtered query builder as getSummary so the chart's
       // per-month totals and counts reconcile exactly with the category/payee
       // info widget's headline summary -- identical brokerage exclusion, split
@@ -882,7 +882,7 @@ export class TransactionAnalyticsService {
     userId: string,
     accountId: string,
   ): Promise<FxFeeMonthlySummaryRow[]> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const feeExpr =
         "CASE WHEN transaction.originalAmount IS NULL THEN 0 " +
         "ELSE ROUND(transaction.originalAmount * transaction.exchangeRate, 2) - transaction.amount " +
@@ -943,7 +943,7 @@ export class TransactionAnalyticsService {
     unresolved: string[];
     suggestions: string[];
   }> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       if (categoryNames.length === 0) {
         return { categoryIds: [], unresolved: [], suggestions: [] };
       }
@@ -1168,7 +1168,7 @@ export class TransactionAnalyticsService {
     minAmount?: number,
     maxAmount?: number,
   ): Promise<unknown> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const qb = m
         .getRepository(Transaction)
         .createQueryBuilder("t")
@@ -1413,7 +1413,7 @@ export class TransactionAnalyticsService {
     groupBy: LlmComparisonGroupBy,
     direction: LlmComparisonDirection,
   ): Promise<{ label: string; total: number }[]> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const qb = m
         .getRepository(Transaction)
         .createQueryBuilder("t")
@@ -1487,7 +1487,7 @@ export class TransactionAnalyticsService {
     endDate: string,
     options: { uncategorizedLabel?: string; payeeIds?: string[] } = {},
   ): Promise<RecurringCharge[]> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const categoryNameSelect = options.uncategorizedLabel
         ? "COALESCE(cat.name, :uncategorizedLabel)"
         : "cat.name";

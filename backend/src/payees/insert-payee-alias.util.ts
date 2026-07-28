@@ -13,7 +13,7 @@ import { PayeeAlias } from "./entities/payee-alias.entity";
  * The alias is a best-effort convenience on top of a merge/create, not the point
  * of it, so a lost alias must never roll back the reassignment work around it.
  *
- * @param manager the EntityManager of the ACTIVE transaction (a `tenantTx`
+ * @param manager the EntityManager of the ACTIVE transaction (a `withScopedDb`
  *   callback's manager) -- savepoints are meaningless outside one.
  */
 export async function insertPayeeAliasIgnoringDuplicate(

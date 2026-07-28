@@ -81,7 +81,7 @@ export class AuthService {
   // scope exists, and they must resolve or create users across the whole table
   // (login by email, OIDC by subject) before any identity is known. Seed a
   // *system* context so the downstream data access has ambient identity once
-  // the repositories move to tenantTx (task R7). This is inert until then:
+  // the repositories move to withScopedDb (task R7). This is inert until then:
   // withSystemContext only seeds AsyncLocalStorage; the injected repositories
   // still work unchanged at RLS_MODE=off.
   async register(registerDto: RegisterDto) {

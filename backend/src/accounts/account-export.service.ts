@@ -5,7 +5,7 @@ import { Category } from "../categories/entities/category.entity";
 import { AccountType } from "./entities/account.entity";
 import { AccountsService } from "./accounts.service";
 import { roundMoney } from "../common/round.util";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 interface ExportTransaction {
   date: string;
@@ -184,7 +184,7 @@ export class AccountExportService {
     userId: string,
     accountId: string,
   ): Promise<ExportTransaction[]> {
-    const rawTransactions = await tenantTx(this.dataSource, (m) =>
+    const rawTransactions = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Transaction)
         .createQueryBuilder("transaction")
@@ -234,7 +234,7 @@ export class AccountExportService {
   private async buildCategoryPathMap(
     userId: string,
   ): Promise<Map<string, string>> {
-    const categories = await tenantTx(this.dataSource, (m) =>
+    const categories = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Category).find({
         where: { userId },
       }),

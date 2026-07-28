@@ -12,12 +12,12 @@ import { TagsService } from "../tags/tags.service";
 import { BulkUpdateDto, BulkDeleteDto } from "./dto/bulk-update.dto";
 import { Brackets, DataSource } from "typeorm";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 jest.mock("../common/date-utils", () => ({
@@ -129,7 +129,7 @@ describe("TransactionBulkUpdateService", () => {
       setSplitTagsBulk: jest.fn().mockResolvedValue(undefined),
     };
 
-    // tenantTx EntityManager with createQueryBuilder and entity-routed
+    // withScopedDb EntityManager with createQueryBuilder and entity-routed
     // getRepository.
     mockManagerCreateQueryBuilder = jest.fn();
     mockManagerFind = jest.fn().mockResolvedValue([]);
@@ -153,7 +153,7 @@ describe("TransactionBulkUpdateService", () => {
       };
     });
 
-    const tenantMocks = createTenantTxMocks();
+    const tenantMocks = createScopedDbMocks();
     mockDataSource = tenantMocks.dataSource;
     const manager = tenantMocks.manager;
     manager.createQueryBuilder = mockManagerCreateQueryBuilder;

@@ -25,7 +25,7 @@ import { toCountMap } from "../common/count-map.util";
 import { getDefaultCategories } from "./country-category-additions";
 import { isSupportedLocale } from "../i18n/config";
 import { ImportDefaultsDto } from "./dto/import-defaults.dto";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class CategoriesService {
@@ -46,7 +46,7 @@ export class CategoriesService {
       isIncome = parent.isIncome;
     }
 
-    const saved = await tenantTx(this.dataSource, (m) => {
+    const saved = await withScopedDb(this.dataSource, (m) => {
       const repo = m.getRepository(Category);
       const category = repo.create({
         ...createCategoryDto,
@@ -113,57 +113,60 @@ export class CategoriesService {
     userId: string,
     includeSystem = false,
   ): Promise<(Category & { transactionCount: number })[]> {
-    const categoriesWithCounts = await tenantTx(this.dataSource, async (m) => {
-      const queryBuilder = m
-        .getRepository(Category)
-        .createQueryBuilder("category")
-        .where("category.userId = :userId", { userId })
-        .orderBy("category.name", "ASC");
+    const categoriesWithCounts = await withScopedDb(
+      this.dataSource,
+      async (m) => {
+        const queryBuilder = m
+          .getRepository(Category)
+          .createQueryBuilder("category")
+          .where("category.userId = :userId", { userId })
+          .orderBy("category.name", "ASC");
 
-      if (!includeSystem) {
-        queryBuilder.andWhere("category.isSystem = :isSystem", {
-          isSystem: false,
-        });
-      }
+        if (!includeSystem) {
+          queryBuilder.andWhere("category.isSystem = :isSystem", {
+            isSystem: false,
+          });
+        }
 
-      const categories = await queryBuilder.getMany();
+        const categories = await queryBuilder.getMany();
 
-      if (categories.length === 0) {
-        return [];
-      }
+        if (categories.length === 0) {
+          return [];
+        }
 
-      const categoryIds = categories.map((c) => c.id);
+        const categoryIds = categories.map((c) => c.id);
 
-      const [directCounts, splitCounts] = await Promise.all([
-        m
-          .getRepository(Transaction)
-          .createQueryBuilder("t")
-          .select("t.category_id", "categoryId")
-          .addSelect("COUNT(t.id)", "count")
-          .where("t.user_id = :userId", { userId })
-          .andWhere("t.category_id IN (:...categoryIds)", { categoryIds })
-          .groupBy("t.category_id")
-          .getRawMany(),
-        m
-          .getRepository(TransactionSplit)
-          .createQueryBuilder("s")
-          .innerJoin("s.transaction", "t")
-          .select("s.category_id", "categoryId")
-          .addSelect("COUNT(s.id)", "count")
-          .where("t.user_id = :userId", { userId })
-          .andWhere("s.category_id IN (:...categoryIds)", { categoryIds })
-          .groupBy("s.category_id")
-          .getRawMany(),
-      ]);
+        const [directCounts, splitCounts] = await Promise.all([
+          m
+            .getRepository(Transaction)
+            .createQueryBuilder("t")
+            .select("t.category_id", "categoryId")
+            .addSelect("COUNT(t.id)", "count")
+            .where("t.user_id = :userId", { userId })
+            .andWhere("t.category_id IN (:...categoryIds)", { categoryIds })
+            .groupBy("t.category_id")
+            .getRawMany(),
+          m
+            .getRepository(TransactionSplit)
+            .createQueryBuilder("s")
+            .innerJoin("s.transaction", "t")
+            .select("s.category_id", "categoryId")
+            .addSelect("COUNT(s.id)", "count")
+            .where("t.user_id = :userId", { userId })
+            .andWhere("s.category_id IN (:...categoryIds)", { categoryIds })
+            .groupBy("s.category_id")
+            .getRawMany(),
+        ]);
 
-      const countMap = toCountMap(directCounts, { keyField: "categoryId" });
-      toCountMap(splitCounts, { keyField: "categoryId", into: countMap });
+        const countMap = toCountMap(directCounts, { keyField: "categoryId" });
+        toCountMap(splitCounts, { keyField: "categoryId", into: countMap });
 
-      return categories.map((category) => ({
-        ...category,
-        transactionCount: countMap.get(category.id) || 0,
-      }));
-    });
+        return categories.map((category) => ({
+          ...category,
+          transactionCount: countMap.get(category.id) || 0,
+        }));
+      },
+    );
 
     return this.resolveEffectiveColors(categoriesWithCounts);
   }
@@ -207,7 +210,7 @@ export class CategoriesService {
     userId: string,
     isIncome: boolean,
   ): Promise<(Category & { effectiveColor: string | null })[]> {
-    const categories = await tenantTx(this.dataSource, (m) =>
+    const categories = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Category).find({
         where: { userId, isIncome },
         order: { name: "ASC" },
@@ -298,7 +301,7 @@ export class CategoriesService {
     userId: string,
     id: string,
   ): Promise<Category & { effectiveColor: string | null }> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Category);
       const category = await repo.findOne({
         where: { id, userId },
@@ -370,7 +373,7 @@ export class CategoriesService {
       await this.findOne(userId, updateCategoryDto.parentId);
 
       // H16: Check for circular parent reference through the hierarchy
-      const allCategories = await tenantTx(this.dataSource, (m) =>
+      const allCategories = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).find({
           where: { userId },
           select: ["id", "parentId"],
@@ -417,7 +420,7 @@ export class CategoriesService {
     // Save the category and cascade any type change to all descendant
     // subcategories atomically, so a partial failure cannot leave children
     // with a type that disagrees with their parent.
-    const saved = await tenantTx(this.dataSource, async (m) => {
+    const saved = await withScopedDb(this.dataSource, async (m) => {
       // Pass the explicit entity target: findOne returns a plain object
       // (spread with effectiveColor), not a Category instance, so the
       // single-arg form would throw CannotDetermineEntityError.
@@ -487,7 +490,7 @@ export class CategoriesService {
       );
     }
 
-    const childCount = await tenantTx(this.dataSource, (m) =>
+    const childCount = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Category).count({
         where: { parentId: id, userId },
       }),
@@ -528,7 +531,7 @@ export class CategoriesService {
     // Clear the default-category reference on any payees and delete the
     // category atomically, so a failure cannot leave payees pointing at a
     // category that no longer exists.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       await m.update(
         Payee,
         { userId, defaultCategoryId: id },
@@ -556,7 +559,7 @@ export class CategoriesService {
   ): Promise<number> {
     await this.findOne(userId, categoryId);
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const [transactionCount, splitCount, scheduledCount, userScheduledTxIds] =
         await Promise.all([
           m.getRepository(Transaction).count({ where: { userId, categoryId } }),
@@ -613,7 +616,7 @@ export class CategoriesService {
     }
 
     // M22: All UPDATE operations run in a single transaction.
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const transactionResult = await m.update(
         Transaction,
         { userId, categoryId: fromCategoryId },
@@ -699,7 +702,7 @@ export class CategoriesService {
     name: string,
     parentName?: string,
   ): Promise<Category | null> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Category);
       if (parentName) {
         const parent = await repo.findOne({
@@ -725,7 +728,7 @@ export class CategoriesService {
     principalCategory: Category | null;
     interestCategory: Category | null;
   }> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Category);
       const loanParent = await repo.findOne({
         where: { userId, name: "Loan", parentId: IsNull() },
@@ -755,7 +758,7 @@ export class CategoriesService {
     userId: string,
     options: ImportDefaultsDto = {},
   ): Promise<{ categoriesCreated: number }> {
-    const existingCount = await tenantTx(this.dataSource, (m) =>
+    const existingCount = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Category).count({
         where: { userId, isSystem: false },
       }),
@@ -777,7 +780,7 @@ export class CategoriesService {
     // keys fall back to the English source.
     const lang = isSupportedLocale(options.language)
       ? (options.language as string)
-      : await tenantTx(this.dataSource, (m) =>
+      : await withScopedDb(this.dataSource, (m) =>
           resolveUserEmailLocale(m.getRepository(UserPreference), userId),
         );
     const localizeCategory = (name: string): string =>
@@ -795,7 +798,7 @@ export class CategoriesService {
     // yields the generic catalog.
     const { income, expense } = getDefaultCategories(options.country);
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Category);
       let categoryCount = 0;
 

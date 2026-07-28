@@ -1,10 +1,10 @@
 import { Tag } from "../tags/entities/tag.entity";
-import { createTenantTxMocks, tenantTxMockModule } from "./tenant-tx-testing";
+import { createScopedDbMocks, scopedDbMockModule } from "./scoped-db-testing";
 
-describe("tenant-tx-testing harness", () => {
-  describe("tenantTxMockModule()", () => {
-    it("delegates tenantTx to dataSource.transaction with the callback", async () => {
-      const { tenantTx } = tenantTxMockModule();
+describe("scoped-db-testing harness", () => {
+  describe("scopedDbMockModule()", () => {
+    it("delegates withScopedDb to dataSource.transaction with the callback", async () => {
+      const { withScopedDb } = scopedDbMockModule();
       const manager = { marker: true };
       const dataSource = {
         transaction: jest.fn(async (fn: (m: unknown) => unknown) =>
@@ -13,7 +13,7 @@ describe("tenant-tx-testing harness", () => {
       };
       const fn = jest.fn().mockResolvedValue("result");
 
-      const result = await tenantTx(dataSource, fn);
+      const result = await withScopedDb(dataSource, fn);
 
       expect(result).toBe("result");
       expect(dataSource.transaction).toHaveBeenCalledTimes(1);
@@ -21,16 +21,16 @@ describe("tenant-tx-testing harness", () => {
     });
   });
 
-  describe("createTenantTxMocks()", () => {
+  describe("createScopedDbMocks()", () => {
     it("routes getRepository to the registered mock repository", () => {
       const tagRepo = { find: jest.fn() };
-      const { manager } = createTenantTxMocks([[Tag, tagRepo]]);
+      const { manager } = createScopedDbMocks([[Tag, tagRepo]]);
 
       expect(manager.getRepository(Tag)).toBe(tagRepo);
     });
 
     it("throws a named error for an unregistered entity class", () => {
-      const { manager } = createTenantTxMocks();
+      const { manager } = createScopedDbMocks();
 
       expect(() => manager.getRepository(Tag)).toThrow(
         'no mock repository registered for entity "Tag"',
@@ -38,7 +38,7 @@ describe("tenant-tx-testing harness", () => {
     });
 
     it("names non-class entity targets in the error too", () => {
-      const { manager } = createTenantTxMocks();
+      const { manager } = createScopedDbMocks();
 
       expect(() => manager.getRepository("tags")).toThrow(
         'no mock repository registered for entity "tags"',
@@ -46,7 +46,7 @@ describe("tenant-tx-testing harness", () => {
     });
 
     it("dataSource.transaction runs the callback with the mock manager", async () => {
-      const { manager, dataSource } = createTenantTxMocks();
+      const { manager, dataSource } = createScopedDbMocks();
       manager.findOne.mockResolvedValue({ id: "row-1" });
 
       const result = await dataSource.transaction(async (m: typeof manager) =>

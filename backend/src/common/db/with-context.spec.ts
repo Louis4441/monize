@@ -14,7 +14,7 @@ describe("withUserContext", () => {
     expect(seen).toEqual({ userId: VALID_UUID });
   });
 
-  it("does not seed realUserId (tenantTx defaults it to userId)", () => {
+  it("does not seed realUserId (withScopedDb defaults it to userId)", () => {
     const seen = withUserContext(VALID_UUID, () => getRequestContext());
     expect(seen?.realUserId).toBeUndefined();
     expect(seen?.system).toBeUndefined();

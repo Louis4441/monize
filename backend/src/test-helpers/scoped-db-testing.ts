@@ -1,21 +1,21 @@
 import { EntityManager, EntityTarget } from "typeorm";
 
 /**
- * Unit-test harness for services refactored onto `tenantTx` (RLS tasks R1-R7).
+ * Unit-test harness for services refactored onto `withScopedDb` (RLS tasks R1-R7).
  *
- * Real `tenantTx` refuses to run without an ambient request/user/system
+ * Real `withScopedDb` refuses to run without an ambient request/user/system
  * context and opens a real transaction; unit tests need neither. Specs mock
- * the module so `tenantTx(ds, fn)` simply delegates to the (mock)
+ * the module so `withScopedDb(ds, fn)` simply delegates to the (mock)
  * `dataSource.transaction(fn)`:
  *
- *   jest.mock("../common/db/tenant-tx", () =>
- *     jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+ *   jest.mock("../common/db/scoped-db", () =>
+ *     jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
  *   );
  *
- * and build the manager/dataSource pair with `createTenantTxMocks`, routing
+ * and build the manager/dataSource pair with `createScopedDbMocks`, routing
  * `manager.getRepository(Entity)` to the same per-entity mock repositories the
  * specs already assert against. The context-throw and GUC-emission behavior of
- * the real tenantTx stays covered by its own spec (tenant-tx.spec.ts).
+ * the real withScopedDb stays covered by its own spec (scoped-db.spec.ts).
  */
 
 /** Mock EntityManager: every method a jest.fn, plus entity-routed getRepository. */
@@ -29,15 +29,15 @@ export interface DataSourceMock {
 }
 
 /**
- * Module factory for `jest.mock` of `src/common/db/tenant-tx`. The replacement
- * `tenantTx` skips the ambient-context check and runs the callback through the
+ * Module factory for `jest.mock` of `src/common/db/scoped-db`. The replacement
+ * `withScopedDb` skips the ambient-context check and runs the callback through the
  * caller-provided (mock) `dataSource.transaction`, so specs can both drive the
- * callback (via `createTenantTxMocks`) and assert transactional grouping (via
+ * callback (via `createScopedDbMocks`) and assert transactional grouping (via
  * `dataSource.transaction.mock.calls`).
  */
-export function tenantTxMockModule() {
+export function scopedDbMockModule() {
   return {
-    tenantTx: jest.fn(
+    withScopedDb: jest.fn(
       (
         dataSource: { transaction: (fn: (m: unknown) => unknown) => unknown },
         fn: (m: unknown) => unknown,
@@ -54,7 +54,7 @@ export function tenantTxMockModule() {
  *   omitted; asking for an unregistered entity throws with a clear message so
  *   the spec failure names the missing mock instead of dying on `undefined`.
  */
-export function createTenantTxMocks(
+export function createScopedDbMocks(
   repos: Array<[EntityTarget<unknown>, Record<string, jest.Mock>]> = [],
 ): { manager: ManagerMock; dataSource: DataSourceMock } {
   const repoMap = new Map<EntityTarget<unknown>, Record<string, jest.Mock>>(
@@ -68,7 +68,7 @@ export function createTenantTxMocks(
         const name =
           typeof entity === "function" ? entity.name : String(entity);
         throw new Error(
-          `createTenantTxMocks: no mock repository registered for entity "${name}"`,
+          `createScopedDbMocks: no mock repository registered for entity "${name}"`,
         );
       }
       return repo;

@@ -1027,7 +1027,7 @@ export class McpTransactionsTools {
    * Validate the resolved files (size/type/per-transaction cap) and park their
    * bytes under fresh store ids for the signed card. Validation errors bubble
    * as 4xx HttpExceptions for `safeToolError`. The MCP request has no ambient
-   * identity context (bearer auth, no JWT guard), so tenantTx-based prep runs
+   * identity context (bearer auth, no JWT guard), so withScopedDb-based prep runs
    * under withUserContext.
    */
   private async prepareAttachmentRefs(

@@ -20,7 +20,7 @@ import { formatCurrency } from "../common/format-currency.util";
 import { roundMoney } from "../common/round.util";
 import { stripHtml } from "../common/sanitization.util";
 import { tr } from "../i18n/translate";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 export interface TransferResult {
   fromTransaction: Transaction;
@@ -109,7 +109,7 @@ export class TransactionTransferService {
     categoryId: string | null | undefined,
   ): Promise<void> {
     if (!categoryId) return;
-    const category = await tenantTx(this.dataSource, (m) =>
+    const category = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Category).findOne({
         where: { id: categoryId, userId },
       }),
@@ -179,7 +179,7 @@ export class TransactionTransferService {
     const toPayeeName = customPayeeName || `Transfer from ${fromAccount.name}`;
 
     // Both legs, their linkage, and the balance updates commit atomically.
-    const { savedFromId, savedToId } = await tenantTx(
+    const { savedFromId, savedToId } = await withScopedDb(
       this.dataSource,
       async (m) => {
         const fromTransaction = m.create(Transaction, {
@@ -384,7 +384,7 @@ export class TransactionTransferService {
     let categoryName: string | null = null;
     if (input.categoryId) {
       const inputCategoryId = input.categoryId;
-      const category = await tenantTx(this.dataSource, (m) =>
+      const category = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).findOne({
           where: { id: inputCategoryId, userId },
         }),
@@ -514,7 +514,7 @@ export class TransactionTransferService {
     if (input.categoryId !== undefined) {
       if (input.categoryId) {
         const inputCategoryId = input.categoryId;
-        const category = await tenantTx(this.dataSource, (m) =>
+        const category = await withScopedDb(this.dataSource, (m) =>
           m.getRepository(Category).findOne({
             where: { id: inputCategoryId, userId },
           }),
@@ -567,7 +567,7 @@ export class TransactionTransferService {
       );
     }
 
-    const parentSplit = await tenantTx(this.dataSource, (m) =>
+    const parentSplit = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionSplit).findOne({
         where: { linkedTransactionId: transactionId },
       }),
@@ -577,7 +577,7 @@ export class TransactionTransferService {
 
     // Both legs (or the whole split parent) and their balance adjustments are
     // removed atomically.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       if (parentSplit) {
         await this.removeTransferFromSplitInTransaction(
           m,
@@ -738,7 +738,7 @@ export class TransactionTransferService {
     // all its splits), not at a mirror leg. Routing it through the two-leg
     // update below would overwrite the parent's aggregate amount and fields with
     // this single leg's values. Handle it separately instead.
-    const parentSplit = await tenantTx(this.dataSource, (m) =>
+    const parentSplit = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionSplit).findOne({
         where: { linkedTransactionId: transactionId },
       }),
@@ -847,7 +847,7 @@ export class TransactionTransferService {
 
     // Both legs' field updates and the four possible balance adjustments
     // commit atomically.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       if ((accountsOrAmountsChanged || dateChanged) && !anyFuture) {
         await this.accountsService.updateBalance(
           oldFromAccountId,
@@ -1000,7 +1000,7 @@ export class TransactionTransferService {
 
     // The leg edit, split-row mirror, parent re-total, and balance updates
     // commit atomically.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       if (Object.keys(legData).length > 0) {
         await m.update(Transaction, counterpart.id, legData);
       }

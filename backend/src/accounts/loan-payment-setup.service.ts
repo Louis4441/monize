@@ -23,7 +23,7 @@ import {
   MortgagePaymentFrequency,
 } from "./mortgage-amortization.util";
 import { tr } from "../i18n/translate";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class LoanPaymentSetupService {
@@ -47,7 +47,7 @@ export class LoanPaymentSetupService {
     accountId: string,
     dto: SetupLoanPaymentsDto,
   ): Promise<SetupLoanPaymentsResponseDto> {
-    const account = await tenantTx(this.dataSource, (m) =>
+    const account = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id: accountId, userId },
       }),
@@ -82,7 +82,7 @@ export class LoanPaymentSetupService {
     }
 
     // Verify source account exists and belongs to user
-    const sourceAccount = await tenantTx(this.dataSource, (m) =>
+    const sourceAccount = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id: dto.sourceAccountId, userId },
       }),
@@ -257,7 +257,7 @@ export class LoanPaymentSetupService {
       }
     }
 
-    await tenantTx(this.dataSource, (m) =>
+    await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).update(accountId, updateData),
     );
 

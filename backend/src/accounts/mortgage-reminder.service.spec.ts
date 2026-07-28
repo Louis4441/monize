@@ -1,9 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
-import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
@@ -74,7 +74,7 @@ describe("MortgageReminderService", () => {
         .mockImplementation((_key: string, fallback: string) => fallback),
     };
 
-    const { dataSource } = createTenantTxMocks([
+    const { dataSource } = createScopedDbMocks([
       [Account, accountsRepository],
       [User, usersRepository],
       [UserPreference, preferencesRepository],

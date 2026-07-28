@@ -23,7 +23,7 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { validateSplitAmountSum } from "../common/split-amount.util";
 import { tr } from "../i18n/translate";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 function inferSplitKind(split: CreateTransactionSplitDto): SplitKind {
   if (split.splitKind) return split.splitKind;
@@ -48,7 +48,7 @@ export class TransactionSplitService {
     userId: string,
     categoryId: string,
   ): Promise<void> {
-    const category = await tenantTx(this.dataSource, (m) =>
+    const category = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Category).findOne({
         where: { id: categoryId, userId },
       }),
@@ -141,7 +141,7 @@ export class TransactionSplitService {
   /**
    * Create the split rows (and their transfer counterparts / embedded
    * investment rows). Runs in its own transaction when called standalone;
-   * called from inside a caller's `tenantTx` (transaction create/update,
+   * called from inside a caller's `withScopedDb` (transaction create/update,
    * updateSplits) it joins that transaction via re-entrancy.
    */
   async createSplits(
@@ -153,7 +153,7 @@ export class TransactionSplitService {
     parentPayeeName?: string | null,
     parentPayeeId?: string | null,
   ): Promise<TransactionSplit[]> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       this.createSplitsInternal(
         m,
         transactionId,
@@ -408,7 +408,7 @@ export class TransactionSplitService {
     transactionId: string,
     userId: string,
   ): Promise<void> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const splits = await m.getRepository(TransactionSplit).find({
         where: { transactionId },
         relations: ["linkedTransaction", "investmentTransaction"],
@@ -462,7 +462,7 @@ export class TransactionSplitService {
   async getTransferSplitByLinkedTransaction(
     linkedTransactionId: string,
   ): Promise<TransactionSplit | null> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionSplit).findOne({
         where: { linkedTransactionId },
       }),
@@ -470,7 +470,7 @@ export class TransactionSplitService {
   }
 
   async getSplits(transactionId: string): Promise<TransactionSplit[]> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionSplit).find({
         where: { transactionId },
         relations: ["category", "transferAccount", "investmentTransaction"],
@@ -486,7 +486,7 @@ export class TransactionSplitService {
   ): Promise<TransactionSplit[]> {
     this.validateSplits(splits, transaction.amount);
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       await this.deleteSplitSideEffects(transaction.id, userId);
 
       await m.delete(TransactionSplit, {
@@ -550,7 +550,7 @@ export class TransactionSplitService {
       );
     }
 
-    const savedSplitId = await tenantTx(this.dataSource, async (m) => {
+    const savedSplitId = await withScopedDb(this.dataSource, async (m) => {
       const splitKind = splitDto.transferAccountId
         ? SplitKind.TRANSFER
         : SplitKind.CATEGORY;
@@ -618,7 +618,7 @@ export class TransactionSplitService {
       return savedSplit.id;
     });
 
-    const splitWithRelations = await tenantTx(this.dataSource, (m) =>
+    const splitWithRelations = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionSplit).findOne({
         where: { id: savedSplitId },
         relations: ["category", "transferAccount"],
@@ -643,7 +643,7 @@ export class TransactionSplitService {
     splitId: string,
     userId: string,
   ): Promise<void> {
-    const split = await tenantTx(this.dataSource, (m) =>
+    const split = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionSplit).findOne({
         where: { id: splitId, transactionId: transaction.id },
         relations: ["investmentTransaction"],
@@ -660,7 +660,7 @@ export class TransactionSplitService {
       );
     }
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       if (split.kind === SplitKind.INVESTMENT && split.investmentTransaction) {
         await this.investmentTransactionsService.reverseAndRemoveEmbedded(
           m,

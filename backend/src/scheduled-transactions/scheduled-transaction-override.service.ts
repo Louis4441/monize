@@ -11,7 +11,7 @@ import {
   UpdateScheduledTransactionOverrideDto,
 } from "./dto/scheduled-transaction-override.dto";
 import { validateSplitAmountSum } from "../common/split-amount.util";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 import { tr } from "../i18n/translate";
 
 @Injectable()
@@ -26,7 +26,7 @@ export class ScheduledTransactionOverrideService {
     scheduledTransactionId: string,
     createDto: CreateScheduledTransactionOverrideDto,
   ): Promise<ScheduledTransactionOverride> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(ScheduledTransactionOverride);
       const existing = await repo
         .createQueryBuilder("override")
@@ -93,7 +93,7 @@ export class ScheduledTransactionOverrideService {
   async findOverrides(
     scheduledTransactionId: string,
   ): Promise<ScheduledTransactionOverride[]> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransactionOverride).find({
         where: { scheduledTransactionId },
         relations: ["category"],
@@ -106,7 +106,7 @@ export class ScheduledTransactionOverrideService {
     scheduledTransactionId: string,
     overrideId: string,
   ): Promise<ScheduledTransactionOverride> {
-    const override = await tenantTx(this.dataSource, (m) =>
+    const override = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransactionOverride).findOne({
         where: { id: overrideId, scheduledTransactionId },
         relations: ["category"],
@@ -136,7 +136,7 @@ export class ScheduledTransactionOverrideService {
       `findOverrideByDate: Looking for override with scheduledTransactionId=${scheduledTransactionId}, date=${normalizedDate}`,
     );
 
-    const allOverrides = await tenantTx(this.dataSource, (m) =>
+    const allOverrides = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransactionOverride).find({
         where: { scheduledTransactionId },
         relations: ["category"],
@@ -209,7 +209,7 @@ export class ScheduledTransactionOverrideService {
     if (updateDto.investmentTotalAmount !== undefined)
       override.investmentTotalAmount = updateDto.investmentTotalAmount;
 
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransactionOverride).save(override),
     );
   }
@@ -222,13 +222,13 @@ export class ScheduledTransactionOverrideService {
       scheduledTransactionId,
       overrideId,
     );
-    await tenantTx(this.dataSource, (m) =>
+    await withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransactionOverride).remove(override),
     );
   }
 
   async removeAllOverrides(scheduledTransactionId: string): Promise<number> {
-    const result = await tenantTx(this.dataSource, (m) =>
+    const result = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransactionOverride).delete({
         scheduledTransactionId,
       }),
@@ -239,7 +239,7 @@ export class ScheduledTransactionOverrideService {
   async hasOverrides(
     scheduledTransactionId: string,
   ): Promise<{ hasOverrides: boolean; count: number }> {
-    const count = await tenantTx(this.dataSource, (m) =>
+    const count = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransactionOverride).count({
         where: { scheduledTransactionId },
       }),

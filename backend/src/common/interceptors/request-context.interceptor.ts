@@ -54,7 +54,7 @@ export class RequestContextInterceptor implements NestInterceptor {
     // RLS (task C6): this fire-and-forget write runs BEFORE the interceptor
     // enters its requestContextStorage scope (that scope needs the resolved
     // timezone, which is not known yet). Seed a user context here so the write
-    // has ambient identity once this repository moves to tenantTx (R7). Inert
+    // has ambient identity once this repository moves to withScopedDb (R7). Inert
     // at RLS_MODE=off; the update writes the same row it always did.
     withUserContext(userId, () =>
       this.usersRepository.update(
@@ -87,7 +87,7 @@ export class RequestContextInterceptor implements NestInterceptor {
     ).user;
     const userId: string | undefined = user?.id;
     // Authenticated identity (the delegate's own id while acting); defaults to
-    // the effective user outside delegation. Seeded so tenantTx can emit
+    // the effective user outside delegation. Seeded so withScopedDb can emit
     // app.real_user_id for delegate-keyed rows. jwt.strategy resolves it.
     const realUserId: string | undefined = user?.realUserId ?? userId;
 

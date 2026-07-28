@@ -20,7 +20,7 @@ This plan replaces the toolchain with a native pipeline inside the backend:
 
 ```
 .mny upload (wizard) -> msisam-decrypt.ts (pure TS, ~100 lines) -> vendored mdb-reader (MIT, pure JS)
-  -> tolerant table readers -> pure mapping functions -> batched writer (tenantTx)
+  -> tolerant table readers -> pure mapping functions -> batched writer (withScopedDb)
   -> verification report (file-computed balances vs imported balances)
 ```
 
@@ -47,7 +47,7 @@ trust-builder both PR testers said they needed.
 - Fix every data-quality issue raised on PR #192 (section 3 table).
 - Support Money 2001 through Money Plus Sunset file layouts, degrading gracefully when tables
   are absent (Money 2001 has no `BILL` table).
-- Pure TypeScript; no new native dependencies; complies with the RLS ratchet (`tenantTx` only).
+- Pure TypeScript; no new native dependencies; complies with the RLS ratchet (`withScopedDb` only).
 - Verification report so users can trust the migration without hand-reconciling 56 accounts.
 
 ### Non-goals (v1, documented in UI copy and user docs)
@@ -196,13 +196,13 @@ Verified by exploration; file paths are current as of this writing.
   AI streaming endpoints; the Next proxy passes `text/event-stream` through). Cron via
   `@nestjs/schedule` runs in-process — on Kubernetes, on every replica, so anything cron-adjacent
   must be idempotent/claimed.
-- **RLS ratchet (hard CI gate)**: new DB code must use `tenantTx(dataSource, (m) => ...)`
-  (`backend/src/common/db/tenant-tx.ts`); the CI script counts `@InjectRepository(` and
+- **RLS ratchet (hard CI gate)**: new DB code must use `withScopedDb(dataSource, (m) => ...)`
+  (`backend/src/common/db/scoped-db.ts`); the CI script counts `@InjectRepository(` and
   `createQueryRunner(` call sites and fails on any increase. Code without an HTTP request context
   (the background job body, crons) wraps in `withUserContext(userId, fn)` /
   `withSystemContext(fn)`. Existing import helpers take a `queryRunner`-shaped object and only use
   `.manager` / `.query()` — the .mny writer passes a `{ manager, query }` shim backed by the
-  `tenantTx` EntityManager, reusing them with **zero** new ratchet sites. New tables need an RLS
+  `withScopedDb` EntityManager, reusing them with **zero** new ratchet sites. New tables need an RLS
   policy in the `user_id`-direct bucket plus a `database/schema.sql` mirror in the same PR.
 - **Domain fit** (all existing, reused): transfers = two transaction rows cross-linked via
   `linked_transaction_id`; transfer splits (`transaction_splits.kind='transfer'`); status enum
@@ -237,7 +237,7 @@ are deleted on completion and swept by a TTL cron (24 h).
 `import_jobs` row (`status`, `options` jsonb, `staged_file_id`, `progress` jsonb, `result` jsonb,
 `heartbeat_at`), claims it atomically (`UPDATE ... WHERE id = $1 AND status = 'pending'`), and
 runs the import as an unawaited in-process task wrapped in `withUserContext`. The wizard polls
-`GET /import/mny/jobs/:id` (~1.5 s). Progress updates are written in their own short `tenantTx`
+`GET /import/mny/jobs/:id` (~1.5 s). Progress updates are written in their own short `withScopedDb`
 (writes inside the import transaction would be invisible to pollers). A reaper cron marks jobs
 with a stale heartbeat (> 5 min) failed-retryable; the staged file survives, so retry is
 one click (new job, same staged file). No queue library, no Redis, no new process.
@@ -412,13 +412,13 @@ Exit gate: all five jackcess fixtures parse end-to-end via the CLI; go/no-go on 
 | ID | Task | Depends | Size |
 |----|------|---------|------|
 | M1.1 | Entities + migration + RLS: `import_staged_files` (bytea, user-owned, `expires_at`), `import_jobs` (`status`, `options`, `progress`, `result`, `heartbeat_at`); `user_id`-direct RLS policies; `database/schema.sql` mirrored. Acceptance: cross-user isolation spec; ratchet unchanged | — | M |
-| M1.2 | Staging service (`tenantTx`) + TTL sweep cron + delete-on-complete; `docs/cron-jobs.md` entry. Acceptance: expiry works; sweep idempotent across replicas | M1.1 | S |
+| M1.2 | Staging service (`withScopedDb`) + TTL sweep cron + delete-on-complete; `docs/cron-jobs.md` entry. Acceptance: expiry works; sweep idempotent across replicas | M1.1 | S |
 | M1.3 | Reference mapper (`map/map-reference.ts`): currencies (DHD base + `ensureSystemCurrency`), accounts (type/subtype map, `hacctRel` pairs, deferred closure, favourites, opening balances), categories (flatten, `is_income`, referenced-only), payees (junk filter, referenced-only), warnings model. Unit fixtures cover every `at` value, deep category trees, junk payees | M0.4, M0.6 | L |
 | M1.4 | Transaction + transfer mapper (`map/map-transactions.ts`, `map/map-transfers.ts`): inclusion rule (`frq != -1` only — auto-entered rows import), statuses/void, splits, `TRN_XFER` pairing with pre-generated UUIDs, **loan-payment transfer splits**, reference numbers. Acceptance: loan fixture yields a transfer split linked to the loan-side transaction, each side imported exactly once | M1.3 | L |
 | M1.5 | Parser service + preview builder (`mny-parser.service.ts`): orchestrates decrypt -> read -> map; computes per-account final balances (the verification baseline). Acceptance: preview for `money2008.mny` matches hand-computed values | M1.3, M1.4 | M |
 | M1.6 | Controller + DTOs: `POST /import/mny/parse` (multer memoryStorage, `password` field, `MNY_IMPORT_LIMIT_MB`, i18n error taxonomy incl. required-vs-incorrect password and Jet 3 rejection), `POST /import/mny/start`, `GET /import/mny/jobs/:id`, `DELETE /import/mny/staged/:id`. Acceptance: contract specs; password never logged or echoed; oversized file -> clean localized error | M1.1, M1.5 | M |
-| M1.7 | Job service: atomic claim, heartbeat, progress writer in its own `tenantTx`, stale reaper cron, retry semantics (staged file survives failure). Acceptance: simulated double-claim has a single winner; stale running job reaped to failed-retryable | M1.1 | M |
-| M1.8 | Writer v1 (`mny-import.service.ts`, `writers/write-transactions.ts`): optional wipe via existing `UsersService.deleteData` (own transaction, before the job body), entity creation via the `{manager, query}` shim over `tenantTx`, chunked inserts + `linked_transaction_id` back-patch, single balance write per account, deferred account closure, **shared `postImportProcessing` extracted** from `ImportService` and called by both pipelines, verification report v1 (balances). Acceptance: integration spec imports a fixture and balances match parser-computed values; QIF suite still green after the extraction; no new ratchet sites | M1.4–M1.7 | L |
+| M1.7 | Job service: atomic claim, heartbeat, progress writer in its own `withScopedDb`, stale reaper cron, retry semantics (staged file survives failure). Acceptance: simulated double-claim has a single winner; stale running job reaped to failed-retryable | M1.1 | M |
+| M1.8 | Writer v1 (`mny-import.service.ts`, `writers/write-transactions.ts`): optional wipe via existing `UsersService.deleteData` (own transaction, before the job body), entity creation via the `{manager, query}` shim over `withScopedDb`, chunked inserts + `linked_transaction_id` back-patch, single balance write per account, deferred account closure, **shared `postImportProcessing` extracted** from `ImportService` and called by both pipelines, verification report v1 (balances). Acceptance: integration spec imports a fixture and balances match parser-computed values; QIF suite still green after the extraction; no new ratchet sites | M1.4–M1.7 | L |
 | M1.9 | Frontend: `useMnyImport` hook (upload, options, start, polling, retry) composed into `useImportWizard`; `detectFileType` + ArrayBuffer path; `ImportStep` additions (`mnyReview`, `mnyImporting`) + `page.tsx` step order; `MnyReviewStep`, `MnyImportProgress`; `CompleteStep` verification table; accept-string updated **with** `UploadStep.test.tsx` and the e2e assertion; `lib/import-mny-api.ts` with per-call timeouts; English catalogs + pseudo-locale. Vitest to gates | M1.6 | L |
 | M1.10 | Verification report UI: pass/warn rows, JSON download, trust-builder copy | M1.8, M1.9 | S |
 

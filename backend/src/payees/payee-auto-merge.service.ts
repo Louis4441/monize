@@ -24,7 +24,7 @@ import {
   backfillPayeeCategory,
   countUncategorizedTransactionsByPayee,
 } from "./payee-backfill.util";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 export type CategoryMatchMode = "off" | "category" | "subcategory";
 
@@ -168,7 +168,7 @@ export class PayeeAutoMergeService {
 
     // Per-payee count of transactions a default-category backfill would touch,
     // surfaced per group so the UI can offer the optional backfill with a count.
-    const uncategorizedCounts = await tenantTx(this.dataSource, (m) =>
+    const uncategorizedCounts = await withScopedDb(this.dataSource, (m) =>
       countUncategorizedTransactionsByPayee(m, userId),
     );
 
@@ -376,7 +376,7 @@ export class PayeeAutoMergeService {
   private async buildRootCategoryMap(
     userId: string,
   ): Promise<Map<string, string>> {
-    const categories = await tenantTx(this.dataSource, (m) =>
+    const categories = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Category).find({
         where: { userId },
         select: ["id", "parentId"],
@@ -410,7 +410,7 @@ export class PayeeAutoMergeService {
   private async buildCategoryCountsMap(
     userId: string,
   ): Promise<Map<string, Map<string, number>>> {
-    const rows = await tenantTx(this.dataSource, (m) =>
+    const rows = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Transaction)
         .createQueryBuilder("t")
@@ -617,7 +617,7 @@ export class PayeeAutoMergeService {
       ),
     ];
     if (categoryIds.length > 0) {
-      const owned = await tenantTx(this.dataSource, (m) =>
+      const owned = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).find({
           where: { id: In(categoryIds), userId },
           select: ["id"],
@@ -742,7 +742,7 @@ export class PayeeAutoMergeService {
     aliasSkipped: boolean;
     transactionsBackfilled: number;
   }> {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const canonical = await m.findOne(Payee, {
         where: { id: group.canonicalPayeeId, userId },
       });

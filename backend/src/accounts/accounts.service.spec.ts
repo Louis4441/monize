@@ -20,12 +20,12 @@ import { LoanRateChangesService } from "../loan-rate-changes/loan-rate-changes.s
 import { DataSource } from "typeorm";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 describe("AccountsService", () => {
@@ -141,7 +141,7 @@ describe("AccountsService", () => {
       find: jest.fn().mockResolvedValue([]),
     };
 
-    const { manager: txManager, dataSource } = createTenantTxMocks([
+    const { manager: txManager, dataSource } = createScopedDbMocks([
       [Account, accountsRepository],
       [Transaction, transactionRepository],
       [InvestmentTransaction, investmentTxRepository],
@@ -3132,7 +3132,7 @@ describe("AccountsService", () => {
       const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       // One sequenced mock serves both the timezone fan-out (still on
       // dataSource.query -- shared util, converted with a later R task) and the
-      // per-timezone work that now runs through the tenantTx manager.
+      // per-timezone work that now runs through the withScopedDb manager.
       ds.query = mockDataSource.query = jest.fn().mockResolvedValue([]);
       await service.applyDueTransactionBalances();
       expect(ds.query).toHaveBeenCalledTimes(1);
@@ -3142,7 +3142,7 @@ describe("AccountsService", () => {
       const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       // One sequenced mock serves both the timezone fan-out (still on
       // dataSource.query -- shared util, converted with a later R task) and the
-      // per-timezone work that now runs through the tenantTx manager.
+      // per-timezone work that now runs through the withScopedDb manager.
       ds.query = mockDataSource.query = jest
         .fn()
         // userRows
@@ -3161,7 +3161,7 @@ describe("AccountsService", () => {
       const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       // One sequenced mock serves both the timezone fan-out (still on
       // dataSource.query -- shared util, converted with a later R task) and the
-      // per-timezone work that now runs through the tenantTx manager.
+      // per-timezone work that now runs through the withScopedDb manager.
       ds.query = mockDataSource.query = jest
         .fn()
         // userRows
@@ -3188,7 +3188,7 @@ describe("AccountsService", () => {
       const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
       // One sequenced mock serves both the timezone fan-out (still on
       // dataSource.query -- shared util, converted with a later R task) and the
-      // per-timezone work that now runs through the tenantTx manager.
+      // per-timezone work that now runs through the withScopedDb manager.
       ds.query = mockDataSource.query = jest
         .fn()
         .mockRejectedValue(new Error("db down"));

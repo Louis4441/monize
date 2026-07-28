@@ -9,7 +9,7 @@ import { computeStatementCycle } from "./statement-cycle.util";
 import { roundMoney } from "../common/round.util";
 import { todayYMD } from "../common/date-utils";
 import { tr } from "../i18n/translate";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 export interface StatementCycleResult {
   accountId: string;
@@ -61,7 +61,7 @@ export class StatementCycleService {
     userId: string,
     accountId: string,
   ): Promise<Account> {
-    const account = await tenantTx(this.dataSource, (m) =>
+    const account = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id: accountId, userId },
       }),
@@ -114,7 +114,7 @@ export class StatementCycleService {
       statement_balance_date: string | null;
       amount_paid: string;
       expenses_since_statement: string;
-    }[] = await tenantTx(this.dataSource, (m) =>
+    }[] = await withScopedDb(this.dataSource, (m) =>
       m.query(
         `SELECT
            COALESCE(a.opening_balance, 0)
@@ -177,7 +177,7 @@ export class StatementCycleService {
   ): Promise<InterestPaidResult> {
     await this.loadOwnedAccount(userId, accountId);
 
-    const rows: { amount: string; count: string }[] = await tenantTx(
+    const rows: { amount: string; count: string }[] = await withScopedDb(
       this.dataSource,
       (m) =>
         m.query(

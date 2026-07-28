@@ -1,11 +1,11 @@
 import { NotFoundException } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
-import { tenantTx } from "../../common/db/tenant-tx";
+import { withScopedDb } from "../../common/db/scoped-db";
 import { AttachmentBlob } from "../entities/attachment-blob.entity";
 import { DatabaseStorageProvider } from "./database-storage.provider";
 
-jest.mock("../../common/db/tenant-tx");
-const mockedTenantTx = tenantTx as jest.MockedFunction<typeof tenantTx>;
+jest.mock("../../common/db/scoped-db");
+const mockedTenantTx = withScopedDb as jest.MockedFunction<typeof withScopedDb>;
 
 describe("DatabaseStorageProvider", () => {
   let provider: DatabaseStorageProvider;

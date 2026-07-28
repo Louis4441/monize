@@ -8,12 +8,12 @@ import { PayeeAlias } from "./entities/payee-alias.entity";
 import { Category } from "../categories/entities/category.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 const userId = "user-1";
@@ -78,7 +78,7 @@ describe("PayeeAutoMergeService", () => {
       createQueryBuilder: jest.fn().mockReturnValue(txQueryBuilder),
     };
 
-    const { manager: txManager, dataSource } = createTenantTxMocks([
+    const { manager: txManager, dataSource } = createScopedDbMocks([
       [Category, mockCategoriesRepository],
       [Transaction, mockTransactionsRepository],
     ]);

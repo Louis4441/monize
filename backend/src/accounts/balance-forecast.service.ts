@@ -13,7 +13,7 @@ import { roundMoney } from "../common/round.util";
 import { todayYMD } from "../common/date-utils";
 import { ensureYMD } from "../common/recurrence";
 import { tr } from "../i18n/translate";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 export interface BalanceForecastResult {
   accountId: string;
@@ -35,7 +35,7 @@ export class BalanceForecastService {
     accountId: string,
     days = 90,
   ): Promise<BalanceForecastResult> {
-    const account = await tenantTx(this.dataSource, (m) =>
+    const account = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id: accountId, userId },
       }),
@@ -57,7 +57,7 @@ export class BalanceForecastService {
 
     // Balance as of end of today (excludes future-dated transactions), matching
     // the last point of the historical daily-balances series.
-    const startRows: { balance: string }[] = await tenantTx(
+    const startRows: { balance: string }[] = await withScopedDb(
       this.dataSource,
       (m) =>
         m.query(
@@ -78,7 +78,7 @@ export class BalanceForecastService {
     );
 
     // Future-dated real transactions per day.
-    const actualRows: { date: string; total: string }[] = await tenantTx(
+    const actualRows: { date: string; total: string }[] = await withScopedDb(
       this.dataSource,
       (m) =>
         m.query(
@@ -98,7 +98,7 @@ export class BalanceForecastService {
     for (const r of actualRows) actualByDate.set(r.date, Number(r.total));
 
     // Active schedules that hit this account directly or as a transfer target.
-    const schedules = await tenantTx(this.dataSource, (m) =>
+    const schedules = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(ScheduledTransaction).find({
         where: [
           { userId, isActive: true, accountId },

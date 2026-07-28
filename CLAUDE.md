@@ -97,22 +97,22 @@ async createSomething(userId: string, dto: CreateDto) {
 }
 ```
 
-Operations that still use QueryRunner: investment transaction CRUD and holdings rebuild, plus the remaining unmigrated modules. This is the pattern **existing** code follows while the Row-Level Security migration is in progress; **new** DB access must use `tenantTx` instead (see below).
+Operations that still use QueryRunner: investment transaction CRUD and holdings rebuild, plus the remaining unmigrated modules. This is the pattern **existing** code follows while the Row-Level Security migration is in progress; **new** DB access must use `withScopedDb` instead (see below).
 
-The accounts, categories, payees, tags, institutions, transactions and scheduled-transactions modules have already migrated (RLS tasks R1-R2): there, `create()`, `update()`, `remove()`, transfers, splits, bulk update/delete and reconciliation each wrap their work in a single `tenantTx` instead, and helpers take an `EntityManager` rather than a `QueryRunner`. Follow those files, not the block above, when working in them.
+The accounts, categories, payees, tags, institutions, transactions and scheduled-transactions modules have already migrated (RLS tasks R1-R2): there, `create()`, `update()`, `remove()`, transfers, splits, bulk update/delete and reconciliation each wrap their work in a single `withScopedDb` instead, and helpers take an `EntityManager` rather than a `QueryRunner`. Follow those files, not the block above, when working in them.
 
 ## Database Access & Row-Level Security (RLS ratchet — CRITICAL)
 
-All **new** database access must go through `tenantTx` (`backend/src/common/db/tenant-tx.ts`) — the single RLS-compliant door to the DB. **Do not add new `@InjectRepository(...)` fields or `this.dataSource.createQueryRunner()` calls.** A CI ratchet (`backend/scripts/rls-ratchet.mjs`, baseline `backend/scripts/rls-ratchet-baseline.json`) counts every `@InjectRepository(` and `createQueryRunner(` site under `src/`; the counts **may only decrease**, so adding either fails "Backend Lint & Type Check". The ~87 existing injected repos / QueryRunners are being migrated module-by-module behind `RLS_MODE=off`; converting one lets you lower the baseline.
+All **new** database access must go through `withScopedDb` (`backend/src/common/db/scoped-db.ts`) — the single RLS-compliant door to the DB. **Do not add new `@InjectRepository(...)` fields or `this.dataSource.createQueryRunner()` calls.** A CI ratchet (`backend/scripts/rls-ratchet.mjs`, baseline `backend/scripts/rls-ratchet-baseline.json`) counts every `@InjectRepository(` and `createQueryRunner(` site under `src/`; the counts **may only decrease**, so adding either fails "Backend Lint & Type Check". The ~87 existing injected repos / QueryRunners are being migrated module-by-module behind `RLS_MODE=off`; converting one lets you lower the baseline.
 
 ```typescript
 // Read: one short tenant transaction, identical to today's autocommit read.
-const prefs = await tenantTx(this.dataSource, (m) =>
+const prefs = await withScopedDb(this.dataSource, (m) =>
   m.getRepository(UserPreference).findOne({ where: { userId } }),
 );
 
-// Read-modify-write / multi-table: one tenantTx replaces the QueryRunner block.
-await tenantTx(this.dataSource, async (m) => {
+// Read-modify-write / multi-table: one withScopedDb replaces the QueryRunner block.
+await withScopedDb(this.dataSource, async (m) => {
   const repo = m.getRepository(UserPreference);
   const row = await repo.findOne({ where: { userId } });
   // ...mutate + repo.save(row); all queries share the transaction + tenant GUC.
@@ -120,9 +120,9 @@ await tenantTx(this.dataSource, async (m) => {
 ```
 
 - Inject `DataSource`, not a repository. Get repositories from the transaction's `EntityManager` (`m.getRepository(X)`); helpers that took a `QueryRunner` take the `EntityManager` instead.
-- `tenantTx` **throws** without an ambient identity context. Authenticated controllers already have it (the `RequestContextInterceptor` seeds `{ userId }` around the handler). Code with no HTTP request — cron jobs, seeders, guards/strategies, background writes — must wrap the call in `withUserContext(userId, fn)` or `withSystemContext(fn)` (`backend/src/common/db/with-context.ts`).
-- Nested `tenantTx` calls join the ambient transaction (same connection/atomicity), so a service method calling another is safe — no pool-exhaustion deadlock.
-- At `RLS_MODE=off` (the default) `tenantTx` still wraps the transaction but skips the identity GUCs, so behavior is identical to pre-RLS. See `docs/future-plans/row-level-security.md`.
+- `withScopedDb` **throws** without an ambient identity context. Authenticated controllers already have it (the `RequestContextInterceptor` seeds `{ userId }` around the handler). Code with no HTTP request — cron jobs, seeders, guards/strategies, background writes — must wrap the call in `withUserContext(userId, fn)` or `withSystemContext(fn)` (`backend/src/common/db/with-context.ts`).
+- Nested `withScopedDb` calls join the ambient transaction (same connection/atomicity), so a service method calling another is safe — no pool-exhaustion deadlock.
+- At `RLS_MODE=off` (the default) `withScopedDb` still wraps the transaction but skips the identity GUCs, so behavior is identical to pre-RLS. See `docs/future-plans/row-level-security.md`.
 
 ## Financial Math
 

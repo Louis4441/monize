@@ -5,10 +5,10 @@ import { Transaction } from "./entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { buildTransactionSearchClause } from "./transaction-search.util";
-import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 describe("TransactionAnalyticsService", () => {
@@ -68,7 +68,7 @@ describe("TransactionAnalyticsService", () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
-    const { dataSource } = createTenantTxMocks([
+    const { dataSource } = createScopedDbMocks([
       [Transaction, transactionsRepository],
       [Category, categoriesRepository],
       [UserPreference, userPreferenceRepository],

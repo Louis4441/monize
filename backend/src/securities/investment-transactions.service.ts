@@ -1877,7 +1877,7 @@ export class InvestmentTransactionsService {
       description?: string | null;
     },
   ): Promise<InvestmentTransaction> {
-    // RLS transition shim (R2): the transactions module now runs on tenantTx
+    // RLS transition shim (R2): the transactions module now runs on withScopedDb
     // and passes the transaction's EntityManager; securities-internal callers
     // still pass their own QueryRunner until task R3 converts this service.
     // The downstream helpers only ever touch `.manager`.

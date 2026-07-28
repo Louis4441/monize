@@ -60,7 +60,7 @@ import {
   BulkCreateSkip,
   bulkSkipReason,
 } from "../common/bulk-create.types";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 export interface TransactionWithInvestmentLink extends Transaction {
   linkedInvestmentTransactionId?: string | null;
@@ -216,7 +216,7 @@ export class TransactionsService {
     term?: string,
   ): Promise<ParsedSearchTerm> {
     if (!term || !term.trim()) return { amount: null, date: null };
-    const prefs = await tenantTx(this.dataSource, (m) =>
+    const prefs = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(UserPreference).findOne({
         where: { userId },
       }),
@@ -348,7 +348,7 @@ export class TransactionsService {
       resolvedPayeeName = payee.name;
     }
     if (transactionData.categoryId) {
-      const cat = await tenantTx(this.dataSource, (m) =>
+      const cat = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).findOne({
           where: { id: transactionData.categoryId, userId },
         }),
@@ -374,63 +374,66 @@ export class TransactionsService {
 
     // One transaction: the row, its splits/tags, and the balance update
     // commit or roll back together. Nested service calls (split service, tags,
-    // account balances) run their own tenantTx and join this one.
-    const savedTransactionId = await tenantTx(this.dataSource, async (m) => {
-      const transaction = m.create(Transaction, {
-        ...transactionData,
-        payeeId: resolvedPayeeId,
-        payeeName: resolvedPayeeName,
-        categoryId: hasSplits ? null : categoryId,
-        isSplit: hasSplits,
-        userId,
-        exchangeRate: transactionData.exchangeRate || 1,
-        originalAmount: fx.originalAmount,
-        originalCurrencyCode: fx.originalCurrencyCode,
-      });
-
-      const savedTransaction = await m.save(transaction);
-
-      if (hasSplits) {
-        const savedSplits = await this.splitService.createSplits(
-          savedTransaction.id,
-          splits,
+    // account balances) run their own withScopedDb and join this one.
+    const savedTransactionId = await withScopedDb(
+      this.dataSource,
+      async (m) => {
+        const transaction = m.create(Transaction, {
+          ...transactionData,
+          payeeId: resolvedPayeeId,
+          payeeName: resolvedPayeeName,
+          categoryId: hasSplits ? null : categoryId,
+          isSplit: hasSplits,
           userId,
-          createTransactionDto.accountId,
-          new Date(createTransactionDto.transactionDate),
-          resolvedPayeeName,
-          resolvedPayeeId,
-        );
+          exchangeRate: transactionData.exchangeRate || 1,
+          originalAmount: fx.originalAmount,
+          originalCurrencyCode: fx.originalCurrencyCode,
+        });
 
-        // Set split-level tags (and mirror them onto any transfer counterpart)
-        if (savedSplits && splits) {
-          await this.applySplitTags(savedSplits, splits, userId);
-        }
-      }
+        const savedTransaction = await m.save(transaction);
 
-      // Set transaction-level tags
-      if (tagIds && tagIds.length > 0) {
-        await this.tagsService.setTransactionTags(
-          savedTransaction.id,
-          tagIds,
-          userId,
-        );
-      }
-
-      if (savedTransaction.status !== TransactionStatus.VOID) {
-        if (isTransactionInFuture(createTransactionDto.transactionDate)) {
-          await this.accountsService.recalculateCurrentBalance(
+        if (hasSplits) {
+          const savedSplits = await this.splitService.createSplits(
+            savedTransaction.id,
+            splits,
+            userId,
             createTransactionDto.accountId,
+            new Date(createTransactionDto.transactionDate),
+            resolvedPayeeName,
+            resolvedPayeeId,
           );
-        } else {
-          await this.accountsService.updateBalance(
-            createTransactionDto.accountId,
-            Number(createTransactionDto.amount),
+
+          // Set split-level tags (and mirror them onto any transfer counterpart)
+          if (savedSplits && splits) {
+            await this.applySplitTags(savedSplits, splits, userId);
+          }
+        }
+
+        // Set transaction-level tags
+        if (tagIds && tagIds.length > 0) {
+          await this.tagsService.setTransactionTags(
+            savedTransaction.id,
+            tagIds,
+            userId,
           );
         }
-      }
 
-      return savedTransaction.id;
-    });
+        if (savedTransaction.status !== TransactionStatus.VOID) {
+          if (isTransactionInFuture(createTransactionDto.transactionDate)) {
+            await this.accountsService.recalculateCurrentBalance(
+              createTransactionDto.accountId,
+            );
+          } else {
+            await this.accountsService.updateBalance(
+              createTransactionDto.accountId,
+              Number(createTransactionDto.amount),
+            );
+          }
+        }
+
+        return savedTransaction.id;
+      },
+    );
 
     this.netWorthService.triggerDebouncedRecalc(
       createTransactionDto.accountId,
@@ -497,7 +500,7 @@ export class TransactionsService {
     let categoryName: string | null = null;
     if (categoryId) {
       const requestedCategoryId = categoryId;
-      const cat = await tenantTx(this.dataSource, (m) =>
+      const cat = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).findOne({
           where: { id: requestedCategoryId, userId },
         }),
@@ -572,7 +575,7 @@ export class TransactionsService {
     categoryId: string,
   ): Promise<CategorizeTransactionPreview> {
     const transaction = await this.findOne(userId, transactionId);
-    const cat = await tenantTx(this.dataSource, (m) =>
+    const cat = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Category).findOne({
         where: { id: categoryId, userId },
       }),
@@ -666,7 +669,7 @@ export class TransactionsService {
     let categoryId: string | null = existing.categoryId ?? null;
     let categoryName: string | null = existing.category?.name ?? null;
     if (input.categoryId !== undefined) {
-      const cat = await tenantTx(this.dataSource, (m) =>
+      const cat = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).findOne({
           where: { id: input.categoryId, userId },
         }),
@@ -770,7 +773,7 @@ export class TransactionsService {
       where.payeeName = filter.payeeName;
     }
 
-    const rows = await tenantTx(this.dataSource, (m) =>
+    const rows = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Transaction).find({
         where,
         order: { transactionDate: "DESC", createdAt: "DESC" },
@@ -843,8 +846,8 @@ export class TransactionsService {
 
     // The whole listing -- main query, target-page lookup, running-balance
     // math, and investment/attachment enrichment -- is one read block on a
-    // single tenantTx manager.
-    return tenantTx(this.dataSource, async (m) => {
+    // single withScopedDb manager.
+    return withScopedDb(this.dataSource, async (m) => {
       const queryBuilder = m
         .getRepository(Transaction)
         .createQueryBuilder("transaction")
@@ -1887,7 +1890,7 @@ export class TransactionsService {
   }
 
   async findOne(userId: string, id: string): Promise<Transaction> {
-    const transaction = await tenantTx(this.dataSource, (m) =>
+    const transaction = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Transaction).findOne({
         where: { id, userId },
         relations: [
@@ -1959,7 +1962,7 @@ export class TransactionsService {
       updateData.payeeName = payee.name;
     }
     if ("categoryId" in updateData && updateData.categoryId) {
-      const cat = await tenantTx(this.dataSource, (m) =>
+      const cat = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).findOne({
           where: { id: updateData.categoryId, userId },
         }),
@@ -1979,7 +1982,7 @@ export class TransactionsService {
 
     // One transaction: split rebuild, field update, tags, and balance
     // adjustments commit or roll back together. Nested service calls join it.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       if (splits !== undefined) {
         if (Array.isArray(splits) && splits.length > 0) {
           await this.splitService.deleteSplitSideEffects(id, userId);
@@ -2179,7 +2182,7 @@ export class TransactionsService {
 
     // One transaction: split side effects, linked/parent cleanup, the delete
     // itself, and the balance adjustment commit or roll back together.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       if (transaction.isSplit) {
         await this.splitService.deleteSplitSideEffects(id, userId);
       }

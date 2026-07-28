@@ -11,12 +11,12 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { isTransactionInFuture } from "../common/date-utils";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 jest.mock("../common/date-utils", () => ({
@@ -34,7 +34,7 @@ describe("TransactionTransferService", () => {
   let accountsService: Record<string, jest.Mock>;
   let payeesService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
-  // The tenantTx EntityManager, under the legacy `mockQueryRunner.manager`
+  // The withScopedDb EntityManager, under the legacy `mockQueryRunner.manager`
   // shape so the pre-RLS manager assertions still read naturally.
   let mockQueryRunner: Record<string, any>;
   let mockDataSource: DataSourceMock;
@@ -128,7 +128,7 @@ describe("TransactionTransferService", () => {
 
     mockFindOne.mockReset();
 
-    const tenantMocks = createTenantTxMocks([
+    const tenantMocks = createScopedDbMocks([
       [Transaction, transactionsRepository],
       [TransactionSplit, splitsRepository],
       [Category, categoriesRepository],
@@ -1723,7 +1723,7 @@ describe("TransactionTransferService", () => {
         service.createTransfer("user-1", baseTransferDto, mockFindOne),
       ).rejects.toThrow("DB error");
 
-      // One tenantTx groups every write; the rejection above is what makes
+      // One withScopedDb groups every write; the rejection above is what makes
       // the surrounding transaction roll back.
       expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
     });
@@ -1743,7 +1743,7 @@ describe("TransactionTransferService", () => {
       await service.removeTransfer("user-1", "from-tx", mockFindOne);
 
       // The split-parent lookup is its own short read transaction (as the
-      // pre-RLS autocommit read was); every write lands in one tenantTx.
+      // pre-RLS autocommit read was); every write lands in one withScopedDb.
       expect(mockDataSource.transaction).toHaveBeenCalledTimes(2);
     });
 
@@ -1808,7 +1808,7 @@ describe("TransactionTransferService", () => {
       );
 
       // The split-parent lookup is its own short read transaction (as the
-      // pre-RLS autocommit read was); every write lands in one tenantTx.
+      // pre-RLS autocommit read was); every write lands in one withScopedDb.
       expect(mockDataSource.transaction).toHaveBeenCalledTimes(2);
     });
 

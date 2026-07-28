@@ -26,7 +26,7 @@ import {
   countUncategorizedTransactionsByPayee,
 } from "./payee-backfill.util";
 import { stripHtml } from "../common/sanitization.util";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 /**
  * Resolved, sanitized preview of a proposed new payee. Shared by the AI
@@ -88,7 +88,7 @@ export class PayeesService {
   ) {}
 
   async create(userId: string, createPayeeDto: CreatePayeeDto): Promise<Payee> {
-    const saved = await tenantTx(this.dataSource, async (m) => {
+    const saved = await withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Payee);
       // Check if payee with same name already exists for this user
       const existing = await repo.findOne({
@@ -145,7 +145,7 @@ export class PayeesService {
   ): Promise<CreatePayeePreview> {
     const name = stripHtml(input.name)?.trim() || "";
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const existing = await m.getRepository(Payee).findOne({
         where: { userId, name },
       });
@@ -192,7 +192,7 @@ export class PayeesService {
     const childName = sep >= 0 ? trimmed.slice(sep + 1).trim() : trimmed;
     const parentName = sep >= 0 ? trimmed.slice(0, sep).trim() : null;
 
-    const match = await tenantTx(this.dataSource, (m) => {
+    const match = await withScopedDb(this.dataSource, (m) => {
       const qb = m
         .getRepository(Category)
         .createQueryBuilder("category")
@@ -272,7 +272,7 @@ export class PayeesService {
         );
       }
       if (sanitized !== payee.name) {
-        const existing = await tenantTx(this.dataSource, (m) =>
+        const existing = await withScopedDb(this.dataSource, (m) =>
           m.getRepository(Payee).findOne({
             where: { userId, name: sanitized },
           }),
@@ -339,7 +339,7 @@ export class PayeesService {
     }
     // "all" or undefined = no isActive filter
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       // Get all payees with their default category
       const payees = await m.getRepository(Payee).find({
         where,
@@ -415,7 +415,7 @@ export class PayeesService {
   }
 
   async findOne(userId: string, id: string): Promise<Payee> {
-    const payee = await tenantTx(this.dataSource, (m) =>
+    const payee = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Payee).findOne({
         where: { id, userId },
         relations: ["defaultCategory"],
@@ -436,7 +436,7 @@ export class PayeesService {
     query: string,
     limit: number = 10,
   ): Promise<Payee[]> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(Payee).find({
         where: {
           userId,
@@ -452,7 +452,7 @@ export class PayeesService {
 
   async autocomplete(userId: string, query: string): Promise<Payee[]> {
     // Return active payees that start with the query (for autocomplete)
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(Payee).find({
         where: {
           userId,
@@ -467,7 +467,7 @@ export class PayeesService {
   }
 
   async findByName(userId: string, name: string): Promise<Payee | null> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(Payee).findOne({
         where: { userId, name },
         relations: ["defaultCategory"],
@@ -483,7 +483,7 @@ export class PayeesService {
     userId: string,
     name: string,
   ): Promise<Payee | null> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Payee)
         .createQueryBuilder("payee")
@@ -515,7 +515,7 @@ export class PayeesService {
       return null;
     }
 
-    const byName = await tenantTx(this.dataSource, (m) =>
+    const byName = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Payee)
         .createQueryBuilder("payee")
@@ -542,7 +542,7 @@ export class PayeesService {
     // Normalize in JS over the user's active payees (the exact + alias tiers
     // already handled the common cases) so apostrophes and other punctuation
     // never block a match regardless of how the database collates them.
-    const activePayees = await tenantTx(this.dataSource, (m) =>
+    const activePayees = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Payee).find({
         where: { userId, isActive: true },
         relations: ["defaultCategory"],
@@ -600,7 +600,7 @@ export class PayeesService {
 
     // Check for name conflicts if name is being updated
     if (updatePayeeDto.name && updatePayeeDto.name !== payee.name) {
-      const existing = await tenantTx(this.dataSource, (m) =>
+      const existing = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Payee).findOne({
           where: {
             userId,
@@ -656,7 +656,7 @@ export class PayeesService {
     // denormalised payeeName snapshots out of sync with the payee record. The
     // optional category backfill runs in the same transaction so the payee
     // default and its transactions can never drift apart on a partial failure.
-    const transactionsCategorized = await tenantTx(
+    const transactionsCategorized = await withScopedDb(
       this.dataSource,
       async (m) => {
         if (Object.keys(updateFields).length > 0) {
@@ -687,7 +687,7 @@ export class PayeesService {
 
     // Re-fetch with relations and computed counts so the frontend has complete data
     const refreshed = await this.findOne(userId, id);
-    const { aliasCount, transactionCount } = await tenantTx(
+    const { aliasCount, transactionCount } = await withScopedDb(
       this.dataSource,
       async (m) => ({
         aliasCount: await m.getRepository(PayeeAlias).count({
@@ -730,7 +730,7 @@ export class PayeesService {
       defaultCategoryId: payee.defaultCategoryId,
       isActive: payee.isActive,
     };
-    await tenantTx(this.dataSource, (m) =>
+    await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Payee).remove(payee),
     );
     this.actionHistoryService.record(userId, {
@@ -747,7 +747,7 @@ export class PayeesService {
   async getMostUsed(userId: string, limit: number = 10): Promise<Payee[]> {
     // Single query: join defaultCategory + aggregate transaction count, avoiding two-step fetch
     // Only return active payees for dropdown use
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Payee)
         .createQueryBuilder("payee")
@@ -771,7 +771,7 @@ export class PayeesService {
   async getRecentlyUsed(userId: string, limit: number = 10): Promise<Payee[]> {
     // Single query: join defaultCategory + aggregate most recent date, avoiding two-step fetch
     // Only return active payees for dropdown use
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Payee)
         .createQueryBuilder("payee")
@@ -793,7 +793,7 @@ export class PayeesService {
   }
 
   async getSummary(userId: string) {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Payee);
       const totalPayees = await repo.count({
         where: { userId },
@@ -823,7 +823,7 @@ export class PayeesService {
   }
 
   async findByCategory(userId: string, categoryId: string): Promise<Payee[]> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(Payee).find({
         where: {
           userId,
@@ -858,7 +858,7 @@ export class PayeesService {
     const cutoffDateStr = cutoffDate.toISOString().split("T")[0];
 
     // Get active payees with their transaction counts and last used dates
-    const results = await tenantTx(this.dataSource, (m) =>
+    const results = await withScopedDb(this.dataSource, (m) =>
       m
         .getRepository(Payee)
         .createQueryBuilder("payee")
@@ -910,7 +910,7 @@ export class PayeesService {
     }
 
     const uniqueIds = [...new Set(payeeIds)];
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Payee);
       const payees = await repo.find({
         where: { id: In(uniqueIds), userId, isActive: true },
@@ -939,7 +939,9 @@ export class PayeesService {
       return payee;
     }
     payee.isActive = true;
-    return tenantTx(this.dataSource, (m) => m.getRepository(Payee).save(payee));
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Payee).save(payee),
+    );
   }
 
   /**
@@ -973,7 +975,7 @@ export class PayeesService {
       totalCounts,
       uncategorizedCountMap,
       payeesWithCategories,
-    } = await tenantTx(this.dataSource, async (m) => {
+    } = await withScopedDb(this.dataSource, async (m) => {
       // Get category usage statistics per payee
       // This query counts how many times each category is used for each payee
       const query = m
@@ -1155,7 +1157,7 @@ export class PayeesService {
       ...new Set(assignments.map((a) => a.categoryId)),
     ];
     if (uniqueCategoryIds.length > 0) {
-      const ownedCategories = await tenantTx(this.dataSource, (m) =>
+      const ownedCategories = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Category).find({
           where: { id: In(uniqueCategoryIds), userId },
           select: ["id"],
@@ -1178,7 +1180,7 @@ export class PayeesService {
 
     const payeeIds = [...new Set(assignments.map((a) => a.payeeId))];
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const payees = await m.find(Payee, {
         where: { id: In(payeeIds), userId },
       });
@@ -1217,7 +1219,7 @@ export class PayeesService {
    */
   async getAliases(userId: string, payeeId: string): Promise<PayeeAlias[]> {
     await this.findOne(userId, payeeId);
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(PayeeAlias).find({
         where: { payeeId, userId },
         order: { alias: "ASC" },
@@ -1229,7 +1231,7 @@ export class PayeesService {
    * Get all aliases for the user (across all payees).
    */
   async getAllAliases(userId: string): Promise<PayeeAlias[]> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(PayeeAlias).find({
         where: { userId },
         relations: ["payee"],
@@ -1256,7 +1258,7 @@ export class PayeesService {
       );
     }
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(PayeeAlias);
 
       // Check for exact duplicate alias (case-insensitive)
@@ -1331,7 +1333,7 @@ export class PayeesService {
    * Delete an alias by ID.
    */
   async removeAlias(userId: string, aliasId: string): Promise<void> {
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(PayeeAlias);
       const alias = await repo.findOne({
         where: { id: aliasId, userId },
@@ -1361,7 +1363,7 @@ export class PayeesService {
     importedName: string,
   ): Promise<Payee | null> {
     // Load all aliases for this user and check for matches
-    const aliases = await tenantTx(this.dataSource, (m) =>
+    const aliases = await withScopedDb(this.dataSource, (m) =>
       m.find(PayeeAlias, {
         where: { userId },
         relations: ["payee", "payee.defaultCategory"],
@@ -1405,7 +1407,7 @@ export class PayeesService {
     const targetPayee = await this.findOne(userId, targetPayeeId);
     const sourcePayee = await this.findOne(userId, sourcePayeeId);
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       // 1. Reassign transactions from source to target
       const txResult = await m.update(
         Transaction,

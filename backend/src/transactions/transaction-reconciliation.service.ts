@@ -12,7 +12,7 @@ import {
   formatDateYMDLocal,
 } from "../common/date-utils";
 import { tr } from "../i18n/translate";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class TransactionReconciliationService {
@@ -36,7 +36,7 @@ export class TransactionReconciliationService {
     // The status change and the matching balance adjustment touch two tables
     // (transactions + accounts) and must commit atomically, otherwise a failure
     // between the two leaves the account balance out of sync with the status.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       if (isTransactionInFuture(transaction.transactionDate)) {
         await m.update(Transaction, transaction.id, {
           status,
@@ -159,7 +159,7 @@ export class TransactionReconciliationService {
       );
     }
 
-    await tenantTx(this.dataSource, (m) =>
+    await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Transaction).update(transaction.id, {
         status: TransactionStatus.CLEARED,
         reconciledDate: null,
@@ -181,7 +181,7 @@ export class TransactionReconciliationService {
     difference: number;
   }> {
     const [account, transactions, reconciledResult, clearedResult] =
-      await tenantTx(this.dataSource, (m) =>
+      await withScopedDb(this.dataSource, (m) =>
         Promise.all([
           this.accountsService.findOne(userId, accountId),
           m
@@ -260,7 +260,7 @@ export class TransactionReconciliationService {
       return { reconciled: 0 };
     }
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const transactions = await m
         .getRepository(Transaction)
         .createQueryBuilder("transaction")

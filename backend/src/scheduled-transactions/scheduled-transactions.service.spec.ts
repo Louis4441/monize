@@ -15,12 +15,12 @@ import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.se
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { getRequestContext } from "../common/request-context";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 describe("ScheduledTransactionsService", () => {
@@ -33,7 +33,7 @@ describe("ScheduledTransactionsService", () => {
   let accountsService: Record<string, jest.Mock>;
   let transactionsService: Record<string, jest.Mock>;
   let investmentTransactionsService: Record<string, jest.Mock>;
-  // The tenantTx manager, exposed under the legacy name so the pre-RLS
+  // The withScopedDb manager, exposed under the legacy name so the pre-RLS
   // queryRunner.manager assertions keep reading naturally.
   let mockQueryRunner: Record<string, any>;
   let mockDataSource: DataSourceMock;
@@ -163,7 +163,7 @@ describe("ScheduledTransactionsService", () => {
       record: jest.fn().mockResolvedValue(null),
     };
 
-    const tenantMocks = createTenantTxMocks([
+    const tenantMocks = createScopedDbMocks([
       [ScheduledTransaction, scheduledRepo],
       [ScheduledTransactionSplit, splitsRepo],
       [ScheduledTransactionOverride, overridesRepo],
@@ -171,7 +171,7 @@ describe("ScheduledTransactionsService", () => {
       [Tag, tagRepo],
     ]);
     mockDataSource = tenantMocks.dataSource;
-    // Direct EntityManager calls inside tenantTx blocks (converted from the
+    // Direct EntityManager calls inside withScopedDb blocks (converted from the
     // old queryRunner.manager usage in update()/post()/createSplits()).
     const txManager = tenantMocks.manager;
     txManager.delete.mockResolvedValue({ affected: 0 });

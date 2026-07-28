@@ -7,7 +7,7 @@ import {
 } from "../users/entities/user-preference.entity";
 import { buildDefaultPreferences } from "../users/user-preference.factory";
 import { currentRequestLocale } from "../i18n/request-locale";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 import { ReleaseNotesService } from "./release-notes.service";
 
 /** Cap on stored tour entries; oldest are pruned past this. */
@@ -15,10 +15,10 @@ const MAX_TOUR_ENTRIES = 200;
 
 /**
  * Per-user guided-tour progress. Stored in the `tour_progress` jsonb column on
- * user_preferences and written exclusively through the RLS-compliant `tenantTx`
+ * user_preferences and written exclusively through the RLS-compliant `withScopedDb`
  * door (no injected repository / QueryRunner -- see the RLS ratchet note in the
  * root CLAUDE.md). These methods run from authenticated controllers, so the
- * request context already supplies the identity `tenantTx` needs.
+ * request context already supplies the identity `withScopedDb` needs.
  *
  * Saves are fire-and-forget from potentially several browser tabs at once, so
  * `saveProgress` merges a single entry into the map **atomically in SQL**
@@ -35,7 +35,7 @@ export class ToursService {
 
   /** Return the user's full tour-progress map (empty when no row/column yet). */
   async getProgress(userId: string): Promise<TourProgressMap> {
-    const prefs = await tenantTx(this.dataSource, (manager) =>
+    const prefs = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(UserPreference).findOne({ where: { userId } }),
     );
     return prefs?.tourProgress ?? {};
@@ -61,7 +61,7 @@ export class ToursService {
     }
     const patch: TourProgressMap = { [tourId]: entry };
 
-    await tenantTx(this.dataSource, async (manager) => {
+    await withScopedDb(this.dataSource, async (manager) => {
       const repo = manager.getRepository(UserPreference);
 
       // Atomic single-entry merge; RETURNING lets us detect the missing-row case
@@ -104,7 +104,7 @@ export class ToursService {
 
   /** Clear all tour progress ("Reset tour progress" in Settings). */
   async resetProgress(userId: string): Promise<{ reset: boolean }> {
-    await tenantTx(this.dataSource, async (manager) => {
+    await withScopedDb(this.dataSource, async (manager) => {
       await manager.query(
         `UPDATE user_preferences SET tour_progress = '{}'::jsonb WHERE user_id = $1`,
         [userId],

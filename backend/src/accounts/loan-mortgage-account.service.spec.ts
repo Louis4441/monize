@@ -1,9 +1,9 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { DataSource } from "typeorm";
-import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 import { BadRequestException } from "@nestjs/common";
 import { LoanMortgageAccountService } from "./loan-mortgage-account.service";
@@ -69,7 +69,7 @@ describe("LoanMortgageAccountService", () => {
       ),
     };
 
-    const { dataSource } = createTenantTxMocks([
+    const { dataSource } = createScopedDbMocks([
       [Account, accountsRepository],
       [Institution, institutionsRepository],
     ]);

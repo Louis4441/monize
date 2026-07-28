@@ -39,7 +39,7 @@ import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { didYouMean } from "../common/name-suggestions.util";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { withSystemContext } from "../common/db/with-context";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class AccountsService {
@@ -66,7 +66,7 @@ export class AccountsService {
     institutionId: string | null | undefined,
   ): Promise<void> {
     if (!institutionId) return;
-    const institution = await tenantTx(this.dataSource, (m) =>
+    const institution = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Institution).findOne({
         where: { id: institutionId, userId },
         select: { id: true },
@@ -132,7 +132,7 @@ export class AccountsService {
       delete accountData.statementSettlementDay;
     }
 
-    const saved = await tenantTx(this.dataSource, (m) => {
+    const saved = await withScopedDb(this.dataSource, (m) => {
       const repo = m.getRepository(Account);
       const account = repo.create({
         ...accountData,
@@ -166,7 +166,7 @@ export class AccountsService {
   ): Promise<{ cashAccount: Account; brokerageAccount: Account }> {
     const { openingBalance = 0, name, ...accountData } = createAccountDto;
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(Account);
 
       // Suffixes are localized to the requester's language so the generated
@@ -217,7 +217,7 @@ export class AccountsService {
   ): Promise<
     (Account & { canDelete?: boolean; futureTransactionsSum?: number })[]
   > {
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const queryBuilder = m
         .getRepository(Account)
         .createQueryBuilder("account")
@@ -439,7 +439,7 @@ export class AccountsService {
    * Find a single account by ID
    */
   async findOne(userId: string, id: string): Promise<Account> {
-    const account = await tenantTx(this.dataSource, (m) =>
+    const account = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id, userId },
       }),
@@ -464,7 +464,7 @@ export class AccountsService {
    */
   async findByIds(userId: string, ids: string[]): Promise<Account[]> {
     if (ids.length === 0) return [];
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).find({
         where: { id: In(ids), userId },
       }),
@@ -593,7 +593,7 @@ export class AccountsService {
     id: string,
     updateAccountDto: UpdateAccountDto,
   ): Promise<Account> {
-    const { savedAccount, beforeData } = await tenantTx(
+    const { savedAccount, beforeData } = await withScopedDb(
       this.dataSource,
       async (m) => {
         // Use pessimistic lock to prevent concurrent balance modifications
@@ -831,7 +831,7 @@ export class AccountsService {
   async close(userId: string, id: string): Promise<Account> {
     // M19: Use pessimistic_write lock to prevent race condition
     // between balance check and close
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const account = await m.findOne(Account, {
         where: { id, userId },
         lock: { mode: "pessimistic_write" },
@@ -894,7 +894,7 @@ export class AccountsService {
   async reopen(userId: string, id: string): Promise<Account> {
     // Mirror close(): reopen the account and any linked brokerage account in a
     // single transaction so the pair cannot end up in mismatched states.
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const account = await m.findOne(Account, {
         where: { id, userId },
       });
@@ -956,7 +956,7 @@ export class AccountsService {
     amount: number,
     queryRunner?: QueryRunner,
   ): Promise<Account> {
-    const account = await tenantTx(this.dataSource, (m) =>
+    const account = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id: accountId },
       }),
@@ -993,7 +993,7 @@ export class AccountsService {
     }
 
     // Atomic update at the database level to avoid read-modify-write race conditions
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       await m.query(sql, [amount, accountId]);
       return m.getRepository(Account).findOneOrFail({
         where: { id: accountId },
@@ -1011,7 +1011,7 @@ export class AccountsService {
     accountId: string,
     queryRunner?: QueryRunner,
   ): Promise<Account> {
-    const account = await tenantTx(this.dataSource, (m) =>
+    const account = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id: accountId },
       }),
@@ -1052,7 +1052,7 @@ export class AccountsService {
       return { ...account, currentBalance: newBalance } as Account;
     }
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const result: { balance: string }[] = await m.query(balanceSql, [
         accountId,
         account.openingBalance,
@@ -1078,9 +1078,11 @@ export class AccountsService {
     userId: string,
     accountId: string,
   ): Promise<number> {
-    const result: { balance: string }[] = await tenantTx(this.dataSource, (m) =>
-      m.query(
-        `SELECT COALESCE(a.opening_balance, 0) + COALESCE(SUM(t.amount), 0) AS balance
+    const result: { balance: string }[] = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT COALESCE(a.opening_balance, 0) + COALESCE(SUM(t.amount), 0) AS balance
          FROM accounts a
          LEFT JOIN transactions t ON t.account_id = a.id
            AND t.user_id = $2
@@ -1088,8 +1090,8 @@ export class AccountsService {
            AND t.parent_transaction_id IS NULL
         WHERE a.id = $1 AND a.user_id = $2
         GROUP BY a.id, a.opening_balance`,
-        [accountId, userId],
-      ),
+          [accountId, userId],
+        ),
     );
     return roundMoney(Number(result?.[0]?.balance ?? 0));
   }
@@ -1238,7 +1240,7 @@ export class AccountsService {
     );
     const institutionNameMap = new Map<string, string>();
     if (institutionIds.length > 0) {
-      const institutions = await tenantTx(this.dataSource, (m) =>
+      const institutions = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Institution).find({
           where: { id: In(institutionIds), userId },
           select: { id: true, name: true },
@@ -1307,7 +1309,7 @@ export class AccountsService {
     // Verify account belongs to user
     await this.findOne(userId, accountId);
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const transactionCount = await m.getRepository(Transaction).count({
         where: { accountId },
       });
@@ -1333,7 +1335,7 @@ export class AccountsService {
     const account = await this.findOne(userId, id);
 
     // Check for regular transactions
-    const transactionCount = await tenantTx(this.dataSource, (m) =>
+    const transactionCount = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Transaction).count({
         where: { accountId: id },
       }),
@@ -1350,10 +1352,12 @@ export class AccountsService {
     }
 
     // Check for investment transactions
-    const investmentTransactionCount = await tenantTx(this.dataSource, (m) =>
-      m.getRepository(InvestmentTransaction).count({
-        where: { accountId: id },
-      }),
+    const investmentTransactionCount = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.getRepository(InvestmentTransaction).count({
+          where: { accountId: id },
+        }),
     );
 
     if (investmentTransactionCount > 0) {
@@ -1392,7 +1396,7 @@ export class AccountsService {
 
     // Unlink the paired account and remove this account atomically, so a
     // failure cannot leave a dangling link pointing at a deleted account.
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       if (account.linkedAccountId) {
         const linkedAccount = await m.findOne(Account, {
           where: { id: account.linkedAccountId },
@@ -1422,7 +1426,7 @@ export class AccountsService {
    * Used when clearing investment data for re-import.
    */
   async resetBrokerageBalances(userId: string): Promise<number> {
-    const result = await tenantTx(this.dataSource, (m) =>
+    const result = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).update(
         {
           userId,
@@ -1463,7 +1467,7 @@ export class AccountsService {
     // in all-time mode, where the MIN/MAX probe below already yields the last
     // transaction date (future-dated ones included) and clamps `end` to it.
     if (!endDate && !allTime) {
-      const maxDateResult = await tenantTx(this.dataSource, (m) =>
+      const maxDateResult = await withScopedDb(this.dataSource, (m) =>
         m.query(
           `SELECT MAX(t.transaction_date)::TEXT as max_date
          FROM transactions t
@@ -1499,7 +1503,7 @@ export class AccountsService {
       // unbounded MAX still includes future-dated transactions, so projections
       // remain visible. Both fall back to the one-year default / today when the
       // account has no transactions yet.
-      const range = await tenantTx(this.dataSource, (m) =>
+      const range = await withScopedDb(this.dataSource, (m) =>
         m.query(
           `SELECT MIN(t.transaction_date)::TEXT as min_date,
                 MAX(t.transaction_date)::TEXT as max_date
@@ -1541,7 +1545,7 @@ export class AccountsService {
       balance: string;
       account_id: string;
       currency_code: string;
-    }> = await tenantTx(this.dataSource, (m) =>
+    }> = await withScopedDb(this.dataSource, (m) =>
       m.query(
         `WITH target_accounts AS (
           SELECT id, opening_balance, currency_code
@@ -1648,7 +1652,7 @@ export class AccountsService {
 
         // One read-modify-write block per timezone bucket: find due accounts,
         // recompute their balances, apply them in a single UPDATE.
-        const applied = await tenantTx(this.dataSource, async (m) => {
+        const applied = await withScopedDb(this.dataSource, async (m) => {
           const accountRows: { account_id: string }[] = await m.query(
             `SELECT DISTINCT t.account_id
                FROM transactions t
@@ -1740,7 +1744,7 @@ export class AccountsService {
     const sql = `UPDATE accounts SET favourite_sort_order = c.ord
        FROM (VALUES ${valuesClause}) AS c(id, ord)
        WHERE accounts.id = c.id AND accounts.user_id = ${userParam}`;
-    await tenantTx(this.dataSource, (m) =>
+    await withScopedDb(this.dataSource, (m) =>
       m.query(sql, [...accountIds, userId]),
     );
   }

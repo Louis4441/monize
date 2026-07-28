@@ -3,7 +3,7 @@ import { Between, DataSource, In } from "typeorm";
 import { Account, AccountType } from "./entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
 
@@ -78,7 +78,7 @@ export class LoanPaymentDetectorService {
     userId: string,
     accountId: string,
   ): Promise<DetectedLoanPayment | null> {
-    const account = await tenantTx(this.dataSource, (m) =>
+    const account = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id: accountId, userId },
       }),
@@ -100,7 +100,7 @@ export class LoanPaymentDetectorService {
 
     // Find all transactions on this loan account that look like payments
     // Payments to a loan are positive amounts (reducing the negative balance)
-    const transactions = await tenantTx(this.dataSource, (m) =>
+    const transactions = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Transaction).find({
         where: { accountId, userId },
         relations: ["account"],
@@ -251,7 +251,7 @@ export class LoanPaymentDetectorService {
   ): Promise<PaymentRecord[]> {
     // One read block: the linked-transfer and split lookups below are a
     // per-transaction walk over the same snapshot of data.
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const payments: PaymentRecord[] = [];
       // Track processed linked source transactions to avoid duplicates.
       // When extra principal is a second transfer split, each split creates its
@@ -439,7 +439,7 @@ export class LoanPaymentDetectorService {
     const rangeStart = this.shiftDateKey(dateKeys[0], -45);
     const rangeEnd = this.shiftDateKey(dateKeys[dateKeys.length - 1], 45);
 
-    const interestTxns = await tenantTx(this.dataSource, (m) =>
+    const interestTxns = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Transaction).find({
         where: {
           userId,

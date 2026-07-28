@@ -4,10 +4,10 @@ import { DataSource } from "typeorm";
 import { BalanceForecastService } from "./balance-forecast.service";
 import { Account } from "./entities/account.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
-import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 jest.mock("../common/date-utils", () => ({
@@ -23,7 +23,7 @@ describe("BalanceForecastService", () => {
   beforeEach(async () => {
     accountsRepo = { findOne: jest.fn() };
     scheduledRepo = { find: jest.fn() };
-    const mocks = createTenantTxMocks([
+    const mocks = createScopedDbMocks([
       [Account, accountsRepo],
       [ScheduledTransaction, scheduledRepo],
     ]);

@@ -7,13 +7,13 @@ import { TransactionTag } from "./entities/transaction-tag.entity";
 import { TransactionSplitTag } from "./entities/transaction-split-tag.entity";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   ManagerMock,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 describe("TagsService", () => {
@@ -68,7 +68,7 @@ describe("TagsService", () => {
       createQueryBuilder: jest.fn(),
     };
 
-    ({ manager: mockManager, dataSource: mockDataSource } = createTenantTxMocks(
+    ({ manager: mockManager, dataSource: mockDataSource } = createScopedDbMocks(
       [
         [Tag, tagsRepository],
         [TransactionTag, transactionTagsRepository],

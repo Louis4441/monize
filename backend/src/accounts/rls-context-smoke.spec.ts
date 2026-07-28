@@ -13,32 +13,32 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { PortfolioService } from "../securities/portfolio.service";
 import { LoanMortgageAccountService } from "./loan-mortgage-account.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
-import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
 /**
  * RLS smoke for the accounts module's out-of-request entry points (task R1).
  *
- * Unlike the per-service specs, this suite does NOT mock `tenantTx`: the real
+ * Unlike the per-service specs, this suite does NOT mock `withScopedDb`: the real
  * implementation runs (at the default RLS_MODE=off), so every DB access on the
  * cron paths must find the ambient context seeded by the C2 wrappers
- * (withSystemContext / withUserContext) or tenantTx throws its
+ * (withSystemContext / withUserContext) or withScopedDb throws its
  * missing-context error. This is the CI stand-in for the "dev smoke of the
  * module's cron paths shows no context throws" acceptance.
  */
 
-describe("accounts module RLS context smoke (real tenantTx)", () => {
+describe("accounts module RLS context smoke (real withScopedDb)", () => {
   const OWNER_ID = "3f1f8a52-2f0e-4b6d-9a56-0d6a3f1c2b4e";
 
-  it("applyDueTransactionBalances runs its tenantTx work under the system context", async () => {
+  it("applyDueTransactionBalances runs its withScopedDb work under the system context", async () => {
     const accountsRepo = { find: jest.fn(), findOne: jest.fn() };
-    const { manager, dataSource } = createTenantTxMocks([
+    const { manager, dataSource } = createScopedDbMocks([
       [Account, accountsRepo],
     ]);
     // Timezone fan-out (still direct dataSource.query) finds one UTC user...
     dataSource.query.mockResolvedValue([
       { user_id: OWNER_ID, timezone: "UTC" },
     ]);
-    // ...whose due-account scan (inside tenantTx) returns one account to apply.
+    // ...whose due-account scan (inside withScopedDb) returns one account to apply.
     manager.query
       .mockResolvedValueOnce([{ account_id: "a1" }])
       .mockResolvedValueOnce([{ account_id: "a1", balance: "150" }])
@@ -66,7 +66,7 @@ describe("accounts module RLS context smoke (real tenantTx)", () => {
     await service.applyDueTransactionBalances();
 
     expect(errorSpy).not.toHaveBeenCalled();
-    // The bulk UPDATE inside tenantTx actually ran.
+    // The bulk UPDATE inside withScopedDb actually ran.
     expect(
       manager.query.mock.calls.some(
         (c) =>
@@ -103,7 +103,7 @@ describe("accounts module RLS context smoke (real tenantTx)", () => {
         .fn()
         .mockResolvedValue({ notificationEmail: true, language: "en" }),
     };
-    const { dataSource } = createTenantTxMocks([
+    const { dataSource } = createScopedDbMocks([
       [Account, accountsRepo],
       [User, usersRepo],
       [UserPreference, preferencesRepo],
@@ -139,7 +139,7 @@ describe("accounts module RLS context smoke (real tenantTx)", () => {
     const service = module.get(MortgageReminderService);
 
     // Both the system-context fan-out and the per-user withUserContext reads
-    // reach the DB through the real tenantTx; a missing context would reject.
+    // reach the DB through the real withScopedDb; a missing context would reject.
     await expect(service.checkMortgageRenewals()).resolves.toBeUndefined();
 
     expect(accountsRepo.find).toHaveBeenCalled();
@@ -148,8 +148,8 @@ describe("accounts module RLS context smoke (real tenantTx)", () => {
     expect(sendMail).toHaveBeenCalledTimes(1);
   });
 
-  it("real tenantTx still refuses these paths without their context wrappers", async () => {
-    const { dataSource } = createTenantTxMocks([
+  it("real withScopedDb still refuses these paths without their context wrappers", async () => {
+    const { dataSource } = createScopedDbMocks([
       [Account, { findOne: jest.fn() }],
     ]);
     const module: TestingModule = await Test.createTestingModule({
@@ -166,7 +166,7 @@ describe("accounts module RLS context smoke (real tenantTx)", () => {
     const service = module.get(AccountsService);
 
     // Called with no ambient scope at all (no interceptor, no wrapper): the
-    // real tenantTx must throw, proving the smoke above passes because of the
+    // real withScopedDb must throw, proving the smoke above passes because of the
     // C1/C2 wrappers and not because the check is inert.
     await expect(service.findOne(OWNER_ID, "acc-1")).rejects.toThrow(
       "DB access outside request/user/system context",

@@ -7,10 +7,10 @@ import {
   CreateScheduledTransactionOverrideDto,
   UpdateScheduledTransactionOverrideDto,
 } from "./dto/scheduled-transaction-override.dto";
-import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 describe("ScheduledTransactionOverrideService", () => {
@@ -64,7 +64,7 @@ describe("ScheduledTransactionOverrideService", () => {
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder()),
     };
 
-    const { dataSource } = createTenantTxMocks([
+    const { dataSource } = createScopedDbMocks([
       [ScheduledTransactionOverride, overridesRepository],
     ]);
 

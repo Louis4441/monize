@@ -28,7 +28,7 @@ import { formatDateYMD } from "../common/date-utils";
 import { roundMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
 import { LoanRateChangesService } from "../loan-rate-changes/loan-rate-changes.service";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class LoanMortgageAccountService {
@@ -62,7 +62,7 @@ export class LoanMortgageAccountService {
       return institution.trim();
     }
     if (institutionId) {
-      const found = await tenantTx(this.dataSource, (m) =>
+      const found = await withScopedDb(this.dataSource, (m) =>
         m.getRepository(Institution).findOne({
           where: { id: institutionId, userId },
         }),
@@ -142,7 +142,7 @@ export class LoanMortgageAccountService {
       new Date(paymentStartDate),
     );
 
-    const savedAccount = await tenantTx(this.dataSource, (m) => {
+    const savedAccount = await withScopedDb(this.dataSource, (m) => {
       const repo = m.getRepository(Account);
       const account = repo.create({
         ...accountData,
@@ -195,7 +195,7 @@ export class LoanMortgageAccountService {
     );
 
     savedAccount.scheduledTransactionId = scheduledTransaction.id;
-    await tenantTx(this.dataSource, (m) =>
+    await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).save(savedAccount),
     );
 
@@ -284,7 +284,7 @@ export class LoanMortgageAccountService {
       termEndDate.setMonth(termEndDate.getMonth() + termMonths);
     }
 
-    const savedAccount = await tenantTx(this.dataSource, (m) => {
+    const savedAccount = await withScopedDb(this.dataSource, (m) => {
       const repo = m.getRepository(Account);
       const account = repo.create({
         ...accountData,
@@ -354,7 +354,7 @@ export class LoanMortgageAccountService {
     );
 
     savedAccount.scheduledTransactionId = scheduledTransaction.id;
-    await tenantTx(this.dataSource, (m) =>
+    await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).save(savedAccount),
     );
 

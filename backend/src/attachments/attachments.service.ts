@@ -8,7 +8,7 @@ import {
 } from "@nestjs/common";
 import { createHash, randomUUID } from "crypto";
 import { DataSource } from "typeorm";
-import { tenantTx } from "../common/db/tenant-tx";
+import { withScopedDb } from "../common/db/scoped-db";
 import { tr } from "../i18n/translate";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionAttachment } from "./entities/transaction-attachment.entity";
@@ -93,7 +93,7 @@ export class AttachmentsService {
     const sha256 = createHash("sha256").update(file.buffer).digest("hex");
     const id = randomUUID();
 
-    return tenantTx(this.dataSource, async (m) => {
+    return withScopedDb(this.dataSource, async (m) => {
       const transaction = await m
         .getRepository(Transaction)
         .findOne({ where: { id: transactionId, userId } });
@@ -130,7 +130,7 @@ export class AttachmentsService {
       });
       const saved = await repo.save(attachment);
 
-      // Nested tenantTx joins this transaction, so the bytes and the metadata
+      // Nested withScopedDb joins this transaction, so the bytes and the metadata
       // row commit together (or roll back together on failure).
       await this.storage.save(id, file.buffer);
 
@@ -143,7 +143,7 @@ export class AttachmentsService {
     userId: string,
     transactionId: string,
   ): Promise<TransactionAttachment[]> {
-    return tenantTx(this.dataSource, (m) =>
+    return withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionAttachment).find({
         where: { transactionId, userId },
         order: { createdAt: "ASC" },
@@ -156,7 +156,7 @@ export class AttachmentsService {
     userId: string,
     id: string,
   ): Promise<AttachmentDownload> {
-    const attachment = await tenantTx(this.dataSource, (m) =>
+    const attachment = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionAttachment).findOne({ where: { id, userId } }),
     );
     if (!attachment) {
@@ -176,7 +176,7 @@ export class AttachmentsService {
 
   /** Delete an attachment (metadata + bytes) the user owns. */
   async remove(userId: string, id: string): Promise<void> {
-    const attachment = await tenantTx(this.dataSource, (m) =>
+    const attachment = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(TransactionAttachment).findOne({ where: { id, userId } }),
     );
     if (!attachment) {
@@ -185,7 +185,7 @@ export class AttachmentsService {
       );
     }
 
-    await tenantTx(this.dataSource, async (m) => {
+    await withScopedDb(this.dataSource, async (m) => {
       // Removing the metadata row cascades to attachment_blobs for the database
       // provider; still call the provider so external stores are cleaned up too.
       await m.getRepository(TransactionAttachment).delete({ id, userId });

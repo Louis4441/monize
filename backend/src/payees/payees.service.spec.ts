@@ -13,12 +13,12 @@ import { ScheduledTransaction } from "../scheduled-transactions/entities/schedul
 import { Category } from "../categories/entities/category.entity";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import {
-  createTenantTxMocks,
+  createScopedDbMocks,
   DataSourceMock,
-} from "../test-helpers/tenant-tx-testing";
+} from "../test-helpers/scoped-db-testing";
 
-jest.mock("../common/db/tenant-tx", () =>
-  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
 );
 
 describe("PayeesService", () => {
@@ -146,7 +146,7 @@ describe("PayeesService", () => {
       },
     };
 
-    const { manager, dataSource } = createTenantTxMocks([
+    const { manager, dataSource } = createScopedDbMocks([
       [Payee, payeesRepository],
       [PayeeAlias, aliasRepository],
       [Transaction, transactionsRepository],
