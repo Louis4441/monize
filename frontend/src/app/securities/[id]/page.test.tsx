@@ -313,15 +313,9 @@ describe('SecurityDetailPage', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('renders the Overview cards and the accounts table', async () => {
+    it('gives Overview the two full-width sections', async () => {
       await renderPage();
       expect(screen.getByRole('heading', { name: 'About' })).toBeInTheDocument();
-      expect(
-        screen.getByRole('heading', { name: 'Performance' }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole('heading', { name: 'Position info' }),
-      ).toBeInTheDocument();
       expect(
         screen.getByRole('heading', { name: 'Accounts' }),
       ).toBeInTheDocument();
@@ -339,6 +333,18 @@ describe('SecurityDetailPage', () => {
       expect(
         screen.queryByRole('heading', { name: 'About' }),
       ).not.toBeInTheDocument();
+    });
+
+    it('keeps the cards beside the chart visible whichever tab is open', async () => {
+      await renderPage();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('tab', { name: 'Transactions' }));
+      });
+      // They sit above the tabs, not inside Overview, so switching tab does not
+      // take the key figures off the screen.
+      for (const name of ['Key information', 'Performance', 'Position info']) {
+        expect(screen.getByRole('heading', { name })).toBeInTheDocument();
+      }
     });
   });
 

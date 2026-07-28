@@ -310,9 +310,11 @@ function SecurityDetailContent() {
             <SecurityPositionState detail={detail} />
           )}
 
-          {/* `items-start` so Key information keeps its natural height: it holds
-              a handful of rows against a 420px chart, and stretching it to match
-              left most of the card empty. */}
+          {/* Two thirds chart, one third a stack of three compact cards. The
+              chart is tall, and one short card beside it left the right third
+              mostly blank; three cards fill that column with figures the page
+              already has. `items-start` keeps each card at its content height
+              rather than stretching it to the chart's. */}
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <SecurityChartSection
@@ -325,12 +327,18 @@ function SecurityDetailContent() {
                 onModeChange={setChartMode}
               />
             </div>
-            <SecurityKeyInformation
-              security={security}
-              latestPrice={
-                quote ? { price: quote.price, priceDate: quote.priceDate } : null
-              }
-            />
+            <div className="space-y-6">
+              <SecurityKeyInformation
+                security={security}
+                latestPrice={
+                  quote
+                    ? { price: quote.price, priceDate: quote.priceDate }
+                    : null
+                }
+              />
+              <SecurityPerformanceCard prices={priceSeries} />
+              <SecurityPositionInfoCard detail={detail} />
+            </div>
           </div>
 
           <div>
@@ -348,19 +356,10 @@ function SecurityDetailContent() {
               isActive={tab === 'overview'}
               className="mt-6 space-y-6"
             >
-              {/* `items-start` again: the three cards hold different amounts,
-                  and stretching the short ones just pads them with blank space. */}
-              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-5">
-                <div className="lg:col-span-2">
-                  <SecurityAboutCard security={security} />
-                </div>
-                <div className="lg:col-span-1">
-                  <SecurityPerformanceCard prices={priceSeries} />
-                </div>
-                <div className="lg:col-span-2">
-                  <SecurityPositionInfoCard detail={detail} />
-                </div>
-              </div>
+              {/* Performance and Position info moved up beside the chart, so
+                  Overview is the two things that want the full width: the prose
+                  description, and the per-account table. */}
+              <SecurityAboutCard security={security} />
               <SecurityAccountsTable detail={detail} />
             </TabPanel>
 

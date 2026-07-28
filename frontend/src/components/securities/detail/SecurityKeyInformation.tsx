@@ -30,6 +30,7 @@ export function SecurityKeyInformation({
   const { formatCurrencyPrecise } = useNumberFormat();
 
   const rows: KeyValueRow[] = [
+    { key: 'symbol', label: t('keyInfo.symbol'), value: security.symbol },
     {
       key: 'assetClass',
       label: t('keyInfo.assetClass'),

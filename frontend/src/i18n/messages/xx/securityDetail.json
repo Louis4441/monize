@@ -63,6 +63,7 @@
   },
   "keyInfo": {
     "title": "[XX-Key information-XX]",
+    "symbol": "[XX-Symbol-XX]",
     "assetClass": "[XX-Asset class-XX]",
     "exchange": "[XX-Exchange-XX]",
     "currency": "[XX-Currency-XX]",
