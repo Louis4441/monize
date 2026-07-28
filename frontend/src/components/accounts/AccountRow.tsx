@@ -79,6 +79,8 @@ export function buildAccountActions(
     },
     {
       key: 'details',
+      // The eye, matching the securities list's Details action: one verb, one
+      // icon across the app (discussion #964 review).
       label: labels.details,
       icon: 'view',
       tone: 'primary',

@@ -11,7 +11,6 @@ import { PageLayout } from '@/components/layout/PageLayout';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { Tabs, TabPanel } from '@/components/ui/Tabs';
-import type { ActionMenuItem } from '@/components/ui/ActionMenu';
 import { SecurityDetailHeader } from '@/components/securities/detail/SecurityDetailHeader';
 import { SecuritySummaryCards } from '@/components/securities/detail/SecuritySummaryCards';
 import { SecurityPositionState } from '@/components/securities/detail/SecurityPositionState';
@@ -33,6 +32,7 @@ import {
 } from '@/lib/security-detail';
 import type {
   CreateSecurityData,
+  Security,
   SecurityDetail,
   SecurityPrice,
   SecurityHistoryTransaction,
@@ -107,7 +107,9 @@ function SecurityDetailContent() {
   const [tab, setTab] = useState<TabKey>('overview');
   const [chartMode, setChartMode] = useState<SecurityChartMode>('price');
   const [isEditing, setIsEditing] = useState(false);
-  const [isWatchPending, setIsWatchPending] = useState(false);
+  const [isFavouritePending, setIsFavouritePending] = useState(false);
+  // Only for the caret beside the name; a failure costs the switcher, not the page.
+  const [securities, setSecurities] = useState<Security[]>([]);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -136,6 +138,22 @@ function SecurityDetailContent() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    let cancelled = false;
+    investmentsApi
+      .getSecurities()
+      .then((list) => {
+        if (!cancelled) setSecurities(list);
+      })
+      // The switcher simply does not render without a list; the page is fine.
+      .catch(() => {
+        if (!cancelled) setSecurities([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useOnUndoRedo(loadData);
   useOnAiAction(loadData);
@@ -167,10 +185,10 @@ function SecurityDetailContent() {
     };
   }, [priceSeries]);
 
-  const handleToggleWatch = useCallback(async () => {
+  const handleToggleFavourite = useCallback(async () => {
     if (!detail) return;
     const next = !detail.security.isFavourite;
-    setIsWatchPending(true);
+    setIsFavouritePending(true);
     try {
       await investmentsApi.setSecurityFavourite(detail.security.id, next);
       setDetail((current) =>
@@ -179,12 +197,12 @@ function SecurityDetailContent() {
           : current,
       );
       toast.success(
-        next ? t('toasts.watchAdded') : t('toasts.watchRemoved'),
+        next ? t('toasts.favouriteAdded') : t('toasts.favouriteRemoved'),
       );
     } catch (err) {
-      toast.error(getErrorMessage(err, t('toasts.watchFailed')));
+      toast.error(getErrorMessage(err, t('toasts.favouriteFailed')));
     } finally {
-      setIsWatchPending(false);
+      setIsFavouritePending(false);
     }
   }, [detail, t]);
 
@@ -203,50 +221,6 @@ function SecurityDetailContent() {
     },
     [securityId, loadData, ts],
   );
-
-  const handleUpdatePrices = useCallback(async () => {
-    if (!detail) return;
-    try {
-      const result = await investmentsApi.backfillSecurityPrices(
-        detail.security.id,
-      );
-      if (!result.success) {
-        toast.error(result.error || t('toasts.pricesFailed'));
-        return;
-      }
-      toast.success(
-        result.pricesLoaded
-          ? t('toasts.pricesUpdated', { count: result.pricesLoaded })
-          : t('toasts.noPricesFound'),
-      );
-      await loadData();
-    } catch (err) {
-      toast.error(getErrorMessage(err, t('toasts.pricesFailed')));
-    }
-  }, [detail, loadData, t]);
-
-  const menuItems = useMemo<ActionMenuItem[]>(() => {
-    if (!detail) return [];
-    return [
-      {
-        id: 'transactions',
-        label: t('actions.viewTransactions'),
-        onSelect: () => setTab('transactions'),
-      },
-      {
-        id: 'prices',
-        label: t('actions.viewPrices'),
-        onSelect: () => setTab('prices'),
-      },
-      {
-        id: 'updatePrices',
-        label: t('actions.updatePrices'),
-        onSelect: () => {
-          void handleUpdatePrices();
-        },
-      },
-    ];
-  }, [detail, handleUpdatePrices, t]);
 
   if (isLoading) {
     return (
@@ -296,25 +270,17 @@ function SecurityDetailContent() {
           quote={quote}
           onBack={() => router.push('/securities')}
           onEdit={() => setIsEditing(true)}
-          onToggleWatch={handleToggleWatch}
-          isWatchPending={isWatchPending}
-          menuItems={menuItems}
+          onToggleFavourite={handleToggleFavourite}
+          isFavouritePending={isFavouritePending}
+          securities={securities}
+          onSelectSecurity={(id) => router.push(`/securities/${id}`)}
         />
 
         <div className="space-y-6">
-          {/* Zero-filled cards would claim a position that is not there, so a
-              closed or never-held security gets its own panel instead. */}
-          {detail.accounts.length > 0 ? (
-            <SecuritySummaryCards detail={detail} />
-          ) : (
-            <SecurityPositionState detail={detail} />
-          )}
-
-          {/* Two thirds chart, one third a stack of three compact cards. The
-              chart is tall, and one short card beside it left the right third
-              mostly blank; three cards fill that column with figures the page
-              already has. `items-start` keeps each card at its content height
-              rather than stretching it to the chart's. */}
+          {/* The chart leads: it is what the page is for, and it is the one
+              element whose height is fixed. Two thirds chart, one third a stack
+              of three compact cards; `items-start` keeps each card at its
+              content height rather than stretching it to the chart's. */}
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <SecurityChartSection
@@ -340,6 +306,17 @@ function SecurityDetailContent() {
               <SecurityPositionInfoCard detail={detail} />
             </div>
           </div>
+
+          {/* The position's key figures sit in the gap between the chart and the
+              tables, which puts everything that matters on one 1080p screen and
+              leaves the tables to be scrolled to. Zero-filled cards would claim
+              a position that is not there, so a closed or never-held security
+              gets its own panel here instead. */}
+          {detail.accounts.length > 0 ? (
+            <SecuritySummaryCards detail={detail} />
+          ) : (
+            <SecurityPositionState detail={detail} />
+          )}
 
           <div>
             <Tabs

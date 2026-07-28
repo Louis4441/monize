@@ -92,6 +92,21 @@ interface BalanceHistoryChartProps {
    * and formatting that as currency would label "+12.50%" as "$12.50".
    */
   valueFormat?: 'currency' | 'percent';
+  /**
+   * Names for the four footer figures. Defaults to the balance wording.
+   *
+   * Set it for a series that is not a balance: "Min Balance" is simply false
+   * about a price or a percentage return, and the label is the one part of this
+   * chart that cannot be made neutral. Supplying names also drops the
+   * negative-balance alarm (the red "!" and the "Lowest" phrasing), which is
+   * about an asset account going overdrawn and means nothing for a price.
+   */
+  summaryLabels?: {
+    starting: string;
+    current: string;
+    ending: string;
+    lowest: string;
+  };
 }
 
 interface ChartPoint {
@@ -161,6 +176,7 @@ export function BalanceHistoryChart({
   precise = false,
   markers,
   valueFormat = 'currency',
+  summaryLabels,
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
@@ -173,6 +189,9 @@ export function BalanceHistoryChart({
     formatSignedPercent,
   } = useNumberFormat();
   const isPercent = valueFormat === 'percent';
+  // A caller that names its own figures is not plotting a balance, so the
+  // overdrawn-account alarm below does not apply to it.
+  const isBalanceSeries = summaryLabels === undefined;
   const formatChartDate = useChartDateFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   // High/low value bubbles a user has temporarily dismissed, keyed by the value
@@ -543,20 +562,20 @@ export function BalanceHistoryChart({
       {summary && (
         <div className={`mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 grid ${summary.hasFutureData ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'} gap-4 text-center`}>
           <div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">{t('charts.balanceHistory.starting')}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">{summaryLabels?.starting ?? t('charts.balanceHistory.starting')}</div>
             <div className={`font-semibold ${valueColor(summary.startBalance)}`}>
               {formatCurrency(summary.startBalance)}
             </div>
           </div>
           <div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">{t('charts.balanceHistory.current')}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">{summaryLabels?.current ?? t('charts.balanceHistory.current')}</div>
             <div className={`font-semibold ${valueColor(summary.currentBalance)}`}>
               {formatCurrency(summary.currentBalance)}
             </div>
           </div>
           {summary.hasFutureData && (
             <div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">{t('charts.balanceHistory.ending')}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">{summaryLabels?.ending ?? t('charts.balanceHistory.ending')}</div>
               <div className={`font-semibold ${valueColor(summary.endBalance)}`}>
                 {formatCurrency(summary.endBalance)}
               </div>
@@ -568,13 +587,15 @@ export function BalanceHistoryChart({
                   stays the neutral "Min Balance" label -- never the "Lowest"
                   alarm phrasing (or "!" marker) reserved for an unexpectedly
                   negative asset. The value itself is still coloured by sign. */}
-              {summary.goesNegative && !isLiability
-                ? t('charts.balanceHistory.lowest')
-                : t('charts.balanceHistory.minBalance')}
+              {summaryLabels
+                ? summaryLabels.lowest
+                : summary.goesNegative && !isLiability
+                  ? t('charts.balanceHistory.lowest')
+                  : t('charts.balanceHistory.minBalance')}
             </div>
             <div className={`font-semibold ${valueColor(summary.minBalance)}`}>
               {formatCurrency(summary.minBalance)}
-              {summary.goesNegative && !isLiability && (
+              {isBalanceSeries && summary.goesNegative && !isLiability && (
                 <span className="ml-1 text-xs text-red-500">!</span>
               )}
             </div>

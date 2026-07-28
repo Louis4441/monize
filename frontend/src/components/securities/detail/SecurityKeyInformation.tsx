@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { KeyValueList, type KeyValueRow } from '@/components/ui/KeyValueList';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { usePreferencesStore } from '@/store/preferencesStore';
 import type { Security } from '@/types/investment';
 
 interface SecurityKeyInformationProps {
@@ -28,6 +29,10 @@ export function SecurityKeyInformation({
   const ts = useTranslations('securities');
   const { formatDate } = useDateFormat();
   const { formatCurrencyPrecise } = useNumberFormat();
+  // A security with no provider of its own inherits the user's default, so the
+  // effective provider is the answer here -- never a blank row.
+  const defaultQuoteProvider =
+    usePreferencesStore((s) => s.preferences?.defaultQuoteProvider) ?? 'yahoo';
 
   const rows: KeyValueRow[] = [
     { key: 'symbol', label: t('keyInfo.symbol'), value: security.symbol },
@@ -49,13 +54,11 @@ export function SecurityKeyInformation({
     {
       key: 'provider',
       label: t('keyInfo.provider'),
-      value: security.quoteProvider
-        ? ts(
-            `form.providers.${security.quoteProvider}` as Parameters<
-              typeof ts
-            >[0],
-          )
-        : null,
+      value: ts(
+        `form.providers.${security.quoteProvider ?? defaultQuoteProvider}` as Parameters<
+          typeof ts
+        >[0],
+      ),
     },
     {
       key: 'lastPrice',

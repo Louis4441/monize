@@ -55,6 +55,7 @@ const mockGetSecurityPrices = vi.fn();
 const mockGetSecurityTransactionHistory = vi.fn();
 const mockSetSecurityFavourite = vi.fn();
 const mockBackfillSecurityPrices = vi.fn();
+const mockGetSecurities = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -66,6 +67,7 @@ vi.mock('@/lib/investments', () => ({
       mockSetSecurityFavourite(...args),
     backfillSecurityPrices: (...args: unknown[]) =>
       mockBackfillSecurityPrices(...args),
+    getSecurities: (...args: unknown[]) => mockGetSecurities(...args),
     updateSecurity: vi.fn(),
   },
 }));
@@ -188,6 +190,7 @@ describe('SecurityDetailPage', () => {
         createdAt: '2026-07-27T00:00:00.000Z',
       },
     ]);
+    mockGetSecurities.mockResolvedValue([security]);
     mockGetSecurityTransactionHistory.mockResolvedValue({
       securityId: 'sec-1',
       symbol: 'AAPL',
@@ -207,9 +210,21 @@ describe('SecurityDetailPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the classification below the name rather than in it', async () => {
+  it('leaves the classification to Key information rather than repeating it', async () => {
     await renderPage();
-    expect(screen.getByText(/AAPL.*Stock.*NASDAQ.*USD/)).toBeInTheDocument();
+    // Symbol, type, exchange and currency used to sit under the name as well;
+    // saying them twice cost a third of the header's height.
+    expect(screen.queryByText(/AAPL.*Stock.*NASDAQ.*USD/)).toBeNull();
+    expect(
+      screen.getByRole('heading', { name: 'Key information' }),
+    ).toBeInTheDocument();
+  });
+
+  it('offers no overflow menu in the header', async () => {
+    await renderPage();
+    // Its items either jumped the page to a tab further down or duplicated the
+    // Price history tab's own refresh button.
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
   });
 
   it('reports the load failure with a way to retry', async () => {
@@ -375,7 +390,16 @@ describe('SecurityDetailPage', () => {
     });
   });
 
-  describe('watchlist', () => {
+  describe('favourites', () => {
+    it('uses the same wording as the securities list', async () => {
+      await renderPage();
+      // "Watch" was ours alone; the rest of the app calls these favourites.
+      expect(screen.getByText('Favourites')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Add to favourites' }),
+      ).toBeInTheDocument();
+    });
+
     it('adds the security and reflects it on the button', async () => {
       mockSetSecurityFavourite.mockResolvedValue({
         ...security,
@@ -383,12 +407,14 @@ describe('SecurityDetailPage', () => {
       });
       await renderPage();
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Watch/ }));
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Add to favourites' }),
+        );
       });
       expect(mockSetSecurityFavourite).toHaveBeenCalledWith('sec-1', true);
       await waitFor(() =>
         expect(
-          screen.getByRole('button', { name: /Watching/ }),
+          screen.getByRole('button', { name: 'Remove from favourites' }),
         ).toBeInTheDocument(),
       );
     });
@@ -397,15 +423,60 @@ describe('SecurityDetailPage', () => {
       mockSetSecurityFavourite.mockRejectedValue(new Error('nope'));
       await renderPage();
       await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Watch/ }));
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Add to favourites' }),
+        );
       });
       await act(async () => {});
       expect(
-        screen.getByRole('button', { name: /Watch/ }),
+        screen.getByRole('button', { name: 'Add to favourites' }),
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: /Watching/ }),
-      ).not.toBeInTheDocument();
+        screen.queryByRole('button', { name: 'Remove from favourites' }),
+      ).toBeNull();
+    });
+  });
+
+  describe('switching security', () => {
+    it('offers no caret when there is nothing else to switch to', async () => {
+      mockGetSecurities.mockResolvedValue([security]);
+      await renderPage();
+      expect(
+        screen.queryByRole('button', { name: 'Switch to another security' }),
+      ).toBeNull();
+    });
+
+    it('navigates straight to another security', async () => {
+      mockGetSecurities.mockResolvedValue([
+        security,
+        { ...security, id: 'sec-2', symbol: 'MSFT', name: 'Microsoft' },
+      ]);
+      await renderPage();
+
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Switch to another security' }),
+        );
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('menuitem', { name: /MSFT/ }));
+      });
+
+      expect(mockPush).toHaveBeenCalledWith('/securities/sec-2');
+    });
+
+    it('does not offer the security already on screen', async () => {
+      mockGetSecurities.mockResolvedValue([
+        security,
+        { ...security, id: 'sec-2', symbol: 'MSFT', name: 'Microsoft' },
+      ]);
+      await renderPage();
+      await act(async () => {
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Switch to another security' }),
+        );
+      });
+      expect(screen.queryByRole('menuitem', { name: /AAPL/ })).toBeNull();
     });
   });
 });

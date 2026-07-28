@@ -160,6 +160,14 @@ export function SecurityChartSection({
         neutralValues={mode !== 'return'}
         precise={mode === 'price'}
         valueFormat={mode === 'return' ? 'percent' : 'currency'}
+        // None of these three series is a balance, so the footer must not call
+        // its lowest point a "Min Balance".
+        summaryLabels={{
+          starting: t('chart.summary.first'),
+          current: t('chart.summary.latest'),
+          ending: t('chart.summary.ending'),
+          lowest: t('chart.summary.lowest'),
+        }}
       />
     </div>
   );

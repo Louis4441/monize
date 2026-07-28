@@ -202,6 +202,71 @@ describe('BalanceHistoryChart', () => {
       .forEach((el) => expect(el.className).toContain('text-red-600'));
   });
 
+  describe('summaryLabels', () => {
+    it('renames the footer figures for a series that is not a balance', () => {
+      render(
+        <BalanceHistoryChart
+          data={[
+            { date: '2025-01-01', balance: 86.46 },
+            { date: '2025-01-02', balance: 104.9 },
+          ]}
+          isLoading={false}
+          summaryLabels={{
+            starting: 'First',
+            current: 'Latest',
+            ending: 'Ending',
+            lowest: 'Lowest price',
+          }}
+        />,
+      );
+
+      // "Min Balance" is simply false about a price series.
+      expect(screen.getByText('First')).toBeInTheDocument();
+      expect(screen.getByText('Latest')).toBeInTheDocument();
+      expect(screen.getByText('Lowest price')).toBeInTheDocument();
+      expect(screen.queryByText('Min Balance')).toBeNull();
+      expect(screen.queryByText('Starting')).toBeNull();
+    });
+
+    it('drops the overdrawn-account alarm for a named series', () => {
+      render(
+        <BalanceHistoryChart
+          data={[
+            { date: '2025-01-01', balance: 5 },
+            { date: '2025-01-02', balance: -12 },
+          ]}
+          isLoading={false}
+          summaryLabels={{
+            starting: 'First',
+            current: 'Latest',
+            ending: 'Ending',
+            lowest: 'Lowest',
+          }}
+        />,
+      );
+
+      // A negative return is a loss, not an overdraft: no red "!" and no
+      // substituted alarm wording.
+      expect(screen.queryByText('!')).toBeNull();
+      expect(screen.getByText('Lowest')).toBeInTheDocument();
+    });
+
+    it('keeps the balance wording when no names are given', () => {
+      render(
+        <BalanceHistoryChart
+          data={[
+            { date: '2025-01-01', balance: 100 },
+            { date: '2025-01-02', balance: 150 },
+          ]}
+          isLoading={false}
+        />,
+      );
+
+      expect(screen.getByText('Starting')).toBeInTheDocument();
+      expect(screen.getByText('Min Balance')).toBeInTheDocument();
+    });
+  });
+
   it('colours each summary figure green or red by sign', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-04-10T12:00:00Z'));

@@ -7,34 +7,21 @@
     "retry": "Retry"
   },
   "header": {
-    "metaSeparator": " · ",
-    "provider": "Provider: {provider}",
-    "providerNotSet": "Provider: not set",
     "priceAt": "Price at {date}",
     "noPrice": "No price recorded yet",
     "changeToday": "{change} ({percent}) today",
     "changeLast": "{change} ({percent}) last move",
     "inactiveBadge": "Inactive",
-    "watch": "Watch",
-    "watching": "Watching",
     "edit": "Edit",
-    "moreActions": "More",
-    "actionsAriaLabel": "Security actions"
-  },
-  "actions": {
-    "viewTransactions": "Transactions",
-    "viewPrices": "Price history",
-    "updatePrices": "Update prices now",
-    "deactivate": "Deactivate security",
-    "activate": "Activate security"
+    "favourites": "Favourites",
+    "switchSecurity": "Switch to another security",
+    "switchPlaceholder": "Filter by symbol or name...",
+    "switchNoMatches": "No securities match"
   },
   "toasts": {
-    "watchAdded": "Added to your watchlist",
-    "watchRemoved": "Removed from your watchlist",
-    "watchFailed": "Could not update your watchlist",
-    "pricesUpdated": "Updated {count} price(s)",
-    "noPricesFound": "No new prices found",
-    "pricesFailed": "Could not update prices"
+    "favouriteAdded": "Added to your favourites",
+    "favouriteRemoved": "Removed from your favourites",
+    "favouriteFailed": "Could not update your favourites"
   },
   "cards": {
     "marketValue": "Market value",
@@ -59,6 +46,12 @@
       "price": "Price",
       "value": "Investment value",
       "return": "Return"
+    },
+    "summary": {
+      "first": "First",
+      "latest": "Latest",
+      "ending": "Ending",
+      "lowest": "Lowest"
     }
   },
   "keyInfo": {
