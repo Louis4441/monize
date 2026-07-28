@@ -235,6 +235,45 @@
       "description": "Bagikan salinan data yang terenkripsi dan dide-identifikasi agar pengelola dapat mereproduksi bug tanpa melihat nama atau jumlah asli Anda."
     }
   },
+  "about": {
+    "heading": "Tentang",
+    "description": "Apa yang dijalankan instans ini, serta di mana menemukan catatan rilis, lisensi, dan kebijakan keamanan.",
+    "appName": "Monize",
+    "tagline": "Manajemen keuangan pribadi yang di-host sendiri.",
+    "versionLabel": "Versi",
+    "versionUnknown": "Tidak diketahui",
+    "versionButtonTitle": "Lihat catatan rilis untuk v{version}",
+    "apiVersionLabel": "Versi API",
+    "versionMismatch": "Aplikasi web dan API menjalankan versi yang berbeda. Biasanya ini berarti peningkatan hanya sebagian yang diterapkan -- mulai ulang atau terapkan ulang layanan yang tertinggal.",
+    "updateLabel": "Pembaruan",
+    "updateUpToDate": "Terbaru",
+    "updateAvailable": "v{version} tersedia",
+    "updateAvailableGeneric": "Versi yang lebih baru tersedia",
+    "updateViewRelease": "Lihat rilis",
+    "whatsNew": {
+      "label": "Yang baru di v{version}",
+      "labelGeneric": "Yang Baru",
+      "description": "Baca catatan rilis versi ini tanpa meninggalkan aplikasi."
+    },
+    "allReleases": {
+      "label": "Semua rilis",
+      "description": "Telusuri setiap rilis dan catatannya di GitHub."
+    },
+    "license": {
+      "label": "Lisensi",
+      "description": "Monize adalah perangkat lunak bebas di bawah GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Kebijakan keamanan",
+      "description": "Cara melaporkan kerentanan secara privat."
+    },
+    "diagnostics": {
+      "label": "Salin diagnostik",
+      "description": "Salin detail versi, peramban, dan bahasa untuk ditempelkan ke laporan bug.",
+      "copied": "Diagnostik disalin ke papan klip",
+      "copyFailed": "Tidak dapat menyalin diagnostik ke papan klip"
+    }
+  },
   "supportBackup": {
     "title": "Buat cadangan dukungan",
     "howItWorks": "Menghasilkan salinan cadangan yang dide-identifikasi: nama disamarkan (dua karakter pertama dan terakhir dipertahankan), catatan/deskripsi/nomor rekening dihapus, dan setiap jumlah dikalikan satu faktor tersembunyi, sementara nilai publik (kurs, harga, suku bunga) tetap utuh. Berkas selalu dienkripsi dengan kata sandi di bawah dan dipulihkan seperti cadangan biasa. Ini melindungi dari paparan tak sengaja, bukan dari orang yang sudah mengenal Anda — tanggal, frekuensi, dan struktur dipertahankan agar bug tetap dapat direproduksi.",
@@ -624,7 +663,8 @@
     "backupRestore": "Cadangkan & Pulihkan",
     "autoBackup": "Pencadangan Otomatis",
     "help": "Bantuan & Dukungan",
-    "dangerZone": "Zona Berbahaya"
+    "dangerZone": "Zona Berbahaya",
+    "about": "Tentang"
   },
   "page": {
     "title": "Pengaturan",

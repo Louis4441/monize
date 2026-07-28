@@ -235,6 +235,45 @@
       "description": "Partagez une copie chiffrée et dé-identifiée de vos données afin qu'un mainteneur puisse reproduire un bug sans voir vos vrais noms ni montants."
     }
   },
+  "about": {
+    "heading": "À propos",
+    "description": "Ce que cette instance exécute, et où trouver les notes de version, la licence et la politique de sécurité.",
+    "appName": "Monize",
+    "tagline": "Gestion de finances personnelles auto-hébergée.",
+    "versionLabel": "Version",
+    "versionUnknown": "Inconnue",
+    "versionButtonTitle": "Voir les notes de version de la v{version}",
+    "apiVersionLabel": "Version de l'API",
+    "versionMismatch": "L'application web et l'API n'exécutent pas la même version. Cela signifie généralement qu'une mise à jour n'a été déployée qu'en partie : redémarrez ou redéployez le service en retard.",
+    "updateLabel": "Mises à jour",
+    "updateUpToDate": "À jour",
+    "updateAvailable": "v{version} disponible",
+    "updateAvailableGeneric": "Une version plus récente est disponible",
+    "updateViewRelease": "Voir la version",
+    "whatsNew": {
+      "label": "Nouveautés de la v{version}",
+      "labelGeneric": "Nouveautés",
+      "description": "Consultez les notes de cette version sans quitter l'application."
+    },
+    "allReleases": {
+      "label": "Toutes les versions",
+      "description": "Parcourez toutes les versions et leurs notes sur GitHub."
+    },
+    "license": {
+      "label": "Licence",
+      "description": "Monize est un logiciel libre sous licence GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Politique de sécurité",
+      "description": "Comment signaler une vulnérabilité en privé."
+    },
+    "diagnostics": {
+      "label": "Copier le diagnostic",
+      "description": "Copiez les informations de version, de navigateur et de langue à coller dans un rapport de bogue.",
+      "copied": "Diagnostic copié dans le presse-papiers",
+      "copyFailed": "Impossible de copier le diagnostic dans le presse-papiers"
+    }
+  },
   "supportBackup": {
     "title": "Créer une sauvegarde de support",
     "howItWorks": "Produit une copie dé-identifiée de votre sauvegarde : les noms sont masqués (les deux premiers et deux derniers caractères sont conservés), les notes/descriptions/numéros de compte sont supprimés, et chaque montant est multiplié par un facteur caché unique tandis que les valeurs publiques (taux de change, cours, taux d'intérêt) restent intactes. Le fichier est toujours chiffré avec le mot de passe ci-dessous et se restaure comme une sauvegarde normale. Cela protège d'une exposition fortuite, pas de quelqu'un qui vous connaît déjà — dates, fréquences et structure sont préservées pour que les bugs restent reproductibles.",
@@ -624,7 +663,8 @@
     "backupRestore": "Sauvegarde et restauration",
     "autoBackup": "Sauvegarde automatique",
     "help": "Aide et support",
-    "dangerZone": "Zone dangereuse"
+    "dangerZone": "Zone dangereuse",
+    "about": "À propos"
   },
   "page": {
     "title": "Paramètres",

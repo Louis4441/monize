@@ -235,6 +235,45 @@
       "description": "Comparta una copia cifrada y desidentificada de sus datos para que un mantenedor pueda reproducir un error sin ver sus nombres o importes reales."
     }
   },
+  "about": {
+    "heading": "Acerca de",
+    "description": "Qué está ejecutando esta instancia y dónde encontrar las notas de la versión, la licencia y la política de seguridad.",
+    "appName": "Monize",
+    "tagline": "Gestión de finanzas personales autoalojada.",
+    "versionLabel": "Versión",
+    "versionUnknown": "Desconocida",
+    "versionButtonTitle": "Ver las notas de la versión v{version}",
+    "apiVersionLabel": "Versión de la API",
+    "versionMismatch": "La aplicación web y la API están ejecutando versiones diferentes. Normalmente significa que una actualización solo se desplegó parcialmente: reinicia o vuelve a desplegar el servicio que va por detrás.",
+    "updateLabel": "Actualizaciones",
+    "updateUpToDate": "Al día",
+    "updateAvailable": "v{version} disponible",
+    "updateAvailableGeneric": "Hay una versión más reciente disponible",
+    "updateViewRelease": "Ver la versión",
+    "whatsNew": {
+      "label": "Novedades de la v{version}",
+      "labelGeneric": "Novedades",
+      "description": "Lee las notas de esta versión sin salir de la aplicación."
+    },
+    "allReleases": {
+      "label": "Todas las versiones",
+      "description": "Consulta todas las versiones y sus notas en GitHub."
+    },
+    "license": {
+      "label": "Licencia",
+      "description": "Monize es software libre bajo la GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Política de seguridad",
+      "description": "Cómo informar de una vulnerabilidad de forma privada."
+    },
+    "diagnostics": {
+      "label": "Copiar diagnóstico",
+      "description": "Copia los datos de versión, navegador e idioma para pegarlos en un informe de error.",
+      "copied": "Diagnóstico copiado al portapapeles",
+      "copyFailed": "No se pudo copiar el diagnóstico al portapapeles"
+    }
+  },
   "supportBackup": {
     "title": "Crear copia para soporte",
     "howItWorks": "Genera una copia desidentificada de su copia de seguridad: los nombres se enmascaran (se conservan los dos primeros y los dos últimos caracteres), se eliminan notas/descripciones/números de cuenta y cada importe se multiplica por un único factor oculto, mientras los valores públicos (tipos de cambio, precios, tipos de interés) quedan intactos. El archivo siempre se cifra con la contraseña de abajo y se restaura como una copia normal. Protege frente a la exposición casual, no frente a alguien que ya le conoce: las fechas, frecuencias y estructura se conservan para que los errores se reproduzcan.",
@@ -624,7 +663,8 @@
     "backupRestore": "Copia de seguridad y restauración",
     "autoBackup": "Copia de seguridad automática",
     "help": "Ayuda y soporte",
-    "dangerZone": "Zona de peligro"
+    "dangerZone": "Zona de peligro",
+    "about": "Acerca de"
   },
   "page": {
     "title": "Configuración",

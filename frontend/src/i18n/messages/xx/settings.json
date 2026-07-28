@@ -235,6 +235,45 @@
       "description": "[XX-Share a de-identified, encrypted copy of your data so a maintainer can reproduce a bug without seeing your real names or amounts.-XX]"
     }
   },
+  "about": {
+    "heading": "[XX-About-XX]",
+    "description": "[XX-What this instance is running, and where to find the release notes, licence and security policy.-XX]",
+    "appName": "[XX-Monize-XX]",
+    "tagline": "[XX-Self-hosted personal finance management.-XX]",
+    "versionLabel": "[XX-Version-XX]",
+    "versionUnknown": "[XX-Unknown-XX]",
+    "versionButtonTitle": "[XX-View release notes for v{version}-XX]",
+    "apiVersionLabel": "[XX-API version-XX]",
+    "versionMismatch": "[XX-The web app and the API are running different versions. This usually means an upgrade only partly rolled out -- restart or redeploy the lagging service.-XX]",
+    "updateLabel": "[XX-Updates-XX]",
+    "updateUpToDate": "[XX-Up to date-XX]",
+    "updateAvailable": "[XX-v{version} available-XX]",
+    "updateAvailableGeneric": "[XX-A newer version is available-XX]",
+    "updateViewRelease": "[XX-View release-XX]",
+    "whatsNew": {
+      "label": "[XX-What's new in v{version}-XX]",
+      "labelGeneric": "[XX-What's new-XX]",
+      "description": "[XX-Read this version's release notes without leaving the app.-XX]"
+    },
+    "allReleases": {
+      "label": "[XX-All releases-XX]",
+      "description": "[XX-Browse every release and its notes on GitHub.-XX]"
+    },
+    "license": {
+      "label": "[XX-Licence-XX]",
+      "description": "[XX-Monize is free software under the GNU AGPL v3.-XX]"
+    },
+    "securityPolicy": {
+      "label": "[XX-Security policy-XX]",
+      "description": "[XX-How to report a vulnerability privately.-XX]"
+    },
+    "diagnostics": {
+      "label": "[XX-Copy diagnostics-XX]",
+      "description": "[XX-Copy version, browser and locale details to paste into a bug report.-XX]",
+      "copied": "[XX-Diagnostics copied to clipboard-XX]",
+      "copyFailed": "[XX-Could not copy diagnostics to the clipboard-XX]"
+    }
+  },
   "supportBackup": {
     "title": "[XX-Create support backup-XX]",
     "howItWorks": "[XX-This produces a de-identified copy of your backup: names are masked (first and last two characters kept), notes/descriptions/account numbers are removed, and every amount is multiplied by a single hidden factor while public values (exchange rates, prices, interest rates) are left intact. The file is always encrypted with the password below and restores like a normal backup. This protects against casual exposure, not against someone who already knows you -- dates, frequencies and structure are preserved so bugs still reproduce.-XX]",
@@ -624,7 +663,8 @@
     "backupRestore": "[XX-Backup & Restore-XX]",
     "autoBackup": "[XX-Automatic Backup-XX]",
     "help": "[XX-Help & Support-XX]",
-    "dangerZone": "[XX-Danger Zone-XX]"
+    "dangerZone": "[XX-Danger Zone-XX]",
+    "about": "[XX-About-XX]"
   },
   "page": {
     "title": "[XX-Settings-XX]",

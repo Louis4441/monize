@@ -75,6 +75,14 @@ export function recordAnnouncedVersion(version: string | undefined): boolean {
 interface WhatsNewState {
   isOpen: boolean;
   /**
+   * The version the *backend* reports, published by WhatsNewHost from the
+   * release-notes fetch it already performs on every load. Kept here so the
+   * About section can compare it against the UI's build-time version without a
+   * second request -- a mismatch means a rolling upgrade only half landed.
+   * Undefined until that fetch resolves (or if it failed).
+   */
+  backendVersion: string | undefined;
+  /**
    * The modal stepped aside for a guided tour started from its offer list, so
    * it should come back when that tour ends -- the remaining tours are listed
    * there and were otherwise unreachable afterwards. A plain `close()` (the X,
@@ -88,11 +96,15 @@ interface WhatsNewState {
   closeForTour: () => void;
   /** Bring a paused modal back; a no-op when it was not paused for a tour. */
   resumeAfterTour: () => void;
+  /** Record the version reported by the backend. */
+  setBackendVersion: (version: string | undefined) => void;
 }
 
 export const useWhatsNewStore = create<WhatsNewState>((set, get) => ({
   isOpen: false,
   pausedForTour: false,
+  backendVersion: undefined,
+  setBackendVersion: (version) => set({ backendVersion: version }),
   open: () => set({ isOpen: true, pausedForTour: false }),
   close: () => set({ isOpen: false, pausedForTour: false }),
   closeForTour: () => set({ isOpen: false, pausedForTour: true }),

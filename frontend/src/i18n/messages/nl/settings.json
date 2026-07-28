@@ -235,6 +235,45 @@
       "description": "Deel een versleutelde, gede-identificeerde kopie van je gegevens zodat een beheerder een bug kan reproduceren zonder je echte namen of bedragen te zien."
     }
   },
+  "about": {
+    "heading": "Over",
+    "description": "Wat deze instantie draait en waar u de release-opmerkingen, licentie en het beveiligingsbeleid vindt.",
+    "appName": "Monize",
+    "tagline": "Zelfgehost beheer van persoonlijke financiën.",
+    "versionLabel": "Versie",
+    "versionUnknown": "Onbekend",
+    "versionButtonTitle": "Release-opmerkingen voor v{version} bekijken",
+    "apiVersionLabel": "API-versie",
+    "versionMismatch": "De webapp en de API draaien verschillende versies. Meestal betekent dit dat een upgrade maar deels is uitgerold -- start de achterlopende service opnieuw of implementeer die opnieuw.",
+    "updateLabel": "Updates",
+    "updateUpToDate": "Up-to-date",
+    "updateAvailable": "v{version} beschikbaar",
+    "updateAvailableGeneric": "Er is een nieuwere versie beschikbaar",
+    "updateViewRelease": "Release bekijken",
+    "whatsNew": {
+      "label": "Wat is er nieuw in v{version}",
+      "labelGeneric": "Wat is er nieuw",
+      "description": "Lees de release-opmerkingen van deze versie zonder de app te verlaten."
+    },
+    "allReleases": {
+      "label": "Alle releases",
+      "description": "Bekijk elke release en de bijbehorende opmerkingen op GitHub."
+    },
+    "license": {
+      "label": "Licentie",
+      "description": "Monize is vrije software onder de GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Beveiligingsbeleid",
+      "description": "Hoe u een kwetsbaarheid vertrouwelijk meldt."
+    },
+    "diagnostics": {
+      "label": "Diagnostiek kopiëren",
+      "description": "Kopieer versie-, browser- en taalgegevens om in een bugmelding te plakken.",
+      "copied": "Diagnostiek gekopieerd naar het klembord",
+      "copyFailed": "Kon de diagnostiek niet naar het klembord kopiëren"
+    }
+  },
   "supportBackup": {
     "title": "Supportback-up maken",
     "howItWorks": "Dit maakt een gede-identificeerde kopie van je back-up: namen worden gemaskeerd (eerste en laatste twee tekens blijven), notities/omschrijvingen/rekeningnummers worden verwijderd en elk bedrag wordt vermenigvuldigd met één verborgen factor, terwijl publieke waarden (wisselkoersen, koersen, rentetarieven) intact blijven. Het bestand wordt altijd versleuteld met het onderstaande wachtwoord en herstelt als een normale back-up. Dit beschermt tegen terloopse blootstelling, niet tegen iemand die je al kent — datums, frequenties en structuur blijven behouden zodat bugs reproduceerbaar zijn.",
@@ -624,7 +663,8 @@
     "backupRestore": "Back-up en herstel",
     "autoBackup": "Automatische back-up",
     "help": "Help & ondersteuning",
-    "dangerZone": "Gevarenzone"
+    "dangerZone": "Gevarenzone",
+    "about": "Over"
   },
   "page": {
     "title": "Instellingen",
