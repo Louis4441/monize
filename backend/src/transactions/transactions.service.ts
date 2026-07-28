@@ -6,8 +6,7 @@ import {
   forwardRef,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Brackets, Repository, In, DataSource, QueryRunner } from "typeorm";
+import { Brackets, EntityManager, In, DataSource } from "typeorm";
 import { Transaction, TransactionStatus } from "./entities/transaction.entity";
 import { TransactionSplit } from "./entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
@@ -61,6 +60,7 @@ import {
   BulkCreateSkip,
   bulkSkipReason,
 } from "../common/bulk-create.types";
+import { tenantTx } from "../common/db/tenant-tx";
 
 export interface TransactionWithInvestmentLink extends Transaction {
   linkedInvestmentTransactionId?: string | null;
@@ -190,16 +190,6 @@ export class TransactionsService {
   private readonly logger = new Logger(TransactionsService.name);
 
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(TransactionSplit)
-    private splitsRepository: Repository<TransactionSplit>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
-    @InjectRepository(InvestmentTransaction)
-    private investmentTransactionsRepository: Repository<InvestmentTransaction>,
-    @InjectRepository(UserPreference)
-    private userPreferenceRepository: Repository<UserPreference>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     private payeesService: PayeesService,
@@ -226,9 +216,11 @@ export class TransactionsService {
     term?: string,
   ): Promise<ParsedSearchTerm> {
     if (!term || !term.trim()) return { amount: null, date: null };
-    const prefs = await this.userPreferenceRepository.findOne({
-      where: { userId },
-    });
+    const prefs = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({
+        where: { userId },
+      }),
+    );
     return parseSearchTerm(term, {
       numberFormat: prefs?.numberFormat,
       dateFormat: prefs?.dateFormat,
@@ -356,9 +348,11 @@ export class TransactionsService {
       resolvedPayeeName = payee.name;
     }
     if (transactionData.categoryId) {
-      const cat = await this.categoriesRepository.findOne({
-        where: { id: transactionData.categoryId, userId },
-      });
+      const cat = await tenantTx(this.dataSource, (m) =>
+        m.getRepository(Category).findOne({
+          where: { id: transactionData.categoryId, userId },
+        }),
+      );
       if (!cat) {
         throw new NotFoundException(
           tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -378,14 +372,11 @@ export class TransactionsService {
       }
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    let savedTransactionId: string;
-
-    try {
-      const transaction = queryRunner.manager.create(Transaction, {
+    // One transaction: the row, its splits/tags, and the balance update
+    // commit or roll back together. Nested service calls (split service, tags,
+    // account balances) run their own tenantTx and join this one.
+    const savedTransactionId = await tenantTx(this.dataSource, async (m) => {
+      const transaction = m.create(Transaction, {
         ...transactionData,
         payeeId: resolvedPayeeId,
         payeeName: resolvedPayeeName,
@@ -397,8 +388,7 @@ export class TransactionsService {
         originalCurrencyCode: fx.originalCurrencyCode,
       });
 
-      const savedTransaction = await queryRunner.manager.save(transaction);
-      savedTransactionId = savedTransaction.id;
+      const savedTransaction = await m.save(transaction);
 
       if (hasSplits) {
         const savedSplits = await this.splitService.createSplits(
@@ -408,13 +398,12 @@ export class TransactionsService {
           createTransactionDto.accountId,
           new Date(createTransactionDto.transactionDate),
           resolvedPayeeName,
-          queryRunner,
           resolvedPayeeId,
         );
 
         // Set split-level tags (and mirror them onto any transfer counterpart)
         if (savedSplits && splits) {
-          await this.applySplitTags(savedSplits, splits, userId, queryRunner);
+          await this.applySplitTags(savedSplits, splits, userId);
         }
       }
 
@@ -424,7 +413,6 @@ export class TransactionsService {
           savedTransaction.id,
           tagIds,
           userId,
-          queryRunner,
         );
       }
 
@@ -432,24 +420,17 @@ export class TransactionsService {
         if (isTransactionInFuture(createTransactionDto.transactionDate)) {
           await this.accountsService.recalculateCurrentBalance(
             createTransactionDto.accountId,
-            queryRunner,
           );
         } else {
           await this.accountsService.updateBalance(
             createTransactionDto.accountId,
             Number(createTransactionDto.amount),
-            queryRunner,
           );
         }
       }
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      return savedTransaction.id;
+    });
 
     this.netWorthService.triggerDebouncedRecalc(
       createTransactionDto.accountId,
@@ -515,9 +496,12 @@ export class TransactionsService {
     let categoryId: string | null = input.categoryId ?? null;
     let categoryName: string | null = null;
     if (categoryId) {
-      const cat = await this.categoriesRepository.findOne({
-        where: { id: categoryId, userId },
-      });
+      const requestedCategoryId = categoryId;
+      const cat = await tenantTx(this.dataSource, (m) =>
+        m.getRepository(Category).findOne({
+          where: { id: requestedCategoryId, userId },
+        }),
+      );
       if (!cat) {
         throw new NotFoundException(
           tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -588,9 +572,11 @@ export class TransactionsService {
     categoryId: string,
   ): Promise<CategorizeTransactionPreview> {
     const transaction = await this.findOne(userId, transactionId);
-    const cat = await this.categoriesRepository.findOne({
-      where: { id: categoryId, userId },
-    });
+    const cat = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Category).findOne({
+        where: { id: categoryId, userId },
+      }),
+    );
     if (!cat) {
       throw new NotFoundException(
         tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -680,9 +666,11 @@ export class TransactionsService {
     let categoryId: string | null = existing.categoryId ?? null;
     let categoryName: string | null = existing.category?.name ?? null;
     if (input.categoryId !== undefined) {
-      const cat = await this.categoriesRepository.findOne({
-        where: { id: input.categoryId, userId },
-      });
+      const cat = await tenantTx(this.dataSource, (m) =>
+        m.getRepository(Category).findOne({
+          where: { id: input.categoryId, userId },
+        }),
+      );
       if (!cat) {
         throw new NotFoundException(
           tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -782,23 +770,25 @@ export class TransactionsService {
       where.payeeName = filter.payeeName;
     }
 
-    const rows = await this.transactionsRepository.find({
-      where,
-      order: { transactionDate: "DESC", createdAt: "DESC" },
-      take: window,
-      relations: [
-        "payee",
-        "category",
-        "account",
-        "tags",
-        "splits",
-        "splits.category",
-        "splits.transferAccount",
-        "splits.tags",
-        "splits.investmentTransaction",
-        "splits.investmentTransaction.security",
-      ],
-    });
+    const rows = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Transaction).find({
+        where,
+        order: { transactionDate: "DESC", createdAt: "DESC" },
+        take: window,
+        relations: [
+          "payee",
+          "category",
+          "account",
+          "tags",
+          "splits",
+          "splits.category",
+          "splits.transferAccount",
+          "splits.tags",
+          "splits.investmentTransaction",
+          "splits.investmentTransaction.security",
+        ],
+      }),
+    );
 
     if (isPayeeFiltered) {
       return rows.slice(0, safeLimit);
@@ -851,260 +841,273 @@ export class TransactionsService {
     // balance so all three match the same rows.
     const parsedSearch = await this.resolveSearchTerm(userId, search);
 
-    const queryBuilder = this.transactionsRepository
-      .createQueryBuilder("transaction")
-      .leftJoinAndSelect("transaction.account", "account")
-      .leftJoinAndSelect("transaction.payee", "payee")
-      .leftJoinAndSelect("transaction.category", "category")
-      .leftJoinAndSelect("transaction.tags", "tags")
-      .leftJoinAndSelect("transaction.splits", "splits")
-      .leftJoinAndSelect("splits.category", "splitCategory")
-      .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
-      .leftJoinAndSelect("splits.tags", "splitTags")
-      .leftJoinAndSelect("splits.investmentTransaction", "splitInvestmentTx")
-      .leftJoinAndSelect(
-        "splitInvestmentTx.security",
-        "splitInvestmentSecurity",
-      )
-      .leftJoinAndSelect("transaction.linkedTransaction", "linkedTransaction")
-      .leftJoinAndSelect("linkedTransaction.account", "linkedAccount")
-      .leftJoinAndSelect("linkedTransaction.splits", "linkedSplits")
-      .leftJoinAndSelect("linkedSplits.category", "linkedSplitCategory")
-      .leftJoinAndSelect(
-        "linkedSplits.transferAccount",
-        "linkedSplitTransferAccount",
-      )
-      .where("transaction.userId = :userId", { userId })
-      .orderBy(
-        sortBy === "amount"
-          ? "transaction.amount"
-          : sortBy === "payee"
-            ? "transaction.payeeName"
-            : "transaction.transactionDate",
-        sortDirection,
-      )
-      .addOrderBy("transaction.createdAt", sortDirection)
-      .addOrderBy("transaction.id", sortDirection);
+    // The whole listing -- main query, target-page lookup, running-balance
+    // math, and investment/attachment enrichment -- is one read block on a
+    // single tenantTx manager.
+    return tenantTx(this.dataSource, async (m) => {
+      const queryBuilder = m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .leftJoinAndSelect("transaction.account", "account")
+        .leftJoinAndSelect("transaction.payee", "payee")
+        .leftJoinAndSelect("transaction.category", "category")
+        .leftJoinAndSelect("transaction.tags", "tags")
+        .leftJoinAndSelect("transaction.splits", "splits")
+        .leftJoinAndSelect("splits.category", "splitCategory")
+        .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
+        .leftJoinAndSelect("splits.tags", "splitTags")
+        .leftJoinAndSelect("splits.investmentTransaction", "splitInvestmentTx")
+        .leftJoinAndSelect(
+          "splitInvestmentTx.security",
+          "splitInvestmentSecurity",
+        )
+        .leftJoinAndSelect("transaction.linkedTransaction", "linkedTransaction")
+        .leftJoinAndSelect("linkedTransaction.account", "linkedAccount")
+        .leftJoinAndSelect("linkedTransaction.splits", "linkedSplits")
+        .leftJoinAndSelect("linkedSplits.category", "linkedSplitCategory")
+        .leftJoinAndSelect(
+          "linkedSplits.transferAccount",
+          "linkedSplitTransferAccount",
+        )
+        .where("transaction.userId = :userId", { userId })
+        .orderBy(
+          sortBy === "amount"
+            ? "transaction.amount"
+            : sortBy === "payee"
+              ? "transaction.payeeName"
+              : "transaction.transactionDate",
+          sortDirection,
+        )
+        .addOrderBy("transaction.createdAt", sortDirection)
+        .addOrderBy("transaction.id", sortDirection);
 
-    if (!includeInvestmentBrokerage) {
-      queryBuilder.andWhere(
-        "(account.accountSubType IS NULL OR account.accountSubType != 'INVESTMENT_BROKERAGE')",
-      );
-    }
+      if (!includeInvestmentBrokerage) {
+        queryBuilder.andWhere(
+          "(account.accountSubType IS NULL OR account.accountSubType != 'INVESTMENT_BROKERAGE')",
+        );
+      }
 
-    if (accountIds && accountIds.length > 0) {
-      queryBuilder.andWhere("transaction.accountId IN (:...accountIds)", {
-        accountIds,
-      });
-    }
+      if (accountIds && accountIds.length > 0) {
+        queryBuilder.andWhere("transaction.accountId IN (:...accountIds)", {
+          accountIds,
+        });
+      }
 
-    if (startDate) {
-      queryBuilder.andWhere("transaction.transactionDate >= :startDate", {
-        startDate,
-      });
-    }
+      if (startDate) {
+        queryBuilder.andWhere("transaction.transactionDate >= :startDate", {
+          startDate,
+        });
+      }
 
-    if (endDate) {
-      queryBuilder.andWhere("transaction.transactionDate <= :endDate", {
-        endDate,
-      });
-    }
+      if (endDate) {
+        queryBuilder.andWhere("transaction.transactionDate <= :endDate", {
+          endDate,
+        });
+      }
 
-    if (categoryIds && categoryIds.length > 0) {
-      await this.applyCategoryFilters(queryBuilder, categoryIds, userId);
-    }
+      if (categoryIds && categoryIds.length > 0) {
+        await this.applyCategoryFilters(m, queryBuilder, categoryIds, userId);
+      }
 
-    if (payeeIds && payeeIds.length > 0) {
-      queryBuilder.andWhere("transaction.payeeId IN (:...payeeIds)", {
-        payeeIds,
-      });
-    }
+      if (payeeIds && payeeIds.length > 0) {
+        queryBuilder.andWhere("transaction.payeeId IN (:...payeeIds)", {
+          payeeIds,
+        });
+      }
 
-    if (search && search.trim()) {
-      const searchPattern = `%${escapeLikePattern(search.trim())}%`;
-      queryBuilder.andWhere(
-        buildTransactionSearchClause({
-          transaction: "transaction",
-          splits: "splits",
-        }),
-        {
-          search: searchPattern,
-          searchAmount: parsedSearch.amount,
-          searchDate: parsedSearch.date,
-        },
-      );
-    }
+      if (search && search.trim()) {
+        const searchPattern = `%${escapeLikePattern(search.trim())}%`;
+        queryBuilder.andWhere(
+          buildTransactionSearchClause({
+            transaction: "transaction",
+            splits: "splits",
+          }),
+          {
+            search: searchPattern,
+            searchAmount: parsedSearch.amount,
+            searchDate: parsedSearch.date,
+          },
+        );
+      }
 
-    if (amountFrom !== undefined) {
-      queryBuilder.andWhere("transaction.amount >= :amountFrom", {
-        amountFrom,
-      });
-    }
+      if (amountFrom !== undefined) {
+        queryBuilder.andWhere("transaction.amount >= :amountFrom", {
+          amountFrom,
+        });
+      }
 
-    if (amountTo !== undefined) {
-      queryBuilder.andWhere("transaction.amount <= :amountTo", { amountTo });
-    }
+      if (amountTo !== undefined) {
+        queryBuilder.andWhere("transaction.amount <= :amountTo", { amountTo });
+      }
 
-    if (tagIds && tagIds.length > 0) {
-      queryBuilder.leftJoin("transaction.tags", "filterTags");
-      queryBuilder.leftJoin("splits.tags", "filterSplitTags");
-      queryBuilder.andWhere(
-        new Brackets((qb) => {
-          qb.where("filterTags.id IN (:...filterTagIds)", {
-            filterTagIds: tagIds,
-          }).orWhere("filterSplitTags.id IN (:...filterTagIds)", {
-            filterTagIds: tagIds,
-          });
-        }),
-      );
-    }
+      if (tagIds && tagIds.length > 0) {
+        queryBuilder.leftJoin("transaction.tags", "filterTags");
+        queryBuilder.leftJoin("splits.tags", "filterSplitTags");
+        queryBuilder.andWhere(
+          new Brackets((qb) => {
+            qb.where("filterTags.id IN (:...filterTagIds)", {
+              filterTagIds: tagIds,
+            }).orWhere("filterSplitTags.id IN (:...filterTagIds)", {
+              filterTagIds: tagIds,
+            });
+          }),
+        );
+      }
 
-    if (tagKeyFilter) {
-      const { clause, params } = buildTagKeyFilterClause(
-        "transaction",
-        tagKeyFilter,
-      );
-      queryBuilder.andWhere(clause, params);
-    }
+      if (tagKeyFilter) {
+        const { clause, params } = buildTagKeyFilterClause(
+          "transaction",
+          tagKeyFilter,
+        );
+        queryBuilder.andWhere(clause, params);
+      }
 
-    if (statuses && statuses.length > 0) {
-      queryBuilder.andWhere("transaction.status IN (:...statuses)", {
-        statuses,
-      });
-    }
+      if (statuses && statuses.length > 0) {
+        queryBuilder.andWhere("transaction.status IN (:...statuses)", {
+          statuses,
+        });
+      }
 
-    if (originalCurrencyCodes && originalCurrencyCodes.length > 0) {
-      queryBuilder.andWhere(
-        "transaction.original_currency_code IN (:...originalCurrencyCodes)",
-        { originalCurrencyCodes },
-      );
-    }
+      if (originalCurrencyCodes && originalCurrencyCodes.length > 0) {
+        queryBuilder.andWhere(
+          "transaction.original_currency_code IN (:...originalCurrencyCodes)",
+          { originalCurrencyCodes },
+        );
+      }
 
-    // Attachment presence filter. An EXISTS subquery against the separate
-    // transaction_attachments table keeps this out of the heavily-joined main
-    // query, so it never multiplies rows or corrupts pagination.
-    if (hasAttachments !== undefined) {
-      const existsSubquery =
-        "SELECT 1 FROM transaction_attachments ta WHERE ta.transaction_id = transaction.id";
-      queryBuilder.andWhere(
-        hasAttachments
-          ? `EXISTS (${existsSubquery})`
-          : `NOT EXISTS (${existsSubquery})`,
-      );
-    }
+      // Attachment presence filter. An EXISTS subquery against the separate
+      // transaction_attachments table keeps this out of the heavily-joined main
+      // query, so it never multiplies rows or corrupts pagination.
+      if (hasAttachments !== undefined) {
+        const existsSubquery =
+          "SELECT 1 FROM transaction_attachments ta WHERE ta.transaction_id = transaction.id";
+        queryBuilder.andWhere(
+          hasAttachments
+            ? `EXISTS (${existsSubquery})`
+            : `NOT EXISTS (${existsSubquery})`,
+        );
+      }
 
-    if (targetTransactionId) {
-      safePage = await this.calculateTargetPage(
-        userId,
-        targetTransactionId,
-        safeLimit,
-        accountIds,
-        startDate,
-        endDate,
-        payeeIds,
-        search,
-        includeInvestmentBrokerage,
-        safePage,
-        parsedSearch,
-      );
-    }
-
-    const skip = (safePage - 1) * safeLimit;
-
-    const [data, total] = await queryBuilder
-      .skip(skip)
-      .take(safeLimit)
-      .getManyAndCount();
-
-    let startingBalance: number | undefined;
-    const singleAccountId =
-      accountIds?.length === 1 ? accountIds[0] : undefined;
-    const hasContentFilters = !!(
-      (categoryIds && categoryIds.length > 0) ||
-      (payeeIds && payeeIds.length > 0) ||
-      (tagIds && tagIds.length > 0) ||
-      search ||
-      amountFrom !== undefined ||
-      amountTo !== undefined
-    );
-    if (singleAccountId && data.length > 0) {
-      startingBalance = await this.calculateStartingBalance(
-        userId,
-        singleAccountId,
-        safePage,
-        skip,
-        {
+      if (targetTransactionId) {
+        safePage = await this.calculateTargetPage(
+          m,
+          userId,
+          targetTransactionId,
+          safeLimit,
+          accountIds,
           startDate,
           endDate,
-          categoryIds,
           payeeIds,
-          tagIds,
           search,
-          searchAmount: parsedSearch.amount,
-          searchDate: parsedSearch.date,
-          amountFrom,
-          amountTo,
-        },
-      );
-    } else if (
-      accountIds &&
-      accountIds.length > 1 &&
-      hasContentFilters &&
-      data.length > 0
-    ) {
-      startingBalance = await this.calculateMultiAccountContentFilteredBalance(
-        userId,
-        accountIds,
-        safePage,
-        skip,
-        {
-          startDate,
-          endDate,
-          categoryIds,
-          payeeIds,
-          tagIds,
-          search,
-          searchAmount: parsedSearch.amount,
-          searchDate: parsedSearch.date,
-          amountFrom,
-          amountTo,
-        },
-      );
-    } else if (
-      (!accountIds || accountIds.length === 0) &&
-      hasContentFilters &&
-      data.length > 0
-    ) {
-      startingBalance = await this.calculateMultiAccountContentFilteredBalance(
-        userId,
-        undefined,
-        safePage,
-        skip,
-        {
-          startDate,
-          endDate,
-          categoryIds,
-          payeeIds,
-          tagIds,
-          search,
-          searchAmount: parsedSearch.amount,
-          searchDate: parsedSearch.date,
-          amountFrom,
-          amountTo,
-        },
-      );
-    }
+          includeInvestmentBrokerage,
+          safePage,
+          parsedSearch,
+        );
+      }
 
-    const enrichedData = await this.enrichWithInvestmentLinks(data);
+      const skip = (safePage - 1) * safeLimit;
 
-    return {
-      data: enrichedData,
-      pagination: buildPaginationMeta(safePage, safeLimit, total),
-      startingBalance,
-    };
+      const [data, total] = await queryBuilder
+        .skip(skip)
+        .take(safeLimit)
+        .getManyAndCount();
+
+      let startingBalance: number | undefined;
+      const singleAccountId =
+        accountIds?.length === 1 ? accountIds[0] : undefined;
+      const hasContentFilters = !!(
+        (categoryIds && categoryIds.length > 0) ||
+        (payeeIds && payeeIds.length > 0) ||
+        (tagIds && tagIds.length > 0) ||
+        search ||
+        amountFrom !== undefined ||
+        amountTo !== undefined
+      );
+      if (singleAccountId && data.length > 0) {
+        startingBalance = await this.calculateStartingBalance(
+          m,
+          userId,
+          singleAccountId,
+          safePage,
+          skip,
+          {
+            startDate,
+            endDate,
+            categoryIds,
+            payeeIds,
+            tagIds,
+            search,
+            searchAmount: parsedSearch.amount,
+            searchDate: parsedSearch.date,
+            amountFrom,
+            amountTo,
+          },
+        );
+      } else if (
+        accountIds &&
+        accountIds.length > 1 &&
+        hasContentFilters &&
+        data.length > 0
+      ) {
+        startingBalance =
+          await this.calculateMultiAccountContentFilteredBalance(
+            m,
+            userId,
+            accountIds,
+            safePage,
+            skip,
+            {
+              startDate,
+              endDate,
+              categoryIds,
+              payeeIds,
+              tagIds,
+              search,
+              searchAmount: parsedSearch.amount,
+              searchDate: parsedSearch.date,
+              amountFrom,
+              amountTo,
+            },
+          );
+      } else if (
+        (!accountIds || accountIds.length === 0) &&
+        hasContentFilters &&
+        data.length > 0
+      ) {
+        startingBalance =
+          await this.calculateMultiAccountContentFilteredBalance(
+            m,
+            userId,
+            undefined,
+            safePage,
+            skip,
+            {
+              startDate,
+              endDate,
+              categoryIds,
+              payeeIds,
+              tagIds,
+              search,
+              searchAmount: parsedSearch.amount,
+              searchDate: parsedSearch.date,
+              amountFrom,
+              amountTo,
+            },
+          );
+      }
+
+      const enrichedData = await this.enrichWithInvestmentLinks(m, data);
+
+      return {
+        data: enrichedData,
+        pagination: buildPaginationMeta(safePage, safeLimit, total),
+        startingBalance,
+      };
+    });
   }
 
   private async applyCategoryFilters(
+    m: EntityManager,
     queryBuilder: any,
     categoryIds: string[],
     userId: string,
@@ -1121,7 +1124,7 @@ export class TransactionsService {
       const uniqueCategoryIds =
         regularCategoryIds.length > 0
           ? await getAllCategoryIdsWithChildren(
-              this.categoriesRepository,
+              m.getRepository(Category),
               userId,
               regularCategoryIds,
             )
@@ -1181,6 +1184,7 @@ export class TransactionsService {
   }
 
   private async calculateTargetPage(
+    m: EntityManager,
     userId: string,
     targetTransactionId: string,
     safeLimit: number,
@@ -1194,14 +1198,15 @@ export class TransactionsService {
     parsedSearch: ParsedSearchTerm = { amount: null, date: null },
   ): Promise<number> {
     try {
-      const targetTx = await this.transactionsRepository.findOne({
+      const targetTx = await m.getRepository(Transaction).findOne({
         where: { id: targetTransactionId, userId },
         select: ["id", "transactionDate", "createdAt"],
       });
 
       if (!targetTx) return fallbackPage;
 
-      const countQuery = this.transactionsRepository
+      const countQuery = m
+        .getRepository(Transaction)
         .createQueryBuilder("t")
         .leftJoin("t.account", "a")
         .leftJoin("t.splits", "s")
@@ -1259,6 +1264,7 @@ export class TransactionsService {
   }
 
   private async calculateStartingBalance(
+    m: EntityManager,
     userId: string,
     singleAccountId: string,
     safePage: number,
@@ -1288,6 +1294,7 @@ export class TransactionsService {
 
     if (hasContentFilters) {
       return this.calculateContentFilteredBalance(
+        m,
         userId,
         singleAccountId,
         safePage,
@@ -1298,6 +1305,7 @@ export class TransactionsService {
 
     if (hasDateFilter) {
       return this.calculateDateFilteredBalance(
+        m,
         userId,
         singleAccountId,
         safePage,
@@ -1308,6 +1316,7 @@ export class TransactionsService {
 
     // No filters: original behavior
     return this.calculateUnfilteredBalance(
+      m,
       userId,
       singleAccountId,
       safePage,
@@ -1320,6 +1329,7 @@ export class TransactionsService {
    * (current + future) adjusted for pagination.
    */
   private async calculateUnfilteredBalance(
+    m: EntityManager,
     userId: string,
     singleAccountId: string,
     safePage: number,
@@ -1334,7 +1344,8 @@ export class TransactionsService {
       return projectedBalance;
     }
 
-    const previousPagesQuery = this.transactionsRepository
+    const previousPagesQuery = m
+      .getRepository(Transaction)
       .createQueryBuilder("t")
       .select("t.id")
       .where("t.userId = :userId", { userId })
@@ -1344,7 +1355,8 @@ export class TransactionsService {
       .addOrderBy("t.id", "DESC")
       .limit(skip);
 
-    const sumResult = await this.transactionsRepository
+    const sumResult = await m
+      .getRepository(Transaction)
       .createQueryBuilder("transaction")
       .select("SUM(transaction.amount)", "sum")
       .where(`transaction.id IN (${previousPagesQuery.getQuery()})`)
@@ -1361,6 +1373,7 @@ export class TransactionsService {
    * or totalSum - sumOfPreviousPages (page > 1).
    */
   private async calculateContentFilteredBalance(
+    m: EntityManager,
     userId: string,
     accountId: string,
     safePage: number,
@@ -1377,12 +1390,14 @@ export class TransactionsService {
     },
   ): Promise<number> {
     const idsSubquery = await this.buildFilteredIdsSubquery(
+      m,
       userId,
       accountId,
       filters,
     );
 
     const totalSum = await this.computeSplitAwareSum(
+      m,
       idsSubquery,
       userId,
       filters,
@@ -1392,7 +1407,13 @@ export class TransactionsService {
 
     return (
       totalSum -
-      (await this.computeFilteredPrevPagesSum(userId, accountId, skip, filters))
+      (await this.computeFilteredPrevPagesSum(
+        m,
+        userId,
+        accountId,
+        skip,
+        filters,
+      ))
     );
   }
 
@@ -1401,6 +1422,7 @@ export class TransactionsService {
    * across multiple accounts when content filters are active.
    */
   private async calculateMultiAccountContentFilteredBalance(
+    m: EntityManager,
     userId: string,
     accountIds: string[] | undefined,
     safePage: number,
@@ -1419,12 +1441,14 @@ export class TransactionsService {
     },
   ): Promise<number> {
     const idsSubquery = await this.buildFilteredIdsSubquery(
+      m,
       userId,
       accountIds,
       filters,
     );
 
     const totalSum = await this.computeSplitAwareSum(
+      m,
       idsSubquery,
       userId,
       filters,
@@ -1435,6 +1459,7 @@ export class TransactionsService {
     return (
       totalSum -
       (await this.computeFilteredPrevPagesSum(
+        m,
         userId,
         accountIds,
         skip,
@@ -1450,6 +1475,7 @@ export class TransactionsService {
    * Adjusted for pagination within the filtered set.
    */
   private async calculateDateFilteredBalance(
+    m: EntityManager,
     userId: string,
     accountId: string,
     safePage: number,
@@ -1468,7 +1494,8 @@ export class TransactionsService {
         accountId,
       );
 
-      const sumAfterResult = await this.transactionsRepository
+      const sumAfterResult = await m
+        .getRepository(Transaction)
         .createQueryBuilder("t")
         .select("COALESCE(SUM(t.amount), 0)", "sum")
         .where("t.userId = :userId", { userId })
@@ -1487,7 +1514,8 @@ export class TransactionsService {
     if (safePage === 1) return baseBalance;
 
     // For page > 1, subtract sum of previous pages (within filtered set)
-    const previousPagesQuery = this.transactionsRepository
+    const previousPagesQuery = m
+      .getRepository(Transaction)
       .createQueryBuilder("t")
       .select("t.id")
       .where("t.userId = :userId", { userId })
@@ -1508,7 +1536,8 @@ export class TransactionsService {
       });
     }
 
-    const sumResult = await this.transactionsRepository
+    const sumResult = await m
+      .getRepository(Transaction)
       .createQueryBuilder("transaction")
       .select("SUM(transaction.amount)", "sum")
       .where(`transaction.id IN (${previousPagesQuery.getQuery()})`)
@@ -1534,6 +1563,7 @@ export class TransactionsService {
    * Sum of filtered transactions on previous pages (for content-filtered pagination).
    */
   private async computeFilteredPrevPagesSum(
+    m: EntityManager,
     userId: string,
     accountId: string | string[] | undefined,
     skip: number,
@@ -1549,13 +1579,15 @@ export class TransactionsService {
     },
   ): Promise<number> {
     const idsSubquery = await this.buildFilteredIdsSubquery(
+      m,
       userId,
       accountId,
       filters,
     );
 
     // Get ordered matching transactions, limited to previous pages
-    const prevIdsQuery = this.transactionsRepository
+    const prevIdsQuery = m
+      .getRepository(Transaction)
       .createQueryBuilder("t")
       .select("t.id")
       .where(`t.id IN (${idsSubquery.getQuery()})`)
@@ -1565,7 +1597,7 @@ export class TransactionsService {
       .addOrderBy("t.id", "DESC")
       .limit(skip);
 
-    return this.computeSplitAwareSum(prevIdsQuery, userId, filters);
+    return this.computeSplitAwareSum(m, prevIdsQuery, userId, filters);
   }
 
   /**
@@ -1578,6 +1610,7 @@ export class TransactionsService {
    * full t.amount for non-split transactions.
    */
   private async computeSplitAwareSum(
+    m: EntityManager,
     idsSubquery: {
       getQuery: () => string;
       getParameters: () => Record<string, any>;
@@ -1595,7 +1628,8 @@ export class TransactionsService {
     const hasTags = (filters.tagIds?.length ?? 0) > 0;
 
     if (!hasRegularCategories && !hasTags) {
-      const result = await this.transactionsRepository
+      const result = await m
+        .getRepository(Transaction)
         .createQueryBuilder("sa")
         .select("COALESCE(SUM(sa.amount), 0)", "totalSum")
         .where(`sa.id IN (${idsSubquery.getQuery()})`)
@@ -1604,7 +1638,8 @@ export class TransactionsService {
       return Number(result?.totalSum) || 0;
     }
 
-    const sumQb = this.transactionsRepository
+    const sumQb = m
+      .getRepository(Transaction)
       .createQueryBuilder("sa")
       .where(`sa.id IN (${idsSubquery.getQuery()})`)
       .setParameters(idsSubquery.getParameters());
@@ -1613,7 +1648,7 @@ export class TransactionsService {
 
     if (hasRegularCategories) {
       const expandedIds = await getAllCategoryIdsWithChildren(
-        this.categoriesRepository,
+        m.getRepository(Category),
         userId,
         regularCategoryIds,
       );
@@ -1653,6 +1688,7 @@ export class TransactionsService {
    * the given content/date filters for a single account.
    */
   private async buildFilteredIdsSubquery(
+    m: EntityManager,
     userId: string,
     accountId: string | string[] | undefined,
     filters: {
@@ -1668,7 +1704,8 @@ export class TransactionsService {
       amountTo?: number;
     },
   ) {
-    const qb = this.transactionsRepository
+    const qb = m
+      .getRepository(Transaction)
       .createQueryBuilder("bf")
       .select("DISTINCT bf.id")
       .where("bf.userId = :bfUserId", { bfUserId: userId });
@@ -1747,7 +1784,7 @@ export class TransactionsService {
       const expandedIds =
         regularIds.length > 0
           ? await getAllCategoryIdsWithChildren(
-              this.categoriesRepository,
+              m.getRepository(Category),
               userId,
               regularIds,
             )
@@ -1801,6 +1838,7 @@ export class TransactionsService {
   }
 
   private async enrichWithInvestmentLinks(
+    m: EntityManager,
     data: Transaction[],
   ): Promise<TransactionWithInvestmentLink[]> {
     const transactionIds = data.map((tx) => tx.id);
@@ -1808,8 +1846,9 @@ export class TransactionsService {
     const attachmentCountMap = new Map<string, number>();
 
     if (transactionIds.length > 0) {
-      const linkedInvestmentTxs =
-        await this.investmentTransactionsRepository.find({
+      const linkedInvestmentTxs = await m
+        .getRepository(InvestmentTransaction)
+        .find({
           where: { transactionId: In(transactionIds) },
           select: ["id", "transactionId"],
         });
@@ -1822,10 +1861,8 @@ export class TransactionsService {
 
       // One grouped count over the current page's ids (index-backed by
       // idx on transaction_id); avoids an N+1 and keeps the blob-free
-      // attachments table off the main query. Read via the injected
-      // DataSource rather than a dedicated @InjectRepository so the RLS
-      // ratchet stays flat.
-      const attachmentCounts = await this.dataSource
+      // attachments table off the main query.
+      const attachmentCounts = await m
         .getRepository(TransactionAttachment)
         .createQueryBuilder("ta")
         .select("ta.transactionId", "transactionId")
@@ -1850,23 +1887,25 @@ export class TransactionsService {
   }
 
   async findOne(userId: string, id: string): Promise<Transaction> {
-    const transaction = await this.transactionsRepository.findOne({
-      where: { id, userId },
-      relations: [
-        "account",
-        "payee",
-        "category",
-        "tags",
-        "splits",
-        "splits.category",
-        "splits.transferAccount",
-        "splits.tags",
-        "splits.investmentTransaction",
-        "splits.investmentTransaction.security",
-        "linkedTransaction",
-        "linkedTransaction.account",
-      ],
-    });
+    const transaction = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Transaction).findOne({
+        where: { id, userId },
+        relations: [
+          "account",
+          "payee",
+          "category",
+          "tags",
+          "splits",
+          "splits.category",
+          "splits.transferAccount",
+          "splits.tags",
+          "splits.investmentTransaction",
+          "splits.investmentTransaction.security",
+          "linkedTransaction",
+          "linkedTransaction.account",
+        ],
+      }),
+    );
 
     if (!transaction) {
       throw new NotFoundException(
@@ -1920,9 +1959,11 @@ export class TransactionsService {
       updateData.payeeName = payee.name;
     }
     if ("categoryId" in updateData && updateData.categoryId) {
-      const cat = await this.categoriesRepository.findOne({
-        where: { id: updateData.categoryId, userId },
-      });
+      const cat = await tenantTx(this.dataSource, (m) =>
+        m.getRepository(Category).findOne({
+          where: { id: updateData.categoryId, userId },
+        }),
+      );
       if (!cat) {
         throw new NotFoundException(
           tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -1936,19 +1977,13 @@ export class TransactionsService {
       this.splitService.validateSplits(splits, amount);
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    // One transaction: split rebuild, field update, tags, and balance
+    // adjustments commit or roll back together. Nested service calls join it.
+    await tenantTx(this.dataSource, async (m) => {
       if (splits !== undefined) {
         if (Array.isArray(splits) && splits.length > 0) {
-          await this.splitService.deleteSplitSideEffects(
-            id,
-            userId,
-            queryRunner,
-          );
-          await queryRunner.manager.delete(TransactionSplit, {
+          await this.splitService.deleteSplitSideEffects(id, userId);
+          await m.delete(TransactionSplit, {
             transactionId: id,
           });
 
@@ -1962,24 +1997,19 @@ export class TransactionsService {
             accountId,
             new Date(txDate),
             updateData.payeeName ?? transaction.payeeName,
-            queryRunner,
             updateData.payeeId ?? transaction.payeeId,
           );
 
           // Set split-level tags (and mirror them onto any transfer counterpart)
           if (savedSplits) {
-            await this.applySplitTags(savedSplits, splits, userId, queryRunner);
+            await this.applySplitTags(savedSplits, splits, userId);
           }
         } else if (Array.isArray(splits) && splits.length === 0) {
-          await this.splitService.deleteSplitSideEffects(
-            id,
-            userId,
-            queryRunner,
-          );
-          await queryRunner.manager.delete(TransactionSplit, {
+          await this.splitService.deleteSplitSideEffects(id, userId);
+          await m.delete(TransactionSplit, {
             transactionId: id,
           });
-          await queryRunner.manager.update(Transaction, id, {
+          await m.update(Transaction, id, {
             isSplit: false,
           });
         }
@@ -2050,10 +2080,10 @@ export class TransactionsService {
         // value as-is in the TIMESTAMP WITHOUT TIME ZONE column.
         const d = new Date(createdAt);
         const utc = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}:${String(d.getUTCSeconds()).padStart(2, "0")}.${String(d.getUTCMilliseconds()).padStart(3, "0")}`;
-        await queryRunner.query(
-          `UPDATE transactions SET created_at = $1 WHERE id = $2`,
-          [utc, id],
-        );
+        await m.query(`UPDATE transactions SET created_at = $1 WHERE id = $2`, [
+          utc,
+          id,
+        ]);
       }
 
       if (splits && splits.length > 0) {
@@ -2062,24 +2092,15 @@ export class TransactionsService {
       }
 
       if (Object.keys(transactionUpdateData).length > 0) {
-        await queryRunner.manager.update(
-          Transaction,
-          id,
-          transactionUpdateData,
-        );
+        await m.update(Transaction, id, transactionUpdateData);
       }
 
       // Update transaction-level tags
       if (tagIds !== undefined) {
-        await this.tagsService.setTransactionTags(
-          id,
-          tagIds,
-          userId,
-          queryRunner,
-        );
+        await this.tagsService.setTransactionTags(id, tagIds, userId);
       }
 
-      const savedTransaction = await queryRunner.manager.findOne(Transaction, {
+      const savedTransaction = await m.findOne(Transaction, {
         where: { id, userId },
       });
       if (!savedTransaction) {
@@ -2105,52 +2126,22 @@ export class TransactionsService {
       if (anyFuture) {
         const affectedAccounts = new Set([oldAccountId, newAccountId]);
         for (const accId of affectedAccounts) {
-          await this.accountsService.recalculateCurrentBalance(
-            accId,
-            queryRunner,
-          );
+          await this.accountsService.recalculateCurrentBalance(accId);
         }
       } else if (wasVoid && !isVoid) {
-        await this.accountsService.updateBalance(
-          newAccountId,
-          newAmount,
-          queryRunner,
-        );
+        await this.accountsService.updateBalance(newAccountId, newAmount);
       } else if (!wasVoid && isVoid) {
-        await this.accountsService.updateBalance(
-          oldAccountId,
-          -oldAmount,
-          queryRunner,
-        );
+        await this.accountsService.updateBalance(oldAccountId, -oldAmount);
       } else if (!wasVoid && !isVoid) {
         if (newAccountId !== oldAccountId) {
-          await this.accountsService.updateBalance(
-            oldAccountId,
-            -oldAmount,
-            queryRunner,
-          );
-          await this.accountsService.updateBalance(
-            newAccountId,
-            newAmount,
-            queryRunner,
-          );
+          await this.accountsService.updateBalance(oldAccountId, -oldAmount);
+          await this.accountsService.updateBalance(newAccountId, newAmount);
         } else if (newAmount !== oldAmount) {
           const balanceChange = newAmount - oldAmount;
-          await this.accountsService.updateBalance(
-            newAccountId,
-            balanceChange,
-            queryRunner,
-          );
+          await this.accountsService.updateBalance(newAccountId, balanceChange);
         }
       }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     const finalTransaction = await this.findOne(userId, id);
 
@@ -2186,61 +2177,35 @@ export class TransactionsService {
     const beforeSnapshot = this.snapshotTransaction(transaction);
     const accountId = transaction.accountId;
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    // One transaction: split side effects, linked/parent cleanup, the delete
+    // itself, and the balance adjustment commit or roll back together.
+    await tenantTx(this.dataSource, async (m) => {
       if (transaction.isSplit) {
-        await this.splitService.deleteSplitSideEffects(id, userId, queryRunner);
+        await this.splitService.deleteSplitSideEffects(id, userId);
       }
 
-      const parentSplit = await queryRunner.manager.findOne(TransactionSplit, {
+      const parentSplit = await m.findOne(TransactionSplit, {
         where: { linkedTransactionId: id },
       });
 
       if (parentSplit) {
-        await this.removeParentTransaction(
-          parentSplit,
-          id,
-          queryRunner,
-          userId,
-        );
+        await this.removeParentTransaction(m, parentSplit, id, userId);
       }
 
       if (transaction.status !== TransactionStatus.VOID) {
         if (isTransactionInFuture(transaction.transactionDate)) {
-          await queryRunner.manager.remove(transaction);
-          await this.accountsService.recalculateCurrentBalance(
-            accountId,
-            queryRunner,
-          );
-          await queryRunner.commitTransaction();
-          this.netWorthService.triggerDebouncedRecalc(accountId, userId);
-          this.recordTransactionAction(
-            userId,
-            { ...transaction, ...beforeSnapshot } as Transaction,
-            "delete",
-            beforeSnapshot,
-          );
+          await m.remove(transaction);
+          await this.accountsService.recalculateCurrentBalance(accountId);
           return;
-        } else {
-          await this.accountsService.updateBalance(
-            accountId,
-            -Number(transaction.amount),
-            queryRunner,
-          );
         }
+        await this.accountsService.updateBalance(
+          accountId,
+          -Number(transaction.amount),
+        );
       }
 
-      await queryRunner.manager.remove(transaction);
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      await m.remove(transaction);
+    });
 
     this.netWorthService.triggerDebouncedRecalc(accountId, userId);
     this.recordTransactionAction(
@@ -2252,18 +2217,18 @@ export class TransactionsService {
   }
 
   private async removeParentTransaction(
+    m: EntityManager,
     parentSplit: TransactionSplit,
     linkedTransactionId: string,
-    queryRunner: QueryRunner,
     userId: string,
   ): Promise<void> {
     const parentTransactionId = parentSplit.transactionId;
-    const parentTransaction = await queryRunner.manager.findOne(Transaction, {
+    const parentTransaction = await m.findOne(Transaction, {
       where: { id: parentTransactionId, userId },
     });
 
     if (parentTransaction) {
-      const allSplits = await queryRunner.manager.find(TransactionSplit, {
+      const allSplits = await m.find(TransactionSplit, {
         where: { transactionId: parentTransactionId },
       });
 
@@ -2279,7 +2244,7 @@ export class TransactionsService {
       ];
 
       if (linkedIds.length > 0) {
-        const linkedTxs = await queryRunner.manager.find(Transaction, {
+        const linkedTxs = await m.find(Transaction, {
           where: { id: In(linkedIds), userId },
         });
 
@@ -2292,37 +2257,31 @@ export class TransactionsService {
             await this.accountsService.updateBalance(
               linkedAccId,
               -Number(linkedTx.amount),
-              queryRunner,
             );
           }
-          await queryRunner.manager.remove(linkedTx);
+          await m.remove(linkedTx);
           if (linkedIsFuture) {
-            await this.accountsService.recalculateCurrentBalance(
-              linkedAccId,
-              queryRunner,
-            );
+            await this.accountsService.recalculateCurrentBalance(linkedAccId);
           }
         }
       }
 
-      await queryRunner.manager.remove(allSplits);
+      await m.remove(allSplits);
 
       if (parentTransaction.status !== TransactionStatus.VOID) {
         if (isTransactionInFuture(parentTransaction.transactionDate)) {
-          await queryRunner.manager.remove(parentTransaction);
+          await m.remove(parentTransaction);
           await this.accountsService.recalculateCurrentBalance(
             parentTransaction.accountId,
-            queryRunner,
           );
           return;
         }
         await this.accountsService.updateBalance(
           parentTransaction.accountId,
           -Number(parentTransaction.amount),
-          queryRunner,
         );
       }
-      await queryRunner.manager.remove(parentTransaction);
+      await m.remove(parentTransaction);
     }
   }
 
@@ -2625,26 +2584,19 @@ export class TransactionsService {
     savedSplits: TransactionSplit[],
     splits: CreateTransactionSplitDto[],
     userId: string,
-    queryRunner: QueryRunner,
   ): Promise<void> {
     for (let i = 0; i < splits.length; i++) {
       const splitTagIds = splits[i].tagIds;
       const saved = savedSplits[i];
       if (!saved || !splitTagIds || splitTagIds.length === 0) continue;
 
-      await this.tagsService.setSplitTags(
-        saved.id,
-        splitTagIds,
-        userId,
-        queryRunner,
-      );
+      await this.tagsService.setSplitTags(saved.id, splitTagIds, userId);
 
       if (saved.linkedTransactionId) {
         await this.tagsService.setTransactionTags(
           saved.linkedTransactionId,
           splitTagIds,
           userId,
-          queryRunner,
         );
       }
     }

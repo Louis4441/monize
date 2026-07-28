@@ -9,7 +9,13 @@ import {
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, QueryRunner, In } from "typeorm";
+import {
+  Repository,
+  DataSource,
+  EntityManager,
+  QueryRunner,
+  In,
+} from "typeorm";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -1855,7 +1861,7 @@ export class InvestmentTransactionsService {
    * free-standing ones in portfolio reports.
    */
   async createEmbeddedForSplit(
-    queryRunner: QueryRunner,
+    db: QueryRunner | EntityManager,
     userId: string,
     parentTransactionDate: string,
     parentSplitId: string,
@@ -1871,6 +1877,11 @@ export class InvestmentTransactionsService {
       description?: string | null;
     },
   ): Promise<InvestmentTransaction> {
+    // RLS transition shim (R2): the transactions module now runs on tenantTx
+    // and passes the transaction's EntityManager; securities-internal callers
+    // still pass their own QueryRunner until task R3 converts this service.
+    // The downstream helpers only ever touch `.manager`.
+    const queryRunner = ("manager" in db ? db : { manager: db }) as QueryRunner;
     if (!isInvestmentActionAllowedInSplit(dto.action)) {
       throw new BadRequestException(
         tr(
@@ -1974,10 +1985,12 @@ export class InvestmentTransactionsService {
    * via the FK, but we need the holdings reversal to happen first.
    */
   async reverseAndRemoveEmbedded(
-    queryRunner: QueryRunner,
+    db: QueryRunner | EntityManager,
     userId: string,
     investmentTransaction: InvestmentTransaction,
   ): Promise<void> {
+    // RLS transition shim (R2): see createEmbeddedForSplit.
+    const queryRunner = ("manager" in db ? db : { manager: db }) as QueryRunner;
     await this.reverseTransactionEffectsInTransaction(
       queryRunner,
       userId,

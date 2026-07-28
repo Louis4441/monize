@@ -97,7 +97,9 @@ async createSomething(userId: string, dto: CreateDto) {
 }
 ```
 
-Operations that correctly use QueryRunner: in the transactions domain, `create()`, `update()`, `remove()`, transfers, splits, and bulk update/delete; plus investment transaction CRUD and holdings rebuild. The split, bulk, transfer, and reconciliation flows live in dedicated `transaction-*.service.ts` files, each managing its own QueryRunner. This is the pattern **existing** code follows while the Row-Level Security migration is in progress; **new** DB access must use `tenantTx` instead (see below).
+Operations that still use QueryRunner: investment transaction CRUD and holdings rebuild, plus the remaining unmigrated modules. This is the pattern **existing** code follows while the Row-Level Security migration is in progress; **new** DB access must use `tenantTx` instead (see below).
+
+The accounts, categories, payees, tags, institutions, transactions and scheduled-transactions modules have already migrated (RLS tasks R1-R2): there, `create()`, `update()`, `remove()`, transfers, splits, bulk update/delete and reconciliation each wrap their work in a single `tenantTx` instead, and helpers take an `EntityManager` rather than a `QueryRunner`. Follow those files, not the block above, when working in them.
 
 ## Database Access & Row-Level Security (RLS ratchet — CRITICAL)
 

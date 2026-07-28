@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { ScheduledTransactionsService } from "./scheduled-transactions.service";
@@ -15,6 +14,14 @@ import { ScheduledTransactionOverrideService } from "./scheduled-transaction-ove
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { getRequestContext } from "../common/request-context";
+import {
+  createTenantTxMocks,
+  DataSourceMock,
+} from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 
 describe("ScheduledTransactionsService", () => {
   let service: ScheduledTransactionsService;
@@ -26,8 +33,10 @@ describe("ScheduledTransactionsService", () => {
   let accountsService: Record<string, jest.Mock>;
   let transactionsService: Record<string, jest.Mock>;
   let investmentTransactionsService: Record<string, jest.Mock>;
+  // The tenantTx manager, exposed under the legacy name so the pre-RLS
+  // queryRunner.manager assertions keep reading naturally.
   let mockQueryRunner: Record<string, any>;
-  let mockDataSource: Record<string, jest.Mock>;
+  let mockDataSource: DataSourceMock;
   let mockActionHistoryService: Record<string, jest.Mock>;
 
   const userId = "11111111-1111-1111-1111-111111111111";
@@ -107,13 +116,6 @@ describe("ScheduledTransactionsService", () => {
       save: jest.fn().mockImplementation((data) => Promise.resolve(data)),
       find: jest.fn().mockResolvedValue([]),
       delete: jest.fn().mockResolvedValue({ affected: 0 }),
-      // createSplits() defaults to splitsRepository.manager when no transaction
-      // manager is supplied (the create() flow).
-      manager: {
-        create: jest.fn().mockImplementation((_entity, data) => data),
-        save: jest.fn().mockImplementation((data) => Promise.resolve(data)),
-        findBy: jest.fn().mockResolvedValue([]),
-      },
     };
 
     overridesRepo = {
@@ -161,58 +163,41 @@ describe("ScheduledTransactionsService", () => {
       record: jest.fn().mockResolvedValue(null),
     };
 
-    mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      manager: {
-        remove: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn().mockResolvedValue({ affected: 0 }),
-        create: jest.fn().mockImplementation((_entity, data) => data),
-        save: jest.fn().mockImplementation((data) => Promise.resolve(data)),
-        findBy: jest.fn().mockResolvedValue([]),
-        createQueryBuilder: jest.fn(() => ({
-          delete: jest.fn().mockReturnThis(),
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          execute: jest.fn().mockResolvedValue({ affected: 0 }),
-        })),
-      },
-    };
-
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-      // Default to a single UTC user so cron logic that buckets by timezone
-      // continues to operate against legacy tests that pre-date the cron
-      // refactor and assume a one-user world.
-      query: jest
-        .fn()
-        .mockResolvedValue([
-          { user_id: "11111111-1111-1111-1111-111111111111", timezone: "UTC" },
-        ]),
-    };
+    const tenantMocks = createTenantTxMocks([
+      [ScheduledTransaction, scheduledRepo],
+      [ScheduledTransactionSplit, splitsRepo],
+      [ScheduledTransactionOverride, overridesRepo],
+      [Account, accountsRepo],
+      [Tag, tagRepo],
+    ]);
+    mockDataSource = tenantMocks.dataSource;
+    // Direct EntityManager calls inside tenantTx blocks (converted from the
+    // old queryRunner.manager usage in update()/post()/createSplits()).
+    const txManager = tenantMocks.manager;
+    txManager.delete.mockResolvedValue({ affected: 0 });
+    txManager.create.mockImplementation(
+      (_entity: unknown, data: unknown) => data,
+    );
+    txManager.save.mockImplementation((data: unknown) => Promise.resolve(data));
+    txManager.findBy.mockResolvedValue([]);
+    txManager.createQueryBuilder.mockImplementation(() => ({
+      delete: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({ affected: 0 }),
+    }));
+    mockQueryRunner = { manager: txManager };
+    // Default to a single UTC user so cron logic that buckets by timezone
+    // continues to operate against legacy tests that pre-date the cron
+    // refactor and assume a one-user world.
+    mockDataSource.query.mockResolvedValue([
+      { user_id: "11111111-1111-1111-1111-111111111111", timezone: "UTC" },
+    ]);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ScheduledTransactionsService,
-        {
-          provide: getRepositoryToken(ScheduledTransaction),
-          useValue: scheduledRepo,
-        },
-        {
-          provide: getRepositoryToken(ScheduledTransactionSplit),
-          useValue: splitsRepo,
-        },
-        {
-          provide: getRepositoryToken(ScheduledTransactionOverride),
-          useValue: overridesRepo,
-        },
-        { provide: getRepositoryToken(Account), useValue: accountsRepo },
-        { provide: getRepositoryToken(Tag), useValue: tagRepo },
         { provide: AccountsService, useValue: accountsService },
         { provide: TransactionsService, useValue: transactionsService },
         {
@@ -397,8 +382,8 @@ describe("ScheduledTransactionsService", () => {
       };
       await service.create(userId, dto);
 
-      expect(splitsRepo.manager.create).toHaveBeenCalledTimes(2);
-      expect(splitsRepo.manager.save).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.create).toHaveBeenCalledTimes(2);
+      expect(mockQueryRunner.manager.save).toHaveBeenCalled();
     });
 
     it("records action history on create", async () => {
@@ -1421,7 +1406,7 @@ describe("ScheduledTransactionsService", () => {
         stId,
       );
       expect(mockQueryRunner.manager.update).not.toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(result).toBeNull();
     });
 
@@ -2852,8 +2837,10 @@ describe("ScheduledTransactionsService", () => {
       });
       scheduledRepo.create.mockImplementation((d) => ({ id: stId, ...d }));
       scheduledRepo.save.mockImplementation(async (d) => d);
-      splitsRepo.manager.create.mockImplementation((_e, d) => d);
-      splitsRepo.manager.save.mockImplementation(async (d) => ({
+      mockQueryRunner.manager.create.mockImplementation(
+        (_e: unknown, d: unknown) => d,
+      );
+      mockQueryRunner.manager.save.mockImplementation(async (d: object) => ({
         id: "split-x",
         ...d,
       }));
@@ -2864,7 +2851,7 @@ describe("ScheduledTransactionsService", () => {
       await service.create(userId, dto as any);
 
       // Verify the investment-kind split was created with all fields populated
-      const investmentCall = splitsRepo.manager.create.mock.calls.find(
+      const investmentCall = mockQueryRunner.manager.create.mock.calls.find(
         (c: any[]) => c[1]?.kind === "investment",
       );
       expect(investmentCall).toBeDefined();

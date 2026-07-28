@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { ScheduledTransactionOverrideService } from "./scheduled-transaction-override.service";
 import { ScheduledTransactionOverride } from "./entities/scheduled-transaction-override.entity";
@@ -7,6 +7,11 @@ import {
   CreateScheduledTransactionOverrideDto,
   UpdateScheduledTransactionOverrideDto,
 } from "./dto/scheduled-transaction-override.dto";
+import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 
 describe("ScheduledTransactionOverrideService", () => {
   let service: ScheduledTransactionOverrideService;
@@ -59,13 +64,14 @@ describe("ScheduledTransactionOverrideService", () => {
       createQueryBuilder: jest.fn().mockReturnValue(mockQueryBuilder()),
     };
 
+    const { dataSource } = createTenantTxMocks([
+      [ScheduledTransactionOverride, overridesRepository],
+    ]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ScheduledTransactionOverrideService,
-        {
-          provide: getRepositoryToken(ScheduledTransactionOverride),
-          useValue: overridesRepository,
-        },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 

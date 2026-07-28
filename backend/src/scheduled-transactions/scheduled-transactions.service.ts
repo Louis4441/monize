@@ -6,14 +6,7 @@ import {
   forwardRef,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import {
-  Repository,
-  LessThanOrEqual,
-  DataSource,
-  EntityManager,
-  In,
-} from "typeorm";
+import { LessThanOrEqual, DataSource, EntityManager, In } from "typeorm";
 import { Cron } from "@nestjs/schedule";
 import {
   ScheduledTransaction,
@@ -46,6 +39,7 @@ import {
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
+import { tenantTx } from "../common/db/tenant-tx";
 import { validateSplitAmountSum } from "../common/split-amount.util";
 import { roundMoney, sumMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
@@ -137,14 +131,6 @@ export class ScheduledTransactionsService {
   private readonly logger = new Logger(ScheduledTransactionsService.name);
 
   constructor(
-    @InjectRepository(ScheduledTransaction)
-    private scheduledTransactionsRepository: Repository<ScheduledTransaction>,
-    @InjectRepository(ScheduledTransactionSplit)
-    private splitsRepository: Repository<ScheduledTransactionSplit>,
-    @InjectRepository(ScheduledTransactionOverride)
-    private overridesRepository: Repository<ScheduledTransactionOverride>,
-    @InjectRepository(Tag)
-    private tagRepository: Repository<Tag>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     private transactionsService: TransactionsService,
@@ -181,50 +167,57 @@ export class ScheduledTransactionsService {
           continue;
         }
 
-        const candidates = await this.scheduledTransactionsRepository.find({
-          where: {
-            userId: In(userIds),
-            isActive: true,
-            autoPost: true,
-            nextDueDate: LessThanOrEqual(today) as any,
-          },
-          relations: INVESTMENT_RELATIONS,
-          order: { nextDueDate: "ASC" },
+        // One read block per timezone bucket. It must COMMIT before the
+        // per-user posting loop below: each post() runs its own user-context
+        // transactions, which would otherwise join this system-context one.
+        const dueTransactions = await tenantTx(this.dataSource, async (m) => {
+          const candidates = await m.getRepository(ScheduledTransaction).find({
+            where: {
+              userId: In(userIds),
+              isActive: true,
+              autoPost: true,
+              nextDueDate: LessThanOrEqual(today) as any,
+            },
+            relations: INVESTMENT_RELATIONS,
+            order: { nextDueDate: "ASC" },
+          });
+
+          const postponedIds = await this.findPostponedIds(
+            candidates.map((t) => t.id),
+            today,
+          );
+          const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
+
+          const overrideDueIds = await m
+            .getRepository(ScheduledTransactionOverride)
+            .createQueryBuilder("o")
+            .innerJoin("o.scheduledTransaction", "st")
+            .where("st.userId IN (:...userIds)", { userIds })
+            .andWhere("o.overrideDate <= :today", { today })
+            .andWhere("o.originalDate = st.nextDueDate")
+            .andWhere("st.isActive = :active", { active: true })
+            .andWhere("st.autoPost = :autoPost", { autoPost: true })
+            .select("st.id", "id")
+            .distinct(true)
+            .getRawMany();
+
+          const dueByDateIds = new Set(dueByDate.map((t) => t.id));
+          const overrideOnlyIds = overrideDueIds
+            .map((r) => r.id as string)
+            .filter((id) => !dueByDateIds.has(id));
+
+          let overrideDueTransactions: ScheduledTransaction[] = [];
+          if (overrideOnlyIds.length > 0) {
+            overrideDueTransactions = await m
+              .getRepository(ScheduledTransaction)
+              .find({
+                where: overrideOnlyIds.map((id) => ({ id })),
+                relations: INVESTMENT_RELATIONS,
+              });
+          }
+
+          return [...dueByDate, ...overrideDueTransactions];
         });
-
-        const postponedIds = await this.findPostponedIds(
-          candidates.map((t) => t.id),
-          today,
-        );
-        const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
-
-        const overrideDueIds = await this.overridesRepository
-          .createQueryBuilder("o")
-          .innerJoin("o.scheduledTransaction", "st")
-          .where("st.userId IN (:...userIds)", { userIds })
-          .andWhere("o.overrideDate <= :today", { today })
-          .andWhere("o.originalDate = st.nextDueDate")
-          .andWhere("st.isActive = :active", { active: true })
-          .andWhere("st.autoPost = :autoPost", { autoPost: true })
-          .select("st.id", "id")
-          .distinct(true)
-          .getRawMany();
-
-        const dueByDateIds = new Set(dueByDate.map((t) => t.id));
-        const overrideOnlyIds = overrideDueIds
-          .map((r) => r.id as string)
-          .filter((id) => !dueByDateIds.has(id));
-
-        let overrideDueTransactions: ScheduledTransaction[] = [];
-        if (overrideOnlyIds.length > 0) {
-          overrideDueTransactions =
-            await this.scheduledTransactionsRepository.find({
-              where: overrideOnlyIds.map((id) => ({ id })),
-              relations: INVESTMENT_RELATIONS,
-            });
-        }
-
-        const dueTransactions = [...dueByDate, ...overrideDueTransactions];
         if (dueTransactions.length === 0) continue;
 
         for (const scheduled of dueTransactions) {
@@ -259,15 +252,18 @@ export class ScheduledTransactionsService {
       return new Set();
     }
 
-    const rows = await this.overridesRepository
-      .createQueryBuilder("o")
-      .innerJoin("o.scheduledTransaction", "st")
-      .where("o.scheduledTransactionId IN (:...ids)", { ids: candidateIds })
-      .andWhere("o.originalDate = st.nextDueDate")
-      .andWhere("o.overrideDate > :today", { today })
-      .select("o.scheduledTransactionId", "id")
-      .distinct(true)
-      .getRawMany();
+    const rows = await tenantTx(this.dataSource, (m) =>
+      m
+        .getRepository(ScheduledTransactionOverride)
+        .createQueryBuilder("o")
+        .innerJoin("o.scheduledTransaction", "st")
+        .where("o.scheduledTransactionId IN (:...ids)", { ids: candidateIds })
+        .andWhere("o.originalDate = st.nextDueDate")
+        .andWhere("o.overrideDate > :today", { today })
+        .select("o.scheduledTransactionId", "id")
+        .distinct(true)
+        .getRawMany(),
+    );
 
     return new Set(rows.map((r) => r.id as string));
   }
@@ -333,57 +329,62 @@ export class ScheduledTransactionsService {
       this.validateSplits(splits, createDto.amount);
     }
 
-    const scheduledTransaction = this.scheduledTransactionsRepository.create({
-      ...transactionData,
-      userId,
-      startDate: transactionData.startDate || transactionData.nextDueDate,
-      totalOccurrences: transactionData.occurrencesRemaining,
-      // A transfer may carry an optional spending category (see #743): it is
-      // stored on the schedule and applied to both legs when posted, surfacing
-      // the transfer in the monthly category breakdown. Only splits (category
-      // lives on each split) and investments null it out here.
-      categoryId: hasSplits || isInvestment ? null : transactionData.categoryId,
-      isSplit: hasSplits && !isTransfer,
-      isTransfer: isTransfer || false,
-      transferAccountId: isTransfer ? transferAccountId : null,
-      isInvestment: isInvestment || false,
-      investmentAction: isInvestment
-        ? (transactionData.investmentAction as InvestmentAction)
-        : null,
-      investmentSecurityId: isInvestment
-        ? transactionData.investmentSecurityId || null
-        : null,
-      investmentFundingAccountId: isInvestment
-        ? transactionData.investmentFundingAccountId || null
-        : null,
-      investmentQuantity:
-        isInvestment && transactionData.investmentQuantity !== undefined
-          ? transactionData.investmentQuantity
+    const saved = await tenantTx(this.dataSource, async (m) => {
+      const repo = m.getRepository(ScheduledTransaction);
+      const scheduledTransaction = repo.create({
+        ...transactionData,
+        userId,
+        startDate: transactionData.startDate || transactionData.nextDueDate,
+        totalOccurrences: transactionData.occurrencesRemaining,
+        // A transfer may carry an optional spending category (see #743): it is
+        // stored on the schedule and applied to both legs when posted, surfacing
+        // the transfer in the monthly category breakdown. Only splits (category
+        // lives on each split) and investments null it out here.
+        categoryId:
+          hasSplits || isInvestment ? null : transactionData.categoryId,
+        isSplit: hasSplits && !isTransfer,
+        isTransfer: isTransfer || false,
+        transferAccountId: isTransfer ? transferAccountId : null,
+        isInvestment: isInvestment || false,
+        investmentAction: isInvestment
+          ? (transactionData.investmentAction as InvestmentAction)
           : null,
-      investmentPrice:
-        isInvestment && transactionData.investmentPrice !== undefined
-          ? transactionData.investmentPrice
+        investmentSecurityId: isInvestment
+          ? transactionData.investmentSecurityId || null
           : null,
-      investmentCommission:
-        isInvestment && transactionData.investmentCommission !== undefined
-          ? transactionData.investmentCommission
+        investmentFundingAccountId: isInvestment
+          ? transactionData.investmentFundingAccountId || null
           : null,
-      investmentTotalAmount:
-        isInvestment && transactionData.investmentTotalAmount !== undefined
-          ? transactionData.investmentTotalAmount
-          : null,
-      investmentExchangeRate:
-        isInvestment && transactionData.investmentExchangeRate !== undefined
-          ? transactionData.investmentExchangeRate
-          : null,
+        investmentQuantity:
+          isInvestment && transactionData.investmentQuantity !== undefined
+            ? transactionData.investmentQuantity
+            : null,
+        investmentPrice:
+          isInvestment && transactionData.investmentPrice !== undefined
+            ? transactionData.investmentPrice
+            : null,
+        investmentCommission:
+          isInvestment && transactionData.investmentCommission !== undefined
+            ? transactionData.investmentCommission
+            : null,
+        investmentTotalAmount:
+          isInvestment && transactionData.investmentTotalAmount !== undefined
+            ? transactionData.investmentTotalAmount
+            : null,
+        investmentExchangeRate:
+          isInvestment && transactionData.investmentExchangeRate !== undefined
+            ? transactionData.investmentExchangeRate
+            : null,
+      });
+
+      const savedRow = await repo.save(scheduledTransaction);
+
+      if (hasSplits && !isTransfer) {
+        await this.createSplits(savedRow.id, splits, m);
+      }
+
+      return savedRow;
     });
-
-    const saved =
-      await this.scheduledTransactionsRepository.save(scheduledTransaction);
-
-    if (hasSplits && !isTransfer) {
-      await this.createSplits(saved.id, splits);
-    }
 
     const result = await this.findOne(userId, saved.id);
 
@@ -498,7 +499,7 @@ export class ScheduledTransactionsService {
   private async createSplits(
     scheduledTransactionId: string,
     splits: CreateScheduledTransactionSplitDto[],
-    manager: EntityManager = this.splitsRepository.manager,
+    manager: EntityManager,
   ): Promise<ScheduledTransactionSplit[]> {
     const savedSplits: ScheduledTransactionSplit[] = [];
 
@@ -586,100 +587,110 @@ export class ScheduledTransactionsService {
       futureOverrides?: ScheduledTransactionOverride[];
     })[]
   > {
-    const transactions = await this.scheduledTransactionsRepository
-      .createQueryBuilder("st")
-      .leftJoinAndSelect("st.account", "account")
-      .leftJoinAndSelect("st.payee", "payee")
-      .leftJoinAndSelect("st.category", "category")
-      .leftJoinAndSelect("st.transferAccount", "transferAccount")
-      .leftJoinAndSelect("st.investmentSecurity", "investmentSecurity")
-      .leftJoinAndSelect(
-        "st.investmentFundingAccount",
-        "investmentFundingAccount",
-      )
-      .leftJoinAndSelect("st.splits", "splits")
-      .leftJoinAndSelect("splits.category", "splitCategory")
-      .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
-      .leftJoinAndSelect("splits.tags", "splitTags")
-      .leftJoinAndSelect("splits.investmentSecurity", "splitInvestmentSecurity")
-      .where("st.userId = :userId", { userId })
-      .orderBy("st.nextDueDate", "ASC")
-      .getMany();
+    return tenantTx(this.dataSource, async (m) => {
+      const transactions = await m
+        .getRepository(ScheduledTransaction)
+        .createQueryBuilder("st")
+        .leftJoinAndSelect("st.account", "account")
+        .leftJoinAndSelect("st.payee", "payee")
+        .leftJoinAndSelect("st.category", "category")
+        .leftJoinAndSelect("st.transferAccount", "transferAccount")
+        .leftJoinAndSelect("st.investmentSecurity", "investmentSecurity")
+        .leftJoinAndSelect(
+          "st.investmentFundingAccount",
+          "investmentFundingAccount",
+        )
+        .leftJoinAndSelect("st.splits", "splits")
+        .leftJoinAndSelect("splits.category", "splitCategory")
+        .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
+        .leftJoinAndSelect("splits.tags", "splitTags")
+        .leftJoinAndSelect(
+          "splits.investmentSecurity",
+          "splitInvestmentSecurity",
+        )
+        .where("st.userId = :userId", { userId })
+        .orderBy("st.nextDueDate", "ASC")
+        .getMany();
 
-    if (transactions.length === 0) {
-      return [];
-    }
-
-    const txDueDates = new Map<string, string>();
-    const txIds = transactions.map((t) => {
-      const d = ensureYMD(t.nextDueDate);
-      txDueDates.set(t.id, d);
-      return t.id;
-    });
-
-    const nextOverridesQuery = this.overridesRepository
-      .createQueryBuilder("override")
-      .leftJoinAndSelect("override.category", "category");
-
-    const orConditions: string[] = [];
-    const params: Record<string, string> = {};
-    txIds.forEach((id, i) => {
-      orConditions.push(
-        `(override.scheduledTransactionId = :id${i} AND override.originalDate = :date${i})`,
-      );
-      params[`id${i}`] = id;
-      params[`date${i}`] = txDueDates.get(id)!;
-    });
-    nextOverridesQuery.where(orConditions.join(" OR "), params);
-
-    const allNextOverrides = await nextOverridesQuery.getMany();
-    const nextOverrideMap = new Map<string, ScheduledTransactionOverride>();
-    for (const o of allNextOverrides) {
-      nextOverrideMap.set(o.scheduledTransactionId, o);
-    }
-
-    // Fetch ALL future overrides (on or after each transaction's nextDueDate)
-    const allFutureOverrides = await this.overridesRepository
-      .createQueryBuilder("override")
-      .leftJoinAndSelect("override.category", "category")
-      .where("override.scheduledTransactionId IN (:...txIds)", { txIds })
-      .orderBy("override.originalDate", "ASC")
-      .getMany();
-
-    // Group overrides by transaction and filter to future-only
-    const futureOverridesMap = new Map<
-      string,
-      ScheduledTransactionOverride[]
-    >();
-    const countMap = new Map<string, number>();
-    for (const o of allFutureOverrides) {
-      const dueDate = txDueDates.get(o.scheduledTransactionId);
-      if (!dueDate) continue;
-      const origDate = String(o.originalDate).split("T")[0];
-      if (origDate >= dueDate) {
-        const list = futureOverridesMap.get(o.scheduledTransactionId) || [];
-        list.push(o);
-        futureOverridesMap.set(o.scheduledTransactionId, list);
-        countMap.set(
-          o.scheduledTransactionId,
-          (countMap.get(o.scheduledTransactionId) || 0) + 1,
-        );
+      if (transactions.length === 0) {
+        return [];
       }
-    }
 
-    return transactions.map((transaction) => ({
-      ...transaction,
-      overrideCount: countMap.get(transaction.id) || 0,
-      nextOverride: nextOverrideMap.get(transaction.id) || null,
-      futureOverrides: futureOverridesMap.get(transaction.id) || [],
-    }));
+      const txDueDates = new Map<string, string>();
+      const txIds = transactions.map((t) => {
+        const d = ensureYMD(t.nextDueDate);
+        txDueDates.set(t.id, d);
+        return t.id;
+      });
+
+      const nextOverridesQuery = m
+        .getRepository(ScheduledTransactionOverride)
+        .createQueryBuilder("override")
+        .leftJoinAndSelect("override.category", "category");
+
+      const orConditions: string[] = [];
+      const params: Record<string, string> = {};
+      txIds.forEach((id, i) => {
+        orConditions.push(
+          `(override.scheduledTransactionId = :id${i} AND override.originalDate = :date${i})`,
+        );
+        params[`id${i}`] = id;
+        params[`date${i}`] = txDueDates.get(id)!;
+      });
+      nextOverridesQuery.where(orConditions.join(" OR "), params);
+
+      const allNextOverrides = await nextOverridesQuery.getMany();
+      const nextOverrideMap = new Map<string, ScheduledTransactionOverride>();
+      for (const o of allNextOverrides) {
+        nextOverrideMap.set(o.scheduledTransactionId, o);
+      }
+
+      // Fetch ALL future overrides (on or after each transaction's nextDueDate)
+      const allFutureOverrides = await m
+        .getRepository(ScheduledTransactionOverride)
+        .createQueryBuilder("override")
+        .leftJoinAndSelect("override.category", "category")
+        .where("override.scheduledTransactionId IN (:...txIds)", { txIds })
+        .orderBy("override.originalDate", "ASC")
+        .getMany();
+
+      // Group overrides by transaction and filter to future-only
+      const futureOverridesMap = new Map<
+        string,
+        ScheduledTransactionOverride[]
+      >();
+      const countMap = new Map<string, number>();
+      for (const o of allFutureOverrides) {
+        const dueDate = txDueDates.get(o.scheduledTransactionId);
+        if (!dueDate) continue;
+        const origDate = String(o.originalDate).split("T")[0];
+        if (origDate >= dueDate) {
+          const list = futureOverridesMap.get(o.scheduledTransactionId) || [];
+          list.push(o);
+          futureOverridesMap.set(o.scheduledTransactionId, list);
+          countMap.set(
+            o.scheduledTransactionId,
+            (countMap.get(o.scheduledTransactionId) || 0) + 1,
+          );
+        }
+      }
+
+      return transactions.map((transaction) => ({
+        ...transaction,
+        overrideCount: countMap.get(transaction.id) || 0,
+        nextOverride: nextOverrideMap.get(transaction.id) || null,
+        futureOverrides: futureOverridesMap.get(transaction.id) || [],
+      }));
+    });
   }
 
   async findOne(userId: string, id: string): Promise<ScheduledTransaction> {
-    const scheduled = await this.scheduledTransactionsRepository.findOne({
-      where: { id, userId },
-      relations: INVESTMENT_RELATIONS,
-    });
+    const scheduled = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(ScheduledTransaction).findOne({
+        where: { id, userId },
+        relations: INVESTMENT_RELATIONS,
+      }),
+    );
 
     if (!scheduled) {
       throw new NotFoundException(
@@ -697,52 +708,56 @@ export class ScheduledTransactionsService {
   async findDue(userId: string): Promise<ScheduledTransaction[]> {
     const today = todayYMD();
 
-    const candidates = await this.scheduledTransactionsRepository.find({
-      where: {
-        userId,
-        isActive: true,
-        nextDueDate: LessThanOrEqual(today) as any,
-      },
-      relations: INVESTMENT_RELATIONS,
-      order: { nextDueDate: "ASC" },
-    });
-
-    // Defer candidates whose next occurrence has an override pushing the
-    // effective date past today.
-    const postponedIds = await this.findPostponedIds(
-      candidates.map((t) => t.id),
-      today,
-    );
-    const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
-
-    // Also find transactions with overrides that moved the date earlier
-    const overrideDueIds = await this.overridesRepository
-      .createQueryBuilder("o")
-      .innerJoin("o.scheduledTransaction", "st")
-      .where("o.overrideDate <= :today", { today })
-      .andWhere("o.originalDate = st.nextDueDate")
-      .andWhere("st.userId = :userId", { userId })
-      .andWhere("st.isActive = :active", { active: true })
-      .select("st.id", "id")
-      .distinct(true)
-      .getRawMany();
-
-    const dueByDateIds = new Set(dueByDate.map((t) => t.id));
-    const overrideOnlyIds = overrideDueIds
-      .map((r) => r.id as string)
-      .filter((id) => !dueByDateIds.has(id));
-
-    if (overrideOnlyIds.length === 0) {
-      return dueByDate;
-    }
-
-    const overrideDueTransactions =
-      await this.scheduledTransactionsRepository.find({
-        where: overrideOnlyIds.map((id) => ({ id })),
+    return tenantTx(this.dataSource, async (m) => {
+      const candidates = await m.getRepository(ScheduledTransaction).find({
+        where: {
+          userId,
+          isActive: true,
+          nextDueDate: LessThanOrEqual(today) as any,
+        },
         relations: INVESTMENT_RELATIONS,
+        order: { nextDueDate: "ASC" },
       });
 
-    return [...dueByDate, ...overrideDueTransactions];
+      // Defer candidates whose next occurrence has an override pushing the
+      // effective date past today.
+      const postponedIds = await this.findPostponedIds(
+        candidates.map((t) => t.id),
+        today,
+      );
+      const dueByDate = candidates.filter((t) => !postponedIds.has(t.id));
+
+      // Also find transactions with overrides that moved the date earlier
+      const overrideDueIds = await m
+        .getRepository(ScheduledTransactionOverride)
+        .createQueryBuilder("o")
+        .innerJoin("o.scheduledTransaction", "st")
+        .where("o.overrideDate <= :today", { today })
+        .andWhere("o.originalDate = st.nextDueDate")
+        .andWhere("st.userId = :userId", { userId })
+        .andWhere("st.isActive = :active", { active: true })
+        .select("st.id", "id")
+        .distinct(true)
+        .getRawMany();
+
+      const dueByDateIds = new Set(dueByDate.map((t) => t.id));
+      const overrideOnlyIds = overrideDueIds
+        .map((r) => r.id as string)
+        .filter((id) => !dueByDateIds.has(id));
+
+      if (overrideOnlyIds.length === 0) {
+        return dueByDate;
+      }
+
+      const overrideDueTransactions = await m
+        .getRepository(ScheduledTransaction)
+        .find({
+          where: overrideOnlyIds.map((id) => ({ id })),
+          relations: INVESTMENT_RELATIONS,
+        });
+
+      return [...dueByDate, ...overrideDueTransactions];
+    });
   }
 
   async findUpcoming(
@@ -752,27 +767,33 @@ export class ScheduledTransactionsService {
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + days);
 
-    return this.scheduledTransactionsRepository
-      .createQueryBuilder("st")
-      .leftJoinAndSelect("st.account", "account")
-      .leftJoinAndSelect("st.payee", "payee")
-      .leftJoinAndSelect("st.category", "category")
-      .leftJoinAndSelect("st.transferAccount", "transferAccount")
-      .leftJoinAndSelect("st.investmentSecurity", "investmentSecurity")
-      .leftJoinAndSelect(
-        "st.investmentFundingAccount",
-        "investmentFundingAccount",
-      )
-      .leftJoinAndSelect("st.splits", "splits")
-      .leftJoinAndSelect("splits.category", "splitCategory")
-      .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
-      .leftJoinAndSelect("splits.tags", "splitTags")
-      .leftJoinAndSelect("splits.investmentSecurity", "splitInvestmentSecurity")
-      .where("st.userId = :userId", { userId })
-      .andWhere("st.isActive = :isActive", { isActive: true })
-      .andWhere("st.nextDueDate <= :futureDate", { futureDate })
-      .orderBy("st.nextDueDate", "ASC")
-      .getMany();
+    return tenantTx(this.dataSource, (m) =>
+      m
+        .getRepository(ScheduledTransaction)
+        .createQueryBuilder("st")
+        .leftJoinAndSelect("st.account", "account")
+        .leftJoinAndSelect("st.payee", "payee")
+        .leftJoinAndSelect("st.category", "category")
+        .leftJoinAndSelect("st.transferAccount", "transferAccount")
+        .leftJoinAndSelect("st.investmentSecurity", "investmentSecurity")
+        .leftJoinAndSelect(
+          "st.investmentFundingAccount",
+          "investmentFundingAccount",
+        )
+        .leftJoinAndSelect("st.splits", "splits")
+        .leftJoinAndSelect("splits.category", "splitCategory")
+        .leftJoinAndSelect("splits.transferAccount", "splitTransferAccount")
+        .leftJoinAndSelect("splits.tags", "splitTags")
+        .leftJoinAndSelect(
+          "splits.investmentSecurity",
+          "splitInvestmentSecurity",
+        )
+        .where("st.userId = :userId", { userId })
+        .andWhere("st.isActive = :isActive", { isActive: true })
+        .andWhere("st.nextDueDate <= :futureDate", { futureDate })
+        .orderBy("st.nextDueDate", "ASC")
+        .getMany(),
+    );
   }
 
   /**
@@ -1009,51 +1030,37 @@ export class ScheduledTransactionsService {
     // Apply the split rewrite, any mode-switch split clearing, and the main
     // row update atomically so a partial failure cannot leave the row and its
     // splits in an inconsistent state.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
+    await tenantTx(this.dataSource, async (m) => {
       if (splits !== undefined) {
         if (Array.isArray(splits) && splits.length > 0) {
-          await queryRunner.manager.delete(ScheduledTransactionSplit, {
+          await m.delete(ScheduledTransactionSplit, {
             scheduledTransactionId: id,
           });
-          await this.createSplits(id, splits, queryRunner.manager);
-          await queryRunner.manager.update(ScheduledTransaction, id, {
+          await this.createSplits(id, splits, m);
+          await m.update(ScheduledTransaction, id, {
             isSplit: true,
             categoryId: null,
           });
         } else if (Array.isArray(splits) && splits.length === 0) {
-          await queryRunner.manager.delete(ScheduledTransactionSplit, {
+          await m.delete(ScheduledTransactionSplit, {
             scheduledTransactionId: id,
           });
-          await queryRunner.manager.update(ScheduledTransaction, id, {
+          await m.update(ScheduledTransaction, id, {
             isSplit: false,
           });
         }
       }
 
       if (clearSplitsForModeSwitch) {
-        await queryRunner.manager.delete(ScheduledTransactionSplit, {
+        await m.delete(ScheduledTransactionSplit, {
           scheduledTransactionId: id,
         });
       }
 
       if (Object.keys(fieldsToUpdate).length > 0) {
-        await queryRunner.manager.update(
-          ScheduledTransaction,
-          id,
-          fieldsToUpdate,
-        );
+        await m.update(ScheduledTransaction, id, fieldsToUpdate);
       }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     const result = await this.findOne(userId, id);
 
@@ -1074,7 +1081,9 @@ export class ScheduledTransactionsService {
   async remove(userId: string, id: string): Promise<void> {
     const scheduled = await this.findOne(userId, id);
     const beforeData = { ...scheduled };
-    await this.scheduledTransactionsRepository.remove(scheduled);
+    await tenantTx(this.dataSource, (m) =>
+      m.getRepository(ScheduledTransaction).remove(scheduled),
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "scheduled_transaction",
@@ -1091,11 +1100,6 @@ export class ScheduledTransactionsService {
     const scheduled = await this.findOne(userId, id);
 
     const nextDueDateStr = ensureYMD(scheduled.nextDueDate);
-
-    await this.overridesRepository.delete({
-      scheduledTransactionId: id,
-      originalDate: nextDueDateStr,
-    });
 
     const newNextDueDateStr = calcNextDueDate(
       nextDueDateStr,
@@ -1121,7 +1125,13 @@ export class ScheduledTransactionsService {
       updateFields.isActive = false;
     }
 
-    await this.scheduledTransactionsRepository.update(id, updateFields);
+    await tenantTx(this.dataSource, async (m) => {
+      await m.getRepository(ScheduledTransactionOverride).delete({
+        scheduledTransactionId: id,
+        originalDate: nextDueDateStr,
+      });
+      await m.getRepository(ScheduledTransaction).update(id, updateFields);
+    });
     return this.findOne(userId, id);
   }
 
@@ -1134,11 +1144,14 @@ export class ScheduledTransactionsService {
 
     const nextDueDateStr = ensureYMD(scheduled.nextDueDate);
 
-    const storedOverride = await this.overridesRepository
-      .createQueryBuilder("override")
-      .where("override.scheduledTransactionId = :id", { id })
-      .andWhere("override.originalDate = :nextDueDateStr", { nextDueDateStr })
-      .getOne();
+    const storedOverride = await tenantTx(this.dataSource, (m) =>
+      m
+        .getRepository(ScheduledTransactionOverride)
+        .createQueryBuilder("override")
+        .where("override.scheduledTransactionId = :id", { id })
+        .andWhere("override.originalDate = :nextDueDateStr", { nextDueDateStr })
+        .getOne(),
+    );
 
     const postDate =
       postDto?.transactionDate ||
@@ -1297,24 +1310,20 @@ export class ScheduledTransactionsService {
       await this.transactionsService.create(userId, transactionPayload);
     }
 
-    // Wrap all bookkeeping in a transaction for atomicity
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    // Wrap all bookkeeping in a transaction for atomicity. The posted
+    // transaction/transfer/investment above has already committed in its own
+    // tenantTx, matching the pre-RLS boundary.
+    const removedAfterOnce = await tenantTx(this.dataSource, async (m) => {
       if (storedOverride) {
-        await queryRunner.manager.remove(storedOverride);
+        await m.remove(storedOverride);
       }
 
       if (scheduled.frequency === "ONCE") {
         // One-time bill or deposit: remove the scheduled transaction entirely
         // after posting so it disappears from the Bills & Deposits page.
         // Splits and overrides are cleaned up via ON DELETE CASCADE.
-        await queryRunner.manager.delete(ScheduledTransaction, id);
-
-        await queryRunner.commitTransaction();
-        return null;
+        await m.delete(ScheduledTransaction, id);
+        return true;
       }
 
       // Recurring frequency: advance nextDueDate, prune stale overrides,
@@ -1324,7 +1333,7 @@ export class ScheduledTransactionsService {
         scheduled.frequency,
       );
 
-      await queryRunner.manager
+      await m
         .createQueryBuilder()
         .delete()
         .from(ScheduledTransactionOverride)
@@ -1357,14 +1366,12 @@ export class ScheduledTransactionsService {
         updateFields.isActive = false;
       }
 
-      await queryRunner.manager.update(ScheduledTransaction, id, updateFields);
+      await m.update(ScheduledTransaction, id, updateFields);
+      return false;
+    });
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
+    if (removedAfterOnce) {
+      return null;
     }
 
     if (scheduled.splits && scheduled.splits.length > 0) {

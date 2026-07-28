@@ -5,8 +5,7 @@ import {
   forwardRef,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, QueryRunner } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
 import { Transaction, TransactionStatus } from "./entities/transaction.entity";
 import { TransactionSplit } from "./entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
@@ -21,6 +20,7 @@ import { formatCurrency } from "../common/format-currency.util";
 import { roundMoney } from "../common/round.util";
 import { stripHtml } from "../common/sanitization.util";
 import { tr } from "../i18n/translate";
+import { tenantTx } from "../common/db/tenant-tx";
 
 export interface TransferResult {
   fromTransaction: Transaction;
@@ -86,12 +86,6 @@ export class TransactionTransferService {
   private readonly logger = new Logger(TransactionTransferService.name);
 
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(TransactionSplit)
-    private splitsRepository: Repository<TransactionSplit>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     private payeesService: PayeesService,
@@ -115,9 +109,11 @@ export class TransactionTransferService {
     categoryId: string | null | undefined,
   ): Promise<void> {
     if (!categoryId) return;
-    const category = await this.categoriesRepository.findOne({
-      where: { id: categoryId, userId },
-    });
+    const category = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Category).findOne({
+        where: { id: categoryId, userId },
+      }),
+    );
     if (!category) {
       throw new BadRequestException(
         tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -182,89 +178,66 @@ export class TransactionTransferService {
     const fromPayeeName = customPayeeName || `Transfer to ${toAccount.name}`;
     const toPayeeName = customPayeeName || `Transfer from ${fromAccount.name}`;
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    // Both legs, their linkage, and the balance updates commit atomically.
+    const { savedFromId, savedToId } = await tenantTx(
+      this.dataSource,
+      async (m) => {
+        const fromTransaction = m.create(Transaction, {
+          userId,
+          accountId: fromAccountId,
+          transactionDate: transactionDate as any,
+          amount: -amount,
+          currencyCode: fromCurrencyCode,
+          exchangeRate: 1,
+          description: description || null,
+          referenceNumber,
+          status,
+          isTransfer: true,
+          payeeId: payeeId || null,
+          payeeName: fromPayeeName,
+          categoryId: categoryId || null,
+        });
 
-    let savedFromId: string;
-    let savedToId: string;
+        const toTransaction = m.create(Transaction, {
+          userId,
+          accountId: toAccountId,
+          transactionDate: transactionDate as any,
+          amount: toAmount,
+          currencyCode: destinationCurrency,
+          exchangeRate: exchangeRate,
+          description: description || null,
+          referenceNumber,
+          status,
+          isTransfer: true,
+          payeeId: payeeId || null,
+          payeeName: toPayeeName,
+          categoryId: categoryId || null,
+        });
 
-    try {
-      const fromTransaction = queryRunner.manager.create(Transaction, {
-        userId,
-        accountId: fromAccountId,
-        transactionDate: transactionDate as any,
-        amount: -amount,
-        currencyCode: fromCurrencyCode,
-        exchangeRate: 1,
-        description: description || null,
-        referenceNumber,
-        status,
-        isTransfer: true,
-        payeeId: payeeId || null,
-        payeeName: fromPayeeName,
-        categoryId: categoryId || null,
-      });
+        const savedFromTransaction = await m.save(fromTransaction);
+        const savedToTransaction = await m.save(toTransaction);
 
-      const toTransaction = queryRunner.manager.create(Transaction, {
-        userId,
-        accountId: toAccountId,
-        transactionDate: transactionDate as any,
-        amount: toAmount,
-        currencyCode: destinationCurrency,
-        exchangeRate: exchangeRate,
-        description: description || null,
-        referenceNumber,
-        status,
-        isTransfer: true,
-        payeeId: payeeId || null,
-        payeeName: toPayeeName,
-        categoryId: categoryId || null,
-      });
+        const fromId = savedFromTransaction.id;
+        const toId = savedToTransaction.id;
 
-      const savedFromTransaction =
-        await queryRunner.manager.save(fromTransaction);
-      const savedToTransaction = await queryRunner.manager.save(toTransaction);
+        await m.update(Transaction, fromId, {
+          linkedTransactionId: toId,
+        });
+        await m.update(Transaction, toId, {
+          linkedTransactionId: fromId,
+        });
 
-      savedFromId = savedFromTransaction.id;
-      savedToId = savedToTransaction.id;
+        if (isTransactionInFuture(transactionDate)) {
+          await this.accountsService.recalculateCurrentBalance(fromAccountId);
+          await this.accountsService.recalculateCurrentBalance(toAccountId);
+        } else {
+          await this.accountsService.updateBalance(fromAccountId, -amount);
+          await this.accountsService.updateBalance(toAccountId, toAmount);
+        }
 
-      await queryRunner.manager.update(Transaction, savedFromId, {
-        linkedTransactionId: savedToId,
-      });
-      await queryRunner.manager.update(Transaction, savedToId, {
-        linkedTransactionId: savedFromId,
-      });
-
-      if (isTransactionInFuture(transactionDate)) {
-        await this.accountsService.recalculateCurrentBalance(
-          fromAccountId,
-          queryRunner,
-        );
-        await this.accountsService.recalculateCurrentBalance(
-          toAccountId,
-          queryRunner,
-        );
-      } else {
-        await this.accountsService.updateBalance(
-          fromAccountId,
-          -amount,
-          queryRunner,
-        );
-        await this.accountsService.updateBalance(
-          toAccountId,
-          toAmount,
-          queryRunner,
-        );
-      }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+        return { savedFromId: fromId, savedToId: toId };
+      },
+    );
 
     this.triggerNetWorthRecalc(fromAccountId, userId);
     this.triggerNetWorthRecalc(toAccountId, userId);
@@ -410,9 +383,12 @@ export class TransactionTransferService {
     let categoryId: string | null = null;
     let categoryName: string | null = null;
     if (input.categoryId) {
-      const category = await this.categoriesRepository.findOne({
-        where: { id: input.categoryId, userId },
-      });
+      const inputCategoryId = input.categoryId;
+      const category = await tenantTx(this.dataSource, (m) =>
+        m.getRepository(Category).findOne({
+          where: { id: inputCategoryId, userId },
+        }),
+      );
       if (!category) {
         throw new BadRequestException(
           tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -537,9 +513,12 @@ export class TransactionTransferService {
     let categoryName: string | null = fromTransaction.category?.name ?? null;
     if (input.categoryId !== undefined) {
       if (input.categoryId) {
-        const category = await this.categoriesRepository.findOne({
-          where: { id: input.categoryId, userId },
-        });
+        const inputCategoryId = input.categoryId;
+        const category = await tenantTx(this.dataSource, (m) =>
+          m.getRepository(Category).findOne({
+            where: { id: inputCategoryId, userId },
+          }),
+        );
         if (!category) {
           throw new BadRequestException(
             tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -588,20 +567,20 @@ export class TransactionTransferService {
       );
     }
 
-    const parentSplit = await this.splitsRepository.findOne({
-      where: { linkedTransactionId: transactionId },
-    });
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    const parentSplit = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(TransactionSplit).findOne({
+        where: { linkedTransactionId: transactionId },
+      }),
+    );
 
     const affectedAccountIds = new Set<string>();
 
-    try {
+    // Both legs (or the whole split parent) and their balance adjustments are
+    // removed atomically.
+    await tenantTx(this.dataSource, async (m) => {
       if (parentSplit) {
         await this.removeTransferFromSplitInTransaction(
-          queryRunner,
+          m,
           parentSplit,
           transaction,
           transactionId,
@@ -609,7 +588,7 @@ export class TransactionTransferService {
         );
       } else {
         const linkedTransaction = transaction.linkedTransactionId
-          ? await queryRunner.manager.findOne(Transaction, {
+          ? await m.findOne(Transaction, {
               where: { id: transaction.linkedTransactionId },
             })
           : null;
@@ -622,7 +601,6 @@ export class TransactionTransferService {
           await this.accountsService.updateBalance(
             txAccountId,
             -Number(transaction.amount),
-            queryRunner,
           );
         }
 
@@ -637,34 +615,22 @@ export class TransactionTransferService {
             await this.accountsService.updateBalance(
               linkedAccountId,
               -Number(linkedTransaction.amount),
-              queryRunner,
             );
           }
-          await queryRunner.manager.remove(linkedTransaction);
+          await m.remove(linkedTransaction);
           if (linkedIsFuture) {
             await this.accountsService.recalculateCurrentBalance(
               linkedAccountId,
-              queryRunner,
             );
           }
         }
 
-        await queryRunner.manager.remove(transaction);
+        await m.remove(transaction);
         if (txIsFuture) {
-          await this.accountsService.recalculateCurrentBalance(
-            txAccountId,
-            queryRunner,
-          );
+          await this.accountsService.recalculateCurrentBalance(txAccountId);
         }
       }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     for (const accId of affectedAccountIds) {
       this.triggerNetWorthRecalc(accId, userId);
@@ -672,19 +638,19 @@ export class TransactionTransferService {
   }
 
   private async removeTransferFromSplitInTransaction(
-    queryRunner: QueryRunner,
+    m: EntityManager,
     parentSplit: TransactionSplit,
     transaction: Transaction,
     transactionId: string,
     affectedAccountIds: Set<string>,
   ): Promise<void> {
     const parentTransactionId = parentSplit.transactionId;
-    const parentTransaction = await queryRunner.manager.findOne(Transaction, {
+    const parentTransaction = await m.findOne(Transaction, {
       where: { id: parentTransactionId },
     });
 
     if (parentTransaction) {
-      const allSplits = await queryRunner.manager.find(TransactionSplit, {
+      const allSplits = await m.find(TransactionSplit, {
         where: { transactionId: parentTransactionId },
       });
 
@@ -693,7 +659,7 @@ export class TransactionTransferService {
           split.linkedTransactionId &&
           split.linkedTransactionId !== transactionId
         ) {
-          const linkedTx = await queryRunner.manager.findOne(Transaction, {
+          const linkedTx = await m.findOne(Transaction, {
             where: { id: split.linkedTransactionId },
           });
 
@@ -707,21 +673,17 @@ export class TransactionTransferService {
               await this.accountsService.updateBalance(
                 linkedAccId,
                 -Number(linkedTx.amount),
-                queryRunner,
               );
             }
-            await queryRunner.manager.remove(linkedTx);
+            await m.remove(linkedTx);
             if (linkedIsFuture) {
-              await this.accountsService.recalculateCurrentBalance(
-                linkedAccId,
-                queryRunner,
-              );
+              await this.accountsService.recalculateCurrentBalance(linkedAccId);
             }
           }
         }
       }
 
-      await queryRunner.manager.remove(allSplits);
+      await m.remove(allSplits);
 
       const parentIsFuture = isTransactionInFuture(
         parentTransaction.transactionDate,
@@ -731,14 +693,12 @@ export class TransactionTransferService {
         await this.accountsService.updateBalance(
           parentTransaction.accountId,
           -Number(parentTransaction.amount),
-          queryRunner,
         );
       }
-      await queryRunner.manager.remove(parentTransaction);
+      await m.remove(parentTransaction);
       if (parentIsFuture) {
         await this.accountsService.recalculateCurrentBalance(
           parentTransaction.accountId,
-          queryRunner,
         );
       }
     }
@@ -749,14 +709,12 @@ export class TransactionTransferService {
       await this.accountsService.updateBalance(
         transaction.accountId,
         -Number(transaction.amount),
-        queryRunner,
       );
     }
-    await queryRunner.manager.remove(transaction);
+    await m.remove(transaction);
     if (txIsFuture) {
       await this.accountsService.recalculateCurrentBalance(
         transaction.accountId,
-        queryRunner,
       );
     }
   }
@@ -780,9 +738,11 @@ export class TransactionTransferService {
     // all its splits), not at a mirror leg. Routing it through the two-leg
     // update below would overwrite the parent's aggregate amount and fields with
     // this single leg's values. Handle it separately instead.
-    const parentSplit = await this.splitsRepository.findOne({
-      where: { linkedTransactionId: transactionId },
-    });
+    const parentSplit = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(TransactionSplit).findOne({
+        where: { linkedTransactionId: transactionId },
+      }),
+    );
     if (parentSplit) {
       return this.updateSplitTransferLeg(
         userId,
@@ -885,38 +845,23 @@ export class TransactionTransferService {
       newFromAccount,
     );
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    // Both legs' field updates and the four possible balance adjustments
+    // commit atomically.
+    await tenantTx(this.dataSource, async (m) => {
       if ((accountsOrAmountsChanged || dateChanged) && !anyFuture) {
         await this.accountsService.updateBalance(
           oldFromAccountId,
           oldFromAmount,
-          queryRunner,
         );
-        await this.accountsService.updateBalance(
-          oldToAccountId,
-          -oldToAmount,
-          queryRunner,
-        );
+        await this.accountsService.updateBalance(oldToAccountId, -oldToAmount);
       }
 
       if (Object.keys(fromUpdateData).length > 0) {
-        await queryRunner.manager.update(
-          Transaction,
-          fromTransaction.id,
-          fromUpdateData,
-        );
+        await m.update(Transaction, fromTransaction.id, fromUpdateData);
       }
 
       if (Object.keys(toUpdateData).length > 0) {
-        await queryRunner.manager.update(
-          Transaction,
-          toTransaction.id,
-          toUpdateData,
-        );
+        await m.update(Transaction, toTransaction.id, toUpdateData);
       }
 
       // Update createdAt via raw query to bypass pg's local-timezone
@@ -924,14 +869,14 @@ export class TransactionTransferService {
       if ((updateDto as any).createdAt !== undefined) {
         const d = new Date((updateDto as any).createdAt);
         const utc = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}:${String(d.getUTCSeconds()).padStart(2, "0")}.${String(d.getUTCMilliseconds()).padStart(3, "0")}`;
-        await queryRunner.query(
-          `UPDATE transactions SET created_at = $1 WHERE id = $2`,
-          [utc, fromTransaction.id],
-        );
-        await queryRunner.query(
-          `UPDATE transactions SET created_at = $1 WHERE id = $2`,
-          [utc, toTransaction.id],
-        );
+        await m.query(`UPDATE transactions SET created_at = $1 WHERE id = $2`, [
+          utc,
+          fromTransaction.id,
+        ]);
+        await m.query(`UPDATE transactions SET created_at = $1 WHERE id = $2`, [
+          utc,
+          toTransaction.id,
+        ]);
       }
 
       if (accountsOrAmountsChanged || dateChanged) {
@@ -943,32 +888,17 @@ export class TransactionTransferService {
             newToAccountId,
           ]);
           for (const accId of allAccounts) {
-            await this.accountsService.recalculateCurrentBalance(
-              accId,
-              queryRunner,
-            );
+            await this.accountsService.recalculateCurrentBalance(accId);
           }
         } else {
           await this.accountsService.updateBalance(
             newFromAccountId,
             -newAmount,
-            queryRunner,
           );
-          await this.accountsService.updateBalance(
-            newToAccountId,
-            newToAmount,
-            queryRunner,
-          );
+          await this.accountsService.updateBalance(newToAccountId, newToAmount);
         }
       }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     const affectedAccounts = new Set([
       oldFromAccountId,
@@ -1068,13 +998,11 @@ export class TransactionTransferService {
       splitData.memo = updateDto.description ?? null;
     if (newSplitAmount !== undefined) splitData.amount = newSplitAmount as any;
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    // The leg edit, split-row mirror, parent re-total, and balance updates
+    // commit atomically.
+    await tenantTx(this.dataSource, async (m) => {
       if (Object.keys(legData).length > 0) {
-        await queryRunner.manager.update(Transaction, counterpart.id, legData);
+        await m.update(Transaction, counterpart.id, legData);
       }
 
       // Rebalance the counterpart's own account for an amount and/or date change.
@@ -1082,29 +1010,23 @@ export class TransactionTransferService {
         if (isTransactionInFuture(oldDate) || isTransactionInFuture(newDate)) {
           await this.accountsService.recalculateCurrentBalance(
             counterpart.accountId,
-            queryRunner,
           );
         } else {
           await this.accountsService.updateBalance(
             counterpart.accountId,
             newCounterpartAmount - oldCounterpartAmount,
-            queryRunner,
           );
         }
       }
 
       // Write the split row (memo mirror and/or amount) in one update.
       if (Object.keys(splitData).length > 0) {
-        await queryRunner.manager.update(
-          TransactionSplit,
-          parentSplit.id,
-          splitData,
-        );
+        await m.update(TransactionSplit, parentSplit.id, splitData);
       }
 
       // When the amount changed, re-total the parent and rebalance the source.
       if (amountChanged && newSplitAmount !== undefined) {
-        const siblingSplits = await queryRunner.manager.find(TransactionSplit, {
+        const siblingSplits = await m.find(TransactionSplit, {
           where: { transactionId: parentTransaction.id },
         });
         const sumCents = siblingSplits.reduce((acc, s) => {
@@ -1115,31 +1037,22 @@ export class TransactionTransferService {
         const newParentAmount = sumCents / 10000;
         const oldParentAmount = Number(parentTransaction.amount);
 
-        await queryRunner.manager.update(Transaction, parentTransaction.id, {
+        await m.update(Transaction, parentTransaction.id, {
           amount: newParentAmount,
         });
 
         if (isTransactionInFuture(parentTransaction.transactionDate)) {
           await this.accountsService.recalculateCurrentBalance(
             parentTransaction.accountId,
-            queryRunner,
           );
         } else {
           await this.accountsService.updateBalance(
             parentTransaction.accountId,
             newParentAmount - oldParentAmount,
-            queryRunner,
           );
         }
       }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     this.triggerNetWorthRecalc(counterpart.accountId, userId);
     this.triggerNetWorthRecalc(parentTransaction.accountId, userId);

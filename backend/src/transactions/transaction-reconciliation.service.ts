@@ -4,8 +4,7 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { Transaction, TransactionStatus } from "./entities/transaction.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import {
@@ -13,12 +12,11 @@ import {
   formatDateYMDLocal,
 } from "../common/date-utils";
 import { tr } from "../i18n/translate";
+import { tenantTx } from "../common/db/tenant-tx";
 
 @Injectable()
 export class TransactionReconciliationService {
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     private dataSource: DataSource,
@@ -38,18 +36,14 @@ export class TransactionReconciliationService {
     // The status change and the matching balance adjustment touch two tables
     // (transactions + accounts) and must commit atomically, otherwise a failure
     // between the two leaves the account balance out of sync with the status.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
+    await tenantTx(this.dataSource, async (m) => {
       if (isTransactionInFuture(transaction.transactionDate)) {
-        await queryRunner.manager.update(Transaction, transaction.id, {
+        await m.update(Transaction, transaction.id, {
           status,
         });
         if (wasVoid !== isVoid) {
           await this.accountsService.recalculateCurrentBalance(
             transaction.accountId,
-            queryRunner,
           );
         }
       } else {
@@ -57,16 +51,14 @@ export class TransactionReconciliationService {
           await this.accountsService.updateBalance(
             transaction.accountId,
             Number(transaction.amount),
-            queryRunner,
           );
         } else if (!wasVoid && isVoid) {
           await this.accountsService.updateBalance(
             transaction.accountId,
             -Number(transaction.amount),
-            queryRunner,
           );
         }
-        await queryRunner.manager.update(Transaction, transaction.id, {
+        await m.update(Transaction, transaction.id, {
           status,
         });
       }
@@ -76,18 +68,11 @@ export class TransactionReconciliationService {
         oldStatus !== TransactionStatus.RECONCILED
       ) {
         const reconciledDate = formatDateYMDLocal(new Date());
-        await queryRunner.manager.update(Transaction, transaction.id, {
+        await m.update(Transaction, transaction.id, {
           reconciledDate,
         });
       }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     if (wasVoid !== isVoid) {
       triggerNetWorthRecalc(transaction.accountId, userId);
@@ -174,10 +159,12 @@ export class TransactionReconciliationService {
       );
     }
 
-    await this.transactionsRepository.update(transaction.id, {
-      status: TransactionStatus.CLEARED,
-      reconciledDate: null,
-    });
+    await tenantTx(this.dataSource, (m) =>
+      m.getRepository(Transaction).update(transaction.id, {
+        status: TransactionStatus.CLEARED,
+        reconciledDate: null,
+      }),
+    );
 
     return findOne(userId, transaction.id);
   }
@@ -194,51 +181,56 @@ export class TransactionReconciliationService {
     difference: number;
   }> {
     const [account, transactions, reconciledResult, clearedResult] =
-      await Promise.all([
-        this.accountsService.findOne(userId, accountId),
-        this.transactionsRepository
-          .createQueryBuilder("transaction")
-          .leftJoinAndSelect("transaction.payee", "payee")
-          .leftJoinAndSelect("transaction.category", "category")
-          .where("transaction.userId = :userId", { userId })
-          .andWhere("transaction.accountId = :accountId", { accountId })
-          .andWhere("transaction.parentTransactionId IS NULL")
-          .andWhere("transaction.status IN (:...statuses)", {
-            statuses: [
-              TransactionStatus.UNRECONCILED,
-              TransactionStatus.CLEARED,
-            ],
-          })
-          .andWhere("transaction.transactionDate <= :statementDate", {
-            statementDate,
-          })
-          .orderBy("transaction.transactionDate", "ASC")
-          .addOrderBy("transaction.createdAt", "ASC")
-          .getMany(),
-        this.transactionsRepository
-          .createQueryBuilder("transaction")
-          .select("SUM(transaction.amount)", "sum")
-          .where("transaction.userId = :userId", { userId })
-          .andWhere("transaction.accountId = :accountId", { accountId })
-          .andWhere("transaction.parentTransactionId IS NULL")
-          .andWhere("transaction.status = :status", {
-            status: TransactionStatus.RECONCILED,
-          })
-          .getRawOne(),
-        this.transactionsRepository
-          .createQueryBuilder("transaction")
-          .select("SUM(transaction.amount)", "sum")
-          .where("transaction.userId = :userId", { userId })
-          .andWhere("transaction.accountId = :accountId", { accountId })
-          .andWhere("transaction.parentTransactionId IS NULL")
-          .andWhere("transaction.status = :status", {
-            status: TransactionStatus.CLEARED,
-          })
-          .andWhere("transaction.transactionDate <= :statementDate", {
-            statementDate,
-          })
-          .getRawOne(),
-      ]);
+      await tenantTx(this.dataSource, (m) =>
+        Promise.all([
+          this.accountsService.findOne(userId, accountId),
+          m
+            .getRepository(Transaction)
+            .createQueryBuilder("transaction")
+            .leftJoinAndSelect("transaction.payee", "payee")
+            .leftJoinAndSelect("transaction.category", "category")
+            .where("transaction.userId = :userId", { userId })
+            .andWhere("transaction.accountId = :accountId", { accountId })
+            .andWhere("transaction.parentTransactionId IS NULL")
+            .andWhere("transaction.status IN (:...statuses)", {
+              statuses: [
+                TransactionStatus.UNRECONCILED,
+                TransactionStatus.CLEARED,
+              ],
+            })
+            .andWhere("transaction.transactionDate <= :statementDate", {
+              statementDate,
+            })
+            .orderBy("transaction.transactionDate", "ASC")
+            .addOrderBy("transaction.createdAt", "ASC")
+            .getMany(),
+          m
+            .getRepository(Transaction)
+            .createQueryBuilder("transaction")
+            .select("SUM(transaction.amount)", "sum")
+            .where("transaction.userId = :userId", { userId })
+            .andWhere("transaction.accountId = :accountId", { accountId })
+            .andWhere("transaction.parentTransactionId IS NULL")
+            .andWhere("transaction.status = :status", {
+              status: TransactionStatus.RECONCILED,
+            })
+            .getRawOne(),
+          m
+            .getRepository(Transaction)
+            .createQueryBuilder("transaction")
+            .select("SUM(transaction.amount)", "sum")
+            .where("transaction.userId = :userId", { userId })
+            .andWhere("transaction.accountId = :accountId", { accountId })
+            .andWhere("transaction.parentTransactionId IS NULL")
+            .andWhere("transaction.status = :status", {
+              status: TransactionStatus.CLEARED,
+            })
+            .andWhere("transaction.transactionDate <= :statementDate", {
+              statementDate,
+            })
+            .getRawOne(),
+        ]),
+      );
 
     const reconciledSum = Number(reconciledResult?.sum) || 0;
     const reconciledBalance = Number(account.openingBalance) + reconciledSum;
@@ -268,45 +260,49 @@ export class TransactionReconciliationService {
       return { reconciled: 0 };
     }
 
-    const transactions = await this.transactionsRepository
-      .createQueryBuilder("transaction")
-      .where("transaction.id IN (:...ids)", { ids: transactionIds })
-      .andWhere("transaction.userId = :userId", { userId })
-      .andWhere("transaction.accountId = :accountId", { accountId })
-      .getMany();
+    return tenantTx(this.dataSource, async (m) => {
+      const transactions = await m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .where("transaction.id IN (:...ids)", { ids: transactionIds })
+        .andWhere("transaction.userId = :userId", { userId })
+        .andWhere("transaction.accountId = :accountId", { accountId })
+        .getMany();
 
-    if (transactions.length !== transactionIds.length) {
-      throw new BadRequestException(
-        tr(
-          "errors.transactions.bulkReconcileNotFound",
-          "Some transactions were not found or do not belong to the specified account",
-        ),
+      if (transactions.length !== transactionIds.length) {
+        throw new BadRequestException(
+          tr(
+            "errors.transactions.bulkReconcileNotFound",
+            "Some transactions were not found or do not belong to the specified account",
+          ),
+        );
+      }
+
+      const voidTransactions = transactions.filter(
+        (t) => t.status === TransactionStatus.VOID,
       );
-    }
+      if (voidTransactions.length > 0) {
+        throw new BadRequestException(
+          tr(
+            "errors.transactions.cannotReconcileVoidPlural",
+            "Cannot reconcile void transactions",
+          ),
+        );
+      }
 
-    const voidTransactions = transactions.filter(
-      (t) => t.status === TransactionStatus.VOID,
-    );
-    if (voidTransactions.length > 0) {
-      throw new BadRequestException(
-        tr(
-          "errors.transactions.cannotReconcileVoidPlural",
-          "Cannot reconcile void transactions",
-        ),
-      );
-    }
+      await m
+        .getRepository(Transaction)
+        .createQueryBuilder()
+        .update(Transaction)
+        .set({
+          status: TransactionStatus.RECONCILED,
+          reconciledDate: reconciledDate,
+        })
+        .where("id IN (:...ids)", { ids: transactionIds })
+        .andWhere("userId = :userId", { userId })
+        .execute();
 
-    await this.transactionsRepository
-      .createQueryBuilder()
-      .update(Transaction)
-      .set({
-        status: TransactionStatus.RECONCILED,
-        reconciledDate: reconciledDate,
-      })
-      .where("id IN (:...ids)", { ids: transactionIds })
-      .andWhere("userId = :userId", { userId })
-      .execute();
-
-    return { reconciled: transactions.length };
+      return { reconciled: transactions.length };
+    });
   }
 }

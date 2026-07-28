@@ -6,11 +6,10 @@ import {
   forwardRef,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
 import {
   Brackets,
+  EntityManager,
   In,
-  Repository,
   SelectQueryBuilder,
   DataSource,
 } from "typeorm";
@@ -41,6 +40,7 @@ import {
   ParsedSearchTerm,
 } from "./transaction-search-parse.util";
 import { tr } from "../i18n/translate";
+import { tenantTx } from "../common/db/tenant-tx";
 
 export interface BulkDeleteResult {
   deleted: number;
@@ -57,14 +57,6 @@ export class TransactionBulkUpdateService {
   private readonly logger = new Logger(TransactionBulkUpdateService.name);
 
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
-    @InjectRepository(Payee)
-    private payeesRepository: Repository<Payee>,
-    @InjectRepository(UserPreference)
-    private userPreferenceRepository: Repository<UserPreference>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     @Inject(forwardRef(() => NetWorthService))
@@ -82,9 +74,11 @@ export class TransactionBulkUpdateService {
     term?: string,
   ): Promise<ParsedSearchTerm> {
     if (!term || !term.trim()) return { amount: null, date: null };
-    const prefs = await this.userPreferenceRepository.findOne({
-      where: { userId },
-    });
+    const prefs = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({
+        where: { userId },
+      }),
+    );
     return parseSearchTerm(term, {
       numberFormat: prefs?.numberFormat,
       dateFormat: prefs?.dateFormat,
@@ -108,9 +102,12 @@ export class TransactionBulkUpdateService {
 
     // H4: Validate ownership of categoryId and payeeId before applying
     if ("categoryId" in dto && dto.categoryId) {
-      const cat = await this.categoriesRepository.findOne({
-        where: { id: dto.categoryId, userId },
-      });
+      const categoryId = dto.categoryId;
+      const cat = await tenantTx(this.dataSource, (m) =>
+        m.getRepository(Category).findOne({
+          where: { id: categoryId, userId },
+        }),
+      );
       if (!cat) {
         throw new NotFoundException(
           tr("errors.transactions.categoryNotFound", "Category not found"),
@@ -118,9 +115,12 @@ export class TransactionBulkUpdateService {
       }
     }
     if ("payeeId" in dto && dto.payeeId) {
-      const payee = await this.payeesRepository.findOne({
-        where: { id: dto.payeeId, userId },
-      });
+      const payeeId = dto.payeeId;
+      const payee = await tenantTx(this.dataSource, (m) =>
+        m.getRepository(Payee).findOne({
+          where: { id: payeeId, userId },
+        }),
+      );
       if (!payee) {
         throw new NotFoundException(
           tr("errors.transactions.payeeNotFound", "Payee not found"),
@@ -150,25 +150,21 @@ export class TransactionBulkUpdateService {
       return { updated: 0, skipped, skippedReasons };
     }
 
-    // Wrap balance changes and batch update in a single transaction
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    // Balance changes and the batch update commit in a single transaction.
+    await tenantTx(this.dataSource, async (m) => {
       // Step 3: Handle balance adjustments for VOID status changes
       if (isUpdatingStatus) {
         await this.handleStatusBalanceChanges(
+          m,
           userId,
           eligibleIds,
           dto.status!,
-          queryRunner,
         );
       }
 
       // Step 4: Execute batch update for column fields
       if (Object.keys(updateFields).length > 0) {
-        await queryRunner.manager
+        await m
           .createQueryBuilder()
           .update(Transaction)
           .set(updateFields)
@@ -177,12 +173,7 @@ export class TransactionBulkUpdateService {
           .execute();
 
         // Step 4b: Sync payee/description to linked transfer transactions
-        await this.syncLinkedTransfers(
-          userId,
-          eligibleIds,
-          updateFields,
-          queryRunner,
-        );
+        await this.syncLinkedTransfers(m, userId, eligibleIds, updateFields);
       }
 
       // Step 4c: Update tags (many-to-many relation). Validates the tag set
@@ -193,27 +184,14 @@ export class TransactionBulkUpdateService {
           eligibleIds,
           dto.tagIds ?? [],
           userId,
-          queryRunner,
         );
 
         // Keep transfer counterparts in step, mirroring the single-edit flow
         // (updateTransfer wrapper): plain transfer legs share tags with their
         // mirror leg; split-transfer legs mirror tags onto the owning split.
-        await this.syncTransferTags(
-          userId,
-          eligibleIds,
-          dto.tagIds ?? [],
-          queryRunner,
-        );
+        await this.syncTransferTags(m, userId, eligibleIds, dto.tagIds ?? []);
       }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     // Step 5: Trigger net worth recalc for affected accounts (after commit)
     if (isUpdatingStatus) {
@@ -237,32 +215,32 @@ export class TransactionBulkUpdateService {
     }
 
     // Load transaction details needed for balance adjustments and linked transfers
-    const transactions = await this.transactionsRepository
-      .createQueryBuilder("transaction")
-      .select([
-        "transaction.id",
-        "transaction.accountId",
-        "transaction.amount",
-        "transaction.status",
-        "transaction.transactionDate",
-        "transaction.isTransfer",
-        "transaction.linkedTransactionId",
-        "transaction.isSplit",
-      ])
-      .leftJoinAndSelect("transaction.splits", "splits")
-      .where("transaction.id IN (:...ids)", { ids: allIds })
-      .andWhere("transaction.userId = :userId", { userId })
-      .getMany();
+    const transactions = await tenantTx(this.dataSource, (m) =>
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .select([
+          "transaction.id",
+          "transaction.accountId",
+          "transaction.amount",
+          "transaction.status",
+          "transaction.transactionDate",
+          "transaction.isTransfer",
+          "transaction.linkedTransactionId",
+          "transaction.isSplit",
+        ])
+        .leftJoinAndSelect("transaction.splits", "splits")
+        .where("transaction.id IN (:...ids)", { ids: allIds })
+        .andWhere("transaction.userId = :userId", { userId })
+        .getMany(),
+    );
 
     if (transactions.length === 0) {
       return { deleted: 0 };
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    // Balance adjustments and both delete passes commit atomically.
+    await tenantTx(this.dataSource, async (m) => {
       // Collect linked transaction IDs from transfers and split transfers
       const linkedIdsToDelete = new Set<string>();
       const transactionIdsSet = new Set(transactions.map((t) => t.id));
@@ -289,7 +267,7 @@ export class TransactionBulkUpdateService {
       // Load linked transactions for balance adjustments
       let linkedTransactions: Transaction[] = [];
       if (linkedIdsToDelete.size > 0) {
-        linkedTransactions = await queryRunner.manager
+        linkedTransactions = await m
           .createQueryBuilder(Transaction, "transaction")
           .select([
             "transaction.id",
@@ -321,17 +299,13 @@ export class TransactionBulkUpdateService {
 
       for (const [accountId, adjustment] of balanceAdjustments) {
         if (adjustment !== 0) {
-          await this.accountsService.updateBalance(
-            accountId,
-            adjustment,
-            queryRunner,
-          );
+          await this.accountsService.updateBalance(accountId, adjustment);
         }
       }
 
       // Delete linked transactions first (foreign key order)
       if (linkedIdsToDelete.size > 0) {
-        await queryRunner.manager
+        await m
           .createQueryBuilder()
           .delete()
           .from(Transaction)
@@ -341,21 +315,14 @@ export class TransactionBulkUpdateService {
       }
 
       // Delete the primary transactions
-      await queryRunner.manager
+      await m
         .createQueryBuilder()
         .delete()
         .from(Transaction)
         .where("id IN (:...ids)", { ids: allIds })
         .andWhere("userId = :userId", { userId })
         .execute();
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     // Trigger net worth recalc for all affected accounts
     const affectedAccountIds = new Set(transactions.map((t) => t.accountId));
@@ -397,31 +364,37 @@ export class TransactionBulkUpdateService {
         return [];
       }
 
-      const transactions = await this.transactionsRepository
-        .createQueryBuilder("transaction")
-        .select("transaction.id")
-        .where("transaction.id IN (:...ids)", { ids: dto.transactionIds })
-        .andWhere("transaction.userId = :userId", { userId })
-        .getMany();
+      const transactions = await tenantTx(this.dataSource, (m) =>
+        m
+          .getRepository(Transaction)
+          .createQueryBuilder("transaction")
+          .select("transaction.id")
+          .where("transaction.id IN (:...ids)", { ids: dto.transactionIds })
+          .andWhere("transaction.userId = :userId", { userId })
+          .getMany(),
+      );
 
       return transactions.map((t) => t.id);
     }
 
     // Filter mode
-    const queryBuilder = this.transactionsRepository
-      .createQueryBuilder("transaction")
-      .select("transaction.id")
-      .where("transaction.userId = :userId", { userId });
+    const transactions = await tenantTx(this.dataSource, async (m) => {
+      const queryBuilder = m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .select("transaction.id")
+        .where("transaction.userId = :userId", { userId });
 
-    await this.applyFilters(queryBuilder, userId, dto.filters || {});
+      await this.applyFilters(m, queryBuilder, userId, dto.filters || {});
 
-    if (dto.excludedIds && dto.excludedIds.length > 0) {
-      queryBuilder.andWhere("transaction.id NOT IN (:...excludedIds)", {
-        excludedIds: dto.excludedIds,
-      });
-    }
+      if (dto.excludedIds && dto.excludedIds.length > 0) {
+        queryBuilder.andWhere("transaction.id NOT IN (:...excludedIds)", {
+          excludedIds: dto.excludedIds,
+        });
+      }
 
-    const transactions = await queryBuilder.getMany();
+      return queryBuilder.getMany();
+    });
     return transactions.map((t) => t.id);
   }
 
@@ -436,16 +409,19 @@ export class TransactionBulkUpdateService {
     skippedReasons: string[];
   }> {
     // Fetch transaction details needed for exclusion logic
-    const transactions = await this.transactionsRepository
-      .createQueryBuilder("transaction")
-      .select([
-        "transaction.id",
-        "transaction.isTransfer",
-        "transaction.isSplit",
-      ])
-      .where("transaction.id IN (:...ids)", { ids: allIds })
-      .andWhere("transaction.userId = :userId", { userId })
-      .getMany();
+    const transactions = await tenantTx(this.dataSource, (m) =>
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .select([
+          "transaction.id",
+          "transaction.isTransfer",
+          "transaction.isSplit",
+        ])
+        .where("transaction.id IN (:...ids)", { ids: allIds })
+        .andWhere("transaction.userId = :userId", { userId })
+        .getMany(),
+    );
 
     const skippedReasons: string[] = [];
     let splitCount = 0;
@@ -481,10 +457,10 @@ export class TransactionBulkUpdateService {
    * different categories (e.g. "Transfer In" vs "Transfer Out").
    */
   private async syncLinkedTransfers(
+    m: EntityManager,
     userId: string,
     eligibleIds: string[],
     updateFields: Partial<Transaction>,
-    queryRunner: import("typeorm").QueryRunner,
   ): Promise<void> {
     // Build the subset of fields that should sync to the linked side
     const syncFields: Record<string, unknown> = {};
@@ -497,13 +473,13 @@ export class TransactionBulkUpdateService {
     if (Object.keys(syncFields).length === 0) return;
 
     const { plainLinkedIds, owningSplitIds } = await this.classifyTransferLegs(
+      m,
       userId,
       eligibleIds,
-      queryRunner,
     );
 
     if (plainLinkedIds.length > 0) {
-      await queryRunner.manager
+      await m
         .createQueryBuilder()
         .update(Transaction)
         .set(syncFields as Partial<Transaction>)
@@ -515,7 +491,7 @@ export class TransactionBulkUpdateService {
     // Split-transfer legs mirror the description onto the owning split's memo
     // instead (matching updateSplitTransferLeg); payee changes stay on the leg.
     if ("description" in syncFields && owningSplitIds.length > 0) {
-      await queryRunner.manager
+      await m
         .createQueryBuilder()
         .update(TransactionSplit)
         .set({ memo: (syncFields.description as string | null) ?? null })
@@ -531,15 +507,15 @@ export class TransactionBulkUpdateService {
    * onto the owning split's split-level tags (never the split parent).
    */
   private async syncTransferTags(
+    m: EntityManager,
     userId: string,
     eligibleIds: string[],
     tagIds: string[],
-    queryRunner: import("typeorm").QueryRunner,
   ): Promise<void> {
     const { plainLinkedIds, owningSplitIds } = await this.classifyTransferLegs(
+      m,
       userId,
       eligibleIds,
-      queryRunner,
     );
 
     // Mirror legs not already covered by the batch itself.
@@ -550,17 +526,11 @@ export class TransactionBulkUpdateService {
         linkedToUpdate,
         tagIds,
         userId,
-        queryRunner,
       );
     }
 
     if (owningSplitIds.length > 0) {
-      await this.tagsService.setSplitTagsBulk(
-        owningSplitIds,
-        tagIds,
-        userId,
-        queryRunner,
-      );
+      await this.tagsService.setSplitTagsBulk(owningSplitIds, tagIds, userId);
     }
   }
 
@@ -572,11 +542,11 @@ export class TransactionBulkUpdateService {
    * mirror leg, which is safe to sync.
    */
   private async classifyTransferLegs(
+    m: EntityManager,
     userId: string,
     eligibleIds: string[],
-    queryRunner: import("typeorm").QueryRunner,
   ): Promise<{ plainLinkedIds: string[]; owningSplitIds: string[] }> {
-    const repo = queryRunner.manager.getRepository(Transaction);
+    const repo = m.getRepository(Transaction);
     const transfers = await repo
       .createQueryBuilder("t")
       .select(["t.id", "t.linkedTransactionId"])
@@ -590,7 +560,7 @@ export class TransactionBulkUpdateService {
       return { plainLinkedIds: [], owningSplitIds: [] };
     }
 
-    const owningSplits = await queryRunner.manager.find(TransactionSplit, {
+    const owningSplits = await m.find(TransactionSplit, {
       where: { linkedTransactionId: In(transfers.map((t) => t.id)) },
       select: ["id", "linkedTransactionId"],
     });
@@ -606,10 +576,10 @@ export class TransactionBulkUpdateService {
   }
 
   private async handleStatusBalanceChanges(
+    m: EntityManager,
     userId: string,
     eligibleIds: string[],
     newStatus: TransactionStatus,
-    queryRunner?: import("typeorm").QueryRunner,
   ): Promise<void> {
     const isNewVoid = newStatus === TransactionStatus.VOID;
 
@@ -621,11 +591,8 @@ export class TransactionBulkUpdateService {
     // Only include non-future transactions in balance changes
     const today = formatDateYMDLocal(new Date());
 
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(Transaction)
-      : this.transactionsRepository;
-
-    const balanceDeltas = await repo
+    const balanceDeltas = await m
+      .getRepository(Transaction)
       .createQueryBuilder("transaction")
       .select("transaction.accountId", "accountId")
       .addSelect("SUM(transaction.amount)", "totalAmount")
@@ -642,18 +609,10 @@ export class TransactionBulkUpdateService {
 
       if (isNewVoid) {
         // Becoming VOID: subtract amounts from balances
-        await this.accountsService.updateBalance(
-          row.accountId,
-          -amount,
-          queryRunner,
-        );
+        await this.accountsService.updateBalance(row.accountId, -amount);
       } else {
         // Leaving VOID: add amounts to balances
-        await this.accountsService.updateBalance(
-          row.accountId,
-          amount,
-          queryRunner,
-        );
+        await this.accountsService.updateBalance(row.accountId, amount);
       }
     }
   }
@@ -662,11 +621,14 @@ export class TransactionBulkUpdateService {
     userId: string,
     transactionIds: string[],
   ): Promise<void> {
-    const accountIds = await this.transactionsRepository
-      .createQueryBuilder("transaction")
-      .select("DISTINCT transaction.accountId", "accountId")
-      .where("transaction.id IN (:...ids)", { ids: transactionIds })
-      .getRawMany();
+    const accountIds = await tenantTx(this.dataSource, (m) =>
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .select("DISTINCT transaction.accountId", "accountId")
+        .where("transaction.id IN (:...ids)", { ids: transactionIds })
+        .getRawMany(),
+    );
 
     for (const row of accountIds) {
       this.netWorthService.triggerDebouncedRecalc(row.accountId, userId);
@@ -674,6 +636,7 @@ export class TransactionBulkUpdateService {
   }
 
   private async applyFilters(
+    m: EntityManager,
     queryBuilder: SelectQueryBuilder<Transaction>,
     userId: string,
     filters: BulkUpdateFilterDto,
@@ -698,6 +661,7 @@ export class TransactionBulkUpdateService {
 
     if (filters.categoryIds && filters.categoryIds.length > 0) {
       await this.applyCategoryFilters(
+        m,
         queryBuilder,
         userId,
         filters.categoryIds,
@@ -743,6 +707,7 @@ export class TransactionBulkUpdateService {
   }
 
   private async applyCategoryFilters(
+    m: EntityManager,
     queryBuilder: SelectQueryBuilder<Transaction>,
     userId: string,
     categoryIds: string[],
@@ -763,7 +728,7 @@ export class TransactionBulkUpdateService {
       const uniqueCategoryIds =
         regularCategoryIds.length > 0
           ? await getAllCategoryIdsWithChildren(
-              this.categoriesRepository,
+              m.getRepository(Category),
               userId,
               regularCategoryIds,
             )

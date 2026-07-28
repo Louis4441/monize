@@ -496,9 +496,53 @@ Shared instructions for every R task — the per-task list only names the module
   still throws), so the no-context-throw acceptance is CI-checked rather than a one-off dev run.
 
 ### R2. transactions, scheduled-transactions
-- [ ] Status: not started — ~9 service files; the heaviest QueryRunner users (create/update/remove,
-  transfers, splits, bulk, reconciliation in dedicated `transaction-*.service.ts` files). Preserve
-  transaction boundaries exactly.
+- [x] Status: done (branch `claude/row-level-security-r1-d6onbm`). All 9 service files converted
+  (transactions ×6: `transactions`, `transaction-split`, `transaction-transfer`,
+  `transaction-bulk-update`, `transaction-reconciliation`, `transaction-analytics`;
+  scheduled-transactions ×3: `scheduled-transactions`, `scheduled-transaction-loan`,
+  `scheduled-transaction-override`). Ratchet lowered **214 → 187** `@InjectRepository` /
+  **47 → 31** `createQueryRunner` (−43 sites, zero left in the two modules). Full
+  `npm run test:unit` green (9154), build + lint + `i18n:check` clean.
+
+  **Transaction boundaries preserved exactly.** Each former `createQueryRunner()` block became one
+  `tenantTx`; each former autocommit read became its own short `tenantTx`. So `removeTransfer` /
+  `updateTransfer` legitimately open **two** transactions (the split-parent lookup, then the write
+  block) — matching what they did pre-RLS, not a regression. Two boundaries that needed care:
+  - `findAll` wraps its whole read block in a single `tenantTx` and threads the `EntityManager`
+    through every helper (`calculateStartingBalance`, `buildFilteredIdsSubquery`,
+    `computeSplitAwareSum`, `enrichWithInvestmentLinks`, …), so the page query, its balance
+    sub-queries and the attachment-count roll-up share one snapshot as before.
+  - The auto-post cron's per-timezone read `tenantTx` **must commit before** the per-user posting
+    loop: each `post()` runs its own `withUserContext` transactions, which would otherwise join the
+    system-context one via F2 re-entrancy.
+
+  **Boundary decisions (for R3/R6 and L1):**
+  - The R1 helpers that kept an optional `queryRunner` for unrefactored callers **dropped it**:
+    `TagsService.setTransactionTags/setSplitTags/+Bulk` and
+    `AccountsService.updateBalance/recalculateCurrentBalance` are now called with no runner from
+    both modules — a nested `tenantTx` joins the ambient transaction. Same for the in-module
+    helpers: `TransactionSplitService.createSplits`/`deleteSplitSideEffects` lost their
+    `externalQueryRunner` parameter, and `applySplitTags`/`removeParentTransaction`/
+    `ScheduledTransactionsService.createSplits` take an `EntityManager` (or nothing) instead.
+  - `InvestmentTransactionsService.createEmbeddedForSplit` / `reverseAndRemoveEmbedded` accept
+    `QueryRunner | EntityManager` for now (a two-line shim at the top of each): the split service
+    passes an `EntityManager` while securities-internal callers still pass a `QueryRunner`. **R3
+    should delete the shim** once those callers convert.
+  - `TransactionSplitService.deleteTransferSplitLinkedTransactions` was **removed** — dead
+    production code (a strict subset of `deleteSplitSideEffects`, which handles investment splits
+    too); its specs were re-pointed at `deleteSplitSideEffects`, so the transfer-leg reversal
+    coverage is unchanged.
+  - `getUsersByEffectiveTimezone` still queries the DataSource directly (unchanged from R1).
+
+  **Tests:** the R1 harness (`src/test-helpers/tenant-tx-testing.ts`) carried the whole batch — the
+  specs `jest.mock` the tenant-tx module and route `manager.getRepository(Entity)` to the same
+  per-entity mocks. Where a spec previously distinguished "injected repo" from "queryRunner.manager"
+  (bulk-update, transactions), those now resolve to one mock, so the per-phase overrides collapsed
+  into a single ordered `createQueryBuilder` chain. QueryRunner-lifecycle assertions
+  (`commitTransaction`/`release`) became `dataSource.transaction` grouping assertions. The
+  cron smoke is `src/scheduled-transactions/rls-context-smoke.spec.ts`, which runs the auto-post
+  cron end to end under the **real** `tenantTx` + C2 wrappers at `RLS_MODE=off` (plus a negative
+  control proving an unwrapped call still throws).
 
 ### R3. securities, investment-reports, net-worth, monte-carlo, loan-rate-changes, loan-scenarios
 - [ ] Status: not started — ~14 service files; includes holdings rebuild and investment CRUD

@@ -4,14 +4,14 @@ import {
   BadRequestException,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { ScheduledTransactionOverride } from "./entities/scheduled-transaction-override.entity";
 import {
   CreateScheduledTransactionOverrideDto,
   UpdateScheduledTransactionOverrideDto,
 } from "./dto/scheduled-transaction-override.dto";
 import { validateSplitAmountSum } from "../common/split-amount.util";
+import { tenantTx } from "../common/db/tenant-tx";
 import { tr } from "../i18n/translate";
 
 @Injectable()
@@ -20,90 +20,98 @@ export class ScheduledTransactionOverrideService {
     ScheduledTransactionOverrideService.name,
   );
 
-  constructor(
-    @InjectRepository(ScheduledTransactionOverride)
-    private overridesRepository: Repository<ScheduledTransactionOverride>,
-  ) {}
+  constructor(private dataSource: DataSource) {}
 
   async createOverride(
     scheduledTransactionId: string,
     createDto: CreateScheduledTransactionOverrideDto,
   ): Promise<ScheduledTransactionOverride> {
-    const existing = await this.overridesRepository
-      .createQueryBuilder("override")
-      .where("override.scheduledTransactionId = :scheduledTransactionId", {
-        scheduledTransactionId,
-      })
-      .andWhere("override.originalDate = :date", {
-        date: createDto.originalDate,
-      })
-      .getOne();
+    return tenantTx(this.dataSource, async (m) => {
+      const repo = m.getRepository(ScheduledTransactionOverride);
+      const existing = await repo
+        .createQueryBuilder("override")
+        .where("override.scheduledTransactionId = :scheduledTransactionId", {
+          scheduledTransactionId,
+        })
+        .andWhere("override.originalDate = :date", {
+          date: createDto.originalDate,
+        })
+        .getOne();
 
-    if (existing) {
-      throw new BadRequestException(
-        tr(
-          "errors.scheduled.overrideAlreadyExists",
-          `An override already exists for the ${createDto.originalDate} occurrence. Use update instead.`,
-          { originalDate: createDto.originalDate },
-        ),
-      );
-    }
-
-    if (createDto.isSplit && createDto.splits && createDto.splits.length > 0) {
-      if (createDto.amount === undefined || createDto.amount === null) {
+      if (existing) {
         throw new BadRequestException(
           tr(
-            "errors.scheduled.splitOverrideRequiresAmount",
-            "Amount is required when creating split override",
+            "errors.scheduled.overrideAlreadyExists",
+            `An override already exists for the ${createDto.originalDate} occurrence. Use update instead.`,
+            { originalDate: createDto.originalDate },
           ),
         );
       }
-      this.validateOverrideSplits(createDto.splits, createDto.amount);
-    }
 
-    const override = this.overridesRepository.create({
-      scheduledTransactionId,
-      originalDate: createDto.originalDate,
-      overrideDate: createDto.overrideDate,
-      amount: createDto.amount ?? null,
-      categoryId: createDto.categoryId ?? null,
-      description: createDto.description ?? null,
-      isSplit: createDto.isSplit ?? null,
-      splits:
-        createDto.splits?.map((s) => ({
-          splitKind: s.splitKind,
-          categoryId: s.categoryId ?? null,
-          transferAccountId: s.transferAccountId ?? null,
-          investment: s.investment,
-          amount: s.amount,
-          memo: s.memo ?? null,
-        })) ?? null,
-      investmentQuantity: createDto.investmentQuantity ?? null,
-      investmentPrice: createDto.investmentPrice ?? null,
-      investmentTotalAmount: createDto.investmentTotalAmount ?? null,
+      if (
+        createDto.isSplit &&
+        createDto.splits &&
+        createDto.splits.length > 0
+      ) {
+        if (createDto.amount === undefined || createDto.amount === null) {
+          throw new BadRequestException(
+            tr(
+              "errors.scheduled.splitOverrideRequiresAmount",
+              "Amount is required when creating split override",
+            ),
+          );
+        }
+        this.validateOverrideSplits(createDto.splits, createDto.amount);
+      }
+
+      const override = repo.create({
+        scheduledTransactionId,
+        originalDate: createDto.originalDate,
+        overrideDate: createDto.overrideDate,
+        amount: createDto.amount ?? null,
+        categoryId: createDto.categoryId ?? null,
+        description: createDto.description ?? null,
+        isSplit: createDto.isSplit ?? null,
+        splits:
+          createDto.splits?.map((s) => ({
+            splitKind: s.splitKind,
+            categoryId: s.categoryId ?? null,
+            transferAccountId: s.transferAccountId ?? null,
+            investment: s.investment,
+            amount: s.amount,
+            memo: s.memo ?? null,
+          })) ?? null,
+        investmentQuantity: createDto.investmentQuantity ?? null,
+        investmentPrice: createDto.investmentPrice ?? null,
+        investmentTotalAmount: createDto.investmentTotalAmount ?? null,
+      });
+
+      return repo.save(override);
     });
-
-    return this.overridesRepository.save(override);
   }
 
   async findOverrides(
     scheduledTransactionId: string,
   ): Promise<ScheduledTransactionOverride[]> {
-    return this.overridesRepository.find({
-      where: { scheduledTransactionId },
-      relations: ["category"],
-      order: { overrideDate: "ASC" },
-    });
+    return tenantTx(this.dataSource, (m) =>
+      m.getRepository(ScheduledTransactionOverride).find({
+        where: { scheduledTransactionId },
+        relations: ["category"],
+        order: { overrideDate: "ASC" },
+      }),
+    );
   }
 
   async findOverride(
     scheduledTransactionId: string,
     overrideId: string,
   ): Promise<ScheduledTransactionOverride> {
-    const override = await this.overridesRepository.findOne({
-      where: { id: overrideId, scheduledTransactionId },
-      relations: ["category"],
-    });
+    const override = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(ScheduledTransactionOverride).findOne({
+        where: { id: overrideId, scheduledTransactionId },
+        relations: ["category"],
+      }),
+    );
 
     if (!override) {
       throw new NotFoundException(
@@ -128,10 +136,12 @@ export class ScheduledTransactionOverrideService {
       `findOverrideByDate: Looking for override with scheduledTransactionId=${scheduledTransactionId}, date=${normalizedDate}`,
     );
 
-    const allOverrides = await this.overridesRepository.find({
-      where: { scheduledTransactionId },
-      relations: ["category"],
-    });
+    const allOverrides = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(ScheduledTransactionOverride).find({
+        where: { scheduledTransactionId },
+        relations: ["category"],
+      }),
+    );
 
     this.logger.debug(
       `findOverrideByDate: Found ${allOverrides.length} total overrides for transaction`,
@@ -199,7 +209,9 @@ export class ScheduledTransactionOverrideService {
     if (updateDto.investmentTotalAmount !== undefined)
       override.investmentTotalAmount = updateDto.investmentTotalAmount;
 
-    return this.overridesRepository.save(override);
+    return tenantTx(this.dataSource, (m) =>
+      m.getRepository(ScheduledTransactionOverride).save(override),
+    );
   }
 
   async removeOverride(
@@ -210,22 +222,28 @@ export class ScheduledTransactionOverrideService {
       scheduledTransactionId,
       overrideId,
     );
-    await this.overridesRepository.remove(override);
+    await tenantTx(this.dataSource, (m) =>
+      m.getRepository(ScheduledTransactionOverride).remove(override),
+    );
   }
 
   async removeAllOverrides(scheduledTransactionId: string): Promise<number> {
-    const result = await this.overridesRepository.delete({
-      scheduledTransactionId,
-    });
+    const result = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(ScheduledTransactionOverride).delete({
+        scheduledTransactionId,
+      }),
+    );
     return result.affected || 0;
   }
 
   async hasOverrides(
     scheduledTransactionId: string,
   ): Promise<{ hasOverrides: boolean; count: number }> {
-    const count = await this.overridesRepository.count({
-      where: { scheduledTransactionId },
-    });
+    const count = await tenantTx(this.dataSource, (m) =>
+      m.getRepository(ScheduledTransactionOverride).count({
+        where: { scheduledTransactionId },
+      }),
+    );
 
     return { hasOverrides: count > 0, count };
   }

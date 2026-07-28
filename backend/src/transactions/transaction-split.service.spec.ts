@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { TransactionSplitService } from "./transaction-split.service";
@@ -8,6 +7,14 @@ import { TransactionSplit } from "./entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
 import { AccountsService } from "../accounts/accounts.service";
 import { isTransactionInFuture } from "../common/date-utils";
+import {
+  createTenantTxMocks,
+  DataSourceMock,
+} from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 
 jest.mock("../common/date-utils", () => ({
   isTransactionInFuture: jest.fn().mockReturnValue(false),
@@ -22,6 +29,9 @@ describe("TransactionSplitService", () => {
   let splitsRepository: Record<string, jest.Mock>;
   let categoriesRepository: Record<string, jest.Mock>;
   let accountsService: Record<string, jest.Mock>;
+  let mockDataSource: DataSourceMock;
+  // The tenantTx EntityManager, kept under the legacy `mockQueryRunner.manager`
+  // shape so the pre-RLS manager assertions below still read naturally.
   let mockQueryRunner: Record<string, any>;
 
   const mockTransaction: Partial<Transaction> = {
@@ -107,59 +117,47 @@ describe("TransactionSplitService", () => {
       recalculateCurrentBalance: jest.fn().mockResolvedValue(undefined),
     };
 
-    mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      query: jest.fn().mockResolvedValue([]),
-      manager: {
-        create: jest.fn().mockImplementation((_Entity: any, data: any) => {
-          if (_Entity === TransactionSplit)
-            return splitsRepository.create(data);
-          if (_Entity === Transaction)
-            return transactionsRepository.create(data);
-          return { ...data, id: "new-entity" };
-        }),
-        save: jest.fn().mockImplementation((data: any) => {
-          if (Array.isArray(data)) return splitsRepository.save(data);
-          if ("userId" in data) return transactionsRepository.save(data);
-          return splitsRepository.save(data);
-        }),
-        update: jest
-          .fn()
-          .mockImplementation((_Entity: any, id: any, data: any) => {
-            if (_Entity === TransactionSplit)
-              return splitsRepository.update(id, data);
-            if (_Entity === Transaction)
-              return transactionsRepository.update(id, data);
-            return Promise.resolve(undefined);
-          }),
-        delete: jest.fn().mockResolvedValue(undefined),
-        findOne: jest.fn().mockResolvedValue(null),
-        find: jest.fn().mockImplementation((_Entity: any, _opts?: any) => {
-          if (_Entity === Category) {
-            return Promise.resolve([
-              { id: "cat-1" },
-              { id: "cat-2" },
-              { id: "cat-3" },
-            ]);
-          }
-          return Promise.resolve([]);
-        }),
-        remove: jest.fn().mockResolvedValue(undefined),
-        getRepository: jest.fn().mockImplementation((entity: any) => {
-          if (entity === TransactionSplit) return splitsRepository;
-          if (entity === Transaction) return transactionsRepository;
-          return {};
-        }),
-      },
-    };
+    const tenantMocks = createTenantTxMocks([
+      [Transaction, transactionsRepository],
+      [TransactionSplit, splitsRepository],
+      [Category, categoriesRepository],
+    ]);
+    mockDataSource = tenantMocks.dataSource;
 
-    const mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    };
+    const manager = tenantMocks.manager;
+    manager.create.mockImplementation((_Entity: any, data: any) => {
+      if (_Entity === TransactionSplit) return splitsRepository.create(data);
+      if (_Entity === Transaction) return transactionsRepository.create(data);
+      return { ...data, id: "new-entity" };
+    });
+    manager.save.mockImplementation((data: any) => {
+      if (Array.isArray(data)) return splitsRepository.save(data);
+      if ("userId" in data) return transactionsRepository.save(data);
+      return splitsRepository.save(data);
+    });
+    manager.update.mockImplementation((_Entity: any, id: any, data: any) => {
+      if (_Entity === TransactionSplit)
+        return splitsRepository.update(id, data);
+      if (_Entity === Transaction)
+        return transactionsRepository.update(id, data);
+      return Promise.resolve(undefined);
+    });
+    manager.delete.mockResolvedValue(undefined);
+    manager.findOne.mockResolvedValue(null);
+    manager.find.mockImplementation((_Entity: any) => {
+      if (_Entity === Category) {
+        return Promise.resolve([
+          { id: "cat-1" },
+          { id: "cat-2" },
+          { id: "cat-3" },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    manager.remove.mockResolvedValue(undefined);
+    manager.query.mockResolvedValue([]);
+
+    mockQueryRunner = { manager };
 
     const investmentTransactionsService = {
       createEmbeddedForSplit: jest.fn().mockResolvedValue({}),
@@ -182,18 +180,6 @@ describe("TransactionSplitService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TransactionSplitService,
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(TransactionSplit),
-          useValue: splitsRepository,
-        },
-        {
-          provide: getRepositoryToken(Category),
-          useValue: categoriesRepository,
-        },
         { provide: AccountsService, useValue: accountsService },
         {
           provide: InvestmentTransactionsService,
@@ -337,7 +323,6 @@ describe("TransactionSplitService", () => {
         "account-1",
         new Date("2026-01-15"),
         "Store",
-        undefined,
         "payee-uuid-1",
       );
 
@@ -375,7 +360,6 @@ describe("TransactionSplitService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "account-2",
         50,
-        expect.anything(),
       );
       expect(result).toHaveLength(1);
       expect(result[0].linkedTransactionId).toBe("linked-tx-1");
@@ -462,7 +446,10 @@ describe("TransactionSplitService", () => {
     });
   });
 
-  describe("deleteTransferSplitLinkedTransactions", () => {
+  // The transfer-leg reversal these cases cover used to live in the
+  // (now-removed) deleteTransferSplitLinkedTransactions; deleteSplitSideEffects
+  // does the same work plus the investment-split reversal.
+  describe("deleteSplitSideEffects transfer legs", () => {
     it("removes linked transactions and reverses balances for transfer splits", async () => {
       const transferSplit = {
         id: "split-1",
@@ -476,11 +463,11 @@ describe("TransactionSplitService", () => {
         { id: "linked-tx-1", accountId: "account-2", amount: 50 },
       ]);
 
-      await service.deleteTransferSplitLinkedTransactions("tx-1");
+      await service.deleteSplitSideEffects("tx-1", "user-1");
 
       expect(splitsRepository.find).toHaveBeenCalledWith({
         where: { transactionId: "tx-1" },
-        relations: ["linkedTransaction"],
+        relations: ["linkedTransaction", "investmentTransaction"],
       });
       expect(transactionsRepository.find).toHaveBeenCalledWith({
         where: { id: expect.anything() },
@@ -488,7 +475,6 @@ describe("TransactionSplitService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "account-2",
         -50,
-        undefined,
       );
       expect(transactionsRepository.remove).toHaveBeenCalledWith(
         expect.objectContaining({ id: "linked-tx-1" }),
@@ -505,7 +491,7 @@ describe("TransactionSplitService", () => {
 
       splitsRepository.find.mockResolvedValue([categorySplit]);
 
-      await service.deleteTransferSplitLinkedTransactions("tx-1");
+      await service.deleteSplitSideEffects("tx-1", "user-1");
 
       expect(transactionsRepository.find).not.toHaveBeenCalled();
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
@@ -523,7 +509,7 @@ describe("TransactionSplitService", () => {
       splitsRepository.find.mockResolvedValue([transferSplit]);
       transactionsRepository.find.mockResolvedValue([]);
 
-      await service.deleteTransferSplitLinkedTransactions("tx-1");
+      await service.deleteSplitSideEffects("tx-1", "user-1");
 
       expect(accountsService.updateBalance).not.toHaveBeenCalled();
       expect(transactionsRepository.remove).not.toHaveBeenCalled();
@@ -532,7 +518,7 @@ describe("TransactionSplitService", () => {
     it("does nothing when no splits exist", async () => {
       splitsRepository.find.mockResolvedValue([]);
 
-      await service.deleteTransferSplitLinkedTransactions("tx-1");
+      await service.deleteSplitSideEffects("tx-1", "user-1");
 
       expect(transactionsRepository.find).not.toHaveBeenCalled();
     });
@@ -559,7 +545,7 @@ describe("TransactionSplitService", () => {
         { id: "linked-tx-2", accountId: "account-3", amount: 70 },
       ]);
 
-      await service.deleteTransferSplitLinkedTransactions("tx-1");
+      await service.deleteSplitSideEffects("tx-1", "user-1");
 
       expect(accountsService.updateBalance).toHaveBeenCalledTimes(2);
       expect(transactionsRepository.remove).toHaveBeenCalledTimes(2);
@@ -661,7 +647,6 @@ describe("TransactionSplitService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "account-2",
         -100,
-        mockQueryRunner,
       );
       expect(transactionsRepository.remove).toHaveBeenCalledWith(
         expect.objectContaining({ id: "old-linked-tx" }),
@@ -856,7 +841,6 @@ describe("TransactionSplitService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "account-2",
         40,
-        mockQueryRunner,
       );
       expect(result.linkedTransactionId).toBe("linked-tx-new");
     });
@@ -964,7 +948,6 @@ describe("TransactionSplitService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "account-2",
         -50,
-        mockQueryRunner,
       );
       expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith(
         expect.objectContaining({ id: "linked-tx-1" }),
@@ -1031,7 +1014,6 @@ describe("TransactionSplitService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         "account-3",
         -40,
-        mockQueryRunner,
       );
       expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith(
         expect.objectContaining({ id: "linked-tx-2" }),
@@ -1151,7 +1133,7 @@ describe("TransactionSplitService", () => {
       });
     });
 
-    describe("deleteTransferSplitLinkedTransactions", () => {
+    describe("deleteSplitSideEffects transfer legs", () => {
       it("does NOT call updateBalance when deleting linked transactions with future dates", async () => {
         mockedIsTransactionInFuture.mockReturnValue(true);
 
@@ -1172,7 +1154,7 @@ describe("TransactionSplitService", () => {
           },
         ]);
 
-        await service.deleteTransferSplitLinkedTransactions("tx-1");
+        await service.deleteSplitSideEffects("tx-1", "user-1");
 
         expect(transactionsRepository.find).toHaveBeenCalled();
         expect(accountsService.updateBalance).not.toHaveBeenCalled();
@@ -1217,13 +1199,12 @@ describe("TransactionSplitService", () => {
           },
         ]);
 
-        await service.deleteTransferSplitLinkedTransactions("tx-1");
+        await service.deleteSplitSideEffects("tx-1", "user-1");
 
         expect(accountsService.updateBalance).toHaveBeenCalledTimes(1);
         expect(accountsService.updateBalance).toHaveBeenCalledWith(
           "account-2",
           -30,
-          undefined,
         );
         expect(transactionsRepository.remove).toHaveBeenCalledTimes(2);
       });
@@ -1231,7 +1212,7 @@ describe("TransactionSplitService", () => {
   });
 
   describe("createSplits atomicity", () => {
-    it("commits own transaction when no external queryRunner provided", async () => {
+    it("runs all its writes inside one tenant transaction", async () => {
       const splits = [
         { amount: -60, categoryId: "cat-1", memo: "Food" },
         { amount: -40, categoryId: "cat-2", memo: "Drinks" },
@@ -1239,14 +1220,14 @@ describe("TransactionSplitService", () => {
 
       await service.createSplits("tx-1", splits, "user-1", "account-1");
 
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // A single tenantTx wraps the category check and both split writes;
+      // callers already inside one join it via re-entrancy rather than
+      // opening a second connection.
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(mockQueryRunner.manager.create).toHaveBeenCalledTimes(2);
     });
 
-    it("rolls back own transaction on error and releases queryRunner", async () => {
+    it("propagates write failures so the tenant transaction rolls back", async () => {
       splitsRepository.save.mockRejectedValue(new Error("Split save error"));
 
       const splits = [{ amount: -60, categoryId: "cat-1", memo: "Food" }];
@@ -1255,59 +1236,7 @@ describe("TransactionSplitService", () => {
         service.createSplits("tx-1", splits, "user-1", "account-1"),
       ).rejects.toThrow("Split save error");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
-    });
-
-    it("does not manage transaction lifecycle when external queryRunner provided", async () => {
-      const externalQr = {
-        connect: jest.fn(),
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        rollbackTransaction: jest.fn(),
-        release: jest.fn(),
-        manager: {
-          create: jest
-            .fn()
-            .mockImplementation((_Entity: any, data: any) =>
-              splitsRepository.create(data),
-            ),
-          save: jest.fn().mockImplementation((data: any) => {
-            if (Array.isArray(data)) return splitsRepository.save(data);
-            return splitsRepository.save(data);
-          }),
-          update: jest.fn().mockResolvedValue(undefined),
-          find: jest.fn().mockImplementation((_Entity: any) => {
-            if (_Entity === Category) {
-              return Promise.resolve([{ id: "cat-1" }, { id: "cat-2" }]);
-            }
-            return Promise.resolve([]);
-          }),
-        },
-      } as any;
-
-      const splits = [
-        { amount: -60, categoryId: "cat-1", memo: "Food" },
-        { amount: -40, categoryId: "cat-2", memo: "Drinks" },
-      ];
-
-      await service.createSplits(
-        "tx-1",
-        splits,
-        "user-1",
-        "account-1",
-        new Date("2026-01-15"),
-        null,
-        externalQr,
-      );
-
-      // Should NOT manage transaction lifecycle for external queryRunner
-      expect(externalQr.connect).not.toHaveBeenCalled();
-      expect(externalQr.startTransaction).not.toHaveBeenCalled();
-      expect(externalQr.commitTransaction).not.toHaveBeenCalled();
-      expect(externalQr.rollbackTransaction).not.toHaveBeenCalled();
-      expect(externalQr.release).not.toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1634,11 +1563,11 @@ describe("TransactionSplitService", () => {
       );
 
       expect(investmentService.reverseAndRemoveEmbedded).toHaveBeenCalledWith(
-        mockQueryRunner,
+        mockQueryRunner.manager,
         "user-1",
         investmentTx,
       );
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("removeSplit keeps isSplit=true when the last remaining split is investment", async () => {
@@ -1671,56 +1600,46 @@ describe("TransactionSplitService", () => {
           entity === Transaction && data?.isSplit === false,
       );
       expect(setIsSplitFalse).toBeUndefined();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("deleteSplitSideEffects reverses each investment split", async () => {
-      const externalQr: any = {
-        ...mockQueryRunner,
-        manager: { ...mockQueryRunner.manager, getRepository: jest.fn() },
-      };
-      const splitsRepo = {
-        find: jest.fn().mockResolvedValue([
-          {
-            id: "split-1",
-            kind: "investment",
-            investmentTransaction: { id: "inv-a" },
-          },
-          {
-            id: "split-2",
-            kind: "investment",
-            investmentTransaction: { id: "inv-b" },
-          },
-          // Without an investmentTransaction relation - skipped
-          {
-            id: "split-3",
-            kind: "investment",
-            investmentTransaction: null,
-          },
-        ]),
-      };
-      const txRepo = { find: jest.fn().mockResolvedValue([]) };
-      externalQr.manager.getRepository = jest.fn().mockImplementation((e) => {
-        if (e === TransactionSplit) return splitsRepo;
-        if (e === Transaction) return txRepo;
-        return {};
-      });
+      splitsRepository.find.mockResolvedValue([
+        {
+          id: "split-1",
+          kind: "investment",
+          investmentTransaction: { id: "inv-a" },
+        },
+        {
+          id: "split-2",
+          kind: "investment",
+          investmentTransaction: { id: "inv-b" },
+        },
+        // Without an investmentTransaction relation - skipped
+        {
+          id: "split-3",
+          kind: "investment",
+          investmentTransaction: null,
+        },
+      ]);
+      transactionsRepository.find.mockResolvedValue([]);
 
       const investmentService = (service as any).investmentTransactionsService;
       investmentService.reverseAndRemoveEmbedded.mockClear();
 
-      await service.deleteSplitSideEffects("tx-1", "user-1", externalQr);
+      await service.deleteSplitSideEffects("tx-1", "user-1");
 
       expect(investmentService.reverseAndRemoveEmbedded).toHaveBeenCalledTimes(
         2,
       );
+      // The reversal now receives the tenantTx EntityManager, not a QueryRunner.
       expect(investmentService.reverseAndRemoveEmbedded).toHaveBeenCalledWith(
-        externalQr,
+        mockQueryRunner.manager,
         "user-1",
         { id: "inv-a" },
       );
       expect(investmentService.reverseAndRemoveEmbedded).toHaveBeenCalledWith(
-        externalQr,
+        mockQueryRunner.manager,
         "user-1",
         { id: "inv-b" },
       );

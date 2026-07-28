@@ -123,7 +123,9 @@ describe("accounts module RLS context smoke (real tenantTx)", () => {
         },
         {
           provide: ConfigService,
-          useValue: { get: jest.fn((_k: string, fallback: string) => fallback) },
+          useValue: {
+            get: jest.fn((_k: string, fallback: string) => fallback),
+          },
         },
         {
           provide: I18nService,

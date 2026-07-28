@@ -1,9 +1,14 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { ScheduledTransactionLoanService } from "./scheduled-transaction-loan.service";
 import { ScheduledTransaction } from "./entities/scheduled-transaction.entity";
 import { ScheduledTransactionSplit } from "./entities/scheduled-transaction-split.entity";
 import { Account } from "../accounts/entities/account.entity";
+import { createTenantTxMocks } from "../test-helpers/tenant-tx-testing";
+
+jest.mock("../common/db/tenant-tx", () =>
+  jest.requireActual("../test-helpers/tenant-tx-testing").tenantTxMockModule(),
+);
 
 describe("ScheduledTransactionLoanService", () => {
   let service: ScheduledTransactionLoanService;
@@ -74,21 +79,16 @@ describe("ScheduledTransactionLoanService", () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
+    const { dataSource } = createTenantTxMocks([
+      [ScheduledTransaction, scheduledTransactionsRepository],
+      [ScheduledTransactionSplit, splitsRepository],
+      [Account, accountsRepository],
+    ]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ScheduledTransactionLoanService,
-        {
-          provide: getRepositoryToken(ScheduledTransaction),
-          useValue: scheduledTransactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(ScheduledTransactionSplit),
-          useValue: splitsRepository,
-        },
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
 

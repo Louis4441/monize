@@ -75,6 +75,7 @@ export function createTenantTxMocks(
     }),
     // Direct EntityManager methods, for code converted from queryRunner.manager.
     find: jest.fn(),
+    findBy: jest.fn(),
     findOne: jest.fn(),
     findOneOrFail: jest.fn(),
     count: jest.fn(),
