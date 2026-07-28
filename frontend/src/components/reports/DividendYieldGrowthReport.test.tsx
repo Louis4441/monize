@@ -912,4 +912,21 @@ describe('DividendYieldGrowthReport', () => {
       }
     }
   });
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-dividend-yield-growth-accounts',
+      JSON.stringify(['acc-1']),
+    );
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' }]);
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: [] });
+    render(<DividendYieldGrowthReport />);
+    await waitFor(() => {
+      expect(mockGetPortfolioSummary).toHaveBeenCalledWith(['acc-1']);
+    });
+    expect(mockGetTransactions).toHaveBeenCalledWith(
+      expect.objectContaining({ accountIds: 'acc-1' }),
+    );
+  });
 });

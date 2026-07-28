@@ -296,4 +296,32 @@ describe('InvestmentPerformanceReport', () => {
       await act(async () => { fireEvent.click(__ths[__i]); });
     }
   });
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-investment-performance-accounts',
+      JSON.stringify(['acc-1']),
+    );
+    mockGetPortfolioSummary.mockResolvedValue(fullPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' }]);
+    render(<InvestmentPerformanceReport />);
+    await waitFor(() => {
+      expect(mockGetPortfolioSummary).toHaveBeenCalledWith(['acc-1']);
+    });
+  });
+
+  it('drops persisted account IDs that no longer exist once accounts load', async () => {
+    window.localStorage.setItem(
+      'monize-reports-investment-performance-accounts',
+      JSON.stringify(['acc-1', 'gone']),
+    );
+    mockGetPortfolioSummary.mockResolvedValue(fullPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' }]);
+    render(<InvestmentPerformanceReport />);
+    await waitFor(() => {
+      expect(
+        window.localStorage.getItem('monize-reports-investment-performance-accounts'),
+      ).toBe(JSON.stringify(['acc-1']));
+    });
+  });
 });

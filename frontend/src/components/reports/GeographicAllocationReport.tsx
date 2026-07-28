@@ -25,6 +25,7 @@ import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
 import { chartColors } from '@/lib/chart-colors';
 import {
@@ -74,13 +75,19 @@ function CustomTooltip({ active, payload, formatCurrencyFull, holdingLabel }: {
   );
 }
 
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-geographic-allocation-accounts';
+
 export function GeographicAllocationReport() {
   const t = useTranslations('reports');
   const { formatCurrencyCompact: formatCurrency, formatCurrency: formatCurrencyFull, formatCurrencyAxis } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [securities, setSecurities] = useState<Security[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  // Persisted so the report opens on the accounts the user last chose.
+  const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
+    ACCOUNTS_STORAGE_KEY,
+    accounts,
+  );
   const [viewType, setViewType] = useState<'region' | 'exchange' | 'country'>('region');
   const chartRef = useRef<HTMLDivElement>(null);
   const regionSort = useSortableTable<GeoRegionSortField>(

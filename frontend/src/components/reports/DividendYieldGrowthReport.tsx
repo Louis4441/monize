@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
 import {
   BarChart,
@@ -59,13 +60,19 @@ interface FrequencyBucket {
   totalDividends: number;
 }
 
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-dividend-yield-growth-accounts';
+
 export function DividendYieldGrowthReport() {
   const t = useTranslations('reports');
   const { formatCurrency: formatCurrencyFull, formatCurrencyAxis, formatSignedPercent } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  // Persisted so the report opens on the accounts the user last chose.
+  const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
+    ACCOUNTS_STORAGE_KEY,
+    accounts,
+  );
   const [viewType, setViewType] = useState<'yield' | 'growth' | 'frequency'>('yield');
   const isSingleAccount = selectedAccountIds.length === 1;
   const yieldSort = useSortableTable<YieldSortField>(

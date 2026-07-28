@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
 import {
   BarChart,
@@ -78,6 +79,8 @@ const SERIES_COLORS: Record<SeriesKey, { positive: string; negative: string }> =
   capitalGains: { positive: CHART_SERIES[4], negative: chartColors.expense },
 };
 
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-dividend-income-accounts';
+
 export function DividendIncomeReport() {
   const t = useTranslations('reports');
   const formatChartDate = useChartDateFormat();
@@ -85,11 +88,15 @@ export function DividendIncomeReport() {
   const { formatCurrency: formatCurrencyFull, formatCurrencyAxis } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  // Persisted so the report opens on the accounts the user last chose.
+  // Accounts arrive with the data below, so stale IDs are pruned there.
+  const [selectedAccountIds, setSelectedAccountIds, pruneAccountFilter] =
+    usePersistedAccountFilter(ACCOUNTS_STORAGE_KEY);
   // Debounced mirror of selectedAccountIds. The data-load effect keys off
   // this, not the raw selection, so rapid toggles in the MultiSelect (e.g.
-  // ticking three accounts in a row) don't fire one fetch per click.
-  const [appliedAccountIds, setAppliedAccountIds] = useState<string[]>([]);
+  // ticking three accounts in a row) don't fire one fetch per click. Seeded
+  // from the persisted selection so the first fetch already honours it.
+  const [appliedAccountIds, setAppliedAccountIds] = useState<string[]>(selectedAccountIds);
   const accountDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (accountDebounceRef.current) clearTimeout(accountDebounceRef.current);
@@ -209,6 +216,10 @@ export function DividendIncomeReport() {
     () => response?.accounts ?? [],
     [response],
   );
+  // Accounts only exist once the data loads, so the persisted filter is pruned
+  // here. A prune lands in localStorage immediately and so takes effect on the
+  // next visit; the debounced mirror above keeps this session's fetches stable.
+  pruneAccountFilter(accounts);
 
   // Lazy-load daily capital gains only when the user switches to the daily view.
   const { data: dailyResponse, reload: reloadDaily } = useReportData(

@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { gainLossColor } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
 import {
   BarChart,
@@ -65,12 +66,18 @@ interface SecurityGain {
   transactionCount: number;
 }
 
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-realized-gains-accounts';
+
 export function RealizedGainsReport() {
   const t = useTranslations('reports');
   const { formatCurrency: formatCurrencyFull, formatCurrencyAxis } = useNumberFormat();
   const { defaultCurrency, convertToDefault } = useExchangeRates();
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  // Persisted so the report opens on the accounts the user last chose.
+  const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
+    ACCOUNTS_STORAGE_KEY,
+    accounts,
+  );
   const { dateRange, setDateRange, resolvedRange, isValid } = useDateRange({ defaultRange: '1y', alignment: 'month' });
   const [viewType, setViewType] = useState<'chart' | 'table'>('chart');
   const isSingleAccount = selectedAccountIds.length === 1;

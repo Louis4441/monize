@@ -357,4 +357,19 @@ describe('InvestmentTransactionHistoryReport', () => {
       await act(async () => { fireEvent.click(ths[i]); });
     }
   });
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-investment-transactions-accounts',
+      JSON.stringify(['acc-1']),
+    );
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' }]);
+    render(<InvestmentTransactionHistoryReport />);
+    await waitFor(() => {
+      expect(mockGetTransactions).toHaveBeenCalledWith(
+        expect.objectContaining({ accountIds: 'acc-1' }),
+      );
+    });
+  });
 });

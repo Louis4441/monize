@@ -231,4 +231,17 @@ describe('SecurityTypeAllocationReport', () => {
       await act(async () => { fireEvent.click(__ths[__i]); });
     }
   });
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-security-type-allocation-accounts',
+      JSON.stringify(['acc-1']),
+    );
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: [] });
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_BROKERAGE' }]);
+    render(<SecurityTypeAllocationReport />);
+    await waitFor(() => {
+      expect(mockGetPortfolioSummary).toHaveBeenCalledWith(['acc-1']);
+    });
+  });
 });

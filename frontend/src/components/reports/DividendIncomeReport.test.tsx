@@ -2149,4 +2149,41 @@ describe('DividendIncomeReport', () => {
       }
     }
   }, 15000);
+
+  it('restores the persisted account selection on the first fetch', async () => {
+    window.localStorage.setItem(
+      'monize-reports-dividend-income-accounts',
+      JSON.stringify(['acc-1']),
+    );
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' }]);
+    mockGetCapitalGains.mockResolvedValue([]);
+    render(<DividendIncomeReport />);
+    await waitFor(() => {
+      expect(mockGetTransactions).toHaveBeenCalledWith(
+        expect.objectContaining({ accountIds: 'acc-1' }),
+      );
+    });
+    // The debounced mirror must start from the persisted value, so no fetch
+    // should have gone out for "all accounts".
+    expect(mockGetTransactions).not.toHaveBeenCalledWith(
+      expect.objectContaining({ accountIds: undefined }),
+    );
+  });
+
+  it('drops persisted account IDs that no longer exist once accounts load', async () => {
+    window.localStorage.setItem(
+      'monize-reports-dividend-income-accounts',
+      JSON.stringify(['acc-1', 'gone']),
+    );
+    mockGetTransactions.mockResolvedValue({ data: [], pagination: { hasMore: false } });
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' }]);
+    mockGetCapitalGains.mockResolvedValue([]);
+    render(<DividendIncomeReport />);
+    await waitFor(() => {
+      expect(
+        window.localStorage.getItem('monize-reports-dividend-income-accounts'),
+      ).toBe(JSON.stringify(['acc-1']));
+    });
+  });
 });

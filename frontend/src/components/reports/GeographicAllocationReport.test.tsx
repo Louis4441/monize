@@ -417,4 +417,18 @@ describe('GeographicAllocationReport', () => {
     // The unclassified remainder is surfaced as an "Other" row.
     expect(screen.getByText('Other')).toBeInTheDocument();
   });
+
+  it('restores the persisted account selection', async () => {
+    window.localStorage.setItem(
+      'monize-reports-geographic-allocation-accounts',
+      JSON.stringify(['acc-1']),
+    );
+    mockGetPortfolioSummary.mockResolvedValue({ holdings: [] });
+    mockGetInvestmentAccounts.mockResolvedValue([{ id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_BROKERAGE' }]);
+    mockGetSecurities.mockResolvedValue([]);
+    render(<GeographicAllocationReport />);
+    await waitFor(() => {
+      expect(mockGetPortfolioSummary).toHaveBeenCalledWith(['acc-1']);
+    });
+  });
 });

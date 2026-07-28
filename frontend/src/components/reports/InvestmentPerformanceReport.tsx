@@ -23,6 +23,7 @@ import { RefreshPricesButton } from '@/components/reports/RefreshPricesButton';
 import { SortableHeader } from '@/components/ui/SortableHeader';
 import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
 import { aggregateHoldingsBySecurity, AggregatedHolding } from '@/lib/aggregate-holdings';
 import { useTranslations } from 'next-intl';
@@ -30,13 +31,18 @@ import { useMainAccountName } from '@/hooks/useMainAccountName';
 
 type HoldingsSortField = 'symbol' | 'quantity' | 'averageCost' | 'currentPrice' | 'marketValue' | 'gainLoss' | 'gainLossPercent';
 
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-investment-performance-accounts';
+
 export function InvestmentPerformanceReport() {
   const t = useTranslations('reports');
   const mainAccountName = useMainAccountName();
   const { formatCurrency: formatCurrencyFull, formatSignedPercent } = useNumberFormat();
   const { defaultCurrency } = useExchangeRates();
   const chartRef = useRef<HTMLDivElement>(null);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  // Persisted so the report opens on the accounts the user last chose.
+  // Accounts arrive with the data below, so stale IDs are pruned there.
+  const [selectedAccountIds, setSelectedAccountIds, pruneAccountFilter] =
+    usePersistedAccountFilter(ACCOUNTS_STORAGE_KEY);
   const [reloadKey, setReloadKey] = useState(0);
   const [expandedSecurityId, setExpandedSecurityId] = useState<string | null>(null);
   const [viewType, setViewType] = useState<'performance' | 'allocation'>('performance');
@@ -62,6 +68,9 @@ export function InvestmentPerformanceReport() {
     [response],
   );
   const accounts = useMemo<Account[]>(() => response?.accounts ?? [], [response]);
+  // Accounts load alongside the portfolio, so the persisted filter can only be
+  // pruned of deleted accounts here, once the list is known.
+  pruneAccountFilter(accounts);
 
   const formatPercent = (value: number) => formatSignedPercent(value);
 
