@@ -26,7 +26,15 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 
 interface SecurityPriceHistoryProps {
   security: Security;
-  onClose: () => void;
+  /** Omitted when embedded, where there is no modal to close. */
+  onClose?: () => void;
+  /**
+   * Rendered inside the security detail page rather than in its own modal. Drops
+   * the modal-only chrome -- the heading that repeats the page title, the Close
+   * button, and the chart the page already shows full width above the tabs --
+   * and keeps the price table and its actions.
+   */
+  embedded?: boolean;
 }
 
 function getSourceLabel(source: string | null): string {
@@ -73,7 +81,11 @@ function formatPrice(value: number | null): string {
   });
 }
 
-export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistoryProps) {
+export function SecurityPriceHistory({
+  security,
+  onClose,
+  embedded = false,
+}: SecurityPriceHistoryProps) {
   const t = useTranslations('securities');
   const { formatDate } = useDateFormat();
   const [prices, setPrices] = useState<SecurityPrice[]>([]);
@@ -115,6 +127,9 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   }, [loadPrices]);
 
   useEffect(() => {
+    // The trades exist only to mark up the chart, so an embedded instance --
+    // which renders no chart -- should not fetch them at all.
+    if (embedded) return;
     let cancelled = false;
     investmentsApi
       .getSecurityTransactionHistory(security.id)
@@ -129,7 +144,7 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
     return () => {
       cancelled = true;
     };
-  }, [security.id]);
+  }, [security.id, embedded]);
 
   const handleAdd = useCallback(async (data: CreateSecurityPriceData) => {
     try {
@@ -293,10 +308,12 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-          {t('priceHistory.title', { symbol: security.symbol })}
-        </h2>
-        <div className="flex gap-2">
+        {!embedded && (
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            {t('priceHistory.title', { symbol: security.symbol })}
+          </h2>
+        )}
+        <div className={`flex gap-2 ${embedded ? 'ml-auto' : ''}`}>
           {!isFormOpen && (
             <>
               <Button
@@ -313,9 +330,11 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
               </Button>
             </>
           )}
-          <Button variant="outline" onClick={onClose} size="sm">
-{t('priceHistory.closeButton')}
-          </Button>
+          {onClose && (
+            <Button variant="outline" onClick={onClose} size="sm">
+              {t('priceHistory.closeButton')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -345,7 +364,7 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
           shape of data, so the two screens read the same way -- title and
           neutral colouring are the only differences (a price has no good or
           bad sign). */}
-      {!isLoading && chartData.length > 1 && (
+      {!embedded && !isLoading && chartData.length > 1 && (
         <BalanceHistoryChart
           data={chartData}
           isLoading={false}

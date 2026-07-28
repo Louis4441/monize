@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -43,6 +44,7 @@ export default function SecuritiesPage() {
 
 function SecuritiesContent() {
   const t = useTranslations('securities');
+  const router = useRouter();
   const [allSecurities, setAllSecurities] = useState<Security[]>([]);
   const [holdings, setHoldings] = useState<SecurityHoldings>({});
   const [transactionSecurityIds, setTransactionSecurityIds] = useState<SecurityTransactions>(new Set());
@@ -125,6 +127,15 @@ function SecuritiesContent() {
   const handleEdit = (security: Security) => {
     openEdit(security);
   };
+
+  // The list's modals stay for a quick look; the detail page is the whole
+  // picture, and the linkable place other screens point at.
+  const handleViewDetails = useCallback(
+    (security: Security) => {
+      router.push(`/securities/${security.id}`);
+    },
+    [router],
+  );
 
   const handleFormSubmit = async (data: CreateSecurityData) => {
     try {
@@ -396,6 +407,7 @@ function SecuritiesContent() {
               onToggleActive={handleToggleActive}
               onToggleFavourite={handleToggleFavourite}
               onDelete={handleDeleteClick}
+              onViewDetails={handleViewDetails}
               onViewPrices={setPriceSecurity}
               onViewHistory={setHistorySecurity}
               density={listDensity}

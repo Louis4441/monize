@@ -1,0 +1,146 @@
+{
+  "loading": "[XX-Loading security...-XX]",
+  "loadFailed": "[XX-Failed to load this security-XX]",
+  "notFound": "[XX-Security not found-XX]",
+  "backToSecurities": "[XX-Securities-XX]",
+  "error": {
+    "retry": "[XX-Retry-XX]"
+  },
+  "header": {
+    "metaSeparator": "[XX- · -XX]",
+    "provider": "[XX-Provider: {provider}-XX]",
+    "providerNotSet": "[XX-Provider: not set-XX]",
+    "priceAt": "[XX-Price at {date}-XX]",
+    "noPrice": "[XX-No price recorded yet-XX]",
+    "changeToday": "[XX-{change} ({percent}) today-XX]",
+    "inactiveBadge": "[XX-Inactive-XX]",
+    "watch": "[XX-Watch-XX]",
+    "watching": "[XX-Watching-XX]",
+    "edit": "[XX-Edit-XX]",
+    "moreActions": "[XX-More-XX]",
+    "actionsAriaLabel": "[XX-Security actions-XX]"
+  },
+  "actions": {
+    "viewTransactions": "[XX-Transactions-XX]",
+    "viewPrices": "[XX-Price history-XX]",
+    "updatePrices": "[XX-Update prices now-XX]",
+    "deactivate": "[XX-Deactivate security-XX]",
+    "activate": "[XX-Activate security-XX]"
+  },
+  "toasts": {
+    "watchAdded": "[XX-Added to your watchlist-XX]",
+    "watchRemoved": "[XX-Removed from your watchlist-XX]",
+    "watchFailed": "[XX-Could not update your watchlist-XX]",
+    "pricesUpdated": "[XX-Updated {count} price(s)-XX]",
+    "noPricesFound": "[XX-No new prices found-XX]",
+    "pricesFailed": "[XX-Could not update prices-XX]"
+  },
+  "cards": {
+    "marketValue": "[XX-Market value-XX]",
+    "costBasis": "[XX-Cost basis-XX]",
+    "unrealizedPl": "[XX-Unrealized P/L-XX]",
+    "units": "[XX-Units-XX]",
+    "avgCostPerUnit": "[XX-Avg. cost / unit-XX]",
+    "heldInAccounts": "[XX-Held in accounts-XX]",
+    "total": "[XX-Total-XX]",
+    "unitsShare": "[XX-{units} ({share})-XX]",
+    "valueUnknown": "[XX-Not priced-XX]"
+  },
+  "chart": {
+    "title": "[XX-{symbol} price-XX]",
+    "seriesAriaLabel": "[XX-Chart series-XX]",
+    "modes": {
+      "price": "[XX-Price-XX]",
+      "value": "[XX-Investment value-XX]",
+      "return": "[XX-Return-XX]"
+    },
+    "titles": {
+      "price": "[XX-Price-XX]",
+      "value": "[XX-Investment value-XX]",
+      "return": "[XX-Return-XX]"
+    }
+  },
+  "keyInfo": {
+    "title": "[XX-Key information-XX]",
+    "assetClass": "[XX-Asset class-XX]",
+    "exchange": "[XX-Exchange-XX]",
+    "currency": "[XX-Currency-XX]",
+    "sector": "[XX-Sector-XX]",
+    "industry": "[XX-Industry-XX]",
+    "provider": "[XX-Provider-XX]",
+    "lastPrice": "[XX-Last price-XX]"
+  },
+  "tabs": {
+    "ariaLabel": "[XX-Security sections-XX]",
+    "overview": "[XX-Overview-XX]",
+    "transactions": "[XX-Transactions-XX]",
+    "prices": "[XX-Price history-XX]"
+  },
+  "about": {
+    "title": "[XX-About-XX]",
+    "noDescription": "[XX-No description has been saved for this security.-XX]",
+    "sector": "[XX-Sector-XX]",
+    "industry": "[XX-Industry-XX]",
+    "country": "[XX-Country-XX]",
+    "website": "[XX-Website-XX]",
+    "irWebsite": "[XX-IR Website-XX]",
+    "tags": "[XX-Tags-XX]",
+    "notStored": "[XX-Not stored yet-XX]"
+  },
+  "performance": {
+    "title": "[XX-Performance-XX]",
+    "empty": "[XX-Not enough price history to measure a return yet.-XX]",
+    "unavailable": "[XX-n/a-XX]",
+    "periods": {
+      "1m": "[XX-1M-XX]",
+      "3m": "[XX-3M-XX]",
+      "ytd": "[XX-YTD-XX]",
+      "1y": "[XX-1Y-XX]",
+      "3y": "[XX-3Y-XX]",
+      "5y": "[XX-5Y-XX]"
+    }
+  },
+  "positionInfo": {
+    "title": "[XX-Position info-XX]",
+    "firstTransaction": "[XX-First transaction-XX]",
+    "lastTransaction": "[XX-Last transaction-XX]",
+    "totalInvested": "[XX-Total invested-XX]",
+    "totalSold": "[XX-Total sold-XX]",
+    "dividends": "[XX-Dividends-XX]",
+    "fees": "[XX-Fees-XX]",
+    "realizedPl": "[XX-Realized P/L-XX]",
+    "status": "[XX-Status-XX]",
+    "statusOpen": "[XX-Open-XX]",
+    "statusClosed": "[XX-Closed-XX]",
+    "statusNone": "[XX-Never held-XX]"
+  },
+  "accounts": {
+    "title": "[XX-Accounts-XX]",
+    "closedSuffix": "[XX-{name} (closed)-XX]",
+    "total": "[XX-Total-XX]",
+    "columns": {
+      "account": "[XX-Account-XX]",
+      "currency": "[XX-Currency-XX]",
+      "units": "[XX-Units-XX]",
+      "avgCost": "[XX-Avg. cost / unit-XX]",
+      "marketValue": "[XX-Market value-XX]",
+      "costBasis": "[XX-Cost basis-XX]",
+      "unrealizedPl": "[XX-Unrealized P/L-XX]"
+    }
+  },
+  "closed": {
+    "title": "[XX-Position closed-XX]",
+    "description": "[XX-You no longer hold this security. Its history stays available below.-XX]",
+    "realizedPl": "[XX-Realized P/L-XX]",
+    "heldFrom": "[XX-Held from-XX]",
+    "heldRange": "[XX-{start} to {end}-XX]"
+  },
+  "empty": {
+    "noPosition": "[XX-No position data-XX]",
+    "noPositionHint": "[XX-You have not recorded any transactions for this security yet.-XX]",
+    "noPrices": "[XX-No price history available-XX]",
+    "noPricesHint": "[XX-Add a price manually, or update prices from the provider.-XX]",
+    "noTransactions": "[XX-No transactions yet-XX]",
+    "noAccounts": "[XX-This security is not held in any account.-XX]"
+  }
+}

@@ -14,6 +14,7 @@ import { RowActionSheet } from '@/components/ui/row-actions/RowActionSheet';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 
 interface SecurityActionLabels {
+  details: string;
   history: string;
   prices: string;
   edit: string;
@@ -23,6 +24,7 @@ interface SecurityActionLabels {
 }
 
 interface SecurityActionHandlers {
+  onViewDetails?: (security: Security) => void;
   onViewHistory?: (security: Security) => void;
   onViewPrices?: (security: Security) => void;
   onEdit: (security: Security) => void;
@@ -43,6 +45,16 @@ function buildSecurityActions(
 ): RowAction[] {
   const canDelete = !hasHoldings && !hasTransactions;
   return [
+    // Leads the row: the detail page is the whole picture, where the two
+    // history actions below each open one slice of it in a modal.
+    {
+      key: 'details',
+      label: labels.details,
+      icon: 'view',
+      tone: 'view',
+      onClick: () => handlers.onViewDetails?.(security),
+      hidden: !handlers.onViewDetails,
+    },
     {
       key: 'history',
       label: labels.history,
@@ -147,6 +159,7 @@ interface SecurityListProps {
   onToggleActive: (security: Security) => void;
   onToggleFavourite?: (security: Security) => void;
   onDelete?: (security: Security) => void;
+  onViewDetails?: (security: Security) => void;
   onViewPrices?: (security: Security) => void;
   onViewHistory?: (security: Security) => void;
   density?: DensityLevel;
@@ -169,6 +182,7 @@ interface SecurityRowProps {
   onToggleActive: (security: Security) => void;
   onToggleFavourite?: (security: Security) => void;
   onDelete?: (security: Security) => void;
+  onViewDetails?: (security: Security) => void;
   onViewPrices?: (security: Security) => void;
   onViewHistory?: (security: Security) => void;
   getRowHandlers: (security: Security) => LongPressRowHandlers;
@@ -188,6 +202,7 @@ const SecurityRow = memo(function SecurityRow({
   onToggleActive,
   onToggleFavourite,
   onDelete,
+  onViewDetails,
   onViewPrices,
   onViewHistory,
   getRowHandlers,
@@ -218,6 +233,7 @@ const SecurityRow = memo(function SecurityRow({
     hasHoldings,
     hasTransactions,
     {
+      details: t('list.actions.details'),
       history: t('list.actions.history'),
       prices: t('list.actions.prices'),
       edit: tc('actions.edit'),
@@ -225,7 +241,7 @@ const SecurityRow = memo(function SecurityRow({
       deactivate: t('list.actions.deactivate'),
       delete: tc('actions.delete'),
     },
-    { onViewHistory, onViewPrices, onEdit, onToggleActive, onDelete },
+    { onViewDetails, onViewHistory, onViewPrices, onEdit, onToggleActive, onDelete },
   );
 
   return (
@@ -383,6 +399,7 @@ export function SecurityList({
   onToggleActive,
   onToggleFavourite,
   onDelete,
+  onViewDetails,
   onViewPrices,
   onViewHistory,
   density: propDensity,
@@ -577,6 +594,7 @@ export function SecurityList({
                 onToggleActive={onToggleActive}
                 onToggleFavourite={onToggleFavourite}
                 onDelete={onDelete}
+                onViewDetails={onViewDetails}
                 onViewPrices={onViewPrices}
                 onViewHistory={onViewHistory}
                 getRowHandlers={getRowHandlers}
@@ -600,6 +618,7 @@ export function SecurityList({
               (holdings[contextSecurity.id] || 0) > 0,
               transactionSecurityIds.has(contextSecurity.id),
               {
+                details: t('list.contextMenu.viewDetails'),
                 history: t('list.contextMenu.transactionHistory'),
                 prices: t('list.contextMenu.viewPrices'),
                 edit: t('list.contextMenu.editSecurity'),
@@ -607,7 +626,7 @@ export function SecurityList({
                 deactivate: t('list.contextMenu.deactivate'),
                 delete: t('list.contextMenu.delete'),
               },
-              { onViewHistory, onViewPrices, onEdit, onToggleActive, onDelete },
+              { onViewDetails, onViewHistory, onViewPrices, onEdit, onToggleActive, onDelete },
             )
           : []}
         onClose={() => setContextSecurity(null)}

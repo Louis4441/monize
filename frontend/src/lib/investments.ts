@@ -19,6 +19,7 @@ import {
   AssetClassWeightingResult,
   SecurityPrice,
   SecurityTransactionHistory,
+  SecurityDetail,
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
 import { getCached, setCache, invalidateCache } from './apiCache';
@@ -364,6 +365,14 @@ export const investmentsApi = {
   // Get a single security by ID
   getSecurity: async (id: string): Promise<Security> => {
     const response = await apiClient.get<Security>(`/securities/${id}`);
+    return response.data;
+  },
+
+  // The security plus its position, per-account breakdown and lifetime totals,
+  // for the security detail page. Deliberately uncached: it is the page's
+  // primary data, and a stale position after a trade would be misleading.
+  getSecurityDetail: async (id: string): Promise<SecurityDetail> => {
+    const response = await apiClient.get<SecurityDetail>(`/securities/${id}/detail`);
     return response.data;
   },
 

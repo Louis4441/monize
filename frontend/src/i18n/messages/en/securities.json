@@ -78,6 +78,7 @@
       "source": "Source of the most recent price"
     },
     "actions": {
+      "details": "Details",
       "history": "History",
       "prices": "Prices",
       "edit": "Edit",
@@ -94,6 +95,7 @@
       "subtitle": "Get started by adding your first security."
     },
     "contextMenu": {
+      "viewDetails": "View details",
       "transactionHistory": "Transaction History",
       "viewPrices": "View Prices",
       "editSecurity": "Edit Security",

@@ -1,0 +1,178 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+import {
+  ArrowTrendingUpIcon,
+  BanknotesIcon,
+  ChartPieIcon,
+  CircleStackIcon,
+  UserGroupIcon,
+} from '@heroicons/react/24/outline';
+import {
+  SummaryCardGrid,
+  type SummaryCardItem,
+} from '@/components/accounts/shared/SummaryCardGrid';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { gainLossColor } from '@/lib/format';
+import type { SecurityDetail } from '@/types/investment';
+
+interface SecuritySummaryCardsProps {
+  detail: SecurityDetail;
+}
+
+const ICON_CLASS = 'h-4 w-4';
+
+/**
+ * The five key figures, in the reporting currency with the security's own
+ * currency underneath wherever the two differ.
+ *
+ * A position with no price is reported as unpriced rather than as zero: a zero
+ * market value is a claim about worth, and "we have no quote" is not that claim.
+ */
+export function SecuritySummaryCards({ detail }: SecuritySummaryCardsProps) {
+  const t = useTranslations('securityDetail');
+  const {
+    formatCurrency,
+    formatCurrencyPrecise,
+    formatQuantity,
+    formatPercent,
+    formatSignedPercent,
+  } = useNumberFormat();
+
+  const { position, security, defaultCurrency } = detail;
+  const securityCurrency = security.currencyCode;
+  // With one currency there is nothing to convert, so the second line is noise.
+  const showSecondary = securityCurrency !== defaultCurrency;
+
+  const secondary = (amount: number | null) =>
+    showSecondary && amount !== null
+      ? formatCurrency(amount, securityCurrency)
+      : undefined;
+
+  const totalUnits = position.quantity;
+
+  const cards: SummaryCardItem[] = [
+    {
+      label: t('cards.marketValue'),
+      icon: <ChartPieIcon className={ICON_CLASS} />,
+      value:
+        position.marketValueDefaultCurrency === null
+          ? t('cards.valueUnknown')
+          : formatCurrency(position.marketValueDefaultCurrency, defaultCurrency),
+      note: secondary(position.marketValue),
+      valueClass:
+        position.marketValueDefaultCurrency === null
+          ? 'text-gray-500 dark:text-gray-400'
+          : undefined,
+    },
+    {
+      label: t('cards.costBasis'),
+      icon: <BanknotesIcon className={ICON_CLASS} />,
+      value: formatCurrency(position.costBasisDefaultCurrency, defaultCurrency),
+      note: secondary(position.costBasis),
+    },
+    {
+      label: t('cards.unrealizedPl'),
+      icon: <ArrowTrendingUpIcon className={ICON_CLASS} />,
+      value:
+        position.gainLossDefaultCurrency === null
+          ? t('cards.valueUnknown')
+          : // Signed, so the figure reads as a gain or a loss without relying
+            // on its colour.
+            `${position.gainLossDefaultCurrency >= 0 ? '+' : ''}${formatCurrency(
+              position.gainLossDefaultCurrency,
+              defaultCurrency,
+            )}`,
+      valueClass:
+        position.gainLossDefaultCurrency === null
+          ? 'text-gray-500 dark:text-gray-400'
+          : gainLossColor(position.gainLossDefaultCurrency),
+      note:
+        position.gainLossPercent === null ? (
+          secondary(position.gainLoss)
+        ) : (
+          <>
+            <span className={gainLossColor(position.gainLossPercent)}>
+              {formatSignedPercent(position.gainLossPercent)}
+            </span>
+            {secondary(position.gainLoss) && (
+              <div>{secondary(position.gainLoss)}</div>
+            )}
+          </>
+        ),
+    },
+    {
+      label: t('cards.units'),
+      icon: <CircleStackIcon className={ICON_CLASS} />,
+      value: formatQuantity(totalUnits),
+      note: (
+        <>
+          <div>{t('cards.avgCostPerUnit')}</div>
+          <div>
+            {formatCurrencyPrecise(position.averageCost, securityCurrency)}
+          </div>
+        </>
+      ),
+    },
+    {
+      label: t('cards.heldInAccounts'),
+      icon: <UserGroupIcon className={ICON_CLASS} />,
+      // Two units of information per row, so this card carries a small list
+      // instead of the single figure the others show.
+      className: 'sm:col-span-2',
+      value: null,
+      body: (
+        <div className="mt-1">
+          <ul className="space-y-0.5">
+            {detail.accounts.map((account) => (
+              <li
+                key={account.accountId}
+                className="flex items-baseline justify-between gap-3 text-sm"
+              >
+                <span
+                  className={`truncate ${
+                    account.isClosed
+                      ? 'text-gray-500 dark:text-gray-400'
+                      : 'text-gray-900 dark:text-gray-100'
+                  }`}
+                >
+                  {account.isClosed
+                    ? t('accounts.closedSuffix', { name: account.accountName })
+                    : account.accountName}
+                </span>
+                <span className="shrink-0 tabular-nums text-gray-900 dark:text-gray-100">
+                  {t('cards.unitsShare', {
+                    units: formatQuantity(account.quantity),
+                    // A share of the total, not a gain: no leading sign.
+                    share: formatPercent(
+                      totalUnits === 0
+                        ? 0
+                        : (account.quantity / totalUnits) * 100,
+                    ),
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {detail.accounts.length === 0 ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {t('empty.noAccounts')}
+            </p>
+          ) : (
+            <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-gray-200 pt-1 text-sm font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
+              <span>{t('cards.total')}</span>
+              <span className="tabular-nums">{formatQuantity(totalUnits)}</span>
+            </div>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <SummaryCardGrid
+      cards={cards}
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+    />
+  );
+}

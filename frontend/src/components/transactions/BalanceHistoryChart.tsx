@@ -85,6 +85,13 @@ interface BalanceHistoryChartProps {
    * twice. The download filename still uses the title.
    */
   hideTitle?: boolean;
+  /**
+   * What the series values are, which decides how every figure on the chart is
+   * written. Defaults to money. Set to 'percent' for a series that is already a
+   * percentage -- the security detail page's "Return" view plots percent change,
+   * and formatting that as currency would label "+12.50%" as "$12.50".
+   */
+  valueFormat?: 'currency' | 'percent';
 }
 
 interface ChartPoint {
@@ -153,6 +160,7 @@ export function BalanceHistoryChart({
   neutralValues = false,
   precise = false,
   markers,
+  valueFormat = 'currency',
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
@@ -162,7 +170,9 @@ export function BalanceHistoryChart({
     formatCurrencyPrecise,
     formatCurrencyAxis,
     formatCurrencyFlag,
+    formatSignedPercent,
   } = useNumberFormat();
+  const isPercent = valueFormat === 'percent';
   const formatChartDate = useChartDateFormat();
   const chartRef = useRef<HTMLDivElement>(null);
   // High/low value bubbles a user has temporarily dismissed, keyed by the value
@@ -175,26 +185,53 @@ export function BalanceHistoryChart({
 
   const formatCurrency = useCallback(
     (value: number) =>
-      precise
-        ? formatCurrencyPrecise(value, currencyCode)
-        : formatCurrencyFull(value, currencyCode),
-    [precise, formatCurrencyPrecise, formatCurrencyFull, currencyCode],
+      isPercent
+        ? formatSignedPercent(value)
+        : precise
+          ? formatCurrencyPrecise(value, currencyCode)
+          : formatCurrencyFull(value, currencyCode),
+    [
+      isPercent,
+      formatSignedPercent,
+      precise,
+      formatCurrencyPrecise,
+      formatCurrencyFull,
+      currencyCode,
+    ],
   );
 
   const formatAxis = useCallback(
     (value: number) =>
-      precise
-        ? formatCurrencyPrecise(value, currencyCode)
-        : formatCurrencyAxis(value, currencyCode),
-    [precise, formatCurrencyPrecise, formatCurrencyAxis, currencyCode],
+      isPercent
+        ? formatSignedPercent(value, 0)
+        : precise
+          ? formatCurrencyPrecise(value, currencyCode)
+          : formatCurrencyAxis(value, currencyCode),
+    [
+      isPercent,
+      formatSignedPercent,
+      precise,
+      formatCurrencyPrecise,
+      formatCurrencyAxis,
+      currencyCode,
+    ],
   );
 
   const formatFlag = useCallback(
     (value: number) =>
-      precise
-        ? formatCurrencyPrecise(value, currencyCode)
-        : formatCurrencyFlag(value, currencyCode),
-    [precise, formatCurrencyPrecise, formatCurrencyFlag, currencyCode],
+      isPercent
+        ? formatSignedPercent(value)
+        : precise
+          ? formatCurrencyPrecise(value, currencyCode)
+          : formatCurrencyFlag(value, currencyCode),
+    [
+      isPercent,
+      formatSignedPercent,
+      precise,
+      formatCurrencyPrecise,
+      formatCurrencyFlag,
+      currencyCode,
+    ],
   );
 
   const { chartData, axisTicks, axisPattern } = useMemo(() => {

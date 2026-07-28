@@ -230,6 +230,66 @@ export interface SecurityTransactionHistory {
   currentQuantityAll: number;
 }
 
+/**
+ * The position in one account holding a security. Money arrives in two
+ * currencies: the security's own (what its price and average cost are quoted
+ * in) and the account's (what the holder's statement shows). The detail page
+ * renders both.
+ */
+export interface SecurityDetailAccountPosition {
+  accountId: string;
+  accountName: string;
+  accountCurrencyCode: string;
+  isClosed: boolean;
+  quantity: number;
+  /** Average cost per unit, in the security's currency. */
+  averageCost: number;
+  costBasis: number;
+  costBasisAccountCurrency: number;
+  marketValue: number | null;
+  marketValueAccountCurrency: number | null;
+  gainLoss: number | null;
+  gainLossAccountCurrency: number | null;
+  gainLossPercent: number | null;
+}
+
+/** The aggregate position across every account, for the summary cards. */
+export interface SecurityDetailPosition {
+  quantity: number;
+  averageCost: number;
+  currentPrice: number | null;
+  costBasis: number;
+  costBasisDefaultCurrency: number;
+  marketValue: number | null;
+  marketValueDefaultCurrency: number | null;
+  gainLoss: number | null;
+  gainLossDefaultCurrency: number | null;
+  gainLossPercent: number | null;
+}
+
+/** Lifetime totals for the Position info card, in the security's currency. */
+export interface SecurityDetailActivity {
+  firstTransactionDate: string | null;
+  lastTransactionDate: string | null;
+  totalInvested: number;
+  totalSold: number;
+  dividends: number;
+  fees: number;
+  realizedGain: number;
+  transactionCount: number;
+}
+
+export interface SecurityDetail {
+  security: Security;
+  /** The user's reporting currency, for the `*DefaultCurrency` amounts. */
+  defaultCurrency: string;
+  position: SecurityDetailPosition;
+  accounts: SecurityDetailAccountPosition[];
+  activity: SecurityDetailActivity;
+  hasTransactions: boolean;
+  isPositionClosed: boolean;
+}
+
 export interface CreateInvestmentTransactionData {
   accountId: string;
   securityId?: string;
