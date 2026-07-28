@@ -98,39 +98,50 @@ export function Tabs<K extends string>({
   );
 
   return (
-    <div
-      role="tablist"
-      aria-label={ariaLabel}
-      className={`flex gap-1 overflow-x-auto border-b border-gray-200 dark:border-gray-700 ${className}`}
-    >
-      {tabs.map((tab, index) => {
-        const isSelected = tab.key === value;
-        return (
-          <button
-            key={tab.key}
-            ref={(element) => {
-              buttonRefs.current[index] = element;
-            }}
-            type="button"
-            role="tab"
-            id={tabId(idPrefix, tab.key)}
-            aria-selected={isSelected}
-            aria-controls={tabPanelId(idPrefix, tab.key)}
-            // One tab stop for the set: Tab reaches the selected tab, then
-            // moves on into the panel rather than through every other tab.
-            tabIndex={isSelected ? 0 : -1}
-            onClick={() => onChange(tab.key)}
-            onKeyDown={(event) => handleKeyDown(event, index)}
-            className={`shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-              isSelected
-                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-            }`}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
+    // The scroll lives on a wrapper, not on the tablist, and it carries `pb-px`
+    // to absorb the 1px the active tab's `-mb-px` overhangs by. Without that
+    // padding, setting overflow-x makes the browser compute overflow-y to `auto`
+    // as well, and that 1px of vertical overflow draws a stray vertical
+    // scrollbar beside the tabs.
+    <div className={`overflow-x-auto pb-px ${className}`}>
+      <div
+        role="tablist"
+        aria-label={ariaLabel}
+        className="flex gap-1 border-b border-gray-200 dark:border-gray-700"
+      >
+        {tabs.map((tab, index) => {
+          const isSelected = tab.key === value;
+          return (
+            <button
+              key={tab.key}
+              ref={(element) => {
+                buttonRefs.current[index] = element;
+              }}
+              type="button"
+              role="tab"
+              id={tabId(idPrefix, tab.key)}
+              aria-selected={isSelected}
+              // Only the selected tab's panel is in the DOM (see TabPanel), and
+              // aria-controls must not point at an element that is not there.
+              aria-controls={
+                isSelected ? tabPanelId(idPrefix, tab.key) : undefined
+              }
+              // One tab stop for the set: Tab reaches the selected tab, then
+              // moves on into the panel rather than through every other tab.
+              tabIndex={isSelected ? 0 : -1}
+              onClick={() => onChange(tab.key)}
+              onKeyDown={(event) => handleKeyDown(event, index)}
+              className={`shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
+                isSelected
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

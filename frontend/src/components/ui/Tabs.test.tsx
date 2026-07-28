@@ -66,7 +66,7 @@ describe('Tabs', () => {
     expect(onChange).toHaveBeenCalledWith('prices');
   });
 
-  it('wires each tab to its panel', () => {
+  it('wires the selected tab to its panel', () => {
     renderTabs();
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
       'aria-controls',
@@ -76,6 +76,17 @@ describe('Tabs', () => {
       'id',
       tabId('security', 'overview'),
     );
+  });
+
+  it('does not point unselected tabs at panels that are not rendered', () => {
+    renderTabs('overview');
+    // Their panels are unmounted, and aria-controls must not dangle.
+    expect(
+      screen.getByRole('tab', { name: 'Transactions' }),
+    ).not.toHaveAttribute('aria-controls');
+    expect(
+      screen.getByRole('tab', { name: 'Price history' }),
+    ).not.toHaveAttribute('aria-controls');
   });
 
   describe('keyboard navigation', () => {
