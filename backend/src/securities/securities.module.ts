@@ -19,6 +19,7 @@ import { HoldingsService } from "./holdings.service";
 import { InvestmentTransactionsService } from "./investment-transactions.service";
 import { PortfolioService } from "./portfolio.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
+import { SecurityDetailService } from "./security-detail.service";
 import { SectorWeightingService } from "./sector-weighting.service";
 import { SecuritiesController } from "./securities.controller";
 import { HoldingsController } from "./holdings.controller";
@@ -62,6 +63,7 @@ import { DelegationModule } from "../delegation/delegation.module";
     InvestmentTransactionsService,
     PortfolioCalculationService,
     PortfolioService,
+    SecurityDetailService,
     SectorWeightingService,
   ],
   controllers: [
@@ -80,6 +82,7 @@ import { DelegationModule } from "../delegation/delegation.module";
     HoldingsService,
     InvestmentTransactionsService,
     PortfolioService,
+    SecurityDetailService,
     SectorWeightingService,
   ],
 })

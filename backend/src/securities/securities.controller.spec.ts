@@ -5,12 +5,14 @@ import { SecuritiesService } from "./securities.service";
 import { SecurityPriceService } from "./security-price.service";
 import { MsnFinanceService } from "./msn-finance.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
+import { SecurityDetailService } from "./security-detail.service";
 import { SectorWeightingService } from "./sector-weighting.service";
 
 describe("SecuritiesController", () => {
   let controller: SecuritiesController;
   let securitiesService: Record<string, jest.Mock>;
   let securityPriceService: Record<string, jest.Mock>;
+  let securityDetailService: Record<string, jest.Mock>;
   let msnFinanceService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
   let sectorWeightingService: Record<string, jest.Mock>;
@@ -63,6 +65,10 @@ describe("SecuritiesController", () => {
       deletePrice: jest.fn(),
     };
 
+    securityDetailService = {
+      getDetail: jest.fn(),
+    };
+
     netWorthService = {
       recalculateAllInvestmentSnapshots: jest.fn().mockResolvedValue(undefined),
       recalculateAllAccounts: jest.fn().mockResolvedValue(undefined),
@@ -81,6 +87,7 @@ describe("SecuritiesController", () => {
       providers: [
         { provide: SecuritiesService, useValue: securitiesService },
         { provide: SecurityPriceService, useValue: securityPriceService },
+        { provide: SecurityDetailService, useValue: securityDetailService },
         { provide: NetWorthService, useValue: netWorthService },
         { provide: SectorWeightingService, useValue: sectorWeightingService },
         { provide: MsnFinanceService, useValue: msnFinanceService },

@@ -38,6 +38,10 @@ import {
 } from "./security-price.service";
 import { MsnFinanceService } from "./msn-finance.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
+import {
+  SecurityDetailService,
+  SecurityDetail,
+} from "./security-detail.service";
 import { SectorWeightingService } from "./sector-weighting.service";
 import { CreateSecurityDto } from "./dto/create-security.dto";
 import { UpdateSecurityDto } from "./dto/update-security.dto";
@@ -56,6 +60,7 @@ export class SecuritiesController {
   constructor(
     private readonly securitiesService: SecuritiesService,
     private readonly securityPriceService: SecurityPriceService,
+    private readonly securityDetailService: SecurityDetailService,
     private readonly netWorthService: NetWorthService,
     private readonly sectorWeightingService: SectorWeightingService,
     private readonly msnFinanceService: MsnFinanceService,
@@ -346,6 +351,23 @@ export class SecuritiesController {
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<Security> {
     return this.securitiesService.findOne(req.user.id, id);
+  }
+
+  @Get(":id/detail")
+  @ApiOperation({
+    summary:
+      "Get a security with its position, per-account breakdown and activity totals",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Security detail for the security detail page",
+  })
+  @ApiResponse({ status: 404, description: "Security not found" })
+  getDetail(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<SecurityDetail> {
+    return this.securityDetailService.getDetail(req.user.id, id);
   }
 
   @Get("symbol/:symbol")
