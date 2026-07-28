@@ -235,6 +235,45 @@
       "description": "Compartilhe uma cópia criptografada e desidentificada dos seus dados para que um mantenedor possa reproduzir um bug sem ver seus nomes ou valores reais."
     }
   },
+  "about": {
+    "heading": "Sobre",
+    "description": "O que esta instância está executando e onde encontrar as notas de versão, a licença e a política de segurança.",
+    "appName": "Monize",
+    "tagline": "Gestão de finanças pessoais auto-hospedada.",
+    "versionLabel": "Versão",
+    "versionUnknown": "Desconhecida",
+    "versionButtonTitle": "Ver as notas de versão da v{version}",
+    "apiVersionLabel": "Versão da API",
+    "versionMismatch": "O aplicativo web e a API estão executando versões diferentes. Normalmente isso significa que uma atualização foi implantada apenas parcialmente -- reinicie ou reimplante o serviço atrasado.",
+    "updateLabel": "Atualizações",
+    "updateUpToDate": "Atualizado",
+    "updateAvailable": "v{version} disponível",
+    "updateAvailableGeneric": "Há uma versão mais recente disponível",
+    "updateViewRelease": "Ver a versão",
+    "whatsNew": {
+      "label": "Novidades da v{version}",
+      "labelGeneric": "Novidades",
+      "description": "Leia as notas desta versão sem sair do aplicativo."
+    },
+    "allReleases": {
+      "label": "Todas as versões",
+      "description": "Veja todas as versões e suas notas no GitHub."
+    },
+    "license": {
+      "label": "Licença",
+      "description": "O Monize é software livre sob a GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Política de segurança",
+      "description": "Como relatar uma vulnerabilidade de forma privada."
+    },
+    "diagnostics": {
+      "label": "Copiar diagnóstico",
+      "description": "Copie os dados de versão, navegador e idioma para colar em um relatório de erro.",
+      "copied": "Diagnóstico copiado para a área de transferência",
+      "copyFailed": "Não foi possível copiar o diagnóstico para a área de transferência"
+    }
+  },
   "supportBackup": {
     "title": "Criar backup de suporte",
     "howItWorks": "Produz uma cópia desidentificada do seu backup: os nomes são mascarados (os dois primeiros e os dois últimos caracteres são mantidos), notas/descrições/números de conta são removidos e cada valor é multiplicado por um único fator oculto, enquanto os valores públicos (taxas de câmbio, preços, taxas de juros) ficam intactos. O arquivo é sempre criptografado com a senha abaixo e restaura como um backup normal. Isso protege contra exposição casual, não contra alguém que já conhece você — datas, frequências e estrutura são preservadas para que os bugs continuem reproduzíveis.",
@@ -624,7 +663,8 @@
     "backupRestore": "Backup e Restauração",
     "autoBackup": "Backup Automático",
     "help": "Ajuda e Suporte",
-    "dangerZone": "Zona de Perigo"
+    "dangerZone": "Zona de Perigo",
+    "about": "Sobre"
   },
   "page": {
     "title": "Configurações",

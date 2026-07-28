@@ -67,7 +67,11 @@ describe('WhatsNewHost', () => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
     window.localStorage.clear();
-    useWhatsNewStore.setState({ isOpen: false, pausedForTour: false });
+    useWhatsNewStore.setState({
+      isOpen: false,
+      pausedForTour: false,
+      backendVersion: undefined,
+    });
     useTourStore.setState({ active: null, progress: {}, progressLoaded: true });
     useAuthStore.setState({ isAuthenticated: false });
     mockApi.getWhatsNew.mockResolvedValue({
@@ -95,6 +99,25 @@ describe('WhatsNewHost', () => {
     );
     expect(mockApi.getWhatsNew).toHaveBeenCalledTimes(1);
     expect(useWhatsNewStore.getState().isOpen).toBe(true);
+  });
+
+  it('publishes the backend version for the Settings About section', async () => {
+    refreshedSession();
+
+    await renderHost();
+
+    await waitFor(() =>
+      expect(useWhatsNewStore.getState().backendVersion).toBe('1.12.1'),
+    );
+  });
+
+  it('publishes the backend version for anonymous visitors too', async () => {
+    await renderHost();
+
+    await waitFor(() =>
+      expect(useWhatsNewStore.getState().backendVersion).toBe('1.12.1'),
+    );
+    expect(mockApi.getReleaseNotes).toHaveBeenCalled();
   });
 
   it('stays shut on a refresh, even while the version is unacknowledged', async () => {
@@ -129,7 +152,11 @@ describe('WhatsNewHost', () => {
 
     // Same tab, same session, same unacknowledged version: the second mount
     // stands in for the refresh.
-    useWhatsNewStore.setState({ isOpen: false, pausedForTour: false });
+    useWhatsNewStore.setState({
+      isOpen: false,
+      pausedForTour: false,
+      backendVersion: undefined,
+    });
     await renderHost();
 
     await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalledTimes(2));
@@ -204,7 +231,11 @@ describe('WhatsNewHost', () => {
 
     // Still unacknowledged, but this browser has already had its one
     // announcement for 1.13.0.
-    useWhatsNewStore.setState({ isOpen: false, pausedForTour: false });
+    useWhatsNewStore.setState({
+      isOpen: false,
+      pausedForTour: false,
+      backendVersion: undefined,
+    });
     await renderHost();
 
     await waitFor(() => expect(mockApi.getWhatsNew).toHaveBeenCalledTimes(2));

@@ -235,6 +235,45 @@
       "description": "Share a de-identified, encrypted copy of your data so a maintainer can reproduce a bug without seeing your real names or amounts."
     }
   },
+  "about": {
+    "heading": "About",
+    "description": "What this instance is running, and where to find the release notes, licence and security policy.",
+    "appName": "Monize",
+    "tagline": "Self-hosted personal finance management.",
+    "versionLabel": "Version",
+    "versionUnknown": "Unknown",
+    "versionButtonTitle": "View release notes for v{version}",
+    "apiVersionLabel": "API version",
+    "versionMismatch": "The web app and the API are running different versions. This usually means an upgrade only partly rolled out -- restart or redeploy the lagging service.",
+    "updateLabel": "Updates",
+    "updateUpToDate": "Up to date",
+    "updateAvailable": "v{version} available",
+    "updateAvailableGeneric": "A newer version is available",
+    "updateViewRelease": "View release",
+    "whatsNew": {
+      "label": "What's new in v{version}",
+      "labelGeneric": "What's new",
+      "description": "Read this version's release notes without leaving the app."
+    },
+    "allReleases": {
+      "label": "All releases",
+      "description": "Browse every release and its notes on GitHub."
+    },
+    "license": {
+      "label": "Licence",
+      "description": "Monize is free software under the GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Security policy",
+      "description": "How to report a vulnerability privately."
+    },
+    "diagnostics": {
+      "label": "Copy diagnostics",
+      "description": "Copy version, browser and locale details to paste into a bug report.",
+      "copied": "Diagnostics copied to clipboard",
+      "copyFailed": "Could not copy diagnostics to the clipboard"
+    }
+  },
   "supportBackup": {
     "title": "Create support backup",
     "howItWorks": "This produces a de-identified copy of your backup: names are masked (first and last two characters kept), notes/descriptions/account numbers are removed, and every amount is multiplied by a single hidden factor while public values (exchange rates, prices, interest rates) are left intact. The file is always encrypted with the password below and restores like a normal backup. This protects against casual exposure, not against someone who already knows you -- dates, frequencies and structure are preserved so bugs still reproduce.",
@@ -624,7 +663,8 @@
     "backupRestore": "Backup & Restore",
     "autoBackup": "Automatic Backup",
     "help": "Help & Support",
-    "dangerZone": "Danger Zone"
+    "dangerZone": "Danger Zone",
+    "about": "About"
   },
   "page": {
     "title": "Settings",

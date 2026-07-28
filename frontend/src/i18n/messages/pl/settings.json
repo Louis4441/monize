@@ -235,6 +235,45 @@
       "description": "Udostępnij zdeidentyfikowaną, zaszyfrowaną kopię swoich danych, aby opiekun projektu mógł odtworzyć błąd bez wglądu w Twoje prawdziwe nazwy i kwoty."
     }
   },
+  "about": {
+    "heading": "O programie",
+    "description": "Co działa w tej instancji oraz gdzie znaleźć informacje o wydaniu, licencję i politykę bezpieczeństwa.",
+    "appName": "Monize",
+    "tagline": "Samodzielnie hostowane zarządzanie finansami osobistymi.",
+    "versionLabel": "Wersja",
+    "versionUnknown": "Nieznana",
+    "versionButtonTitle": "Zobacz informacje o wydaniu v{version}",
+    "apiVersionLabel": "Wersja API",
+    "versionMismatch": "Aplikacja internetowa i API działają w różnych wersjach. Zwykle oznacza to, że aktualizacja wdrożyła się tylko częściowo -- uruchom ponownie lub wdróż ponownie zapóźnioną usługę.",
+    "updateLabel": "Aktualizacje",
+    "updateUpToDate": "Aktualna",
+    "updateAvailable": "Dostępna wersja v{version}",
+    "updateAvailableGeneric": "Dostępna jest nowsza wersja",
+    "updateViewRelease": "Zobacz wydanie",
+    "whatsNew": {
+      "label": "Co nowego w v{version}",
+      "labelGeneric": "Co nowego",
+      "description": "Przeczytaj informacje o tym wydaniu bez opuszczania aplikacji."
+    },
+    "allReleases": {
+      "label": "Wszystkie wydania",
+      "description": "Przeglądaj wszystkie wydania i ich informacje na GitHubie."
+    },
+    "license": {
+      "label": "Licencja",
+      "description": "Monize to wolne oprogramowanie na licencji GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Polityka bezpieczeństwa",
+      "description": "Jak zgłosić lukę w zabezpieczeniach prywatnie."
+    },
+    "diagnostics": {
+      "label": "Kopiuj diagnostykę",
+      "description": "Skopiuj dane o wersji, przeglądarce i języku, aby wkleić je do zgłoszenia błędu.",
+      "copied": "Diagnostyka skopiowana do schowka",
+      "copyFailed": "Nie udało się skopiować diagnostyki do schowka"
+    }
+  },
   "supportBackup": {
     "title": "Utwórz kopię dla wsparcia",
     "howItWorks": "Powstaje zdeidentyfikowana kopia Twojego backupu: nazwy są maskowane (zostają pierwsze i ostatnie dwa znaki), notatki/opisy/numery kont są usuwane, a każda kwota jest mnożona przez jeden ukryty współczynnik, podczas gdy wartości publiczne (kursy walut, ceny, oprocentowanie) pozostają nietknięte. Plik jest zawsze szyfrowany poniższym hasłem i przywraca się jak zwykły backup. Chroni to przed przypadkową ekspozycją, ale nie przed kimś, kto już Cię zna — daty, częstotliwości i struktura są zachowane, aby błędy dało się odtworzyć.",
@@ -624,7 +663,8 @@
     "backupRestore": "Kopia zapasowa i przywracanie",
     "autoBackup": "Automatyczna kopia zapasowa",
     "help": "Pomoc i wsparcie",
-    "dangerZone": "Strefa zagrożenia"
+    "dangerZone": "Strefa zagrożenia",
+    "about": "O programie"
   },
   "page": {
     "title": "Ustawienia",

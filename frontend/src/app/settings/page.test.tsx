@@ -251,7 +251,7 @@ describe('SettingsPage', () => {
       expect(screen.getByText('Settings')).toBeInTheDocument();
     });
 
-    const expectedIds = ['profile', 'preferences', 'notifications', 'security', 'api-access', 'backup-restore', 'auto-backup', 'danger-zone'];
+    const expectedIds = ['profile', 'preferences', 'notifications', 'security', 'api-access', 'backup-restore', 'auto-backup', 'about', 'danger-zone'];
     for (const id of expectedIds) {
       expect(container.querySelector(`#${id}`)).toBeInTheDocument();
     }

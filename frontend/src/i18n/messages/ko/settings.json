@@ -235,6 +235,45 @@
       "description": "유지관리자가 실제 이름이나 금액을 보지 않고도 버그를 재현할 수 있도록 비식별화·암호화된 데이터 사본을 공유하세요."
     }
   },
+  "about": {
+    "heading": "정보",
+    "description": "이 인스턴스가 실행 중인 버전과 릴리스 노트, 라이선스, 보안 정책을 찾을 수 있는 곳입니다.",
+    "appName": "Monize",
+    "tagline": "직접 호스팅하는 개인 재무 관리.",
+    "versionLabel": "버전",
+    "versionUnknown": "알 수 없음",
+    "versionButtonTitle": "v{version} 릴리스 노트 보기",
+    "apiVersionLabel": "API 버전",
+    "versionMismatch": "웹 앱과 API가 서로 다른 버전으로 실행 중입니다. 보통 업그레이드가 일부만 적용된 경우입니다. 뒤처진 서비스를 다시 시작하거나 다시 배포하세요.",
+    "updateLabel": "업데이트",
+    "updateUpToDate": "최신 상태",
+    "updateAvailable": "v{version} 사용 가능",
+    "updateAvailableGeneric": "새 버전을 사용할 수 있습니다",
+    "updateViewRelease": "릴리스 보기",
+    "whatsNew": {
+      "label": "v{version}의 새로운 기능",
+      "labelGeneric": "새로운 기능",
+      "description": "앱을 벗어나지 않고 이 버전의 릴리스 노트를 읽어 보세요."
+    },
+    "allReleases": {
+      "label": "모든 릴리스",
+      "description": "GitHub에서 모든 릴리스와 노트를 살펴보세요."
+    },
+    "license": {
+      "label": "라이선스",
+      "description": "Monize는 GNU AGPL v3에 따라 배포되는 자유 소프트웨어입니다."
+    },
+    "securityPolicy": {
+      "label": "보안 정책",
+      "description": "취약점을 비공개로 신고하는 방법."
+    },
+    "diagnostics": {
+      "label": "진단 정보 복사",
+      "description": "버그 신고에 붙여 넣을 수 있도록 버전, 브라우저, 언어 정보를 복사합니다.",
+      "copied": "진단 정보를 클립보드에 복사했습니다",
+      "copyFailed": "진단 정보를 클립보드에 복사하지 못했습니다"
+    }
+  },
   "supportBackup": {
     "title": "지원용 백업 만들기",
     "howItWorks": "백업의 비식별화 사본을 만듭니다. 이름은 마스킹되고(처음과 마지막 두 글자만 남음), 메모/설명/계좌번호는 제거되며, 모든 금액은 하나의 숨겨진 계수로 곱해집니다. 공개 값(환율, 가격, 이자율)은 그대로 유지됩니다. 파일은 항상 아래 비밀번호로 암호화되며 일반 백업처럼 복원됩니다. 이는 우발적 노출로부터 보호할 뿐, 이미 당신을 아는 사람으로부터 보호하지는 않습니다 — 버그 재현을 위해 날짜, 빈도, 구조는 보존됩니다.",
@@ -624,7 +663,8 @@
     "backupRestore": "백업 및 복원",
     "autoBackup": "자동 백업",
     "help": "도움말 및 지원",
-    "dangerZone": "위험 구역"
+    "dangerZone": "위험 구역",
+    "about": "정보"
   },
   "page": {
     "title": "설정",

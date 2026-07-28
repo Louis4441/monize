@@ -6,7 +6,6 @@ import { useTranslations } from 'next-intl';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { AppVersion } from '@/components/ui/AppVersion';
 import { ProfileSection } from '@/components/settings/ProfileSection';
 import { PreferencesSection } from '@/components/settings/PreferencesSection';
 import { NotificationsSection } from '@/components/settings/NotificationsSection';
@@ -16,6 +15,7 @@ import { BackupRestoreSection } from '@/components/settings/BackupRestoreSection
 import { AutoBackupSection } from '@/components/settings/AutoBackupSection';
 import { ApiAccessSection } from '@/components/settings/ApiAccessSection';
 import { HelpSection } from '@/components/settings/HelpSection';
+import { AboutSection } from '@/components/settings/AboutSection';
 import { SettingsNav, SettingsSection } from '@/components/settings/SettingsNav';
 import { useScrollSpy } from '@/hooks/useScrollSpy';
 import { userSettingsApi } from '@/lib/user-settings';
@@ -42,6 +42,7 @@ const SETTINGS_SECTION_IDS = [
   { id: 'backup-restore', navKey: 'backupRestore', demoVisible: false },
   { id: 'auto-backup', navKey: 'autoBackup', demoVisible: false },
   { id: 'help', navKey: 'help', demoVisible: false },
+  { id: 'about', navKey: 'about', demoVisible: true },
   { id: 'danger-zone', navKey: 'dangerZone', variant: 'danger' as const, demoVisible: false },
 ] as const;
 
@@ -386,13 +387,15 @@ function OwnerSettingsView() {
               <HelpSection />
             </div>
 
+            <div id="about" className="scroll-mt-32 lg:scroll-mt-22">
+              <AboutSection />
+            </div>
+
             {!isDemoMode && user && (
               <div id="danger-zone" className="scroll-mt-32 lg:scroll-mt-22">
                 <DangerZoneSection user={user} />
               </div>
             )}
-
-            <AppVersion className="text-center text-xs text-gray-400 dark:text-gray-500 mt-8 mb-4" />
           </div>
         </div>
       </main>

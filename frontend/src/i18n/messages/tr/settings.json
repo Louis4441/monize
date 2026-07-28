@@ -235,6 +235,45 @@
       "description": "Bir bakımcının gerçek adlarınızı veya tutarlarınızı görmeden bir hatayı yeniden üretebilmesi için verilerinizin şifrelenmiş, kimliksizleştirilmiş bir kopyasını paylaşın."
     }
   },
+  "about": {
+    "heading": "Hakkında",
+    "description": "Bu örneğin hangi sürümü çalıştırdığı ve sürüm notlarını, lisansı ve güvenlik politikasını nerede bulacağınız.",
+    "appName": "Monize",
+    "tagline": "Kendi sunucunuzda barındırılan kişisel finans yönetimi.",
+    "versionLabel": "Sürüm",
+    "versionUnknown": "Bilinmiyor",
+    "versionButtonTitle": "v{version} sürüm notlarını görüntüle",
+    "apiVersionLabel": "API sürümü",
+    "versionMismatch": "Web uygulaması ile API farklı sürümleri çalıştırıyor. Bu genellikle yükseltmenin yalnızca kısmen yayıldığı anlamına gelir; geride kalan hizmeti yeniden başlatın veya yeniden dağıtın.",
+    "updateLabel": "Güncellemeler",
+    "updateUpToDate": "Güncel",
+    "updateAvailable": "v{version} mevcut",
+    "updateAvailableGeneric": "Daha yeni bir sürüm mevcut",
+    "updateViewRelease": "Sürümü görüntüle",
+    "whatsNew": {
+      "label": "v{version} sürümündeki yenilikler",
+      "labelGeneric": "Yenilikler",
+      "description": "Bu sürümün notlarını uygulamadan ayrılmadan okuyun."
+    },
+    "allReleases": {
+      "label": "Tüm sürümler",
+      "description": "GitHub'da her sürümü ve notlarını inceleyin."
+    },
+    "license": {
+      "label": "Lisans",
+      "description": "Monize, GNU AGPL v3 kapsamında özgür yazılımdır."
+    },
+    "securityPolicy": {
+      "label": "Güvenlik politikası",
+      "description": "Bir güvenlik açığını özel olarak nasıl bildirirsiniz."
+    },
+    "diagnostics": {
+      "label": "Tanılamayı kopyala",
+      "description": "Hata bildirimine yapıştırmak için sürüm, tarayıcı ve dil bilgilerini kopyalayın.",
+      "copied": "Tanılama panoya kopyalandı",
+      "copyFailed": "Tanılama panoya kopyalanamadı"
+    }
+  },
   "supportBackup": {
     "title": "Destek yedeği oluştur",
     "howItWorks": "Yedeğinizin kimliksizleştirilmiş bir kopyasını üretir: adlar maskelenir (ilk ve son iki karakter kalır), notlar/açıklamalar/hesap numaraları kaldırılır ve her tutar tek bir gizli çarpanla çarpılırken kamuya açık değerler (döviz kurları, fiyatlar, faiz oranları) olduğu gibi kalır. Dosya her zaman aşağıdaki parolayla şifrelenir ve normal bir yedek gibi geri yüklenir. Bu, sıradan ifşaya karşı korur; sizi zaten tanıyan birine karşı değil — hatalar yeniden üretilebilsin diye tarihler, sıklıklar ve yapı korunur.",
@@ -624,7 +663,8 @@
     "backupRestore": "Yedekleme ve Geri Yükleme",
     "autoBackup": "Otomatik Yedekleme",
     "help": "Yardım ve Destek",
-    "dangerZone": "Tehlikeli Alan"
+    "dangerZone": "Tehlikeli Alan",
+    "about": "Hakkında"
   },
   "page": {
     "title": "Ayarlar",

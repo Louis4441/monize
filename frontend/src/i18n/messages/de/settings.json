@@ -235,6 +235,45 @@
       "description": "Teilen Sie eine de-identifizierte, verschlüsselte Kopie Ihrer Daten, damit ein Maintainer einen Fehler reproduzieren kann, ohne Ihre echten Namen oder Beträge zu sehen."
     }
   },
+  "about": {
+    "heading": "Über",
+    "description": "Was auf dieser Instanz läuft und wo Sie Versionshinweise, Lizenz und Sicherheitsrichtlinie finden.",
+    "appName": "Monize",
+    "tagline": "Selbst gehostete Verwaltung der persönlichen Finanzen.",
+    "versionLabel": "Version",
+    "versionUnknown": "Unbekannt",
+    "versionButtonTitle": "Versionshinweise für v{version} anzeigen",
+    "apiVersionLabel": "API-Version",
+    "versionMismatch": "Web-App und API laufen in unterschiedlichen Versionen. Meist wurde ein Upgrade nur teilweise ausgerollt -- starten Sie den zurückliegenden Dienst neu oder stellen Sie ihn erneut bereit.",
+    "updateLabel": "Aktualisierungen",
+    "updateUpToDate": "Aktuell",
+    "updateAvailable": "v{version} verfügbar",
+    "updateAvailableGeneric": "Eine neuere Version ist verfügbar",
+    "updateViewRelease": "Release anzeigen",
+    "whatsNew": {
+      "label": "Neuigkeiten in v{version}",
+      "labelGeneric": "Neuigkeiten",
+      "description": "Lesen Sie die Versionshinweise dieser Version, ohne die App zu verlassen."
+    },
+    "allReleases": {
+      "label": "Alle Releases",
+      "description": "Alle Releases und ihre Hinweise auf GitHub durchsuchen."
+    },
+    "license": {
+      "label": "Lizenz",
+      "description": "Monize ist freie Software unter der GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Sicherheitsrichtlinie",
+      "description": "So melden Sie eine Schwachstelle vertraulich."
+    },
+    "diagnostics": {
+      "label": "Diagnose kopieren",
+      "description": "Versions-, Browser- und Sprachdaten zum Einfügen in einen Fehlerbericht kopieren.",
+      "copied": "Diagnose in die Zwischenablage kopiert",
+      "copyFailed": "Diagnose konnte nicht in die Zwischenablage kopiert werden"
+    }
+  },
   "supportBackup": {
     "title": "Support-Backup erstellen",
     "howItWorks": "Es entsteht eine de-identifizierte Kopie Ihres Backups: Namen werden maskiert (erste und letzte zwei Zeichen bleiben), Notizen/Beschreibungen/Kontonummern werden entfernt, und jeder Betrag wird mit einem einzigen verborgenen Faktor multipliziert, während öffentliche Werte (Wechselkurse, Kurse, Zinssätze) unangetastet bleiben. Die Datei wird immer mit dem untenstehenden Passwort verschlüsselt und lässt sich wie ein normales Backup wiederherstellen. Das schützt vor beiläufiger Einsichtnahme, nicht vor jemandem, der Sie bereits kennt — Daten, Häufigkeiten und Struktur bleiben erhalten, damit Fehler reproduzierbar sind.",
@@ -624,7 +663,8 @@
     "backupRestore": "Backup & Wiederherstellung",
     "autoBackup": "Automatisches Backup",
     "help": "Hilfe & Support",
-    "dangerZone": "Gefahrenbereich"
+    "dangerZone": "Gefahrenbereich",
+    "about": "Über"
   },
   "page": {
     "title": "Einstellungen",

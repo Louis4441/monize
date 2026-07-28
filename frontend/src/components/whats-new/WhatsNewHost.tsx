@@ -39,6 +39,7 @@ export function WhatsNewHost() {
   const close = useWhatsNewStore((s) => s.close);
   const closeForTour = useWhatsNewStore((s) => s.closeForTour);
   const resumeAfterTour = useWhatsNewStore((s) => s.resumeAfterTour);
+  const setBackendVersion = useWhatsNewStore((s) => s.setBackendVersion);
 
   const [notes, setNotes] = useState<ReleaseNotes | null>(null);
   const [currentVersion, setCurrentVersion] = useState<string | undefined>(
@@ -57,9 +58,12 @@ export function WhatsNewHost() {
       .then((res) => {
         if (cancelled) return;
         setNotes(res.notes);
-        setCurrentVersion(
-          'currentVersion' in res ? res.currentVersion : res.version,
-        );
+        const version = 'currentVersion' in res ? res.currentVersion : res.version;
+        setCurrentVersion(version);
+        // Publish it for the Settings About section, which compares it against
+        // the UI's build-time version. This fetch already happens on every load,
+        // so About never needs a request of its own.
+        setBackendVersion(version);
         // `autoShow` says the user is *due* this version's digest; the two
         // client-side triggers say this page load is a moment to deliver it --
         // a fresh login, or a version this browser has not announced yet (so a
@@ -89,7 +93,7 @@ export function WhatsNewHost() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, open]);
+  }, [isAuthenticated, open, setBackendVersion]);
 
   // A tour started from the offer list has to have the modal out of its way (it
   // drives the app underneath), so bring the modal back once the tour is done --

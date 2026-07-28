@@ -235,6 +235,45 @@
       "description": "分享一份去識別化且加密的資料副本,讓維護者無需看到您的真實名稱或金額即可重現問題。"
     }
   },
+  "about": {
+    "heading": "關於",
+    "description": "此執行個體正在執行的版本，以及版本說明、授權條款和安全性原則的位置。",
+    "appName": "Monize",
+    "tagline": "自行架設的個人財務管理。",
+    "versionLabel": "版本",
+    "versionUnknown": "未知",
+    "versionButtonTitle": "查看 v{version} 版本說明",
+    "apiVersionLabel": "API 版本",
+    "versionMismatch": "網頁應用程式與 API 執行的版本不一致。這通常表示升級只部署了一部分 -- 請重新啟動或重新部署落後的服務。",
+    "updateLabel": "更新",
+    "updateUpToDate": "已是最新",
+    "updateAvailable": "有新版本 v{version}",
+    "updateAvailableGeneric": "有更新的版本可用",
+    "updateViewRelease": "查看發行",
+    "whatsNew": {
+      "label": "v{version} 更新內容",
+      "labelGeneric": "更新內容",
+      "description": "不必離開應用程式即可閱讀此版本的版本說明。"
+    },
+    "allReleases": {
+      "label": "所有發行版本",
+      "description": "在 GitHub 上瀏覽每個發行版本及其說明。"
+    },
+    "license": {
+      "label": "授權條款",
+      "description": "Monize 是採用 GNU AGPL v3 的自由軟體。"
+    },
+    "securityPolicy": {
+      "label": "安全性原則",
+      "description": "如何私下回報安全性弱點。"
+    },
+    "diagnostics": {
+      "label": "複製診斷資訊",
+      "description": "複製版本、瀏覽器與語言資訊，以便貼到問題回報中。",
+      "copied": "診斷資訊已複製到剪貼簿",
+      "copyFailed": "無法將診斷資訊複製到剪貼簿"
+    }
+  },
   "supportBackup": {
     "title": "建立支援備份",
     "howItWorks": "產生備份的去識別化副本:名稱會被遮罩(保留首尾各兩個字元),備註/描述/帳號會被移除,每筆金額乘以同一個隱藏係數,而公開數值(匯率、價格、利率)保持不變。檔案一律以下方密碼加密,並像一般備份一樣還原。這只能防範偶然外洩,防不了已經認識您的人——日期、頻率與結構會被保留,讓問題仍可重現。",
@@ -624,7 +663,8 @@
     "backupRestore": "備份與還原",
     "autoBackup": "自動備份",
     "help": "說明與支援",
-    "dangerZone": "危險區域"
+    "dangerZone": "危險區域",
+    "about": "關於"
   },
   "page": {
     "title": "設定",

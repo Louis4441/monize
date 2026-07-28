@@ -235,6 +235,45 @@
       "description": "Condividi una copia cifrata e de-identificata dei tuoi dati così che un manutentore possa riprodurre un bug senza vedere i tuoi nomi o importi reali."
     }
   },
+  "about": {
+    "heading": "Informazioni",
+    "description": "Che cosa sta eseguendo questa istanza e dove trovare le note di rilascio, la licenza e la politica di sicurezza.",
+    "appName": "Monize",
+    "tagline": "Gestione delle finanze personali self-hosted.",
+    "versionLabel": "Versione",
+    "versionUnknown": "Sconosciuta",
+    "versionButtonTitle": "Visualizza le note di rilascio della v{version}",
+    "apiVersionLabel": "Versione API",
+    "versionMismatch": "L'app web e l'API stanno eseguendo versioni diverse. Di solito significa che un aggiornamento è stato distribuito solo in parte: riavvia o ridistribuisci il servizio rimasto indietro.",
+    "updateLabel": "Aggiornamenti",
+    "updateUpToDate": "Aggiornato",
+    "updateAvailable": "v{version} disponibile",
+    "updateAvailableGeneric": "È disponibile una versione più recente",
+    "updateViewRelease": "Vedi il rilascio",
+    "whatsNew": {
+      "label": "Novità della v{version}",
+      "labelGeneric": "Novità",
+      "description": "Leggi le note di questa versione senza uscire dall'app."
+    },
+    "allReleases": {
+      "label": "Tutti i rilasci",
+      "description": "Sfoglia ogni rilascio e le relative note su GitHub."
+    },
+    "license": {
+      "label": "Licenza",
+      "description": "Monize è software libero rilasciato con licenza GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Politica di sicurezza",
+      "description": "Come segnalare una vulnerabilità in privato."
+    },
+    "diagnostics": {
+      "label": "Copia la diagnostica",
+      "description": "Copia i dettagli di versione, browser e lingua da incollare in una segnalazione di bug.",
+      "copied": "Diagnostica copiata negli appunti",
+      "copyFailed": "Impossibile copiare la diagnostica negli appunti"
+    }
+  },
   "supportBackup": {
     "title": "Crea backup di supporto",
     "howItWorks": "Produce una copia de-identificata del tuo backup: i nomi sono mascherati (restano i primi e gli ultimi due caratteri), note/descrizioni/numeri di conto vengono rimossi e ogni importo è moltiplicato per un unico fattore nascosto, mentre i valori pubblici (tassi di cambio, prezzi, tassi d'interesse) restano intatti. Il file è sempre cifrato con la password qui sotto e si ripristina come un backup normale. Protegge dall'esposizione casuale, non da chi ti conosce già: date, frequenze e struttura sono preservate perché i bug restino riproducibili.",
@@ -624,7 +663,8 @@
     "backupRestore": "Backup e ripristino",
     "autoBackup": "Backup automatico",
     "help": "Guida e supporto",
-    "dangerZone": "Zona pericolosa"
+    "dangerZone": "Zona pericolosa",
+    "about": "Informazioni"
   },
   "page": {
     "title": "Impostazioni",

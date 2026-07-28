@@ -235,6 +235,45 @@
       "description": "Chia sẻ bản sao dữ liệu đã ẩn danh và mã hoá để người bảo trì có thể tái hiện lỗi mà không thấy tên hay số tiền thật của bạn."
     }
   },
+  "about": {
+    "heading": "Giới thiệu",
+    "description": "Phiên bản đang chạy trên máy chủ này, cùng nơi tìm ghi chú phát hành, giấy phép và chính sách bảo mật.",
+    "appName": "Monize",
+    "tagline": "Quản lý tài chính cá nhân tự lưu trữ.",
+    "versionLabel": "Phiên bản",
+    "versionUnknown": "Không rõ",
+    "versionButtonTitle": "Xem ghi chú phát hành cho v{version}",
+    "apiVersionLabel": "Phiên bản API",
+    "versionMismatch": "Ứng dụng web và API đang chạy các phiên bản khác nhau. Điều này thường có nghĩa là bản nâng cấp mới triển khai một phần -- hãy khởi động lại hoặc triển khai lại dịch vụ bị tụt lại.",
+    "updateLabel": "Cập nhật",
+    "updateUpToDate": "Đã cập nhật",
+    "updateAvailable": "Đã có v{version}",
+    "updateAvailableGeneric": "Đã có phiên bản mới hơn",
+    "updateViewRelease": "Xem bản phát hành",
+    "whatsNew": {
+      "label": "Có gì mới trong v{version}",
+      "labelGeneric": "Có gì mới",
+      "description": "Đọc ghi chú phát hành của phiên bản này mà không cần rời ứng dụng."
+    },
+    "allReleases": {
+      "label": "Tất cả bản phát hành",
+      "description": "Duyệt mọi bản phát hành và ghi chú của chúng trên GitHub."
+    },
+    "license": {
+      "label": "Giấy phép",
+      "description": "Monize là phần mềm tự do theo giấy phép GNU AGPL v3."
+    },
+    "securityPolicy": {
+      "label": "Chính sách bảo mật",
+      "description": "Cách báo cáo lỗ hổng một cách riêng tư."
+    },
+    "diagnostics": {
+      "label": "Sao chép thông tin chẩn đoán",
+      "description": "Sao chép thông tin phiên bản, trình duyệt và ngôn ngữ để dán vào báo cáo lỗi.",
+      "copied": "Đã sao chép thông tin chẩn đoán vào bảng nhớ tạm",
+      "copyFailed": "Không thể sao chép thông tin chẩn đoán vào bảng nhớ tạm"
+    }
+  },
   "supportBackup": {
     "title": "Tạo bản sao lưu hỗ trợ",
     "howItWorks": "Tạo một bản sao đã ẩn danh của bản sao lưu: tên bị che (giữ hai ký tự đầu và cuối), ghi chú/mô tả/số tài khoản bị xoá, và mọi số tiền được nhân với một hệ số ẩn duy nhất, trong khi các giá trị công khai (tỷ giá, giá, lãi suất) giữ nguyên. Tệp luôn được mã hoá bằng mật khẩu bên dưới và khôi phục như bản sao lưu bình thường. Điều này bảo vệ trước sự lộ lọt tình cờ, không phải trước người đã biết bạn — ngày tháng, tần suất và cấu trúc được giữ để lỗi vẫn tái hiện được.",
@@ -624,7 +663,8 @@
     "backupRestore": "Sao lưu & Khôi phục",
     "autoBackup": "Sao lưu tự động",
     "help": "Trợ giúp & Hỗ trợ",
-    "dangerZone": "Khu vực nguy hiểm"
+    "dangerZone": "Khu vực nguy hiểm",
+    "about": "Giới thiệu"
   },
   "page": {
     "title": "Cài đặt",

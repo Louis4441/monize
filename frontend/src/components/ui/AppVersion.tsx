@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl';
 import { useWhatsNewStore } from '@/store/whatsNewStore';
-import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 
 interface AppVersionProps {
   /** Classes for the wrapping paragraph (margins, text size/colour). */
@@ -14,7 +13,11 @@ interface AppVersionProps {
  * New" release-notes modal for the current version (the modal itself links out
  * to the full GitHub release notes). The version is injected at build time from
  * package.json via NEXT_PUBLIC_APP_VERSION; if it is somehow absent the
- * component renders nothing. Shown in the Settings and login footers.
+ * component renders nothing.
+ *
+ * Used on the login screens, where a compact one-line footer is all there is
+ * room for. Settings states the version in its About section instead, and that
+ * is where the `settingsAppVersion` tour anchor now lives.
  */
 export function AppVersion({ className }: AppVersionProps) {
   const t = useTranslations('common');
@@ -26,7 +29,6 @@ export function AppVersion({ className }: AppVersionProps) {
     <p className={className}>
       <button
         type="button"
-        {...tourAnchor(TOUR_ANCHORS.settingsAppVersion)}
         onClick={open}
         title={t('appVersion.releaseNotes', { version })}
         className="hover:text-gray-600 dark:hover:text-gray-300 hover:underline focus:outline-none focus:underline"

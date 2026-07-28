@@ -235,6 +235,45 @@
       "description": "本当の名称や金額を見せずにメンテナーがバグを再現できるよう、匿名化・暗号化したデータのコピーを共有します。"
     }
   },
+  "about": {
+    "heading": "このアプリについて",
+    "description": "このインスタンスで動作しているバージョンと、リリースノート・ライセンス・セキュリティポリシーの場所です。",
+    "appName": "Monize",
+    "tagline": "セルフホスト型の個人資産管理。",
+    "versionLabel": "バージョン",
+    "versionUnknown": "不明",
+    "versionButtonTitle": "v{version}のリリースノートを見る",
+    "apiVersionLabel": "APIバージョン",
+    "versionMismatch": "ウェブアプリとAPIのバージョンが異なります。通常はアップグレードが一部しか適用されていないことを意味します。遅れているサービスを再起動または再デプロイしてください。",
+    "updateLabel": "更新",
+    "updateUpToDate": "最新です",
+    "updateAvailable": "v{version}が利用可能",
+    "updateAvailableGeneric": "新しいバージョンが利用可能です",
+    "updateViewRelease": "リリースを見る",
+    "whatsNew": {
+      "label": "v{version}の新着情報",
+      "labelGeneric": "新着情報",
+      "description": "アプリを離れずにこのバージョンのリリースノートを読めます。"
+    },
+    "allReleases": {
+      "label": "すべてのリリース",
+      "description": "GitHubですべてのリリースとノートを見る。"
+    },
+    "license": {
+      "label": "ライセンス",
+      "description": "MonizeはGNU AGPL v3のもとで公開されている自由ソフトウェアです。"
+    },
+    "securityPolicy": {
+      "label": "セキュリティポリシー",
+      "description": "脆弱性を非公開で報告する方法。"
+    },
+    "diagnostics": {
+      "label": "診断情報をコピー",
+      "description": "バージョン・ブラウザ・言語の情報をコピーして不具合報告に貼り付けられます。",
+      "copied": "診断情報をクリップボードにコピーしました",
+      "copyFailed": "診断情報をクリップボードにコピーできませんでした"
+    }
+  },
   "supportBackup": {
     "title": "サポート用バックアップを作成",
     "howItWorks": "バックアップの匿名化コピーを作成します。名称はマスクされ(先頭と末尾の2文字のみ残ります)、メモ/説明/口座番号は削除され、各金額は単一の非公開係数で乗算されます。公開値(為替レート、価格、金利)はそのままです。ファイルは常に下のパスワードで暗号化され、通常のバックアップと同じ手順で復元できます。これは偶発的な露出への保護であり、あなたを既に知る相手への保護ではありません — バグを再現できるよう、日付・頻度・構造は保持されます。",
@@ -624,7 +663,8 @@
     "backupRestore": "バックアップと復元",
     "autoBackup": "自動バックアップ",
     "help": "ヘルプ＆サポート",
-    "dangerZone": "危険な操作"
+    "dangerZone": "危険な操作",
+    "about": "このアプリについて"
   },
   "page": {
     "title": "設定",
