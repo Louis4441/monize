@@ -45,14 +45,34 @@ vi.mock('@/hooks/useDateRange', () => ({
 }));
 
 let mockSeriesMode = 'total';
-vi.mock('@/hooks/useLocalStorage', () => ({
-  useLocalStorage: (key: string, defaultValue: string) => {
-    if (key === 'monize-reports-portfolio-value-series-mode') {
-      return [mockSeriesMode, vi.fn()];
-    }
-    return [defaultValue, vi.fn()];
-  },
-}));
+// Stateful stand-in for the real hook: seed `mockStoredValues` to simulate a
+// previous visit, and read it back to assert what the report persisted.
+const mockStoredValues = new Map<string, unknown>();
+vi.mock('@/hooks/useLocalStorage', async () => {
+  const { useState, useCallback } = await vi.importActual<typeof import('react')>('react');
+  return {
+    useLocalStorage: (key: string, defaultValue: unknown) => {
+      const [value, setValue] = useState(() =>
+        mockStoredValues.has(key) ? mockStoredValues.get(key) : defaultValue,
+      );
+      const persist = useCallback(
+        (next: unknown) => {
+          setValue((prev: unknown) => {
+            const resolved =
+              typeof next === 'function' ? (next as (p: unknown) => unknown)(prev) : next;
+            mockStoredValues.set(key, resolved);
+            return resolved;
+          });
+        },
+        [key],
+      );
+      if (key === 'monize-reports-portfolio-value-series-mode') {
+        return [mockSeriesMode, vi.fn()];
+      }
+      return [value, persist];
+    },
+  };
+});
 
 vi.mock('@/lib/utils', async (importActual) => ({
   ...(await importActual<typeof import('@/lib/utils')>()),
@@ -178,6 +198,7 @@ describe('PortfolioValueReport', () => {
     vi.clearAllMocks();
     mockDateRangeValue = '2y';
     mockSeriesMode = 'total';
+    mockStoredValues.clear();
   });
 
   it('shows loading state initially', () => {
@@ -407,6 +428,65 @@ describe('PortfolioValueReport', () => {
     await act(async () => { fireEvent.click(trigger); });
     await act(async () => {
       fireEvent.click(screen.getByText('TFSA'));
+    });
+  });
+
+  it('persists the account selection so it survives leaving the report', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockGetInvestmentsMonthly.mockResolvedValue([{ month: '2024-06-01', value: 50000 }]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA - Cash', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    render(<PortfolioValueReport />);
+    const trigger = await screen.findByRole('button', { name: 'Filter by account' });
+    await act(async () => { fireEvent.click(trigger); });
+    await act(async () => { fireEvent.click(screen.getByText('TFSA')); });
+    // The picker debounces before notifying the report.
+    await act(async () => { vi.advanceTimersByTime(350); });
+
+    await waitFor(() => {
+      expect(mockStoredValues.get('monize-reports-portfolio-value-accounts')).toEqual(['acc-1']);
+    });
+    vi.useRealTimers();
+  });
+
+  it('restores the persisted account selection on mount', async () => {
+    mockStoredValues.set('monize-reports-portfolio-value-accounts', ['acc-2']);
+    mockGetInvestmentsMonthly.mockResolvedValue([{ month: '2024-06-01', value: 50000 }]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+      { id: 'acc-2', name: 'RRSP', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    render(<PortfolioValueReport />);
+
+    await waitFor(() => {
+      expect(mockGetInvestmentsMonthly).toHaveBeenCalledWith(
+        expect.objectContaining({ accountIds: 'acc-2' }),
+      );
+    });
+    expect(mockGetPortfolioSummary).toHaveBeenCalledWith(['acc-2']);
+    // The stored selection is left alone when the account still exists.
+    expect(mockStoredValues.get('monize-reports-portfolio-value-accounts')).toEqual(['acc-2']);
+  });
+
+  it('drops persisted account IDs that no longer exist', async () => {
+    mockStoredValues.set('monize-reports-portfolio-value-accounts', ['acc-1', 'gone']);
+    mockGetInvestmentsMonthly.mockResolvedValue([{ month: '2024-06-01', value: 50000 }]);
+    mockGetPortfolioSummary.mockResolvedValue(emptyPortfolio);
+    mockGetInvestmentAccounts.mockResolvedValue([
+      { id: 'acc-1', name: 'TFSA', currencyCode: 'CAD', accountSubType: 'INVESTMENT_CASH' },
+    ]);
+    render(<PortfolioValueReport />);
+
+    await waitFor(() => {
+      expect(mockStoredValues.get('monize-reports-portfolio-value-accounts')).toEqual(['acc-1']);
+    });
+    await waitFor(() => {
+      expect(mockGetInvestmentsMonthly).toHaveBeenCalledWith(
+        expect.objectContaining({ accountIds: 'acc-1' }),
+      );
     });
   });
 

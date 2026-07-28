@@ -62,6 +62,7 @@ const logger = createLogger('PortfolioValueReport');
 
 const DAILY_RANGES = new Set(['1w', '1m', '3m', 'ytd', '1y']);
 const RANGE_STORAGE_KEY = 'monize-reports-portfolio-value-range';
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-portfolio-value-accounts';
 
 function CustomTooltip({ active, payload, fmtFull, portfolioLabel }: {
   active?: boolean;
@@ -123,7 +124,12 @@ export function PortfolioValueReport() {
   const [chartPoints, setChartPoints] = useState<Array<{ name: string; Value: number }>>([]);
   const [portfolio, setPortfolio] = useState<PortfolioSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  // Account filter is persisted so the report opens on the same set of accounts
+  // the user last looked at, matching the investments page.
+  const [selectedAccountIds, setSelectedAccountIds] = useLocalStorage<string[]>(
+    ACCOUNTS_STORAGE_KEY,
+    [],
+  );
   const [reloadKey, setReloadKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [chartViewType, setChartViewType] = useState<'area' | 'table'>('area');
@@ -140,6 +146,19 @@ export function PortfolioValueReport() {
   const [dismissedHigh, setDismissedHigh] = useState<number | null>(null);
   const [dismissedLow, setDismissedLow] = useState<number | null>(null);
   const isSingleAccount = selectedAccountIds.length === 1;
+  // A persisted ID can outlive the account it points at (deleted, or converted
+  // to a type this report no longer offers). Drop unknown IDs once the account
+  // list arrives so the report can't stay filtered on an account that is gone.
+  // Done during render rather than in an effect (no setState in effects here).
+  const [prunedAgainstAccounts, setPrunedAgainstAccounts] = useState<Account[] | null>(null);
+  if (accounts.length > 0 && accounts !== prunedAgainstAccounts) {
+    setPrunedAgainstAccounts(accounts);
+    const knownIds = new Set(accounts.map((a) => a.id));
+    const kept = selectedAccountIds.filter((id) => knownIds.has(id));
+    if (kept.length !== selectedAccountIds.length) {
+      setSelectedAccountIds(kept);
+    }
+  }
   const { sortField, sortDirection, handleSort } = useSortableTable<PortfolioBreakdownSortField>(
     'reports.portfolio-value.breakdown.sort',
     { field: 'total', direction: 'desc' },
