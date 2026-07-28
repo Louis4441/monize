@@ -58,3 +58,22 @@ export function usePersistedAccountFilter(
 
   return [selectedIds, setStored, pruneAgainst];
 }
+
+/**
+ * Single-account variant for the reports that analyse one account at a time
+ * (loan amortization, debt payoff, overpayment simulator).
+ *
+ * A stored account that is no longer in `accounts` -- deleted, or paid off and
+ * closed -- reads back as no selection, leaving the caller's own fallback (the
+ * first account, or none) to take over. That makes this a pure derivation: no
+ * pruning write, so nothing to keep in step with the account list.
+ */
+export function usePersistedAccountId(
+  storageKey: string,
+  accounts: ReadonlyArray<AccountLike>,
+): [string, (id: string) => void] {
+  const [stored, setStored] = useLocalStorage<string>(storageKey, '');
+  const persistedId = typeof stored === 'string' ? stored : '';
+  const selectedId = accounts.some((a) => a.id === persistedId) ? persistedId : '';
+  return [selectedId, setStored];
+}

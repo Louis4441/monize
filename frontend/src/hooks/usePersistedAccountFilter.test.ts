@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { usePersistedAccountFilter } from './usePersistedAccountFilter';
+import { usePersistedAccountFilter, usePersistedAccountId } from './usePersistedAccountFilter';
 
 const KEY = 'monize-reports-test-accounts';
 
@@ -83,5 +83,52 @@ describe('usePersistedAccountFilter', () => {
       usePersistedAccountFilter(KEY, [{ id: 'acc-1' }]),
     );
     expect(result.current[0]).toEqual([]);
+  });
+});
+
+describe('usePersistedAccountId', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('starts with no selection when nothing is stored', () => {
+    const { result } = renderHook(() => usePersistedAccountId(KEY, [{ id: 'acc-1' }]));
+    expect(result.current[0]).toBe('');
+  });
+
+  it('restores a stored account once the account list loads', () => {
+    window.localStorage.setItem(KEY, JSON.stringify('acc-2'));
+    const { result, rerender } = renderHook(
+      ({ accounts }) => usePersistedAccountId(KEY, accounts),
+      { initialProps: { accounts: [] as Array<{ id: string }> } },
+    );
+    // Nothing to match against while the accounts are still loading.
+    expect(result.current[0]).toBe('');
+
+    rerender({ accounts: [{ id: 'acc-1' }, { id: 'acc-2' }] });
+    expect(result.current[0]).toBe('acc-2');
+  });
+
+  it('persists a new selection', () => {
+    const { result } = renderHook(() =>
+      usePersistedAccountId(KEY, [{ id: 'acc-1' }, { id: 'acc-2' }]),
+    );
+    act(() => {
+      result.current[1]('acc-2');
+    });
+    expect(result.current[0]).toBe('acc-2');
+    expect(window.localStorage.getItem(KEY)).toBe(JSON.stringify('acc-2'));
+  });
+
+  it('reads back as no selection when the stored account is gone', () => {
+    window.localStorage.setItem(KEY, JSON.stringify('gone'));
+    const { result } = renderHook(() => usePersistedAccountId(KEY, [{ id: 'acc-1' }]));
+    expect(result.current[0]).toBe('');
+  });
+
+  it('ignores a stored value that is not a string', () => {
+    window.localStorage.setItem(KEY, JSON.stringify(['acc-1']));
+    const { result } = renderHook(() => usePersistedAccountId(KEY, [{ id: 'acc-1' }]));
+    expect(result.current[0]).toBe('');
   });
 });

@@ -942,4 +942,67 @@ describe('DebtPayoffTimelineReport', () => {
     expect(screen.getByText('Home Mortgage')).toBeInTheDocument();
     expect(screen.getByText('My LOC')).toBeInTheDocument();
   });
+
+  it('restores the persisted account selection instead of the first account', async () => {
+    window.localStorage.setItem(
+      'monize-reports-debt-payoff-timeline-account',
+      JSON.stringify('loan-2'),
+    );
+    mockGetAllAccounts.mockResolvedValue([
+      {
+        id: 'loan-1',
+        name: 'Car Loan',
+        accountType: 'LOAN',
+        currentBalance: -10000,
+        openingBalance: -20000,
+        interestRate: 5.0,
+        paymentAmount: 400,
+        paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      },
+      {
+        id: 'loan-2',
+        name: 'Mortgage',
+        accountType: 'MORTGAGE',
+        currentBalance: -10000,
+        openingBalance: -20000,
+        interestRate: 5.0,
+        paymentAmount: 400,
+        paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      },
+    ]);
+    render(<DebtPayoffTimelineReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toHaveValue('loan-2');
+    });
+  });
+
+  it('falls back to the first account when the persisted one is gone', async () => {
+    window.localStorage.setItem(
+      'monize-reports-debt-payoff-timeline-account',
+      JSON.stringify('deleted-loan'),
+    );
+    mockGetAllAccounts.mockResolvedValue([{
+        id: 'loan-1',
+        name: 'Car Loan',
+        accountType: 'LOAN',
+        currentBalance: -10000,
+        openingBalance: -20000,
+        interestRate: 5.0,
+        paymentAmount: 400,
+        paymentFrequency: 'MONTHLY',
+        isCanadianMortgage: false,
+        isVariableRate: false,
+        isClosed: false,
+      }]);
+    render(<DebtPayoffTimelineReport />);
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toHaveValue('loan-1');
+    });
+  });
 });

@@ -9,6 +9,7 @@ import { transactionsApi } from '@/lib/transactions';
 import { exportForeignTransactionsCsv } from '@/lib/fx-fees-csv';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useFormModal } from '@/hooks/useFormModal';
+import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { createLogger } from '@/lib/logger';
 import { Modal } from '@/components/ui/Modal';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
@@ -40,6 +41,8 @@ interface FeeResult {
   currency: string;
 }
 
+const ACCOUNTS_STORAGE_KEY = 'monize-reports-foreign-currency-fees-accounts';
+
 /**
  * Foreign Currency Transaction Fees report: the same chart and transaction
  * table as the account-detail section, but across one or more accounts. The
@@ -56,7 +59,6 @@ export function ForeignCurrencyFeesReport() {
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
-  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [selectedCurrencies, setSelectedCurrencies] = useState<string[]>([]);
   const [feeResults, setFeeResults] = useState<FeeResult[]>([]);
   const [feeLoadedKey, setFeeLoadedKey] = useState<string | null>(null);
@@ -100,6 +102,12 @@ export function ForeignCurrencyFeesReport() {
   }, []);
 
   const eligibleAccounts = useMemo(() => accounts.filter(hasFxFee), [accounts]);
+
+  // Persisted so the report opens on the accounts the user last chose.
+  const [selectedAccountIds, setSelectedAccountIds] = usePersistedAccountFilter(
+    ACCOUNTS_STORAGE_KEY,
+    eligibleAccounts,
+  );
 
   // No selection means "all eligible accounts".
   const effectiveAccountIds = useMemo(
@@ -252,7 +260,7 @@ export function ForeignCurrencyFeesReport() {
     setSelectedAccountIds(values);
     setSelectedCurrencies([]);
     setPage(1);
-  }, []);
+  }, [setSelectedAccountIds]);
 
   const handleCurrencyFilterChange = useCallback((values: string[]) => {
     setSelectedCurrencies(values);

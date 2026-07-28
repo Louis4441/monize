@@ -178,4 +178,32 @@ describe('LoanOverpaymentSimulatorReport', () => {
     expect(screen.getByText('Try again')).toBeInTheDocument();
     expect(screen.queryByTestId('loan-detail-view')).not.toBeInTheDocument();
   });
+
+  it('restores the persisted account selection instead of the first account', async () => {
+    window.localStorage.setItem(
+      'monize-reports-loan-overpayment-simulator-account',
+      JSON.stringify('mtg-1'),
+    );
+    mockGetAll.mockResolvedValue([
+      makeAccount(),
+      makeAccount({ id: 'mtg-1', accountType: 'MORTGAGE', name: 'Mortgage' }),
+    ]);
+
+    await renderReport();
+
+    expect(screen.getByRole('combobox')).toHaveValue('mtg-1');
+    expect(screen.getByTestId('loan-detail-view')).toHaveTextContent('Mortgage');
+  });
+
+  it('falls back to the first account when the persisted one is gone', async () => {
+    window.localStorage.setItem(
+      'monize-reports-loan-overpayment-simulator-account',
+      JSON.stringify('deleted-loan'),
+    );
+    mockGetAll.mockResolvedValue([makeAccount()]);
+
+    await renderReport();
+
+    expect(screen.getByRole('combobox')).toHaveValue('loan-1');
+  });
 });
