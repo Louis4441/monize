@@ -35,7 +35,7 @@
     }
   },
   "security": {
-    "heading": "Papier wartościowy",
+    "heading": "Zabezpieczenia",
     "ssoNotice": "Twoje konto korzysta z logowania jednokrotnego (SSO). Poniższe hasło nie jest używane do logowania, ale można je zachować jako zapasowe na wypadek wyłączenia SSO.",
     "currentPasswordLabel": "Bieżące hasło",
     "currentPasswordPlaceholder": "Wpisz bieżące hasło",
@@ -616,7 +616,7 @@
     "profile": "Profil",
     "preferences": "Preferencje",
     "notifications": "Powiadomienia",
-    "security": "Papier wartościowy",
+    "security": "Zabezpieczenia",
     "sharedAccess": "Dostęp współdzielony",
     "emergencyAccess": "Dostęp awaryjny",
     "apiAccess": "Dostęp do API",
