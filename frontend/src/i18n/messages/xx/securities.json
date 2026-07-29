@@ -223,6 +223,8 @@
     "columns": {
       "date": "[XX-Date-XX]",
       "close": "[XX-Close-XX]",
+      "adjustedClose": "[XX-Adj. close-XX]",
+      "adjustedCloseTitle": "[XX-Split- and dividend-adjusted close (total return). Empty when the price provider does not supply it.-XX]",
       "open": "[XX-Open-XX]",
       "high": "[XX-High-XX]",
       "low": "[XX-Low-XX]",

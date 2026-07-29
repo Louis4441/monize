@@ -68,6 +68,7 @@ const mockPrices = [
     highPrice: 195,
     lowPrice: 189,
     closePrice: 193.5,
+    adjustedClose: 191.2,
     volume: 50000000,
     source: 'yahoo_finance',
     createdAt: '2025-06-01T17:00:00Z',
@@ -80,6 +81,7 @@ const mockPrices = [
     highPrice: null,
     lowPrice: null,
     closePrice: 150.25,
+    adjustedClose: null,
     volume: null,
     source: 'buy',
     createdAt: '2025-05-30T10:00:00Z',
@@ -92,6 +94,7 @@ const mockPrices = [
     highPrice: 148,
     lowPrice: 144,
     closePrice: 147,
+    adjustedClose: null,
     volume: 1000,
     source: 'manual',
     createdAt: '2025-05-29T10:00:00Z',
@@ -224,6 +227,18 @@ describe('SecurityPriceHistory', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('shows the adjusted close, and a dash where the provider gives none', async () => {
+    await renderComponent();
+
+    expect(screen.getByText('Adj. close')).toBeInTheDocument();
+    // The Yahoo row has the total-return close...
+    expect(screen.getByText('191.20')).toBeInTheDocument();
+    // ...and a dash on the rows without one is the only way to notice that a
+    // provider (MSN) supplies no total-return series at all.
+    const manualRow = screen.getByText('147.00').closest('tr')!;
+    expect(manualRow.textContent).toContain('-');
   });
 
   it('renders edit and delete buttons for each row', async () => {

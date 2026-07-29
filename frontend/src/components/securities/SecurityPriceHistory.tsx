@@ -395,6 +395,16 @@ export function SecurityPriceHistory({
               <tr>
                 <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.date')}</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.close')}</th>
+                {/* The total-return close. Shown so it is visible whether the
+                    provider supplies it at all -- MSN does not, and a column of
+                    dashes here is the only way to notice before a return
+                    calculation quietly uses price instead. */}
+                <th
+                  className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell"
+                  title={t('priceHistory.columns.adjustedCloseTitle')}
+                >
+                  {t('priceHistory.columns.adjustedClose')}
+                </th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.open')}</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.high')}</th>
                 <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.low')}</th>
@@ -416,6 +426,9 @@ export function SecurityPriceHistory({
                   </td>
                   <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100 text-right">
                     {formatPrice(price.closePrice)}
+                  </td>
+                  <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden lg:table-cell">
+                    {formatPrice(price.adjustedClose)}
                   </td>
                   <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
                     {formatPrice(price.openPrice)}
