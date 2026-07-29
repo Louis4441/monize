@@ -1268,6 +1268,39 @@ describe('TransactionList', () => {
       });
     });
 
+    it('preserves list-only enrichment fields when cycling status', async () => {
+      const { transactionsApi } = await import('@/lib/transactions');
+      const mockOnTransactionUpdate = vi.fn();
+      const tx = createTransaction({
+        status: TransactionStatus.UNRECONCILED,
+        attachmentCount: 3,
+        linkedInvestmentTransactionId: 'inv-1',
+      });
+      // The status endpoint returns the plain transaction, without the
+      // attachment count / investment link the list query adds.
+      const updatedTx = createTransaction({ status: TransactionStatus.CLEARED });
+      vi.mocked(transactionsApi.updateStatus).mockResolvedValueOnce(updatedTx);
+
+      render(
+        <TransactionList
+          transactions={[tx]}
+          onEdit={mockOnEdit}
+          onRefresh={mockOnRefresh}
+          onTransactionUpdate={mockOnTransactionUpdate}
+        />
+      );
+
+      fireEvent.click(screen.getByTitle('Click to cycle status'));
+
+      await waitFor(() => {
+        expect(mockOnTransactionUpdate).toHaveBeenCalledWith({
+          ...updatedTx,
+          attachmentCount: 3,
+          linkedInvestmentTransactionId: 'inv-1',
+        });
+      });
+    });
+
     it('calls onRefresh when onTransactionUpdate is not provided', async () => {
       const { transactionsApi } = await import('@/lib/transactions');
       const tx = createTransaction({ status: TransactionStatus.UNRECONCILED });

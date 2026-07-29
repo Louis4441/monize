@@ -208,6 +208,7 @@ vi.mock('@/components/transactions/TransactionList', () => ({
       {props.transactions?.map((t: any) => (
         <div key={t.id} data-testid={`tx-${t.id}`} onClick={() => props.onEdit(t)}>
           {t.payee?.name || 'No payee'}
+          <span data-testid={`tx-${t.id}-attachments`}>{t.attachmentCount ?? 'none'}</span>
         </div>
       ))}
       {props.onPayeeClick && <button data-testid="payee-click-btn" onClick={() => props.onPayeeClick('payee-1')}>Payee</button>}
@@ -1513,6 +1514,28 @@ describe('TransactionsPage', () => {
       });
       expect(mockGetAllCategories.mock.calls.length).toBe(categoryCallsBefore);
       expect(mockGetAllPayees.mock.calls.length).toBe(payeeCallsBefore);
+    });
+
+    it('keeps the attachment count when the update payload omits it', async () => {
+      mockGetAll.mockResolvedValue({
+        data: [{ ...mockTransactions[0], attachmentCount: 2 }, ...mockTransactions.slice(1)],
+        pagination: { page: 1, totalPages: 1, total: 3 },
+      });
+      mockGetSummary.mockResolvedValue({ totalIncome: 0, totalExpenses: 0, netCashFlow: 0, transactionCount: 0 });
+
+      render(<TransactionsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('tx-tx-1-attachments')).toHaveTextContent('2');
+      });
+
+      // The inline update payload (a status change) carries no attachmentCount;
+      // the row must keep the count it already had.
+      fireEvent.click(screen.getByTestId('inline-update-btn'));
+
+      // Asserted synchronously: a later refetch would restore the count and
+      // hide the regression this test guards against.
+      expect(screen.getByTestId('tx-tx-1-attachments')).toHaveTextContent('2');
     });
   });
 
