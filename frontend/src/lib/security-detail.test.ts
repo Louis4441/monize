@@ -11,6 +11,7 @@ import {
   buildChartSeries,
   periodStartDate,
   computePeriodReturn,
+  computePositionReturn,
   filterPriceWindow,
 } from './security-detail';
 import type {
@@ -491,5 +492,102 @@ describe('defaultOpenPriceGroups', () => {
 
   it('opens nothing when there is nothing', () => {
     expect(defaultOpenPriceGroups([])).toEqual([]);
+  });
+});
+
+describe('computePositionReturn', () => {
+  /** A held position that cost 10,000 and is now worth 13,000. */
+  const base = {
+    totalInvested: 10000,
+    marketValue: 13000,
+    costBasis: 10000,
+    dividends: 200,
+    fees: 50,
+    realizedGain: null as number | null,
+    realizedGainCurrency: null as string | null,
+    realizedSaleCount: 0,
+    securityCurrency: 'EUR',
+    isPositionClosed: false,
+  };
+
+  it('adds realized gains and income to the unrealized gain', () => {
+    expect(
+      computePositionReturn({
+        ...base,
+        realizedGain: 500,
+        realizedGainCurrency: 'EUR',
+        realizedSaleCount: 1,
+      }),
+    ).toEqual({ profit: 3650, percent: 36.5 });
+  });
+
+  it('treats a security never sold as having realized nothing', () => {
+    expect(computePositionReturn(base)).toEqual({ profit: 3150, percent: 31.5 });
+  });
+
+  it('subtracts commission, which is a cost of the position', () => {
+    expect(computePositionReturn({ ...base, fees: 1050 })?.profit).toBe(2150);
+  });
+
+  it('needs no market value once the position is closed', () => {
+    // Nothing is held, so there is no unrealized component to be missing.
+    expect(
+      computePositionReturn({
+        ...base,
+        isPositionClosed: true,
+        marketValue: null,
+        costBasis: null,
+        realizedGain: 900,
+        realizedGainCurrency: 'EUR',
+        realizedSaleCount: 1,
+      }),
+    ).toEqual({ profit: 1050, percent: 10.5 });
+  });
+
+  describe('refusals', () => {
+    it('states nothing without capital to measure against', () => {
+      expect(computePositionReturn({ ...base, totalInvested: 0 })).toBeNull();
+    });
+
+    it('states nothing when the held part cannot be priced', () => {
+      // A partial total reads as a complete one, which is the whole reason this
+      // returns null rather than leaving the unpriced part out at zero.
+      expect(
+        computePositionReturn({ ...base, marketValue: null }),
+      ).toBeNull();
+      expect(computePositionReturn({ ...base, costBasis: null })).toBeNull();
+    });
+
+    it('refuses to add a realized gain from another currency', () => {
+      expect(
+        computePositionReturn({
+          ...base,
+          realizedGain: 500,
+          realizedGainCurrency: 'PLN',
+          realizedSaleCount: 1,
+        }),
+      ).toBeNull();
+    });
+
+    it('refuses when sales spanned currencies and were not added up', () => {
+      expect(
+        computePositionReturn({
+          ...base,
+          realizedGain: null,
+          realizedGainCurrency: null,
+          realizedSaleCount: 2,
+        }),
+      ).toBeNull();
+    });
+  });
+
+  it('reports a loss with its sign intact', () => {
+    const loss = computePositionReturn({
+      ...base,
+      marketValue: 8000,
+      dividends: 0,
+      fees: 0,
+    });
+    expect(loss).toEqual({ profit: -2000, percent: -20 });
   });
 });

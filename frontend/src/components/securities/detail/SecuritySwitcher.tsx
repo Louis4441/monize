@@ -75,7 +75,11 @@ export function SecuritySwitcher({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setIsOpen((open) => !open)}
+        // Closing goes through `close()` so the filter is cleared with it.
+        // Toggling `isOpen` alone left the query behind, and reopening then
+        // showed the previous search instead of the list -- which reads as most
+        // of the securities having disappeared.
+        onClick={() => (isOpen ? close() : setIsOpen(true))}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-label={t('header.switchSecurity')}
