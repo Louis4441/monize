@@ -134,8 +134,46 @@ interface BalanceHistoryChartProps {
 
 interface ChartPoint {
   date: string;
+  /**
+   * The same day as a millisecond timestamp. The x axis is a time scale, so it
+   * needs a number: on a category axis recharts spaces points evenly by index,
+   * which puts a year of daily closes and a year of monthly ones side by side at
+   * the same width and bunches the older year labels together.
+   */
+  t: number;
   label: string;
   balance: number;
+}
+
+/**
+ * Evenly spaced tick positions across `[from, to]`, at the start of each year or
+ * each month.
+ *
+ * Computed from the calendar rather than from the data, which is the whole point:
+ * a tick per "first point of a new year" lands wherever that year's history
+ * happens to begin, so the gaps between labels vary with how densely each period
+ * was recorded. Boundaries are regular by construction.
+ */
+function calendarTicks(from: number, to: number, unit: 'year' | 'month'): number[] {
+  const start = new Date(from);
+  const ticks: number[] = [];
+  const cursor =
+    unit === 'year'
+      ? new Date(start.getFullYear(), 0, 1)
+      : new Date(start.getFullYear(), start.getMonth(), 1);
+  // The first boundary may precede the data; step forward until inside.
+  while (cursor.getTime() < from) {
+    if (unit === 'year') cursor.setFullYear(cursor.getFullYear() + 1);
+    else cursor.setMonth(cursor.getMonth() + 1);
+  }
+  while (cursor.getTime() <= to) {
+    ticks.push(cursor.getTime());
+    if (unit === 'year') cursor.setFullYear(cursor.getFullYear() + 1);
+    else cursor.setMonth(cursor.getMonth() + 1);
+  }
+  // A span too short to cross a boundary would leave the axis bare; its own ends
+  // are the only honest labels left.
+  return ticks.length > 0 ? ticks : [from, to];
 }
 
 function BalanceTooltip({
@@ -287,40 +325,28 @@ export function BalanceHistoryChart({
     if (data.length === 0) {
       return {
         chartData: [] as ChartPoint[],
-        axisTicks: [] as string[],
+        axisTicks: [] as number[],
         axisPattern: 'MMM' as ChartDatePattern,
       };
     }
 
     const points = data.map((d) => ({
       date: d.date,
+      t: parseLocalDate(d.date).getTime(),
       label: formatChartDate(parseLocalDate(d.date), 'MMM d, yyyy'),
       // Money rounds to cents; a price keeps what it was quoted at.
       balance: precise ? d.balance : Math.round(d.balance * 100) / 100,
     }));
 
     // A month tick per month reads well over ~2 years or less; beyond that the
-    // axis is crowded and yearless, so switch to one tick per year. Dates are
-    // ISO `yyyy-MM-dd`, so year/month keys come from a plain string slice.
-    const spanDays =
-      (parseLocalDate(points[points.length - 1].date).getTime() -
-        parseLocalDate(points[0].date).getTime()) /
-      86_400_000;
-    const useYearTicks = spanDays > 730;
-
-    const ticks: string[] = [];
-    let lastKey = '';
-    for (const p of points) {
-      const key = useYearTicks ? p.date.slice(0, 4) : p.date.slice(0, 7);
-      if (key !== lastKey) {
-        ticks.push(p.date);
-        lastKey = key;
-      }
-    }
+    // axis is crowded and yearless, so switch to one tick per year.
+    const first = points[0].t;
+    const last = points[points.length - 1].t;
+    const useYearTicks = (last - first) / 86_400_000 > 730;
 
     return {
       chartData: points,
-      axisTicks: ticks,
+      axisTicks: calendarTicks(first, last, useYearTicks ? 'year' : 'month'),
       axisPattern: (useYearTicks ? 'yyyy' : 'MMM') as ChartDatePattern,
     };
   }, [data, formatChartDate, precise]);
@@ -387,10 +413,12 @@ export function BalanceHistoryChart({
     if (chartData.length === 0) return null;
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    let anchor: string | null = null;
+    let anchor: number | null = null;
     let hasFuture = false;
     for (const point of chartData) {
-      if (point.date <= todayStr) anchor = point.date;
+      // `x` is a position on the time axis now, so the divider carries the
+      // anchor's timestamp rather than its ISO date.
+      if (point.date <= todayStr) anchor = point.t;
       else hasFuture = true;
     }
     return hasFuture ? anchor : null;
@@ -487,13 +515,21 @@ export function BalanceHistoryChart({
             </defs>
             <ChartFlagShadowFilter />
             <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+            {/* A time scale, not a category axis: distance along it is elapsed
+                time, so ten years of monthly closes cannot occupy the same width
+                as ten years of daily ones. */}
             <XAxis
-              dataKey="date"
+              dataKey="t"
+              type="number"
+              scale="time"
+              domain={['dataMin', 'dataMax']}
               ticks={axisTicks}
               tick={{ fill: chartColors.axis, fontSize: 12 }}
               tickLine={false}
               axisLine={{ stroke: chartColors.grid }}
-              tickFormatter={(value: string) => formatChartDate(value, axisPattern)}
+              tickFormatter={(value: number) =>
+                formatChartDate(new Date(value), axisPattern)
+              }
             />
             {/* width="auto" lets recharts size the axis to its widest tick
                 label so long localized currency values (e.g. "1.234.567 €")
@@ -551,7 +587,7 @@ export function BalanceHistoryChart({
             {pinnedMarkers.map(({ marker, point }, i) => (
               <ReferenceDot
                 key={`${point.date}-${i}`}
-                x={point.date}
+                x={point.t}
                 y={point.balance}
                 r={4}
                 fill={

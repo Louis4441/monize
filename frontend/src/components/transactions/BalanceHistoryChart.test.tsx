@@ -2,6 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@/test/render';
 import { BalanceHistoryChart } from './BalanceHistoryChart';
 import { computeBalanceGradient } from '@/lib/balance-history';
+import { parseLocalDate } from '@/lib/utils';
+
+/**
+ * A day as the x coordinate the chart uses. The axis is a time scale, so a
+ * reference dot is positioned by timestamp rather than by ISO date; the tests
+ * still name the day they mean.
+ */
+const at = (isoDate: string) => String(parseLocalDate(isoDate).getTime());
 
 // The Area mock invokes the `dot` render-prop so the high/low value bubbles
 // are exercised by the data-driven tests below; their output is exposed via
@@ -19,7 +27,19 @@ vi.mock('recharts', () => ({
       )}
     </div>
   ),
-  XAxis: () => <div data-testid="x-axis" />,
+  // Exposes the axis configuration, so the tests can assert that distance along
+  // it is elapsed time rather than a point index.
+  XAxis: ({ type, scale, ticks, tickFormatter }: any) => (
+    <div
+      data-testid="x-axis"
+      data-type={type}
+      data-scale={scale}
+      data-ticks={(ticks ?? []).join(',')}
+      data-labels={(ticks ?? [])
+        .map((tick: number) => tickFormatter?.(tick))
+        .join(',')}
+    />
+  ),
   YAxis: () => <div data-testid="y-axis" />,
   CartesianGrid: () => <div data-testid="cartesian-grid" />,
   // Render the tooltip's content with a hovered point, so the marker lines
@@ -218,7 +238,7 @@ describe('BalanceHistoryChart', () => {
       // A price is continuous, so the last quote before the trade is near enough.
       expect(screen.getByTestId('reference-dot')).toHaveAttribute(
         'data-x',
-        '2026-01-01',
+        at('2026-01-01'),
       );
     });
 
@@ -235,7 +255,7 @@ describe('BalanceHistoryChart', () => {
       // it landed on the day the position was still zero, drawing the dot flat
       // on the axis where it read as missing entirely.
       const dot = screen.getByTestId('reference-dot');
-      expect(dot).toHaveAttribute('data-x', '2026-06-01');
+      expect(dot).toHaveAttribute('data-x', at('2026-06-01'));
       expect(dot).toHaveAttribute('data-y', '1200');
     });
 
@@ -618,7 +638,7 @@ describe('computeBalanceGradient', () => {
 
       const dots = screen.getAllByTestId('reference-dot');
       expect(dots).toHaveLength(2);
-      expect(dots[0]).toHaveAttribute('data-x', '2026-01-02');
+      expect(dots[0]).toHaveAttribute('data-x', at('2026-01-02'));
       expect(dots[0]).toHaveAttribute('data-y', '120');
       expect(dots[0].getAttribute('data-fill')).not.toBe(
         dots[1].getAttribute('data-fill'),
@@ -634,7 +654,7 @@ describe('computeBalanceGradient', () => {
           markers={[{ date: '2026-01-02T12:00:00Z'.slice(0, 10), direction: 'in', label: 'Bought 1' }]}
         />,
       );
-      expect(screen.getByTestId('reference-dot')).toHaveAttribute('data-x', '2026-01-02');
+      expect(screen.getByTestId('reference-dot')).toHaveAttribute('data-x', at('2026-01-02'));
 
       cleanup();
       render(
@@ -706,5 +726,85 @@ describe('computeBalanceGradient', () => {
       );
       expect(mockFormatCurrency).toHaveBeenCalled();
     });
+  });
+});
+
+describe('BalanceHistoryChart x axis', () => {
+  /** A dense recent stretch after a sparse older one -- the shape that exposed
+   *  the bug: yearly points to 2024, then daily ones. */
+  const unevenHistory = [
+    ...['2021-03-01', '2022-03-01', '2023-03-01', '2024-03-01'].map((date) => ({
+      date,
+      balance: 100,
+    })),
+    ...Array.from({ length: 120 }, (_, i) => ({
+      date: `2026-0${1 + Math.floor(i / 40)}-${String((i % 28) + 1).padStart(2, '0')}`,
+      balance: 150,
+    })),
+  ];
+
+  it('measures distance along the axis in time, not in data points', () => {
+    // On a category axis recharts spaces every point equally, so 120 daily
+    // closes in 2026 took thirty times the width of the four years before them
+    // and squeezed those year labels into the left edge.
+    render(<BalanceHistoryChart data={unevenHistory} isLoading={false} />);
+    const axis = screen.getByTestId('x-axis');
+    expect(axis).toHaveAttribute('data-type', 'number');
+    expect(axis).toHaveAttribute('data-scale', 'time');
+  });
+
+  it('puts the year ticks on January 1st, at equal intervals', () => {
+    render(<BalanceHistoryChart data={unevenHistory} isLoading={false} />);
+    const ticks = screen
+      .getByTestId('x-axis')
+      .getAttribute('data-ticks')!
+      .split(',')
+      .map(Number);
+
+    // Every tick is the start of a year...
+    for (const tick of ticks) {
+      const date = new Date(tick);
+      expect(date.getMonth()).toBe(0);
+      expect(date.getDate()).toBe(1);
+    }
+    // ...and consecutive years, so the spacing is a calendar year throughout
+    // rather than "wherever that year's data happens to begin".
+    const years = ticks.map((tick) => new Date(tick).getFullYear());
+    expect(years).toEqual([2022, 2023, 2024, 2025, 2026]);
+  });
+
+  it('labels a span of two years or less by month', () => {
+    render(
+      <BalanceHistoryChart
+        data={[
+          { date: '2026-01-15', balance: 10 },
+          { date: '2026-04-20', balance: 20 },
+        ]}
+        isLoading={false}
+      />,
+    );
+    const ticks = screen
+      .getByTestId('x-axis')
+      .getAttribute('data-ticks')!
+      .split(',')
+      .map(Number);
+    expect(ticks.map((tick) => new Date(tick).getMonth())).toEqual([1, 2, 3]);
+  });
+
+  it('falls back to the span ends when no boundary is crossed', () => {
+    // A week of data crosses no month start; a bare axis would be worse than
+    // labelling what it does cover.
+    render(
+      <BalanceHistoryChart
+        data={[
+          { date: '2026-03-10', balance: 10 },
+          { date: '2026-03-14', balance: 20 },
+        ]}
+        isLoading={false}
+      />,
+    );
+    expect(
+      screen.getByTestId('x-axis').getAttribute('data-ticks')!.split(','),
+    ).toHaveLength(2);
   });
 });
