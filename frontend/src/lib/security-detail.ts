@@ -357,6 +357,52 @@ export function computePositionReturn(
   };
 }
 
+/** A closed date window, in ISO `yyyy-MM-dd`. */
+export interface DateWindow {
+  start: string;
+  end: string;
+}
+
+/** Whole days a window covers; at least one, so it can always be stepped. */
+function windowDays(range: DateWindow): number {
+  const start = new Date(`${range.start}T00:00:00`).getTime();
+  const end = new Date(`${range.end}T00:00:00`).getTime();
+  return Math.max(1, Math.round((end - start) / 86_400_000));
+}
+
+/**
+ * The same window moved `spansBack` of its own lengths into the past.
+ *
+ * A range preset picks how much history to show; this picks *which* stretch of
+ * it. Selecting 1Y and then stepping back twice shows the year before last at
+ * the same zoom, rather than forcing a jump to 5Y and squinting. Steps are one
+ * full window, so consecutive views share only their boundary day and the line
+ * reads continuously across a step.
+ */
+export function shiftWindow(range: DateWindow, spansBack: number): DateWindow {
+  if (spansBack <= 0 || !range.start || !range.end) return range;
+  const days = windowDays(range) * spansBack;
+  const shift = (iso: string): string =>
+    format(subDays(new Date(`${iso}T00:00:00`), days), 'yyyy-MM-dd');
+  return { start: shift(range.start), end: shift(range.end) };
+}
+
+/**
+ * How many steps back there is still data for, given the oldest date on record.
+ *
+ * Zero when the window already reaches the beginning: the control that steps
+ * back has to be able to say when there is nothing left to step to, or it
+ * scrolls off into empty charts.
+ */
+export function maxSpansBack(range: DateWindow, earliest: string): number {
+  if (!range.start || !range.end || !earliest) return 0;
+  const start = new Date(`${range.start}T00:00:00`).getTime();
+  const oldest = new Date(`${earliest}T00:00:00`).getTime();
+  if (oldest >= start) return 0;
+  const gapDays = (start - oldest) / 86_400_000;
+  return Math.ceil(gapDays / windowDays(range));
+}
+
 /** Prices within `[start, end]`; an empty `start` means "from the beginning". */
 export function filterPriceWindow(
   series: readonly SecurityPricePoint[],
@@ -366,6 +412,65 @@ export function filterPriceWindow(
   return series.filter(
     (point) => (!start || point.date >= start) && (!end || point.date <= end),
   );
+}
+
+/**
+ * A formatted amount with its currency code appended, when the security is not
+ * quoted in the user's own currency.
+ *
+ * Every figure on the detail page is in the security's currency and none of them
+ * is converted, so a reader whose default is CAD needs to be told that "$1,300"
+ * is not their $1,300. Symbols do not carry that: `$` is four currencies and `kr`
+ * is three. Matches how the Investments page marks a foreign holding, so the two
+ * screens read the same way.
+ */
+export function withCurrencyCode(
+  formatted: string,
+  currencyCode: string,
+  defaultCurrency: string,
+): string {
+  return currencyCode && currencyCode !== defaultCurrency
+    ? `${formatted} ${currencyCode}`
+    : formatted;
+}
+
+/** Most decimal places a price column will show, matching NUMERIC(24,10). */
+export const MAX_PRICE_DECIMALS = 10;
+
+/** Fewest, so a whole-number price still reads as money. */
+const MIN_PRICE_DECIMALS = 2;
+
+/** Decimal places a single number is written with, or null if not readable. */
+function decimalPlacesOf(value: number): number | null {
+  if (!isFinite(value)) return null;
+  const text = Math.abs(value).toString();
+  // Exponent form (a very small price): the digits are there but not countable
+  // this way, so let the caller fall back to the maximum.
+  if (text.includes('e')) return null;
+  const dot = text.indexOf('.');
+  return dot === -1 ? 0 : text.length - dot - 1;
+}
+
+/**
+ * One decimal count for a whole price table, so the column does not jag.
+ *
+ * Providers hand back both `93.239998` and `93.18` in the same series -- the
+ * first is a float artefact of a value that was really 93.24 -- and formatting
+ * each to its own precision put two and six decimals side by side in one column
+ * of figures that should be scannable at a glance. The widest count any value
+ * needs is the one they all use, so every row lines up.
+ */
+export function priceDecimals(values: readonly (number | null)[]): number {
+  let widest = MIN_PRICE_DECIMALS;
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const places = decimalPlacesOf(value);
+    // Unreadable means "at least as precise as anything we can count", so it
+    // takes the column straight to the maximum.
+    if (places === null) return MAX_PRICE_DECIMALS;
+    if (places > widest) widest = places;
+  }
+  return Math.min(widest, MAX_PRICE_DECIMALS);
 }
 
 /** A month's worth of price rows, newest month first within its year. */

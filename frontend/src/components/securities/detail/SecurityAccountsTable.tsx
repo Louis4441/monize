@@ -4,6 +4,7 @@ import { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { gainLossColor } from '@/lib/format';
+import { withCurrencyCode } from '@/lib/security-detail';
 import type { SecurityDetail } from '@/types/investment';
 
 interface SecurityAccountsTableProps {
@@ -33,6 +34,7 @@ export function SecurityAccountsTable({ detail }: SecurityAccountsTableProps) {
     formatCurrencyPrecise,
     formatQuantity,
     formatSignedPercent,
+    defaultCurrency,
   } = useNumberFormat();
   const { accounts, position, security } = detail;
   const currency = security.currencyCode;
@@ -45,9 +47,19 @@ export function SecurityAccountsTable({ detail }: SecurityAccountsTableProps) {
     </span>
   );
 
-  /** Money in the security's currency, or the unknown marker. */
+  /**
+   * Money in the security's currency, or the unknown marker. Carries the code
+   * when that is not the reader's own currency: nothing on this page is
+   * converted, and a symbol alone does not say which dollar it is.
+   */
   const money = (amount: number | null): ReactNode =>
-    amount === null ? unknown : formatCurrency(amount, currency);
+    amount === null
+      ? unknown
+      : withCurrencyCode(
+          formatCurrency(amount, currency),
+          currency,
+          defaultCurrency,
+        );
 
   /** A signed gain with its percentage under it, coloured and signed. */
   const gain = (amount: number | null, percent: number | null): ReactNode => {
@@ -55,7 +67,11 @@ export function SecurityAccountsTable({ detail }: SecurityAccountsTableProps) {
     return (
       <span className={gainLossColor(amount)}>
         {amount >= 0 ? '+' : ''}
-        {formatCurrency(amount, currency)}
+        {withCurrencyCode(
+          formatCurrency(amount, currency),
+          currency,
+          defaultCurrency,
+        )}
         {percent !== null && (
           <div className="text-xs font-normal">
             {formatSignedPercent(percent)}

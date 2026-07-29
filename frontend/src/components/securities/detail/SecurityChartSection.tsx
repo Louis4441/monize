@@ -1,7 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import {
@@ -14,6 +18,8 @@ import {
   CHART_RANGES,
   buildChartSeries,
   filterPriceWindow,
+  maxSpansBack,
+  shiftWindow,
   type SecurityChartMode,
   type SecurityPricePoint,
   type QuantityStep,
@@ -79,14 +85,43 @@ export function SecurityChartSection({
     storageKey: `securityDetail:range:${security.id}`,
   });
 
+  // How many windows back from the latest one is on screen. The range preset
+  // picks how much history to show; this picks which stretch of it, so a reader
+  // on 1Y can walk back year by year at the same zoom instead of switching to 5Y
+  // and squinting at a compressed line.
+  const [spansBack, setSpansBack] = useState(0);
+  // Information from the previous render: changing the preset changes what a
+  // step even means, so the walk starts again from the latest window.
+  const [lastPreset, setLastPreset] = useState(dateRange);
+  if (dateRange !== lastPreset) {
+    setLastPreset(dateRange);
+    setSpansBack(0);
+  }
+
+  // "All" already shows everything and has no start date to move.
+  const isPannable = dateRange !== 'all' && !!resolvedRange.start;
+  const oldestDate = prices[0]?.date ?? '';
+
+  const window = useMemo(() => {
+    const latest = { start: resolvedRange.start, end: resolvedRange.end };
+    return isPannable ? shiftWindow(latest, spansBack) : latest;
+  }, [resolvedRange.start, resolvedRange.end, isPannable, spansBack]);
+
+  const stepsAvailable = useMemo(
+    () =>
+      isPannable
+        ? maxSpansBack(
+            { start: resolvedRange.start, end: resolvedRange.end },
+            oldestDate,
+          )
+        : 0,
+    [isPannable, resolvedRange.start, resolvedRange.end, oldestDate],
+  );
+
   const series = useMemo(() => {
-    const window = filterPriceWindow(
-      prices,
-      resolvedRange.start,
-      resolvedRange.end,
-    );
-    return buildChartSeries(window, quantitySteps, mode);
-  }, [prices, quantitySteps, resolvedRange.start, resolvedRange.end, mode]);
+    const points = filterPriceWindow(prices, window.start, window.end);
+    return buildChartSeries(points, quantitySteps, mode);
+  }, [prices, quantitySteps, window.start, window.end, mode]);
 
   const markers = useMemo<ChartMarker[]>(
     () =>
@@ -140,12 +175,40 @@ export function SecurityChartSection({
             </button>
           ))}
         </div>
-        <DateRangeSelector
-          ranges={CHART_RANGES}
-          value={dateRange}
-          onChange={setDateRange}
-          size="sm"
-        />
+        <div className="flex items-center gap-2">
+          {/* Walk the window through history without changing its length. Hidden
+              for "All", which already shows everything. */}
+          {isPannable && stepsAvailable > 0 && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setSpansBack((back) => Math.min(back + 1, stepsAvailable))}
+                disabled={spansBack >= stepsAvailable}
+                aria-label={t('chart.panEarlier')}
+                title={t('chart.panEarlier')}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700"
+              >
+                <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpansBack((back) => Math.max(back - 1, 0))}
+                disabled={spansBack === 0}
+                aria-label={t('chart.panLater')}
+                title={t('chart.panLater')}
+                className="rounded p-1 text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700"
+              >
+                <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          )}
+          <DateRangeSelector
+            ranges={CHART_RANGES}
+            value={dateRange}
+            onChange={setDateRange}
+            size="sm"
+          />
+        </div>
       </div>
 
       {/* The chart brings its own card chrome, loading skeleton and no-data

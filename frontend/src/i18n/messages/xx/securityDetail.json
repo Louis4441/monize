@@ -55,7 +55,9 @@
       "latest": "[XX-Latest-XX]",
       "ending": "[XX-Ending-XX]",
       "lowest": "[XX-Lowest-XX]"
-    }
+    },
+    "panEarlier": "[XX-Show the previous stretch of history-XX]",
+    "panLater": "[XX-Show the next stretch of history-XX]"
   },
   "keyInfo": {
     "title": "[XX-Key information-XX]",

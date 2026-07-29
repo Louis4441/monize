@@ -22,6 +22,7 @@ import {
   groupPricesByPeriod,
   allPriceGroupKeys,
   defaultOpenPriceGroups,
+  priceDecimals,
 } from '@/lib/security-detail';
 import { SecurityPriceForm } from './SecurityPriceForm';
 import {
@@ -72,11 +73,16 @@ function getSourceColor(source: string | null): string {
   }
 }
 
-function formatPrice(value: number | null): string {
+/**
+ * One price cell, at the column's shared decimal count so the figures line up.
+ * See `priceDecimals`: providers mix `93.239998` and `93.18` in one series, and
+ * formatting each to its own precision leaves the column ragged.
+ */
+function formatPrice(value: number | null, decimals: number): string {
   if (value === null || value === undefined) return '-';
   return Number(value).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   });
 }
 
@@ -282,6 +288,23 @@ export function SecurityPriceHistory({
   }, [security.id, loadPrices, t]);
 
   const isFormOpen = showAddForm || !!editingPrice;
+  // One decimal count across every price column and every row, so the figures
+  // form a column instead of a ragged edge. Taken over the whole series rather
+  // than per visible month: expanding a month must not reformat the rest.
+  const decimals = useMemo(
+    () =>
+      priceDecimals(
+        prices.flatMap((price) => [
+          price.closePrice,
+          price.adjustedClose,
+          price.openPrice,
+          price.highPrice,
+          price.lowPrice,
+        ]),
+      ),
+    [prices],
+  );
+
   const yearGroups = useMemo(() => groupPricesByPeriod(prices), [prices]);
   const allKeys = useMemo(() => allPriceGroupKeys(yearGroups), [yearGroups]);
   const allOpen = allKeys.length > 0 && allKeys.every((k) => openGroups.has(k));
@@ -478,19 +501,19 @@ export function SecurityPriceHistory({
                               {formatDate(price.priceDate)}
                               </td>
                               <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100 text-right">
-                              {formatPrice(price.closePrice)}
+                              {formatPrice(price.closePrice, decimals)}
                               </td>
                               <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden lg:table-cell">
-                              {formatPrice(price.adjustedClose)}
+                              {formatPrice(price.adjustedClose, decimals)}
                               </td>
                               <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
-                              {formatPrice(price.openPrice)}
+                              {formatPrice(price.openPrice, decimals)}
                               </td>
                               <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
-                              {formatPrice(price.highPrice)}
+                              {formatPrice(price.highPrice, decimals)}
                               </td>
                               <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
-                              {formatPrice(price.lowPrice)}
+                              {formatPrice(price.lowPrice, decimals)}
                               </td>
                               <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden md:table-cell">
                               {price.volume !== null ? Number(price.volume).toLocaleString() : '-'}
@@ -540,7 +563,7 @@ export function SecurityPriceHistory({
       <RowActionSheet
         isOpen={!!contextPrice}
         title={contextPrice ? formatDate(contextPrice.priceDate) : ''}
-        subtitle={contextPrice ? formatPrice(contextPrice.closePrice) : undefined}
+        subtitle={contextPrice ? formatPrice(contextPrice.closePrice, decimals) : undefined}
         actions={contextActions}
         onClose={() => setContextPrice(undefined)}
       />

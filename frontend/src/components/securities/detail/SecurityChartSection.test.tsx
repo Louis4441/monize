@@ -201,3 +201,94 @@ describe('SecurityChartSection', () => {
     expect(props().hideExtremeFlags).toBe(true);
   });
 });
+
+describe('SecurityChartSection window panning', () => {
+  /** Three years of monthly closes, so a 1Y window has somewhere to walk to. */
+  const threeYears: SecurityPricePoint[] = Array.from({ length: 36 }, (_, i) => {
+    const year = 2024 + Math.floor(i / 12);
+    const month = String((i % 12) + 1).padStart(2, '0');
+    return { date: `${year}-${month}-01`, close: 100 + i };
+  });
+
+  function renderPannable() {
+    render(
+      <SecurityChartSection
+        security={security()}
+        prices={threeYears}
+        quantitySteps={[]}
+        trades={[]}
+        isLoading={false}
+        mode="price"
+        onModeChange={vi.fn()}
+      />,
+    );
+    return () => chartProps.mock.calls.at(-1)![0];
+  }
+
+  const earlier = () =>
+    screen.getByRole('button', { name: 'Show the previous stretch of history' });
+  const later = () =>
+    screen.getByRole('button', { name: 'Show the next stretch of history' });
+
+  it('offers a walk back through history at the chosen zoom', () => {
+    renderPannable();
+    expect(earlier()).toBeEnabled();
+    // Already at the latest window, so there is nothing later to show.
+    expect(later()).toBeDisabled();
+  });
+
+  it('shows an earlier stretch without changing the window length', () => {
+    const props = renderPannable();
+    const before = props().data.length;
+    const firstDate = props().data[0].date;
+
+    fireEvent.click(earlier());
+
+    expect(props().data[0].date < firstDate).toBe(true);
+    // Same zoom, a different stretch: that is the whole point of stepping rather
+    // than switching to a longer preset.
+    expect(Math.abs(props().data.length - before)).toBeLessThanOrEqual(1);
+  });
+
+  it('walks back to the latest window again', () => {
+    const props = renderPannable();
+    const latestFirst = props().data[0].date;
+
+    fireEvent.click(earlier());
+    fireEvent.click(later());
+
+    expect(props().data[0].date).toBe(latestFirst);
+    expect(later()).toBeDisabled();
+  });
+
+  it('stops when the history runs out', () => {
+    renderPannable();
+    // Three years of data at a 1Y window: a handful of steps, then nothing.
+    for (let i = 0; i < 10; i++) {
+      if ((earlier() as HTMLButtonElement).disabled) break;
+      fireEvent.click(earlier());
+    }
+    expect(earlier()).toBeDisabled();
+  });
+
+  it('offers no walk when the whole history is already shown', () => {
+    render(
+      <SecurityChartSection
+        security={security()}
+        prices={prices}
+        quantitySteps={steps}
+        trades={[]}
+        isLoading={false}
+        mode="price"
+        onModeChange={vi.fn()}
+      />,
+    );
+    // Two days of data inside a 1Y window: there is no earlier stretch, so the
+    // controls would only be there to be disabled.
+    expect(
+      screen.queryByRole('button', {
+        name: 'Show the previous stretch of history',
+      }),
+    ).not.toBeInTheDocument();
+  });
+});

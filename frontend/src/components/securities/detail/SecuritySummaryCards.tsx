@@ -15,6 +15,7 @@ import {
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { gainLossColor } from '@/lib/format';
+import { withCurrencyCode } from '@/lib/security-detail';
 import type { SecurityDetail } from '@/types/investment';
 
 interface SecuritySummaryCardsProps {
@@ -49,10 +50,15 @@ export function SecuritySummaryCards({
     formatQuantity,
     formatPercent,
     formatSignedPercent,
+    defaultCurrency,
   } = useNumberFormat();
 
   const { position, security } = detail;
   const currency = security.currencyCode;
+  // Nothing here is converted, so a figure in a currency that is not the
+  // reader's own has to say which one it is.
+  const money = (amount: number) =>
+    withCurrencyCode(formatCurrency(amount, currency), currency, defaultCurrency);
   const unknown = (
     <span className="text-gray-500 dark:text-gray-400">
       {t('cards.valueUnknown')}
@@ -61,7 +67,11 @@ export function SecuritySummaryCards({
 
   /** A signed money figure, so colour is never the only signal of a loss. */
   const signedMoney = (amount: number) =>
-    `${amount >= 0 ? '+' : ''}${formatCurrency(amount, currency)}`;
+    `${amount >= 0 ? '+' : ''}${withCurrencyCode(
+      formatCurrency(amount, currency),
+      currency,
+      defaultCurrency,
+    )}`;
 
   const totalUnits = position.quantity;
 
@@ -72,7 +82,7 @@ export function SecuritySummaryCards({
       value:
         position.marketValue === null
           ? unknown
-          : formatCurrency(position.marketValue, currency),
+          : money(position.marketValue),
       // Market value is quantity times the newest close on record, whatever day
       // that is. A security whose prices stopped updating in 2019 would
       // otherwise present a 2019 valuation as today's, with nothing on the card
@@ -96,7 +106,7 @@ export function SecuritySummaryCards({
       value:
         position.costBasis === null
           ? unknown
-          : formatCurrency(position.costBasis, currency),
+          : money(position.costBasis),
     },
     {
       label: t('cards.unrealizedPl'),
@@ -124,7 +134,11 @@ export function SecuritySummaryCards({
           <div>
             {position.averageCost === null
               ? t('cards.valueUnknown')
-              : formatCurrencyPrecise(position.averageCost, currency)}
+              : withCurrencyCode(
+                  formatCurrencyPrecise(position.averageCost, currency),
+                  currency,
+                  defaultCurrency,
+                )}
           </div>
         </>
       ),

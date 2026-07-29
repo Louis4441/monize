@@ -89,10 +89,36 @@ function detail(overrides: Partial<SecurityDetail> = {}): SecurityDetail {
 describe('SecuritySummaryCards', () => {
   it('shows the five figures in the security currency', () => {
     render(<SecuritySummaryCards detail={detail()} />);
-    expect(screen.getByText('€15,000.00')).toBeInTheDocument();
-    expect(screen.getByText('€12,000.00')).toBeInTheDocument();
-    expect(screen.getByText('+€3,000.00')).toBeInTheDocument();
+    // The fixture is a EUR security and the test default is USD, so each figure
+    // carries its code -- see the foreign-currency tests below.
+    expect(screen.getByText('€15,000.00 EUR')).toBeInTheDocument();
+    expect(screen.getByText('€12,000.00 EUR')).toBeInTheDocument();
+    expect(screen.getByText('+€3,000.00 EUR')).toBeInTheDocument();
     expect(screen.getByText('+25.00%')).toBeInTheDocument();
+  });
+
+  describe('a currency that is not the reader s own', () => {
+    it('names the currency on every money figure', () => {
+      render(<SecuritySummaryCards detail={detail()} />);
+      // Nothing on this page is converted, and a symbol does not identify a
+      // currency: "$" is four of them. Same marking the Investments page uses.
+      expect(screen.getByText('€15,000.00 EUR')).toBeInTheDocument();
+      expect(screen.getByText('€120.00 EUR')).toBeInTheDocument();
+    });
+
+    it('leaves the code off when it is the reader s own currency', () => {
+      // CAD is the fallback default in `useNumberFormat`, and the test
+      // preferences set none.
+      render(
+        <SecuritySummaryCards
+          detail={detail({ security: security({ currencyCode: 'CAD' }) })}
+        />,
+      );
+      // Repeating "CAD" beside every dollar figure on a CAD user's screen is
+      // noise, not information.
+      expect(screen.getByText('$15,000.00')).toBeInTheDocument();
+      expect(screen.queryByText(/CAD/)).not.toBeInTheDocument();
+    });
   });
 
   describe('the unknown contract', () => {

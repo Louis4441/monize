@@ -13,6 +13,10 @@ import {
   computePeriodReturn,
   computePositionReturn,
   filterPriceWindow,
+  priceDecimals,
+  MAX_PRICE_DECIMALS,
+  shiftWindow,
+  maxSpansBack,
 } from './security-detail';
 import type {
   SecurityPrice,
@@ -589,5 +593,97 @@ describe('computePositionReturn', () => {
       fees: 0,
     });
     expect(loss).toEqual({ profit: -2000, percent: -20 });
+  });
+});
+
+describe('priceDecimals', () => {
+  it('gives a whole column the widest count any value needs', () => {
+    // The case that prompted this: a provider hands back 93.239998 and 93.18 in
+    // one series, and per-value formatting put two decimals beside six.
+    expect(priceDecimals([93.239998, 93.18])).toBe(6);
+  });
+
+  it('never drops below two, so a price still reads as money', () => {
+    expect(priceDecimals([12, 15])).toBe(2);
+    expect(priceDecimals([12.5])).toBe(2);
+  });
+
+  it('ignores gaps in the series', () => {
+    expect(priceDecimals([null, 4.5, null])).toBe(2);
+    expect(priceDecimals([])).toBe(2);
+  });
+
+  it('caps at what the price columns can store', () => {
+    expect(priceDecimals([1.23456789012345])).toBe(MAX_PRICE_DECIMALS);
+  });
+
+  it('goes to the cap for a price written in exponent form', () => {
+    // 1e-7 has digits that cannot be counted off its string form; assuming two
+    // would round a sub-cent price to nothing.
+    expect(priceDecimals([1e-7, 5])).toBe(MAX_PRICE_DECIMALS);
+  });
+});
+
+describe('shiftWindow', () => {
+  const year = { start: '2026-01-01', end: '2026-12-31' };
+
+  it('leaves the latest window alone', () => {
+    expect(shiftWindow(year, 0)).toEqual(year);
+    expect(shiftWindow(year, -1)).toEqual(year);
+  });
+
+  it('moves back by one full window per step', () => {
+    // The point of the feature: 1Y stays 1Y, and stepping back shows the year
+    // before it at the same zoom rather than forcing a jump to 5Y.
+    // Jan 1 to Dec 31 is 364 days, so each step moves both ends back by that
+    // much: window 1 ends where window 0 begins, sharing the boundary day.
+    expect(shiftWindow(year, 1)).toEqual({
+      start: '2025-01-02',
+      end: '2026-01-01',
+    });
+    expect(shiftWindow(year, 2)).toEqual({
+      start: '2024-01-04',
+      end: '2025-01-02',
+    });
+  });
+
+  it('keeps the span the same length as it moves', () => {
+    const shifted = shiftWindow(year, 3);
+    const days = (a: string, b: string) =>
+      (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000;
+    expect(days(shifted.start, shifted.end)).toBe(days(year.start, year.end));
+  });
+
+  it('has nothing to shift without both ends', () => {
+    // The "all" preset has no start, and there is no window to move.
+    expect(shiftWindow({ start: '', end: '2026-12-31' }, 2)).toEqual({
+      start: '',
+      end: '2026-12-31',
+    });
+  });
+});
+
+describe('maxSpansBack', () => {
+  const year = { start: '2026-01-01', end: '2026-12-31' };
+
+  it('counts the steps the history can still fill', () => {
+    expect(maxSpansBack(year, '2024-01-01')).toBe(3);
+  });
+
+  it('is zero when the window already reaches the oldest price', () => {
+    // The control that steps back must be able to stop, or it scrolls off into
+    // empty charts.
+    expect(maxSpansBack(year, '2026-01-01')).toBe(0);
+    expect(maxSpansBack(year, '2026-06-01')).toBe(0);
+  });
+
+  it('allows one step for a partial window of older data', () => {
+    // Half a year earlier is still worth a step; it just shows a half-full one.
+    expect(maxSpansBack(year, '2025-07-01')).toBe(1);
+  });
+
+  it('is zero without a bounded window or a known oldest date', () => {
+    expect(maxSpansBack({ start: '', end: '' }, '2020-01-01')).toBe(0);
+    expect(maxSpansBack(year, '')).toBe(0);
   });
 });

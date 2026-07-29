@@ -98,8 +98,8 @@ describe('SecurityAccountsTable', () => {
   it('lists the account with its units, value and gain', () => {
     render(<SecurityAccountsTable detail={detail([account()])} />);
     expect(screen.getByText('Brokerage')).toBeInTheDocument();
-    expect(screen.getAllByText('€7,200.00').length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/\+€1,200\.00/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('€7,200.00 EUR').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/\+€1,200\.00 EUR/).length).toBeGreaterThan(0);
   });
 
   it('marks a position stranded in a closed account', () => {
@@ -125,14 +125,14 @@ describe('SecurityAccountsTable', () => {
       );
       // Both, as the maintainer asked: the security's own currency and the
       // account's, the latter at the historical rates on the buy legs.
-      expect(screen.getAllByText('€6,000.00').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('€6,000.00 EUR').length).toBeGreaterThan(0);
       expect(screen.getByText(/25,800/)).toBeInTheDocument();
     });
 
     it('adds no second line when the account is in the security currency', () => {
       render(<SecurityAccountsTable detail={detail([account()])} />);
       // A duplicate figure in the same currency is noise.
-      expect(screen.getAllByText('€6,000.00')).toHaveLength(2); // row + total
+      expect(screen.getAllByText('€6,000.00 EUR')).toHaveLength(2); // row + total
     });
 
     it('adds no second line without a converted figure to show', () => {
@@ -184,7 +184,7 @@ describe('SecurityAccountsTable', () => {
         />,
       );
       expect(screen.queryByText('+20.00%')).not.toBeInTheDocument();
-      expect(screen.getAllByText(/\+€1,200\.00/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/\+€1,200\.00 EUR/).length).toBeGreaterThan(0);
     });
   });
 
