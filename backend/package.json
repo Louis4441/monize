@@ -32,7 +32,8 @@
     "migration:generate": "npm run typeorm -- migration:generate",
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
-    "seed": "ts-node -r tsconfig-paths/register src/database/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register src/database/seed.ts",
+    "mny:inspect": "ts-node -r tsconfig-paths/register src/import/mny/mny-inspect.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",
@@ -55,6 +56,7 @@
     "date-fns": "^4.1.0",
     "he": "^1.2.0",
     "helmet": "^8.1.0",
+    "mdb-reader": "^3.2.0",
     "nestjs-i18n": "^10.8.4",
     "nodemailer": "^9.0.1",
     "oidc-provider": "^9.8.3",
@@ -164,11 +166,12 @@
       "!src/database/seed*.ts",
       "!src/database/add-*.ts",
       "!src/database/fix-*.ts",
-      "!src/database/migrations/**"
+      "!src/database/migrations/**",
+      "!src/**/__fixtures__/**"
     ],
     "coverageDirectory": "./coverage",
     "transformIgnorePatterns": [
-      "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid)/)"
+      "node_modules/(?!(@scure|@otplib|otplib|@noble|openid-client|oauth4webapi|jose|uuid|mdb-reader)/)"
     ],
     "coverageThreshold": {
       "global": {

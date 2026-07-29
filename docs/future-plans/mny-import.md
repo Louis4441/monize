@@ -156,11 +156,11 @@ files, MD5-flag files), patch a real MSISAM codec handler into the vendored read
 interface is small and the fix is local. Either way, contribute the codec upstream to
 `mdb-reader` as a stretch goal so the vendor copy can eventually be deleted.
 
-**Vendoring:** `mdb-reader` is ESM-only; the backend is CommonJS and Jest runs CJS. Rather than
+**Vendoring:** ~~`mdb-reader` is ESM-only; the backend is CommonJS and Jest runs CJS. Rather than
 fight `--experimental-vm-modules`, vendor the reader at
-`backend/src/import/mny/vendor/mdb-reader/` with its MIT license header, a `VENDORING.md`
-recording version + upstream URL + local diffs (target: none), and coverage/lint exclusions in the
-same PR (the same treatment seed scripts already get).
+`backend/src/import/mny/vendor/mdb-reader/`.~~ Superseded during the Phase 0 spike: the reader is
+a plain dependency, because `require(esm)` and the repo's existing Jest transform allowlist make
+vendoring unnecessary. See section 6.1.
 
 **Fixtures:** the jackcess-encrypt repository ships real sample files in `src/test/data/`:
 `money2001.mny`, `money2001-pwd.mny`, `money2002.mny`, `money2008.mny`, `money2008-pwd.mny`
@@ -272,6 +272,42 @@ name-and-amount transfer *matching* is exactly what a file with authoritative tr
 not fall back to (it is implicated in the loan-split bug). Lower-level services are reused
 (entity creator, currencies, holdings rebuild, shared post-processing extracted from
 `ImportService` so both pipelines call one implementation).
+
+### 6.1 Phase 0 spike findings (M0.1–M0.3, implemented)
+
+Two things in section 4 were wrong or unnecessary; both are settled by working code
+(`backend/src/import/mny/msisam/`) rather than by argument.
+
+**Plan A works, for every fixture, including the "old encryption" vintage.** All five jackcess
+files decrypt and parse; `money2001*.mny` uses the Jet-style scheme (flags `0x1` at `0x298`,
+`0x6` bit clear) and needed the fallback implemented up front, so Plan B was never reached.
+Schemes observed: `money2001*` old, `money2002` new/MD5 (flags `0x5`), `money2008*` new/SHA-1
+(flags `0x3d`).
+
+**The header page is obfuscated, and the design's offsets are relative to the de-obfuscated
+copy.** Jet XORs page-0 bytes `0x18..0x95` with a fixed 126-byte mask (jackcess
+`JetFormat.BASE_HEADER_MASK`, applied in `PageChannel.readRootPage`). The salt at `0x72` sits
+inside that window. Reading it straight from the file yields a plausible-looking key that
+decrypts every page to garbage, with no error until `mdb-reader` reports a wrong page type — the
+single most expensive wrong turn in this spike. `jet-header.ts` owns the de-masking; nothing else
+touches raw page-0 bytes. Two facts follow from it: the crypt-check offset is
+`0x2e9 + demasked[0x72]`, and the "salt" is simply the Jet creation-date field reused.
+
+**A file with non-blank crypt-check bytes is not necessarily password protected.**
+`money2008.mny` has check bytes yet verifies against the blank password. So `passwordProtected`
+is defined as "the blank password fails", which is what makes `mnyPasswordRequired` and
+`mnyPasswordIncorrect` distinguishable (ADR-7) and lets an unprotected file open without a
+prompt.
+
+**`mdb-reader` is a plain dependency, not vendored.** The vendoring in M0.3 existed to avoid
+ESM/CJS friction, and that friction does not exist here: TypeScript `nodenext` emits `require()`,
+Node 22+/24 resolves `require(esm)` natively, and Jest already transforms ESM-only packages
+through the `transformIgnorePatterns` allowlist the repo uses for `openid-client`, `jose` and
+`uuid` — `mdb-reader` was added to it. Verified in both directions: the compiled `dist/` bundle
+opens `money2008-pwd.mny` under plain `node`, and the specs run under Jest. This drops 69 files
+of third-party source from `src/`, the coverage/lint exclusions they would need, and the drift
+risk `VENDORING.md` was meant to manage. If a future `mdb-reader` release needs an MSISAM codec
+patch, vendoring is still the escape hatch — `open-mny.ts` is the only file that imports it.
 
 **ADR-9 — Write performance.** Pre-generate UUIDs for all transactions/splits in the mapper so
 transfer pairs and splits are wired before insert; insert in chunks of ~500 via
@@ -390,14 +426,14 @@ documented v1 limitation.
 
 Exit gate: all five jackcess fixtures parse end-to-end via the CLI; go/no-go on Plan A recorded.
 
-| ID | Task | Depends | Size |
-|----|------|---------|------|
-| M0.1 | Commit jackcess-encrypt sample fixtures (`money2001.mny`, `money2001-pwd.mny`, `money2002.mny`, `money2008.mny`, `money2008-pwd.mny`) under `backend/src/import/mny/__fixtures__/` with provenance/license README (Apache-2.0) and documented passwords | — | S |
-| M0.2 | `msisam/msisam-decrypt.ts`: RC4, key derivation (SHA-1/MD5 flag at `0x298`), salt at `0x72`, page loop 1..0xE, page-number key XOR, old-encryption fallback, password verify near `0x2e9`. Spec: all five fixtures decrypt; wrong password -> typed error; blank-password files open without a password | M0.1 | M |
-| M0.3 | Vendor `mdb-reader` v3.2.0 + `msisam/open-mny.ts` wrapper (`getTableOrNull`, column-presence map, engine sanity checks); Jest/ESLint/coverage exclusions for the vendor dir; confirm identity-codec reads pre-decrypted buffers. Spec: table lists + row counts correct for all fixtures | M0.2 | M |
-| M0.4 | Tolerant table readers (`tables/read-reference.ts`, `read-transactions.ts`, `read-investments.ts`, `read-bills.ts`) + typed raw-row model (`model/mny-rows.ts`) + date/amount normalization utils; build the per-version column-presence matrix across fixtures and encode defaults. Spec: every table reads or degrades gracefully on all fixtures | M0.3 | L |
-| M0.5 | Validation-harness CLI: `npm run mny:validate -- file.mny [--password ...]` prints accounts, transaction counts, per-account computed final balances, per-security holdings (replay + LOT), warnings. Excluded from coverage like seed scripts. Acceptance: maintainer runs it on the real Sunset and Money 2001 files; output sane; runtime + memory recorded in the PR | M0.4 | M |
-| M0.6 | Spike report resolving open questions (section 12): DHD base-currency field, CAT `is_income` signal, BILL `st` active semantics (validated against the known "~20 real bills" ground truth), act 5 vs 3 and act 14 semantics, native date decoding vs pivot logic. Constants land in `model/mny-model.ts` with the findings documented | M0.5 | M |
+| ID | Task | Depends | Size | Status |
+|----|------|---------|------|--------|
+| M0.1 | Commit jackcess-encrypt sample fixtures (`money2001.mny`, `money2001-pwd.mny`, `money2002.mny`, `money2008.mny`, `money2008-pwd.mny`) under `backend/src/import/mny/__fixtures__/` with provenance/license README (Apache-2.0) and documented passwords | — | S | **done** |
+| M0.2 | `msisam/msisam-decrypt.ts`: RC4, key derivation (SHA-1/MD5 flag at `0x298`), salt at `0x72`, page loop 1..0xE, page-number key XOR, old-encryption fallback, password verify near `0x2e9`. Spec: all five fixtures decrypt; wrong password -> typed error; blank-password files open without a password | M0.1 | M | **done** |
+| M0.3 | `msisam/open-mny.ts` wrapper over `mdb-reader` v3.2.0 (`getTableOrNull`, column-presence map, engine sanity checks); confirm the identity-codec path reads pre-decrypted buffers. Spec: table lists + row counts correct for all fixtures | M0.2 | M | **done** (not vendored — see 6.1) |
+| M0.4 | Tolerant table readers (`tables/read-reference.ts`, `read-transactions.ts`, `read-investments.ts`, `read-bills.ts`) + typed raw-row model (`model/mny-rows.ts`) + date/amount normalization utils; build the per-version column-presence matrix across fixtures and encode defaults. Spec: every table reads or degrades gracefully on all fixtures | M0.3 | L | |
+| M0.5 | Validation-harness CLI: `npm run mny:validate -- file.mny [--password ...]` prints accounts, transaction counts, per-account computed final balances, per-security holdings (replay + LOT), warnings. Acceptance: maintainer runs it on the real Sunset and Money 2001 files; output sane; runtime + memory recorded in the PR | M0.4 | M | reader half shipped as `npm run mny:inspect` (scheme, table list, row/column counts, sample rows, per-table failure isolation); balances and holdings still need M0.4 |
+| M0.6 | Spike report resolving open questions (section 12): DHD base-currency field, CAT `is_income` signal, BILL `st` active semantics (validated against the known "~20 real bills" ground truth), act 5 vs 3 and act 14 semantics, native date decoding vs pivot logic. Constants land in `model/mny-model.ts` with the findings documented | M0.5 | M | |
 
 ### Track B — Parallel, not .mny-specific
 
