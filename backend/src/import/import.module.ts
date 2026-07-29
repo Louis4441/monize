@@ -14,6 +14,9 @@ import { Security } from "../securities/entities/security.entity";
 import { InvestmentTransaction } from "../securities/entities/investment-transaction.entity";
 import { Holding } from "../securities/entities/holding.entity";
 import { ImportColumnMapping } from "./entities/import-column-mapping.entity";
+import { ImportJob } from "./mny/entities/import-job.entity";
+import { ImportStagedFile } from "./mny/entities/import-staged-file.entity";
+import { MnyStagingService } from "./mny/mny-staging.service";
 import { NetWorthModule } from "../net-worth/net-worth.module";
 import { SecuritiesModule } from "../securities/securities.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
@@ -30,6 +33,10 @@ import { CurrenciesModule } from "../currencies/currencies.module";
       InvestmentTransaction,
       Holding,
       ImportColumnMapping,
+      // Registered so TypeORM knows the entities; the .mny services reach them
+      // through withScopedDb rather than through injected repositories.
+      ImportStagedFile,
+      ImportJob,
     ]),
     forwardRef(() => NetWorthModule),
     forwardRef(() => SecuritiesModule),
@@ -41,7 +48,8 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     ImportEntityCreatorService,
     ImportInvestmentProcessorService,
     ImportRegularProcessorService,
+    MnyStagingService,
   ],
-  exports: [ImportService],
+  exports: [ImportService, MnyStagingService],
 })
 export class ImportModule {}

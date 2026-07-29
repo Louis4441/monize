@@ -30,7 +30,7 @@ export class ImportStagedFile {
   @Column({ type: "uuid", name: "user_id" })
   userId: string;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
   user?: User;
 

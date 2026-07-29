@@ -33,14 +33,18 @@ export class ImportJob {
   @Column({ type: "uuid", name: "user_id" })
   userId: string;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
   user?: User;
 
   @Column({ type: "uuid", name: "staged_file_id", nullable: true })
   stagedFileId: string | null;
 
-  @ManyToOne(() => ImportStagedFile, { nullable: true })
+  // SET NULL, not CASCADE: a completed job's verification report has to outlive
+  // the bytes it was produced from, so the TTL sweep must not take import
+  // history with it. Declared here as well as in the migration because test and
+  // dev databases are synchronized from the entities.
+  @ManyToOne(() => ImportStagedFile, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "staged_file_id" })
   stagedFile?: ImportStagedFile | null;
 
