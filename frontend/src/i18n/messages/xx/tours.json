@@ -222,7 +222,7 @@
           },
           "tabs": {
             "title": "[XX-The detail underneath-XX]",
-            "body": "[XX-**Overview** holds the description, the security's own returns, your total return on the position, and your holdings per account. **Transactions** and **Price history** are the tables the old dialogs used to hold, and **Documents** is where a factsheet or an annual report goes.-XX]"
+            "body": "[XX-**Overview** holds the description, the security's own returns, your total return on the position, and your holdings per account. **Transactions** and **Price history** are the tables the old dialogs used to hold. **Documents** is where a factsheet or an annual report goes, and **News** carries recent headlines that mention the symbol.-XX]"
           },
           "finish": {
             "title": "[XX-That is the tour-XX]",
