@@ -157,6 +157,15 @@ export function SecurityChartSection({
         accountName={security.symbol}
         title={t(`chart.titles.${mode}` as Parameters<typeof t>[0])}
         markers={mode === 'return' ? undefined : markers}
+        // On the value series a trade *changes* the line, so its marker belongs
+        // on the first point that reflects it. Snapping backwards put a first
+        // purchase on the day the position was still zero -- flat on the axis,
+        // which read as the marker being missing altogether.
+        markerSnap={mode === 'value' ? 'later' : 'earlier'}
+        // The high/low bubbles sat beside the buy/sell dots in the same green and
+        // red, and read as the price a trade went through at. The footer already
+        // gives the first, latest and lowest figures.
+        hideExtremeFlags
         neutralValues={mode !== 'return'}
         precise={mode === 'price'}
         valueFormat={mode === 'return' ? 'percent' : 'currency'}

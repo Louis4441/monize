@@ -202,6 +202,96 @@ describe('BalanceHistoryChart', () => {
       .forEach((el) => expect(el.className).toContain('text-red-600'));
   });
 
+  describe('markerSnap', () => {
+    const sparse = [
+      { date: '2026-01-01', balance: 0 },
+      { date: '2026-06-01', balance: 1200 },
+    ];
+    const trade = [
+      { date: '2026-02-01', direction: 'in' as const, label: 'Bought 10' },
+    ];
+
+    it('pins a marker to the preceding point by default', () => {
+      render(
+        <BalanceHistoryChart data={sparse} isLoading={false} markers={trade} />,
+      );
+      // A price is continuous, so the last quote before the trade is near enough.
+      expect(screen.getByTestId('reference-dot')).toHaveAttribute(
+        'data-x',
+        '2026-01-01',
+      );
+    });
+
+    it('pins a marker to the first point that reflects it when asked', () => {
+      render(
+        <BalanceHistoryChart
+          data={sparse}
+          isLoading={false}
+          markers={trade}
+          markerSnap="later"
+        />,
+      );
+      // On a value series the purchase is what lifts the line: pinned backwards
+      // it landed on the day the position was still zero, drawing the dot flat
+      // on the axis where it read as missing entirely.
+      const dot = screen.getByTestId('reference-dot');
+      expect(dot).toHaveAttribute('data-x', '2026-06-01');
+      expect(dot).toHaveAttribute('data-y', '1200');
+    });
+
+    it('still drops a marker outside the window either way', () => {
+      render(
+        <BalanceHistoryChart
+          data={sparse}
+          isLoading={false}
+          markers={[{ date: '2030-01-01', direction: 'in', label: 'Later' }]}
+          markerSnap="later"
+        />,
+      );
+      expect(screen.queryByTestId('reference-dot')).toBeNull();
+    });
+  });
+
+  describe('hideExtremeFlags', () => {
+    const swinging = [
+      { date: '2026-01-01', balance: 100 },
+      { date: '2026-02-01', balance: 300 },
+      { date: '2026-03-01', balance: 50 },
+    ];
+
+    /** Radii of the dots the series' render-prop drew, in DOM order. */
+    function dotRadii(): number[] {
+      return Array.from(
+        screen.getByTestId('line-dots').querySelectorAll('circle'),
+      ).map((circle) => Number(circle.getAttribute('r') ?? 0));
+    }
+
+    it('draws the high/low bubbles by default', () => {
+      render(<BalanceHistoryChart data={swinging} isLoading={false} />);
+      // The render-prop draws a zero-radius circle for an ordinary point and a
+      // real one for an extreme, so a visible dot means a bubble was drawn.
+      expect(dotRadii().some((r) => r > 0)).toBe(true);
+    });
+
+    it('drops them when asked', () => {
+      render(
+        <BalanceHistoryChart data={swinging} isLoading={false} hideExtremeFlags />,
+      );
+      // They read as "this is what you paid" beside buy/sell markers of the same
+      // green and red, and the footer already states these figures.
+      expect(dotRadii().every((r) => r === 0)).toBe(true);
+    });
+
+    it('keeps the footer figures when the bubbles are gone', () => {
+      render(
+        <BalanceHistoryChart data={swinging} isLoading={false} hideExtremeFlags />,
+      );
+      expect(screen.getByText('Min Balance')).toBeInTheDocument();
+      // Current and Min are both 50 here, so the figure is on screen twice.
+      expect(screen.getAllByText('$50.00').length).toBeGreaterThan(0);
+    });
+  });
+
   describe('summaryLabels', () => {
     it('renames the footer figures for a series that is not a balance', () => {
       render(

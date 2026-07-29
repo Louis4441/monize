@@ -113,6 +113,23 @@ interface BalanceHistoryChartProps {
    * running past the chart's bottom edge.
    */
   plotHeight?: 'default' | 'tall';
+  /**
+   * Which series point a marker lands on when the event's own date has no point
+   * (a trade on a non-trading day, or a series sampled sparsely).
+   *
+   * `earlier` (the default) suits a price: the quote is continuous, so the last
+   * point before the trade is near enough. `later` is required for a series the
+   * event *changes*: a purchase pinned to the point before it lands on the old
+   * position -- zero, for a first purchase -- which draws the marker flat on the
+   * axis instead of on the line, where it reads as missing.
+   */
+  markerSnap?: 'earlier' | 'later';
+  /**
+   * Drop the high/low value bubbles. They read as "this is what you paid" once
+   * buy/sell markers share the plot -- same green and red, same size of dot --
+   * and the footer already states the first, latest and lowest figures.
+   */
+  hideExtremeFlags?: boolean;
 }
 
 interface ChartPoint {
@@ -184,6 +201,8 @@ export function BalanceHistoryChart({
   valueFormat = 'currency',
   summaryLabels,
   plotHeight = 'default',
+  markerSnap = 'earlier',
+  hideExtremeFlags = false,
 }: BalanceHistoryChartProps) {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
@@ -331,13 +350,21 @@ export function BalanceHistoryChart({
     return markers.flatMap((marker) => {
       if (marker.date < first || marker.date > last) return [];
       let point = chartData[0];
-      for (const candidate of chartData) {
-        if (candidate.date <= marker.date) point = candidate;
-        else break;
+      if (markerSnap === 'later') {
+        // The first point at or after the event, i.e. the first one that
+        // reflects it.
+        point =
+          chartData.find((candidate) => candidate.date >= marker.date) ??
+          chartData[chartData.length - 1];
+      } else {
+        for (const candidate of chartData) {
+          if (candidate.date <= marker.date) point = candidate;
+          else break;
+        }
       }
       return [{ marker, point }];
     });
-  }, [markers, chartData]);
+  }, [markers, chartData, markerSnap]);
 
   const markersByDate = useMemo(() => {
     const byDate = new Map<string, ChartMarker[]>();
@@ -378,8 +405,11 @@ export function BalanceHistoryChart({
   // inside of whichever chart half they fall on so they never overlap the
   // plot edges.
   const flags = useMemo(
-    () => computeMinMaxFlagIndices(chartData.map((point) => point.balance)),
-    [chartData],
+    () =>
+      hideExtremeFlags
+        ? { show: false as const, minIndex: 0, maxIndex: 0 }
+        : computeMinMaxFlagIndices(chartData.map((point) => point.balance)),
+    [chartData, hideExtremeFlags],
   );
 
   if (isLoading) {
