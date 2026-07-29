@@ -108,6 +108,12 @@ const INTENTIONALLY_EXCLUDED_TABLES: ReadonlySet<string> = new Set([
   "emergency_access_contacts", // cross-user emergency-access config
   "emergency_access_settings", // cross-user emergency-access config
   "oauth_payloads", // transient OIDC state
+  // Import working state, not user content: the staged bytes are a decrypted
+  // upload with a 24 h TTL, and a job row describes one in-flight import. Both
+  // are meaningless after the fact, and the staged file would multiply a
+  // backup's size by the size of whatever was last uploaded.
+  "import_staged_files",
+  "import_jobs",
   "personal_access_tokens", // auth credentials -- never exported
   "refresh_tokens", // auth session tokens -- never exported
   "trusted_devices", // 2FA device registrations -- never exported

@@ -18,7 +18,9 @@ export type MnyErrorCode =
   /** A password was supplied but it does not open the file. */
   | "mnyPasswordIncorrect"
   /** Decryption succeeded but the page structure could not be parsed. */
-  | "mnyUnreadableDatabase";
+  | "mnyUnreadableDatabase"
+  /** The staged upload expired or was deleted before the import ran. */
+  | "mnyStagedFileMissing";
 
 /**
  * Base class for every `.mny` parse failure. Never include the password (or
@@ -80,6 +82,20 @@ export class MnyUnreadableDatabaseError extends MnyImportError {
       "mnyUnreadableDatabase",
       "Money file was decrypted but its contents could not be read",
       cause,
+    );
+  }
+}
+
+/**
+ * The staged file is gone by the time the import runs -- expired past its TTL,
+ * swept, or explicitly discarded. Not retryable over the same staging row: the
+ * wizard has to upload again.
+ */
+export class MnyStagedFileMissingError extends MnyImportError {
+  constructor(stagedFileId: string) {
+    super(
+      "mnyStagedFileMissing",
+      `Staged import file ${stagedFileId} is no longer available`,
     );
   }
 }

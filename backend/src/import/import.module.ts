@@ -17,11 +17,14 @@ import { ImportColumnMapping } from "./entities/import-column-mapping.entity";
 import { ImportJob } from "./mny/entities/import-job.entity";
 import { ImportStagedFile } from "./mny/entities/import-staged-file.entity";
 import { MnyImportJobService } from "./mny/mny-import-job.service";
+import { MnyImportService } from "./mny/mny-import.service";
+import { ImportPostProcessingService } from "./import-post-processing.service";
 import { MnyParserService } from "./mny/mny-parser.service";
 import { MnyStagingService } from "./mny/mny-staging.service";
 import { NetWorthModule } from "../net-worth/net-worth.module";
 import { SecuritiesModule } from "../securities/securities.module";
 import { CurrenciesModule } from "../currencies/currencies.module";
+import { UsersModule } from "../users/users.module";
 
 @Module({
   imports: [
@@ -43,22 +46,26 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     forwardRef(() => NetWorthModule),
     forwardRef(() => SecuritiesModule),
     forwardRef(() => CurrenciesModule),
+    forwardRef(() => UsersModule),
   ],
   controllers: [ImportController],
   providers: [
     ImportService,
+    ImportPostProcessingService,
     ImportEntityCreatorService,
     ImportInvestmentProcessorService,
     ImportRegularProcessorService,
     MnyStagingService,
     MnyParserService,
     MnyImportJobService,
+    MnyImportService,
   ],
   exports: [
     ImportService,
     MnyStagingService,
     MnyParserService,
     MnyImportJobService,
+    MnyImportService,
   ],
 })
 export class ImportModule {}
