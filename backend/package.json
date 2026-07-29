@@ -19,6 +19,8 @@
     "rls:ratchet": "node scripts/rls-ratchet.mjs",
     "rls:ratchet:update": "node scripts/rls-ratchet.mjs --update",
     "rls:ratchet:test": "node --test scripts/rls-ratchet.test.mjs",
+    "migration:lint": "node scripts/migration-lint.mjs",
+    "migration:lint:test": "node --test scripts/migration-lint.test.mjs",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:unit": "jest --testPathPatterns='src/.*\\.spec\\.ts$'",

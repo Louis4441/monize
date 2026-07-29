@@ -15,6 +15,8 @@ npm run test:cov           # Coverage report (95% lines, 94% stmts, 95% funcs, 8
 npm run test:e2e           # E2E tests (test/**/*.spec.ts, 30s timeout, sequential)
 npm run i18n:pseudo        # Regenerate the xx pseudo-locale from en
 npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
+npm run migration:lint     # Idempotency lint over database/migrations (CI gate)
+npm run migration:lint:test # Self-test for the migration lint
 ```
 
 ## Module Structure

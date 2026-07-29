@@ -1,0 +1,266 @@
+/**
+ * Self-test for the migration idempotency lint (`migration-lint.mjs`). Runs
+ * under `node --test` (not jest) since it exercises an ESM build script, not
+ * app code.
+ *
+ *   node --test scripts/migration-lint.test.mjs   (npm run migration:lint:test)
+ */
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  RULES,
+  stripComments,
+  splitStatements,
+  lineOf,
+  isBlockGuarded,
+  normalizeIdentifier,
+  collectPragmas,
+  lintSql,
+  lintDirectory,
+} from "./migration-lint.mjs";
+
+const rulesOf = (sql) => lintSql(sql).findings.map((f) => f.rule);
+const clean = (sql) => assert.deepEqual(lintSql(sql).findings, []);
+const flags = (sql, rule) => {
+  const found = rulesOf(sql);
+  assert.ok(found.includes(rule), `expected rule "${rule}", got ${JSON.stringify(found)}`);
+};
+
+// ---------------------------------------------------------------------------
+// Lexing
+// ---------------------------------------------------------------------------
+
+test("stripComments blanks comments while preserving offsets and newlines", () => {
+  const sql = "SELECT 1; -- trailing\nSELECT 2;";
+  const stripped = stripComments(sql);
+  assert.equal(stripped.length, sql.length);
+  assert.equal(stripped.split("\n").length, 2);
+  assert.ok(!stripped.includes("trailing"));
+  assert.ok(stripped.startsWith("SELECT 1;"));
+});
+
+test("stripComments removes block comments and leaves double dashes inside literals", () => {
+  assert.ok(!stripComments("/* note */ SELECT 1;").includes("note"));
+  const literal = stripComments("SELECT '-- not a comment', 2;");
+  assert.ok(literal.includes("-- not a comment"));
+});
+
+test("stripComments leaves dollar-quoted bodies untouched", () => {
+  const sql = "DO $$ BEGIN -- inner\n RAISE NOTICE 'x'; END $$;";
+  assert.ok(stripComments(sql).includes("-- inner"));
+});
+
+test("splitStatements separates top-level statements and reports offsets", () => {
+  const sql = "SELECT 1;\nSELECT 2;";
+  const statements = splitStatements(sql);
+  assert.equal(statements.length, 2);
+  assert.equal(lineOf(sql, statements[1].start), 2);
+  assert.equal(statements[1].blockText, null);
+});
+
+test("splitStatements keeps a semicolon inside a dollar-quoted body out of the top level", () => {
+  const sql = "DO $$ BEGIN PERFORM 1; PERFORM 2; END $$;\nSELECT 9;";
+  const statements = splitStatements(sql);
+  const topLevel = statements.filter((s) => s.blockText === null);
+  assert.equal(topLevel.length, 2);
+  assert.ok(topLevel[0].text.includes("DO $$"));
+  // The body's statements are present too, tagged with their enclosing block.
+  assert.ok(statements.some((s) => s.blockText && s.text.includes("PERFORM 2")));
+});
+
+test("splitStatements blanks the body out of the wrapper statement text", () => {
+  const sql = "DO $$ BEGIN CREATE TABLE t (id int); END $$;";
+  const wrapper = splitStatements(sql).find((s) => s.blockText === null);
+  assert.ok(!wrapper.text.includes("CREATE TABLE"));
+});
+
+test("normalizeIdentifier strips quotes and schema qualification", () => {
+  assert.equal(normalizeIdentifier('"MyTrigger"'), "mytrigger");
+  assert.equal(normalizeIdentifier("public.tbl"), "tbl");
+  assert.equal(normalizeIdentifier(undefined), "");
+});
+
+test("isBlockGuarded recognizes catalog probes and IF EXISTS tests only", () => {
+  assert.equal(isBlockGuarded(null), false);
+  assert.equal(isBlockGuarded("BEGIN PERFORM 1; END"), false);
+  assert.equal(isBlockGuarded("IF NOT EXISTS (SELECT 1 FROM pg_trigger) THEN"), true);
+  assert.equal(isBlockGuarded("IF EXISTS (SELECT 1 FROM information_schema.columns)"), true);
+});
+
+// ---------------------------------------------------------------------------
+// Rules: unguarded DDL is caught
+// ---------------------------------------------------------------------------
+
+test("CREATE TABLE without IF NOT EXISTS is flagged", () => {
+  flags("CREATE TABLE widgets (id UUID PRIMARY KEY);", "create-table-without-if-not-exists");
+  clean("CREATE TABLE IF NOT EXISTS widgets (id UUID PRIMARY KEY);");
+});
+
+test("CREATE INDEX without IF NOT EXISTS is flagged, unique and concurrent included", () => {
+  flags("CREATE INDEX idx_a ON t(a);", "create-index-without-if-not-exists");
+  flags("CREATE UNIQUE INDEX idx_a ON t(a);", "create-index-without-if-not-exists");
+  flags("CREATE INDEX CONCURRENTLY idx_a ON t(a);", "create-index-without-if-not-exists");
+  clean("CREATE INDEX IF NOT EXISTS idx_a ON t(a);");
+  clean("CREATE UNIQUE INDEX IF NOT EXISTS idx_a ON t(a);");
+});
+
+test("ADD COLUMN without IF NOT EXISTS is flagged once per column", () => {
+  const findings = lintSql(
+    "ALTER TABLE t ADD COLUMN a INT, ADD COLUMN IF NOT EXISTS b INT, ADD COLUMN c INT;",
+  ).findings;
+  assert.equal(findings.length, 2);
+  assert.ok(findings.every((f) => f.rule === "add-column-without-if-not-exists"));
+  clean("ALTER TABLE t ADD COLUMN IF NOT EXISTS a INT;");
+});
+
+test("ADD without the COLUMN keyword is flagged (it can never carry the guard)", () => {
+  flags("ALTER TABLE t ADD note TEXT;", "add-column-without-if-not-exists");
+  clean("ALTER TABLE t ENABLE ROW LEVEL SECURITY;");
+});
+
+test("DROP without IF EXISTS is flagged for every object kind", () => {
+  for (const stmt of [
+    "DROP TABLE t;",
+    "DROP INDEX idx_a;",
+    "DROP TRIGGER trg ON t;",
+    "DROP POLICY p ON t;",
+    "ALTER TABLE t DROP COLUMN a;",
+    "ALTER TABLE t DROP CONSTRAINT c;",
+  ]) {
+    flags(stmt, "drop-without-if-exists");
+  }
+  clean("DROP TABLE IF EXISTS t;");
+  clean("ALTER TABLE t DROP COLUMN IF EXISTS a;");
+});
+
+test("ADD CONSTRAINT needs a preceding DROP CONSTRAINT IF EXISTS of the same name", () => {
+  flags(
+    "ALTER TABLE t ADD CONSTRAINT chk_a CHECK (a > 0);",
+    "add-constraint-without-drop",
+  );
+  // A drop of a *different* constraint does not excuse it.
+  flags(
+    "ALTER TABLE t DROP CONSTRAINT IF EXISTS chk_b;\nALTER TABLE t ADD CONSTRAINT chk_a CHECK (a > 0);",
+    "add-constraint-without-drop",
+  );
+  clean(
+    "ALTER TABLE t DROP CONSTRAINT IF EXISTS chk_a;\nALTER TABLE t ADD CONSTRAINT chk_a CHECK (a > 0);",
+  );
+});
+
+test("CREATE TRIGGER needs a preceding DROP TRIGGER IF EXISTS or a pg_trigger guard", () => {
+  flags(
+    "CREATE TRIGGER trg_a BEFORE UPDATE ON t FOR EACH ROW EXECUTE FUNCTION f();",
+    "create-trigger-without-drop",
+  );
+  // The 077 style: drop-then-create.
+  clean(
+    "DROP TRIGGER IF EXISTS trg_a ON t;\n" +
+      "CREATE TRIGGER trg_a BEFORE UPDATE ON t FOR EACH ROW EXECUTE FUNCTION f();",
+  );
+  // The 056 style: a DO block that checks pg_trigger first.
+  clean(`DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_a') THEN
+        CREATE TRIGGER trg_a BEFORE UPDATE ON t
+            FOR EACH ROW EXECUTE FUNCTION f();
+    END IF;
+END $$;`);
+});
+
+test("CREATE POLICY needs a preceding DROP POLICY IF EXISTS, dynamic %I included", () => {
+  flags("CREATE POLICY p ON t USING (true);", "create-policy-without-drop");
+  clean("DROP POLICY IF EXISTS p ON t;\nCREATE POLICY p ON t USING (true);");
+  // The 112 style: a format()-driven drop/create loop over a table list.
+  clean(`DO $$
+DECLARE t text;
+BEGIN
+    FOREACH t IN ARRAY ARRAY['a', 'b'] LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_isolation', t);
+        EXECUTE format('CREATE POLICY %I ON %I USING (user_id = 1)', t || '_isolation', t);
+    END LOOP;
+END $$;`);
+});
+
+test("enum value, type, function, view, sequence, extension and schema DDL are covered", () => {
+  flags("ALTER TYPE mood ADD VALUE 'sad';", "enum-add-value-without-if-not-exists");
+  clean("ALTER TYPE mood ADD VALUE IF NOT EXISTS 'sad';");
+  flags("CREATE TYPE mood AS ENUM ('ok');", "create-type-without-guard");
+  flags("CREATE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;", "create-function-without-or-replace");
+  clean("CREATE OR REPLACE FUNCTION f() RETURNS int AS $$ SELECT 1 $$ LANGUAGE sql;");
+  flags("CREATE VIEW v AS SELECT 1;", "create-view-without-or-replace");
+  clean("CREATE OR REPLACE VIEW v AS SELECT 1;");
+  flags("CREATE MATERIALIZED VIEW mv AS SELECT 1;", "create-view-without-or-replace");
+  flags("CREATE SEQUENCE s;", "create-object-without-if-not-exists");
+  flags("CREATE EXTENSION pg_trgm;", "create-object-without-if-not-exists");
+  clean("CREATE EXTENSION IF NOT EXISTS pg_trgm;");
+});
+
+test("INSERT without ON CONFLICT is flagged; ON CONFLICT and WHERE NOT EXISTS pass", () => {
+  flags("INSERT INTO t (a) VALUES (1);", "insert-without-on-conflict");
+  clean("INSERT INTO t (a) VALUES (1) ON CONFLICT DO NOTHING;");
+  clean("INSERT INTO t (a) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM t);");
+});
+
+test("statements that are re-runnable by nature are not flagged", () => {
+  clean("ALTER TABLE t ALTER COLUMN a TYPE NUMERIC(20, 6);");
+  clean("ALTER TABLE t ALTER COLUMN a SET DEFAULT 'x';");
+  clean("ALTER TABLE t ALTER COLUMN a DROP NOT NULL;");
+  clean("UPDATE t SET a = 'x' WHERE a IS NULL;");
+  clean("DELETE FROM t WHERE a IS NULL;");
+  clean("COMMENT ON FUNCTION f() IS 'note';");
+  clean("SELECT 1;");
+});
+
+test("findings carry the line of the offending statement", () => {
+  const { findings } = lintSql("-- header\n\nCREATE TABLE t (id int);\n");
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].line, 3);
+});
+
+// ---------------------------------------------------------------------------
+// Pragmas
+// ---------------------------------------------------------------------------
+
+test("a disable pragma with a reason suppresses that rule on the next statement", () => {
+  clean(
+    "-- migration-lint-disable-next-line insert-without-on-conflict: seed table is truncated first\n" +
+      "INSERT INTO t (a) VALUES (1);",
+  );
+  // Only the named rule, and only for that statement.
+  flags(
+    "-- migration-lint-disable-next-line insert-without-on-conflict: reason\n" +
+      "INSERT INTO t (a) VALUES (1);\nCREATE TABLE u (id int);",
+    "create-table-without-if-not-exists",
+  );
+});
+
+test("a disable pragma without a reason, or naming an unknown rule, is itself a finding", () => {
+  const noReason = lintSql(
+    "-- migration-lint-disable-next-line insert-without-on-conflict\nINSERT INTO t (a) VALUES (1);",
+  ).findings;
+  assert.ok(noReason.some((f) => f.rule === "pragma" && /needs a reason/.test(f.message)));
+
+  const unknown = collectPragmas("-- migration-lint-disable-next-line no-such-rule: why\n");
+  assert.ok(unknown.problems.some((p) => /unknown lint rule/.test(p.message)));
+});
+
+// ---------------------------------------------------------------------------
+// The gate itself
+// ---------------------------------------------------------------------------
+
+test("every rule has a unique id", () => {
+  const ids = RULES.map((r) => r.id);
+  assert.equal(new Set(ids).size, ids.length);
+});
+
+test("the repository's migrations lint clean", () => {
+  const { files, findings } = lintDirectory(
+    new URL("../../database/migrations", import.meta.url).pathname,
+  );
+  assert.ok(files.length > 0, "expected migrations to be found");
+  assert.deepEqual(
+    findings.map((f) => `${f.file}:${f.line} [${f.rule}] ${f.message}`),
+    [],
+  );
+});
