@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { render } from '@/test/render';
 import { SecurityWeightingBars } from './SecurityWeightingBars';
 
@@ -25,7 +25,48 @@ function bars(container: HTMLElement): HTMLElement[] {
   ) as HTMLElement[];
 }
 
+/** Eight slices, so the list is longer than the collapsed cut. */
+const MANY = Array.from({ length: 8 }, (_, i) => ({
+  name: `Slice ${i + 1}`,
+  weight: (8 - i) / 40,
+}));
+
 describe('SecurityWeightingBars', () => {
+  describe('a long breakdown', () => {
+    it('shows the largest few and offers the rest', () => {
+      renderCard(MANY);
+      // Not a capped scrolling box: inside a small card that draws a full native
+      // scrollbar against the figures.
+      expect(screen.getAllByRole('listitem')).toHaveLength(5);
+      expect(
+        screen.getByRole('button', { name: 'Show 3 more' }),
+      ).toBeInTheDocument();
+    });
+
+    it('expands and collapses again', () => {
+      renderCard(MANY);
+      fireEvent.click(screen.getByRole('button', { name: 'Show 3 more' }));
+      expect(screen.getAllByRole('listitem')).toHaveLength(8);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }));
+      expect(screen.getAllByRole('listitem')).toHaveLength(5);
+    });
+
+    it('keeps the bars at the same scale when expanded', () => {
+      const { container } = renderCard(MANY);
+      const before = bars(container)[0].style.width;
+      fireEvent.click(screen.getByRole('button', { name: 'Show 3 more' }));
+      // Scaled against the largest overall, so rows already on screen do not
+      // jump when more arrive.
+      expect(bars(container)[0].style.width).toBe(before);
+    });
+
+    it('offers no button when everything already fits', () => {
+      renderCard(MANY.slice(0, 4));
+      expect(screen.queryByRole('button', { name: /Show/ })).toBeNull();
+    });
+  });
+
   it('lists each share with its percentage', () => {
     renderCard([
       { name: 'Technology', weight: 0.324 },

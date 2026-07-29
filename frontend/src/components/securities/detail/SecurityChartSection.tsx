@@ -156,7 +156,9 @@ export function SecurityChartSection({
         currencyCode={security.currencyCode}
         accountName={security.symbol}
         title={t(`chart.titles.${mode}` as Parameters<typeof t>[0])}
-        markers={mode === 'return' ? undefined : markers}
+        // Marked on every series, including Return: knowing you bought into a
+        // dip is exactly what the return line is read for.
+        markers={markers}
         // On the value series a trade *changes* the line, so its marker belongs
         // on the first point that reflects it. Snapping backwards put a first
         // purchase on the day the position was still zero -- flat on the axis,
