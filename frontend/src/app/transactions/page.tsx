@@ -523,7 +523,12 @@ function TransactionsContent() {
   const handleTransactionUpdate = useCallback((updatedTransaction: Transaction) => {
     setTransactions(prev =>
       prev.map(tx => tx.id === updatedTransaction.id
-        ? { ...updatedTransaction, linkedInvestmentTransactionId: tx.linkedInvestmentTransactionId }
+        ? {
+            ...updatedTransaction,
+            // Enrichment fields the single-transaction endpoints do not return.
+            linkedInvestmentTransactionId: updatedTransaction.linkedInvestmentTransactionId ?? tx.linkedInvestmentTransactionId,
+            attachmentCount: updatedTransaction.attachmentCount ?? tx.attachmentCount,
+          }
         : tx
       )
     );

@@ -275,7 +275,15 @@ export function TransactionList({
       toast.success(t('list.status.changed', { status: statusLabels[nextStatus] }));
 
       if (onTransactionUpdate) {
-        onTransactionUpdate(updatedTransaction);
+        // The status endpoint returns the plain transaction; list-only
+        // enrichment (attachment count, investment link) is not part of that
+        // payload, so carry it over from the row we already have. Otherwise
+        // the attachment column blanks out until the next refetch.
+        onTransactionUpdate({
+          ...updatedTransaction,
+          linkedInvestmentTransactionId: transaction.linkedInvestmentTransactionId,
+          attachmentCount: transaction.attachmentCount,
+        });
       } else {
         onRefresh?.();
       }
