@@ -205,28 +205,28 @@
           },
           "openDetail": {
             "title": "[XX-Open a security-XX]",
-            "body": "[XX-Pick any security in the list and choose **Details**. On a narrow screen, press and hold the row to reach the same action.-XX]"
+            "body": "[XX-Click any security in the list: the whole row opens its page. A long press, or a right-click, brings up that row's own actions instead.-XX]"
           },
           "summary": {
             "title": "[XX-Your position at a glance-XX]",
-            "body": "[XX-Market value, cost basis, unrealised gain, units held, and which accounts hold them. Amounts are in the security's own currency -- the one its price is quoted in.-XX]",
-            "fallbackBody": "[XX-This row normally shows your position. You no longer hold this security, so the page shows what you realised on it instead -- open one you still hold to see the figures.-XX]"
+            "body": "[XX-Market value, cost basis, unrealised gain, units held, and which accounts hold them. Amounts are in the security's own currency — the one its price is quoted in — and the market value says which close it was struck at.-XX]",
+            "fallbackBody": "[XX-This row normally shows your position. You no longer hold this security, so the page shows what you realised on it instead. Open one you still hold to see the figures.-XX]"
           },
           "chart": {
             "title": "[XX-Three ways to read the history-XX]",
-            "body": "[XX-Switch between the **price**, the **value of your position**, and the **return** over the window. The buttons on the right set how far back it goes. Try them now -- the chart stays live while you read.-XX]"
+            "body": "[XX-Switch between the **price**, the **value of your position**, and the **return** over the window. Buys and sells are marked on every series. The buttons on the right set how far back it goes, and the **arrows** beside them walk that window through earlier history at the same zoom — pick 1Y and step back a year at a time rather than switching to 5Y.-XX]"
           },
           "keyInfo": {
             "title": "[XX-What the instrument is-XX]",
-            "body": "[XX-Beside the chart: security type, exchange, currency, the quote provider Monize uses, and the price it last recorded. Underneath, the **Breakdown** card shows what a fund is made of -- switch between its sector and country splits.-XX]"
+            "body": "[XX-Beside the chart: security type, exchange, currency, the quote provider Monize uses, and the price it last recorded. Underneath, the **Breakdown** card shows what a fund is made of — switch between its sector, country and asset-class splits.-XX]"
           },
           "tabs": {
             "title": "[XX-The detail underneath-XX]",
-            "body": "[XX-**Overview** holds the description, the period returns and your holdings per account. **Transactions** and **Price history** are the same tables the old dialogs showed.-XX]"
+            "body": "[XX-**Overview** holds the description, the security's own returns, your total return on the position, and your holdings per account. **Transactions** and **Price history** are the tables the old dialogs used to hold, and **Documents** is where a factsheet or an annual report goes.-XX]"
           },
           "finish": {
             "title": "[XX-That is the tour-XX]",
-            "body": "[XX-The old dialogs are still on the securities list for a quick look. This page is the one you can link to and come back to.-XX]"
+            "body": "[XX-Every link that pointed at the old dialogs lands here instead — the dashboard's price widgets open this page on its Price history tab. It is a real page, so you can bookmark it and come back to it.-XX]"
           }
         }
       }
