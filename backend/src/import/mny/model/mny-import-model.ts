@@ -164,5 +164,11 @@ export interface MappedTransactions {
   readonly transfersLinked: number;
   /** `TRN` rows that are real postings but could not be imported. */
   readonly skipped: number;
+  /**
+   * Rows carrying a security, left for the investment mapper. Not a warning:
+   * Phase 1 imports banking data and Phase 2 picks these up from the same
+   * tables.
+   */
+  readonly deferredInvestments: number;
   readonly warnings: readonly MnyWarning[];
 }

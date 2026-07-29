@@ -32,6 +32,13 @@ export const MNY_WARNING_CODES = [
   "orphanedTransferSide",
   /** A `TRN_SPLIT` child whose parent is not being imported. */
   "orphanedSplit",
+  /** A split's legs do not add up to the parent transaction's amount. */
+  "splitSumMismatch",
+  /**
+   * A transfer whose counterpart sits in an account the user left out, so the
+   * row imports as an ordinary transaction rather than half a transfer.
+   */
+  "transferAcrossExcludedAccount",
   /** The account's file-computed final balance and its imported balance differ. */
   "balanceMismatch",
 ] as const;
