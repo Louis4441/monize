@@ -336,14 +336,57 @@ Four things the fixtures settled, each now pinned by a test:
 
 Partial answer to **open question 12.2** (`CAT` income/expense signal): every category tree
 descends from one of two roots, `INCOME` (`hcat` 130) and `EXPENSE` (`hcat` 131), which are the
-only rows with `nLevel` 0 and a null `hcatParent`. `lType` is *not* a clean income flag — income
-leaves carry both 2 and 3. Root-ancestor classification is therefore the primary signal; M1.3
-settles the fallback order.
+only rows with `nLevel` 0 and a null `hcatParent`. Root-ancestor classification therefore works.
+(A first reading of this data called `lType` unusable because income categories carry both 2 and
+3; a cross-tab against the roots in M0.6 showed it is in fact clean — see 6.3.)
 
 Column-presence differences across the fixtures are pinned as a table in
 `read-mny-tables.spec.ts`: Money 2001 lacks `CRNC.fHidden` and `TRN.hbillHead` (and the whole
 `BILL` table), Money 2002 lacks `CRNC.fHidden`, Money Plus has everything. Growing that list has
 to be a deliberate edit rather than silent data loss.
+
+### 6.3 Spike report (M0.6, implemented)
+
+Money's coded values and their Monize equivalents live in
+`backend/src/import/mny/model/mny-model.ts`. Every constant is labelled **confirmed** (asserted
+against the committed fixtures in `mny-model.spec.ts`) or **unconfirmed** (carried from PR #192's
+format reference). Mappers own row-level rules; this file owns only code-to-meaning lookups over a
+single value, so an unconfirmed code surfaces as a warning rather than a silent mapping.
+
+**`CAT.lType` is a clean income/expense flag** — this corrects 6.2. Cross-tabbing `lType` against
+each category's root ancestor across all three vintages gives no crossover in 349 categories:
+`-1` marks the two roots, `{0, 1}` sit under `EXPENSE`, `{2, 3}` under `INCOME`. So
+`isIncomeCategoryType` reads `lType` directly and returns null only for the roots, where the
+caller walks to the root ancestor. Open question 12.2 is answered, with the ancestor walk as the
+fallback rather than the primary signal.
+
+**`SEC.sct` codes are not stable across releases**, which weakens the design's "exclude `sct = 4`"
+rule for currency pseudo-securities. The same Amex index securities are `sct` 6 in Money
+2001/2002 while the Money Plus indices are `sct` 7, and `sct` 3 is a unit trust. No fixture
+contains a currency pseudo-security at all, so `sct = 4` is unverified. The version-independent
+second signal is the symbol: every `CRNC.szSymbol` in every fixture has the shape `/GBPUS` —
+slash, three-letter currency, two-letter quote currency — so `isCurrencyPseudoSecurity` tests the
+code **or** the symbol shape. M2.1 should use it rather than the code alone.
+
+**Frequency mapping is code plus interval.** `cFrqInst` is Money's interval multiplier, and two
+combinations land exactly on a Monize type that the code alone does not reach: weekly × 2 is
+BIWEEKLY, weekly × 4 is EVERY4WEEKS (likewise monthly × 3 → QUARTERLY, × 12 → YEARLY). Where no
+exact type exists — every two months, twice a year — `mapFrequency` falls to the next **shorter**
+period and returns `approximate: true`. Shorter is the safer error while v1 imports bills with
+`auto_post = false`: an extra reminder is noise, a missed one is a missed payment. PR #192 erred
+in both directions (bimonthly → BIWEEKLY, semiannual → YEARLY). Track B task B3 removes the
+approximation.
+
+**Still unanswerable from the fixtures.** `BILL` is empty in all five files and the transactions
+exercise only `act` 0, 1 and 15, so `BILL.st` (question 12.3) and the `act` 5 / 14 semantics
+(12.4) need a real file. `mny-model.ts` deliberately exports **no** `BILL.st` constant — a
+plausible-looking one would only make the guess harder to see — and lists 5 and 14 in
+`MNY_UNCONFIRMED_ACTIONS` so mappers can warn per transaction. Account types beyond `at` 0 and 5,
+and the `grftt` void/auto-entered bits, are likewise unconfirmed: the fixture rows carry `grftt`
+0x2 (Money 2001/2002) and 0x10 (Money Plus), neither of which is 0x80 or 0x8000.
+
+`npm run mny:inspect -- file.mny --table BILL` against a real Money Plus file closes 12.3 and
+12.4 in one pass.
 
 **ADR-9 — Write performance.** Pre-generate UUIDs for all transactions/splits in the mapper so
 transfer pairs and splits are wired before insert; insert in chunks of ~500 via
@@ -469,7 +512,7 @@ Exit gate: all five jackcess fixtures parse end-to-end via the CLI; go/no-go on 
 | M0.3 | `msisam/open-mny.ts` wrapper over `mdb-reader` v3.2.0 (`getTableOrNull`, column-presence map, engine sanity checks); confirm the identity-codec path reads pre-decrypted buffers. Spec: table lists + row counts correct for all fixtures | M0.2 | M | **done** (not vendored — see 6.1) |
 | M0.4 | Tolerant table readers (`tables/read-reference.ts`, `read-transactions.ts`, `read-investments.ts`, `read-bills.ts`) + typed raw-row model (`model/mny-rows.ts`) + date/amount normalization utils; build the per-version column-presence matrix across fixtures and encode defaults. Spec: every table reads or degrades gracefully on all fixtures | M0.3 | L | **done** (see 6.2) |
 | M0.5 | Validation-harness CLI: `npm run mny:validate -- file.mny [--password ...]` prints accounts, transaction counts, per-account computed final balances, per-security holdings (replay + LOT), warnings. Acceptance: maintainer runs it on the real Sunset and Money 2001 files; output sane; runtime + memory recorded in the PR | M0.4 | M | reader half shipped as `npm run mny:inspect`: scheme, table list, row/column counts, base currency, entity counts, missing tables/fields, sample rows, per-table failure isolation. Balances and holdings need the mappers |
-| M0.6 | Spike report resolving open questions (section 12): DHD base-currency field, CAT `is_income` signal, BILL `st` active semantics (validated against the known "~20 real bills" ground truth), act 5 vs 3 and act 14 semantics, native date decoding vs pivot logic. Constants land in `model/mny-model.ts` with the findings documented | M0.5 | M | |
+| M0.6 | Spike report resolving open questions (section 12): DHD base-currency field, CAT `is_income` signal, BILL `st` active semantics (validated against the known "~20 real bills" ground truth), act 5 vs 3 and act 14 semantics, native date decoding vs pivot logic. Constants land in `model/mny-model.ts` with the findings documented | M0.5 | M | **done** (see 6.3). Questions 12.3 and 12.4 need a real file — no fixture has a `BILL` row or an `act` outside {0, 1, 15} |
 
 ### Track B — Parallel, not .mny-specific
 
@@ -573,17 +616,19 @@ wizard simply gains capability per phase.
 
 1. ~~`DHD` base-currency field name/shape.~~ **Answered (M0.4):** `DHD.hcrncDef`, a `CRNC` handle.
    `hcrncCur` (display currency) is null in every sample file. See 6.2.
-2. `CAT` income/expense signal: explicit flag, root-ancestor classification, or transaction-sign
-   heuristic (fallback order to be established empirically). **Partly answered (M0.4):**
-   root-ancestor classification works — the tree descends from `INCOME` (130) and `EXPENSE` (131),
-   the only `nLevel` 0 rows — and `lType` is not a clean flag. Fallback order still open for M1.3.
+2. ~~`CAT` income/expense signal: explicit flag, root-ancestor classification, or transaction-sign
+   heuristic.~~ **Answered (M0.6): `lType` is an explicit flag** — `{2, 3}` income, `{0, 1}`
+   expense, `-1` the two roots, with no crossover in 349 fixture categories. Root-ancestor
+   classification is the fallback for the roots themselves. See 6.3.
 3. Exact `BILL.st` active values, and whether BILL rows are series or instances (drives the
-   dedupe key). Ground truth: kenlasko's file must yield ~20 active candidates. `BILL` is empty in
-   every committed fixture, so this needs a real file; note `BILL` has both `hbillHead` (series)
-   and `iinst` (instance), which is suggestive but not proof.
+   dedupe key). Ground truth: kenlasko's file must yield ~20 active candidates. **Blocked on a
+   real file:** `BILL` is empty in every committed fixture. `BILL` has both `hbillHead` (series)
+   and `iinst` (instance), which is suggestive but not proof; `mny-model.ts` deliberately exports
+   no `st` constant until this is observed.
 4. act=5 vs act=3 distinction, act=14 real-world meaning (defaults chosen: REINVEST /
-   CAPITAL_GAIN + warning). The fixtures only exercise act 0, 1 and 15, so this also needs a real
-   file.
+   CAPITAL_GAIN + warning). **Blocked on a real file:** the fixtures only exercise act 0, 1 and
+   15. Both codes are listed in `MNY_UNCONFIRMED_ACTIONS` so every transaction mapped through them
+   carries a warning.
 5. ~~Whether mdb-reader's native Jet datetime decoding fully obsoletes the MM/DD/YY 70-year-pivot
    logic.~~ **Answered (M0.4): yes.** Dates arrive as absolute-epoch `Date`s; the real sentinel is
    year 10000, not a two-digit-year pivot. See 6.2.

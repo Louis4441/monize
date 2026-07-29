@@ -9,7 +9,18 @@ Native TypeScript pipeline for importing complete Microsoft Money files. Design 
   -> writer (withScopedDb) -> verification report
 ```
 
-Implemented so far: the decrypt, reader and table layers (Phase 0, tasks M0.1–M0.4).
+Implemented so far: the decrypt, reader, table and coded-value layers (Phase 0, tasks M0.1–M0.4
+and M0.6).
+
+## Coded values
+
+`model/mny-model.ts` holds every Money code and its Monize equivalent -- account types, cleared
+status and the `grftt` flag bits, investment actions, category classification, recurrence
+frequencies. Each constant is labelled **confirmed** (asserted against the fixtures in
+`mny-model.spec.ts`) or **unconfirmed** (carried from the format reference). An unconfirmed code
+that turns up in a real file must become a warning in the verification report, never a silent
+mapping: `mapAccountType`, `mapInvestmentAction` and `mapFrequency` all return null for codes they
+do not know, and `MNY_UNCONFIRMED_ACTIONS` names the ones whose meaning is inferred.
 
 ## Reading tables
 
@@ -69,3 +80,14 @@ than aborting the report.
   which is built from `SP.hss` -> `SP.hsec`.
 - **"No date" is year 10000, not a two-digit-year pivot.** `toDate` returns null outside
   1900–2199; never parse Money dates by hand.
+- **`act` 16 removes shares; it is not a sale.** Mapping it to SELL closes lots against a
+  fabricated price and corrupts average cost. Direction always comes from `act` -- `TRN_INV.qty`
+  is stored positive, so a quantity sign proves nothing.
+- **`act` 4 (cash dividend) has no `TRN_INV` row.** Drive the investment mapper from `TRN`;
+  iterating `TRN_INV` drops every dividend.
+- **`SEC.sct` codes shift between releases** (the same index securities are `sct` 6 in Money
+  2001/2002 and `sct` 7 in Money Plus), so the `sct = 4` currency test is not enough on its own.
+  Use `isCurrencyPseudoSecurity`, which also matches the version-independent `/GBPUS` symbol
+  shape.
+- **`CAT.lType` says income or expense directly** -- `{2, 3}` income, `{0, 1}` expense, `-1` the
+  two roots. Use `isIncomeCategoryType` and fall back to the root ancestor only for the roots.
