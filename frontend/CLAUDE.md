@@ -89,6 +89,19 @@ Two patterns, depending on where it lives:
 
 Do not cap a card's height with `overflow-y-auto`. In a small card that draws a full native scrollbar hard against the content, which on Linux is a chunky arrowed bar that reads as a rendering fault -- and it hides the rest of the list behind a gutter nobody notices. The `overflow-y-auto` regions that do exist are panels, modals and sidebars, not cards. `scrollbar-hide` is for a horizontal strip of chips, and hiding a scrollbar you need is worse than not needing one.
 
+### Copy -- `--` is comment style, never UI text
+
+This repo writes `--` in code comments, and the habit is strong enough that it
+leaks into catalog strings, where it renders literally on screen and reads as a
+typo. In copy use an em dash, or recast the sentence and drop the aside.
+`messages.punctuation.test.ts` fails the build on a new one; it carries a
+shrink-only baseline of the strings that already had them.
+
+The same applies to anything else that is punctuation rather than words: compose
+it in the catalog, not in JSX. `"{units} ({share})"` is one string a translator
+can reorder; `{value}{' ('}{share}{')'}` in a component is three fragments they
+cannot reach.
+
 ## Form Patterns
 
 `useFormModal<T>` (`hooks/useFormModal.ts`) manages create/edit modal state with browser-history integration (back button closes), unsaved-changes detection via `UnsavedChangesDialog`, and form submit exposed via ref. Returns `showForm`, `editingItem`, `openCreate()`, `openEdit(item)`, `close()`, `modalProps`, `unsavedChangesDialog`.
