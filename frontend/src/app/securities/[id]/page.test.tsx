@@ -88,6 +88,7 @@ const security: Security = {
   industry: 'Consumer Electronics',
   sectorWeightings: null,
   countryWeightings: null,
+  assetWeightings: null,
   quoteProvider: 'yahoo',
   msnInstrumentId: null,
   lastPriceSource: 'yahoo_finance',
