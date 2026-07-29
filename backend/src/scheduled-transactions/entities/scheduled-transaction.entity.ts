@@ -25,7 +25,9 @@ export type FrequencyType =
   | "EVERY4WEEKS"
   | "SEMIMONTHLY"
   | "MONTHLY"
+  | "EVERY2MONTHS"
   | "QUARTERLY"
+  | "SEMIANNUAL"
   | "YEARLY";
 
 const dateStringTransformer = {

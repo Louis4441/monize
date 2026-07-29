@@ -397,13 +397,15 @@ describe('buildForecast', () => {
         frequency: 'MONTHLY',
       })];
       const result = buildForecast(accounts, transactions, '90days', 'all');
-      // Jan 31 -> setMonth adds 1 -> JS Date will give Feb 28 in 2025 (non-leap)
-      // Actually JS Date(2025, 1, 31) = March 3, so let's verify what actually happens
       const jan31 = result.find(dp => dp.date === '2025-01-31');
       expect(jan31?.transactions.length).toBe(1);
-      // JS setMonth(1) on Jan 31 => Feb 31 => Mar 3 (date overflow)
-      const mar03 = result.find(dp => dp.date === '2025-03-03');
-      expect(mar03?.transactions.length).toBe(1);
+      // Clamped to the last day of the shorter month, matching the backend's
+      // calculateNextDueDate (the authority for the stored next_due_date).
+      // A bare setMonth(1) on Jan 31 overflows to Mar 3, which this used to
+      // assert -- the forecast then showed a date the server would never post.
+      const feb28 = result.find(dp => dp.date === '2025-02-28');
+      expect(feb28?.transactions.length).toBe(1);
+      expect(result.find(dp => dp.date === '2025-03-03')?.transactions.length ?? 0).toBe(0);
     });
 
     it('handles end-of-month SEMIMONTHLY in February (non-leap year)', () => {

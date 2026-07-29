@@ -775,8 +775,11 @@ describe('BillsPage', () => {
       ]);
       render(<BillsPage />);
       await waitFor(() => {
-        // Weekly: 100 * 4.33 = 433, monthly net = -433
-        expect(screen.getByTestId('summary-Monthly Net')).toHaveTextContent('$433.00');
+        // Weekly: 100 * (365.25 / 7 / 12) ~= 434.82. The per-frequency factors
+        // moved to monthlyEquivalent() in @/lib/frequency, which uses the real
+        // year length everywhere instead of the old hand-rounded 4.33.
+        const text = screen.getByTestId('summary-Monthly Net').textContent || '';
+        expect(parseFloat(text.replace('$', ''))).toBeCloseTo((365.25 / 7 / 12) * 100, 0);
       });
     });
 
@@ -847,8 +850,9 @@ describe('BillsPage', () => {
       ]);
       render(<BillsPage />);
       await waitFor(() => {
-        // 10 * 30 = 300
-        expect(screen.getByTestId('summary-Monthly Net')).toHaveTextContent('$300.00');
+        // 10 * (365.25 / 12) ~= 304.38 (was a flat 30 days per month)
+        const text = screen.getByTestId('summary-Monthly Net').textContent || '';
+        expect(parseFloat(text.replace('$', ''))).toBeCloseTo((365.25 / 12) * 10, 0);
       });
     });
 
@@ -858,8 +862,9 @@ describe('BillsPage', () => {
       ]);
       render(<BillsPage />);
       await waitFor(() => {
-        // 1000 * 2.17 = 2170
-        expect(screen.getByTestId('summary-Monthly Net')).toHaveTextContent('$2170.00');
+        // 1000 * (365.25 / 14 / 12) ~= 2173.66 (was a hand-rounded 2.17)
+        const text = screen.getByTestId('summary-Monthly Net').textContent || '';
+        expect(parseFloat(text.replace('$', ''))).toBeCloseTo((365.25 / 14 / 12) * 1000, 0);
       });
     });
 

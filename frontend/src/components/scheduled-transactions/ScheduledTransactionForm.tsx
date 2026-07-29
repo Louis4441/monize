@@ -23,7 +23,7 @@ import { payeesApi } from '@/lib/payees';
 import { categoriesApi } from '@/lib/categories';
 import { accountsApi } from '@/lib/accounts';
 import { tagsApi } from '@/lib/tags';
-import { ScheduledTransaction, FrequencyType, FREQUENCY_LABELS } from '@/types/scheduled-transaction';
+import { ScheduledTransaction, FrequencyType, FREQUENCY_VALUES } from '@/types/scheduled-transaction';
 import { InvestmentAction, Security } from '@/types/investment';
 import { Transaction } from '@/types/transaction';
 import { Payee } from '@/types/payee';
@@ -71,7 +71,7 @@ const buildScheduledTransactionSchema = (t: (key: string) => string) => z.object
   currencyCode: z.string().default('CAD'),
   description: optionalString,
   referenceNumber: optionalString,
-  frequency: z.enum(['ONCE', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'EVERY4WEEKS', 'SEMIMONTHLY', 'MONTHLY', 'QUARTERLY', 'YEARLY']),
+  frequency: z.enum(FREQUENCY_VALUES),
   nextDueDate: z.string().min(1, t('validation.dueDateRequired')),
   endDate: optionalString,
   occurrencesRemaining: optionalNumber,
@@ -849,7 +849,7 @@ export function ScheduledTransactionForm({
   };
   useFormSubmitRef(submitRef, handleSubmit, onSubmit);
 
-  const frequencyOptions = Object.keys(FREQUENCY_LABELS).map((value) => ({
+  const frequencyOptions = FREQUENCY_VALUES.map((value) => ({
     value,
     label: t(`frequency.${value}`),
   }));

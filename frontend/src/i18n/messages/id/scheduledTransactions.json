@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "Setiap 4 Minggu",
     "SEMIMONTHLY": "Dua Kali Sebulan",
     "MONTHLY": "Bulanan",
+    "EVERY2MONTHS": "Setiap 2 Bulan",
     "QUARTERLY": "Kuartalan",
+    "SEMIANNUAL": "Dua Kali Setahun",
     "YEARLY": "Tahunan"
   },
   "validation": {

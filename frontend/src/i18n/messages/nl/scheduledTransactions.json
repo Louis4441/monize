@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "Elke 4 weken",
     "SEMIMONTHLY": "Twee keer per maand",
     "MONTHLY": "Maandelijks",
+    "EVERY2MONTHS": "Elke 2 maanden",
     "QUARTERLY": "Kwartaal",
+    "SEMIANNUAL": "Twee keer per jaar",
     "YEARLY": "Jaarlijks"
   },
   "validation": {

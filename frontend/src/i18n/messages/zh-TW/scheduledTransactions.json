@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "每 4 週",
     "SEMIMONTHLY": "每月兩次",
     "MONTHLY": "每月",
+    "EVERY2MONTHS": "每兩個月",
     "QUARTERLY": "每季",
+    "SEMIANNUAL": "每年兩次",
     "YEARLY": "每年"
   },
   "validation": {

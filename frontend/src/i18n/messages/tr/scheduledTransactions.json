@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "Her 4 Haftada Bir",
     "SEMIMONTHLY": "Ayda İki Kez",
     "MONTHLY": "Aylık",
+    "EVERY2MONTHS": "Her 2 Ayda Bir",
     "QUARTERLY": "Üç Aylık",
+    "SEMIANNUAL": "Yılda İki Kez",
     "YEARLY": "Yıllık"
   },
   "validation": {

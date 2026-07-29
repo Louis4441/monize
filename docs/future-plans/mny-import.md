@@ -90,7 +90,7 @@ as the living format reference. Also correct and carried forward:
 | 3 | Junk payees `#` and `*` with zero transactions; never-used categories such as `alimony` (kenlasko) | Money seeds a default category tree and keeps degenerate payee rows; the PoC imported all of `PAY`/`CAT` | Referenced-only import (default on, wizard toggle): only payees/categories referenced by an imported transaction, split, or selected bill are created. Degenerate payee names (`#`, `*`, empty after trim) always skipped. Skip counts shown in the report |
 | 4 | Investment accounts "a mess": share counts wrong, negative positions, cost basis nonsense (kenlasko; marksimpson confirmed buy/sell subtleties and FX cost-basis storage quirks) | Four distinct causes: act=16 mapped to SELL (it closes lots but is a *transfer-out*, and mapping it to SELL corrupts average cost); act=4 dividends have **no TRN_INV row** so iterating TRN_INV dropped them entirely; `SEC_SPLIT` (stock splits) ignored, so every post-split position is wrong; qty-sign/action inference inconsistencies | Complete act map driven from TRN not TRN_INV (section 8.4): 4 -> DIVIDEND from `TRN.amt`; 16 -> REMOVE_SHARES, or paired with the matching act=15 row (same date+security+qty across accounts) into linked TRANSFER_OUT/TRANSFER_IN; SEC_SPLIT -> SPLIT transactions; quantity always positive, direction only from act. Holdings produced exclusively by the existing `HoldingsService.rebuildAccountsFromTransactions`. Independently, the mapper computes expected holdings from **LOT open lots** (`htrnSell` empty) and flags disagreements in the verification report instead of silently corrupting positions. Foreign-currency cost basis (Money stores base-currency value at the historical rate) is surfaced as report warnings and documented as a v1 limitation |
 | 5 | Money 2001 file crashed on the missing `BILL` table; needed hand-patched `tableExists` (gerardfarrell11) | Reader assumed the Sunset-era table set | Every table access goes through `getTableOrNull`; every column read has a declared default; a per-version column-presence matrix (built in Phase 0 from the 2001/2002/2008 fixtures) is encoded in the row-reader layer. Missing `BILL`/`SEC_SPLIT`/`LOT` degrade the corresponding feature with a preview notice, never a crash |
-| 6 | Backend crash-looped on migration `056_monte_carlo_scenarios.sql` ("trigger already exists") until the migration was hand-marked applied (gerardfarrell11 — **not** a .mny issue, but raised in the thread) | A partially-applied migration state plus non-idempotent `CREATE TRIGGER`; the runner `process.exit(1)`s with little diagnostic help | `056` in the current tree is already guarded with a `pg_trigger` existence check. Remaining work is Track B: audit **all** migrations for idempotent DDL (B1), add a CI lint for unguarded DDL in new migrations (B1), and make `db-migrate.ts` failures diagnosable — failing filename, SQL error detail/position, runbook pointer (B2) |
+| 6 | Backend crash-looped on migration `056_monte_carlo_scenarios.sql` ("trigger already exists") until the migration was hand-marked applied (gerardfarrell11 — **not** a .mny issue, but raised in the thread) | A partially-applied migration state plus non-idempotent `CREATE TRIGGER`; the runner `process.exit(1)`s with little diagnostic help | `056` in the current tree is already guarded with a `pg_trigger` existence check. **Done in Track B:** the full-corpus audit found no other unguarded DDL, and both gates now exist — a static lint (`npm run migration:lint`) plus a double-apply pass in `verify-schema.sh` (B1) — while `db-migrate.ts` prints the failing filename, SQLSTATE, every pg diagnostic, the offending line and a pointer to `docs/database-migrations.md` before its non-zero exit (B2) |
 | 7 | Setup friction: manual `npm install pg`, missing `libatomic1`, `.env` password with `$T` mangled by shell interpolation (gerardfarrell11, kenlasko) | Inherent to the external-toolchain design | Disappears entirely with the native in-app import. The Money file password is a form field, never a shell variable |
 
 ### PoC design flaws to not repeat (from code review of `migrate.ts`)
@@ -115,8 +115,9 @@ as the living format reference. Also correct and carried forward:
   `AccountsService.updateBalance` rejects closed accounts, closure is applied **after** the
   account's transactions are written.
 - **Frequency mis-mapping**: Money bimonthly -> BIWEEKLY (wrong: every 2 months vs every 2 weeks)
-  and semiannually -> YEARLY. Monize already has `SEMIMONTHLY`; Track B task B3 adds
-  `EVERY2MONTHS` and `SEMIANNUAL`. Until B3 lands the mapper downgrades with a per-bill warning.
+  and semiannually -> YEARLY. Monize already had `SEMIMONTHLY`; Track B task B3 has since added
+  `EVERY2MONTHS` and `SEMIANNUAL`, so every Money recurrence code now maps exactly and the
+  downgrade-with-warning path is left only for intervals Monize cannot express.
 - **No i18n, no tests, no wizard integration** — all mandatory here (sections 9–10).
 
 ## 4. The .mny format and the native parsing strategy
@@ -212,7 +213,8 @@ Verified by exploration; file paths are current as of this writing.
   canonical holdings rebuild; `CurrenciesService.ensureSystemCurrency(code)` creates currencies
   idempotently with proper metadata; `UsersService.deleteData` is the safe selective wipe;
   scheduled transactions support splits/transfers/investment templates and `is_active`.
-- **Gaps to fill**: no `EVERY2MONTHS`/`SEMIANNUAL` frequency (B3); categories are two-level
+- **Gaps to fill**: ~~no `EVERY2MONTHS`/`SEMIANNUAL` frequency~~ (added in B3, with the frontend's
+  four hand-rolled steppers folded into `frontend/src/lib/frequency.ts`); categories are two-level
   (deeper Money trees flatten); `is_income` must be derived (spike); no background job table
   (M1.1).
 
@@ -368,14 +370,15 @@ second signal is the symbol: every `CRNC.szSymbol` in every fixture has the shap
 slash, three-letter currency, two-letter quote currency — so `isCurrencyPseudoSecurity` tests the
 code **or** the symbol shape. M2.1 should use it rather than the code alone.
 
-**Frequency mapping is code plus interval.** `cFrqInst` is Money's interval multiplier, and two
-combinations land exactly on a Monize type that the code alone does not reach: weekly × 2 is
-BIWEEKLY, weekly × 4 is EVERY4WEEKS (likewise monthly × 3 → QUARTERLY, × 12 → YEARLY). Where no
-exact type exists — every two months, twice a year — `mapFrequency` falls to the next **shorter**
-period and returns `approximate: true`. Shorter is the safer error while v1 imports bills with
-`auto_post = false`: an extra reminder is noise, a missed one is a missed payment. PR #192 erred
-in both directions (bimonthly → BIWEEKLY, semiannual → YEARLY). Track B task B3 removes the
-approximation.
+**Frequency mapping is code plus interval.** `cFrqInst` is Money's interval multiplier, and
+several combinations land exactly on a Monize type that the code alone does not reach: weekly × 2
+is BIWEEKLY, weekly × 4 is EVERY4WEEKS (likewise monthly × 2 → EVERY2MONTHS, × 3 → QUARTERLY,
+× 6 → SEMIANNUAL, × 12 → YEARLY). Where no exact type exists, `mapFrequency` falls to the next
+**shorter** period and returns `approximate: true`. Shorter is the safer error while v1 imports
+bills with `auto_post = false`: an extra reminder is noise, a missed one is a missed payment.
+PR #192 erred in both directions (bimonthly → BIWEEKLY, semiannual → YEARLY). Track B task B3
+has since added `EVERY2MONTHS` and `SEMIANNUAL`, so every recurrence *code* is now exact and only
+an unrepresentable interval (weekly × 3, monthly × 5) still approximates.
 
 **Still unanswerable from the fixtures.** `BILL` is empty in all five files and the transactions
 exercise only `act` 0, 1 and 15, so `BILL.st` (question 12.3) and the `act` 5 / 14 semantics
@@ -463,8 +466,9 @@ the shared bulk recalc as a cross-check. Prices and FX rates are multi-row upser
 template support. Active-series detection: `st` in the spike-confirmed active set, next-due date
 within a sanity horizon, deduped per series. Wizard selection is authoritative; selected bills
 import with `is_active = true`, `auto_post = false`. Frequency map: 0 ONCE, 1 DAILY, 2 WEEKLY,
-3 MONTHLY, 4 YEARLY, 5 -> `EVERY2MONTHS` (B3), 6 QUARTERLY, 7 -> `SEMIANNUAL` (B3);
-`cFrqInst` interval honored where representable, else downgrade + warning.
+3 MONTHLY, 4 YEARLY, 5 EVERY2MONTHS, 6 QUARTERLY, 7 SEMIANNUAL;
+`cFrqInst` interval honored where representable, else downgrade + warning. (B3 has landed, so
+only intervals with no Monize type downgrade.)
 
 ### 8.4 Investments
 
@@ -516,11 +520,62 @@ Exit gate: all five jackcess fixtures parse end-to-end via the CLI; go/no-go on 
 
 ### Track B — Parallel, not .mny-specific
 
-| ID | Task | Depends | Size |
-|----|------|---------|------|
-| B1 | Migration idempotency audit: guard all unguarded `CREATE TRIGGER` / `CREATE POLICY` / `CREATE INDEX` / `ADD COLUMN` / enum-value DDL across `database/migrations/*.sql` (mirroring the existing `056` pg_trigger guard); add a CI lint script that flags unguarded DDL in new migrations. Acceptance: re-running any migration body against an up-to-date DB is a no-op | — | M |
-| B2 | `backend/src/db-migrate.ts` failure UX: log failing filename, SQL error detail/position, and a runbook pointer before the non-zero exit (fail-fast retained); unit specs; short runbook section for the "partially applied" recovery that PR #192's thread walked through by hand | — | S |
-| B3 | Frequency extension `EVERY2MONTHS` + `SEMIANNUAL`: `FrequencyType`, next-due-date calculator, scheduled-transaction UI selector, English catalogs + pseudo-locale. Acceptance: next-occurrence math specs for both | — | M |
+| ID | Task | Depends | Size | Status |
+|----|------|---------|------|--------|
+| B1 | Migration idempotency audit: guard all unguarded `CREATE TRIGGER` / `CREATE POLICY` / `CREATE INDEX` / `ADD COLUMN` / enum-value DDL across `database/migrations/*.sql` (mirroring the existing `056` pg_trigger guard); add a CI lint script that flags unguarded DDL in new migrations. Acceptance: re-running any migration body against an up-to-date DB is a no-op | — | M | **done** (see B1 below) |
+| B2 | `backend/src/db-migrate.ts` failure UX: log failing filename, SQL error detail/position, and a runbook pointer before the non-zero exit (fail-fast retained); unit specs; short runbook section for the "partially applied" recovery that PR #192's thread walked through by hand | — | S | **done** |
+| B3 | Frequency extension `EVERY2MONTHS` + `SEMIANNUAL`: `FrequencyType`, next-due-date calculator, scheduled-transaction UI selector, English catalogs + pseudo-locale. Acceptance: next-occurrence math specs for both | — | M | **done** (see B3 below) |
+
+#### B1 findings — the corpus was already idempotent; the gates are new
+
+The audit found **no unguarded DDL** to fix across the 102 migration files: every
+`CREATE TABLE`/`INDEX` and `ADD COLUMN` carries `IF NOT EXISTS`, the four
+`CREATE TRIGGER` sites use either the `056` `pg_trigger` `DO` block or a
+preceding `DROP TRIGGER IF EXISTS` (`077`), every `ADD CONSTRAINT` is preceded by
+its `DROP CONSTRAINT IF EXISTS` or wrapped in a `pg_constraint` check, the RLS
+`CREATE POLICY` statements drop-then-create (including inside `112`'s `format()`
+loop), and the one data `INSERT` (`018`) has `ON CONFLICT DO NOTHING`. Verified
+empirically: `schema.sql` plus all 102 migrations applied **twice** against a
+Postgres 16 instance, zero errors.
+
+What was missing was enforcement, so B1 shipped the two gates instead:
+
+- `backend/scripts/migration-lint.mjs` (+ `migration-lint.test.mjs` self-test,
+  `npm run migration:lint`, wired into the "Backend Lint & Type Check" job) — a
+  SQL-aware static lint. It splits each file into statements (dollar-quoted
+  bodies handled, comments blanked offset-preserving), then checks each against a
+  rule per DDL family: `IF [NOT] EXISTS` where the clause exists, a preceding
+  `DROP ... IF EXISTS` of the same name for constraints/triggers/policies, an
+  enclosing catalog-checking `DO` block otherwise, `OR REPLACE` for
+  functions/views, `ON CONFLICT` for `INSERT`. Escape hatch:
+  `-- migration-lint-disable-next-line <rule>: <reason>`, reason mandatory.
+- `scripts/verify-schema.sh` now applies every migration on top of `schema.sql`
+  **twice** ("Schema vs Migrations Drift" job). Pass 1 was already the
+  no-op-on-current-schema proof; pass 2 covers the half-applied re-run that
+  actually bites in production.
+
+Runbook and guard recipes: `docs/database-migrations.md` (also the pointer B2's
+failure report prints), summarised in `database/CLAUDE.md`.
+
+#### B3 notes — one stepper, not five
+
+The two types landed end-to-end: `FrequencyType` (backend enum, entity union,
+frontend `FREQUENCY_VALUES` tuple that the form's `z.enum` now derives from),
+`calculateNextDueDate` (`+2` / `+6` months, clamped), all 23 locales, migration
+`116` (documentation no-op like `041`, `VARCHAR(20)` already fits), and
+`mapFrequency` in `mny-model.ts` — Money's `frq` 5 and 7 and `cFrqInst` 2 and 6
+now map **exactly**, so `approximate: true` is left only for intervals Monize
+still cannot express (weekly every 3 weeks, monthly every 5 months). Section 3's
+frequency bullet and 6.3's approximation note are resolved by this.
+
+The frontend had **four** hand-rolled `switch (frequency)` steppers (cash-flow
+forecast, occurrence picker, bills calendar, upcoming-bills report). Two had
+already drifted — neither handled `SEMIMONTHLY`, so those schedules projected the
+same date until the loop cap — and the forecast's `setMonth` overflowed Jan 31 to
+Mar 3 where the backend clamps to Feb 28. All four now call
+`frontend/src/lib/frequency.ts` (`advanceByFrequency`, `isOneTime`,
+`monthlyEquivalent`), with `frequency.guard.test.ts` failing if a local switch
+reappears. Phase 3's M3.1 can therefore drop the downgrade-and-warn fallback.
 
 ### Phase 1 — Core banking import, end-to-end behind the wizard (shippable)
 
@@ -552,7 +607,7 @@ Exit gate: all five jackcess fixtures parse end-to-end via the CLI; go/no-go on 
 
 | ID | Task | Depends | Size |
 |----|------|---------|------|
-| M3.1 | Bills mapper (`map/map-bills.ts`): active-series detection (`st` + due-date horizon + series dedupe per M0.6), `lHtrn` template resolution (splits/transfer/investment templates), frequency map using B3 (downgrade + warn fallback while B3 unmerged). Acceptance: the kenlasko scenario yields ~20 active candidates from 1,844 rows; Money 2001 absence degrades with a notice | M0.6, M1.4 | L |
+| M3.1 | Bills mapper (`map/map-bills.ts`): active-series detection (`st` + due-date horizon + series dedupe per M0.6), `lHtrn` template resolution (splits/transfer/investment templates), frequency map via `mapFrequency` (B3 landed: every code exact, downgrade + warn only for unrepresentable intervals). Acceptance: the kenlasko scenario yields ~20 active candidates from 1,844 rows; Money 2001 absence degrades with a notice | M0.6, M1.4 | L |
 | M3.2 | Bills writer + wizard selection panel (`MnyBillsPanel`): only selected bills imported, `is_active=true`, `auto_post=false`. Acceptance: unchecked bills are absent from the DB, not inactive | M3.1, M1.9 | M |
 | M3.3 | Wipe-first UX: typed-confirmation dialog naming the delete-my-data operation, wiring to `deleteData` as a pre-step, report line "existing data removed". Default import never deletes | M1.8 | S |
 | M3.4 | Loan verification on real files: loan/mortgage balances in the report, mortgage subtype mapping, escrow split refinement. Acceptance: maintainer's loan accounts reconcile in the harness | M1.4, M0.5 | M |

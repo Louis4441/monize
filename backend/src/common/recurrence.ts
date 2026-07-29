@@ -6,7 +6,9 @@ export type FrequencyType =
   | "EVERY4WEEKS"
   | "SEMIMONTHLY"
   | "MONTHLY"
+  | "EVERY2MONTHS"
   | "QUARTERLY"
+  | "SEMIANNUAL"
   | "YEARLY";
 
 const YMD_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -84,8 +86,12 @@ export function calculateNextDueDate(
     }
     case "MONTHLY":
       return addMonthsClamped(ymd, 1);
+    case "EVERY2MONTHS":
+      return addMonthsClamped(ymd, 2);
     case "QUARTERLY":
       return addMonthsClamped(ymd, 3);
+    case "SEMIANNUAL":
+      return addMonthsClamped(ymd, 6);
     case "YEARLY":
       return addYearsClamped(ymd, 1);
     default:

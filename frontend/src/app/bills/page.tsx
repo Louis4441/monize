@@ -15,9 +15,6 @@ import {
   addMonths,
   subMonths,
   getDay,
-  addWeeks,
-  addDays,
-  addYears,
 } from 'date-fns';
 import { Button } from '@/components/ui/Button';
 import { ScheduledTransactionForm } from '@/components/scheduled-transactions/ScheduledTransactionForm';
@@ -46,6 +43,7 @@ import {
   deriveAccountsFromScheduledTransactions,
 } from '@/lib/bills-filters';
 import { parseLocalDate } from '@/lib/utils';
+import { advanceByFrequency, isOneTime, monthlyEquivalent } from '@/lib/frequency';
 import type { FutureTransaction } from '@/lib/forecast';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { Modal } from '@/components/ui/Modal';
@@ -452,19 +450,6 @@ function BillsContent() {
 
   // Calculate summary stats in a single pass (exclude transfers from bills/deposits)
   const summary = useMemo(() => {
-    const normalizeToMonthly = (amount: number, frequency: string): number => {
-      switch (frequency) {
-        case 'DAILY': return amount * 30;
-        case 'WEEKLY': return amount * 4.33;
-        case 'BIWEEKLY': return amount * 2.17;
-        case 'EVERY4WEEKS': return amount * (365.25 / 28 / 12);
-        case 'MONTHLY': return amount;
-        case 'QUARTERLY': return amount / 3;
-        case 'YEARLY': return amount / 12;
-        default: return 0;
-      }
-    };
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -481,10 +466,10 @@ function BillsContent() {
       if (isActiveNonTransfer) {
         if (amount < 0) {
           totalBills++;
-          monthlyBills += normalizeToMonthly(Math.abs(amount), t.frequency);
+          monthlyBills += monthlyEquivalent(Math.abs(amount), t.frequency);
         } else if (amount > 0) {
           totalDeposits++;
-          monthlyDeposits += normalizeToMonthly(amount, t.frequency);
+          monthlyDeposits += monthlyEquivalent(amount, t.frequency);
         }
       }
 
@@ -533,16 +518,8 @@ function BillsContent() {
       if (effectiveDate >= startDate && effectiveDate <= endDate) {
         occurrences.push(new Date(effectiveDate));
       }
-      switch (st.frequency) {
-        case 'ONCE': return occurrences;
-        case 'DAILY': nextDate = addDays(nextDate, 1); break;
-        case 'WEEKLY': nextDate = addWeeks(nextDate, 1); break;
-        case 'BIWEEKLY': nextDate = addWeeks(nextDate, 2); break;
-        case 'EVERY4WEEKS': nextDate = addWeeks(nextDate, 4); break;
-        case 'MONTHLY': nextDate = addMonths(nextDate, 1); break;
-        case 'QUARTERLY': nextDate = addMonths(nextDate, 3); break;
-        case 'YEARLY': nextDate = addYears(nextDate, 1); break;
-      }
+      if (isOneTime(st.frequency)) return occurrences;
+      nextDate = advanceByFrequency(nextDate, st.frequency);
       count++;
     }
     return occurrences;
