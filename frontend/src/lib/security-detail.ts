@@ -27,7 +27,28 @@ export const CHART_RANGES = ['1m', '3m', 'ytd', '1y', '5y', 'all'] as const;
 export interface SecurityPricePoint {
   /** ISO `yyyy-MM-dd`. */
   date: string;
+  /** The quoted close: what the security traded at. */
   close: number;
+  /**
+   * The split- and dividend-adjusted close, when the provider supplies one.
+   * Undefined otherwise, which is why every reader goes through
+   * `totalReturnOf` rather than touching this directly.
+   */
+  totalReturnClose?: number;
+}
+
+/**
+ * The value to measure a *return* from: the adjusted close where there is one,
+ * the quoted close otherwise. Mirrors the backend's own
+ * `COALESCE(adjusted_close, close_price)`, so a percentage shown here and one
+ * computed server-side describe the same thing.
+ *
+ * Anything that shows a *price* -- the quote in the header, the price chart,
+ * position value -- must keep using `close`: the adjusted series is not what the
+ * security traded at.
+ */
+export function totalReturnOf(point: SecurityPricePoint): number {
+  return point.totalReturnClose ?? point.close;
 }
 
 /** The share count from `date` onwards, until the next step. */
@@ -50,10 +71,17 @@ export function toPriceSeries(
   prices: readonly SecurityPrice[],
 ): SecurityPricePoint[] {
   return prices
-    .map((price) => ({
-      date: price.priceDate.slice(0, 10),
-      close: Number(price.closePrice),
-    }))
+    .map((price) => {
+      const adjusted = Number(price.adjustedClose);
+      return {
+        date: price.priceDate.slice(0, 10),
+        close: Number(price.closePrice),
+        totalReturnClose:
+          price.adjustedClose !== null && isFinite(adjusted) && adjusted > 0
+            ? adjusted
+            : undefined,
+      };
+    })
     .filter((point) => isFinite(point.close))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -121,13 +149,15 @@ export function buildChartSeries(
     }));
   }
 
-  const baseline = window[0]?.close;
+  // Return mode reads the same adjusted series the Performance card does, so the
+  // chart's 1Y and the card's 1Y cannot disagree.
+  const baseline = window[0] ? totalReturnOf(window[0]) : undefined;
   // Without a usable baseline there is no percentage to state, so the caller
   // gets an empty series and renders the chart's own no-data state.
   if (baseline === undefined || baseline === 0) return [];
   return window.map((point) => ({
     date: point.date,
-    balance: roundToDecimals((point.close / baseline - 1) * 100, 4),
+    balance: roundToDecimals((totalReturnOf(point) / baseline - 1) * 100, 4),
   }));
 }
 
@@ -176,13 +206,20 @@ export function computePeriodReturn(
     if (point.date > startDate) break;
     baseline = point;
   }
-  if (!baseline || baseline.close === 0) return null;
+  if (!baseline) return null;
 
   const latest = series[series.length - 1];
   // A baseline that is also the newest point spans no time at all.
   if (latest.date === baseline.date) return null;
 
-  return roundToDecimals((latest.close / baseline.close - 1) * 100, 2);
+  // Dividends belong in a return, so this runs on the adjusted series where the
+  // provider gives one. A distributing fund measured on price alone understates
+  // its return by its whole yield.
+  const from = totalReturnOf(baseline);
+  const to = totalReturnOf(latest);
+  if (from === 0) return null;
+
+  return roundToDecimals((to / from - 1) * 100, 2);
 }
 
 /** Prices within `[start, end]`; an empty `start` means "from the beginning". */

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  totalReturnOf,
   toPriceSeries,
   buildQuantitySteps,
   quantityAt,
@@ -13,7 +14,11 @@ import type {
   SecurityHistoryTransaction,
 } from '@/types/investment';
 
-function price(priceDate: string, closePrice: number): SecurityPrice {
+function price(
+  priceDate: string,
+  closePrice: number,
+  adjustedClose: number | null = null,
+): SecurityPrice {
   return {
     id: 1,
     securityId: 'sec-1',
@@ -22,7 +27,7 @@ function price(priceDate: string, closePrice: number): SecurityPrice {
     highPrice: null,
     lowPrice: null,
     closePrice,
-    adjustedClose: null,
+    adjustedClose,
     volume: null,
     source: 'yahoo_finance',
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -49,7 +54,35 @@ function transaction(
   };
 }
 
+describe('totalReturnOf', () => {
+  it('prefers the adjusted close', () => {
+    expect(totalReturnOf({ date: '2026-01-01', close: 100, totalReturnClose: 104 })).toBe(104);
+  });
+
+  it('falls back to the quoted close when there is no adjusted one', () => {
+    // Same rule as the backend's COALESCE(adjusted_close, close_price).
+    expect(totalReturnOf({ date: '2026-01-01', close: 100 })).toBe(100);
+  });
+});
+
 describe('toPriceSeries', () => {
+  it('carries the adjusted close through when the provider supplies one', () => {
+    const [point] = toPriceSeries([price('2026-01-01', 100, 97.5)]);
+    expect(point.close).toBe(100);
+    expect(point.totalReturnClose).toBe(97.5);
+  });
+
+  it('leaves the total-return value unset for a provider without one', () => {
+    // MSN stores null here; the series must not pretend price is total return.
+    const [point] = toPriceSeries([price('2026-01-01', 100, null)]);
+    expect(point.totalReturnClose).toBeUndefined();
+  });
+
+  it('ignores a nonsensical adjusted close', () => {
+    const [point] = toPriceSeries([price('2026-01-01', 100, 0)]);
+    expect(point.totalReturnClose).toBeUndefined();
+  });
+
   it('flips the newest-first API order into oldest-first', () => {
     const series = toPriceSeries([
       price('2026-03-01', 30),
@@ -153,6 +186,29 @@ describe('buildChartSeries', () => {
     ]);
   });
 
+  it('uses the adjusted series in return mode, matching the Performance card', () => {
+    const withAdjusted = [
+      { date: '2024-01-01', close: 100, totalReturnClose: 100 },
+      { date: '2024-02-01', close: 100, totalReturnClose: 102 },
+    ];
+    expect(buildChartSeries(withAdjusted, [], 'return')).toEqual([
+      { date: '2024-01-01', balance: 0 },
+      { date: '2024-02-01', balance: 2 },
+    ]);
+  });
+
+  it('keeps price and value modes on the quoted close', () => {
+    // The adjusted series is not what the security traded at, so neither the
+    // price line nor the position's value may use it.
+    const withAdjusted = [{ date: '2024-01-01', close: 100, totalReturnClose: 90 }];
+    expect(buildChartSeries(withAdjusted, [], 'price')).toEqual([
+      { date: '2024-01-01', balance: 100 },
+    ]);
+    expect(
+      buildChartSeries(withAdjusted, [{ date: '2024-01-01', quantity: 2 }], 'value'),
+    ).toEqual([{ date: '2024-01-01', balance: 200 }]);
+  });
+
   it('re-bases the window on its own first point in return mode', () => {
     expect(buildChartSeries(window, steps, 'return')).toEqual([
       { date: '2024-01-01', balance: 0 },
@@ -194,6 +250,24 @@ describe('periodStartDate', () => {
 });
 
 describe('computePeriodReturn', () => {
+  it('measures the return on the adjusted series, dividends included', () => {
+    // Price is flat, but the adjusted series rose 4%: a distributing fund whose
+    // return is entirely its dividend. Measured on price it would read 0%.
+    const series = [
+      { date: '2024-01-01', close: 100, totalReturnClose: 100 },
+      { date: '2026-01-01', close: 100, totalReturnClose: 104 },
+    ];
+    expect(computePeriodReturn(series, '2024-06-01')).toBe(4);
+  });
+
+  it('falls back to price when the provider gives no adjusted series', () => {
+    const series = [
+      { date: '2024-01-01', close: 100 },
+      { date: '2026-01-01', close: 110 },
+    ];
+    expect(computePeriodReturn(series, '2024-06-01')).toBe(10);
+  });
+
   const series = [
     { date: '2024-01-01', close: 100 },
     { date: '2025-01-01', close: 120 },
