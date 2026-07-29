@@ -555,11 +555,11 @@ CREATE TABLE security_prices (
     id BIGSERIAL PRIMARY KEY,
     security_id UUID NOT NULL REFERENCES securities(id) ON DELETE CASCADE,
     price_date DATE NOT NULL,
-    open_price NUMERIC(20, 6),
-    high_price NUMERIC(20, 6),
-    low_price NUMERIC(20, 6),
-    close_price NUMERIC(20, 6) NOT NULL,
-    adjusted_close NUMERIC(20, 6),
+    open_price NUMERIC(24, 10),
+    high_price NUMERIC(24, 10),
+    low_price NUMERIC(24, 10),
+    close_price NUMERIC(24, 10) NOT NULL,
+    adjusted_close NUMERIC(24, 10),
     volume BIGINT,
     source VARCHAR(50), -- yahoo_finance, msn_finance, manual, or transaction action (buy, sell, reinvest, transfer_in, transfer_out)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -575,7 +575,7 @@ CREATE TABLE holdings (
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     security_id UUID NOT NULL REFERENCES securities(id),
     quantity NUMERIC(20, 8) NOT NULL DEFAULT 0,
-    average_cost NUMERIC(20, 6), -- average cost per unit
+    average_cost NUMERIC(24, 10), -- average cost per unit
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(account_id, security_id)
@@ -611,7 +611,7 @@ CREATE TABLE investment_transactions (
     action investment_action NOT NULL,
     transaction_date DATE NOT NULL,
     quantity NUMERIC(20, 8),
-    price NUMERIC(20, 6),
+    price NUMERIC(24, 10),
     commission NUMERIC(20, 4) DEFAULT 0,
     total_amount NUMERIC(20, 4) NOT NULL,
     exchange_rate NUMERIC(20, 10) NOT NULL DEFAULT 1,
