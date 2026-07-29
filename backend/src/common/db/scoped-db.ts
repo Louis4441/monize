@@ -46,6 +46,25 @@ export function runWithActiveScopedManager<T>(
   return activeManagerStorage.run(manager, fn);
 }
 
+/**
+ * Run `fn` with no ambient transaction, so a `withScopedDb` inside it opens its
+ * **own** transaction on its own connection instead of joining the caller's.
+ *
+ * This is the deliberate exception to the re-entrancy rule above, and it exists
+ * for one shape: a long write that has to publish progress a concurrent reader
+ * can see. A row written inside the outer transaction is invisible until commit,
+ * so a wizard polling an import job would watch a frozen progress bar for three
+ * minutes. See the `.mny` import job service (design ADR-3).
+ *
+ * It costs one extra pooled connection for the duration of the inner call, which
+ * is why it is only ever correct for a small, short statement at a phase
+ * boundary -- never per row, and never for another long transaction. Used in a
+ * loop it would reproduce exactly the pool exhaustion the nesting rule prevents.
+ */
+export function runOutsideActiveScopedManager<T>(fn: () => T): T {
+  return activeManagerStorage.exit(fn);
+}
+
 export const MISSING_CONTEXT_MESSAGE =
   "DB access outside request/user/system context -- wrap the call path in withUserContext/withSystemContext";
 

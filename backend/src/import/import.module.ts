@@ -16,6 +16,7 @@ import { Holding } from "../securities/entities/holding.entity";
 import { ImportColumnMapping } from "./entities/import-column-mapping.entity";
 import { ImportJob } from "./mny/entities/import-job.entity";
 import { ImportStagedFile } from "./mny/entities/import-staged-file.entity";
+import { MnyImportJobService } from "./mny/mny-import-job.service";
 import { MnyParserService } from "./mny/mny-parser.service";
 import { MnyStagingService } from "./mny/mny-staging.service";
 import { NetWorthModule } from "../net-worth/net-worth.module";
@@ -51,7 +52,13 @@ import { CurrenciesModule } from "../currencies/currencies.module";
     ImportRegularProcessorService,
     MnyStagingService,
     MnyParserService,
+    MnyImportJobService,
   ],
-  exports: [ImportService, MnyStagingService, MnyParserService],
+  exports: [
+    ImportService,
+    MnyStagingService,
+    MnyParserService,
+    MnyImportJobService,
+  ],
 })
 export class ImportModule {}
