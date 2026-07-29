@@ -858,3 +858,19 @@ describe('BalanceHistoryChart lowest-value marker', () => {
     expect(lineYs()).toContain(0);
   });
 });
+
+describe('BalanceHistoryChart with a single point', () => {
+  it('labels a one-point series once, not twice', () => {
+    // `from === to`, so the fallback used to emit the same tick twice: two
+    // labels stacked on each other over a zero-width time domain.
+    render(
+      <BalanceHistoryChart
+        data={[{ date: '2026-03-10', balance: 42 }]}
+        isLoading={false}
+      />,
+    );
+    expect(
+      screen.getByTestId('x-axis').getAttribute('data-ticks')!.split(','),
+    ).toHaveLength(1);
+  });
+});

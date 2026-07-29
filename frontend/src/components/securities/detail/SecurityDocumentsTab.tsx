@@ -169,14 +169,19 @@ export function SecurityDocumentsTab({ security }: SecurityDocumentsTabProps) {
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           {t('documents.title')}
         </h3>
-        {documents.length > 0 && addButton}
+        {/* Also on error: the first-run panel is suppressed then, and leaving
+            no way to add a document would make a failed read a dead end. */}
+        {(documents.length > 0 || !!error) && addButton}
       </div>
 
       {error && (
         <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>
       )}
 
-      {documents.length === 0 ? (
+      {/* `!error` matters: a failed load leaves the list empty too, and showing
+          "No documents yet" under the error would assert there are none when in
+          fact none could be read. */}
+      {!error && documents.length === 0 ? (
         // Not an empty table with headers over nothing: a first-run state that
         // says what documents are for and offers the one action worth taking.
         <div className="py-10 text-center">

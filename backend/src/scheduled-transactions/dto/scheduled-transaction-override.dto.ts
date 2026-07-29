@@ -117,7 +117,7 @@ export class CreateScheduledTransactionOverrideDto {
 
   @ApiPropertyOptional({ description: "Per-occurrence investment price" })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0)
   @Max(999999999999)
   investmentPrice?: number | null;
@@ -179,7 +179,7 @@ export class UpdateScheduledTransactionOverrideDto {
 
   @ApiPropertyOptional({ description: "Per-occurrence investment price" })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0)
   @Max(999999999999)
   investmentPrice?: number | null;

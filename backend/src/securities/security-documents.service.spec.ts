@@ -165,18 +165,30 @@ describe("SecurityDocumentsService", () => {
       );
     });
 
-    it("clears a date or note that was explicitly emptied", async () => {
+    it("leaves a field alone when it was not sent", async () => {
       repo.findOne.mockResolvedValue(existingDocument());
       const saved = await service.update(USER_ID, SECURITY_ID, DOCUMENT_ID, {
         documentDate: undefined,
         notes: undefined,
       });
-      // `undefined` means "not sent" and must leave the value alone...
       expect(saved).toEqual(
         expect.objectContaining({
           documentDate: "2024-12-31",
           notes: "original",
         }),
+      );
+    });
+
+    it("clears a field that was sent as null", async () => {
+      repo.findOne.mockResolvedValue(existingDocument());
+      const saved = await service.update(USER_ID, SECURITY_ID, DOCUMENT_ID, {
+        documentDate: null,
+        notes: null,
+      });
+      // The distinction the edit form depends on: `undefined` is "not sent",
+      // `null` is "empty this". Without it a stored date could never be removed.
+      expect(saved).toEqual(
+        expect.objectContaining({ documentDate: null, notes: null }),
       );
     });
 

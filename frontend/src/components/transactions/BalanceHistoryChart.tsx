@@ -171,9 +171,12 @@ function calendarTicks(from: number, to: number, unit: 'year' | 'month'): number
     if (unit === 'year') cursor.setFullYear(cursor.getFullYear() + 1);
     else cursor.setMonth(cursor.getMonth() + 1);
   }
-  // A span too short to cross a boundary would leave the axis bare; its own ends
-  // are the only honest labels left.
-  return ticks.length > 0 ? ticks : [from, to];
+  if (ticks.length > 0) return ticks;
+  // A span too short to cross a boundary leaves the axis bare, so fall back to
+  // its own ends. De-duplicated because a single-point series has `from === to`,
+  // and two identical ticks draw two labels on top of each other over a
+  // zero-width domain.
+  return from === to ? [from] : [from, to];
 }
 
 function BalanceTooltip({

@@ -81,8 +81,8 @@ export class ScheduledTransactionSplit {
 
   @Column({
     type: "decimal",
-    precision: 20,
-    scale: 6,
+    precision: 24,
+    scale: 10,
     name: "investment_price",
     nullable: true,
   })

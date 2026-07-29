@@ -56,6 +56,12 @@ describe("entity decimal precision", () => {
     "security_prices.low_price",
     "security_prices.close_price",
     "security_prices.adjusted_close",
+    // The scheduled copies of a per-unit price: each is written straight onto
+    // the investment transaction it posts, so a truncation here reappears every
+    // time the schedule fires.
+    "scheduled_transactions.investment_price",
+    "scheduled_transaction_splits.investment_price",
+    "scheduled_transaction_overrides.investment_price",
   ]);
 
   /**

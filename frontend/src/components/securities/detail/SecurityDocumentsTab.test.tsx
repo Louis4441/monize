@@ -203,15 +203,19 @@ describe('SecurityDocumentsTab', () => {
     });
   });
 
-  it('reports a load failure without losing the Add action', async () => {
+  it('reports a load failure without claiming there are no documents', async () => {
     mockGetDocuments.mockRejectedValue(new Error('boom'));
     await renderTab();
+
     expect(
       screen.getByText('Could not load the documents for this security'),
     ).toBeInTheDocument();
-    // Still offers a way forward rather than a dead panel.
+    // A failed read leaves the list empty too, and "No documents yet" under the
+    // error would assert there are none when in fact none could be read.
+    expect(screen.queryByText('No documents yet')).not.toBeInTheDocument();
+    // Still a way forward rather than a dead panel.
     expect(
-      screen.getByRole('button', { name: 'Add the first document' }),
+      screen.getByRole('button', { name: 'Add document' }),
     ).toBeInTheDocument();
   });
 });

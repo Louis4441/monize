@@ -451,7 +451,7 @@ CREATE TABLE scheduled_transactions (
     investment_security_id UUID REFERENCES securities(id),
     investment_funding_account_id UUID REFERENCES accounts(id), -- alternate cash source (e.g., bank for contribution+buy)
     investment_quantity NUMERIC(20, 8),
-    investment_price NUMERIC(20, 6),
+    investment_price NUMERIC(24, 10),
     investment_commission NUMERIC(20, 4) DEFAULT 0,
     investment_total_amount NUMERIC(20, 4), -- for amount-only actions (DIVIDEND, INTEREST, CAPITAL_GAIN)
     investment_exchange_rate NUMERIC(20, 10),
@@ -482,7 +482,7 @@ CREATE TABLE scheduled_transaction_splits (
     investment_action VARCHAR(50),
     investment_security_id UUID REFERENCES securities(id),
     investment_quantity NUMERIC(20, 8),
-    investment_price NUMERIC(20, 6),
+    investment_price NUMERIC(24, 10),
     investment_commission NUMERIC(20, 4),
     investment_exchange_rate NUMERIC(20, 10),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -539,7 +539,7 @@ CREATE TABLE scheduled_transaction_overrides (
     splits JSONB, -- JSON array of split overrides: [{categoryId, amount, memo}]
     -- Per-occurrence investment overrides (BUY/SELL/REINVEST etc.); NULL means "use base value"
     investment_quantity NUMERIC(20, 8),
-    investment_price NUMERIC(20, 6),
+    investment_price NUMERIC(24, 10),
     investment_total_amount NUMERIC(20, 4),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -550,11 +550,10 @@ CREATE INDEX idx_sched_txn_overrides_sched_txn_id ON scheduled_transaction_overr
 CREATE INDEX idx_sched_txn_overrides_date ON scheduled_transaction_overrides(override_date);
 CREATE INDEX idx_sched_txn_overrides_orig ON scheduled_transaction_overrides(scheduled_transaction_id, original_date);
 
--- Security Prices (historical)
--- Documents attached to a security: factsheet, KIID, prospectus, annual report,
--- tax slip, research. Real columns rather than a JSONB blob so the type, name,
--- date and address are all sortable (discussion #964). Linked documents only for
--- now; uploads need the attachments table generalised beyond transactions first.
+-- Security documents: factsheet, KIID, prospectus, annual report, tax slip,
+-- research. Real columns rather than a JSONB blob so the type, name, date and
+-- address are all sortable (discussion #964). Linked documents only for now;
+-- uploads need the attachments table generalised beyond transactions first.
 CREATE TABLE security_documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -577,6 +576,7 @@ CREATE INDEX idx_security_documents_security
   ON security_documents(security_id, document_date DESC NULLS LAST);
 CREATE INDEX idx_security_documents_user ON security_documents(user_id);
 
+-- Security Prices (historical)
 CREATE TABLE security_prices (
     id BIGSERIAL PRIMARY KEY,
     security_id UUID NOT NULL REFERENCES securities(id) ON DELETE CASCADE,
@@ -979,6 +979,7 @@ CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions FOR 
 CREATE TRIGGER update_scheduled_transactions_updated_at BEFORE UPDATE ON scheduled_transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_scheduled_transaction_overrides_updated_at BEFORE UPDATE ON scheduled_transaction_overrides FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_securities_updated_at BEFORE UPDATE ON securities FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_security_documents_updated_at BEFORE UPDATE ON security_documents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_holdings_updated_at BEFORE UPDATE ON holdings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_investment_transactions_updated_at BEFORE UPDATE ON investment_transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -1669,6 +1670,16 @@ CREATE POLICY scheduled_transaction_overrides_isolation ON scheduled_transaction
 -- history and tags belong to exactly one user despite looking like reference
 -- data. holdings hang off the account, not the security.
 -- ---------------------------------------------------------------------------
+
+-- security_documents carries its own user_id (migration 118)
+DROP POLICY IF EXISTS security_documents_isolation ON security_documents;
+CREATE POLICY security_documents_isolation ON security_documents
+  USING (
+    user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls())
+  )
+  WITH CHECK (
+    user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls())
+  );
 
 -- security_prices -> securities.user_id
 DROP POLICY IF EXISTS security_prices_isolation ON security_prices;

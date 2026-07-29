@@ -130,7 +130,7 @@ export class CreateScheduledTransactionDto {
   investmentQuantity?: number;
 
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0)
   investmentPrice?: number;
 

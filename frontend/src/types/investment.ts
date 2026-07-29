@@ -355,9 +355,14 @@ export interface SecurityDocument {
 export interface CreateSecurityDocumentData {
   documentType?: SecurityDocumentType;
   name: string;
-  documentDate?: string;
+  /**
+   * Explicit `null` clears the stored date on an edit. `undefined` omits the
+   * field, which on a PATCH means "leave it alone" -- the difference is what
+   * makes clearing possible at all.
+   */
+  documentDate?: string | null;
   url: string;
-  notes?: string;
+  notes?: string | null;
 }
 
 export interface SecurityDetail {

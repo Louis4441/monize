@@ -383,6 +383,8 @@ export class SecuritiesController {
   }
 
   @Get(":id/news")
+  // Reaches a provider, like every other throttled route in this controller.
+  @Throttle({ default: { ttl: 60000, limit: 60 } })
   @ApiOperation({ summary: "Recent headlines filed against a security" })
   @ApiResponse({
     status: 200,
@@ -398,6 +400,11 @@ export class SecuritiesController {
   }
 
   @Get(":id/news/:itemId/thumbnail")
+  // Each call makes an outbound fetch of up to 2 MB with no response cache, so
+  // an unthrottled loop here would hammer the publisher's CDN at request rate
+  // and hold that much heap per concurrent call. A page shows at most fifteen
+  // thumbnails, so this is generous.
+  @Throttle({ default: { ttl: 60000, limit: 120 } })
   @ApiOperation({
     summary: "A headline's image, fetched server-side and served from here",
   })

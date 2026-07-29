@@ -80,14 +80,17 @@ export function SecurityDocumentForm({
   useFormDirtyNotify(isDirty, onDirtyChange);
 
   async function onFormSubmit(data: DocumentFormData) {
+    // On create, an omitted field means "leave it null". On edit it means "do
+    // not change it", which made clearing a date or a note impossible: the
+    // server only assigns what the request carries. So an edit sends an explicit
+    // null, which the DTO accepts and the service writes through.
+    const cleared = document ? null : undefined;
     const payload: CreateSecurityDocumentData = {
       documentType: data.documentType,
       name: data.name.trim(),
       url: data.url.trim(),
-      // Omitted rather than sent empty: the column is nullable and an empty
-      // string is not a date.
-      ...(data.documentDate ? { documentDate: data.documentDate } : {}),
-      ...(data.notes?.trim() ? { notes: data.notes.trim() } : {}),
+      documentDate: data.documentDate || cleared,
+      notes: data.notes?.trim() || cleared,
     };
     try {
       await onSubmit(payload);

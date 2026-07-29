@@ -29,9 +29,11 @@ export class CreateSecurityDocumentDto {
     example: "2024-12-31",
     description: "The date on the document, not the day it was recorded.",
   })
+  // `IsOptional` already lets an explicit null through, which is how an edit
+  // clears a stored date -- see the update path in the service.
   @IsOptional()
   @IsISO8601()
-  documentDate?: string;
+  documentDate?: string | null;
 
   @ApiProperty({
     example: "https://www.ishares.com/factsheet.pdf",
@@ -56,5 +58,5 @@ export class CreateSecurityDocumentDto {
   @IsString()
   @MaxLength(2000)
   @SanitizeHtml()
-  notes?: string;
+  notes?: string | null;
 }
