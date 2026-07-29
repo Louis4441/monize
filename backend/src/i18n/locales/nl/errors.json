@@ -393,7 +393,8 @@
     "noUpdateFields": "Geef ten minste één veld op om te wijzigen.",
     "allocationExceedsTotal": "De toewijzingspercentages tellen op tot meer dan 100%.",
     "invalidTagKey": "Een tagsleutel (1-100 tekens) is vereist",
-    "assetOptionNameRequired": "Een naam voor de beleggingscategorie is verplicht."
+    "assetOptionNameRequired": "Een naam voor de beleggingscategorie is verplicht.",
+    "documentNotFound": "Document niet gevonden"
   },
   "tags": {
     "notFound": "Label met ID {{ id }} niet gevonden",

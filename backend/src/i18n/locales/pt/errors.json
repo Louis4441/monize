@@ -393,7 +393,8 @@
     "noUpdateFields": "Indique pelo menos um campo para alterar.",
     "allocationExceedsTotal": "As percentagens de alocação somam mais de 100%.",
     "invalidTagKey": "É necessária uma chave de etiqueta (1-100 caracteres)",
-    "assetOptionNameRequired": "É necessário um nome de classe de ativos."
+    "assetOptionNameRequired": "É necessário um nome de classe de ativos.",
+    "documentNotFound": "Documento não encontrado"
   },
   "tags": {
     "notFound": "Etiqueta com ID {{ id }} não encontrada",

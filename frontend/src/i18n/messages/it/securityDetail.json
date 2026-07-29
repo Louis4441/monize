@@ -1,0 +1,244 @@
+{
+  "loading": "Caricamento del titolo...",
+  "loadFailed": "Impossibile caricare questo titolo",
+  "notFound": "Titolo non trovato",
+  "backToSecurities": "Titoli",
+  "error": {
+    "retry": "Riprova"
+  },
+  "header": {
+    "priceAt": "Prezzo del {date}",
+    "noPrice": "Nessun prezzo ancora registrato",
+    "changeToday": "{change} ({percent}) oggi",
+    "changeLast": "{change} ({percent}) ultima variazione",
+    "inactiveBadge": "Non attivo",
+    "edit": "Modifica",
+    "favourites": "Preferiti",
+    "switchSecurity": "Passa a un altro titolo",
+    "switchPlaceholder": "Filtra per simbolo o nome...",
+    "switchNoMatches": "Nessun titolo corrisponde"
+  },
+  "toasts": {
+    "favouriteAdded": "Aggiunto ai preferiti",
+    "favouriteRemoved": "Rimosso dai preferiti",
+    "favouriteFailed": "Impossibile aggiornare i preferiti"
+  },
+  "cards": {
+    "marketValue": "Valore di mercato",
+    "costBasis": "Costo di acquisto",
+    "unrealizedPl": "U/P non realizzato",
+    "units": "Quote",
+    "avgCostPerUnit": "Costo medio / quota",
+    "heldInAccounts": "Detenuto nei conti",
+    "openAccount": "Mostra {name} nella pagina Investimenti",
+    "unitsShare": "{units} ({share})",
+    "valueUnknown": "Non valorizzato",
+    "approx": "~ {amount}",
+    "asOf": "Alla chiusura del {date}",
+    "asOfStale": "Alla chiusura del {date}, il prezzo più recente registrato",
+    "asOfStaleTitle": "Non è memorizzato alcun prezzo più recente, quindi questo è il valore della posizione in quel giorno e non oggi. Aggiorna i prezzi dal fornitore oppure inseriscine uno a mano."
+  },
+  "chart": {
+    "title": "Prezzo di {symbol}",
+    "seriesAriaLabel": "Serie del grafico",
+    "modes": {
+      "price": "Prezzo",
+      "value": "Valore dell'investimento",
+      "return": "Rendimento"
+    },
+    "titles": {
+      "price": "Prezzo",
+      "value": "Valore dell'investimento",
+      "return": "Rendimento"
+    },
+    "summary": {
+      "first": "Primo",
+      "latest": "Ultimo",
+      "ending": "Finale",
+      "lowest": "Minimo"
+    },
+    "panEarlier": "Mostra il tratto precedente dello storico",
+    "panLater": "Mostra il tratto successivo dello storico"
+  },
+  "keyInfo": {
+    "title": "Informazioni principali",
+    "symbol": "Simbolo",
+    "securityType": "Tipo di titolo",
+    "distributions": "Distribuzioni",
+    "distributing": "Pagate (osservato)",
+    "accumulating": "Nessuna (ad accumulazione)",
+    "distributionsTitle": "Letto dallo storico dei prezzi: la chiusura aggiustata si discosta da quella quotata ogni volta che viene pagata una distribuzione. Dedotto dai dati, non dichiarato dall'emittente.",
+    "exchange": "Borsa",
+    "currency": "Valuta",
+    "sector": "Settore",
+    "industry": "Industria",
+    "provider": "Fornitore",
+    "lastPrice": "Ultimo prezzo"
+  },
+  "tabs": {
+    "ariaLabel": "Sezioni del titolo",
+    "overview": "Panoramica",
+    "transactions": "Transazioni",
+    "prices": "Storico prezzi",
+    "documents": "Documenti",
+    "news": "Notizie"
+  },
+  "about": {
+    "title": "Informazioni",
+    "noDescription": "Per questo titolo non è stata salvata alcuna descrizione.",
+    "sector": "Settore",
+    "industry": "Industria",
+    "country": "Paese",
+    "website": "Sito web",
+    "irWebsite": "Sito investor relations",
+    "tags": "Tag",
+    "notStored": "Non ancora memorizzato"
+  },
+  "performance": {
+    "title": "Andamento del titolo",
+    "subject": "Come si è mosso lo strumento in sé, che tu lo abbia detenuto o no. Quanto ha reso la tua posizione è sotto Rendimento totale.",
+    "empty": "Storico prezzi ancora insufficiente per misurare un rendimento.",
+    "unavailable": "n/d",
+    "periods": {
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Da inizio anno",
+      "1y": "1A",
+      "3y": "3A",
+      "5y": "5A"
+    },
+    "includesDividends": "Dividendi inclusi",
+    "excludesDividends": "Senza dividendi",
+    "excludesDividendsTitle": "Questo fornitore non offre una serie di chiusure aggiustate, quindi questi rendimenti sono misurati solo sul prezzo. Per un fondo a distribuzione sottostimano il rendimento di tutto il suo tasso di distribuzione."
+  },
+  "positionInfo": {
+    "title": "Dati della posizione",
+    "firstTransaction": "Prima transazione",
+    "lastTransaction": "Ultima transazione",
+    "totalInvested": "Totale investito",
+    "totalSold": "Totale venduto",
+    "dividends": "Dividendi",
+    "fees": "Commissioni",
+    "realizedPl": "U/P realizzato",
+    "realizedMixed": "Realizzato in {currencies}, quindi non sommato",
+    "totalReturn": "Rendimento totale",
+    "totalReturnValue": "{amount} ({percent})",
+    "totalReturnTitle": "L'utile non realizzato, più quanto hai realizzato sulle vendite e ricevuto come proventi, meno le commissioni, rapportato al capitale impiegato. Un rendimento semplice su quel capitale: non è annualizzato e non pondera le tranche per il tempo in cui le hai tenute.",
+    "status": "Stato",
+    "statusOpen": "Aperta",
+    "statusClosed": "Chiusa",
+    "statusNone": "Mai detenuto"
+  },
+  "accounts": {
+    "title": "Conti",
+    "closedSuffix": "{name} (chiuso)",
+    "total": "Totale",
+    "columns": {
+      "account": "Conto",
+      "currency": "Valuta",
+      "units": "Quote",
+      "avgCost": "Costo medio / quota",
+      "marketValue": "Valore di mercato",
+      "costBasis": "Costo di acquisto",
+      "unrealizedPl": "U/P non realizzato"
+    }
+  },
+  "closed": {
+    "title": "Posizione chiusa",
+    "description": "Non detieni più questo titolo. Il suo storico resta disponibile qui sotto.",
+    "realizedPl": "U/P realizzato",
+    "heldFrom": "Detenuto da",
+    "heldRange": "dal {start} al {end}"
+  },
+  "empty": {
+    "noPosition": "Nessun dato di posizione",
+    "noPositionHint": "Non hai ancora registrato alcuna transazione per questo titolo.",
+    "noPrices": "Nessuno storico prezzi disponibile",
+    "noPricesHint": "Inserisci un prezzo a mano oppure aggiorna i prezzi dal fornitore.",
+    "noTransactions": "Ancora nessuna transazione",
+    "noAccounts": "Questo titolo non è detenuto in alcun conto."
+  },
+  "weightings": {
+    "title": "Composizione",
+    "ariaLabel": "Dimensione della composizione",
+    "sectorTab": "Settore",
+    "countryTab": "Paese",
+    "assetClassTab": "Classe di attivo",
+    "sectorEmpty": "Non è memorizzata alcuna composizione settoriale. Monize la compila dal fornitore per fondi ed ETF.",
+    "countryEmpty": "Non è memorizzata alcuna composizione per paese. Puoi inserirla modificando il titolo.",
+    "assetClassEmpty": "Non è ancora memorizzata alcuna composizione per classe di attivo.",
+    "remainder": "{percent} non classificato"
+  },
+  "documents": {
+    "title": "Documenti",
+    "add": "Aggiungi documento",
+    "loadFailed": "Impossibile caricare i documenti di questo titolo",
+    "noDate": "Senza data",
+    "columns": {
+      "type": "Tipo",
+      "name": "Nome",
+      "date": "Data",
+      "address": "Indirizzo",
+      "actions": "Azioni"
+    },
+    "types": {
+      "FACTSHEET": "Scheda informativa",
+      "KIID": "KIID",
+      "PROSPECTUS": "Prospetto",
+      "ANNUAL_REPORT": "Relazione annuale",
+      "SEMI_ANNUAL_REPORT": "Relazione semestrale",
+      "TAX": "Documento fiscale",
+      "RESEARCH": "Analisi",
+      "OTHER": "Altro"
+    },
+    "actions": {
+      "open": "Apri",
+      "openNamed": "Apri {name} in una nuova scheda",
+      "edit": "Modifica",
+      "delete": "Elimina"
+    },
+    "empty": {
+      "title": "Ancora nessun documento",
+      "description": "Tieni la documentazione di questo titolo in un unico posto: la scheda informativa, il KIID, un prospetto, una relazione annuale, un documento fiscale. Ognuno è un link che apri direttamente da qui.",
+      "action": "Aggiungi il primo documento"
+    },
+    "form": {
+      "addTitle": "Aggiungi documento",
+      "editTitle": "Modifica documento",
+      "date": "Data del documento",
+      "dateHint": "La data riportata sul documento stesso, non quella di oggi. Lascia vuoto se non ne ha una.",
+      "url": "Indirizzo",
+      "notes": "Note",
+      "create": "Aggiungi documento",
+      "save": "Salva documento"
+    },
+    "validation": {
+      "nameRequired": "Dai un nome al documento",
+      "urlRequired": "L'indirizzo è obbligatorio",
+      "urlScheme": "L'indirizzo deve iniziare con http:// o https://"
+    },
+    "delete": {
+      "title": "Eliminare il documento?",
+      "message": "Questo rimuove il link a «{name}». Il documento in sé non viene toccato."
+    },
+    "toasts": {
+      "created": "Documento aggiunto",
+      "updated": "Documento aggiornato",
+      "deleted": "Documento eliminato",
+      "saveFailed": "Impossibile salvare il documento",
+      "deleteFailed": "Impossibile eliminare il documento"
+    }
+  },
+  "news": {
+    "title": "Notizie che citano {symbol}",
+    "subject": "Il fornitore associa una notizia a ogni simbolo che nomina, quindi alcune riguardano un'altra società che cita questa.",
+    "loadFailed": "Impossibile caricare le notizie di questo titolo",
+    "video": "Video",
+    "alsoMentions": "Cita anche {tickers}",
+    "unsupportedProvider": "Il fornitore di quotazioni di questo titolo non offre notizie. Passandolo a Yahoo mentre modifichi il titolo, qui compariranno i titoli di giornale.",
+    "empty": {
+      "title": "Nessuna notizia al momento",
+      "description": "Di recente non è stato pubblicato nulla su questo simbolo. La lista si aggiorna quando ci torni."
+    }
+  }
+}

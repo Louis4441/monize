@@ -393,7 +393,8 @@
     "noUpdateFields": "बदलने के लिए कम से कम एक फ़ील्ड प्रदान करें।",
     "allocationExceedsTotal": "आवंटन प्रतिशत का योग 100% से अधिक है।",
     "invalidTagKey": "एक टैग कुंजी (1-100 अक्षर) आवश्यक है",
-    "assetOptionNameRequired": "एसेट क्लास का नाम आवश्यक है।"
+    "assetOptionNameRequired": "एसेट क्लास का नाम आवश्यक है।",
+    "documentNotFound": "दस्तावेज़ नहीं मिला"
   },
   "tags": {
     "notFound": "ID {{ id }} वाला टैग नहीं मिला",

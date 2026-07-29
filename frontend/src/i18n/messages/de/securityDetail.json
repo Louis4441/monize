@@ -1,0 +1,244 @@
+{
+  "loading": "Wertpapier wird geladen...",
+  "loadFailed": "Dieses Wertpapier konnte nicht geladen werden",
+  "notFound": "Wertpapier nicht gefunden",
+  "backToSecurities": "Wertpapiere",
+  "error": {
+    "retry": "Erneut versuchen"
+  },
+  "header": {
+    "priceAt": "Kurs vom {date}",
+    "noPrice": "Noch kein Kurs erfasst",
+    "changeToday": "{change} ({percent}) heute",
+    "changeLast": "{change} ({percent}) letzte Bewegung",
+    "inactiveBadge": "Inaktiv",
+    "edit": "Bearbeiten",
+    "favourites": "Favoriten",
+    "switchSecurity": "Zu einem anderen Wertpapier wechseln",
+    "switchPlaceholder": "Nach Symbol oder Name filtern...",
+    "switchNoMatches": "Keine Wertpapiere gefunden"
+  },
+  "toasts": {
+    "favouriteAdded": "Zu den Favoriten hinzugefügt",
+    "favouriteRemoved": "Aus den Favoriten entfernt",
+    "favouriteFailed": "Favoriten konnten nicht aktualisiert werden"
+  },
+  "cards": {
+    "marketValue": "Marktwert",
+    "costBasis": "Einstandswert",
+    "unrealizedPl": "Nicht realisierter G/V",
+    "units": "Anteile",
+    "avgCostPerUnit": "Durchschn. Kosten / Anteil",
+    "heldInAccounts": "Gehalten in Konten",
+    "openAccount": "{name} auf der Seite Investitionen anzeigen",
+    "unitsShare": "{units} ({share})",
+    "valueUnknown": "Kein Kurs",
+    "approx": "~ {amount}",
+    "asOf": "Zum Schlusskurs vom {date}",
+    "asOfStale": "Zum Schlusskurs vom {date}, dem neuesten erfassten Kurs",
+    "asOfStaleTitle": "Es ist kein neuerer Kurs gespeichert, daher ist dies der Wert der Position an jenem Tag und nicht heute. Aktualisiere die Kurse beim Anbieter oder trage einen von Hand ein."
+  },
+  "chart": {
+    "title": "Kurs {symbol}",
+    "seriesAriaLabel": "Diagrammreihe",
+    "modes": {
+      "price": "Kurs",
+      "value": "Anlagewert",
+      "return": "Rendite"
+    },
+    "titles": {
+      "price": "Kurs",
+      "value": "Anlagewert",
+      "return": "Rendite"
+    },
+    "summary": {
+      "first": "Erster",
+      "latest": "Aktuell",
+      "ending": "Letzter",
+      "lowest": "Niedrigster"
+    },
+    "panEarlier": "Den vorherigen Abschnitt der Historie zeigen",
+    "panLater": "Den nächsten Abschnitt der Historie zeigen"
+  },
+  "keyInfo": {
+    "title": "Kerndaten",
+    "symbol": "Symbol",
+    "securityType": "Wertpapierart",
+    "distributions": "Ausschüttungen",
+    "distributing": "Ausschüttend (beobachtet)",
+    "accumulating": "Keine (thesaurierend)",
+    "distributionsTitle": "Aus der Kurshistorie gelesen: der bereinigte Schlusskurs weicht vom notierten Schlusskurs ab, sobald eine Ausschüttung erfolgt. Aus Daten abgeleitet, nicht vom Emittenten angegeben.",
+    "exchange": "Börse",
+    "currency": "Währung",
+    "sector": "Sektor",
+    "industry": "Branche",
+    "provider": "Anbieter",
+    "lastPrice": "Letzter Kurs"
+  },
+  "tabs": {
+    "ariaLabel": "Wertpapier-Abschnitte",
+    "overview": "Überblick",
+    "transactions": "Transaktionen",
+    "prices": "Kurshistorie",
+    "documents": "Dokumente",
+    "news": "Nachrichten"
+  },
+  "about": {
+    "title": "Über",
+    "noDescription": "Für dieses Wertpapier ist keine Beschreibung gespeichert.",
+    "sector": "Sektor",
+    "industry": "Branche",
+    "country": "Land",
+    "website": "Website",
+    "irWebsite": "IR-Website",
+    "tags": "Tags",
+    "notStored": "Noch nicht gespeichert"
+  },
+  "performance": {
+    "title": "Wertentwicklung des Wertpapiers",
+    "subject": "Wie sich das Instrument selbst entwickelt hat, unabhängig davon, ob du es gehalten hast. Was deine eigene Position erzielt hat, steht unter Gesamtrendite.",
+    "empty": "Noch zu wenig Kurshistorie, um eine Rendite zu messen.",
+    "unavailable": "k. A.",
+    "periods": {
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Seit Jahresbeginn",
+      "1y": "1J",
+      "3y": "3J",
+      "5y": "5J"
+    },
+    "includesDividends": "Einschließlich Dividenden",
+    "excludesDividends": "Ohne Dividenden",
+    "excludesDividendsTitle": "Dieser Anbieter liefert keine Reihe bereinigter Schlusskurse, daher werden diese Renditen allein aus dem Kurs berechnet. Bei einem ausschüttenden Fonds untertreiben sie die Rendite um dessen gesamte Ausschüttungsrendite."
+  },
+  "positionInfo": {
+    "title": "Positionsdaten",
+    "firstTransaction": "Erste Transaktion",
+    "lastTransaction": "Letzte Transaktion",
+    "totalInvested": "Insgesamt investiert",
+    "totalSold": "Insgesamt verkauft",
+    "dividends": "Dividenden",
+    "fees": "Gebühren",
+    "realizedPl": "Realisierter G/V",
+    "realizedMixed": "Realisiert in {currencies}, daher nicht summiert",
+    "totalReturn": "Gesamtrendite",
+    "totalReturnValue": "{amount} ({percent})",
+    "totalReturnTitle": "Nicht realisierter Gewinn plus das, was du bei Verkäufen realisiert und an Erträgen erhalten hast, abzüglich Gebühren, bezogen auf das eingesetzte Kapital. Eine einfache Rendite auf dieses Kapital: nicht auf ein Jahr gerechnet und nicht nach Haltedauer der Tranchen gewichtet.",
+    "status": "Status",
+    "statusOpen": "Offen",
+    "statusClosed": "Geschlossen",
+    "statusNone": "Nie gehalten"
+  },
+  "accounts": {
+    "title": "Konten",
+    "closedSuffix": "{name} (geschlossen)",
+    "total": "Gesamt",
+    "columns": {
+      "account": "Konto",
+      "currency": "Währung",
+      "units": "Anteile",
+      "avgCost": "Durchschn. Kosten / Anteil",
+      "marketValue": "Marktwert",
+      "costBasis": "Einstandswert",
+      "unrealizedPl": "Nicht realisierter G/V"
+    }
+  },
+  "closed": {
+    "title": "Position geschlossen",
+    "description": "Du hältst dieses Wertpapier nicht mehr. Seine Historie bleibt unten verfügbar.",
+    "realizedPl": "Realisierter G/V",
+    "heldFrom": "Gehalten seit",
+    "heldRange": "{start} bis {end}"
+  },
+  "empty": {
+    "noPosition": "Keine Positionsdaten",
+    "noPositionHint": "Du hast für dieses Wertpapier noch keine Transaktionen erfasst.",
+    "noPrices": "Keine Kurshistorie verfügbar",
+    "noPricesHint": "Trage einen Kurs von Hand ein oder aktualisiere die Kurse beim Anbieter.",
+    "noTransactions": "Noch keine Transaktionen",
+    "noAccounts": "Dieses Wertpapier wird in keinem Konto gehalten."
+  },
+  "weightings": {
+    "title": "Aufteilung",
+    "ariaLabel": "Dimension der Aufteilung",
+    "sectorTab": "Sektor",
+    "countryTab": "Land",
+    "assetClassTab": "Anlageklasse",
+    "sectorEmpty": "Es ist keine Sektoraufteilung gespeichert. Monize füllt sie für Fonds und ETFs beim Anbieter ab.",
+    "countryEmpty": "Es ist keine Länderaufteilung gespeichert. Du kannst sie beim Bearbeiten des Wertpapiers eintragen.",
+    "assetClassEmpty": "Es ist noch keine Aufteilung nach Anlageklassen gespeichert.",
+    "remainder": "{percent} nicht zugeordnet"
+  },
+  "documents": {
+    "title": "Dokumente",
+    "add": "Dokument hinzufügen",
+    "loadFailed": "Die Dokumente dieses Wertpapiers konnten nicht geladen werden",
+    "noDate": "Kein Datum",
+    "columns": {
+      "type": "Art",
+      "name": "Name",
+      "date": "Datum",
+      "address": "Adresse",
+      "actions": "Aktionen"
+    },
+    "types": {
+      "FACTSHEET": "Factsheet",
+      "KIID": "KIID",
+      "PROSPECTUS": "Prospekt",
+      "ANNUAL_REPORT": "Jahresbericht",
+      "SEMI_ANNUAL_REPORT": "Halbjahresbericht",
+      "TAX": "Steuerdokument",
+      "RESEARCH": "Analyse",
+      "OTHER": "Sonstiges"
+    },
+    "actions": {
+      "open": "Öffnen",
+      "openNamed": "{name} in einem neuen Tab öffnen",
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
+    },
+    "empty": {
+      "title": "Noch keine Dokumente",
+      "description": "Sammle die Unterlagen zu diesem Wertpapier an einem Ort: Factsheet, KIID, Prospekt, Jahresbericht, Steuerbeleg. Jedes ist ein Link, den du direkt von hier öffnen kannst.",
+      "action": "Erstes Dokument hinzufügen"
+    },
+    "form": {
+      "addTitle": "Dokument hinzufügen",
+      "editTitle": "Dokument bearbeiten",
+      "date": "Datum des Dokuments",
+      "dateHint": "Das Datum auf dem Dokument selbst, nicht das heutige. Lass es leer, wenn es keines hat.",
+      "url": "Adresse",
+      "notes": "Notizen",
+      "create": "Dokument hinzufügen",
+      "save": "Dokument speichern"
+    },
+    "validation": {
+      "nameRequired": "Gib dem Dokument einen Namen",
+      "urlRequired": "Eine Adresse ist erforderlich",
+      "urlScheme": "Die Adresse muss mit http:// oder https:// beginnen"
+    },
+    "delete": {
+      "title": "Dokument löschen?",
+      "message": "Damit wird der Link zu „{name}“ entfernt. Das Dokument selbst bleibt unberührt."
+    },
+    "toasts": {
+      "created": "Dokument hinzugefügt",
+      "updated": "Dokument aktualisiert",
+      "deleted": "Dokument gelöscht",
+      "saveFailed": "Das Dokument konnte nicht gespeichert werden",
+      "deleteFailed": "Das Dokument konnte nicht gelöscht werden"
+    }
+  },
+  "news": {
+    "title": "Nachrichten, die {symbol} erwähnen",
+    "subject": "Der Anbieter ordnet eine Meldung jedem genannten Ticker zu, daher geht es bei einigen um ein anderes Unternehmen, das dieses erwähnt.",
+    "loadFailed": "Die Nachrichten zu diesem Wertpapier konnten nicht geladen werden",
+    "video": "Video",
+    "alsoMentions": "Erwähnt außerdem {tickers}",
+    "unsupportedProvider": "Der Kursanbieter dieses Wertpapiers liefert keine Nachrichten. Wenn du ihn beim Bearbeiten auf Yahoo umstellst, erscheinen hier Schlagzeilen.",
+    "empty": {
+      "title": "Derzeit keine Schlagzeilen",
+      "description": "Zu diesem Symbol wurde in letzter Zeit nichts veröffentlicht. Die Liste wird aktualisiert, wenn du zurückkommst."
+    }
+  }
+}

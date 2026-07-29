@@ -393,7 +393,8 @@
     "noUpdateFields": "Укажіть принаймні одне поле для зміни.",
     "allocationExceedsTotal": "Сума відсотків розподілу перевищує 100%.",
     "invalidTagKey": "Потрібен ключ тегу (1–100 символів)",
-    "assetOptionNameRequired": "Потрібна назва класу активів."
+    "assetOptionNameRequired": "Потрібна назва класу активів.",
+    "documentNotFound": "Документ не знайдено"
   },
   "tags": {
     "notFound": "Тег з ідентифікатором {{ id }} не знайдено",

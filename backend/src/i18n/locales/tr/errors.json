@@ -393,7 +393,8 @@
     "noUpdateFields": "Değiştirmek için en az bir alan girin.",
     "allocationExceedsTotal": "Tahsis yüzdeleri toplamı %100'ü aşıyor.",
     "invalidTagKey": "Bir etiket anahtarı (1-100 karakter) gereklidir",
-    "assetOptionNameRequired": "Varlık sınıfı adı gerekli."
+    "assetOptionNameRequired": "Varlık sınıfı adı gerekli.",
+    "documentNotFound": "Belge bulunamadı"
   },
   "tags": {
     "notFound": "{{ id }} kimliğine sahip etiket bulunamadı",

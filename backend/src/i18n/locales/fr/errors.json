@@ -393,7 +393,8 @@
     "noUpdateFields": "Indiquez au moins un champ à modifier.",
     "allocationExceedsTotal": "Les pourcentages de répartition dépassent 100 %.",
     "invalidTagKey": "Une clé d'étiquette (1 à 100 caractères) est requise",
-    "assetOptionNameRequired": "Un nom de classe d'actifs est requis."
+    "assetOptionNameRequired": "Un nom de classe d'actifs est requis.",
+    "documentNotFound": "Document introuvable"
   },
   "tags": {
     "notFound": "Étiquette avec l'ID {{ id }} introuvable",
