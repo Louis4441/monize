@@ -148,7 +148,7 @@ describe('FavouriteSecurities', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Price history for AAPL/i }));
 
-    expect(mockPush).toHaveBeenCalledWith('/securities?price=sec-9');
+    expect(mockPush).toHaveBeenCalledWith('/securities/sec-9?tab=prices');
   });
 
   it('highlights the row edge on hover, matching the Top Movers widget', () => {

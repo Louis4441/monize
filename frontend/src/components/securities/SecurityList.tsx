@@ -14,9 +14,6 @@ import { RowActionSheet } from '@/components/ui/row-actions/RowActionSheet';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 
 interface SecurityActionLabels {
-  details: string;
-  history: string;
-  prices: string;
   edit: string;
   activate: string;
   deactivate: string;
@@ -24,9 +21,6 @@ interface SecurityActionLabels {
 }
 
 interface SecurityActionHandlers {
-  onViewDetails?: (security: Security) => void;
-  onViewHistory?: (security: Security) => void;
-  onViewPrices?: (security: Security) => void;
   onEdit: (security: Security) => void;
   onToggleActive: (security: Security) => void;
   onDelete?: (security: Security) => void;
@@ -45,32 +39,6 @@ function buildSecurityActions(
 ): RowAction[] {
   const canDelete = !hasHoldings && !hasTransactions;
   return [
-    // Leads the row: the detail page is the whole picture, where the two
-    // history actions below each open one slice of it in a modal.
-    {
-      key: 'details',
-      label: labels.details,
-      icon: 'view',
-      tone: 'view',
-      onClick: () => handlers.onViewDetails?.(security),
-      hidden: !handlers.onViewDetails,
-    },
-    {
-      key: 'history',
-      label: labels.history,
-      icon: 'history',
-      tone: 'neutral',
-      onClick: () => handlers.onViewHistory?.(security),
-      hidden: !handlers.onViewHistory,
-    },
-    {
-      key: 'prices',
-      label: labels.prices,
-      icon: 'prices',
-      tone: 'neutral',
-      onClick: () => handlers.onViewPrices?.(security),
-      hidden: !handlers.onViewPrices,
-    },
     {
       key: 'edit',
       label: labels.edit,
@@ -159,9 +127,8 @@ interface SecurityListProps {
   onToggleActive: (security: Security) => void;
   onToggleFavourite?: (security: Security) => void;
   onDelete?: (security: Security) => void;
-  onViewDetails?: (security: Security) => void;
-  onViewPrices?: (security: Security) => void;
-  onViewHistory?: (security: Security) => void;
+  /** Opens the security's detail page; the symbol and name cells call it. */
+  onOpen: (security: Security) => void;
   density?: DensityLevel;
   onDensityChange?: (density: DensityLevel) => void;
   sortField?: SecuritySortField;
@@ -182,9 +149,7 @@ interface SecurityRowProps {
   onToggleActive: (security: Security) => void;
   onToggleFavourite?: (security: Security) => void;
   onDelete?: (security: Security) => void;
-  onViewDetails?: (security: Security) => void;
-  onViewPrices?: (security: Security) => void;
-  onViewHistory?: (security: Security) => void;
+  onOpen: (security: Security) => void;
   getRowHandlers: (security: Security) => LongPressRowHandlers;
   index: number;
   defaultQuoteProvider: 'yahoo' | 'msn';
@@ -202,9 +167,7 @@ const SecurityRow = memo(function SecurityRow({
   onToggleActive,
   onToggleFavourite,
   onDelete,
-  onViewDetails,
-  onViewPrices,
-  onViewHistory,
+  onOpen,
   getRowHandlers,
   index,
   defaultQuoteProvider,
@@ -233,15 +196,12 @@ const SecurityRow = memo(function SecurityRow({
     hasHoldings,
     hasTransactions,
     {
-      details: t('list.actions.details'),
-      history: t('list.actions.history'),
-      prices: t('list.actions.prices'),
       edit: tc('actions.edit'),
       activate: t('list.actions.activate'),
       deactivate: t('list.actions.deactivate'),
       delete: tc('actions.delete'),
     },
-    { onViewDetails, onViewHistory, onViewPrices, onEdit, onToggleActive, onDelete },
+    { onEdit, onToggleActive, onDelete },
   );
 
   return (
@@ -273,14 +233,26 @@ const SecurityRow = memo(function SecurityRow({
         </button>
       </td>
       <td className={`${cellPadding} whitespace-nowrap`}>
-        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+        <button
+          type="button"
+          onClick={() => onOpen(security)}
+          onMouseDown={(e) => e.stopPropagation()}
+          title={t('list.openTitle')}
+          className="text-sm font-medium text-blue-600 hover:underline focus:outline-none focus-visible:underline dark:text-blue-400"
+        >
           {security.symbol}
-        </span>
+        </button>
       </td>
       <td className={`${cellPadding}`}>
-        <span className="text-sm text-gray-900 dark:text-gray-100">
+        <button
+          type="button"
+          onClick={() => onOpen(security)}
+          onMouseDown={(e) => e.stopPropagation()}
+          title={t('list.openTitle')}
+          className="text-left text-sm text-gray-900 hover:underline focus:outline-none focus-visible:underline dark:text-gray-100"
+        >
           {security.name}
-        </span>
+        </button>
         {security.tags && security.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
             {security.tags.map((tag) => (
@@ -399,9 +371,7 @@ export function SecurityList({
   onToggleActive,
   onToggleFavourite,
   onDelete,
-  onViewDetails,
-  onViewPrices,
-  onViewHistory,
+  onOpen,
   density: propDensity,
   onDensityChange,
   sortField: propSortField,
@@ -594,9 +564,7 @@ export function SecurityList({
                 onToggleActive={onToggleActive}
                 onToggleFavourite={onToggleFavourite}
                 onDelete={onDelete}
-                onViewDetails={onViewDetails}
-                onViewPrices={onViewPrices}
-                onViewHistory={onViewHistory}
+                onOpen={onOpen}
                 getRowHandlers={getRowHandlers}
                 index={index}
                 defaultQuoteProvider={defaultQuoteProvider}
@@ -618,15 +586,12 @@ export function SecurityList({
               (holdings[contextSecurity.id] || 0) > 0,
               transactionSecurityIds.has(contextSecurity.id),
               {
-                details: t('list.contextMenu.viewDetails'),
-                history: t('list.contextMenu.transactionHistory'),
-                prices: t('list.contextMenu.viewPrices'),
                 edit: t('list.contextMenu.editSecurity'),
                 activate: t('list.contextMenu.activate'),
                 deactivate: t('list.contextMenu.deactivate'),
                 delete: t('list.contextMenu.delete'),
               },
-              { onViewDetails, onViewHistory, onViewPrices, onEdit, onToggleActive, onDelete },
+              { onEdit, onToggleActive, onDelete },
             )
           : []}
         onClose={() => setContextSecurity(null)}

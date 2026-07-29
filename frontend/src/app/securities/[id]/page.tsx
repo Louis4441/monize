@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -66,6 +66,11 @@ const SecurityPriceHistory = dynamic(
 const TAB_KEYS = ['overview', 'transactions', 'prices'] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
+/** `?tab=` if it names a real tab, so a link can point at one. */
+function tabFromQuery(value: string | null): TabKey {
+  return TAB_KEYS.includes(value as TabKey) ? (value as TabKey) : 'overview';
+}
+
 /**
  * How old the newest close may be and still describe "today's" move. Covers a
  * long weekend plus a public holiday, which is the normal gap between sessions.
@@ -98,6 +103,7 @@ function SecurityDetailContent() {
   const ts = useTranslations('securities');
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const securityId = params.id as string;
 
   const [detail, setDetail] = useState<SecurityDetail | null>(null);
@@ -105,7 +111,12 @@ function SecurityDetailContent() {
   const [trades, setTrades] = useState<SecurityHistoryTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabKey>('overview');
+  // Read once, from the link that opened the page: the dashboard's price
+  // widgets point straight at the Price history tab. Later tab changes are the
+  // user's, so this is an initial value rather than a synced one.
+  const [tab, setTab] = useState<TabKey>(() =>
+    tabFromQuery(searchParams.get('tab')),
+  );
   const [chartMode, setChartMode] = useState<SecurityChartMode>('price');
   const [isEditing, setIsEditing] = useState(false);
   const [isFavouritePending, setIsFavouritePending] = useState(false);

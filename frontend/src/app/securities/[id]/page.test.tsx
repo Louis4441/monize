@@ -4,10 +4,13 @@ import SecurityDetailPage from './page';
 import type { Security, SecurityDetail } from '@/types/investment';
 
 const mockPush = vi.fn();
+/** Mutable so a test can arrive with `?tab=` the way a deep link does. */
+const searchParams = { current: new URLSearchParams() };
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: vi.fn() }),
   usePathname: () => '/securities/sec-1',
   useParams: () => ({ id: 'sec-1' }),
+  useSearchParams: () => searchParams.current,
 }));
 
 vi.mock('@/store/authStore', () => ({
@@ -164,6 +167,7 @@ async function renderPage() {
 describe('SecurityDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParams.current = new URLSearchParams();
     mockGetSecurityDetail.mockResolvedValue(detailFixture());
     mockGetSecurityPrices.mockResolvedValue([
       {
@@ -320,6 +324,25 @@ describe('SecurityDetailPage', () => {
       );
       expect(screen.getByRole('tab', { name: 'Transactions' })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: 'Price history' })).toBeInTheDocument();
+    });
+
+    it('opens the tab a link names', async () => {
+      // The dashboard's price widgets point straight here.
+      searchParams.current = new URLSearchParams('tab=prices');
+      await renderPage();
+      expect(screen.getByRole('tab', { name: 'Price history' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+    });
+
+    it('falls back to Overview for a tab that does not exist', async () => {
+      searchParams.current = new URLSearchParams('tab=nonsense');
+      await renderPage();
+      expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
     });
 
     it('does not offer Documents yet', async () => {

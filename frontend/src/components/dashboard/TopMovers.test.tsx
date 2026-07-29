@@ -232,9 +232,10 @@ describe('TopMovers', () => {
     expect(row).toHaveAccessibleName(expect.stringContaining('$180.00'));
     fireEvent.click(row);
 
-    // The same view the securities page opens from its Prices action, reached
+    // The detail page's Price history tab, which replaced the modal the
+    // securities list used to open, reached
     // by deep link rather than by a second copy of it on the dashboard.
-    expect(mockPush).toHaveBeenCalledWith('/securities?price=sec-1');
+    expect(mockPush).toHaveBeenCalledWith('/securities/sec-1?tab=prices');
   });
 
   it('does not show currency code for default currency securities', () => {

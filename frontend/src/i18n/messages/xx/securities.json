@@ -78,9 +78,6 @@
       "source": "[XX-Source of the most recent price-XX]"
     },
     "actions": {
-      "details": "[XX-Details-XX]",
-      "history": "[XX-History-XX]",
-      "prices": "[XX-Prices-XX]",
       "edit": "[XX-Edit-XX]",
       "deactivate": "[XX-Deactivate-XX]",
       "activate": "[XX-Activate-XX]",
@@ -95,14 +92,12 @@
       "subtitle": "[XX-Get started by adding your first security.-XX]"
     },
     "contextMenu": {
-      "viewDetails": "[XX-View details-XX]",
-      "transactionHistory": "[XX-Transaction History-XX]",
-      "viewPrices": "[XX-View Prices-XX]",
       "editSecurity": "[XX-Edit Security-XX]",
       "deactivate": "[XX-Deactivate-XX]",
       "activate": "[XX-Activate-XX]",
       "delete": "[XX-Delete-XX]"
-    }
+    },
+    "openTitle": "[XX-Click to open this security-XX]"
   },
   "typeLabels": {
     "STOCK": "[XX-Stock-XX]",

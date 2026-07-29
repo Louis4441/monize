@@ -8,8 +8,8 @@ import toast from 'react-hot-toast';
 const nav = vi.hoisted(() => ({ params: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
-    replace: vi.fn(),
+    push: mockPush,
+    replace: mockReplace,
     back: vi.fn(),
     prefetch: vi.fn(),
     refresh: vi.fn(),
@@ -17,6 +17,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/securities',
   useSearchParams: () => nav.params,
 }));
+
+const mockPush = vi.fn();
+const mockReplace = vi.fn();
 
 // Mock next/image
 vi.mock('next/image', () => ({
@@ -142,7 +145,7 @@ vi.mock('@/lib/investments', () => ({
 
 // Mock child components
 vi.mock('@/components/securities/SecurityList', () => ({
-  SecurityList: ({ securities, holdings, onEdit, onToggleActive, onToggleFavourite, onDelete, onViewPrices, sortField, sortDirection, onSort, density, onDensityChange }: any) => (
+  SecurityList: ({ securities, holdings, onEdit, onToggleActive, onToggleFavourite, onDelete, onOpen, sortField, sortDirection, onSort, density, onDensityChange }: any) => (
     <div data-testid="security-list">
       {sortField && <span data-testid="sort-field">{sortField}</span>}
       {sortDirection && <span data-testid="sort-direction">{sortDirection}</span>}
@@ -163,7 +166,7 @@ vi.mock('@/components/securities/SecurityList', () => ({
           <span data-testid={`fav-state-${s.symbol}`}>{String(s.isFavourite)}</span>
           {onToggleFavourite && <button data-testid={`fav-${s.symbol}`} onClick={() => onToggleFavourite(s)}>Fav</button>}
           <button data-testid={`delete-${s.symbol}`} onClick={() => onDelete(s)}>Delete</button>
-          <button data-testid={`view-prices-${s.symbol}`} onClick={() => onViewPrices(s)}>ViewPrices</button>
+          <button data-testid={`open-${s.symbol}`} onClick={() => onOpen(s)}>Open</button>
         </div>
       ))}
       <div data-testid="holdings-data">{JSON.stringify(holdings)}</div>
@@ -693,20 +696,12 @@ describe('SecuritiesPage', () => {
     });
   });
 
-  it('opens price history modal when view prices is clicked', async () => {
+  it('opens the detail page from the list', async () => {
     render(<SecuritiesPage />);
     await waitFor(() => expect(screen.getByTestId('security-list')).toBeInTheDocument());
-    await act(async () => { fireEvent.click(screen.getByTestId('view-prices-AAPL')); });
-    await waitFor(() => expect(screen.getByTestId('price-history')).toBeInTheDocument());
-  });
-
-  it('closes price history modal', async () => {
-    render(<SecuritiesPage />);
-    await waitFor(() => expect(screen.getByTestId('security-list')).toBeInTheDocument());
-    await act(async () => { fireEvent.click(screen.getByTestId('view-prices-AAPL')); });
-    await waitFor(() => expect(screen.getByTestId('price-history')).toBeInTheDocument());
-    await act(async () => { fireEvent.click(screen.getByTestId('price-history-close')); });
-    expect(screen.queryByTestId('price-history')).not.toBeInTheDocument();
+    await act(async () => { fireEvent.click(screen.getByTestId('open-AAPL')); });
+    // The price and transaction views live on that page now, not in a modal here.
+    expect(mockPush).toHaveBeenCalledWith('/securities/s1');
   });
 
   it('activates an inactive security when toggled', async () => {
@@ -799,36 +794,25 @@ describe('SecuritiesPage', () => {
     await waitFor(() => expect(screen.getByTestId('pagination')).toBeInTheDocument());
   });
 
-  describe('price history deep link', () => {
-    it('opens the price history the ?price= link asks for', async () => {
-      // The dashboard's Top Movers sends the user here rather than growing its
-      // own copy of this view.
+  describe('legacy price deep link', () => {
+    it('redirects ?price= to the detail page it now lives on', async () => {
+      // Links already sent out -- the dashboard's widgets, a bookmark -- must not
+      // land on a page that silently ignores them.
       nav.params = new URLSearchParams('price=s1');
       render(<SecuritiesPage />);
 
       await waitFor(() =>
-        expect(screen.getByTestId('price-history')).toBeInTheDocument(),
+        expect(mockReplace).toHaveBeenCalledWith('/securities/s1?tab=prices'),
       );
     });
 
-    it('does not reopen it once closed', async () => {
-      nav.params = new URLSearchParams('price=s1');
+    it('leaves the list alone without the parameter', async () => {
+      nav.params = new URLSearchParams('');
       render(<SecuritiesPage />);
       await waitFor(() =>
-        expect(screen.getByTestId('price-history')).toBeInTheDocument(),
+        expect(screen.getByTestId('security-list')).toBeInTheDocument(),
       );
-
-      await act(async () => {
-        fireEvent.click(screen.getByTestId('price-history-close'));
-      });
-      expect(screen.queryByTestId('price-history')).not.toBeInTheDocument();
-    });
-
-    it('ignores an id that is not in the list', async () => {
-      nav.params = new URLSearchParams('price=nope');
-      render(<SecuritiesPage />);
-
-      expect(screen.queryByTestId('price-history')).not.toBeInTheDocument();
+      expect(mockReplace).not.toHaveBeenCalled();
     });
   });
 });
