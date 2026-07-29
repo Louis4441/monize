@@ -226,6 +226,23 @@ describe('SecurityDetailPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('names the currency on the header quote when it is not the reader\'s', async () => {
+    await renderPage();
+    // The quote is the largest figure on the page and the one a reader anchors
+    // on; the fixture is a USD security and the test default is CAD.
+    expect(screen.getByText(/150\.00 USD/)).toBeInTheDocument();
+  });
+
+  it('opens the Investments page filtered to an account', async () => {
+    await renderPage();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Brokerage/ }));
+    });
+    // The Investments page already accepts this parameter; the Accounts list
+    // links the same way.
+    expect(mockPush).toHaveBeenCalledWith('/investments?accountId=acct-1');
+  });
+
   it('leaves the classification to Key information rather than repeating it', async () => {
     await renderPage();
     // Symbol, type, exchange and currency used to sit under the name as well;

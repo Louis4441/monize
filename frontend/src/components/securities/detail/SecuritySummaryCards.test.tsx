@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import { render } from '@/test/render';
 
 /** Rates the mocked hook reports, keyed `FROM->TO`; a test sets what it needs. */
@@ -349,5 +349,41 @@ describe('SecuritySummaryCards in the reader s own currency', () => {
       />,
     );
     expect(screen.queryByText(/~/)).not.toBeInTheDocument();
+  });
+});
+
+describe('SecuritySummaryCards held-in-accounts changes', () => {
+  it('no longer repeats the total, leaving the row for an account', () => {
+    render(<SecuritySummaryCards detail={detail()} />);
+    // The Units card beside this one already states it (review of #964).
+    expect(screen.queryByText('Total')).not.toBeInTheDocument();
+  });
+
+  it('opens the Investments page for an account when asked to', () => {
+    const onSelectAccount = vi.fn();
+    render(
+      <SecuritySummaryCards detail={detail()} onSelectAccount={onSelectAccount} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Brokerage/ }));
+    expect(onSelectAccount).toHaveBeenCalledWith('acct-1');
+  });
+
+  it('leaves a closed account as plain text', () => {
+    // The Investments page lists open accounts, so a link there would land on
+    // nothing.
+    render(
+      <SecuritySummaryCards
+        detail={detail({ accounts: [account({ isClosed: true })] })}
+        onSelectAccount={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Brokerage (closed)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Brokerage/ })).toBeNull();
+  });
+
+  it('stays read-only without a handler', () => {
+    render(<SecuritySummaryCards detail={detail()} />);
+    expect(screen.queryByRole('button', { name: /Brokerage/ })).toBeNull();
+    expect(screen.getByText('Brokerage')).toBeInTheDocument();
   });
 });

@@ -6,6 +6,7 @@ import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/Button';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { withCurrencyCode } from '@/lib/security-detail';
 import { gainLossColor } from '@/lib/format';
 import type { Security } from '@/types/investment';
 import { SecuritySwitcher } from './SecuritySwitcher';
@@ -60,7 +61,8 @@ export function SecurityDetailHeader({
   const t = useTranslations('securityDetail');
   const ts = useTranslations('securities');
   const { formatDate } = useDateFormat();
-  const { formatCurrencyPrecise, formatSignedPercent } = useNumberFormat();
+  const { formatCurrencyPrecise, formatSignedPercent, defaultCurrency } =
+    useNumberFormat();
 
   const FavouriteIcon = security.isFavourite ? StarSolidIcon : StarIcon;
   const favouriteLabel = security.isFavourite
@@ -134,7 +136,14 @@ export function SecurityDetailHeader({
             <>
               <div className="flex flex-wrap items-baseline gap-x-3 lg:justify-end">
                 <span className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                  {formatCurrencyPrecise(quote.price, security.currencyCode)}
+                  {/* The quote is the largest figure on the page and the one a
+                      reader anchors on, so it names its currency too when that
+                      is not their own. */}
+                  {withCurrencyCode(
+                    formatCurrencyPrecise(quote.price, security.currencyCode),
+                    security.currencyCode,
+                    defaultCurrency,
+                  )}
                 </span>
                 {quote.change !== null && quote.changePercent !== null && (
                   <span

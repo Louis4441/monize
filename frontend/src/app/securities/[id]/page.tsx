@@ -316,6 +316,11 @@ function SecurityDetailContent() {
           {detail.accounts.length > 0 ? (
             <SecuritySummaryCards
               detail={detail}
+              // The Investments page already accepts `?accountId=`; the Accounts
+              // list links to it the same way.
+              onSelectAccount={(accountId) =>
+                router.push(`/investments?accountId=${accountId}`)
+              }
               // The same newest close the backend valued the position at: both
               // take the latest `security_prices` row, so dating the card from
               // the series cannot disagree with the figure on it.
@@ -333,7 +338,7 @@ function SecurityDetailContent() {
               instrument is, and what it is made of. The chart runs tall so that
               column has the room, and the breakdown's bars are capped and
               scrollable so an eleven-sector fund cannot outgrow it.
-              `items-start` keeps the cards at their content height. */}
+              `items-stretch` is what lets the column match it. */}
           <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <SecurityChartSection
@@ -384,16 +389,18 @@ function SecurityDetailContent() {
                 isActive={tab === 'overview'}
                 className="mt-6 space-y-6"
               >
-                {/* `items-start`: the three cards hold different amounts, and
-                    stretching the short ones just pads them with blank space. */}
-                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-5">
-                  <div className="lg:col-span-2">
+                {/* One height across the row: the three cards hold different
+                    amounts, so the short ones gain blank space at the bottom,
+                    which reads better than three boxes ending at three
+                    different heights (review of discussion #964). */}
+                <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-5">
+                  <div className="lg:col-span-2 h-full">
                     <SecurityAboutCard security={security} />
                   </div>
-                  <div className="lg:col-span-1">
+                  <div className="lg:col-span-1 h-full">
                     <SecurityPerformanceCard prices={priceSeries} />
                   </div>
-                  <div className="lg:col-span-2">
+                  <div className="lg:col-span-2 h-full">
                     <SecurityPositionInfoCard detail={detail} />
                   </div>
                 </div>

@@ -573,14 +573,26 @@ export function BalanceHistoryChart({
                 }}
               />
             )}
-            {summary && summary.minBalance !== summary.startBalance && (
-              <ReferenceLine
-                y={summary.minBalance}
-                stroke={summary.minBalance < 0 && !isLiability ? chartColors.expense : chartColors.warning}
-                strokeDasharray="3 3"
-                strokeOpacity={0.4}
-              />
-            )}
+            {/* The amber dashed line marks the series' lowest point. That is
+                worth flagging on an account balance -- "this is how low you
+                got" -- and meaningless on a price or a percentage, where a
+                minimum always exists and amber reads as a warning about
+                nothing. `summaryLabels` is the caller saying "this is not a
+                balance", the same signal that drops the overdrawn styling. */}
+            {!summaryLabels &&
+              summary &&
+              summary.minBalance !== summary.startBalance && (
+                <ReferenceLine
+                  y={summary.minBalance}
+                  stroke={
+                    summary.minBalance < 0 && !isLiability
+                      ? chartColors.expense
+                      : chartColors.warning
+                  }
+                  strokeDasharray="3 3"
+                  strokeOpacity={0.4}
+                />
+              )}
             {/* Pinned events (buys and sells on a price series): a dot on the
                 line at the day it happened, green in / red out, with the
                 quantity in the tooltip for that day. */}

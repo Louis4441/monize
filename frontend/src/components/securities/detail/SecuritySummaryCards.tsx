@@ -22,6 +22,11 @@ import type { SecurityDetail } from '@/types/investment';
 interface SecuritySummaryCardsProps {
   detail: SecurityDetail;
   /**
+   * Opens the Investments page filtered to one account. Optional: the cards
+   * render read-only without it.
+   */
+  onSelectAccount?: (accountId: string) => void;
+  /**
    * The close the market value was struck at, and whether it is recent enough to
    * pass for today's. Null when no price is on record.
    */
@@ -42,6 +47,7 @@ const ICON_CLASS = 'h-4 w-4';
 export function SecuritySummaryCards({
   detail,
   quoteAsOf = null,
+  onSelectAccount,
 }: SecuritySummaryCardsProps) {
   const t = useTranslations('securityDetail');
   const { formatDate } = useDateFormat();
@@ -206,45 +212,60 @@ export function SecuritySummaryCards({
                   held in a single account -- it sits in a row with five others,
                   and growing it drags the whole grid down. `scrollbar-slim`
                   keeps the bar quiet; the native one is what looked broken. */}
-              <ul className="scrollbar-slim max-h-24 space-y-0.5 overflow-y-auto pr-1">
-                {detail.accounts.map((account) => (
-                  <li
-                    key={account.accountId}
-                    className="flex items-baseline justify-between gap-3 text-sm"
-                  >
-                    <span
-                      className={`truncate ${
-                        account.isClosed
-                          ? 'text-gray-500 dark:text-gray-400'
-                          : 'text-gray-900 dark:text-gray-100'
-                      }`}
-                    >
-                      {account.isClosed
-                        ? t('accounts.closedSuffix', {
-                            name: account.accountName,
-                          })
-                        : account.accountName}
-                    </span>
-                    <span className="shrink-0 tabular-nums text-gray-900 dark:text-gray-100">
-                      {t('cards.unitsShare', {
-                        units: formatQuantity(account.quantity),
-                        // A share of the total, not a gain: no leading sign.
-                        share: formatPercent(
-                          totalUnits === 0
-                            ? 0
-                            : (account.quantity / totalUnits) * 100,
-                        ),
-                      })}
-                    </span>
-                  </li>
-                ))}
+              <ul className="scrollbar-slim max-h-28 space-y-0.5 overflow-y-auto pr-1">
+                {detail.accounts.map((account) => {
+                  const name = account.isClosed
+                    ? t('accounts.closedSuffix', { name: account.accountName })
+                    : account.accountName;
+                  const units = t('cards.unitsShare', {
+                    units: formatQuantity(account.quantity),
+                    // A share of the total, not a gain: no leading sign.
+                    share: formatPercent(
+                      totalUnits === 0
+                        ? 0
+                        : (account.quantity / totalUnits) * 100,
+                    ),
+                  });
+                  return (
+                    <li key={account.accountId}>
+                      {/* A closed account has nothing to show on the
+                          Investments page, which lists open ones, so only an
+                          open account is a link. */}
+                      {onSelectAccount && !account.isClosed ? (
+                        <button
+                          type="button"
+                          onClick={() => onSelectAccount(account.accountId)}
+                          title={t('cards.openAccount', { name })}
+                          className="flex w-full items-baseline justify-between gap-3 rounded text-left text-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700/50"
+                        >
+                          <span className="truncate text-gray-900 hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400">
+                            {name}
+                          </span>
+                          <span className="shrink-0 tabular-nums text-gray-900 dark:text-gray-100">
+                            {units}
+                          </span>
+                        </button>
+                      ) : (
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                          <span
+                            className={`truncate ${
+                              account.isClosed
+                                ? 'text-gray-500 dark:text-gray-400'
+                                : 'text-gray-900 dark:text-gray-100'
+                            }`}
+                          >
+                            {name}
+                          </span>
+                          <span className="shrink-0 tabular-nums text-gray-900 dark:text-gray-100">
+                            {units}
+                          </span>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
-              <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-gray-200 pt-1 text-sm font-semibold text-gray-900 dark:border-gray-700 dark:text-gray-100">
-                <span>{t('cards.total')}</span>
-                <span className="tabular-nums">
-                  {formatQuantity(totalUnits)}
-                </span>
-              </div>
+
             </>
           )}
         </div>

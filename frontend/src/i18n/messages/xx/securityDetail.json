@@ -30,7 +30,7 @@
     "units": "[XX-Units-XX]",
     "avgCostPerUnit": "[XX-Avg. cost / unit-XX]",
     "heldInAccounts": "[XX-Held in accounts-XX]",
-    "total": "[XX-Total-XX]",
+    "openAccount": "[XX-Show {name} on the Investments page-XX]",
     "unitsShare": "[XX-{units} ({share})-XX]",
     "valueUnknown": "[XX-Not priced-XX]",
     "approx": "[XX-~ {amount}-XX]",

@@ -49,7 +49,7 @@ export function SecurityPerformanceCard({
   const includesDividends = inferDistributionPolicy(prices) !== 'unknown';
 
   return (
-    <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
+    <div className="flex h-full flex-col rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
         {t('performance.title')}
       </h3>

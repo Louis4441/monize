@@ -60,7 +60,14 @@ vi.mock('recharts', () => ({
         : null}
     </div>
   ),
-  ReferenceLine: () => <div data-testid="reference-line" />,
+  ReferenceLine: ({ y, x, stroke }: any) => (
+    <div
+      data-testid="reference-line"
+      data-y={y}
+      data-x={x}
+      data-stroke={stroke}
+    />
+  ),
   ReferenceDot: ({ x, y, fill }: any) => (
     <div data-testid="reference-dot" data-x={x} data-y={y} data-fill={fill} />
   ),
@@ -806,5 +813,48 @@ describe('BalanceHistoryChart x axis', () => {
     expect(
       screen.getByTestId('x-axis').getAttribute('data-ticks')!.split(','),
     ).toHaveLength(2);
+  });
+});
+
+describe('BalanceHistoryChart lowest-value marker', () => {
+  const dipping = [
+    { date: '2026-01-01', balance: 100 },
+    { date: '2026-02-01', balance: 60 },
+    { date: '2026-03-01', balance: 90 },
+  ];
+
+  /** Every reference line's `data-y`, as numbers. */
+  const lineYs = () =>
+    screen
+      .getAllByTestId('reference-line')
+      .map((el) => el.getAttribute('data-y'))
+      .filter((y) => y !== null)
+      .map(Number);
+
+  it('marks the lowest point on a balance series', () => {
+    render(<BalanceHistoryChart data={dipping} isLoading={false} />);
+    // "This is how low you got" is worth flagging on an account balance.
+    expect(lineYs()).toContain(60);
+  });
+
+  it('leaves it off a series that is not a balance', () => {
+    render(
+      <BalanceHistoryChart
+        data={dipping}
+        isLoading={false}
+        summaryLabels={{
+          starting: 'First',
+          current: 'Latest',
+          ending: 'Ending',
+          lowest: 'Lowest',
+        }}
+      />,
+    );
+    // A price or a percentage always has a minimum, and an amber dashed line
+    // across it reads as a warning about nothing. `summaryLabels` is the
+    // caller saying this is not a balance.
+    expect(lineYs()).not.toContain(60);
+    // The zero line still belongs there.
+    expect(lineYs()).toContain(0);
   });
 });
