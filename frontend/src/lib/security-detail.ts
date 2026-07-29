@@ -135,6 +135,14 @@ const DISTRIBUTION_EPSILON = 0.0005;
  * nothing was ever distributed, and a gap means something was. This is an
  * inference from data rather than a field an issuer told us, and the wording
  * around it has to say so.
+ *
+ * Checked against Yahoo's own series for a known pair, rather than assumed:
+ * IUSQ.DE (iShares MSCI ACWI, accumulating) returns close === adjclose at every
+ * monthly point, while VWRL.AS (Vanguard FTSE All-World, distributing) sits
+ * about 3% below its quoted close throughout -- roughly sixty times
+ * DISTRIBUTION_EPSILON, so the threshold has ample margin over provider
+ * rounding. The sign is consistent too: the adjusted series runs below the
+ * quoted one, because Yahoo back-adjusts history for each distribution.
  */
 export function inferDistributionPolicy(
   series: readonly SecurityPricePoint[],
