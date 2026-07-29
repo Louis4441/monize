@@ -233,7 +233,9 @@ describe("entity decimal precision", () => {
         .filter((c) => c.tableName !== null)
         .map((c) => `${c.tableName}.${c.columnName}`),
     );
-    const missing = [...UNIT_PRICE_COLUMNS].filter((name) => !present.has(name));
+    const missing = [...UNIT_PRICE_COLUMNS].filter(
+      (name) => !present.has(name),
+    );
     expect(missing).toEqual([]);
   });
 
