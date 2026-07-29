@@ -330,6 +330,16 @@ export interface SecurityPrice {
   highPrice: number | null;
   lowPrice: number | null;
   closePrice: number;
+  /**
+   * Split- and dividend-adjusted close, i.e. the total-return series. Stored by
+   * the backend from provider data and returned by the prices endpoint; null for
+   * a security whose provider does not supply it (MSN today).
+   *
+   * Use it, falling back to `closePrice`, wherever a *return* is computed --
+   * `COALESCE(adjusted_close, close_price)` is what the backend's own
+   * calculations do. Keep `closePrice` for anything that shows the quote itself.
+   */
+  adjustedClose: number | null;
   volume: number | null;
   source: string | null;
   createdAt: string;

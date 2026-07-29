@@ -22,6 +22,7 @@ function price(priceDate: string, closePrice: number): SecurityPrice {
     highPrice: null,
     lowPrice: null,
     closePrice,
+    adjustedClose: null,
     volume: null,
     source: 'yahoo_finance',
     createdAt: '2026-01-01T00:00:00.000Z',
