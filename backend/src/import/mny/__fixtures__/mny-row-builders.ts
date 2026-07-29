@@ -1,0 +1,199 @@
+import {
+  MnyAccount,
+  MnyBill,
+  MnyCategory,
+  MnyCurrency,
+  MnyExchangeRate,
+  MnyFileDefaults,
+  MnyPayee,
+  MnySecurity,
+  MnyTransaction,
+  MnyTransactionSplit,
+  MnyTransfer,
+} from "../model/mny-rows";
+import { MnyReferenceData } from "../tables/read-reference";
+import { MnyTransactionData } from "../tables/read-transactions";
+
+/**
+ * Builders for the typed rows the mappers consume.
+ *
+ * The mappers never see Jet bytes -- that is the whole point of the layering --
+ * so their fixtures are plain objects. Each builder supplies the neutral value
+ * for every field (no reference, zero amount, real posting) and takes overrides,
+ * so a spec states only the field it is about. Adding a field to a row type
+ * therefore does not touch a single spec.
+ */
+
+export function mnyDefaults(
+  overrides: Partial<MnyFileDefaults> = {},
+): MnyFileDefaults {
+  return {
+    defaultCurrency: null,
+    displayCurrency: null,
+    localeId: 1033,
+    ...overrides,
+  };
+}
+
+export function mnyCurrency(overrides: Partial<MnyCurrency> = {}): MnyCurrency {
+  return {
+    handle: 1,
+    isoCode: "USD",
+    name: "US dollar",
+    quoteSymbol: "",
+    hidden: false,
+    ...overrides,
+  };
+}
+
+export function mnyExchangeRate(
+  overrides: Partial<MnyExchangeRate> = {},
+): MnyExchangeRate {
+  return {
+    fromCurrency: null,
+    toCurrency: null,
+    rate: 1,
+    date: null,
+    historical: true,
+    ...overrides,
+  };
+}
+
+export function mnyAccount(overrides: Partial<MnyAccount> = {}): MnyAccount {
+  return {
+    handle: 1,
+    type: 0,
+    name: "Chequing",
+    relatedAccount: null,
+    currency: null,
+    openingBalance: 0,
+    creditLimit: 0,
+    openedOn: null,
+    closedOn: null,
+    closed: false,
+    favourite: false,
+    comment: null,
+    ...overrides,
+  };
+}
+
+export function mnyPayee(overrides: Partial<MnyPayee> = {}): MnyPayee {
+  return {
+    handle: 1,
+    name: "Payee",
+    hidden: false,
+    ...overrides,
+  };
+}
+
+export function mnyCategory(overrides: Partial<MnyCategory> = {}): MnyCategory {
+  return {
+    handle: 1,
+    name: "Category",
+    parent: null,
+    level: 1,
+    categoryType: 0,
+    taxRelated: false,
+    ...overrides,
+  };
+}
+
+export function mnySecurity(overrides: Partial<MnySecurity> = {}): MnySecurity {
+  return {
+    handle: 1,
+    symbol: "VOO",
+    name: "Vanguard S&P 500",
+    securityType: 0,
+    currency: null,
+    hidden: false,
+    ...overrides,
+  };
+}
+
+/** A real posting: `frq` -1, no flags, unreconciled, no investment action. */
+export function mnyTransaction(
+  overrides: Partial<MnyTransaction> = {},
+): MnyTransaction {
+  return {
+    handle: 1,
+    account: 1,
+    linkedAccount: null,
+    payee: null,
+    category: null,
+    security: null,
+    date: "2026-01-15",
+    amount: 0,
+    clearedStatus: 0,
+    flags: 0,
+    action: -1,
+    frequency: -1,
+    reference: null,
+    memo: null,
+    billSeries: null,
+    ...overrides,
+  };
+}
+
+export function mnySplit(
+  overrides: Partial<MnyTransactionSplit> = {},
+): MnyTransactionSplit {
+  return {
+    child: 2,
+    parent: 1,
+    position: 0,
+    ...overrides,
+  };
+}
+
+export function mnyTransfer(overrides: Partial<MnyTransfer> = {}): MnyTransfer {
+  return {
+    from: 1,
+    to: 2,
+    ...overrides,
+  };
+}
+
+export function mnyBill(overrides: Partial<MnyBill> = {}): MnyBill {
+  return {
+    handle: 1,
+    status: 0,
+    frequency: 3,
+    interval: 1,
+    nextDue: null,
+    templateTransaction: null,
+    series: null,
+    instance: 0,
+    endsOn: null,
+    maxInstances: 0,
+    ...overrides,
+  };
+}
+
+/** `MnyReferenceData` with empty tables, ready to be filled per spec. */
+export function referenceData(
+  overrides: Partial<MnyReferenceData> = {},
+): MnyReferenceData {
+  return {
+    defaults: null,
+    currencies: [],
+    exchangeRates: [],
+    accounts: [],
+    payees: [],
+    categories: [],
+    availability: [],
+    ...overrides,
+  };
+}
+
+/** `MnyTransactionData` with empty tables. */
+export function transactionData(
+  overrides: Partial<MnyTransactionData> = {},
+): MnyTransactionData {
+  return {
+    transactions: [],
+    splits: [],
+    transfers: [],
+    availability: [],
+    ...overrides,
+  };
+}
