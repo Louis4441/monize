@@ -17,6 +17,7 @@ import {
   MAX_PRICE_DECIMALS,
   shiftWindow,
   maxSpansBack,
+  documentHost,
 } from './security-detail';
 import type {
   SecurityPrice,
@@ -685,5 +686,33 @@ describe('maxSpansBack', () => {
   it('is zero without a bounded window or a known oldest date', () => {
     expect(maxSpansBack({ start: '', end: '' }, '2020-01-01')).toBe(0);
     expect(maxSpansBack(year, '')).toBe(0);
+  });
+});
+
+describe('documentHost', () => {
+  it('reduces a long document link to its host', () => {
+    // The address column is a column of hosts; the full URL is on the link.
+    expect(
+      documentHost('https://www.ishares.com/de/literature/factsheet/x.pdf'),
+    ).toBe('ishares.com');
+  });
+
+  it('drops the www prefix, which is noise in a column of hosts', () => {
+    expect(documentHost('https://www.vanguard.co.uk/a.pdf')).toBe(
+      'vanguard.co.uk',
+    );
+    expect(documentHost('https://vanguard.co.uk/a.pdf')).toBe('vanguard.co.uk');
+  });
+
+  it('keeps a subdomain that is not www', () => {
+    expect(documentHost('https://docs.example.com/a.pdf')).toBe(
+      'docs.example.com',
+    );
+  });
+
+  it('shows an unparseable address as it was typed', () => {
+    // The reader is the one who can tell what is wrong with it; hiding it would
+    // leave a blank cell and no way to find out.
+    expect(documentHost('not a url')).toBe('not a url');
   });
 });

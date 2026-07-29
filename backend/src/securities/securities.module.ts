@@ -5,6 +5,7 @@ import { SecurityTag } from "./entities/security-tag.entity";
 import { Holding } from "./entities/holding.entity";
 import { InvestmentTransaction } from "./entities/investment-transaction.entity";
 import { SecurityPrice } from "./entities/security-price.entity";
+import { SecurityDocument } from "./entities/security-document.entity";
 import { Account } from "../accounts/entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Tag } from "../tags/entities/tag.entity";
@@ -20,6 +21,7 @@ import { InvestmentTransactionsService } from "./investment-transactions.service
 import { PortfolioService } from "./portfolio.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { SecurityDetailService } from "./security-detail.service";
+import { SecurityDocumentsService } from "./security-documents.service";
 import { SectorWeightingService } from "./sector-weighting.service";
 import { SecuritiesController } from "./securities.controller";
 import { HoldingsController } from "./holdings.controller";
@@ -40,6 +42,7 @@ import { DelegationModule } from "../delegation/delegation.module";
       Holding,
       InvestmentTransaction,
       SecurityPrice,
+      SecurityDocument,
       Account,
       Transaction,
       Tag,
@@ -64,6 +67,7 @@ import { DelegationModule } from "../delegation/delegation.module";
     PortfolioCalculationService,
     PortfolioService,
     SecurityDetailService,
+    SecurityDocumentsService,
     SectorWeightingService,
   ],
   controllers: [
@@ -83,6 +87,7 @@ import { DelegationModule } from "../delegation/delegation.module";
     InvestmentTransactionsService,
     PortfolioService,
     SecurityDetailService,
+    SecurityDocumentsService,
     SectorWeightingService,
   ],
 })

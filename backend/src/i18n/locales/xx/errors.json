@@ -401,7 +401,8 @@
     "invalidUuid": "[XX-Invalid {{ label }} UUID: {{ id }}-XX]",
     "symbolLength": "[XX-Symbol must be between 1 and 20 characters-XX]",
     "symbolCharacters": "[XX-Symbol must contain only letters, digits, dots, or dashes-XX]",
-    "noUpdateFields": "[XX-Provide at least one field to change.-XX]"
+    "noUpdateFields": "[XX-Provide at least one field to change.-XX]",
+    "documentNotFound": "[XX-Document not found-XX]"
   },
   "tags": {
     "notFound": "[XX-Tag with ID {{ id }} not found-XX]",

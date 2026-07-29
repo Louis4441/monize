@@ -551,6 +551,32 @@ CREATE INDEX idx_sched_txn_overrides_date ON scheduled_transaction_overrides(ove
 CREATE INDEX idx_sched_txn_overrides_orig ON scheduled_transaction_overrides(scheduled_transaction_id, original_date);
 
 -- Security Prices (historical)
+-- Documents attached to a security: factsheet, KIID, prospectus, annual report,
+-- tax slip, research. Real columns rather than a JSONB blob so the type, name,
+-- date and address are all sortable (discussion #964). Linked documents only for
+-- now; uploads need the attachments table generalised beyond transactions first.
+CREATE TABLE security_documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    security_id UUID NOT NULL REFERENCES securities(id) ON DELETE CASCADE,
+    document_type VARCHAR(30) NOT NULL DEFAULT 'OTHER',
+    name VARCHAR(255) NOT NULL,
+    document_date DATE,             -- the date on the document, not when it was added
+    url VARCHAR(2048) NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT security_documents_type_check
+      CHECK (document_type IN (
+        'FACTSHEET','KIID','PROSPECTUS','ANNUAL_REPORT',
+        'SEMI_ANNUAL_REPORT','TAX','RESEARCH','OTHER'
+      ))
+);
+
+CREATE INDEX idx_security_documents_security
+  ON security_documents(security_id, document_date DESC NULLS LAST);
+CREATE INDEX idx_security_documents_user ON security_documents(user_id);
+
 CREATE TABLE security_prices (
     id BIGSERIAL PRIMARY KEY,
     security_id UUID NOT NULL REFERENCES securities(id) ON DELETE CASCADE,

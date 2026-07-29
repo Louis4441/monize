@@ -339,6 +339,17 @@ export const RULES: Record<string, TableRules> = {
     source: keep,
     created_at: keep,
   },
+  security_documents: {
+    id: keep,
+    security_id: keep,
+    document_type: keep, // a factsheet is a factsheet
+    name: mask, // the user's own wording, and it can name them
+    document_date: keep,
+    url: drop, // an address can identify the holder or the account it came from
+    notes: drop, // free text
+    created_at: keep,
+    updated_at: keep,
+  },
   holdings: {
     id: keep,
     account_id: keep,
@@ -604,6 +615,7 @@ export const SECTION_TABLES: Record<SupportBackupSection, string[]> = {
   investments: [
     "securities",
     "security_prices",
+    "security_documents",
     "holdings",
     "investment_transactions",
     "security_tags",

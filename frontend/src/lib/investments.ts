@@ -18,6 +18,8 @@ import {
   CountryWeightingResult,
   AssetClassWeightingResult,
   SecurityPrice,
+  SecurityDocument,
+  CreateSecurityDocumentData,
   SecurityTransactionHistory,
   SecurityDetail,
 } from '@/types/investment';
@@ -589,6 +591,43 @@ export const investmentsApi = {
   },
 
   // Get price history for a security
+  getSecurityDocuments: async (securityId: string): Promise<SecurityDocument[]> => {
+    const response = await apiClient.get<SecurityDocument[]>(
+      `/securities/${securityId}/documents`,
+    );
+    return response.data;
+  },
+
+  createSecurityDocument: async (
+    securityId: string,
+    data: CreateSecurityDocumentData,
+  ): Promise<SecurityDocument> => {
+    const response = await apiClient.post<SecurityDocument>(
+      `/securities/${securityId}/documents`,
+      data,
+    );
+    return response.data;
+  },
+
+  updateSecurityDocument: async (
+    securityId: string,
+    documentId: string,
+    data: Partial<CreateSecurityDocumentData>,
+  ): Promise<SecurityDocument> => {
+    const response = await apiClient.patch<SecurityDocument>(
+      `/securities/${securityId}/documents/${documentId}`,
+      data,
+    );
+    return response.data;
+  },
+
+  deleteSecurityDocument: async (
+    securityId: string,
+    documentId: string,
+  ): Promise<void> => {
+    await apiClient.delete(`/securities/${securityId}/documents/${documentId}`);
+  },
+
   getSecurityPrices: async (securityId: string, limit = 365): Promise<SecurityPrice[]> => {
     const cacheKey = `investments:prices:${securityId}:${limit}`;
     const cached = getCached<SecurityPrice[]>(cacheKey);

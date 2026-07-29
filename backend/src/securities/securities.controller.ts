@@ -42,6 +42,10 @@ import {
   SecurityDetailService,
   SecurityDetail,
 } from "./security-detail.service";
+import { SecurityDocumentsService } from "./security-documents.service";
+import { SecurityDocument } from "./entities/security-document.entity";
+import { CreateSecurityDocumentDto } from "./dto/create-security-document.dto";
+import { UpdateSecurityDocumentDto } from "./dto/update-security-document.dto";
 import { SectorWeightingService } from "./sector-weighting.service";
 import { CreateSecurityDto } from "./dto/create-security.dto";
 import { UpdateSecurityDto } from "./dto/update-security.dto";
@@ -61,6 +65,7 @@ export class SecuritiesController {
     private readonly securitiesService: SecuritiesService,
     private readonly securityPriceService: SecurityPriceService,
     private readonly securityDetailService: SecurityDetailService,
+    private readonly securityDocumentsService: SecurityDocumentsService,
     private readonly netWorthService: NetWorthService,
     private readonly sectorWeightingService: SectorWeightingService,
     private readonly msnFinanceService: MsnFinanceService,
@@ -368,6 +373,59 @@ export class SecuritiesController {
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<SecurityDetail> {
     return this.securityDetailService.getDetail(req.user.id, id);
+  }
+
+  @Get(":id/documents")
+  @ApiOperation({ summary: "List the documents recorded against a security" })
+  @ApiResponse({ status: 200, description: "Documents, newest first" })
+  @ApiResponse({ status: 404, description: "Security not found" })
+  listDocuments(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<SecurityDocument[]> {
+    return this.securityDocumentsService.findAll(req.user.id, id);
+  }
+
+  @Post(":id/documents")
+  @ApiOperation({ summary: "Record a document against a security" })
+  @ApiResponse({ status: 201, description: "Document created" })
+  @ApiResponse({ status: 404, description: "Security not found" })
+  createDocument(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: CreateSecurityDocumentDto,
+  ): Promise<SecurityDocument> {
+    return this.securityDocumentsService.create(req.user.id, id, dto);
+  }
+
+  @Patch(":id/documents/:documentId")
+  @ApiOperation({ summary: "Update a document" })
+  @ApiResponse({ status: 200, description: "Document updated" })
+  @ApiResponse({ status: 404, description: "Security or document not found" })
+  updateDocument(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+    @Body() dto: UpdateSecurityDocumentDto,
+  ): Promise<SecurityDocument> {
+    return this.securityDocumentsService.update(
+      req.user.id,
+      id,
+      documentId,
+      dto,
+    );
+  }
+
+  @Delete(":id/documents/:documentId")
+  @ApiOperation({ summary: "Delete a document" })
+  @ApiResponse({ status: 200, description: "Document deleted" })
+  @ApiResponse({ status: 404, description: "Security or document not found" })
+  removeDocument(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+  ): Promise<void> {
+    return this.securityDocumentsService.remove(req.user.id, id, documentId);
   }
 
   @Get("symbol/:symbol")

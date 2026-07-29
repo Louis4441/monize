@@ -59,6 +59,7 @@ const mockGetSecurityTransactionHistory = vi.fn();
 const mockSetSecurityFavourite = vi.fn();
 const mockBackfillSecurityPrices = vi.fn();
 const mockGetSecurities = vi.fn();
+const mockGetSecurityDocuments = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -71,6 +72,8 @@ vi.mock('@/lib/investments', () => ({
     backfillSecurityPrices: (...args: unknown[]) =>
       mockBackfillSecurityPrices(...args),
     getSecurities: (...args: unknown[]) => mockGetSecurities(...args),
+    getSecurityDocuments: (...args: unknown[]) =>
+      mockGetSecurityDocuments(...args),
     updateSecurity: vi.fn(),
   },
 }));
@@ -200,6 +203,7 @@ describe('SecurityDetailPage', () => {
       },
     ]);
     mockGetSecurities.mockResolvedValue([security]);
+    mockGetSecurityDocuments.mockResolvedValue([]);
     mockGetSecurityTransactionHistory.mockResolvedValue({
       securityId: 'sec-1',
       symbol: 'AAPL',
@@ -349,11 +353,24 @@ describe('SecurityDetailPage', () => {
       );
     });
 
-    it('does not offer Documents yet', async () => {
+    it('offers Documents, and does not load it until it is opened', async () => {
       await renderPage();
       expect(
-        screen.queryByRole('tab', { name: 'Documents' }),
-      ).not.toBeInTheDocument();
+        screen.getByRole('tab', { name: 'Documents' }),
+      ).toBeInTheDocument();
+      // Lazy panel: nothing asks the API for documents on arrival.
+      expect(mockGetSecurityDocuments).not.toHaveBeenCalled();
+    });
+
+    it('loads the documents when that tab is opened', async () => {
+      await renderPage();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('tab', { name: 'Documents' }));
+      });
+      // The panel is a dynamic import, so its first render lands a tick later.
+      await waitFor(() =>
+        expect(mockGetSecurityDocuments).toHaveBeenCalledWith('sec-1'),
+      );
     });
 
     it('gives Overview the description, the figures and the tables', async () => {
@@ -575,6 +592,7 @@ describe('SecurityDetailPage', () => {
   describe('switching security', () => {
     it('offers no caret when there is nothing else to switch to', async () => {
       mockGetSecurities.mockResolvedValue([security]);
+    mockGetSecurityDocuments.mockResolvedValue([]);
       await renderPage();
       expect(
         screen.queryByRole('button', { name: 'Switch to another security' }),

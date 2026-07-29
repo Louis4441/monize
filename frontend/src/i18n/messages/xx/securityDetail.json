@@ -78,7 +78,8 @@
     "ariaLabel": "[XX-Security sections-XX]",
     "overview": "[XX-Overview-XX]",
     "transactions": "[XX-Transactions-XX]",
-    "prices": "[XX-Price history-XX]"
+    "prices": "[XX-Price history-XX]",
+    "documents": "[XX-Documents-XX]"
   },
   "about": {
     "title": "[XX-About-XX]",
@@ -165,5 +166,65 @@
     "countryEmpty": "[XX-No country breakdown is stored. You can enter one when editing the security.-XX]",
     "assetClassEmpty": "[XX-No asset class breakdown is stored yet.-XX]",
     "remainder": "[XX-{percent} unclassified-XX]"
+  },
+  "documents": {
+    "title": "[XX-Documents-XX]",
+    "add": "[XX-Add document-XX]",
+    "loadFailed": "[XX-Could not load the documents for this security-XX]",
+    "noDate": "[XX-No date-XX]",
+    "columns": {
+      "type": "[XX-Type-XX]",
+      "name": "[XX-Name-XX]",
+      "date": "[XX-Date-XX]",
+      "address": "[XX-Address-XX]",
+      "actions": "[XX-Actions-XX]"
+    },
+    "types": {
+      "FACTSHEET": "[XX-Factsheet-XX]",
+      "KIID": "[XX-KIID-XX]",
+      "PROSPECTUS": "[XX-Prospectus-XX]",
+      "ANNUAL_REPORT": "[XX-Annual report-XX]",
+      "SEMI_ANNUAL_REPORT": "[XX-Semi-annual report-XX]",
+      "TAX": "[XX-Tax document-XX]",
+      "RESEARCH": "[XX-Research-XX]",
+      "OTHER": "[XX-Other-XX]"
+    },
+    "actions": {
+      "open": "[XX-Open-XX]",
+      "openNamed": "[XX-Open {name} in a new tab-XX]",
+      "edit": "[XX-Edit-XX]",
+      "delete": "[XX-Delete-XX]"
+    },
+    "empty": {
+      "title": "[XX-No documents yet-XX]",
+      "description": "[XX-Keep the paperwork for this security in one place: its factsheet, its KIID, a prospectus, an annual report, a tax slip. Each one is a link you can open straight from here.-XX]",
+      "action": "[XX-Add the first document-XX]"
+    },
+    "form": {
+      "addTitle": "[XX-Add document-XX]",
+      "editTitle": "[XX-Edit document-XX]",
+      "date": "[XX-Document date-XX]",
+      "dateHint": "[XX-The date on the document itself, not today. Leave it empty if it has none.-XX]",
+      "url": "[XX-Address-XX]",
+      "notes": "[XX-Notes-XX]",
+      "create": "[XX-Add document-XX]",
+      "save": "[XX-Save document-XX]"
+    },
+    "validation": {
+      "nameRequired": "[XX-Give the document a name-XX]",
+      "urlRequired": "[XX-An address is required-XX]",
+      "urlScheme": "[XX-The address must start with http:// or https://-XX]"
+    },
+    "delete": {
+      "title": "[XX-Delete document?-XX]",
+      "message": "[XX-This removes the link to \"{name}\". The document itself is not touched.-XX]"
+    },
+    "toasts": {
+      "created": "[XX-Document added-XX]",
+      "updated": "[XX-Document updated-XX]",
+      "deleted": "[XX-Document deleted-XX]",
+      "saveFailed": "[XX-Could not save the document-XX]",
+      "deleteFailed": "[XX-Could not delete the document-XX]"
+    }
   }
 }

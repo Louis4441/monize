@@ -357,6 +357,23 @@ export function computePositionReturn(
   };
 }
 
+/**
+ * The host a document link points at, for the address column.
+ *
+ * A factsheet URL runs to a couple of hundred characters and none of them say as
+ * much as "ishares.com" does; the whole address is still on the link's tooltip.
+ * `www.` comes off because it is noise in a column of hosts. An address that
+ * cannot be parsed is shown as it was typed rather than hidden -- the reader is
+ * the one who can tell what is wrong with it.
+ */
+export function documentHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '');
+  } catch {
+    return url;
+  }
+}
+
 /** A closed date window, in ISO `yyyy-MM-dd`. */
 export interface DateWindow {
   start: string;

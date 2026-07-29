@@ -63,7 +63,15 @@ const SecurityPriceHistory = dynamic(
   { ssr: false },
 );
 
-const TAB_KEYS = ['overview', 'transactions', 'prices'] as const;
+const SecurityDocumentsTab = dynamic(
+  () =>
+    import('@/components/securities/detail/SecurityDocumentsTab').then((m) => ({
+      default: m.SecurityDocumentsTab,
+    })),
+  { ssr: false },
+);
+
+const TAB_KEYS = ['overview', 'transactions', 'prices', 'documents'] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
 /** `?tab=` if it names a real tab, so a link can point at one. */
@@ -407,6 +415,17 @@ function SecurityDetailContent() {
                 <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
                   <SecurityPriceHistory security={security} embedded />
                 </div>
+              </TabPanel>
+
+              <TabPanel
+                idPrefix="securityDetail"
+                tabKey="documents"
+                isActive={tab === 'documents'}
+                // Loads its own list, so it keeps it between visits.
+                keepMounted
+                className="mt-6"
+              >
+                <SecurityDocumentsTab security={security} />
               </TabPanel>
             </div>
           </div>

@@ -78,7 +78,8 @@
     "ariaLabel": "Security sections",
     "overview": "Overview",
     "transactions": "Transactions",
-    "prices": "Price history"
+    "prices": "Price history",
+    "documents": "Documents"
   },
   "about": {
     "title": "About",
@@ -165,5 +166,65 @@
     "countryEmpty": "No country breakdown is stored. You can enter one when editing the security.",
     "assetClassEmpty": "No asset class breakdown is stored yet.",
     "remainder": "{percent} unclassified"
+  },
+  "documents": {
+    "title": "Documents",
+    "add": "Add document",
+    "loadFailed": "Could not load the documents for this security",
+    "noDate": "No date",
+    "columns": {
+      "type": "Type",
+      "name": "Name",
+      "date": "Date",
+      "address": "Address",
+      "actions": "Actions"
+    },
+    "types": {
+      "FACTSHEET": "Factsheet",
+      "KIID": "KIID",
+      "PROSPECTUS": "Prospectus",
+      "ANNUAL_REPORT": "Annual report",
+      "SEMI_ANNUAL_REPORT": "Semi-annual report",
+      "TAX": "Tax document",
+      "RESEARCH": "Research",
+      "OTHER": "Other"
+    },
+    "actions": {
+      "open": "Open",
+      "openNamed": "Open {name} in a new tab",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "empty": {
+      "title": "No documents yet",
+      "description": "Keep the paperwork for this security in one place: its factsheet, its KIID, a prospectus, an annual report, a tax slip. Each one is a link you can open straight from here.",
+      "action": "Add the first document"
+    },
+    "form": {
+      "addTitle": "Add document",
+      "editTitle": "Edit document",
+      "date": "Document date",
+      "dateHint": "The date on the document itself, not today. Leave it empty if it has none.",
+      "url": "Address",
+      "notes": "Notes",
+      "create": "Add document",
+      "save": "Save document"
+    },
+    "validation": {
+      "nameRequired": "Give the document a name",
+      "urlRequired": "An address is required",
+      "urlScheme": "The address must start with http:// or https://"
+    },
+    "delete": {
+      "title": "Delete document?",
+      "message": "This removes the link to \"{name}\". The document itself is not touched."
+    },
+    "toasts": {
+      "created": "Document added",
+      "updated": "Document updated",
+      "deleted": "Document deleted",
+      "saveFailed": "Could not save the document",
+      "deleteFailed": "Could not delete the document"
+    }
   }
 }

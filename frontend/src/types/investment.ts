@@ -296,6 +296,42 @@ export interface SecurityDetailActivity {
   transactionCount: number;
 }
 
+/** The kinds of document a security can carry. Mirrors the backend enum. */
+export const SECURITY_DOCUMENT_TYPES = [
+  'FACTSHEET',
+  'KIID',
+  'PROSPECTUS',
+  'ANNUAL_REPORT',
+  'SEMI_ANNUAL_REPORT',
+  'TAX',
+  'RESEARCH',
+  'OTHER',
+] as const;
+
+export type SecurityDocumentType = (typeof SECURITY_DOCUMENT_TYPES)[number];
+
+/** A document recorded against a security. */
+export interface SecurityDocument {
+  id: string;
+  securityId: string;
+  documentType: SecurityDocumentType;
+  name: string;
+  /** The date on the document, not when it was recorded. Null where it has none. */
+  documentDate: string | null;
+  url: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSecurityDocumentData {
+  documentType?: SecurityDocumentType;
+  name: string;
+  documentDate?: string;
+  url: string;
+  notes?: string;
+}
+
 export interface SecurityDetail {
   security: Security;
   position: SecurityDetailPosition;
