@@ -309,6 +309,42 @@ of third-party source from `src/`, the coverage/lint exclusions they would need,
 risk `VENDORING.md` was meant to manage. If a future `mdb-reader` release needs an MSISAM codec
 patch, vendoring is still the escape hatch — `open-mny.ts` is the only file that imports it.
 
+### 6.2 Table-reader findings (M0.4, implemented)
+
+The readers live in `backend/src/import/mny/tables/`, driven by declarative specs
+(`table-reader.ts`): each field names the Money column (or columns, newest-first) it comes from
+plus a converter. A table this Money version lacks reads as zero rows; a column it lacks reads as
+the converter's default, and both are reported in a `TableAvailability` record rather than
+thrown. `readMnyTables(db)` returns the whole bundle and is the last layer that knows about Jet.
+
+Four things the fixtures settled, each now pinned by a test:
+
+- **Money Plus renamed `TRN.hpay` to `TRN.lHpay`.** A file has exactly one of the two. Reading
+  only `hpay` — as the design's section 8.2 implies — silently drops *every payee* on a Money
+  2001/2002 file, and reading only `lHpay` drops them on a Money Plus file. This is the column
+  alias the reader layer exists for.
+- **`SEC_SPLIT` carries no security handle.** The link runs `SEC_SPLIT.hss` <- `SP.hss` and then
+  `SP.hsec`, so `readInvestmentData` returns a `splitSecurities` map built from the price rows.
+  Task M2.2 must use it rather than looking for an `hsec` column that does not exist.
+- **`DHD.hcrncDef` is the file's base currency** — open question 12.1, answered: GBP in
+  `money2002.mny`, USD in `money2008.mny`. `hcrncCur` is null in every sample.
+- **Money's "no date" sentinel is year 10000** (`+010000-02-28`), not a two-digit-year pivot.
+  1320 of the 2292 date values in `money2002.mny` are it. `mdb-reader` decodes Jet datetimes
+  natively from an absolute epoch value, so the PoC's MM/DD/YY 70-year pivot is indeed obsolete
+  (open question 12.5, answered); dates outside 1900–2199 normalise to null, which also covers
+  the Jet zero date 1899-12-30.
+
+Partial answer to **open question 12.2** (`CAT` income/expense signal): every category tree
+descends from one of two roots, `INCOME` (`hcat` 130) and `EXPENSE` (`hcat` 131), which are the
+only rows with `nLevel` 0 and a null `hcatParent`. `lType` is *not* a clean income flag — income
+leaves carry both 2 and 3. Root-ancestor classification is therefore the primary signal; M1.3
+settles the fallback order.
+
+Column-presence differences across the fixtures are pinned as a table in
+`read-mny-tables.spec.ts`: Money 2001 lacks `CRNC.fHidden` and `TRN.hbillHead` (and the whole
+`BILL` table), Money 2002 lacks `CRNC.fHidden`, Money Plus has everything. Growing that list has
+to be a deliberate edit rather than silent data loss.
+
 **ADR-9 — Write performance.** Pre-generate UUIDs for all transactions/splits in the mapper so
 transfer pairs and splits are wired before insert; insert in chunks of ~500 via
 `manager.insert`; back-patch `linked_transaction_id` with a single
@@ -431,8 +467,8 @@ Exit gate: all five jackcess fixtures parse end-to-end via the CLI; go/no-go on 
 | M0.1 | Commit jackcess-encrypt sample fixtures (`money2001.mny`, `money2001-pwd.mny`, `money2002.mny`, `money2008.mny`, `money2008-pwd.mny`) under `backend/src/import/mny/__fixtures__/` with provenance/license README (Apache-2.0) and documented passwords | — | S | **done** |
 | M0.2 | `msisam/msisam-decrypt.ts`: RC4, key derivation (SHA-1/MD5 flag at `0x298`), salt at `0x72`, page loop 1..0xE, page-number key XOR, old-encryption fallback, password verify near `0x2e9`. Spec: all five fixtures decrypt; wrong password -> typed error; blank-password files open without a password | M0.1 | M | **done** |
 | M0.3 | `msisam/open-mny.ts` wrapper over `mdb-reader` v3.2.0 (`getTableOrNull`, column-presence map, engine sanity checks); confirm the identity-codec path reads pre-decrypted buffers. Spec: table lists + row counts correct for all fixtures | M0.2 | M | **done** (not vendored — see 6.1) |
-| M0.4 | Tolerant table readers (`tables/read-reference.ts`, `read-transactions.ts`, `read-investments.ts`, `read-bills.ts`) + typed raw-row model (`model/mny-rows.ts`) + date/amount normalization utils; build the per-version column-presence matrix across fixtures and encode defaults. Spec: every table reads or degrades gracefully on all fixtures | M0.3 | L | |
-| M0.5 | Validation-harness CLI: `npm run mny:validate -- file.mny [--password ...]` prints accounts, transaction counts, per-account computed final balances, per-security holdings (replay + LOT), warnings. Acceptance: maintainer runs it on the real Sunset and Money 2001 files; output sane; runtime + memory recorded in the PR | M0.4 | M | reader half shipped as `npm run mny:inspect` (scheme, table list, row/column counts, sample rows, per-table failure isolation); balances and holdings still need M0.4 |
+| M0.4 | Tolerant table readers (`tables/read-reference.ts`, `read-transactions.ts`, `read-investments.ts`, `read-bills.ts`) + typed raw-row model (`model/mny-rows.ts`) + date/amount normalization utils; build the per-version column-presence matrix across fixtures and encode defaults. Spec: every table reads or degrades gracefully on all fixtures | M0.3 | L | **done** (see 6.2) |
+| M0.5 | Validation-harness CLI: `npm run mny:validate -- file.mny [--password ...]` prints accounts, transaction counts, per-account computed final balances, per-security holdings (replay + LOT), warnings. Acceptance: maintainer runs it on the real Sunset and Money 2001 files; output sane; runtime + memory recorded in the PR | M0.4 | M | reader half shipped as `npm run mny:inspect`: scheme, table list, row/column counts, base currency, entity counts, missing tables/fields, sample rows, per-table failure isolation. Balances and holdings need the mappers |
 | M0.6 | Spike report resolving open questions (section 12): DHD base-currency field, CAT `is_income` signal, BILL `st` active semantics (validated against the known "~20 real bills" ground truth), act 5 vs 3 and act 14 semantics, native date decoding vs pivot logic. Constants land in `model/mny-model.ts` with the findings documented | M0.5 | M | |
 
 ### Track B — Parallel, not .mny-specific
@@ -535,15 +571,22 @@ wizard simply gains capability per phase.
 
 ## 12. Open questions (owner: Phase 0 spike, M0.6, unless noted)
 
-1. `DHD` base-currency field name/shape.
+1. ~~`DHD` base-currency field name/shape.~~ **Answered (M0.4):** `DHD.hcrncDef`, a `CRNC` handle.
+   `hcrncCur` (display currency) is null in every sample file. See 6.2.
 2. `CAT` income/expense signal: explicit flag, root-ancestor classification, or transaction-sign
-   heuristic (fallback order to be established empirically).
+   heuristic (fallback order to be established empirically). **Partly answered (M0.4):**
+   root-ancestor classification works — the tree descends from `INCOME` (130) and `EXPENSE` (131),
+   the only `nLevel` 0 rows — and `lType` is not a clean flag. Fallback order still open for M1.3.
 3. Exact `BILL.st` active values, and whether BILL rows are series or instances (drives the
-   dedupe key). Ground truth: kenlasko's file must yield ~20 active candidates.
+   dedupe key). Ground truth: kenlasko's file must yield ~20 active candidates. `BILL` is empty in
+   every committed fixture, so this needs a real file; note `BILL` has both `hbillHead` (series)
+   and `iinst` (instance), which is suggestive but not proof.
 4. act=5 vs act=3 distinction, act=14 real-world meaning (defaults chosen: REINVEST /
-   CAPITAL_GAIN + warning).
-5. Whether mdb-reader's native Jet datetime decoding fully obsoletes the MM/DD/YY 70-year-pivot
-   logic (expected yes — that pivot was an artifact of mdbtools CSV output).
+   CAPITAL_GAIN + warning). The fixtures only exercise act 0, 1 and 15, so this also needs a real
+   file.
+5. ~~Whether mdb-reader's native Jet datetime decoding fully obsoletes the MM/DD/YY 70-year-pivot
+   logic.~~ **Answered (M0.4): yes.** Dates arrive as absolute-epoch `Date`s; the real sentinel is
+   year 10000, not a two-digit-year pivot. See 6.2.
 6. Product (decided here, revisit in review): per-account currency override offered in the review
    step (yes — cheap); closed accounts included by default (yes).
 7. Deferred product questions, documented as limitations: merge/dedupe into populated profiles;

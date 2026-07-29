@@ -4,15 +4,22 @@
  *   npm run mny:inspect -- path/to/file.mny [--password secret] [--table TRN]
  *
  * Prints what the reader can see: encryption scheme, table list with row and
- * column counts, and optionally the first rows of one table. Its job is to
- * prove that a real-world file -- a 200 MB Money Plus Sunset file, a Money
- * 2001 file -- decrypts and parses before any mapping work depends on it.
+ * column counts, a summary of what the table readers made of the file, and
+ * optionally the first rows of one table. Its job is to prove that a
+ * real-world file -- a 200 MB Money Plus Sunset file, a Money 2001 file --
+ * decrypts and reads before any mapping work depends on it.
  *
  * This is not the full validation CLI from task M0.5: per-account balances and
- * holdings need the table readers and mappers that do not exist yet.
+ * holdings need the mappers, which do not exist yet.
  */
 import { MnyImportError } from "./mny-errors";
 import { openMnyFile } from "./msisam/open-mny";
+import {
+  MnyTables,
+  missingFields,
+  missingTables,
+  readMnyTables,
+} from "./tables/read-mny-tables";
 
 interface InspectOptions {
   file: string;
@@ -51,6 +58,33 @@ export function parseInspectArgs(argv: readonly string[]): InspectOptions {
   return { file: positional[0], password, table, rows };
 }
 
+/**
+ * Summarises what the table readers made of the file: the counts a preview
+ * will show, plus anything this Money version could not supply.
+ */
+export function summarise(tables: MnyTables): string[] {
+  const { reference, transactions, investments, bills } = tables;
+  const baseCurrency = reference.currencies.find(
+    (currency) => currency.handle === reference.defaults?.defaultCurrency,
+  );
+  const absentTables = missingTables(tables);
+  const defaulted = missingFields(tables);
+
+  return [
+    "summary:",
+    `  base currency:   ${baseCurrency ? `${baseCurrency.isoCode} (${baseCurrency.name})` : "unknown"}`,
+    `  accounts:        ${reference.accounts.length}`,
+    `  payees:          ${reference.payees.length}`,
+    `  categories:      ${reference.categories.length}`,
+    `  currencies:      ${reference.currencies.length} (${reference.exchangeRates.length} exchange rates)`,
+    `  transactions:    ${transactions.transactions.length} (${transactions.splits.length} split children, ${transactions.transfers.length} transfer pairs)`,
+    `  securities:      ${investments.securities.length} (${investments.prices.length} prices, ${investments.securitySplits.length} stock splits, ${investments.lots.length} lots)`,
+    `  bills:           ${bills.supported ? String(bills.bills.length) : "not supported by this Money version"}`,
+    `  missing tables:  ${absentTables.length > 0 ? absentTables.join(", ") : "none"}`,
+    `  defaulted fields:${defaulted.length > 0 ? ` ${defaulted.join(", ")}` : " none"}`,
+  ];
+}
+
 /** Formats the report as lines so the shape is testable without stdout capture. */
 export function inspect(
   buffer: Buffer,
@@ -80,6 +114,14 @@ export function inspect(
         `  ${name.padEnd(28)} unreadable: ${(error as Error).message}`,
       );
     }
+  }
+
+  try {
+    lines.push("", ...summarise(readMnyTables(db)));
+  } catch (error) {
+    // A damaged table stops the readers but not the report: the table list
+    // above is what tells you which one to look at.
+    lines.push("", `summary unavailable: ${(error as Error).message}`);
   }
 
   if (options.table) {

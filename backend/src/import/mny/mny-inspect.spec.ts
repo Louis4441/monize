@@ -1,5 +1,8 @@
+import { fakeMnyDatabase } from "./__fixtures__/fake-mny-database";
 import { readMnyFixture } from "./__fixtures__/mny-fixtures";
-import { inspect, parseInspectArgs } from "./mny-inspect";
+import { inspect, parseInspectArgs, summarise } from "./mny-inspect";
+import { openMnyFile } from "./msisam/open-mny";
+import { readMnyTables } from "./tables/read-mny-tables";
 
 describe("parseInspectArgs", () => {
   it("reads the file path from the single positional argument", () => {
@@ -31,6 +34,41 @@ describe("parseInspectArgs", () => {
       expect(() => parseInspectArgs(argv)).toThrow(/usage/);
     },
   );
+});
+
+describe("summarise", () => {
+  it("reports the reader's view of a real file", () => {
+    const lines = summarise(
+      readMnyTables(openMnyFile(readMnyFixture("money2002"))),
+    );
+
+    expect(lines).toContain("  base currency:   GBP (British pound)");
+    expect(lines).toContain("  accounts:        3");
+    expect(lines.some((line) => line.startsWith("  transactions:    60"))).toBe(
+      true,
+    );
+    expect(lines).toContain("  missing tables:  none");
+    expect(lines).toContain("  defaulted fields: CRNC.hidden");
+  });
+
+  it("names the tables and fields a Money 2001 file cannot supply", () => {
+    const lines = summarise(
+      readMnyTables(openMnyFile(readMnyFixture("money2001"))),
+    );
+
+    expect(lines).toContain(
+      "  bills:           not supported by this Money version",
+    );
+    expect(lines).toContain("  missing tables:  BILL");
+    expect(lines).toContain("  defaulted fields: CRNC.hidden, TRN.billSeries");
+  });
+
+  it("says so when the file names no base currency", () => {
+    const lines = summarise(readMnyTables(fakeMnyDatabase({})));
+
+    expect(lines).toContain("  base currency:   unknown");
+    expect(lines).toContain("  defaulted fields: none");
+  });
 });
 
 describe("inspect", () => {
@@ -74,6 +112,9 @@ describe("inspect", () => {
 
     expect(lines.some((line) => /ACCT\s+unreadable:/.test(line))).toBe(true);
     expect(lines.some((line) => /TRN\s+60 rows/.test(line))).toBe(true);
+    expect(lines.some((line) => line.startsWith("summary unavailable:"))).toBe(
+      true,
+    );
   });
 
   it("notes a table the Money version does not have", () => {
