@@ -67,11 +67,13 @@
     "noTagData": "Geen gelabelde posities om te tonen. Voeg labels toe aan je effecten om de verdeling per label te zien.",
     "noCountryData": "Geen landenspreidingsgegevens beschikbaar.",
     "otherCountries": "Overige landen",
+    "otherAssetClasses": "Overige beleggingscategorieën",
     "groupBy": {
       "security": "Per effect",
       "tag": "Per label",
       "country": "Per land",
-      "tagKey": "Op sleutel"
+      "tagKey": "Op sleutel",
+      "assetClass": "Op beleggingscategorie"
     },
     "noKeyData": "Geen posities hebben een waarde voor deze tagsleutel. Tag effecten als key:value (bijv. country:usa) om deze verdeling te zien.",
     "keySelectorLabel": "Tagsleutel om te aggregeren"

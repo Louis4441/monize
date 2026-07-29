@@ -74,6 +74,27 @@ export interface CountryWeightingResult {
   unclassifiedValue: number;
 }
 
+export interface AssetClassWeightingItem {
+  assetClass: string;
+  directValue: number;
+  etfValue: number;
+  totalValue: number;
+  percentage: number;
+}
+
+export interface AssetClassWeightingResult {
+  items: AssetClassWeightingItem[];
+  totalPortfolioValue: number;
+  totalDirectValue: number;
+  totalEtfValue: number;
+  /**
+   * Value with no asset-class classification: fund value beyond the manual
+   * weightings plus securities whose type says nothing definite. Rendered as
+   * the "Other" slice.
+   */
+  unclassifiedValue: number;
+}
+
 export interface Holding {
   id: string;
   accountId: string;
@@ -140,7 +161,7 @@ export interface PortfolioSummary {
 export interface AllocationItem {
   name: string;
   symbol: string | null;
-  type: 'cash' | 'security' | 'tag' | 'untagged' | 'country' | 'other';
+  type: 'cash' | 'security' | 'tag' | 'untagged' | 'country' | 'assetClass' | 'other';
   value: number;
   percentage: number;
   color?: string;

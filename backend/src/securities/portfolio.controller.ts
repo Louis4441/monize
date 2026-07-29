@@ -384,4 +384,41 @@ export class PortfolioController {
       sIds,
     );
   }
+
+  @Get("asset-class-weightings")
+  @AllowDelegate()
+  @DelegateRequiresSection("investments")
+  @ApiOperation({
+    summary: "Get the asset-class (look-through) breakdown for the portfolio",
+    description:
+      "Funds are split by the manual asset allocation saved on the security; anything without one is placed by security type. Unclassified value is reported separately as the 'Other' remainder.",
+  })
+  @ApiQuery({
+    name: "accountIds",
+    required: false,
+    description: "Comma-separated account IDs to filter by",
+  })
+  @ApiQuery({
+    name: "securityIds",
+    required: false,
+    description: "Comma-separated security IDs to filter by",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Asset-class weightings retrieved successfully",
+  })
+  @ApiResponse({ status: 401, description: "Unauthorized" })
+  async getAssetClassWeightings(
+    @Request() req,
+    @Query("accountIds") accountIds?: string,
+    @Query("securityIds") securityIds?: string,
+  ) {
+    const aIds = this.parseUuidList(accountIds, "account");
+    const sIds = this.parseUuidList(securityIds, "security");
+    return this.sectorWeightingService.getAssetClassWeightings(
+      req.user.id,
+      await this.scopeIds(req, aIds),
+      sIds,
+    );
+  }
 }

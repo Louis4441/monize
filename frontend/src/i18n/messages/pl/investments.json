@@ -67,11 +67,13 @@
     "noTagData": "Brak otagowanych pozycji do pokazania. Dodaj tagi do swoich papierów, aby zobaczyć ekspozycję wg tagów.",
     "noCountryData": "Brak danych o alokacji krajowej.",
     "otherCountries": "Pozostałe kraje",
+    "otherAssetClasses": "Pozostałe klasy aktywów",
     "groupBy": {
       "security": "Wg papieru",
       "tag": "Wg tagu",
       "country": "Wg kraju",
-      "tagKey": "Wg klucza"
+      "tagKey": "Wg klucza",
+      "assetClass": "Wg klasy aktywów"
     },
     "noKeyData": "Żadna pozycja nie ma wartości dla tego klucza tagu. Oznacz papiery jako klucz:wartość (np. country:usa), aby zobaczyć ten podział.",
     "keySelectorLabel": "Klucz tagu do agregacji"

@@ -67,11 +67,13 @@
     "noTagData": "표시할 태그가 지정된 보유 종목이 없습니다. 태그별 노출을 보려면 증권에 태그를 추가하세요.",
     "noCountryData": "국가별 배분 데이터가 없습니다.",
     "otherCountries": "기타 국가",
+    "otherAssetClasses": "기타 자산군",
     "groupBy": {
       "security": "증권별",
       "tag": "태그별",
       "country": "국가별",
-      "tagKey": "키별"
+      "tagKey": "키별",
+      "assetClass": "자산군별"
     },
     "noKeyData": "이 태그 키에 대한 값을 가진 보유 종목이 없습니다. 이 분석을 보려면 증권을 key:value(예: country:usa) 형식으로 태그하세요.",
     "keySelectorLabel": "집계할 태그 키"

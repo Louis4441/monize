@@ -67,11 +67,13 @@
     "noTagData": "Aucune position étiquetée à afficher. Ajoutez des étiquettes à vos titres pour voir la répartition par étiquette.",
     "noCountryData": "Aucune donnée de répartition par pays disponible.",
     "otherCountries": "Autres pays",
+    "otherAssetClasses": "Autres classes d'actifs",
     "groupBy": {
       "security": "Par titre",
       "tag": "Par étiquette",
       "country": "Par pays",
-      "tagKey": "Par clé"
+      "tagKey": "Par clé",
+      "assetClass": "Par classe d'actifs"
     },
     "noKeyData": "Aucune position ne comporte de valeur pour cette clé d'étiquette. Étiquetez les titres au format clé:valeur (p. ex. country:usa) pour voir cette répartition.",
     "keySelectorLabel": "Clé d'étiquette à agréger"

@@ -67,11 +67,13 @@
     "noTagData": "沒有可顯示的帶標籤持倉。為你的證券新增標籤即可按標籤查看曝險。",
     "noCountryData": "無國家/地區配置資料。",
     "otherCountries": "其他國家/地區",
+    "otherAssetClasses": "其他資產類別",
     "groupBy": {
       "security": "按證券",
       "tag": "按標籤",
       "country": "依國家/地區",
-      "tagKey": "依鍵"
+      "tagKey": "依鍵",
+      "assetClass": "按資產類別"
     },
     "noKeyData": "沒有持倉包含此標籤鍵的值。將證券標記為 key:value（例如 country:usa）以檢視此細分。",
     "keySelectorLabel": "用於彙總的標籤鍵"

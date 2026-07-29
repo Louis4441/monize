@@ -16,6 +16,7 @@ import {
   FavouriteSecurityQuote,
   SectorWeightingResult,
   CountryWeightingResult,
+  AssetClassWeightingResult,
   SecurityPrice,
   SecurityTransactionHistory,
 } from '@/types/investment';
@@ -633,6 +634,22 @@ export const investmentsApi = {
     const cached = getCached<CountryWeightingResult>(cacheKey);
     if (cached) return cached;
     const response = await apiClient.get<CountryWeightingResult>('/portfolio/country-weightings', {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    });
+    setCache(cacheKey, response.data, 60_000);
+    return response.data;
+  },
+
+  // Asset-class look-through: funds split by the manual asset allocation saved
+  // on the security, everything else placed by security type.
+  getAssetClassWeightings: async (accountIds?: string[], securityIds?: string[]): Promise<AssetClassWeightingResult> => {
+    const params: Record<string, string> = {};
+    if (accountIds && accountIds.length > 0) params.accountIds = accountIds.join(',');
+    if (securityIds && securityIds.length > 0) params.securityIds = securityIds.join(',');
+    const cacheKey = `investments:assetClassWeightings:${params.accountIds || 'all'}:${params.securityIds || 'all'}`;
+    const cached = getCached<AssetClassWeightingResult>(cacheKey);
+    if (cached) return cached;
+    const response = await apiClient.get<AssetClassWeightingResult>('/portfolio/asset-class-weightings', {
       params: Object.keys(params).length > 0 ? params : undefined,
     });
     setCache(cacheKey, response.data, 60_000);

@@ -67,11 +67,13 @@
     "noTagData": "Tidak ada kepemilikan bertag untuk ditampilkan. Tambahkan tag ke sekuritas Anda untuk melihat eksposur berdasarkan tag.",
     "noCountryData": "Tidak ada data alokasi negara tersedia.",
     "otherCountries": "Negara lainnya",
+    "otherAssetClasses": "Kelas aset lainnya",
     "groupBy": {
       "security": "Berdasarkan sekuritas",
       "tag": "Berdasarkan tag",
       "country": "Berdasarkan negara",
-      "tagKey": "Menurut kunci"
+      "tagKey": "Menurut kunci",
+      "assetClass": "Menurut kelas aset"
     },
     "noKeyData": "Tidak ada kepemilikan yang memiliki nilai untuk kunci tag ini. Beri tag sekuritas sebagai key:value (mis. country:usa) untuk melihat rincian ini.",
     "keySelectorLabel": "Kunci tag untuk diagregasi"

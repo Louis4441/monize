@@ -67,11 +67,13 @@
     "noTagData": "Nessuna posizione con etichetta da mostrare. Aggiungi etichette ai tuoi titoli per vedere l'esposizione per etichetta.",
     "noCountryData": "Nessun dato di allocazione per paese disponibile.",
     "otherCountries": "Altri paesi",
+    "otherAssetClasses": "Altre classi di attivo",
     "groupBy": {
       "security": "Per titolo",
       "tag": "Per etichetta",
       "country": "Per paese",
-      "tagKey": "Per chiave"
+      "tagKey": "Per chiave",
+      "assetClass": "Per classe di attivo"
     },
     "noKeyData": "Nessuna posizione ha un valore per questa chiave tag. Etichetta i titoli come key:value (es. country:usa) per vedere questa ripartizione.",
     "keySelectorLabel": "Chiave tag da aggregare"

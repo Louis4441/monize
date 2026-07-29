@@ -67,11 +67,13 @@
     "noTagData": "Gösterilecek etiketli pozisyon yok. Etikete göre dağılımı görmek için menkul kıymetlerinize etiket ekleyin.",
     "noCountryData": "Ülke dağılımı verisi mevcut değil.",
     "otherCountries": "Diğer ülkeler",
+    "otherAssetClasses": "Diğer varlık sınıfları",
     "groupBy": {
       "security": "Menkul kıymete göre",
       "tag": "Etikete göre",
       "country": "Ülkeye göre",
-      "tagKey": "Anahtara göre"
+      "tagKey": "Anahtara göre",
+      "assetClass": "Varlık sınıfına göre"
     },
     "noKeyData": "Bu etiket anahtarı için değeri olan varlık yok. Bu dökümü görmek için menkul kıymetleri anahtar:değer (örn. country:usa) olarak etiketleyin.",
     "keySelectorLabel": "Toplanacak etiket anahtarı"

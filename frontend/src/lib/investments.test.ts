@@ -243,6 +243,24 @@ describe('investmentsApi', () => {
     });
   });
 
+  it('getAssetClassWeightings fetches /portfolio/asset-class-weightings', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { items: [], totalPortfolioValue: 0 },
+    });
+    await investmentsApi.getAssetClassWeightings();
+    expect(apiClient.get).toHaveBeenCalledWith('/portfolio/asset-class-weightings', {
+      params: undefined,
+    });
+  });
+
+  it('getAssetClassWeightings passes accountIds and securityIds as CSV', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { items: [] } });
+    await investmentsApi.getAssetClassWeightings(['a1', 'a2'], ['s1']);
+    expect(apiClient.get).toHaveBeenCalledWith('/portfolio/asset-class-weightings', {
+      params: { accountIds: 'a1,a2', securityIds: 's1' },
+    });
+  });
+
   it('rebuildHoldings posts to /holdings/rebuild', async () => {
     vi.mocked(apiClient.post).mockResolvedValue({
       data: { holdingsCreated: 1, holdingsUpdated: 2, holdingsDeleted: 0 },
