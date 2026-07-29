@@ -25,6 +25,7 @@
     "accounts": "Konten",
     "budgets": "Budgets",
     "reports": "Berichte",
+    "investments": "Investitionen",
     "settings": "Einstellungen"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "Das war's",
             "body": "Sie können diese Highlights jederzeit hier in den Einstellungen erneut ansehen."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Wertpapier-Detailseite",
+        "steps": {
+          "welcome": {
+            "title": "Jedes Wertpapier auf einer Seite",
+            "body": "Wertpapiere waren früher drei getrennte Dialoge. Jetzt hat jedes eine eigene Seite, die alles zusammenführt: was du hältst, wie es sich entwickelt hat und alles, was Monize darüber weiß. Hier die Kurzfassung."
+          },
+          "openDetail": {
+            "title": "Ein Wertpapier öffnen",
+            "body": "Klicke ein beliebiges Wertpapier in der Liste an: die ganze Zeile öffnet seine Seite. Ein langer Druck oder ein Rechtsklick zeigt stattdessen die übrigen Aktionen der Zeile."
+          },
+          "summary": {
+            "title": "Deine Position auf einen Blick",
+            "body": "Marktwert, Einstandswert, nicht realisierter Gewinn, gehaltene Anteile und in welchen Konten sie liegen. Die Beträge stehen in der Währung des Wertpapiers selbst — der, in der sein Kurs notiert wird — und beim Marktwert steht, aus welchem Schlusskurs er stammt.",
+            "fallbackBody": "Diese Reihe zeigt normalerweise deine Position. Du hältst dieses Wertpapier nicht mehr, deshalb zeigt die Seite stattdessen, was du damit realisiert hast. Öffne eines, das du noch hältst, um die Zahlen zu sehen."
+          },
+          "chart": {
+            "title": "Drei Wege, die Historie zu lesen",
+            "body": "Wechsle zwischen **Kurs**, **Wert deiner Position** und **Rendite** im Zeitfenster. Käufe und Verkäufe sind auf jeder Reihe markiert. Die Schaltflächen rechts legen fest, wie weit zurück es geht, und die **Pfeile** daneben schieben dieses Fenster bei gleichem Zoom durch die frühere Historie — wähle 1J und gehe Jahr für Jahr zurück, statt auf 5J umzuschalten."
+          },
+          "keyInfo": {
+            "title": "Was das Instrument ist",
+            "body": "Neben dem Diagramm: Wertpapierart, Börse, Währung, der Kursanbieter, den Monize nutzt, und der letzte erfasste Kurs. Darunter zeigt die Karte **Aufteilung**, woraus ein Fonds besteht — wechsle zwischen Sektor-, Länder- und Anlageklassenaufteilung."
+          },
+          "tabs": {
+            "title": "Die Details darunter",
+            "body": "**Überblick** enthält die Beschreibung, die Renditen des Wertpapiers selbst, deine Gesamtrendite auf die Position und deine Bestände je Konto. **Transaktionen** und **Kurshistorie** sind dieselben Tabellen wie in den alten Dialogen. **Dokumente** ist der Platz für ein Factsheet oder einen Jahresbericht, und **Nachrichten** bringt aktuelle Schlagzeilen, die das Symbol erwähnen."
+          },
+          "finish": {
+            "title": "Das war die Tour",
+            "body": "Jeder Link, der auf die alten Dialoge zeigte, landet jetzt hier — die Kurs-Widgets im Dashboard öffnen diese Seite direkt auf dem Tab Kurshistorie. Es ist eine echte Seite, du kannst sie also als Lesezeichen speichern und wiederkommen."
           }
         }
       }

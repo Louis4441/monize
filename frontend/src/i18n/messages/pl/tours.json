@@ -25,6 +25,7 @@
     "accounts": "Konta",
     "budgets": "Budżety",
     "reports": "Raporty",
+    "investments": "Inwestycje",
     "settings": "Ustawienia"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "To wszystko",
             "body": "Możesz wrócić do tych najważniejszych zmian, kiedy tylko zechcesz, tutaj, w Ustawieniach."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Strona detali papieru wartościowego",
+        "steps": {
+          "welcome": {
+            "title": "Każdy papier na jednej stronie",
+            "body": "Papiery wartościowe były wcześniej trzema osobnymi okienkami. Teraz każdy ma własną stronę, która zbiera wszystko: co trzymasz, jak się zachowywał i wszystko, co Monize o nim wie. Oto skrócona wersja."
+          },
+          "openDetail": {
+            "title": "Otwórz papier",
+            "body": "Kliknij dowolny papier na liście: cały wiersz otwiera jego stronę. Długie przytrzymanie albo prawy przycisk pokazują za to pozostałe akcje wiersza."
+          },
+          "summary": {
+            "title": "Twoja pozycja na pierwszy rzut oka",
+            "body": "Wartość rynkowa, koszt nabycia, niezrealizowany zysk, liczba jednostek i konta, na których leżą. Kwoty są w walucie samego papieru — tej, w której podawana jest jego cena — a przy wartości rynkowej widać, z którego zamknięcia pochodzi.",
+            "fallbackBody": "Ten rząd zwykle pokazuje Twoją pozycję. Tego papieru już nie trzymasz, więc strona pokazuje zamiast tego, co na nim zrealizowałeś. Otwórz papier, który wciąż masz, żeby zobaczyć te liczby."
+          },
+          "chart": {
+            "title": "Trzy sposoby czytania historii",
+            "body": "Przełączaj między **ceną**, **wartością Twojej pozycji** i **zwrotem** w oknie. Kupna i sprzedaże są zaznaczone na każdej serii. Przyciski po prawej ustawiają, jak daleko wstecz sięga wykres, a **strzałki** obok nich przesuwają to okno po wcześniejszej historii w tym samym przybliżeniu — wybierz 1R i cofaj się rok po roku, zamiast przełączać na 5L."
+          },
+          "keyInfo": {
+            "title": "Czym jest ten instrument",
+            "body": "Obok wykresu: typ papieru, giełda, waluta, dostawca notowań, którego używa Monize, i ostatnia zapisana cena. Pod tym karta **Struktura** pokazuje, z czego składa się fundusz — przełączaj między podziałem na sektory, kraje i klasy aktywów."
+          },
+          "tabs": {
+            "title": "Szczegóły pod spodem",
+            "body": "**Przegląd** zawiera opis, zwroty samego papieru, Twój zwrot całkowity na pozycji i stany na poszczególnych kontach. **Transakcje** i **Historia cen** to te same tabele, które trzymały dawne okienka. **Dokumenty** to miejsce na kartę funduszu albo raport roczny, a **Wiadomości** przynoszą najnowsze nagłówki wspominające ten symbol."
+          },
+          "finish": {
+            "title": "To cały przewodnik",
+            "body": "Każdy link, który wskazywał dawne okienka, prowadzi teraz tutaj — widżety cen na pulpicie otwierają tę stronę na karcie Historia cen. To zwykła strona, więc możesz dodać ją do zakładek i do niej wracać."
           }
         }
       }

@@ -25,6 +25,7 @@
     "accounts": "Rekeningen",
     "budgets": "Budget",
     "reports": "Rapporten",
+    "investments": "Beleggingen",
     "settings": "Instellingen"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "Dat is alles",
             "body": "U kunt deze hoogtepunten altijd opnieuw bekijken vanaf hier in Instellingen."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Detailpagina van het effect",
+        "steps": {
+          "welcome": {
+            "title": "Elk effect op één pagina",
+            "body": "Effecten zaten eerder in drie losse dialoogvensters. Nu heeft elk een eigen pagina die alles samenbrengt: wat je aanhoudt, hoe het is gegaan en alles wat Monize erover weet. Hier de korte versie."
+          },
+          "openDetail": {
+            "title": "Een effect openen",
+            "body": "Klik op een willekeurig effect in de lijst: de hele rij opent zijn pagina. Lang indrukken, of rechtsklikken, laat in plaats daarvan de overige acties van de rij zien."
+          },
+          "summary": {
+            "title": "Je positie in één oogopslag",
+            "body": "Marktwaarde, kostprijs, ongerealiseerde winst, aangehouden stukken en in welke rekeningen ze zitten. De bedragen staan in de valuta van het effect zelf — die waarin de koers wordt genoteerd — en bij de marktwaarde staat uit welke slotkoers die komt.",
+            "fallbackBody": "Deze rij laat normaal je positie zien. Je houdt dit effect niet meer aan, dus toont de pagina in plaats daarvan wat je erop hebt gerealiseerd. Open er een die je nog wel aanhoudt om de cijfers te zien."
+          },
+          "chart": {
+            "title": "Drie manieren om de historie te lezen",
+            "body": "Wissel tussen de **koers**, de **waarde van je positie** en het **rendement** over het venster. Aan- en verkopen zijn op elke reeks gemarkeerd. De knoppen rechts bepalen hoe ver terug het gaat, en de **pijlen** ernaast schuiven dat venster met dezelfde zoom door de eerdere historie: kies 1J en ga jaar per jaar terug in plaats van naar 5J te schakelen."
+          },
+          "keyInfo": {
+            "title": "Wat het instrument is",
+            "body": "Naast de grafiek: soort effect, beurs, valuta, de koersaanbieder die Monize gebruikt en de laatst vastgelegde koers. Daaronder laat de kaart **Opbouw** zien waaruit een fonds bestaat: wissel tussen de opbouw per sector, per land en per beleggingscategorie."
+          },
+          "tabs": {
+            "title": "De details eronder",
+            "body": "**Overzicht** bevat de omschrijving, het rendement van het effect zelf, je totaalrendement op de positie en je bezit per rekening. **Transacties** en **Koershistorie** zijn dezelfde tabellen die in de oude dialoogvensters zaten. **Documenten** is de plek voor een factsheet of een jaarverslag, en **Nieuws** brengt recente koppen die het symbool noemen."
+          },
+          "finish": {
+            "title": "Dat was de tour",
+            "body": "Elke link die naar de oude dialoogvensters wees, komt nu hier uit: de koerswidgets op het dashboard openen deze pagina direct op het tabblad Koershistorie. Het is een echte pagina, dus je kunt hem als bladwijzer opslaan en terugkomen."
           }
         }
       }

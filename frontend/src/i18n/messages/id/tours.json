@@ -25,6 +25,7 @@
     "accounts": "Akun",
     "budgets": "Anggaran",
     "reports": "Laporan",
+    "investments": "Investasi",
     "settings": "Pengaturan"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "Selesai",
             "body": "Anda dapat meninjau kembali sorotan ini kapan saja dari sini di Pengaturan."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Halaman detail efek",
+        "steps": {
+          "welcome": {
+            "title": "Setiap efek dalam satu halaman",
+            "body": "Efek sebelumnya tersebar di tiga dialog. Kini masing-masing punya halaman sendiri yang mengumpulkan semuanya: apa yang Anda pegang, bagaimana perjalanannya, dan semua yang Monize ketahui tentangnya. Ini versi singkatnya."
+          },
+          "openDetail": {
+            "title": "Membuka sebuah efek",
+            "body": "Klik efek mana pun di daftar: seluruh baris membuka halamannya. Tekan lama, atau klik kanan, justru menampilkan tindakan lain pada baris itu."
+          },
+          "summary": {
+            "title": "Posisi Anda dalam sekali lihat",
+            "body": "Nilai pasar, harga perolehan, keuntungan belum terealisasi, unit yang dipegang, dan di rekening mana saja. Jumlahnya dalam mata uang efek itu sendiri — mata uang harganya dikutip — dan nilai pasar menyebut dari penutupan mana angka itu berasal.",
+            "fallbackBody": "Baris ini biasanya menampilkan posisi Anda. Anda tidak lagi memegang efek ini, jadi halaman menampilkan apa yang Anda realisasikan darinya. Buka efek yang masih Anda pegang untuk melihat angkanya."
+          },
+          "chart": {
+            "title": "Tiga cara membaca riwayat",
+            "body": "Beralih antara **harga**, **nilai posisi Anda**, dan **hasil** pada jendela itu. Pembelian dan penjualan ditandai di setiap seri. Tombol di kanan menentukan seberapa jauh ke belakang, dan **panah** di sebelahnya menggeser jendela itu melewati riwayat sebelumnya pada perbesaran yang sama: pilih 1T lalu mundur setahun demi setahun ketimbang beralih ke 5T."
+          },
+          "keyInfo": {
+            "title": "Apa instrumen ini",
+            "body": "Di samping grafik: jenis efek, bursa, mata uang, penyedia kuotasi yang Monize pakai, dan harga terakhir yang tercatat. Di bawahnya, kartu **Rincian** menunjukkan isi sebuah reksa dana: beralih antara rincian sektor, negara, dan kelas aset."
+          },
+          "tabs": {
+            "title": "Detail di bawahnya",
+            "body": "**Ringkasan** memuat deskripsi, hasil efek itu sendiri, hasil total Anda atas posisi, dan kepemilikan Anda per rekening. **Transaksi** dan **Riwayat harga** adalah tabel yang sama seperti pada dialog lama. **Dokumen** adalah tempat untuk lembar fakta atau laporan tahunan, dan **Berita** membawa judul terbaru yang menyebut simbol ini."
+          },
+          "finish": {
+            "title": "Itu seluruh panduannya",
+            "body": "Setiap tautan yang menuju dialog lama sekarang mendarat di sini: widget harga di dasbor membuka halaman ini langsung pada tab Riwayat harga. Ini halaman sungguhan, jadi Anda bisa menandainya dan kembali lagi."
           }
         }
       }
