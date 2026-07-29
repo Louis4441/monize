@@ -96,8 +96,7 @@
       "deactivate": "Deactivate",
       "activate": "Activate",
       "delete": "Delete"
-    },
-    "openTitle": "Click to open this security"
+    }
   },
   "typeLabels": {
     "STOCK": "Stock",

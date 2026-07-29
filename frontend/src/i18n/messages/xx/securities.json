@@ -96,8 +96,7 @@
       "deactivate": "[XX-Deactivate-XX]",
       "activate": "[XX-Activate-XX]",
       "delete": "[XX-Delete-XX]"
-    },
-    "openTitle": "[XX-Click to open this security-XX]"
+    }
   },
   "typeLabels": {
     "STOCK": "[XX-Stock-XX]",

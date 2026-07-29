@@ -127,7 +127,7 @@ interface SecurityListProps {
   onToggleActive: (security: Security) => void;
   onToggleFavourite?: (security: Security) => void;
   onDelete?: (security: Security) => void;
-  /** Opens the security's detail page; the symbol and name cells call it. */
+  /** Opens the security's detail page; a click anywhere on the row calls it. */
   onOpen: (security: Security) => void;
   density?: DensityLevel;
   onDensityChange?: (density: DensityLevel) => void;
@@ -149,7 +149,6 @@ interface SecurityRowProps {
   onToggleActive: (security: Security) => void;
   onToggleFavourite?: (security: Security) => void;
   onDelete?: (security: Security) => void;
-  onOpen: (security: Security) => void;
   getRowHandlers: (security: Security) => LongPressRowHandlers;
   index: number;
   defaultQuoteProvider: 'yahoo' | 'msn';
@@ -167,7 +166,6 @@ const SecurityRow = memo(function SecurityRow({
   onToggleActive,
   onToggleFavourite,
   onDelete,
-  onOpen,
   getRowHandlers,
   index,
   defaultQuoteProvider,
@@ -207,7 +205,7 @@ const SecurityRow = memo(function SecurityRow({
   return (
     <tr
       ref={rowRef}
-      className={`group hover:bg-gray-100 dark:hover:bg-gray-800 select-none ${
+      className={`group hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer select-none ${
         !security.isActive ? 'opacity-60' : ''
       } ${density !== 'normal' && index % 2 === 1 ? 'bg-gray-50 dark:bg-table-stripe-dark' : 'bg-white dark:bg-gray-900'} ${isHighlighted ? HIGHLIGHT_FLASH : ''}`}
       {...getRowHandlers(security)}
@@ -233,26 +231,14 @@ const SecurityRow = memo(function SecurityRow({
         </button>
       </td>
       <td className={`${cellPadding} whitespace-nowrap`}>
-        <button
-          type="button"
-          onClick={() => onOpen(security)}
-          onMouseDown={(e) => e.stopPropagation()}
-          title={t('list.openTitle')}
-          className="text-sm font-medium text-blue-600 hover:underline focus:outline-none focus-visible:underline dark:text-blue-400"
-        >
+        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
           {security.symbol}
-        </button>
+        </span>
       </td>
       <td className={`${cellPadding}`}>
-        <button
-          type="button"
-          onClick={() => onOpen(security)}
-          onMouseDown={(e) => e.stopPropagation()}
-          title={t('list.openTitle')}
-          className="text-left text-sm text-gray-900 hover:underline focus:outline-none focus-visible:underline dark:text-gray-100"
-        >
+        <span className="text-sm text-gray-900 dark:text-gray-100">
           {security.name}
-        </button>
+        </span>
         {security.tags && security.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
             {security.tags.map((tag) => (
@@ -412,6 +398,10 @@ export function SecurityList({
 
   const { getRowHandlers } = useLongPress<Security>({
     onLongPress: setContextSecurity,
+    // A plain click anywhere on the row opens the security, matching the
+    // accounts list. The favourite star and the row actions stop propagation, so
+    // they act on themselves rather than opening the page underneath.
+    onClick: onOpen,
   });
 
   // Memoize padding classes based on density
@@ -564,7 +554,6 @@ export function SecurityList({
                 onToggleActive={onToggleActive}
                 onToggleFavourite={onToggleFavourite}
                 onDelete={onDelete}
-                onOpen={onOpen}
                 getRowHandlers={getRowHandlers}
                 index={index}
                 defaultQuoteProvider={defaultQuoteProvider}

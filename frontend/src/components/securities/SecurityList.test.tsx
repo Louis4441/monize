@@ -166,7 +166,7 @@ describe('SecurityList', () => {
     expect(screen.getByText('0')).toBeInTheDocument();
   });
 
-  it('opens the detail page from the symbol and from the name', () => {
+  it('opens the detail page from a click anywhere on the row', () => {
     const securities = [makeSecurity()];
     render(
       <SecurityList
@@ -177,14 +177,48 @@ describe('SecurityList', () => {
       />,
     );
 
-    // The row's History/Prices/Details actions are gone; the security's own
-    // fields are the way in.
-    fireEvent.click(screen.getByText('AAPL'));
-    fireEvent.click(screen.getByText('Apple Inc.'));
-    expect(onOpen).toHaveBeenCalledTimes(2);
+    // The whole row is the target, as on the accounts list. Buttons on the text
+    // alone were a narrow hit area inside a wide row: clicking the cell's
+    // padding did nothing at all.
+    fireEvent.click(screen.getByText('Apple Inc.').closest('tr')!);
     expect(onOpen).toHaveBeenCalledWith(
       expect.objectContaining({ symbol: 'AAPL' }),
     );
+  });
+
+  it('does not open the page when the favourite star is clicked', () => {
+    const onToggleFavourite = vi.fn();
+    const securities = [makeSecurity()];
+    render(
+      <SecurityList
+        securities={securities}
+        onEdit={onEdit}
+        onToggleActive={onToggleActive}
+        onOpen={onOpen}
+        onToggleFavourite={onToggleFavourite}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to favourites' }));
+    expect(onToggleFavourite).toHaveBeenCalled();
+    // The risk of a clickable row: a control on it acting twice.
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('does not open the page when a row action is clicked', () => {
+    const securities = [makeSecurity()];
+    render(
+      <SecurityList
+        securities={securities}
+        onEdit={onEdit}
+        onToggleActive={onToggleActive}
+        onOpen={onOpen}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Edit'));
+    expect(onEdit).toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it('no longer offers History, Prices or Details actions', () => {
