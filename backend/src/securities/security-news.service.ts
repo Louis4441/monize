@@ -23,12 +23,19 @@ export interface SecurityNewsResult {
   items: SecurityNewsItem[];
 }
 
-/** One symbol's headlines, plus the upstream image addresses behind them. */
+/**
+ * One symbol's headlines as the provider gave them, with the upstream image
+ * addresses still on them.
+ *
+ * Deliberately nothing request-specific: the entry is shared by every user who
+ * holds this symbol, and each of them owns a *different* `securities` row for it
+ * (`@Unique(["userId","symbol"])`). Caching a thumbnail path built from one
+ * user's security id handed that id to the next user and 404'd every image for
+ * the rest of the TTL.
+ */
 interface CachedNews {
   fetchedAt: number;
   items: SecurityNewsItem[];
-  /** `itemId -> upstream thumbnail URL`, never sent to the browser. */
-  thumbnails: Map<string, string>;
 }
 
 /**
@@ -92,12 +99,16 @@ export class SecurityNewsService {
     }
 
     const cached = this.readCache(security.symbol);
-    if (cached) return { provider: "yahoo", items: cached.items };
-
-    const raw = await this.yahoo.fetchNews(security.symbol);
-    const entry = this.buildEntry(securityId, raw);
-    this.writeCache(security.symbol, entry);
-    return { provider: "yahoo", items: entry.items };
+    const items =
+      cached?.items ?? (await this.yahoo.fetchNews(security.symbol));
+    if (!cached) {
+      this.writeCache(security.symbol, { fetchedAt: Date.now(), items });
+    }
+    // Paths are built for this caller's own security, never cached.
+    return {
+      provider: "yahoo",
+      items: this.withLocalThumbnails(securityId, items),
+    };
   }
 
   /**
@@ -114,7 +125,9 @@ export class SecurityNewsService {
     itemId: string,
   ): Promise<FetchedThumbnail | null> {
     const security = await this.securitiesService.findOne(userId, securityId);
-    const url = this.cache.get(security.symbol)?.thumbnails.get(itemId);
+    const url = this.cache
+      .get(security.symbol)
+      ?.items.find((item) => item.id === itemId)?.thumbnailUrl;
     if (!url || !this.isAllowedThumbnailHost(url)) return null;
     return this.fetchImage(url);
   }
@@ -136,25 +149,24 @@ export class SecurityNewsService {
   }
 
   /**
-   * Swap each upstream thumbnail address for a path on our own API, keeping the
-   * original where only this process can reach it. The CSP is
-   * `img-src 'self' data: blob:`, and beyond that the reader's browser has no
+   * Swap each upstream thumbnail address for a path on this caller's own
+   * security, leaving the original only where this process can reach it. The CSP
+   * is `img-src 'self' data: blob:`, and beyond that the reader's browser has no
    * business announcing itself to a publisher's CDN.
+   *
+   * Per request, not per cache entry: the same symbol is a different `securities`
+   * row for every user who holds it.
    */
-  private buildEntry(
+  private withLocalThumbnails(
     securityId: string,
-    raw: readonly SecurityNewsItem[],
-  ): CachedNews {
-    const thumbnails = new Map<string, string>();
-    const items = raw.map((item) => {
-      if (!item.thumbnailUrl) return { ...item, thumbnailUrl: null };
-      thumbnails.set(item.id, item.thumbnailUrl);
-      return {
-        ...item,
-        thumbnailUrl: `/api/v1/securities/${securityId}/news/${encodeURIComponent(item.id)}/thumbnail`,
-      };
-    });
-    return { fetchedAt: Date.now(), items, thumbnails };
+    items: readonly SecurityNewsItem[],
+  ): SecurityNewsItem[] {
+    return items.map((item) => ({
+      ...item,
+      thumbnailUrl: item.thumbnailUrl
+        ? `/api/v1/securities/${securityId}/news/${encodeURIComponent(item.id)}/thumbnail`
+        : null,
+    }));
   }
 
   private readCache(symbol: string): CachedNews | null {

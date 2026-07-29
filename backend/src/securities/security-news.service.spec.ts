@@ -237,6 +237,57 @@ describe("SecurityNewsService", () => {
     });
   });
 
+  describe("the cache is shared between users", () => {
+    // A symbol is a different `securities` row for every user who holds it
+    // (@Unique(["userId","symbol"])). The cache is per symbol, so nothing
+    // request-specific may go into it.
+    const OTHER_USER = "44444444-4444-4444-8444-444444444444";
+    const OTHER_SECURITY = "55555555-5555-4555-8555-555555555555";
+
+    it("builds each caller's thumbnail path from their own security", async () => {
+      const first = await service.getNews(USER_ID, SECURITY_ID);
+      expect(first.items[0].thumbnailUrl).toContain(SECURITY_ID);
+
+      // Second user, same symbol -- a cache hit, and previously it handed them
+      // the first user's security id, 404ing every image for the whole TTL.
+      securitiesService.findOne.mockResolvedValue({
+        id: OTHER_SECURITY,
+        symbol: "AAPL",
+        quoteProvider: "yahoo",
+      });
+      const second = await service.getNews(OTHER_USER, OTHER_SECURITY);
+
+      expect(second.items[0].thumbnailUrl).toContain(OTHER_SECURITY);
+      expect(second.items[0].thumbnailUrl).not.toContain(SECURITY_ID);
+      // Still one upstream call: the headlines themselves are shared.
+      expect(yahoo.fetchNews).toHaveBeenCalledTimes(1);
+    });
+
+    it("serves the image to the second user from their own path", async () => {
+      await service.getNews(USER_ID, SECURITY_ID);
+      securitiesService.findOne.mockResolvedValue({
+        id: OTHER_SECURITY,
+        symbol: "AAPL",
+        quoteProvider: "yahoo",
+      });
+      await service.getNews(OTHER_USER, OTHER_SECURITY);
+
+      const originalFetch = global.fetch;
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        headers: new Map([["content-type", "image/jpeg"]]) as never,
+        arrayBuffer: () => Promise.resolve(new Uint8Array([9]).buffer),
+      } as never);
+      try {
+        expect(
+          await service.getThumbnail(OTHER_USER, OTHER_SECURITY, "uuid-1"),
+        ).not.toBeNull();
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+
   describe("caching", () => {
     it("reuses the headlines instead of asking again on every visit", async () => {
       await service.getNews(USER_ID, SECURITY_ID);

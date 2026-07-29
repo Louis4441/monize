@@ -341,6 +341,7 @@ export const RULES: Record<string, TableRules> = {
   },
   security_documents: {
     id: keep,
+    user_id: keep,
     security_id: keep,
     document_type: keep, // a factsheet is a factsheet
     name: mask, // the user's own wording, and it can name them
