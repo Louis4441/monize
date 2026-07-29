@@ -46,7 +46,9 @@ describe("SecurityDocumentsService", () => {
     (global as never as { __manager: unknown }).__manager = {
       getRepository: () => repo,
     };
-    securitiesService = { findOne: jest.fn().mockResolvedValue({ id: SECURITY_ID }) };
+    securitiesService = {
+      findOne: jest.fn().mockResolvedValue({ id: SECURITY_ID }),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -76,14 +78,17 @@ describe("SecurityDocumentsService", () => {
         () => service.update(USER_ID, SECURITY_ID, DOCUMENT_ID, { name: "y" }),
       ],
       ["remove", () => service.remove(USER_ID, SECURITY_ID, DOCUMENT_ID)],
-    ])("checks the security through SecuritiesService on %s", async (_n, call) => {
-      repo.findOne.mockResolvedValue(existingDocument());
-      await call();
-      expect(securitiesService.findOne).toHaveBeenCalledWith(
-        USER_ID,
-        SECURITY_ID,
-      );
-    });
+    ])(
+      "checks the security through SecuritiesService on %s",
+      async (_n, call) => {
+        repo.findOne.mockResolvedValue(existingDocument());
+        await call();
+        expect(securitiesService.findOne).toHaveBeenCalledWith(
+          USER_ID,
+          SECURITY_ID,
+        );
+      },
+    );
 
     it("propagates a security that is not the caller's", async () => {
       securitiesService.findOne.mockRejectedValue(new NotFoundException());
@@ -168,7 +173,10 @@ describe("SecurityDocumentsService", () => {
       });
       // `undefined` means "not sent" and must leave the value alone...
       expect(saved).toEqual(
-        expect.objectContaining({ documentDate: "2024-12-31", notes: "original" }),
+        expect.objectContaining({
+          documentDate: "2024-12-31",
+          notes: "original",
+        }),
       );
     });
 

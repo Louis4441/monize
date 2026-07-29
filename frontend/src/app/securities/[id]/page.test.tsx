@@ -60,6 +60,7 @@ const mockSetSecurityFavourite = vi.fn();
 const mockBackfillSecurityPrices = vi.fn();
 const mockGetSecurities = vi.fn();
 const mockGetSecurityDocuments = vi.fn();
+const mockGetSecurityNews = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
@@ -74,6 +75,7 @@ vi.mock('@/lib/investments', () => ({
     getSecurities: (...args: unknown[]) => mockGetSecurities(...args),
     getSecurityDocuments: (...args: unknown[]) =>
       mockGetSecurityDocuments(...args),
+    getSecurityNews: (...args: unknown[]) => mockGetSecurityNews(...args),
     updateSecurity: vi.fn(),
   },
 }));
@@ -204,6 +206,7 @@ describe('SecurityDetailPage', () => {
     ]);
     mockGetSecurities.mockResolvedValue([security]);
     mockGetSecurityDocuments.mockResolvedValue([]);
+    mockGetSecurityNews.mockResolvedValue({ provider: 'yahoo', items: [] });
     mockGetSecurityTransactionHistory.mockResolvedValue({
       securityId: 'sec-1',
       symbol: 'AAPL',
@@ -353,13 +356,25 @@ describe('SecurityDetailPage', () => {
       );
     });
 
-    it('offers Documents, and does not load it until it is opened', async () => {
+    it('offers Documents and News, and loads neither until opened', async () => {
       await renderPage();
       expect(
         screen.getByRole('tab', { name: 'Documents' }),
       ).toBeInTheDocument();
-      // Lazy panel: nothing asks the API for documents on arrival.
+      expect(screen.getByRole('tab', { name: 'News' })).toBeInTheDocument();
+      // Lazy panels: nothing asks the API for either on arrival.
       expect(mockGetSecurityDocuments).not.toHaveBeenCalled();
+      expect(mockGetSecurityNews).not.toHaveBeenCalled();
+    });
+
+    it('loads the news when that tab is opened', async () => {
+      await renderPage();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('tab', { name: 'News' }));
+      });
+      await waitFor(() =>
+        expect(mockGetSecurityNews).toHaveBeenCalledWith('sec-1'),
+      );
     });
 
     it('loads the documents when that tab is opened', async () => {
@@ -593,6 +608,7 @@ describe('SecurityDetailPage', () => {
     it('offers no caret when there is nothing else to switch to', async () => {
       mockGetSecurities.mockResolvedValue([security]);
     mockGetSecurityDocuments.mockResolvedValue([]);
+    mockGetSecurityNews.mockResolvedValue({ provider: 'yahoo', items: [] });
       await renderPage();
       expect(
         screen.queryByRole('button', { name: 'Switch to another security' }),

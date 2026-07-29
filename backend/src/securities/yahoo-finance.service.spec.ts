@@ -1953,8 +1953,7 @@ describe("YahooFinanceService", () => {
 
       expect(item).toEqual({
         id: "uuid-1",
-        title:
-          "Apple says UK App Store proposal amounts to price regulation",
+        title: "Apple says UK App Store proposal amounts to price regulation",
         publisher: "Reuters",
         link: "https://finance.yahoo.com/news/apple-uk-app-store.html",
         publishedAt: new Date(1785350000 * 1000).toISOString(),
@@ -1967,7 +1966,9 @@ describe("YahooFinanceService", () => {
     it("reads the timestamp as seconds, not milliseconds", async () => {
       // Upstream sends Unix seconds; a millisecond reading dates every story
       // to 1970 and the list sorts and reads as nonsense.
-      mockFetchResponse({ news: [newsItem({ providerPublishTime: 1785350000 })] });
+      mockFetchResponse({
+        news: [newsItem({ providerPublishTime: 1785350000 })],
+      });
       const [item] = await service.fetchNews("AAPL");
       expect(item.publishedAt!.startsWith("2026-")).toBe(true);
     });
@@ -1983,7 +1984,9 @@ describe("YahooFinanceService", () => {
       mockFetchResponse({
         news: [
           newsItem({
-            thumbnail: { resolutions: [{ url: "http://s.yimg.com/x.jpg", width: 140 }] },
+            thumbnail: {
+              resolutions: [{ url: "http://s.yimg.com/x.jpg", width: 140 }],
+            },
           }),
         ],
       });
@@ -2042,5 +2045,4 @@ describe("YahooFinanceService", () => {
       expect(await service.fetchNews("AAPL")).toEqual([]);
     });
   });
-
 });

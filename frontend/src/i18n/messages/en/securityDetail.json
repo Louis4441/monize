@@ -80,7 +80,8 @@
     "overview": "Overview",
     "transactions": "Transactions",
     "prices": "Price history",
-    "documents": "Documents"
+    "documents": "Documents",
+    "news": "News"
   },
   "about": {
     "title": "About",
@@ -226,6 +227,18 @@
       "deleted": "Document deleted",
       "saveFailed": "Could not save the document",
       "deleteFailed": "Could not delete the document"
+    }
+  },
+  "news": {
+    "title": "News mentioning {symbol}",
+    "subject": "The provider files a story against every ticker it names, so some of these are about another company that mentions this one.",
+    "loadFailed": "Could not load the news for this security",
+    "video": "Video",
+    "alsoMentions": "Also mentions {tickers}",
+    "unsupportedProvider": "The quote provider for this security supplies no news. Switching it to Yahoo, when editing the security, brings headlines here.",
+    "empty": {
+      "title": "No headlines right now",
+      "description": "Nothing has been published against this symbol recently. The list refreshes when you come back to it."
     }
   }
 }

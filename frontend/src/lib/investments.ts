@@ -20,6 +20,7 @@ import {
   SecurityPrice,
   SecurityDocument,
   CreateSecurityDocumentData,
+  SecurityNewsResult,
   SecurityTransactionHistory,
   SecurityDetail,
 } from '@/types/investment';
@@ -591,6 +592,13 @@ export const investmentsApi = {
   },
 
   // Get price history for a security
+  getSecurityNews: async (securityId: string): Promise<SecurityNewsResult> => {
+    const response = await apiClient.get<SecurityNewsResult>(
+      `/securities/${securityId}/news`,
+    );
+    return response.data;
+  },
+
   getSecurityDocuments: async (securityId: string): Promise<SecurityDocument[]> => {
     const response = await apiClient.get<SecurityDocument[]>(
       `/securities/${securityId}/documents`,

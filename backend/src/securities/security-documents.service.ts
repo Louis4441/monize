@@ -34,7 +34,10 @@ export class SecurityDocumentsService {
         where: { userId, securityId },
         // Newest document first, and the undated ones after those that have a
         // date rather than sorted among them as if they were the oldest.
-        order: { documentDate: { direction: "DESC", nulls: "LAST" }, name: "ASC" },
+        order: {
+          documentDate: { direction: "DESC", nulls: "LAST" },
+          name: "ASC",
+        },
       }),
     );
   }

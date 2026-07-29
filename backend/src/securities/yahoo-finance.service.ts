@@ -1308,14 +1308,11 @@ export class YahooFinanceService implements QuoteProvider {
     if (usable.length === 0) return null;
     // Smallest that still covers a 96px thumbnail, else the smallest there is:
     // the list draws these tiny, and a 1200px hero is wasted bytes.
-    const sorted = [...usable].sort(
-      (a, b) => (a.width ?? 0) - (b.width ?? 0),
-    );
+    const sorted = [...usable].sort((a, b) => (a.width ?? 0) - (b.width ?? 0));
     return (
       sorted.find((resolution) => (resolution.width ?? 0) >= 96)?.url ||
       sorted[0].url ||
       null
     );
   }
-
 }

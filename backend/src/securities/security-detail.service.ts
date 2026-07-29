@@ -376,7 +376,8 @@ export class SecurityDetailService {
         transactions
           .filter((tx) => ACQUIRING_ACTIONS.has(tx.action))
           .map(
-            (tx) => Math.abs(Number(tx.quantity) || 0) * (Number(tx.price) || 0),
+            (tx) =>
+              Math.abs(Number(tx.quantity) || 0) * (Number(tx.price) || 0),
           ),
       ),
       totalSold: amountsFor((tx) => tx.action === InvestmentAction.SELL),

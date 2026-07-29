@@ -296,6 +296,34 @@ export interface SecurityDetailActivity {
   transactionCount: number;
 }
 
+/** One headline filed against a security. */
+export interface SecurityNewsItem {
+  id: string;
+  title: string;
+  publisher: string | null;
+  link: string;
+  /** ISO timestamp, or null when the provider gave none. */
+  publishedAt: string | null;
+  /** `STORY` or `VIDEO`. */
+  type: string | null;
+  /**
+   * Path on our own API, never the publisher's CDN: the backend fetches the
+   * image so the reader's browser does not have to contact a third party.
+   */
+  thumbnailUrl: string | null;
+  /** Every symbol the item was filed under, which is more than just this one. */
+  relatedTickers: string[];
+}
+
+export interface SecurityNewsResult {
+  /**
+   * Which provider supplied the headlines, or null when the security's quote
+   * provider supplies none. Distinguishes "nothing published" from "cannot ask".
+   */
+  provider: 'yahoo' | 'msn' | null;
+  items: SecurityNewsItem[];
+}
+
 /** The kinds of document a security can carry. Mirrors the backend enum. */
 export const SECURITY_DOCUMENT_TYPES = [
   'FACTSHEET',

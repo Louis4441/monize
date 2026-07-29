@@ -80,7 +80,8 @@
     "overview": "[XX-Overview-XX]",
     "transactions": "[XX-Transactions-XX]",
     "prices": "[XX-Price history-XX]",
-    "documents": "[XX-Documents-XX]"
+    "documents": "[XX-Documents-XX]",
+    "news": "[XX-News-XX]"
   },
   "about": {
     "title": "[XX-About-XX]",
@@ -226,6 +227,18 @@
       "deleted": "[XX-Document deleted-XX]",
       "saveFailed": "[XX-Could not save the document-XX]",
       "deleteFailed": "[XX-Could not delete the document-XX]"
+    }
+  },
+  "news": {
+    "title": "[XX-News mentioning {symbol}-XX]",
+    "subject": "[XX-The provider files a story against every ticker it names, so some of these are about another company that mentions this one.-XX]",
+    "loadFailed": "[XX-Could not load the news for this security-XX]",
+    "video": "[XX-Video-XX]",
+    "alsoMentions": "[XX-Also mentions {tickers}-XX]",
+    "unsupportedProvider": "[XX-The quote provider for this security supplies no news. Switching it to Yahoo, when editing the security, brings headlines here.-XX]",
+    "empty": {
+      "title": "[XX-No headlines right now-XX]",
+      "description": "[XX-Nothing has been published against this symbol recently. The list refreshes when you come back to it.-XX]"
     }
   }
 }

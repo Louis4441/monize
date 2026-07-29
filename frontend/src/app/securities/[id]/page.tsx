@@ -71,7 +71,21 @@ const SecurityDocumentsTab = dynamic(
   { ssr: false },
 );
 
-const TAB_KEYS = ['overview', 'transactions', 'prices', 'documents'] as const;
+const SecurityNewsTab = dynamic(
+  () =>
+    import('@/components/securities/detail/SecurityNewsTab').then((m) => ({
+      default: m.SecurityNewsTab,
+    })),
+  { ssr: false },
+);
+
+const TAB_KEYS = [
+  'overview',
+  'transactions',
+  'prices',
+  'documents',
+  'news',
+] as const;
 type TabKey = (typeof TAB_KEYS)[number];
 
 /** `?tab=` if it names a real tab, so a link can point at one. */
@@ -426,6 +440,16 @@ function SecurityDetailContent() {
                 className="mt-6"
               >
                 <SecurityDocumentsTab security={security} />
+              </TabPanel>
+
+              <TabPanel
+                idPrefix="securityDetail"
+                tabKey="news"
+                isActive={tab === 'news'}
+                keepMounted
+                className="mt-6"
+              >
+                <SecurityNewsTab security={security} />
               </TabPanel>
             </div>
           </div>

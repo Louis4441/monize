@@ -7,6 +7,7 @@ import { MsnFinanceService } from "./msn-finance.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { SecurityDetailService } from "./security-detail.service";
 import { SecurityDocumentsService } from "./security-documents.service";
+import { SecurityNewsService } from "./security-news.service";
 import { SectorWeightingService } from "./sector-weighting.service";
 
 describe("SecuritiesController", () => {
@@ -15,6 +16,7 @@ describe("SecuritiesController", () => {
   let securityPriceService: Record<string, jest.Mock>;
   let securityDetailService: Record<string, jest.Mock>;
   let securityDocumentsService: Record<string, jest.Mock>;
+  let securityNewsService: Record<string, jest.Mock>;
   let msnFinanceService: Record<string, jest.Mock>;
   let netWorthService: Record<string, jest.Mock>;
   let sectorWeightingService: Record<string, jest.Mock>;
@@ -67,6 +69,10 @@ describe("SecuritiesController", () => {
       deletePrice: jest.fn(),
     };
 
+    securityNewsService = {
+      getNews: jest.fn(),
+      getThumbnail: jest.fn(),
+    };
     securityDocumentsService = {
       findAll: jest.fn(),
       create: jest.fn(),
@@ -100,6 +106,7 @@ describe("SecuritiesController", () => {
           provide: SecurityDocumentsService,
           useValue: securityDocumentsService,
         },
+        { provide: SecurityNewsService, useValue: securityNewsService },
         { provide: NetWorthService, useValue: netWorthService },
         { provide: SectorWeightingService, useValue: sectorWeightingService },
         { provide: MsnFinanceService, useValue: msnFinanceService },
@@ -301,6 +308,67 @@ describe("SecuritiesController", () => {
 
       expect(securitiesService.findOne).toHaveBeenCalledWith("user-1", "sec-1");
       expect(result).toEqual(mockSecurity);
+    });
+  });
+
+  describe("news", () => {
+    it("returns the headlines for the caller's security", async () => {
+      const news = { provider: "yahoo", items: [] };
+      securityNewsService.getNews.mockResolvedValue(news);
+
+      expect(await controller.getNews(req, "sec-1")).toBe(news);
+      expect(securityNewsService.getNews).toHaveBeenCalledWith(
+        "user-1",
+        "sec-1",
+      );
+    });
+
+    describe("thumbnail", () => {
+      const mockRes = () => {
+        const res: Record<string, jest.Mock> = {
+          set: jest.fn(),
+          end: jest.fn(),
+        };
+        res.status = jest.fn().mockReturnValue(res);
+        return res;
+      };
+
+      it("streams the image with the no-sniff hardening", async () => {
+        securityNewsService.getThumbnail.mockResolvedValue({
+          data: Buffer.from([1, 2, 3]),
+          contentType: "image/jpeg",
+        });
+        const res = mockRes();
+
+        await controller.getNewsThumbnail(req, "sec-1", "uuid-1", res as never);
+
+        expect(securityNewsService.getThumbnail).toHaveBeenCalledWith(
+          "user-1",
+          "sec-1",
+          "uuid-1",
+        );
+        const headers = res.set.mock.calls[0][0];
+        expect(headers["Content-Type"]).toBe("image/jpeg");
+        expect(headers["Content-Length"]).toBe("3");
+        // Same hardening as the attachment download: the bytes came from a
+        // third party, so the browser must not reinterpret them.
+        expect(headers["X-Content-Type-Options"]).toBe("nosniff");
+        expect(headers["Content-Security-Policy"]).toBe("default-src 'none'");
+        expect(headers["Cache-Control"]).toContain("private");
+        expect(res.end).toHaveBeenCalledWith(Buffer.from([1, 2, 3]));
+      });
+
+      it("404s with no body when there is no image to serve", async () => {
+        securityNewsService.getThumbnail.mockResolvedValue(null);
+        const res = mockRes();
+
+        await controller.getNewsThumbnail(req, "sec-1", "uuid-1", res as never);
+
+        // A picture nobody can fetch is not an error worth a body; the row
+        // simply renders without one.
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.set).not.toHaveBeenCalled();
+      });
     });
   });
 

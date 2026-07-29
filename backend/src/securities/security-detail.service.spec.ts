@@ -82,10 +82,12 @@ describe("SecurityDetailService", () => {
     holdingsByAccount?: Record<string, unknown>[];
     holdings?: Record<string, unknown>[];
   }) {
-    const accounts: Record<string, unknown>[] =
-      options.historyAccounts ?? [historyAccount()];
-    const transactions: Record<string, unknown>[] =
-      options.transactions ?? [historyTransaction()];
+    const accounts: Record<string, unknown>[] = options.historyAccounts ?? [
+      historyAccount(),
+    ];
+    const transactions: Record<string, unknown>[] = options.transactions ?? [
+      historyTransaction(),
+    ];
     investmentTransactionsService.getSecurityTransactionHistory.mockResolvedValue(
       {
         securityId: SECURITY_ID,
