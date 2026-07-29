@@ -1,6 +1,6 @@
 'use client';
 
-import { KeyboardEvent, useCallback, useRef } from 'react';
+import { KeyboardEvent, useCallback, useRef, useState } from 'react';
 
 export interface TabItem<K extends string = string> {
   /** Stable identifier, also used to build the aria ids. */
@@ -153,28 +153,52 @@ interface TabPanelProps {
   tabKey: string;
   /** Rendered only when this panel's tab is the selected one. */
   isActive: boolean;
+  /**
+   * Keep the panel mounted once it has been opened, hidden while another tab is
+   * selected, instead of unmounting it.
+   *
+   * For a panel that fetches its own data. Unmounting throws that data away, so
+   * every return to the tab refetches and shows its loading state again, which
+   * reads as the page reloading. Leave it off for a panel that is cheap to
+   * rebuild -- an unopened panel is still never mounted either way, so nothing
+   * requests data for a tab nobody visited.
+   */
+  keepMounted?: boolean;
   children: React.ReactNode;
   className?: string;
 }
 
 /**
- * The panel half of the pair. Kept in the DOM only while active: the panels on
- * the security detail page each load their own data, so mounting the inactive
- * ones would fire requests for tabs nobody opened.
+ * The panel half of the pair.
+ *
+ * A panel is not mounted until its tab is first selected, so the panels on the
+ * security detail page do not fire requests for tabs nobody opened. What happens
+ * after that is `keepMounted`'s choice.
  */
 export function TabPanel({
   idPrefix,
   tabKey,
   isActive,
+  keepMounted = false,
   children,
   className = '',
 }: TabPanelProps) {
-  if (!isActive) return null;
+  // "Information from the previous render": tracked in state and updated during
+  // render, because `setState` in an effect is an error in this codebase.
+  const [hasBeenActive, setHasBeenActive] = useState(isActive);
+  if (isActive && !hasBeenActive) setHasBeenActive(true);
+
+  const shouldRender = isActive || (keepMounted && hasBeenActive);
+  if (!shouldRender) return null;
+
   return (
     <div
       role="tabpanel"
       id={tabPanelId(idPrefix, tabKey)}
       aria-labelledby={tabId(idPrefix, tabKey)}
+      // `hidden` rather than a class, so the panel is out of the accessibility
+      // tree and out of the tab order as well as off screen.
+      hidden={!isActive}
       tabIndex={0}
       className={className}
     >

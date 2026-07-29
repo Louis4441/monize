@@ -347,54 +347,65 @@ function SecurityDetailContent() {
               ariaLabel={t('tabs.ariaLabel')}
             />
 
-            <TabPanel
-              idPrefix="securityDetail"
-              tabKey="overview"
-              isActive={tab === 'overview'}
-              className="mt-6 space-y-6"
-            >
-              {/* `items-start`: the three cards hold different amounts, and
-                  stretching the short ones just pads them with blank space. */}
-              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-5">
-                <div className="lg:col-span-2">
-                  <SecurityAboutCard security={security} />
+            {/* A floor under the panel area, so switching tabs cannot shorten
+                the document. Overview is much taller than the two tables, and
+                when the page shrank under the scroll position the browser
+                clamped it -- which landed the reader back at the top, having
+                only meant to change tab. */}
+            <div className="min-h-[36rem]">
+              <TabPanel
+                idPrefix="securityDetail"
+                tabKey="overview"
+                isActive={tab === 'overview'}
+                className="mt-6 space-y-6"
+              >
+                {/* `items-start`: the three cards hold different amounts, and
+                    stretching the short ones just pads them with blank space. */}
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-5">
+                  <div className="lg:col-span-2">
+                    <SecurityAboutCard security={security} />
+                  </div>
+                  <div className="lg:col-span-1">
+                    <SecurityPerformanceCard prices={priceSeries} />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <SecurityPositionInfoCard detail={detail} />
+                  </div>
                 </div>
-                <div className="lg:col-span-1">
-                  <SecurityPerformanceCard prices={priceSeries} />
+
+                <SecurityAccountsTable detail={detail} />
+              </TabPanel>
+
+              <TabPanel
+                idPrefix="securityDetail"
+                tabKey="transactions"
+                isActive={tab === 'transactions'}
+                // Holds its own fetched rows: unmounting would refetch and replay
+                // the loading state on every return to the tab.
+                keepMounted
+                className="mt-6"
+              >
+                <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
+                  <SecurityTransactionHistory
+                    security={security}
+                    onChanged={loadData}
+                    embedded
+                  />
                 </div>
-                <div className="lg:col-span-2">
-                  <SecurityPositionInfoCard detail={detail} />
+              </TabPanel>
+
+              <TabPanel
+                idPrefix="securityDetail"
+                tabKey="prices"
+                isActive={tab === 'prices'}
+                keepMounted
+                className="mt-6"
+              >
+                <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
+                  <SecurityPriceHistory security={security} embedded />
                 </div>
-              </div>
-
-              <SecurityAccountsTable detail={detail} />
-            </TabPanel>
-
-            <TabPanel
-              idPrefix="securityDetail"
-              tabKey="transactions"
-              isActive={tab === 'transactions'}
-              className="mt-6"
-            >
-              <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
-                <SecurityTransactionHistory
-                  security={security}
-                  onChanged={loadData}
-                  embedded
-                />
-              </div>
-            </TabPanel>
-
-            <TabPanel
-              idPrefix="securityDetail"
-              tabKey="prices"
-              isActive={tab === 'prices'}
-              className="mt-6"
-            >
-              <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
-                <SecurityPriceHistory security={security} embedded />
-              </div>
-            </TabPanel>
+              </TabPanel>
+            </div>
           </div>
         </div>
 

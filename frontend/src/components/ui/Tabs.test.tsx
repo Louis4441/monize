@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { useState } from 'react';
 import { fireEvent, screen } from '@testing-library/react';
 import { render } from '@/test/render';
 import { Tabs, TabPanel, tabId, tabPanelId } from './Tabs';
@@ -174,5 +175,75 @@ describe('TabPanel', () => {
     );
     expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument();
     expect(screen.queryByText('Panel body')).not.toBeInTheDocument();
+  });
+});
+
+describe('TabPanel keepMounted', () => {
+  function Harness({ keepMounted }: { keepMounted?: boolean }) {
+    const [tab, setTab] = useState<'a' | 'b'>('a');
+    return (
+      <>
+        <Tabs
+          tabs={[
+            { key: 'a' as const, label: 'A' },
+            { key: 'b' as const, label: 'B' },
+          ]}
+          value={tab}
+          onChange={setTab}
+          idPrefix="h"
+          ariaLabel="Sections"
+        />
+        <TabPanel idPrefix="h" tabKey="a" isActive={tab === 'a'}>
+          Panel A
+        </TabPanel>
+        <TabPanel
+          idPrefix="h"
+          tabKey="b"
+          isActive={tab === 'b'}
+          keepMounted={keepMounted}
+        >
+          Panel B
+        </TabPanel>
+      </>
+    );
+  }
+
+  it('does not mount a panel that has never been selected', () => {
+    // The point of lazy panels: no requests for a tab nobody opened.
+    render(<Harness keepMounted />);
+    expect(screen.queryByText('Panel B')).not.toBeInTheDocument();
+  });
+
+  it('keeps a visited panel in the DOM, hidden, once it has been left', () => {
+    render(<Harness keepMounted />);
+    fireEvent.click(screen.getByRole('tab', { name: 'B' }));
+    expect(screen.getByText('Panel B')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'A' }));
+    // Still mounted -- so its fetched rows survive and coming back does not
+    // replay the loading state, which read as the page reloading.
+    // Both panels are in the DOM now, so this addresses B by its own id.
+    const panelB = document.getElementById(tabPanelId('h', 'b'));
+    expect(panelB).toBeInTheDocument();
+    expect(panelB).toHaveAttribute('hidden');
+    expect(screen.getByText('Panel A')).toBeVisible();
+  });
+
+  it('unmounts a panel that did not ask to be kept', () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('tab', { name: 'B' }));
+    expect(screen.getByText('Panel B')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'A' }));
+    expect(screen.queryByText('Panel B')).not.toBeInTheDocument();
+  });
+
+  it('hides the inactive panel from assistive tech and the tab order', () => {
+    render(<Harness keepMounted />);
+    fireEvent.click(screen.getByRole('tab', { name: 'B' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'A' }));
+    // `hidden` does both, where a visually-hidden class would leave a focusable
+    // panel announced to a screen reader.
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
   });
 });
