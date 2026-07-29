@@ -33,6 +33,44 @@ interface YahooSearchResult {
   typeDisp?: string;
 }
 
+/** One item as the search endpoint's `news[]` carries it. */
+interface YahooNewsItem {
+  uuid?: string;
+  title?: string;
+  publisher?: string;
+  link?: string;
+  /** Unix seconds, not milliseconds. */
+  providerPublishTime?: number;
+  type?: string;
+  thumbnail?: {
+    resolutions?: { url?: string; width?: number; height?: number }[];
+  };
+  relatedTickers?: string[];
+}
+
+/** A news item, narrowed to what the detail page shows. */
+export interface SecurityNewsItem {
+  id: string;
+  title: string;
+  publisher: string | null;
+  link: string;
+  /** ISO timestamp; the UI turns it into "44m ago". */
+  publishedAt: string | null;
+  /** `STORY` or `VIDEO` -- the only two the endpoint returns. */
+  type: string | null;
+  /**
+   * Path on our own API for the thumbnail, or null when the item has none.
+   * Never the upstream URL: the CSP is `img-src 'self' data: blob:`, and the
+   * reader's browser has no business contacting the publisher's CDN.
+   */
+  thumbnailUrl: string | null;
+  /**
+   * Every symbol the item was filed under. The requested one is in here, but so
+   * are others -- see `fetchNews`.
+   */
+  relatedTickers: string[];
+}
+
 const YAHOO_SECTOR_NAMES: Record<string, string> = {
   realestate: "Real Estate",
   consumer_cyclical: "Consumer Cyclical",
@@ -1167,4 +1205,117 @@ export class YahooFinanceService implements QuoteProvider {
     const description = parts.join(" ").trim();
     return description.length > 0 ? description : null;
   }
+
+  /**
+   * Headlines filed against a symbol.
+   *
+   * The same `v1/finance/search` endpoint `lookupSecurityMany` already uses,
+   * with `newsCount` turned up instead of down -- so this inherits the
+   * concurrency cap, the 429/503 backoff and the timeout, and adds no new
+   * upstream surface.
+   *
+   * Two things the caller has to know about the data. It is filed by *mention*,
+   * not by subject: a story about Berkshire that lists AAPL among five tickers
+   * comes back for AAPL, so the UI must not claim these are stories about the
+   * company. And the publisher mix is whatever the endpoint returns -- Reuters
+   * beside Motley Fool and Zacks -- which is broader than the curated stream
+   * Yahoo's own web page shows.
+   *
+   * Nothing here is an advertisement: the feed carries only `STORY` and `VIDEO`.
+   * The "Ad" rows on Yahoo's page are injected client-side by Taboola and never
+   * reach the API.
+   */
+  async fetchNews(symbol: string, count = 15): Promise<SecurityNewsItem[]> {
+    try {
+      const url =
+        `https://query1.finance.yahoo.com/v1/finance/search` +
+        `?q=${encodeURIComponent(symbol)}&quotesCount=0&newsCount=${count}` +
+        `&enableFuzzyQuery=false`;
+
+      const response = await this.throttledFetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+
+      if (!response.ok) {
+        this.logger.warn(
+          `Yahoo news lookup returned ${response.status} for ${symbol}`,
+        );
+        return [];
+      }
+
+      const data = await response.json();
+      const items: YahooNewsItem[] = data.news || [];
+      return items.flatMap((item) => this.toNewsItem(item));
+    } catch (error) {
+      // News is decoration on a page that works without it, so a failure here
+      // is logged and swallowed rather than shown as a broken page.
+      this.logger.warn(
+        `Yahoo news lookup failed for ${symbol}: ${error instanceof Error ? error.message : error}`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Narrow one raw item, dropping anything that could not be rendered safely.
+   *
+   * A story with no title or no link is not a story. The link's scheme is
+   * checked because the UI turns it into an anchor -- the value comes from a
+   * third party, so it is no more trusted here than a user-typed one.
+   */
+  private toNewsItem(item: YahooNewsItem): SecurityNewsItem[] {
+    const title = item.title?.trim();
+    const link = item.link?.trim();
+    if (!title || !link || !/^https?:\/\//i.test(link)) return [];
+
+    return [
+      {
+        id: item.uuid || link,
+        title,
+        publisher: item.publisher?.trim() || null,
+        link,
+        // Unix *seconds* upstream; a millisecond reading would date every story
+        // to 1970.
+        publishedAt:
+          typeof item.providerPublishTime === "number" &&
+          isFinite(item.providerPublishTime)
+            ? new Date(item.providerPublishTime * 1000).toISOString()
+            : null,
+        type: item.type?.trim() || null,
+        thumbnailUrl: this.pickThumbnail(item),
+        relatedTickers: (item.relatedTickers || []).filter(
+          (ticker) => typeof ticker === "string" && ticker.length > 0,
+        ),
+      },
+    ];
+  }
+
+  /**
+   * The upstream thumbnail closest to the size the list renders, or null.
+   *
+   * Returns the upstream address; the controller is what turns it into a path on
+   * our own API. Only an https URL is considered -- an http image would be
+   * blocked as mixed content anyway.
+   */
+  private pickThumbnail(item: YahooNewsItem): string | null {
+    const resolutions = item.thumbnail?.resolutions || [];
+    const usable = resolutions.filter(
+      (resolution) => resolution.url && /^https:\/\//i.test(resolution.url),
+    );
+    if (usable.length === 0) return null;
+    // Smallest that still covers a 96px thumbnail, else the smallest there is:
+    // the list draws these tiny, and a 1200px hero is wasted bytes.
+    const sorted = [...usable].sort(
+      (a, b) => (a.width ?? 0) - (b.width ?? 0),
+    );
+    return (
+      sorted.find((resolution) => (resolution.width ?? 0) >= 96)?.url ||
+      sorted[0].url ||
+      null
+    );
+  }
+
 }
