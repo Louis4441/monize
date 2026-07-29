@@ -60,31 +60,25 @@ This is Next.js middleware (NOT the deprecated middleware pattern from this proj
 
 ## Reusing existing UI patterns
 
-Each of these exists once. Use it; do not hand-roll a second one. Every rule here
-was added after an agent wrote the generic version and a human had to point it out.
+Each of these exists once. Use it; do not hand-roll a second one. Every rule here was added after an agent wrote the generic version and a human had to point it out.
 
 ### Date entry -- `DateInput`, never a raw `<input type="date">`
 
-`components/ui/DateInput.tsx` is the only place a raw date input is allowed, and
-`ui-conventions.test.ts` fails the build if another appears. It carries the
-locale-aware parsing, the keyboard shortcuts, and `CalendarPopover` -- the custom
-picker that the `.date-picker-hide` CSS in `globals.css` exists to make room for by
-hiding the browser's own icon. A bare `<input type="date">` gets none of that and
-shows two calendar icons. 32 components use `DateInput`; yours should too.
+`components/ui/DateInput.tsx` is the only place a raw date input is allowed, and `ui-conventions.test.ts` fails the build if another appears. It carries the locale-aware parsing, the keyboard shortcuts, and `CalendarPopover` -- the custom picker that the `.date-picker-hide` CSS in `globals.css` exists to make room for by hiding the browser's own icon. A bare `<input type="date">` gets none of that and shows two calendar icons. 32 components use `DateInput`; yours should too.
+
+### Currency entry -- `CurrencyInput`, never a raw number input
+
+`components/ui/CurrencyInput.tsx` is the only way to take a money amount. It is a `type="text"` field with `inputMode="decimal"`, not `<input type="number">`: it filters non-numeric characters as you type, formats with thousands separators and two decimals on blur, strips the commas and clears a `0.00` on focus so the field is immediately typable, parses back through `parseAmount` so the value reaching the form is rounded to cents, and re-syncs when the parent changes the value externally (a form reset, or a category auto-signing the amount negative). It also accepts inline calculator expressions -- typing `100*1.13` and blurring or pressing Enter evaluates it in place instead of submitting the form -- and offers a calculator modal via the in-field icon. Props worth knowing: `prefix` for the currency symbol, `allowNegative` (default true), `allowCalculator` (default true), `allowSignToggle` for the in-field `±` button. 22 components use it; yours should too.
+
+A raw `<input type="number">` gets none of this and adds spinner arrows, scroll-wheel value changes, and locale-dependent decimal handling. For non-money numbers -- share counts, rates, percentages -- use `NumericInput` instead: same filtering and blur formatting, but with `decimalPlaces`, a `suffix`, a `min`, `allowNegative` defaulting to false, and no calculator.
+
+Note that unlike `DateInput`, this rule has no guard test in `ui-conventions.test.ts` yet -- add one there if a raw number input slips in.
 
 ### A clickable table row -- `useLongPress({ onClick })`
 
-`useLongPress` takes an `onClick` alongside `onLongPress` for exactly this: a plain
-click runs the row's primary action, a 750ms press (or right-click) opens the
-mobile action sheet, and a click that followed a long-press is suppressed. Spread
-`getRowHandlers(item)` on the `<tr>` and add `cursor-pointer`. The accounts,
-payees, tags, categories and securities lists all do this.
+`useLongPress` takes an `onClick` alongside `onLongPress` for exactly this: a plain click runs the row's primary action, a 750ms press (or right-click) opens the mobile action sheet, and a click that followed a long-press is suppressed. Spread `getRowHandlers(item)` on the `<tr>` and add `cursor-pointer`. The accounts, payees, tags, categories and securities lists all do this.
 
-Do not put the click on a button around the symbol or the name instead. It looks
-identical and is not: the rest of the row -- all the cell padding, every other
-column -- becomes dead, and clicking a row "does nothing" for the majority of its
-area. Controls *inside* the row (a favourite star, `RowActions`) must
-`stopPropagation` so they act on themselves; both already do.
+Do not put the click on a button around the symbol or the name instead. It looks identical and is not: the rest of the row -- all the cell padding, every other column -- becomes dead, and clicking a row "does nothing" for the majority of its area. Controls *inside* the row (a favourite star, `RowActions`) must `stopPropagation` so they act on themselves; both already do.
 
 ### A long list -- page it, or bound it with an expander
 
@@ -93,12 +87,7 @@ Two patterns, depending on where it lives:
 - A full-page list uses `components/ui/Pagination.tsx`.
 - A list inside a card shows the first few rows and a "Show N more" button.
 
-Do not cap a card's height with `overflow-y-auto`. In a small card that draws a
-full native scrollbar hard against the content, which on Linux is a chunky arrowed
-bar that reads as a rendering fault -- and it hides the rest of the list behind a
-gutter nobody notices. The `overflow-y-auto` regions that do exist are panels,
-modals and sidebars, not cards. `scrollbar-hide` is for a horizontal strip of
-chips, and hiding a scrollbar you need is worse than not needing one.
+Do not cap a card's height with `overflow-y-auto`. In a small card that draws a full native scrollbar hard against the content, which on Linux is a chunky arrowed bar that reads as a rendering fault -- and it hides the rest of the list behind a gutter nobody notices. The `overflow-y-auto` regions that do exist are panels, modals and sidebars, not cards. `scrollbar-hide` is for a horizontal strip of chips, and hiding a scrollbar you need is worse than not needing one.
 
 ## Form Patterns
 
