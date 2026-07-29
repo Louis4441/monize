@@ -7,28 +7,28 @@ export class CreateSecurityPriceDto {
   priceDate: string;
 
   @ApiProperty({ description: "Closing price" })
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0)
   @Max(999999999999)
   closePrice: number;
 
   @ApiProperty({ description: "Opening price", required: false })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0)
   @Max(999999999999)
   openPrice?: number;
 
   @ApiProperty({ description: "High price", required: false })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0)
   @Max(999999999999)
   highPrice?: number;
 
   @ApiProperty({ description: "Low price", required: false })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0)
   @Max(999999999999)
   lowPrice?: number;

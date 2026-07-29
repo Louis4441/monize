@@ -117,11 +117,15 @@ export function SecurityPositionInfoCard({
             className={gainLossColor(positionReturn.profit)}
             title={t('positionInfo.totalReturnTitle')}
           >
-            {positionReturn.profit >= 0 ? '+' : ''}
-            {formatCurrency(positionReturn.profit, currency)}
-            {' ('}
-            {formatSignedPercent(positionReturn.percent)}
-            {')'}
+            {/* Composed in the catalog, not here: the bracketing around a
+                percentage is copy, and a locale may want it another way. */}
+            {t('positionInfo.totalReturnValue', {
+              amount: `${positionReturn.profit >= 0 ? '+' : ''}${formatCurrency(
+                positionReturn.profit,
+                currency,
+              )}`,
+              percent: formatSignedPercent(positionReturn.percent),
+            })}
           </span>
         ),
     },

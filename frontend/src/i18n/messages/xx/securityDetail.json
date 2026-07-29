@@ -117,6 +117,7 @@
     "realizedPl": "[XX-Realized P/L-XX]",
     "realizedMixed": "[XX-Realized in {currencies}, so not added up-XX]",
     "totalReturn": "[XX-Total return-XX]",
+    "totalReturnValue": "[XX-{amount} ({percent})-XX]",
     "totalReturnTitle": "[XX-Unrealized gain, plus what you realized on sales and received in income, less fees, over the capital you put in. A simple return on that capital: it is not annualized and does not weight tranches by how long you held them.-XX]",
     "status": "[XX-Status-XX]",
     "statusOpen": "[XX-Open-XX]",

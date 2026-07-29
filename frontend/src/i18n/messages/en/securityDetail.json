@@ -117,6 +117,7 @@
     "realizedPl": "Realized P/L",
     "realizedMixed": "Realized in {currencies}, so not added up",
     "totalReturn": "Total return",
+    "totalReturnValue": "{amount} ({percent})",
     "totalReturnTitle": "Unrealized gain, plus what you realized on sales and received in income, less fees, over the capital you put in. A simple return on that capital: it is not annualized and does not weight tranches by how long you held them.",
     "status": "Status",
     "statusOpen": "Open",
