@@ -582,6 +582,65 @@ describe("McpInvestmentsTools", () => {
       expect(parsed.count).toBe(1);
     });
 
+    it("forwards a manual asset allocation on update", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "write" });
+      securityPrepService.prepareUpdateSecuritySingle.mockResolvedValue({
+        securityId: "sec-1",
+        symbol: "VBAL",
+        name: "Vanguard Balanced ETF",
+        securityType: "ETF",
+        exchange: "TSX",
+        currencyCode: "CAD",
+        isFavourite: false,
+        countryWeightings: null,
+        // The prep service has already converted percentages to decimals.
+        assetWeightings: [
+          { name: "Equity", weight: 0.6 },
+          { name: "Fixed Income", weight: 0.4 },
+        ],
+      });
+
+      await handlers["manage_securities"](
+        {
+          operation: "update",
+          items: [
+            {
+              symbol: "VBAL",
+              assetWeightings: [
+                { name: "Equity", weight: 60 },
+                { name: "Fixed Income", weight: 40 },
+              ],
+            },
+          ],
+        },
+        { sessionId: "s1" },
+      );
+
+      // The tool passes the row through to the shared prep service...
+      expect(
+        securityPrepService.prepareUpdateSecuritySingle,
+      ).toHaveBeenCalledWith(
+        "u1",
+        expect.objectContaining({
+          assetWeightings: [
+            { name: "Equity", weight: 60 },
+            { name: "Fixed Income", weight: 40 },
+          ],
+        }),
+      );
+      // ...and commits the resolved decimals.
+      expect(securitiesService.update).toHaveBeenCalledWith(
+        "u1",
+        "sec-1",
+        expect.objectContaining({
+          assetWeightings: [
+            { name: "Equity", weight: 0.6 },
+            { name: "Fixed Income", weight: 0.4 },
+          ],
+        }),
+      );
+    });
+
     it("deletes a single security on success", async () => {
       resolve.mockReturnValue({ userId: "u1", scopes: "write" });
       const result = await handlers["manage_securities"](

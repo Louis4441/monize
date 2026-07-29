@@ -188,6 +188,33 @@ describe("AiActionBuilderService", () => {
     });
   });
 
+  it("carries both manual allocations into the signed update descriptor", () => {
+    const action = builder.buildUpdateSecurity("u1", {
+      securityId: "s9",
+      symbol: "VBAL",
+      name: "Vanguard Balanced ETF",
+      securityType: "ETF",
+      exchange: "TSX",
+      currencyCode: "CAD",
+      isFavourite: false,
+      countryWeightings: [{ name: "Canada", weight: 0.3 }],
+      assetWeightings: [
+        { name: "Equity", weight: 0.6 },
+        { name: "Fixed Income", weight: 0.4 },
+      ],
+    });
+
+    expect(action.descriptor).toMatchObject({
+      countryWeightings: [{ name: "Canada", weight: 0.3 }],
+      assetWeightings: [
+        { name: "Equity", weight: 0.6 },
+        { name: "Fixed Income", weight: 0.4 },
+      ],
+    });
+    // Signing covers the allocations, so a tampered breakdown fails verify.
+    expect(signing.sign).toHaveBeenCalledWith(action.descriptor);
+  });
+
   it("builds an update_security action", () => {
     const action = builder.buildUpdateSecurity("u1", {
       securityId: "s9",
@@ -198,6 +225,7 @@ describe("AiActionBuilderService", () => {
       currencyCode: "USD",
       isFavourite: true,
       countryWeightings: null,
+      assetWeightings: null,
     });
 
     expect(action.type).toBe("update_security");

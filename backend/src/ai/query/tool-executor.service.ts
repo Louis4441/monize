@@ -1265,6 +1265,9 @@ export class ToolExecutorService {
       countryWeightings: item.countryWeightings as
         | { name: string; weight: number }[]
         | undefined,
+      assetWeightings: item.assetWeightings as
+        | { name: string; weight: number }[]
+        | undefined,
     };
   }
 

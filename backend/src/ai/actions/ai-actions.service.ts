@@ -504,6 +504,9 @@ export class AiActionsService {
           ...(r.countryWeightings !== undefined
             ? { countryWeightings: r.countryWeightings ?? [] }
             : {}),
+          ...(r.assetWeightings !== undefined
+            ? { assetWeightings: r.assetWeightings ?? [] }
+            : {}),
         });
         const security = await this.securitiesService.update(
           userId,
@@ -780,6 +783,7 @@ export class AiActionsService {
       currencyCode: descriptor.currencyCode,
       isFavourite: descriptor.isFavourite,
       countryWeightings: descriptor.countryWeightings ?? [],
+      assetWeightings: descriptor.assetWeightings ?? [],
     });
     const security = await this.securitiesService.update(
       userId,

@@ -2513,6 +2513,31 @@ describe("ToolExecutorService", () => {
       expect(result.pendingAction?.type).toBe("update_security");
     });
 
+    it("update forwards a manual asset allocation as decimals", async () => {
+      await service.execute(userId, "manage_securities", {
+        operation: "update",
+        items: [
+          {
+            symbol: "VBAL",
+            assetWeightings: [
+              { name: "Equity", weight: 60 },
+              { name: "Fixed Income", weight: 40 },
+            ],
+          },
+        ],
+      });
+
+      expect(securities.previewUpdateSecurity).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({
+          assetWeightings: [
+            { name: "Equity", weight: 0.6 },
+            { name: "Fixed Income", weight: 0.4 },
+          ],
+        }),
+      );
+    });
+
     it("delete returns a signed delete_security pending action", async () => {
       const result = await service.execute(userId, "manage_securities", {
         operation: "delete",

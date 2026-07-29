@@ -277,6 +277,17 @@ export const manageSecuritiesSchema = z.object({
           )
           .max(60)
           .optional(),
+        // update only: manual asset-class allocation for an ETF/fund. Free-text
+        // names; weights are PERCENTAGES (0-100) with the same "Other" rule.
+        assetWeightings: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(100),
+              weight: z.number().min(0).max(100),
+            }),
+          )
+          .max(60)
+          .optional(),
       }),
     )
     .min(1)

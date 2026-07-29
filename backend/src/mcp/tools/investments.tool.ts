@@ -79,6 +79,9 @@ interface ManageSecItem {
   currencyCode?: string;
   // update only: manual country allocation, weights as PERCENTAGES (0-100).
   countryWeightings?: { name: string; weight: number }[];
+  // update only: manual asset-class allocation (free-text names), weights as
+  // PERCENTAGES (0-100).
+  assetWeightings?: { name: string; weight: number }[];
 }
 
 @Injectable()
@@ -347,7 +350,7 @@ export class McpInvestmentsTools {
         description:
           "Create, edit, or delete the user's securities (stocks, ETFs, funds). operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). " +
           "create: { query, exchange?, securityType?, isFavourite?, currencyCode? } -- the security is looked up and validated by ticker/name against the user's configured price provider, which fills the official symbol/name/exchange/type/currency (do not invent them); exchange/securityType MUST come from the enumerated lists; exchange disambiguates a symbol traded on several exchanges. " +
-          "update: { symbol, securityType?, exchange?, isFavourite?, currencyCode?, countryWeightings? } -- symbol identifies an existing security (ticker or name); provide the classification/display fields to change. countryWeightings sets a manual country allocation for an ETF/fund as { name, weight } with weight a PERCENTAGE (0-100); entries need not add to 100 (the rest is 'Other'). " +
+          "update: { symbol, securityType?, exchange?, isFavourite?, currencyCode?, countryWeightings?, assetWeightings? } -- symbol identifies an existing security (ticker or name); provide the classification/display fields to change. countryWeightings sets a manual country allocation for an ETF/fund as { name, weight } with weight a PERCENTAGE (0-100); entries need not add to 100 (the rest is 'Other'). assetWeightings does the same for asset classes, with free-text names (e.g. 'Equity', 'Fixed Income', 'Cash') -- reuse the spelling already used on the user's other securities where one fits. " +
           "delete: { symbol } -- removes the security (fails if it still has holdings or investment transactions). " +
           "approvalMode = 'bulk' (default; one card for the whole batch) or 'individual' (one card per item); ignored for a single item. Set dryRun=true to preview every item without saving. The user is asked to confirm before anything is saved (web chat card via relay, or an MCP confirmation dialog).",
         inputSchema: {
@@ -419,6 +422,28 @@ export class McpInvestmentsTools {
                   .optional()
                   .describe(
                     "update only: manual country (geographic) allocation for an ETF/fund. Weights are PERCENTAGES (0-100) and need not sum to 100 (the rest is 'Other').",
+                  ),
+                assetWeightings: z
+                  .array(
+                    z.object({
+                      name: z
+                        .string()
+                        .min(1)
+                        .max(100)
+                        .describe(
+                          "Asset class name, free text (e.g. 'Equity', 'Fixed Income', 'Cash').",
+                        ),
+                      weight: z
+                        .number()
+                        .min(0)
+                        .max(100)
+                        .describe("Percentage 0-100."),
+                    }),
+                  )
+                  .max(60)
+                  .optional()
+                  .describe(
+                    "update only: manual asset-class allocation for an ETF/fund. Free-text names (no canonical list); weights are PERCENTAGES (0-100) and need not sum to 100 (the rest is 'Other').",
                   ),
               }),
             )
@@ -1232,6 +1257,7 @@ export class McpInvestmentsTools {
       isFavourite: item.isFavourite,
       currencyCode: item.currencyCode,
       countryWeightings: item.countryWeightings,
+      assetWeightings: item.assetWeightings,
     };
   }
 
@@ -1580,6 +1606,7 @@ export class McpInvestmentsTools {
       currencyCode: string;
       isFavourite: boolean;
       countryWeightings?: { name: string; weight: number }[] | null;
+      assetWeightings?: { name: string; weight: number }[] | null;
     },
   ) {
     const security = await this.securitiesService.update(
@@ -1591,6 +1618,7 @@ export class McpInvestmentsTools {
         currencyCode: preview.currencyCode,
         isFavourite: preview.isFavourite,
         countryWeightings: preview.countryWeightings ?? [],
+        assetWeightings: preview.assetWeightings ?? [],
       },
     );
     this.writeLimiter.record(userId, "update_security");

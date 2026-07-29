@@ -1531,6 +1531,7 @@ describe("SecuritiesService", () => {
         currencyCode: "USD",
         isFavourite: true,
         countryWeightings: null,
+        assetWeightings: null,
       });
     });
 
@@ -1550,6 +1551,38 @@ describe("SecuritiesService", () => {
       expect(preview.countryWeightings).toEqual([
         { name: "United States", weight: 0.6 },
         { name: "Canada", weight: 0.25 },
+      ]);
+    });
+
+    it("previewUpdateSecurity normalizes supplied asset weightings and keeps stored ones otherwise", async () => {
+      securitiesRepository.createQueryBuilder.mockReturnValueOnce(
+        qb({ getOne: sec }),
+      );
+
+      const preview = await service.previewUpdateSecurity("user-1", {
+        query: "AAPL",
+        assetWeightings: [
+          { name: " equity ", weight: 0.6 },
+          { name: "Equity", weight: 0.1 },
+        ],
+      });
+
+      // Free-text names are kept as typed; case-only duplicates are summed.
+      expect(preview.assetWeightings).toEqual([
+        { name: "equity", weight: 0.7 },
+      ]);
+
+      securitiesRepository.createQueryBuilder.mockReturnValueOnce(
+        qb({
+          getOne: { ...sec, assetWeightings: [{ name: "Cash", weight: 0.2 }] },
+        }),
+      );
+      const untouched = await service.previewUpdateSecurity("user-1", {
+        query: "AAPL",
+        isFavourite: true,
+      });
+      expect(untouched.assetWeightings).toEqual([
+        { name: "Cash", weight: 0.2 },
       ]);
     });
 

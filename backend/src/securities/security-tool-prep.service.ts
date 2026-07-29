@@ -37,6 +37,12 @@ export interface ManageUpdateSecurityRow {
    * "Other".
    */
   countryWeightings?: { name: string; weight: number }[];
+  /**
+   * Manual asset-class allocation, with weights as PERCENTAGES (0-100). Names
+   * are free text -- whatever the user calls the class. Same conversion and
+   * "Other" remainder rules as `countryWeightings`.
+   */
+  assetWeightings?: { name: string; weight: number }[];
 }
 
 /** Delete-row input for manage_securities (identified by symbol or name). */
@@ -104,11 +110,12 @@ export class SecurityToolPrepService {
       currencyCode: preview.currencyCode,
       isFavourite: preview.isFavourite,
       countryWeightings: preview.countryWeightings,
+      assetWeightings: preview.assetWeightings,
     };
   }
 
   /**
-   * Convert AI-supplied country weightings (percentages 0-100) to the decimal
+   * Convert AI-supplied allocation weightings (percentages 0-100) to the decimal
    * 0-1 form the service/entity store. Returns undefined when the caller did
    * not supply any (so the existing allocation is left untouched).
    */
@@ -147,6 +154,9 @@ export class SecurityToolPrepService {
       isFavourite: row.isFavourite,
       countryWeightings: SecurityToolPrepService.toFractionWeightings(
         row.countryWeightings,
+      ),
+      assetWeightings: SecurityToolPrepService.toFractionWeightings(
+        row.assetWeightings,
       ),
     });
   }

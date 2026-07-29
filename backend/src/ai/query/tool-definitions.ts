@@ -660,7 +660,7 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
   {
     name: "manage_securities",
     description:
-      "Create, edit, or delete the user's securities (stocks, ETFs, mutual funds). This does NOT change anything immediately: it shows the user one or more confirmation cards they must explicitly approve before anything is saved. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). create: { query, exchange?, securityType?, isFavourite?, currencyCode? } -- the security is looked up and validated by ticker/name against the user's configured price provider, which fills the official symbol/name/exchange/type/currency (do not invent them); pass exchange only to disambiguate a dual-listed ticker. update: { symbol, securityType?, exchange?, isFavourite?, currencyCode?, countryWeightings? } -- symbol identifies an existing security (ticker or name); provide the classification/display fields to change. countryWeightings sets a manual country (geographic) allocation for an ETF/fund as an array of { name, weight } where weight is a PERCENTAGE (0-100); the entries need not add to 100 -- the remainder is treated as 'Other'. Prefer the canonical country names listed in the countryWeightings schema below and map pasted variants to them (e.g. 'USA' -> 'United States'). delete: { symbol } -- fails if the security still has holdings or investment transactions. Only ever pass exchange/securityType values from the enumerated lists below. approvalMode = 'bulk' (default) one card for all; 'individual' one card per item. After calling, briefly tell the user to review and approve the card(s); never claim the change was made.",
+      "Create, edit, or delete the user's securities (stocks, ETFs, mutual funds). This does NOT change anything immediately: it shows the user one or more confirmation cards they must explicitly approve before anything is saved. operation = 'create' | 'update' | 'delete' with an items array (1-25 rows). create: { query, exchange?, securityType?, isFavourite?, currencyCode? } -- the security is looked up and validated by ticker/name against the user's configured price provider, which fills the official symbol/name/exchange/type/currency (do not invent them); pass exchange only to disambiguate a dual-listed ticker. update: { symbol, securityType?, exchange?, isFavourite?, currencyCode?, countryWeightings?, assetWeightings? } -- symbol identifies an existing security (ticker or name); provide the classification/display fields to change. countryWeightings sets a manual country (geographic) allocation for an ETF/fund as an array of { name, weight } where weight is a PERCENTAGE (0-100); the entries need not add to 100 -- the remainder is treated as 'Other'. Prefer the canonical country names listed in the countryWeightings schema below and map pasted variants to them (e.g. 'USA' -> 'United States'). assetWeightings sets a manual asset-class allocation the same way, but its names are free text (e.g. 'Equity', 'Fixed Income', 'Cash') -- reuse the spelling the user already uses on their other securities where one fits. delete: { symbol } -- fails if the security still has holdings or investment transactions. Only ever pass exchange/securityType values from the enumerated lists below. approvalMode = 'bulk' (default) one card for all; 'individual' one card per item. After calling, briefly tell the user to review and approve the card(s); never claim the change was made.",
     inputSchema: {
       type: "object",
       properties: {
@@ -719,6 +719,26 @@ export const FINANCIAL_TOOLS: AiToolDefinition[] = [
                       enum: [...COUNTRY_OPTIONS],
                       description:
                         "Country name. Prefer one of the listed canonical values; a custom value is accepted if none fits.",
+                    },
+                    weight: {
+                      type: "number",
+                      description: "Percentage 0-100.",
+                    },
+                  },
+                  required: ["name", "weight"],
+                },
+              },
+              assetWeightings: {
+                type: "array",
+                description:
+                  "update only: manual asset-class allocation for an ETF/fund (e.g. Equity / Fixed Income / Cash / Real Estate). Weights are PERCENTAGES (0-100) and need not sum to 100 (the rest is 'Other'). Names are free text -- there is no canonical list, so reuse the exact spelling the user already uses on their other securities when one fits, and keep the user's own wording otherwise.",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: {
+                      type: "string",
+                      description:
+                        "Asset class name, free text (e.g. 'Equity', 'Fixed Income', 'Cash').",
                     },
                     weight: {
                       type: "number",

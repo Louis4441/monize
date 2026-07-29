@@ -93,6 +93,8 @@ export interface UpdateSecurityPreview {
   isFavourite: boolean;
   /** Manual country allocation (decimal 0-1 weights), when the edit sets it. */
   countryWeightings: { name: string; weight: number }[] | null;
+  /** Manual asset-class allocation (decimal 0-1 weights), when the edit sets it. */
+  assetWeightings: { name: string; weight: number }[] | null;
 }
 
 /** Resolved preview of a proposed security deletion. */
@@ -927,6 +929,7 @@ export class SecuritiesService {
       currencyCode?: string;
       isFavourite?: boolean;
       countryWeightings?: AllocationWeight[];
+      assetWeightings?: AllocationWeight[];
     },
   ): Promise<UpdateSecurityPreview> {
     const security = await this.resolveSecurityForManage(userId, input.query);
@@ -948,6 +951,10 @@ export class SecuritiesService {
         input.countryWeightings !== undefined
           ? this.normalizeAllocationWeightings(input.countryWeightings)
           : (security.countryWeightings ?? null),
+      assetWeightings:
+        input.assetWeightings !== undefined
+          ? this.normalizeAssetWeightings(input.assetWeightings)
+          : (security.assetWeightings ?? null),
     };
   }
 
