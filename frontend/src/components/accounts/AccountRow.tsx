@@ -80,7 +80,7 @@ export function buildAccountActions(
     {
       key: 'details',
       label: labels.details,
-      icon: 'prices',
+      icon: 'view',
       tone: 'primary',
       onClick: () => handlers.onDetails?.(account),
       hidden:
