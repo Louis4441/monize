@@ -1,6 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { render } from '@/test/render';
+
+/** Rates the mocked hook reports, keyed `FROM->TO`; a test sets what it needs. */
+const mockRates = new Map<string, number>();
+
+vi.mock('@/hooks/useExchangeRates', () => ({
+  useExchangeRates: () => ({
+    convertToDefault: (amount: number, from: string) => {
+      const rate = mockRates.get(`${from}->CAD`);
+      // Mirrors the real hook, which returns the amount untouched without a
+      // rate -- the behaviour the guard exists to defend against.
+      return rate === undefined ? amount : amount * rate;
+    },
+    getRate: (from: string, to?: string) =>
+      from === (to ?? 'CAD') ? 1 : (mockRates.get(`${from}->${to ?? 'CAD'}`) ?? null),
+  }),
+}));
 import { SecuritySummaryCards } from './SecuritySummaryCards';
 import type {
   Security,
@@ -85,6 +101,10 @@ function detail(overrides: Partial<SecurityDetail> = {}): SecurityDetail {
     ...overrides,
   };
 }
+
+beforeEach(() => {
+  mockRates.clear();
+});
 
 describe('SecuritySummaryCards', () => {
   it('shows the five figures in the security currency', () => {
@@ -287,5 +307,47 @@ describe('SecuritySummaryCards', () => {
       expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Infinity/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('SecuritySummaryCards in the reader s own currency', () => {
+  // The page holds every figure in the security's currency and converts nothing
+  // itself. What a reader on PLN still wants is roughly what it is worth to
+  // them, so the cards carry a second line -- but only when a rate exists.
+  it('adds the converted figure when a rate for the pair is known', () => {
+    mockRates.set('EUR->CAD', 1.5);
+    render(<SecuritySummaryCards detail={detail()} />);
+
+    // 15,000 EUR at 1.5 = 22,500 in the reader's currency.
+    expect(screen.getByText(/~\s*\$22,500\.00/)).toBeInTheDocument();
+    // ...and the figure itself still reads in the security's own currency.
+    expect(screen.getByText('€15,000.00 EUR')).toBeInTheDocument();
+  });
+
+  it('converts the cost basis and the gain at the same rate', () => {
+    mockRates.set('EUR->CAD', 1.5);
+    render(<SecuritySummaryCards detail={detail()} />);
+    // 12,000 -> 18,000 and 3,000 -> 4,500: one rate throughout, so the three
+    // converted figures still add up the way the originals do.
+    expect(screen.getByText(/~\s*\$18,000\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/~\s*\$4,500\.00/)).toBeInTheDocument();
+  });
+
+  it('shows nothing rather than an unconverted figure under the wrong symbol', () => {
+    // `convertToDefault` returns the amount untouched when it has no rate, so a
+    // euro figure would print as zlotys. Silence is the honest output.
+    mockRates.clear();
+    render(<SecuritySummaryCards detail={detail()} />);
+    expect(screen.queryByText(/~/)).not.toBeInTheDocument();
+  });
+
+  it('adds no second line when the security is already in the reader s currency', () => {
+    mockRates.set('EUR->CAD', 1.5);
+    render(
+      <SecuritySummaryCards
+        detail={detail({ security: security({ currencyCode: 'CAD' }) })}
+      />,
+    );
+    expect(screen.queryByText(/~/)).not.toBeInTheDocument();
   });
 });

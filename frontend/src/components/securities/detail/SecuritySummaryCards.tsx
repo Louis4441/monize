@@ -14,6 +14,7 @@ import {
 } from '@/components/accounts/shared/SummaryCardGrid';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { gainLossColor } from '@/lib/format';
 import { withCurrencyCode } from '@/lib/security-detail';
 import type { SecurityDetail } from '@/types/investment';
@@ -53,12 +54,39 @@ export function SecuritySummaryCards({
     defaultCurrency,
   } = useNumberFormat();
 
+  const { convertToDefault, getRate } = useExchangeRates();
+
   const { position, security } = detail;
   const currency = security.currencyCode;
-  // Nothing here is converted, so a figure in a currency that is not the
-  // reader's own has to say which one it is.
+  const isForeign = !!currency && currency !== defaultCurrency;
+
+  /** The figure itself, in the security's own currency, named when foreign. */
   const money = (amount: number) =>
     withCurrencyCode(formatCurrency(amount, currency), currency, defaultCurrency);
+
+  /**
+   * The same figure in the reader's own currency, as a second line.
+   *
+   * At today's rate, which is why it is marked as approximate: for the market
+   * value that is exactly right, but a cost basis converted today is not what
+   * was paid -- the historical-rate figure for that lives in the Accounts table.
+   * All three cards convert at the same rate, so the arithmetic between them
+   * still holds.
+   */
+  // Only when a rate actually exists. `convertToDefault` falls back to the
+  // amount unconverted when it has no rate for the pair, which would print a
+  // euro figure under a zloty symbol -- a fabricated number, and a worse failure
+  // than showing nothing.
+  const hasRate = isForeign && getRate(currency, defaultCurrency) !== null;
+
+  const converted = (amount: number | null) => {
+    if (!hasRate || amount === null) return undefined;
+    const value = convertToDefault(amount, currency);
+    if (!isFinite(value)) return undefined;
+    return t('cards.approx', {
+      amount: formatCurrency(value, defaultCurrency),
+    });
+  };
   const unknown = (
     <span className="text-gray-500 dark:text-gray-400">
       {t('cards.valueUnknown')}
@@ -88,17 +116,25 @@ export function SecuritySummaryCards({
       // otherwise present a 2019 valuation as today's, with nothing on the card
       // to say so -- the header already flags a stale quote, and this figure is
       // derived from the very same price.
-      note:
-        position.marketValue === null || quoteAsOf === null ? undefined : quoteAsOf.isCurrent ? (
-          t('cards.asOf', { date: formatDate(quoteAsOf.priceDate) })
-        ) : (
-          <span
-            className="text-amber-600 dark:text-amber-500"
-            title={t('cards.asOfStaleTitle')}
-          >
-            {t('cards.asOfStale', { date: formatDate(quoteAsOf.priceDate) })}
-          </span>
-        ),
+      note: (
+        <>
+          {converted(position.marketValue) && (
+            <div>{converted(position.marketValue)}</div>
+          )}
+          {position.marketValue !== null &&
+            quoteAsOf !== null &&
+            (quoteAsOf.isCurrent ? (
+              <div>{t('cards.asOf', { date: formatDate(quoteAsOf.priceDate) })}</div>
+            ) : (
+              <div
+                className="text-amber-600 dark:text-amber-500"
+                title={t('cards.asOfStaleTitle')}
+              >
+                {t('cards.asOfStale', { date: formatDate(quoteAsOf.priceDate) })}
+              </div>
+            ))}
+        </>
+      ),
     },
     {
       label: t('cards.costBasis'),
@@ -107,6 +143,7 @@ export function SecuritySummaryCards({
         position.costBasis === null
           ? unknown
           : money(position.costBasis),
+      note: converted(position.costBasis),
     },
     {
       label: t('cards.unrealizedPl'),
@@ -117,12 +154,18 @@ export function SecuritySummaryCards({
         position.gainLoss === null
           ? undefined
           : gainLossColor(position.gainLoss),
-      note:
-        position.gainLossPercent === null ? undefined : (
-          <span className={gainLossColor(position.gainLossPercent)}>
-            {formatSignedPercent(position.gainLossPercent)}
-          </span>
-        ),
+      note: (
+        <>
+          {position.gainLossPercent !== null && (
+            <div className={gainLossColor(position.gainLossPercent)}>
+              {formatSignedPercent(position.gainLossPercent)}
+            </div>
+          )}
+          {converted(position.gainLoss) && (
+            <div>{converted(position.gainLoss)}</div>
+          )}
+        </>
+      ),
     },
     {
       label: t('cards.units'),

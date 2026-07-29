@@ -33,6 +33,7 @@
     "total": "[XX-Total-XX]",
     "unitsShare": "[XX-{units} ({share})-XX]",
     "valueUnknown": "[XX-Not priced-XX]",
+    "approx": "[XX-~ {amount}-XX]",
     "asOf": "[XX-At the close of {date}-XX]",
     "asOfStale": "[XX-At the close of {date}, the newest price on record-XX]",
     "asOfStaleTitle": "[XX-No newer price is stored, so this is what the position was worth on that day rather than today. Update prices from the provider, or add one by hand.-XX]"
