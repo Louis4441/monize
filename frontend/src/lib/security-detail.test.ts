@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  groupPricesByPeriod,
+  allPriceGroupKeys,
+  defaultOpenPriceGroups,
   inferDistributionPolicy,
   totalReturnOf,
   toPriceSeries,
@@ -404,5 +407,89 @@ describe('filterPriceWindow', () => {
 
   it('treats an empty start as all of history', () => {
     expect(filterPriceWindow(series, '', '2026-01-01')).toHaveLength(3);
+  });
+});
+
+describe('groupPricesByPeriod', () => {
+  const history = [
+    price('2026-07-28', 150),
+    price('2026-07-01', 145),
+    price('2026-06-30', 140),
+    price('2025-12-31', 120),
+    price('2025-01-02', 100),
+  ];
+
+  it('groups into years, newest first', () => {
+    expect(groupPricesByPeriod(history).map((y) => y.key)).toEqual([
+      '2026',
+      '2025',
+    ]);
+  });
+
+  it('groups each year into months, newest first', () => {
+    const [twentySix] = groupPricesByPeriod(history);
+    expect(twentySix.months.map((m) => m.key)).toEqual(['2026-07', '2026-06']);
+  });
+
+  it('counts a whole year, so a folded year can still state its size', () => {
+    const [twentySix, twentyFive] = groupPricesByPeriod(history);
+    expect(twentySix.count).toBe(3);
+    expect(twentyFive.count).toBe(2);
+  });
+
+  it('keeps the API order inside a month', () => {
+    const [twentySix] = groupPricesByPeriod(history);
+    expect(twentySix.months[0].prices.map((p) => p.priceDate)).toEqual([
+      '2026-07-28',
+      '2026-07-01',
+    ]);
+  });
+
+  it('keys each month the way formatMonth takes it', () => {
+    const [twentySix] = groupPricesByPeriod(history);
+    // `formatMonth` reads `yyyy-MM`; handing it a full date worked by accident
+    // and made the month heading indistinguishable from a row's own date.
+    expect(twentySix.months[0].key).toBe('2026-07');
+  });
+
+  it('handles an empty history', () => {
+    expect(groupPricesByPeriod([])).toEqual([]);
+  });
+
+  it('tolerates a timestamp rather than a plain date', () => {
+    const groups = groupPricesByPeriod([price('2026-07-28T00:00:00.000Z', 150)]);
+    expect(groups[0].key).toBe('2026');
+    expect(groups[0].months[0].key).toBe('2026-07');
+  });
+});
+
+describe('allPriceGroupKeys', () => {
+  it('lists every year and every month', () => {
+    const groups = groupPricesByPeriod([
+      price('2026-07-28', 150),
+      price('2025-01-02', 100),
+    ]);
+    expect(allPriceGroupKeys(groups)).toEqual([
+      '2026',
+      '2026-07',
+      '2025',
+      '2025-01',
+    ]);
+  });
+});
+
+describe('defaultOpenPriceGroups', () => {
+  it('opens the newest year and its newest month', () => {
+    const groups = groupPricesByPeriod([
+      price('2026-07-28', 150),
+      price('2026-06-30', 140),
+      price('2025-01-02', 100),
+    ]);
+    // Recent prices on screen without a click; everything older stays folded.
+    expect(defaultOpenPriceGroups(groups)).toEqual(['2026', '2026-07']);
+  });
+
+  it('opens nothing when there is nothing', () => {
+    expect(defaultOpenPriceGroups([])).toEqual([]);
   });
 });

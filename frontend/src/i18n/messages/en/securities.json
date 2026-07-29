@@ -218,7 +218,6 @@
       "sold": "Sold {quantity} · {account}"
     },
     "empty": "No price history available",
-    "showingCount": "Showing {shown} of {total} prices",
     "columns": {
       "date": "Date",
       "close": "Close",
@@ -249,7 +248,10 @@
       "title": "Delete Price",
       "message": "Delete price entry for {date}?",
       "confirmLabel": "Delete"
-    }
+    },
+    "groupCount": "{count} price(s)",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all"
   },
   "transactionHistory": {
     "inactiveBadge": "Inactive",

@@ -32,6 +32,7 @@ vi.mock('@/lib/investments', () => ({
 vi.mock('@/hooks/useDateFormat', () => ({
   useDateFormat: () => ({
     formatDate: (d: string) => d,
+    formatMonth: (m: string) => m,
     dateFormat: 'browser',
   }),
 }));
@@ -143,14 +144,6 @@ vi.stubGlobal(
   }),
 );
 
-/** Scrolls the end-of-list sentinel into view, releasing the next batch. */
-async function scrollToEnd() {
-  const callback = liveObservers[liveObservers.length - 1];
-  await act(async () => {
-    callback?.([{ isIntersecting: true }]);
-  });
-}
-
 describe('SecurityPriceHistory', () => {
   const onClose = vi.fn();
 
@@ -194,8 +187,25 @@ describe('SecurityPriceHistory', () => {
     return result!;
   }
 
+  /**
+   * Render with every year and month unfolded. Only the newest month opens by
+   * itself, so any test about the rows themselves has to ask for the rest.
+   */
+  async function renderExpanded() {
+    const result = await renderComponent();
+    const expand = screen.queryByRole('button', { name: 'Expand all' });
+    // Absent when a single month holds everything: it is open already, and the
+    // button reads "Collapse all".
+    if (expand) {
+      await act(async () => {
+        fireEvent.click(expand);
+      });
+    }
+    return result;
+  }
+
   it('renders price history with source badges', async () => {
-    await renderComponent();
+    await renderExpanded();
 
     expect(screen.getByText('AAPL - Price History')).toBeInTheDocument();
     expect(screen.getByText('Yahoo')).toBeInTheDocument();
@@ -230,9 +240,10 @@ describe('SecurityPriceHistory', () => {
   });
 
   it('shows the adjusted close, and a dash where the provider gives none', async () => {
-    await renderComponent();
+    await renderExpanded();
 
-    expect(screen.getByText('Adj. close')).toBeInTheDocument();
+    // One header per open month, so the column appears once per month.
+    expect(screen.getAllByText('Adj. close').length).toBeGreaterThan(0);
     // The Yahoo row has the total-return close...
     expect(screen.getByText('191.20')).toBeInTheDocument();
     // ...and a dash on the rows without one is the only way to notice that a
@@ -242,7 +253,7 @@ describe('SecurityPriceHistory', () => {
   });
 
   it('renders edit and delete buttons for each row', async () => {
-    await renderComponent();
+    await renderExpanded();
 
     const editButtons = screen.getAllByText('Edit');
     const deleteButtons = screen.getAllByText('Delete');
@@ -285,7 +296,7 @@ describe('SecurityPriceHistory', () => {
       { id: 15, securityId: 'sec-1', priceDate: '2025-06-15', openPrice: null, highPrice: null, lowPrice: null, closePrice: 1, volume: null, source: 'made_up_provider', createdAt: 'x' },
       { id: 16, securityId: 'sec-1', priceDate: '2025-06-16', openPrice: null, highPrice: null, lowPrice: null, closePrice: 1, volume: null, source: null, createdAt: 'x' },
     ]);
-    await renderComponent();
+    await renderExpanded();
     expect(screen.getByText('MSN')).toBeInTheDocument();
     expect(screen.getByText('Sell')).toBeInTheDocument();
     expect(screen.getByText('Reinvest')).toBeInTheDocument();
@@ -462,7 +473,7 @@ describe('SecurityPriceHistory', () => {
     (investmentsApi.deleteSecurityPrice as ReturnType<typeof vi.fn>).mockRejectedValue(
       'boom',
     );
-    await renderComponent();
+    await renderExpanded();
 
     fireEvent.click(screen.getAllByText('Delete')[0]);
     const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
@@ -475,101 +486,77 @@ describe('SecurityPriceHistory', () => {
     expect(screen.getAllByText('Edit')).toHaveLength(3);
   });
 
-  describe('paging the price table', () => {
-    const rowCount = () =>
-      document.querySelectorAll('tbody tr').length;
+  describe('grouping the price table by year and month', () => {
+    const rowCount = () => document.querySelectorAll('tbody tr').length;
 
-    it('renders only the first 10 rows, with no button to press', async () => {
+    it('opens the newest year and month, and folds the rest', async () => {
       (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
         manyPrices(75),
       );
       await renderComponent();
 
-      expect(rowCount()).toBe(10);
-      expect(screen.getByText('Showing 10 of 75 prices')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /more/i })).not.toBeInTheDocument();
+      // 75 rows spread over Jan-Mar 2025; only March is open, so only its rows
+      // are mounted. A flat table of a decade of closes cannot be navigated to
+      // March 2023 except by scrolling past everything after it.
+      // Reached through its own label rather than the button's computed name:
+      // adjacent spans give no whitespace between the year and its count.
+      expect(screen.getByText('2025').closest('button')).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+      expect(rowCount()).toBeLessThan(75);
+      expect(rowCount()).toBeGreaterThan(0);
     });
 
-    it('appends 50 more each time the end of the list scrolls into view', async () => {
+    it('mounts a month\'s rows only once it is opened', async () => {
       (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
         manyPrices(75),
       );
       await renderComponent();
-      expect(rowCount()).toBe(10);
+      const before = rowCount();
 
-      await scrollToEnd();
-      expect(rowCount()).toBe(60);
-      expect(screen.getByText('Showing 60 of 75 prices')).toBeInTheDocument();
-
-      // Last batch is short: 15 left, not another 50.
-      await scrollToEnd();
-      expect(rowCount()).toBe(75);
-    });
-
-    it('stops observing once every row is shown', async () => {
-      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
-        manyPrices(25),
-      );
-      await renderComponent();
-
-      await scrollToEnd();
-
-      expect(rowCount()).toBe(25);
-      expect(screen.queryByTestId('price-history-sentinel')).not.toBeInTheDocument();
-      expect(screen.queryByText(/Showing/)).not.toBeInTheDocument();
-      expect(liveObservers).toHaveLength(0);
-    });
-
-    it('leaves the sentinel out when everything already fits on one page', async () => {
-      await renderComponent();
-
-      expect(rowCount()).toBe(3);
-      expect(screen.queryByTestId('price-history-sentinel')).not.toBeInTheDocument();
-      expect(liveObservers).toHaveLength(0);
-    });
-
-    it('charts the whole series even though the table is paged', async () => {
-      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
-        manyPrices(25),
-      );
-      await renderComponent();
-
-      // The chart is fed every fetched point, not just the visible rows.
-      expect(investmentsApi.getSecurityPrices).toHaveBeenCalledWith('sec-1', 9999);
-      expect(screen.getByTestId('price-chart')).toBeInTheDocument();
-      expect(rowCount()).toBe(10);
-    });
-
-    it('collapses back to the first page after a reload', async () => {
-      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
-        manyPrices(25),
-      );
-      (investmentsApi.deleteSecurityPrice as ReturnType<typeof vi.fn>).mockResolvedValue(
-        undefined,
-      );
-      await renderComponent();
-
-      await scrollToEnd();
-      expect(rowCount()).toBe(25);
-
-      fireEvent.click(screen.getAllByText('Delete')[0]);
-      const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
+      // 2025-01 is folded on arrival.
       await act(async () => {
-        fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+        fireEvent.click(screen.getByRole('button', { name: /2025-01/ }));
       });
-
-      expect(rowCount()).toBe(10);
+      expect(rowCount()).toBeGreaterThan(before);
     });
 
-    it('keeps the table in a single vertical scroll region -- the modal panel', async () => {
+    it('expands everything, then collapses everything', async () => {
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyPrices(75),
+      );
       await renderComponent();
 
-      const scroller = document.querySelector('table')!.parentElement!;
-      // Horizontal overflow stays for narrow screens; a capped vertical
-      // scroller here would nest a second scrollbar inside the modal's.
-      expect(scroller.className).toContain('overflow-x-auto');
-      expect(scroller.className).not.toContain('overflow-y-auto');
-      expect(scroller.className).not.toContain('max-h-');
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Expand all' }));
+      });
+      expect(rowCount()).toBe(75);
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Collapse all' }));
+      });
+      expect(rowCount()).toBe(0);
+    });
+
+    it('states how many prices a folded group holds', async () => {
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyPrices(75),
+      );
+      await renderComponent();
+
+      // The year says its size without being opened.
+      expect(screen.getByText('75 price(s)')).toBeInTheDocument();
+    });
+
+    it('keeps the chart alongside however little of the table is unfolded', async () => {
+      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
+        manyPrices(75),
+      );
+      await renderComponent();
+
+      // Folding is about the table only; the chart still plots the whole series.
+      expect(screen.getByTestId('price-chart')).toBeInTheDocument();
     });
   });
 
@@ -598,7 +585,7 @@ describe('SecurityPriceHistory', () => {
     });
 
     it('opens the action sheet on long-press, headed by the row date and close price', async () => {
-      await renderComponent();
+      await renderExpanded();
       await longPressFirstRow();
 
       expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -610,7 +597,7 @@ describe('SecurityPriceHistory', () => {
     });
 
     it('does not open the sheet when the touch moves beyond the drag threshold', async () => {
-      await renderComponent();
+      await renderExpanded();
 
       const row = screen.getByText('2025-06-01').closest('tr')!;
       fireEvent.touchStart(row, { touches: [{ clientX: 0, clientY: 0 }] });
@@ -623,7 +610,7 @@ describe('SecurityPriceHistory', () => {
     });
 
     it('opens the edit form from the action sheet', async () => {
-      await renderComponent();
+      await renderExpanded();
       await longPressFirstRow();
 
       const sheetEdit = screen.getAllByRole('button', { name: 'Edit' }).at(-1)!;
@@ -638,7 +625,7 @@ describe('SecurityPriceHistory', () => {
       (investmentsApi.deleteSecurityPrice as ReturnType<typeof vi.fn>).mockResolvedValue(
         undefined,
       );
-      await renderComponent();
+      await renderExpanded();
       await longPressFirstRow();
 
       const sheetDelete = screen.getAllByRole('button', { name: 'Delete' }).at(-1)!;

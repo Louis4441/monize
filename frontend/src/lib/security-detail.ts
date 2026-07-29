@@ -278,3 +278,87 @@ export function filterPriceWindow(
     (point) => (!start || point.date >= start) && (!end || point.date <= end),
   );
 }
+
+/** A month's worth of price rows, newest month first within its year. */
+export interface PriceMonthGroup {
+  /** `yyyy-MM` -- the expand/collapse key, and what `formatMonth` takes. */
+  key: string;
+  prices: SecurityPrice[];
+}
+
+/** A year of price rows, newest first. */
+export interface PriceYearGroup {
+  /** `yyyy`, also the expand/collapse key. */
+  key: string;
+  /** Rows across the whole year, so a collapsed year can still state its size. */
+  count: number;
+  months: PriceMonthGroup[];
+}
+
+/**
+ * Group a price history into years, then months, newest first.
+ *
+ * A security backfilled from the provider carries thousands of daily closes, and
+ * a flat table of them is unreadable however it is paged: there is no way to get
+ * to March 2023 except by scrolling past everything after it. Years and months
+ * are the units people actually navigate a price history by.
+ *
+ * Rows keep the API's newest-first order inside each month, so the newest row of
+ * the newest month is the first thing in the first group.
+ */
+export function groupPricesByPeriod(
+  prices: readonly SecurityPrice[],
+): PriceYearGroup[] {
+  const byMonth = new Map<string, SecurityPrice[]>();
+  for (const price of prices) {
+    const month = price.priceDate.slice(0, 7);
+    const bucket = byMonth.get(month);
+    if (bucket) bucket.push(price);
+    else byMonth.set(month, [price]);
+  }
+
+  const byYear = new Map<string, PriceMonthGroup[]>();
+  // Descending by month key, so both levels read newest first.
+  for (const month of [...byMonth.keys()].sort((a, b) => b.localeCompare(a))) {
+    const year = month.slice(0, 4);
+    const group: PriceMonthGroup = {
+      key: month,
+      prices: byMonth.get(month) as SecurityPrice[],
+    };
+    const bucket = byYear.get(year);
+    if (bucket) bucket.push(group);
+    else byYear.set(year, [group]);
+  }
+
+  return [...byYear.keys()]
+    .sort((a, b) => b.localeCompare(a))
+    .map((year) => {
+      const months = byYear.get(year) as PriceMonthGroup[];
+      return {
+        key: year,
+        count: months.reduce((sum, month) => sum + month.prices.length, 0),
+        months,
+      };
+    });
+}
+
+/** Every expand/collapse key in a grouping: both years and months. */
+export function allPriceGroupKeys(groups: readonly PriceYearGroup[]): string[] {
+  return groups.flatMap((year) => [
+    year.key,
+    ...year.months.map((month) => month.key),
+  ]);
+}
+
+/**
+ * What to open on arrival: the newest year and its newest month, so the recent
+ * prices are on screen without a click while everything older stays folded.
+ */
+export function defaultOpenPriceGroups(
+  groups: readonly PriceYearGroup[],
+): string[] {
+  const newestYear = groups[0];
+  if (!newestYear) return [];
+  const newestMonth = newestYear.months[0];
+  return newestMonth ? [newestYear.key, newestMonth.key] : [newestYear.key];
+}
