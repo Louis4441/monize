@@ -8,7 +8,11 @@ import { SecurityPrice } from "./entities/security-price.entity";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { roundMoney, sumMoney } from "../common/round.util";
-import { EXCHANGE_TO_COUNTRY, isOtherAllocationName } from "./security-enums";
+import {
+  EXCHANGE_TO_COUNTRY,
+  assetClassForSecurityType,
+  isOtherAllocationName,
+} from "./security-enums";
 
 export interface SectorWeightingItem {
   sector: string;
@@ -45,6 +49,98 @@ export interface CountryWeightingResult {
    * The frontend renders this as an "Other" slice.
    */
   unclassifiedValue: number;
+}
+
+export interface AssetClassWeightingItem {
+  assetClass: string;
+  directValue: number;
+  etfValue: number;
+  totalValue: number;
+  percentage: number;
+}
+
+export interface AssetClassWeightingResult {
+  items: AssetClassWeightingItem[];
+  totalPortfolioValue: number;
+  totalDirectValue: number;
+  totalEtfValue: number;
+  /**
+   * Value with no asset-class classification: fund value beyond the manual
+   * weightings (the "Other" remainder) plus securities whose type says nothing
+   * definite (a fund with no breakdown, options, GICs).
+   */
+  unclassifiedValue: number;
+}
+
+/** One bucket of a look-through rollup, before it is named country/assetClass. */
+interface LookThroughItem {
+  name: string;
+  directValue: number;
+  etfValue: number;
+  totalValue: number;
+  percentage: number;
+}
+
+interface LookThroughResult {
+  items: LookThroughItem[];
+  totalPortfolioValue: number;
+  totalDirectValue: number;
+  totalEtfValue: number;
+  unclassifiedValue: number;
+}
+
+/** One slice of a look-through breakdown as returned to the LLM tools. */
+export interface LlmAllocationSlice {
+  name: string;
+  value: number;
+  percentage: number;
+}
+
+export interface LlmAllocationBreakdown {
+  items: LlmAllocationSlice[];
+  /** Value not attributed to any named bucket, shown in the UI as "Other". */
+  unclassifiedValue: number;
+  unclassifiedPercentage: number;
+}
+
+/** Both portfolio look-through breakdowns in one LLM-friendly payload. */
+export interface LlmLookThrough {
+  totalPortfolioValue: number;
+  byCountry: LlmAllocationBreakdown;
+  byAssetClass: LlmAllocationBreakdown;
+}
+
+/**
+ * Cap on the buckets listed per breakdown for the LLM. Beyond this the tail is
+ * folded into the unclassified "Other" value so a long-tail portfolio cannot
+ * blow out the tool result.
+ */
+const MAX_LLM_LOOK_THROUGH_ITEMS = 25;
+
+/**
+ * Trim a rollup to its largest buckets and fold the tail into the unclassified
+ * value, so the parts always add up to the portfolio total.
+ */
+function toLlmBreakdown(
+  items: { name: string; totalValue: number; percentage: number }[],
+  unclassifiedValue: number,
+  totalPortfolioValue: number,
+): LlmAllocationBreakdown {
+  const kept = items.slice(0, MAX_LLM_LOOK_THROUGH_ITEMS);
+  const tail = items.slice(MAX_LLM_LOOK_THROUGH_ITEMS);
+  const other = sumMoney([unclassifiedValue, ...tail.map((i) => i.totalValue)]);
+  return {
+    items: kept.map((i) => ({
+      name: i.name,
+      value: i.totalValue,
+      percentage: i.percentage,
+    })),
+    unclassifiedValue: roundMoney(other),
+    unclassifiedPercentage:
+      totalPortfolioValue > 0
+        ? Math.round((other / totalPortfolioValue) * 10000) / 100
+        : 0,
+  };
 }
 
 @Injectable()
@@ -350,6 +446,93 @@ export class SectorWeightingService {
     accountIds?: string[],
     securityIds?: string[],
   ): Promise<CountryWeightingResult> {
+    const result = await this.computeLookThrough(
+      userId,
+      accountIds,
+      securityIds,
+      (sec) => {
+        const isStock =
+          sec.securityType === "STOCK" || sec.securityType === "Equity";
+        const isFund =
+          sec.securityType === "ETF" || sec.securityType === "MUTUAL_FUND";
+        if (isFund && sec.countryWeightings?.length) {
+          return { slices: sec.countryWeightings };
+        }
+        if (isStock && sec.exchange && EXCHANGE_TO_COUNTRY[sec.exchange]) {
+          return { direct: EXCHANGE_TO_COUNTRY[sec.exchange] };
+        }
+        return {};
+      },
+    );
+    return {
+      ...result,
+      items: result.items.map(({ name, ...rest }) => ({
+        country: name,
+        ...rest,
+      })),
+    };
+  }
+
+  /**
+   * Compute an asset-class look-through breakdown for the portfolio.
+   *
+   * The asset-class counterpart of `getCountryWeightings`: ETFs/funds are split
+   * by their manual `assetWeightings` (decimal 0-1), and anything without a
+   * breakdown is placed by security type via `assetClassForSecurityType` (a
+   * stock is equity, a bond is fixed income). Fund value beyond the manual
+   * weightings, and securities whose type says nothing definite (a fund with no
+   * breakdown, options, GICs), fall into `unclassifiedValue` ("Other").
+   *
+   * Class names are the user's own free text, so they are merged
+   * case-insensitively under the first spelling seen.
+   */
+  async getAssetClassWeightings(
+    userId: string,
+    accountIds?: string[],
+    securityIds?: string[],
+  ): Promise<AssetClassWeightingResult> {
+    const result = await this.computeLookThrough(
+      userId,
+      accountIds,
+      securityIds,
+      (sec) => {
+        const isFund =
+          sec.securityType === "ETF" || sec.securityType === "MUTUAL_FUND";
+        if (isFund && sec.assetWeightings?.length) {
+          return { slices: sec.assetWeightings };
+        }
+        return { direct: assetClassForSecurityType(sec.securityType) };
+      },
+    );
+    return {
+      ...result,
+      items: result.items.map(({ name, ...rest }) => ({
+        assetClass: name,
+        ...rest,
+      })),
+    };
+  }
+
+  /**
+   * Shared look-through rollup behind the country and asset-class breakdowns.
+   *
+   * `classify` decides, per security, either a manual `slices` breakdown
+   * (weights are decimals 0-1; the shortfall under 1.0 is unclassified) or a
+   * single `direct` bucket inferred from the security itself. Returning neither
+   * -- or a null `direct` -- sends the whole position to `unclassifiedValue`.
+   *
+   * Buckets are keyed case-insensitively and reported under the first spelling
+   * seen, so free-text names that differ only in case are one row.
+   */
+  private async computeLookThrough(
+    userId: string,
+    accountIds: string[] | undefined,
+    securityIds: string[] | undefined,
+    classify: (security: Security) => {
+      slices?: { name: string; weight: number }[];
+      direct?: string | null;
+    },
+  ): Promise<LookThroughResult> {
     let investmentAccounts: Account[];
     if (accountIds && accountIds.length > 0) {
       investmentAccounts = await this.accountsRepository.find({
@@ -402,9 +585,23 @@ export class SectorWeightingService {
         ? investmentAccounts[0].currencyCode
         : "CAD";
 
-    const directMap = new Map<string, number>(); // country -> value (stocks)
-    const etfMap = new Map<string, number>(); // country -> value (funds)
+    // key (lower-cased) -> { name (first spelling seen), value }
+    const directMap = new Map<string, { name: string; value: number }>();
+    const etfMap = new Map<string, { name: string; value: number }>();
     let unclassifiedValue = 0;
+
+    const add = (
+      map: Map<string, { name: string; value: number }>,
+      name: string,
+      value: number,
+    ) => {
+      const key = name.trim().toLowerCase();
+      const existing = map.get(key);
+      map.set(key, {
+        name: existing?.name ?? name.trim(),
+        value: (existing?.value ?? 0) + value,
+      });
+    };
 
     for (const holding of holdings) {
       const quantity = Number(holding.quantity);
@@ -419,44 +616,41 @@ export class SectorWeightingService {
         rateCache,
       );
 
-      const sec = holding.security;
-      const isStock =
-        sec.securityType === "STOCK" || sec.securityType === "Equity";
-      const isFund =
-        sec.securityType === "ETF" || sec.securityType === "MUTUAL_FUND";
+      const classification = classify(holding.security);
 
-      if (isFund && sec.countryWeightings?.length) {
+      if (classification.slices?.length) {
         let allocatedWeight = 0;
-        for (const cw of sec.countryWeightings) {
-          const weight = Number(cw.weight);
+        for (const slice of classification.slices) {
+          const weight = Number(slice.weight);
           if (!Number.isFinite(weight) || weight <= 0) continue;
-          // A provider "Other" slice isn't a country: leave its weight in the
+          // An "Other" slice isn't a real bucket: leave its weight in the
           // remainder so it merges with the computed "Other" (unclassified).
-          if (isOtherAllocationName(cw.name)) continue;
-          etfMap.set(
-            cw.name,
-            (etfMap.get(cw.name) || 0) + marketValue * weight,
-          );
+          if (isOtherAllocationName(slice.name)) continue;
+          add(etfMap, slice.name, marketValue * weight);
           allocatedWeight += weight;
         }
         // Anything not allocated by the manual weightings is "Other".
         const remainder = Math.max(0, 1 - allocatedWeight);
         unclassifiedValue += marketValue * remainder;
-      } else if (isStock && sec.exchange && EXCHANGE_TO_COUNTRY[sec.exchange]) {
-        const country = EXCHANGE_TO_COUNTRY[sec.exchange];
-        directMap.set(country, (directMap.get(country) || 0) + marketValue);
+      } else if (classification.direct) {
+        add(directMap, classification.direct, marketValue);
       } else {
         unclassifiedValue += marketValue;
       }
     }
 
-    const allCountries = new Set([...directMap.keys(), ...etfMap.keys()]);
-    const items: CountryWeightingItem[] = [];
-    for (const country of allCountries) {
-      const dv = directMap.get(country) || 0;
-      const ev = etfMap.get(country) || 0;
+    const allKeys = new Set([...directMap.keys(), ...etfMap.keys()]);
+    const items: LookThroughItem[] = [];
+    for (const key of allKeys) {
+      const direct = directMap.get(key);
+      const etf = etfMap.get(key);
+      const dv = direct?.value || 0;
+      const ev = etf?.value || 0;
       items.push({
-        country,
+        // The manual breakdown's spelling wins over an inferred default, so a
+        // user who writes "equity" doesn't get a second "Equity" row from the
+        // security-type fallback.
+        name: etf?.name ?? direct?.name ?? key,
         directValue: roundMoney(dv),
         etfValue: roundMoney(ev),
         totalValue: roundMoney(dv + ev),
@@ -464,8 +658,10 @@ export class SectorWeightingService {
       });
     }
 
-    const totalDirectValue = sumMoney([...directMap.values()]);
-    const totalEtfValue = sumMoney([...etfMap.values()]);
+    const totalDirectValue = sumMoney(
+      [...directMap.values()].map((v) => v.value),
+    );
+    const totalEtfValue = sumMoney([...etfMap.values()].map((v) => v.value));
     const totalPortfolioValue = sumMoney([
       totalDirectValue,
       totalEtfValue,
@@ -487,6 +683,47 @@ export class SectorWeightingService {
       totalDirectValue: roundMoney(totalDirectValue),
       totalEtfValue: roundMoney(totalEtfValue),
       unclassifiedValue: roundMoney(unclassifiedValue),
+    };
+  }
+
+  /**
+   * Both look-through breakdowns in the compact shape the AI Assistant and MCP
+   * `get_portfolio_summary` tools return. Shared by the two surfaces (CLAUDE.md
+   * repo rule) so they can never drift.
+   *
+   * Only the largest `MAX_LLM_LOOK_THROUGH_ITEMS` buckets are listed; the tail
+   * is folded into `unclassifiedValue` alongside the genuinely unclassified
+   * value, which is exactly how the UI renders its "Other" slice.
+   */
+  async getLlmLookThrough(
+    userId: string,
+    accountIds?: string[],
+  ): Promise<LlmLookThrough> {
+    const [countries, assetClasses] = await Promise.all([
+      this.getCountryWeightings(userId, accountIds),
+      this.getAssetClassWeightings(userId, accountIds),
+    ]);
+
+    return {
+      totalPortfolioValue: countries.totalPortfolioValue,
+      byCountry: toLlmBreakdown(
+        countries.items.map((i) => ({
+          name: i.country,
+          totalValue: i.totalValue,
+          percentage: i.percentage,
+        })),
+        countries.unclassifiedValue,
+        countries.totalPortfolioValue,
+      ),
+      byAssetClass: toLlmBreakdown(
+        assetClasses.items.map((i) => ({
+          name: i.assetClass,
+          totalValue: i.totalValue,
+          percentage: i.percentage,
+        })),
+        assetClasses.unclassifiedValue,
+        assetClasses.totalPortfolioValue,
+      ),
     };
   }
 }

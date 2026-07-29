@@ -318,6 +318,13 @@ export const generateReportOutput = {
 // investments.tool.ts
 // ---------------------------------------------------------------------------
 
+/** One dimension of the portfolio look-through (countries or asset classes). */
+const lookThroughBreakdown = looseObject({
+  items: z.array(looseObject({ name: str, value: num, percentage: num })),
+  unclassifiedValue: num,
+  unclassifiedPercentage: num,
+});
+
 export const getPortfolioSummaryOutput = {
   holdingCount: num,
   totalCashValue: num,
@@ -378,6 +385,12 @@ export const getPortfolioSummaryOutput = {
       percentage: num,
     }),
   ),
+  // Only present when the caller passes includeLookThrough.
+  lookThrough: looseObject({
+    totalPortfolioValue: num,
+    byCountry: lookThroughBreakdown,
+    byAssetClass: lookThroughBreakdown,
+  }).optional(),
 };
 
 export const listInvestmentTransactionsOutput = {

@@ -69,6 +69,17 @@ describe("tool-input-schemas", () => {
       }
     });
 
+    it("accepts the get_portfolio_summary look-through flag", () => {
+      const result = validateToolInput("get_portfolio_summary", {
+        includeLookThrough: true,
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.includeLookThrough).toBe(true);
+      }
+    });
+
     it("returns success for unknown tool names (passthrough)", () => {
       const input = { foo: "bar", baz: 42 };
       const result = validateToolInput("unknown_tool", input);

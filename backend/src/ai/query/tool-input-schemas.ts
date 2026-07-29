@@ -82,6 +82,8 @@ export const comparePeriodsSchema = z.object({
 
 export const getPortfolioSummarySchema = z.object({
   accountNames: z.array(z.string().max(100)).optional(),
+  // Opt-in country / asset-class look-through (an extra holdings + FX pass).
+  includeLookThrough: z.boolean().optional(),
 });
 
 export const INVESTMENT_ACTIONS = [

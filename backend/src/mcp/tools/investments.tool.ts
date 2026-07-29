@@ -104,7 +104,8 @@ export class McpInvestmentsTools {
         title: "Portfolio summary",
         annotations: READ_ONLY,
         description:
-          "Get investment portfolio overview with holdings, gains/losses, and allocation. Returns the same compact, LLM-friendly shape as the AI Assistant's tool. Accepts account NAMES (resolved internally), so you do NOT need to call list_accounts first.",
+          "Get investment portfolio overview with holdings, gains/losses, and allocation. Returns the same compact, LLM-friendly shape as the AI Assistant's tool. Accepts account NAMES (resolved internally), so you do NOT need to call list_accounts first. " +
+          "Set includeLookThrough=true for exposure questions ('how much am I in the US?', 'what's my equity vs fixed income split?'): it adds lookThrough.byCountry and lookThrough.byAssetClass, each a list of { name, value, percentage } plus an unclassified 'Other' value. Funds are split by the breakdown the user maintains on the security; individual stocks are placed by listing exchange (country) and security type (asset class).",
         inputSchema: {
           accountNames: z
             .array(z.string().max(100))
@@ -112,6 +113,12 @@ export class McpInvestmentsTools {
             .optional()
             .describe(
               "Optional investment account names to filter to (resolved internally). Omit to cover all investment accounts.",
+            ),
+          includeLookThrough: z
+            .boolean()
+            .optional()
+            .describe(
+              "Set true to also return the country and asset-class look-through breakdowns. Default false; costs an extra pass over the holdings.",
             ),
         },
         outputSchema: getPortfolioSummaryOutput,
@@ -132,6 +139,7 @@ export class McpInvestmentsTools {
           const summary = await this.portfolioService.getLlmSummary(
             ctx.userId,
             accountIds,
+            { includeLookThrough: args.includeLookThrough === true },
           );
           return toolResult(summary);
         } catch (err: unknown) {

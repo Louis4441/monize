@@ -1942,12 +1942,17 @@ export class ToolExecutorService {
     if (accountFilter.error) return this.toolError(accountFilter.error);
     const accountIds = accountFilter.accountIds;
 
-    const data = await this.portfolioService.getLlmSummary(userId, accountIds);
+    const data = await this.portfolioService.getLlmSummary(userId, accountIds, {
+      includeLookThrough: input.includeLookThrough === true,
+    });
 
     const sign = data.totalGainLoss >= 0 ? "+" : "";
+    const lookThroughNote = data.lookThrough
+      ? ` Look-through: ${data.lookThrough.byCountry.items.length} countr${data.lookThrough.byCountry.items.length === 1 ? "y" : "ies"}, ${data.lookThrough.byAssetClass.items.length} asset class${data.lookThrough.byAssetClass.items.length === 1 ? "" : "es"}.`
+      : "";
     return {
       data,
-      summary: `${data.holdingCount} holding${data.holdingCount === 1 ? "" : "s"}, total portfolio value ${data.totalPortfolioValue.toFixed(2)}, unrealized gain/loss ${sign}${data.totalGainLoss.toFixed(2)} (${sign}${data.totalGainLossPercent.toFixed(2)}%).`,
+      summary: `${data.holdingCount} holding${data.holdingCount === 1 ? "" : "s"}, total portfolio value ${data.totalPortfolioValue.toFixed(2)}, unrealized gain/loss ${sign}${data.totalGainLoss.toFixed(2)} (${sign}${data.totalGainLossPercent.toFixed(2)}%).${lookThroughNote}`,
       sources: [
         {
           type: "portfolio",

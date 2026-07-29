@@ -9,6 +9,10 @@ import {
   PortfolioCalculationService,
   DailyRateIndex,
 } from "./portfolio-calculation.service";
+import {
+  SectorWeightingService,
+  LlmLookThrough,
+} from "./sector-weighting.service";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { roundMoney } from "../common/round.util";
@@ -179,6 +183,12 @@ export interface LlmPortfolioSummary {
   holdings: LlmPortfolioHolding[];
   holdingsByAccount: LlmAccountHoldings[];
   allocation: LlmPortfolioAllocation[];
+  /**
+   * Country and asset-class look-through breakdowns. Only present when the
+   * caller asks for them: they cost a second holdings/FX pass, and most
+   * portfolio questions don't need them.
+   */
+  lookThrough?: LlmLookThrough;
 }
 
 /**
@@ -328,6 +338,7 @@ export class PortfolioService {
     private calculationService: PortfolioCalculationService,
     private yahooFinanceService: YahooFinanceService,
     private quoteProviderRegistry: QuoteProviderRegistry,
+    private sectorWeightingService: SectorWeightingService,
   ) {}
 
   /**
@@ -534,12 +545,20 @@ export class PortfolioService {
    * Assistant's tool executor and the MCP server's `get_portfolio_summary`
    * tool so the two surfaces return the same shape. Monetary values are
    * rounded to 4 decimal places; percentages to 2.
+   *
+   * `includeLookThrough` adds the country and asset-class breakdowns for
+   * exposure questions ("how much am I in the US?", "what's my equity/bond
+   * split?"). It is opt-in because it re-walks the holdings with FX conversion.
    */
   async getLlmSummary(
     userId: string,
     accountIds?: string[],
+    options?: { includeLookThrough?: boolean },
   ): Promise<LlmPortfolioSummary> {
     const summary = await this.getPortfolioSummary(userId, accountIds);
+    const lookThrough = options?.includeLookThrough
+      ? await this.sectorWeightingService.getLlmLookThrough(userId, accountIds)
+      : null;
 
     const roundMoneyValue = (v: number | null | undefined): number =>
       v === null || v === undefined ? 0 : roundMoney(Number(v));
@@ -599,6 +618,7 @@ export class PortfolioService {
       holdings,
       holdingsByAccount,
       allocation,
+      ...(lookThrough ? { lookThrough } : {}),
     };
   }
 

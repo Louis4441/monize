@@ -188,6 +188,7 @@ describe("McpInvestmentsTools", () => {
       expect(portfolioService.getLlmSummary).toHaveBeenCalledWith(
         "u1",
         undefined,
+        { includeLookThrough: false },
       );
       const parsed = JSON.parse(result.content[0].text);
       expect(parsed.totalPortfolioValue).toBe(10000);
@@ -214,9 +215,50 @@ describe("McpInvestmentsTools", () => {
       expect(accountsService.resolveAccountFilter).toHaveBeenCalledWith("u1", [
         "RRSP",
       ]);
-      expect(portfolioService.getLlmSummary).toHaveBeenCalledWith("u1", [
-        "acc-1",
-      ]);
+      expect(portfolioService.getLlmSummary).toHaveBeenCalledWith(
+        "u1",
+        ["acc-1"],
+        { includeLookThrough: false },
+      );
+    });
+
+    it("returns the country and asset-class look-through when asked", async () => {
+      resolve.mockReturnValue({ userId: "u1", scopes: "read" });
+      portfolioService.getLlmSummary.mockResolvedValue({
+        holdingCount: 1,
+        totalPortfolioValue: 1000,
+        totalGainLoss: 0,
+        holdings: [],
+        allocation: [],
+        lookThrough: {
+          totalPortfolioValue: 1000,
+          byCountry: {
+            items: [{ name: "United States", value: 750, percentage: 75 }],
+            unclassifiedValue: 250,
+            unclassifiedPercentage: 25,
+          },
+          byAssetClass: {
+            items: [{ name: "Equity", value: 600, percentage: 60 }],
+            unclassifiedValue: 400,
+            unclassifiedPercentage: 40,
+          },
+        },
+      });
+
+      const result = await handlers["get_portfolio_summary"](
+        { includeLookThrough: true },
+        { sessionId: "s1" },
+      );
+
+      expect(portfolioService.getLlmSummary).toHaveBeenCalledWith(
+        "u1",
+        undefined,
+        { includeLookThrough: true },
+      );
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.lookThrough.byCountry.items[0].name).toBe("United States");
+      expect(parsed.lookThrough.byAssetClass.items[0].name).toBe("Equity");
+      expect(parsed.lookThrough.byAssetClass.unclassifiedValue).toBe(400);
     });
 
     it("returns error when getLlmSummary throws", async () => {
