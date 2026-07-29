@@ -72,20 +72,30 @@ psql_in -d db_schema -f /tmp/schema.sql >/dev/null
 echo "Applying database/schema.sql to db_migrations (baseline)..."
 psql_in -d db_migrations -f /tmp/schema.sql >/dev/null
 
-echo "Applying migrations on top of db_migrations..."
 # Migrations should be no-ops on a schema.sql baseline (per CLAUDE.md they
 # must use IF NOT EXISTS / IF EXISTS). A migration that fails here -- or
 # that succeeds but mutates the schema -- means schema.sql is missing the
 # change and would diverge from upgraded installs.
-for f in "$REPO_ROOT"/database/migrations/*.sql; do
-  fname="$(basename "$f")"
-  docker cp "$f" "$CONTAINER:/tmp/migration.sql"
-  if ! psql_in -d db_migrations -f /tmp/migration.sql >/dev/null 2>&1; then
-    echo "FAIL: migration $fname errored when applied on top of schema.sql"
-    echo "      (likely missing IF NOT EXISTS / IF EXISTS guards)"
-    psql_in -d db_migrations -f /tmp/migration.sql || true
-    exit 1
-  fi
+#
+# Applied TWICE (task B1): pass 1 proves each body is a no-op on an up-to-date
+# schema, pass 2 proves it is a no-op on the state it just produced -- the case
+# that bites in production, when a migration half-applies (crash between the DDL
+# and the schema_migrations INSERT, restore from a mid-deploy snapshot) and the
+# next boot re-runs the whole body. The static counterpart is
+# `backend/npm run migration:lint`; see docs/database-migrations.md.
+for pass in 1 2; do
+  echo "Applying migrations on top of db_migrations (pass $pass of 2)..."
+  for f in "$REPO_ROOT"/database/migrations/*.sql; do
+    fname="$(basename "$f")"
+    docker cp "$f" "$CONTAINER:/tmp/migration.sql"
+    if ! psql_in -d db_migrations -f /tmp/migration.sql >/dev/null 2>&1; then
+      echo "FAIL: migration $fname errored when applied on top of schema.sql (pass $pass)"
+      echo "      (likely missing IF NOT EXISTS / IF EXISTS guards -- see"
+      echo "       docs/database-migrations.md and npm run migration:lint)"
+      psql_in -d db_migrations -f /tmp/migration.sql || true
+      exit 1
+    fi
+  done
 done
 
 DUMP_OPTS=(--schema-only --no-comments --no-owner --no-privileges --no-tablespaces)

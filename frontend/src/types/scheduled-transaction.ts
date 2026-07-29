@@ -5,28 +5,30 @@ import { Tag } from './tag';
 import { InvestmentAction, Security } from './investment';
 import { SplitKind, InvestmentSplitDetails } from './transaction';
 
-export type FrequencyType =
-  | 'ONCE'
-  | 'DAILY'
-  | 'WEEKLY'
-  | 'BIWEEKLY'
-  | 'EVERY4WEEKS'
-  | 'SEMIMONTHLY'
-  | 'MONTHLY'
-  | 'QUARTERLY'
-  | 'YEARLY';
+/**
+ * Every frequency a scheduled transaction can have, ordered shortest period
+ * first -- the order the selector renders them in. Mirrors the backend's
+ * `FrequencyType` enum (`create-scheduled-transaction.dto.ts`); the stepping
+ * maths lives in `@/lib/frequency`.
+ *
+ * Declared as a const tuple so `z.enum(FREQUENCY_VALUES)` in the form derives
+ * from it instead of repeating the list.
+ */
+export const FREQUENCY_VALUES = [
+  'ONCE',
+  'DAILY',
+  'WEEKLY',
+  'BIWEEKLY',
+  'EVERY4WEEKS',
+  'SEMIMONTHLY',
+  'MONTHLY',
+  'EVERY2MONTHS',
+  'QUARTERLY',
+  'SEMIANNUAL',
+  'YEARLY',
+] as const;
 
-export const FREQUENCY_LABELS: Record<FrequencyType, string> = {
-  ONCE: 'One Time',
-  DAILY: 'Daily',
-  WEEKLY: 'Weekly',
-  BIWEEKLY: 'Every 2 Weeks',
-  EVERY4WEEKS: 'Every 4 Weeks',
-  SEMIMONTHLY: 'Twice a Month',
-  MONTHLY: 'Monthly',
-  QUARTERLY: 'Quarterly',
-  YEARLY: 'Yearly',
-};
+export type FrequencyType = (typeof FREQUENCY_VALUES)[number];
 
 export interface ScheduledTransactionSplit {
   id: string;

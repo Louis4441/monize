@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "Кожні 4 тижні",
     "SEMIMONTHLY": "Двічі на місяць",
     "MONTHLY": "Щомісяця",
+    "EVERY2MONTHS": "Кожні 2 місяці",
     "QUARTERLY": "Щокварталу",
+    "SEMIANNUAL": "Двічі на рік",
     "YEARLY": "Щороку"
   },
   "validation": {

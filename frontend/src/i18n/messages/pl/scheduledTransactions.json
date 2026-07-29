@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "Co 4 tygodnie",
     "SEMIMONTHLY": "Dwa razy w miesiącu",
     "MONTHLY": "Miesięczny",
+    "EVERY2MONTHS": "Co 2 miesiące",
     "QUARTERLY": "Co kwartał",
+    "SEMIANNUAL": "Dwa razy w roku",
     "YEARLY": "Co rok"
   },
   "validation": {

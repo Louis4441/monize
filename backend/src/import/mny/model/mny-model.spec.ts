@@ -268,7 +268,9 @@ describe("mapFrequency", () => {
     [MNY_FREQUENCY.WEEKLY, FrequencyType.WEEKLY],
     [MNY_FREQUENCY.MONTHLY, FrequencyType.MONTHLY],
     [MNY_FREQUENCY.YEARLY, FrequencyType.YEARLY],
+    [MNY_FREQUENCY.EVERY_2_MONTHS, FrequencyType.EVERY2MONTHS],
     [MNY_FREQUENCY.QUARTERLY, FrequencyType.QUARTERLY],
+    [MNY_FREQUENCY.SEMIANNUAL, FrequencyType.SEMIANNUAL],
   ])("maps frq %p to %s exactly", (frequency, expected) => {
     expect(mapFrequency(frequency)).toEqual({
       frequency: expected,
@@ -290,7 +292,9 @@ describe("mapFrequency", () => {
   );
 
   it.each([
+    [2, FrequencyType.EVERY2MONTHS],
     [3, FrequencyType.QUARTERLY],
+    [6, FrequencyType.SEMIANNUAL],
     [12, FrequencyType.YEARLY],
   ])(
     "turns a monthly recurrence every %p months into %s",
@@ -302,34 +306,39 @@ describe("mapFrequency", () => {
     },
   );
 
-  it("marks every-two-months as an approximate monthly", () => {
+  it("maps every-two-months exactly, by code and by interval", () => {
     // PR #192 mapped this to BIWEEKLY -- every two weeks, not every two
-    // months.
-    expect(mapFrequency(MNY_FREQUENCY.EVERY_2_MONTHS)).toEqual({
-      frequency: FrequencyType.MONTHLY,
-      approximate: true,
-    });
-    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 2)).toEqual({
-      frequency: FrequencyType.MONTHLY,
-      approximate: true,
-    });
+    // months. Before task B3 Monize had no type for it and the mapper
+    // downgraded to MONTHLY with a warning.
+    const expected = {
+      frequency: FrequencyType.EVERY2MONTHS,
+      approximate: false,
+    };
+    expect(mapFrequency(MNY_FREQUENCY.EVERY_2_MONTHS)).toEqual(expected);
+    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 2)).toEqual(expected);
   });
 
-  it("marks semiannual as an approximate quarterly", () => {
-    // PR #192 stretched it to YEARLY, halving the reminders.
-    expect(mapFrequency(MNY_FREQUENCY.SEMIANNUAL)).toEqual({
-      frequency: FrequencyType.QUARTERLY,
-      approximate: true,
-    });
-    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 6)).toEqual({
-      frequency: FrequencyType.MONTHLY,
-      approximate: true,
-    });
+  it("maps semiannual exactly, by code and by interval", () => {
+    // PR #192 stretched it to YEARLY, halving the reminders; before B3 the
+    // mapper downgraded to QUARTERLY with a warning.
+    const expected = {
+      frequency: FrequencyType.SEMIANNUAL,
+      approximate: false,
+    };
+    expect(mapFrequency(MNY_FREQUENCY.SEMIANNUAL)).toEqual(expected);
+    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 6)).toEqual(expected);
   });
 
   it("approximates an unrepresentable weekly interval", () => {
     expect(mapFrequency(MNY_FREQUENCY.WEEKLY, 3)).toEqual({
       frequency: FrequencyType.WEEKLY,
+      approximate: true,
+    });
+  });
+
+  it("approximates an unrepresentable monthly interval", () => {
+    expect(mapFrequency(MNY_FREQUENCY.MONTHLY, 5)).toEqual({
+      frequency: FrequencyType.MONTHLY,
       approximate: true,
     });
   });

@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "4週間ごと",
     "SEMIMONTHLY": "月2回",
     "MONTHLY": "毎月",
+    "EVERY2MONTHS": "2か月ごと",
     "QUARTERLY": "四半期ごと",
+    "SEMIANNUAL": "年2回",
     "YEARLY": "毎年"
   },
   "validation": {

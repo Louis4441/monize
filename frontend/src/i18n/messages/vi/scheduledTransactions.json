@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "Mỗi 4 tuần",
     "SEMIMONTHLY": "Hai lần một tháng",
     "MONTHLY": "Hàng tháng",
+    "EVERY2MONTHS": "Mỗi 2 tháng",
     "QUARTERLY": "Hàng quý",
+    "SEMIANNUAL": "Hai lần một năm",
     "YEARLY": "Hàng năm"
   },
   "validation": {

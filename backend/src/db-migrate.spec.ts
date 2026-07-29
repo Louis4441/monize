@@ -18,7 +18,18 @@ const mockExit = jest
   .spyOn(process, "exit")
   .mockImplementation((() => {}) as any);
 
-import { runMigrations } from "./db-migrate";
+import {
+  runMigrations,
+  describeSqlError,
+  locateSqlPosition,
+  formatMigrationFailure,
+  formatRunnerFailure,
+} from "./db-migrate";
+
+/** A stand-in for pg's DatabaseError, which carries diagnostics as own props. */
+function pgError(message: string, fields: Record<string, string> = {}): Error {
+  return Object.assign(new Error(message), fields);
+}
 
 describe("db-migrate runMigrations()", () => {
   let existsSyncSpy: jest.SpyInstance;
@@ -176,7 +187,7 @@ describe("db-migrate runMigrations()", () => {
     );
   });
 
-  it("rolls back and exits on migration failure", async () => {
+  it("rolls back and exits on migration failure, naming the file and the SQL error", async () => {
     existsSyncSpy.mockReturnValue(true);
     readdirSyncSpy.mockReturnValue(["001_bad.sql"] as any);
     readFileSyncSpy.mockReturnValue("INVALID SQL;");
@@ -185,28 +196,61 @@ describe("db-migrate runMigrations()", () => {
       .mockResolvedValueOnce(undefined) // CREATE TABLE
       .mockResolvedValueOnce({ rows: [] }) // SELECT applied
       .mockResolvedValueOnce(undefined) // BEGIN
-      .mockRejectedValueOnce(new Error("syntax error")) // SQL fails
+      .mockRejectedValueOnce(
+        pgError('syntax error at or near "INVALID"', {
+          code: "42601",
+          position: "1",
+        }),
+      ) // SQL fails
       .mockResolvedValueOnce(undefined); // ROLLBACK
 
     await runMigrations();
 
     expect(mockQuery).toHaveBeenCalledWith("ROLLBACK");
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Migration 001_bad.sql failed:",
-      expect.any(Error),
-    );
+    const report = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(report).toContain("Migration failed: 001_bad.sql");
+    expect(report).toContain('syntax error at or near "INVALID"');
+    expect(report).toContain("42601 (syntax_error)");
+    expect(report).toContain("docs/database-migrations.md");
     expect(mockExit).toHaveBeenCalledWith(1);
   });
 
-  it("exits on connection failure", async () => {
+  it("reports how many migrations committed before the failing one", async () => {
+    existsSyncSpy.mockReturnValue(true);
+    readdirSyncSpy.mockReturnValue(["001_ok.sql", "002_bad.sql"] as any);
+    readFileSyncSpy.mockReturnValue("SELECT 1;");
+
+    mockQuery
+      .mockResolvedValueOnce(undefined) // CREATE TABLE
+      .mockResolvedValueOnce({ rows: [] }) // SELECT applied
+      .mockResolvedValueOnce(undefined) // BEGIN (001)
+      .mockResolvedValueOnce(undefined) // SQL (001)
+      .mockResolvedValueOnce(undefined) // INSERT (001)
+      .mockResolvedValueOnce(undefined) // COMMIT (001)
+      .mockResolvedValueOnce(undefined) // BEGIN (002)
+      .mockRejectedValueOnce(pgError("boom")) // SQL fails (002)
+      .mockResolvedValue(undefined); // ROLLBACK and beyond
+
+    await runMigrations();
+
+    const report = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(report).toContain("Migration failed: 002_bad.sql");
+    expect(report).toContain(
+      "1 migration(s) applied successfully before this one",
+    );
+  });
+
+  it("exits on connection failure with a runner-level diagnostic", async () => {
     mockConnect.mockRejectedValue(new Error("ECONNREFUSED"));
 
     await runMigrations();
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Migration runner failed:",
-      expect.any(Error),
+    const report = consoleErrorSpy.mock.calls.map((c) => c[0]).join("\n");
+    expect(report).toContain(
+      "Migration runner failed before or between migrations.",
     );
+    expect(report).toContain("ECONNREFUSED");
+    expect(report).toContain("docs/database-migrations.md");
     expect(mockExit).toHaveBeenCalledWith(1);
   });
 
@@ -250,5 +294,218 @@ describe("db-migrate runMigrations()", () => {
     await runMigrations();
 
     expect(mockEnd).toHaveBeenCalled();
+  });
+});
+
+describe("describeSqlError()", () => {
+  it("reads every pg diagnostic field off a DatabaseError", () => {
+    const fields = describeSqlError(
+      pgError('column "x" of relation "y" already exists', {
+        code: "42701",
+        detail: "some detail",
+        hint: "some hint",
+        where: "PL/pgSQL function inline_code_block line 3",
+        position: "42",
+        schema: "public",
+        table: "y",
+        column: "x",
+        constraint: "y_pkey",
+      }),
+    );
+
+    expect(fields).toEqual({
+      message: 'column "x" of relation "y" already exists',
+      code: "42701",
+      detail: "some detail",
+      hint: "some hint",
+      where: "PL/pgSQL function inline_code_block line 3",
+      position: "42",
+      schema: "public",
+      table: "y",
+      column: "x",
+      constraint: "y_pkey",
+    });
+  });
+
+  it("survives a plain Error and a non-object throw", () => {
+    expect(describeSqlError(new Error("plain")).message).toBe("plain");
+    expect(describeSqlError(new Error("plain")).code).toBeUndefined();
+    expect(describeSqlError("just a string").message).toBe("just a string");
+    expect(describeSqlError(null).message).toBe("null");
+  });
+
+  it("ignores empty-string diagnostics", () => {
+    expect(
+      describeSqlError(pgError("m", { detail: "" })).detail,
+    ).toBeUndefined();
+  });
+});
+
+describe("locateSqlPosition()", () => {
+  const sql = "SELECT 1;\nALTER TABLE t ADD COLUMN x INT;\nSELECT 2;";
+
+  it("maps a pg character offset to the migration's line and column", () => {
+    // Position 11 (1-based) is the "A" of ALTER: ten characters ("SELECT 1;\n")
+    // precede it, so it is line 2, column 1.
+    const located = locateSqlPosition(sql, "11");
+    expect(located).not.toBeNull();
+    expect(located!.line).toBe(2);
+    expect(located!.column).toBe(1);
+  });
+
+  it("renders the offending line with a caret under the column", () => {
+    const located = locateSqlPosition(sql, "11")!;
+    const [source, caret] = located.excerpt.split("\n");
+    expect(source).toContain("ALTER TABLE t ADD COLUMN x INT;");
+    expect(caret.indexOf("^")).toBe(source.indexOf("ALTER"));
+  });
+
+  it("returns null when there is no usable position", () => {
+    expect(locateSqlPosition(sql, undefined)).toBeNull();
+    expect(locateSqlPosition(sql, "")).toBeNull();
+    expect(locateSqlPosition(sql, "0")).toBeNull();
+    expect(locateSqlPosition(sql, "not-a-number")).toBeNull();
+    expect(locateSqlPosition(sql, String(sql.length + 2))).toBeNull();
+  });
+});
+
+describe("formatMigrationFailure()", () => {
+  const base = {
+    file: "116_frequency.sql",
+    filePath: "/app/migrations/116_frequency.sql",
+    sql: "ALTER TABLE t ADD COLUMN x INT;",
+    appliedBefore: 0,
+  };
+
+  it("names the file, path, message, sqlstate and runbook", () => {
+    const report = formatMigrationFailure({
+      ...base,
+      error: pgError("boom", { code: "42601" }),
+    });
+
+    expect(report).toContain("Migration failed: 116_frequency.sql");
+    expect(report).toContain("/app/migrations/116_frequency.sql");
+    expect(report).toContain("error:     boom");
+    expect(report).toContain("sqlstate:  42601 (syntax_error)");
+    expect(report).toContain("docs/database-migrations.md");
+    expect(report).toContain("No migrations were applied in this run.");
+  });
+
+  it("includes detail, hint, where and object identity when pg supplies them", () => {
+    const report = formatMigrationFailure({
+      ...base,
+      error: pgError("boom", {
+        detail: "Key (id)=(1) already exists.",
+        hint: "Drop it first.",
+        where: "PL/pgSQL function inline_code_block line 4",
+        schema: "public",
+        table: "t",
+        column: "x",
+        constraint: "t_pkey",
+      }),
+    });
+
+    expect(report).toContain("Key (id)=(1) already exists.");
+    expect(report).toContain("Drop it first.");
+    expect(report).toContain("inline_code_block line 4");
+    expect(report).toContain("public");
+    expect(report).toContain("t_pkey");
+  });
+
+  it("points at the idempotency lint for already-exists failures", () => {
+    const report = formatMigrationFailure({
+      ...base,
+      error: pgError('trigger "x" for relation "t" already exists', {
+        code: "42710",
+      }),
+    });
+
+    expect(report).toContain("not re-runnable");
+    expect(report).toContain("npm run migration:lint");
+  });
+
+  it("separates missing-object failures from non-idempotent ones", () => {
+    const report = formatMigrationFailure({
+      ...base,
+      error: pgError('relation "currencies" does not exist', { code: "42P01" }),
+    });
+
+    expect(report).toContain("ahead of whatever creates the object");
+    expect(report).not.toContain("npm run migration:lint");
+  });
+
+  it("asks for a SQL fix, not the lint, for other failures", () => {
+    const report = formatMigrationFailure({
+      ...base,
+      error: pgError("division by zero", { code: "22012" }),
+    });
+
+    expect(report).toContain("Fix the SQL in 116_frequency.sql");
+    expect(report).not.toContain("npm run migration:lint");
+  });
+
+  it("shows the failing line when the error carries a position", () => {
+    const report = formatMigrationFailure({
+      ...base,
+      sql: "SELECT 1;\nSELCT 2;",
+      error: pgError("syntax error", { code: "42601", position: "11" }),
+    });
+
+    expect(report).toContain("at:        line 2, column 1");
+    expect(report).toContain("SELCT 2;");
+    expect(report).toContain("^");
+  });
+
+  it("states that the failed migration was rolled back and will be retried", () => {
+    const report = formatMigrationFailure({
+      ...base,
+      error: new Error("boom"),
+    });
+
+    expect(report).toContain("rolled back in full");
+    expect(report).toContain(
+      "schema_migrations does not list 116_frequency.sql",
+    );
+  });
+
+  it("counts the migrations that committed before the failure", () => {
+    const report = formatMigrationFailure({
+      ...base,
+      appliedBefore: 3,
+      error: new Error("boom"),
+    });
+
+    expect(report).toContain(
+      "3 migration(s) applied successfully before this one",
+    );
+  });
+});
+
+describe("formatRunnerFailure()", () => {
+  it("explains that nothing was migrated and points at the runbook", () => {
+    const report = formatRunnerFailure(
+      pgError("password authentication failed", {
+        code: "42501",
+        detail: "role monize_user",
+        hint: "check DATABASE_PASSWORD",
+      }),
+    );
+
+    expect(report).toContain(
+      "Migration runner failed before or between migrations.",
+    );
+    expect(report).toContain("password authentication failed");
+    expect(report).toContain("42501 (insufficient_privilege)");
+    expect(report).toContain("role monize_user");
+    expect(report).toContain("check DATABASE_PASSWORD");
+    expect(report).toContain("Nothing was migrated.");
+    expect(report).toContain("docs/database-migrations.md");
+  });
+
+  it("handles an error with no pg diagnostics", () => {
+    const report = formatRunnerFailure(new Error("ECONNREFUSED"));
+
+    expect(report).toContain("ECONNREFUSED");
+    expect(report).not.toContain("sqlstate:");
   });
 });

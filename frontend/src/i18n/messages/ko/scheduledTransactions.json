@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "4주마다",
     "SEMIMONTHLY": "월 2회",
     "MONTHLY": "매월",
+    "EVERY2MONTHS": "2개월마다",
     "QUARTERLY": "분기별",
+    "SEMIANNUAL": "연 2회",
     "YEARLY": "매년"
   },
   "validation": {

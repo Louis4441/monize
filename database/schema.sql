@@ -433,7 +433,10 @@ CREATE TABLE scheduled_transactions (
     amount NUMERIC(20, 4) NOT NULL,
     currency_code VARCHAR(3) NOT NULL REFERENCES currencies(code),
     description TEXT,
-    frequency VARCHAR(20) NOT NULL, -- 'ONCE', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'EVERY4WEEKS', 'MONTHLY', 'QUARTERLY', 'YEARLY'
+    -- 'ONCE', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'EVERY4WEEKS', 'SEMIMONTHLY',
+    -- 'MONTHLY', 'EVERY2MONTHS', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY'
+    -- (backend/src/scheduled-transactions/dto: FrequencyType)
+    frequency VARCHAR(20) NOT NULL,
     next_due_date DATE NOT NULL,
     start_date DATE NOT NULL,
     end_date DATE,

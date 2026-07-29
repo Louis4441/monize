@@ -15,13 +15,11 @@ import {
   subMonths,
   getDay,
   isSameDay,
-  addWeeks,
-  addDays,
-  addYears,
 } from 'date-fns';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { parseLocalDate } from '@/lib/utils';
+import { advanceByFrequency, isOneTime } from '@/lib/frequency';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { ExportDropdown } from '@/components/ui/ExportDropdown';
 import { exportToCsv } from '@/lib/csv-export';
@@ -77,31 +75,8 @@ export function UpcomingBillsReport() {
       }
 
       // Calculate next occurrence based on frequency
-      switch (st.frequency) {
-        case 'ONCE':
-          return occurrences;
-        case 'DAILY':
-          nextDate = addDays(nextDate, 1);
-          break;
-        case 'WEEKLY':
-          nextDate = addWeeks(nextDate, 1);
-          break;
-        case 'BIWEEKLY':
-          nextDate = addWeeks(nextDate, 2);
-          break;
-        case 'EVERY4WEEKS':
-          nextDate = addWeeks(nextDate, 4);
-          break;
-        case 'MONTHLY':
-          nextDate = addMonths(nextDate, 1);
-          break;
-        case 'QUARTERLY':
-          nextDate = addMonths(nextDate, 3);
-          break;
-        case 'YEARLY':
-          nextDate = addYears(nextDate, 1);
-          break;
-      }
+      if (isOneTime(st.frequency)) return occurrences;
+      nextDate = advanceByFrequency(nextDate, st.frequency);
       count++;
     }
 

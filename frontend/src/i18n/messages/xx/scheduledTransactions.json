@@ -268,7 +268,9 @@
     "EVERY4WEEKS": "[XX-Every 4 Weeks-XX]",
     "SEMIMONTHLY": "[XX-Twice a Month-XX]",
     "MONTHLY": "[XX-Monthly-XX]",
+    "EVERY2MONTHS": "[XX-Every 2 Months-XX]",
     "QUARTERLY": "[XX-Quarterly-XX]",
+    "SEMIANNUAL": "[XX-Twice a Year-XX]",
     "YEARLY": "[XX-Yearly-XX]"
   },
   "validation": {

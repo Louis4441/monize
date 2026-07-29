@@ -52,6 +52,20 @@ Credentials are in the root `.env` file (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGR
 - Keep migrations small and focused on a single change
 - Migrations must be idempotent (safe to run multiple times)
 
+## Idempotency is a CI gate
+
+Every statement must be a no-op when re-applied to an up-to-date database --
+a half-applied migration otherwise crash-loops the backend at startup. Two
+checks enforce it, and `docs/database-migrations.md` holds the guard recipes
+(`ADD CONSTRAINT` needs a preceding `DROP CONSTRAINT IF EXISTS`, `CREATE
+TRIGGER` a `DROP TRIGGER IF EXISTS` or a `pg_trigger` `DO` block, `INSERT` an
+`ON CONFLICT`, ...) plus the recovery runbook for a failed migration:
+
+- `cd backend && npm run migration:lint` -- static guard check, run in the
+  "Backend Lint & Type Check" job (`backend/scripts/migration-lint.mjs`).
+- `scripts/verify-schema.sh` -- applies every migration on top of `schema.sql`
+  **twice** and diffs the result, run in the "Schema vs Migrations Drift" job.
+
 ## Tables
 
 `schema.sql` is the authoritative source. Use it (or the TypeORM entities under `backend/src/*/entities/`) to look up table and column definitions rather than maintaining a duplicate list here.

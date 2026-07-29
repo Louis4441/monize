@@ -1,6 +1,7 @@
-import { ScheduledTransaction, FrequencyType } from '@/types/scheduled-transaction';
+import { ScheduledTransaction } from '@/types/scheduled-transaction';
 import { Account } from '@/types/account';
 import { parseLocalDate } from '@/lib/utils';
+import { advanceByFrequency } from '@/lib/frequency';
 
 export interface FutureTransaction {
   id: string;
@@ -59,47 +60,6 @@ function formatDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-/**
- * Add interval to a date based on frequency, returning a new Date object.
- */
-function addFrequencyInterval(date: Date, frequency: FrequencyType): Date {
-  const newDate = new Date(date.getTime());
-  switch (frequency) {
-    case 'DAILY':
-      newDate.setDate(newDate.getDate() + 1);
-      break;
-    case 'WEEKLY':
-      newDate.setDate(newDate.getDate() + 7);
-      break;
-    case 'BIWEEKLY':
-      newDate.setDate(newDate.getDate() + 14);
-      break;
-    case 'EVERY4WEEKS':
-      newDate.setDate(newDate.getDate() + 28);
-      break;
-    case 'SEMIMONTHLY':
-      // Twice a month: 15th and last day of month
-      if (newDate.getDate() <= 15) {
-        // Go to end of current month
-        newDate.setMonth(newDate.getMonth() + 1, 0); // Day 0 of next month = last day of current month
-      } else {
-        // Go to 15th of next month
-        newDate.setMonth(newDate.getMonth() + 1, 15);
-      }
-      break;
-    case 'MONTHLY':
-      newDate.setMonth(newDate.getMonth() + 1);
-      break;
-    case 'QUARTERLY':
-      newDate.setMonth(newDate.getMonth() + 3);
-      break;
-    case 'YEARLY':
-      newDate.setFullYear(newDate.getFullYear() + 1);
-      break;
-  }
-  return newDate;
 }
 
 /**
@@ -198,7 +158,7 @@ function generateOccurrences(
     }
 
     // Calculate next date based on frequency
-    currentDate = addFrequencyInterval(currentDate, transaction.frequency);
+    currentDate = advanceByFrequency(currentDate, transaction.frequency);
   }
 
   return occurrences;

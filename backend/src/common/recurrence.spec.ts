@@ -100,6 +100,81 @@ describe("calculateNextDueDate", () => {
     });
   });
 
+  describe("EVERY2MONTHS", () => {
+    it("advances 2 months", () => {
+      expect(calculateNextDueDate("2026-05-10", "EVERY2MONTHS")).toBe(
+        "2026-07-10",
+      );
+    });
+
+    it("clamps to the shorter target month", () => {
+      expect(calculateNextDueDate("2026-12-31", "EVERY2MONTHS")).toBe(
+        "2027-02-28",
+      );
+    });
+
+    it("clamps into a leap February", () => {
+      expect(calculateNextDueDate("2023-12-31", "EVERY2MONTHS")).toBe(
+        "2024-02-29",
+      );
+    });
+
+    it("crosses the year boundary", () => {
+      expect(calculateNextDueDate("2026-11-15", "EVERY2MONTHS")).toBe(
+        "2027-01-15",
+      );
+    });
+
+    it("is not every two weeks (the PR #192 mis-mapping)", () => {
+      expect(calculateNextDueDate("2026-05-10", "EVERY2MONTHS")).not.toBe(
+        calculateNextDueDate("2026-05-10", "BIWEEKLY"),
+      );
+    });
+
+    it("lands on the same day six steps later, a year on", () => {
+      let d = "2026-01-15";
+      for (let i = 0; i < 6; i++) d = calculateNextDueDate(d, "EVERY2MONTHS");
+      expect(d).toBe("2027-01-15");
+    });
+  });
+
+  describe("SEMIANNUAL", () => {
+    it("advances 6 months", () => {
+      expect(calculateNextDueDate("2026-05-10", "SEMIANNUAL")).toBe(
+        "2026-11-10",
+      );
+    });
+
+    it("crosses the year boundary", () => {
+      expect(calculateNextDueDate("2026-11-10", "SEMIANNUAL")).toBe(
+        "2027-05-10",
+      );
+    });
+
+    it("clamps Aug 31 to the end of February", () => {
+      expect(calculateNextDueDate("2026-08-31", "SEMIANNUAL")).toBe(
+        "2027-02-28",
+      );
+    });
+
+    it("clamps Aug 31 into a leap February", () => {
+      expect(calculateNextDueDate("2023-08-31", "SEMIANNUAL")).toBe(
+        "2024-02-29",
+      );
+    });
+
+    it("is not yearly (the PR #192 mis-mapping)", () => {
+      expect(calculateNextDueDate("2026-05-10", "SEMIANNUAL")).not.toBe(
+        calculateNextDueDate("2026-05-10", "YEARLY"),
+      );
+    });
+
+    it("lands on the same day two steps later, a year on", () => {
+      const first = calculateNextDueDate("2026-03-31", "SEMIANNUAL");
+      expect(calculateNextDueDate(first, "SEMIANNUAL")).toBe("2027-03-30");
+    });
+  });
+
   it("throws on invalid date string", () => {
     expect(() => calculateNextDueDate("not-a-date", "DAILY")).toThrow();
   });

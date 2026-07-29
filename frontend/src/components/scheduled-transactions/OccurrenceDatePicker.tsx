@@ -6,6 +6,7 @@ import { ScheduledTransaction, ScheduledTransactionOverride, FrequencyType } fro
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { parseLocalDate } from '@/lib/utils';
+import { advanceByFrequency, isOneTime } from '@/lib/frequency';
 import { Modal } from '@/components/ui/Modal';
 
 interface OccurrenceDatePickerProps {
@@ -27,44 +28,9 @@ function calculateNextDates(startDate: string, frequency: FrequencyType, count: 
     const day = String(currentDate.getDate()).padStart(2, '0');
     dates.push(`${year}-${month}-${day}`);
 
-    // Calculate next date based on frequency
-    switch (frequency) {
-      case 'DAILY':
-        currentDate.setDate(currentDate.getDate() + 1);
-        break;
-      case 'WEEKLY':
-        currentDate.setDate(currentDate.getDate() + 7);
-        break;
-      case 'BIWEEKLY':
-        currentDate.setDate(currentDate.getDate() + 14);
-        break;
-      case 'EVERY4WEEKS':
-        currentDate.setDate(currentDate.getDate() + 28);
-        break;
-      case 'SEMIMONTHLY':
-        // Twice a month: 15th and last day of month
-        if (currentDate.getDate() <= 15) {
-          // Go to end of current month
-          currentDate.setMonth(currentDate.getMonth() + 1, 0); // Day 0 of next month = last day of current month
-        } else {
-          // Go to 15th of next month
-          currentDate.setMonth(currentDate.getMonth() + 1, 15);
-        }
-        break;
-      case 'MONTHLY':
-        currentDate.setMonth(currentDate.getMonth() + 1);
-        break;
-      case 'QUARTERLY':
-        currentDate.setMonth(currentDate.getMonth() + 3);
-        break;
-      case 'YEARLY':
-        currentDate.setFullYear(currentDate.getFullYear() + 1);
-        break;
-      case 'ONCE':
-      default:
-        // For one-time, just return the single date
-        return dates;
-    }
+    // One-time schedules have no next occurrence.
+    if (isOneTime(frequency)) return dates;
+    currentDate = advanceByFrequency(currentDate, frequency);
   }
 
   return dates;
