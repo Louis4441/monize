@@ -50,6 +50,32 @@ Every user-facing string must be internationalized -- no hardcoded literals in t
 - No `console.log` in production code; use NestJS `Logger` class
 - Use proxy, not middleware (middleware is deprecated in this project)
 
+### Follow the existing pattern, and pin it down when you miss it
+
+Before writing a UI control, a data access path, or anything a user interacts
+with, find how the codebase already does that thing and do it the same way. This
+project has one way to make a table row clickable, one date input, one money
+formatter, one door to the database. Reaching for the generic solution -- a raw
+`<input type="date">`, a hand-rolled dropdown, a fresh `overflow-y-auto` -- when
+one already exists produces code that looks fine in isolation and wrong in place.
+
+**When a human points out a defect in code an AI wrote, that is a missing rule,
+not just a bug.** Fixing it is half the work. Also:
+
+1. Find how the codebase already solves that problem, and switch to it -- there
+   is usually an existing helper or hook, and not using it was the actual mistake.
+2. Add a regression test that fails on the original mistake, not merely one that
+   covers the fix. Where the mistake is mechanical (a raw element instead of the
+   shared component), prefer a guard test that scans the source and fails for
+   *any* occurrence, so the next instance is caught wherever it appears --
+   `frontend/src/test/ui-conventions.test.ts` and
+   `frontend/src/lib/tours/anchors.uniqueness.test.ts` are the pattern.
+3. Write the rule down here or in the layer's `CLAUDE.md`, in one or two
+   sentences, naming the thing to use and the thing not to.
+
+The point is that the next agent inherits the correction. A fix that lives only
+in one file will be re-broken in the next one.
+
 ### Code Intelligence
 Prefer LSP over Grep/Read for code navigation — it's faster, precise, and avoids reading entire files:
 - `workspaceSymbol` to find where something is defined
