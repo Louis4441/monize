@@ -322,6 +322,7 @@ function SecurityDetailContent() {
                     ? { price: quote.price, priceDate: quote.priceDate }
                     : null
                 }
+                prices={priceSeries}
               />
               <SecurityBreakdownCard security={security} />
             </div>

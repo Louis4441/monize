@@ -178,6 +178,7 @@ describe('SecurityDetailPage', () => {
         highPrice: null,
         lowPrice: null,
         closePrice: 150,
+        adjustedClose: 150,
         volume: null,
         source: 'yahoo_finance',
         createdAt: '2026-07-28T00:00:00.000Z',
@@ -190,6 +191,7 @@ describe('SecurityDetailPage', () => {
         highPrice: null,
         lowPrice: null,
         closePrice: 145,
+        adjustedClose: 145,
         volume: null,
         source: 'yahoo_finance',
         createdAt: '2026-07-27T00:00:00.000Z',
@@ -418,6 +420,77 @@ describe('SecurityDetailPage', () => {
         screen.getByRole('heading', { name: 'Key information' }),
       ).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Performance' })).toBeNull();
+    });
+  });
+
+  describe('distributions', () => {
+    it('reports an accumulating fund when the two price series agree', async () => {
+      // A year of history, so the periods have a baseline and the card is not
+      // empty -- the caption only appears when there are returns to caption.
+      mockGetSecurityPrices.mockResolvedValue([
+        {
+          id: 2, securityId: 'sec-1', priceDate: '2026-07-28',
+          openPrice: null, highPrice: null, lowPrice: null,
+          closePrice: 150, adjustedClose: 150, volume: null,
+          source: 'yahoo_finance', createdAt: '2026-07-28T00:00:00.000Z',
+        },
+        {
+          id: 1, securityId: 'sec-1', priceDate: '2025-07-27',
+          openPrice: null, highPrice: null, lowPrice: null,
+          closePrice: 100, adjustedClose: 100, volume: null,
+          source: 'yahoo_finance', createdAt: '2025-07-27T00:00:00.000Z',
+        },
+      ]);
+      await renderPage();
+
+      // Nothing was ever paid out, so the adjusted close never parts from the
+      // quoted one.
+      expect(screen.getByText('None (accumulating)')).toBeInTheDocument();
+      expect(screen.getByText('Includes dividends')).toBeInTheDocument();
+    });
+
+    it('reports a distributing fund once the series part', async () => {
+      mockGetSecurityPrices.mockResolvedValue([
+        {
+          id: 2, securityId: 'sec-1', priceDate: '2026-07-28',
+          openPrice: null, highPrice: null, lowPrice: null,
+          closePrice: 150, adjustedClose: 150, volume: null,
+          source: 'yahoo_finance', createdAt: '2026-07-28T00:00:00.000Z',
+        },
+        {
+          id: 1, securityId: 'sec-1', priceDate: '2025-07-27',
+          openPrice: null, highPrice: null, lowPrice: null,
+          closePrice: 100, adjustedClose: 96, volume: null,
+          source: 'yahoo_finance', createdAt: '2025-07-27T00:00:00.000Z',
+        },
+      ]);
+      await renderPage();
+      expect(screen.getByText('Paid (observed)')).toBeInTheDocument();
+    });
+
+    it('says nothing, and warns, when the provider gives no adjusted series', async () => {
+      mockGetSecurityPrices.mockResolvedValue([
+        {
+          id: 2, securityId: 'sec-1', priceDate: '2026-07-28',
+          openPrice: null, highPrice: null, lowPrice: null,
+          closePrice: 150, adjustedClose: null, volume: null,
+          source: 'msn_finance', createdAt: '2026-07-28T00:00:00.000Z',
+        },
+        {
+          id: 1, securityId: 'sec-1', priceDate: '2025-07-27',
+          openPrice: null, highPrice: null, lowPrice: null,
+          closePrice: 100, adjustedClose: null, volume: null,
+          source: 'msn_finance', createdAt: '2025-07-27T00:00:00.000Z',
+        },
+      ]);
+      await renderPage();
+
+      // No basis to claim either way, so the row is absent...
+      expect(screen.queryByText('Distributions')).toBeNull();
+      // ...but the returns on screen are measured on price alone, and that is
+      // not left to be discovered.
+      expect(screen.getByText('Excludes dividends')).toBeInTheDocument();
+      expect(screen.queryByText('Includes dividends')).toBeNull();
     });
   });
 

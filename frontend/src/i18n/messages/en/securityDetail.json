@@ -58,6 +58,10 @@
     "title": "Key information",
     "symbol": "Symbol",
     "securityType": "Security type",
+    "distributions": "Distributions",
+    "distributing": "Paid (observed)",
+    "accumulating": "None (accumulating)",
+    "distributionsTitle": "Read from the price history: the adjusted close parts from the quoted close whenever a distribution is paid. Observed from data, not declared by the issuer.",
     "exchange": "Exchange",
     "currency": "Currency",
     "sector": "Sector",
@@ -93,7 +97,10 @@
       "1y": "1Y",
       "3y": "3Y",
       "5y": "5Y"
-    }
+    },
+    "includesDividends": "Includes dividends",
+    "excludesDividends": "Excludes dividends",
+    "excludesDividendsTitle": "This provider supplies no adjusted-close series, so these returns are measured on price alone. For a fund that pays out, they understate the return by its yield."
   },
   "positionInfo": {
     "title": "Position info",

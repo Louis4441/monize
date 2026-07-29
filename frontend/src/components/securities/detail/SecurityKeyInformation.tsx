@@ -5,12 +5,18 @@ import { KeyValueList, type KeyValueRow } from '@/components/ui/KeyValueList';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { usePreferencesStore } from '@/store/preferencesStore';
+import {
+  inferDistributionPolicy,
+  type SecurityPricePoint,
+} from '@/lib/security-detail';
 import type { Security } from '@/types/investment';
 
 interface SecurityKeyInformationProps {
   security: Security;
   /** Latest close price and the day it is from; null when none is recorded. */
   latestPrice: { price: number; priceDate: string } | null;
+  /** Full price history, for reading the distribution behaviour off it. */
+  prices: readonly SecurityPricePoint[];
 }
 
 /**
@@ -24,6 +30,7 @@ interface SecurityKeyInformationProps {
 export function SecurityKeyInformation({
   security,
   latestPrice,
+  prices,
 }: SecurityKeyInformationProps) {
   const t = useTranslations('securityDetail');
   const ts = useTranslations('securities');
@@ -33,6 +40,11 @@ export function SecurityKeyInformation({
   // effective provider is the answer here -- never a blank row.
   const defaultQuoteProvider =
     usePreferencesStore((s) => s.preferences?.defaultQuoteProvider) ?? 'yahoo';
+
+  // Whether the fund pays out is not a field anyone stores -- it is read off the
+  // price history, where the adjusted close parts from the quoted one on every
+  // distribution. `unknown` drops the row rather than guessing.
+  const policy = inferDistributionPolicy(prices);
 
   const rows: KeyValueRow[] = [
     { key: 'symbol', label: t('keyInfo.symbol'), value: security.symbol },
@@ -45,6 +57,18 @@ export function SecurityKeyInformation({
       value: security.securityType
         ? ts(`typeLabels.${security.securityType}` as Parameters<typeof ts>[0])
         : null,
+    },
+    {
+      key: 'distributions',
+      label: t('keyInfo.distributions'),
+      value:
+        policy === 'unknown' ? null : (
+          <span title={t('keyInfo.distributionsTitle')}>
+            {policy === 'distributing'
+              ? t('keyInfo.distributing')
+              : t('keyInfo.accumulating')}
+          </span>
+        ),
     },
     { key: 'exchange', label: t('keyInfo.exchange'), value: security.exchange },
     {

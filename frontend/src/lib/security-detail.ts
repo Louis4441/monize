@@ -109,6 +109,52 @@ export function buildQuantitySteps(
 }
 
 /**
+ * What the price data says about whether the instrument pays out.
+ *
+ * - `distributing` -- the adjusted series diverges from the quoted close, which
+ *   happens when a distribution is paid.
+ * - `accumulating` -- both series exist and agree throughout, so nothing was ever
+ *   paid out. (A share class that simply never declared a dividend looks the
+ *   same, which is why the UI words this as observed rather than declared.)
+ * - `unknown` -- no adjusted series to compare against, so there is nothing to
+ *   conclude. MSN supplies none.
+ */
+export type DistributionPolicy = 'distributing' | 'accumulating' | 'unknown';
+
+/**
+ * Relative gap between the two series big enough to mean a real distribution
+ * rather than rounding at the provider's 6dp.
+ */
+const DISTRIBUTION_EPSILON = 0.0005;
+
+/**
+ * Read the distribution behaviour off the price history.
+ *
+ * Yahoo's quoted close is adjusted for splits; its adjusted close is adjusted for
+ * splits *and* dividends. So the two agreeing across the whole series means
+ * nothing was ever distributed, and a gap means something was. This is an
+ * inference from data rather than a field an issuer told us, and the wording
+ * around it has to say so.
+ */
+export function inferDistributionPolicy(
+  series: readonly SecurityPricePoint[],
+): DistributionPolicy {
+  const comparable = series.filter(
+    (point) => point.totalReturnClose !== undefined && point.close > 0,
+  );
+  // Nothing to compare, or only the newest point (where the two always agree,
+  // because no distribution has happened since).
+  if (comparable.length < 2) return 'unknown';
+
+  const diverges = comparable.some(
+    (point) =>
+      Math.abs((point.totalReturnClose as number) - point.close) / point.close >
+      DISTRIBUTION_EPSILON,
+  );
+  return diverges ? 'distributing' : 'accumulating';
+}
+
+/**
  * Shares held on `date`: the most recent step at or before it, or zero for a
  * date before the first trade.
  */

@@ -8,6 +8,7 @@ import {
   PERFORMANCE_PERIODS,
   computePeriodReturn,
   periodStartDate,
+  inferDistributionPolicy,
   type SecurityPricePoint,
 } from '@/lib/security-detail';
 
@@ -22,6 +23,11 @@ interface SecurityPerformanceCardProps {
  * A period the history does not cover reads "n/a" rather than 0%: a security
  * listed two years ago has no five-year return, and a zero there would be a
  * statement about its performance instead of about our data.
+ *
+ * The caption says whether dividends are in these figures. They are whenever the
+ * provider supplies an adjusted close; when it does not, the returns are measured
+ * on price alone and a fund that pays out looks worse than it was by its whole
+ * yield -- which is worth saying out loud rather than leaving to be discovered.
  */
 export function SecurityPerformanceCard({
   prices,
@@ -39,6 +45,8 @@ export function SecurityPerformanceCard({
   );
 
   const hasAny = returns.some((entry) => entry.value !== null);
+  // `unknown` means no adjusted series exists, so these returns exclude dividends.
+  const includesDividends = inferDistributionPolicy(prices) !== 'unknown';
 
   return (
     <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
@@ -71,6 +79,19 @@ export function SecurityPerformanceCard({
           {t('performance.empty')}
         </p>
       )}
+      {hasAny &&
+        (includesDividends ? (
+          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            {t('performance.includesDividends')}
+          </p>
+        ) : (
+          <p
+            className="mt-3 text-xs text-amber-600 dark:text-amber-500"
+            title={t('performance.excludesDividendsTitle')}
+          >
+            {t('performance.excludesDividends')}
+          </p>
+        ))}
     </div>
   );
 }

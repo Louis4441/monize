@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  inferDistributionPolicy,
   totalReturnOf,
   toPriceSeries,
   buildQuantitySteps,
@@ -107,6 +108,72 @@ describe('toPriceSeries', () => {
       { ...price('2026-01-02', 0), closePrice: NaN },
     ]);
     expect(series).toHaveLength(1);
+  });
+});
+
+describe('inferDistributionPolicy', () => {
+  it('calls a fund accumulating when the two series never part', () => {
+    // Yahoo's close is split-adjusted and its adjusted close is split- and
+    // dividend-adjusted, so agreement throughout means nothing was paid out.
+    expect(
+      inferDistributionPolicy([
+        { date: '2024-01-01', close: 100, totalReturnClose: 100 },
+        { date: '2025-01-01', close: 120, totalReturnClose: 120 },
+      ]),
+    ).toBe('accumulating');
+  });
+
+  it('calls a fund distributing once the series diverge', () => {
+    expect(
+      inferDistributionPolicy([
+        { date: '2024-01-01', close: 100, totalReturnClose: 97 },
+        { date: '2025-01-01', close: 120, totalReturnClose: 120 },
+      ]),
+    ).toBe('distributing');
+  });
+
+  it('ignores a gap that is only provider rounding', () => {
+    // Six decimal places of storage can leave a hair of difference; that is not
+    // a dividend.
+    expect(
+      inferDistributionPolicy([
+        { date: '2024-01-01', close: 100, totalReturnClose: 100.00002 },
+        { date: '2025-01-01', close: 120, totalReturnClose: 120.00001 },
+      ]),
+    ).toBe('accumulating');
+  });
+
+  it('concludes nothing without an adjusted series', () => {
+    // MSN supplies none, so there is nothing to compare and nothing to say.
+    expect(
+      inferDistributionPolicy([
+        { date: '2024-01-01', close: 100 },
+        { date: '2025-01-01', close: 120 },
+      ]),
+    ).toBe('unknown');
+  });
+
+  it('concludes nothing from a single comparable point', () => {
+    // The two series always agree on the newest point, because no distribution
+    // has happened since it.
+    expect(
+      inferDistributionPolicy([
+        { date: '2025-01-01', close: 120, totalReturnClose: 120 },
+      ]),
+    ).toBe('unknown');
+  });
+
+  it('concludes nothing from an empty history', () => {
+    expect(inferDistributionPolicy([])).toBe('unknown');
+  });
+
+  it('ignores points with no usable close', () => {
+    expect(
+      inferDistributionPolicy([
+        { date: '2024-01-01', close: 0, totalReturnClose: 5 },
+        { date: '2025-01-01', close: 120, totalReturnClose: 120 },
+      ]),
+    ).toBe('unknown');
   });
 });
 
