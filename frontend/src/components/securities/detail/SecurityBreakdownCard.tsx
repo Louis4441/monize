@@ -37,6 +37,11 @@ function slicesFor(security: Security, dimension: Dimension) {
  * side (or stacked) they would make the column beside the price chart several
  * times its height.
  *
+ * The card fills the height its column gives it and its panel area scrolls, so
+ * the card ends level with the chart beside it and switching tabs cannot change
+ * where it ends. A card that resized itself as the reader moved between sector,
+ * country and asset class made the whole row jump.
+ *
  * Sector comes from the quote provider; country and asset class are the user's
  * own, entered when editing the security. Each is `{ name, weight }` with weight
  * a decimal 0-1, so one set of bars renders all three.
@@ -48,8 +53,8 @@ export function SecurityBreakdownCard({ security }: SecurityBreakdownCardProps) 
   const slices = slicesFor(security, dimension);
 
   return (
-    <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
-      <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
+    <div className="flex min-h-0 flex-1 flex-col rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
+      <h3 className="mb-3 shrink-0 text-lg font-semibold text-gray-900 dark:text-gray-100">
         {t('weightings.title')}
       </h3>
 
@@ -62,6 +67,7 @@ export function SecurityBreakdownCard({ security }: SecurityBreakdownCardProps) 
         onChange={setDimension}
         idPrefix="securityBreakdown"
         ariaLabel={t('weightings.ariaLabel')}
+        className="shrink-0"
       />
 
       {DIMENSIONS.map((key) => (
@@ -70,7 +76,7 @@ export function SecurityBreakdownCard({ security }: SecurityBreakdownCardProps) 
           idPrefix="securityBreakdown"
           tabKey={key}
           isActive={dimension === key}
-          className="mt-3"
+          className="mt-3 flex min-h-0 flex-1 flex-col"
         >
           <SecurityWeightingBars
             slices={key === dimension ? slices : undefined}

@@ -29,14 +29,22 @@ interface SecurityWeightingBarsProps {
  * but a colourblindness problem. Each share is labelled directly, so the bar is
  * a second reading of the number rather than the only one.
  *
+ * Bars are drawn against 100%, so a 32% share fills a third of its track and the
+ * empty remainder is part of the reading. They were briefly scaled against the
+ * largest share instead, which drew the biggest sector full width whatever its
+ * size -- a bar claiming everything beside a label saying 32% contradicts the
+ * number it is supposed to restate, and that is worse than the sliver bars the
+ * relative scaling was avoiding.
+ *
  * Renders its empty state, not empty bars, when the data is absent. A security
  * with no sector data is not a security with zero-length bars.
  *
- * A long breakdown scrolls inside a fixed height rather than growing the card or
- * hiding rows behind a button. The card sits beside the price chart, so its
- * height has to be the same whether a fund reports three sectors or eleven --
- * an expander left a gap under the chart, and cutting the list needed a click to
- * answer a question the bars exist to answer at a glance. The scrollbar is
+ * A long breakdown scrolls inside whatever height its parent gives it, rather
+ * than growing the card or hiding rows behind a button. The card sits beside the
+ * price chart and ends level with it, so its height cannot depend on whether a
+ * fund reports three sectors or eleven -- nor on which tab is open. An expander
+ * left a gap under the chart, and cutting the list needed a click to answer a
+ * question the bars exist to answer at a glance. The scrollbar is
  * `scrollbar-slim`: the native one is a wide arrowed control drawn against the
  * figures, which is what made this look broken the first time round.
  */
@@ -62,10 +70,6 @@ export function SecurityWeightingBars({
   const showRemainder =
     !!remainderLabel && rows.length > 0 && remainder > 0.005;
 
-  // Bars are scaled against the largest share, not against 100%: a fund whose
-  // biggest sector is 22% would otherwise draw every bar as a sliver.
-  const scale = rows.length > 0 ? rows[0].weight : 1;
-
   if (rows.length === 0) {
     return (
       <p className="text-sm text-gray-500 dark:text-gray-400">{emptyMessage}</p>
@@ -73,11 +77,13 @@ export function SecurityWeightingBars({
   }
 
   return (
-    <>
-      {/* Fixed height, so the card is the same size for three sectors as for
-          eleven and the column beside the chart stays put. `pr-1` keeps the
-          percentages off the thumb. */}
-      <ul className="scrollbar-slim max-h-56 space-y-2 overflow-y-auto pr-1">
+    // A column, so the list can take the leftover height and the remainder note
+    // stays pinned under it.
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Takes the height it is given and scrolls inside it, so the card is the
+          same size for three sectors as for eleven. `pr-1` keeps the percentages
+          off the thumb. */}
+      <ul className="scrollbar-slim min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {rows.map((row) => {
           const percent = formatPercent(row.weight * 100);
           return (
@@ -100,7 +106,10 @@ export function SecurityWeightingBars({
                 <div
                   className="h-full rounded-full"
                   style={{
-                    width: `${Math.max((row.weight / scale) * 100, 2)}%`,
+                    // Against the whole, not against the largest slice. The
+                    // floor is only so a rounding-error share still draws
+                    // something; its number is printed beside it either way.
+                    width: `${Math.max(row.weight * 100, 0.5)}%`,
                     backgroundColor: chartColors.primary,
                   }}
                 />
@@ -114,6 +123,6 @@ export function SecurityWeightingBars({
           {remainderLabel(formatPercent(remainder * 100))}
         </p>
       )}
-    </>
+    </div>
   );
 }

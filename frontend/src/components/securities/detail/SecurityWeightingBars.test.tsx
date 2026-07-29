@@ -42,11 +42,15 @@ describe('SecurityWeightingBars', () => {
       expect(screen.queryByRole('button', { name: /Show/ })).toBeNull();
     });
 
-    it('bounds the list and scrolls it, rather than growing the card', () => {
+    it('scrolls inside the height it is given, rather than growing the card', () => {
+      // The height comes from the column now, not from a max-height here: the
+      // card ends level with the chart beside it, so its size must not depend on
+      // the contents -- nor on which breakdown tab is open.
       const { container } = renderCard(MANY);
       const list = container.querySelector('ul')!;
       expect(list.className).toContain('overflow-y-auto');
-      expect(list.className).toMatch(/max-h-/);
+      expect(list.className).toContain('flex-1');
+      expect(list.className).toContain('min-h-0');
     });
 
     it('uses the slim scrollbar, not the native one', () => {
@@ -62,11 +66,24 @@ describe('SecurityWeightingBars', () => {
       );
     });
 
-    it('scales every bar against the largest share', () => {
-      const { container } = renderCard(MANY);
-      // The biggest fills the track; nothing rescales, because nothing is
-      // hidden and then revealed.
-      expect(bars(container)[0].style.width).toBe('100%');
+    it('draws each bar against the whole, not against the largest share', () => {
+      const { container } = renderCard([
+        { name: 'Technology', weight: 0.32 },
+        { name: 'Financials', weight: 0.16 },
+      ]);
+      // A 32% share fills a third of its track. Scaling against the largest
+      // slice drew this one full width, which contradicted the 32% printed
+      // beside it -- a bar that restates a number has to restate that number.
+      expect(bars(container)[0].style.width).toBe('32%');
+      expect(bars(container)[1].style.width).toBe('16%');
+    });
+
+    it('still draws something for a share that rounds to nothing', () => {
+      const { container } = renderCard([
+        { name: 'Big', weight: 0.99 },
+        { name: 'Trace', weight: 0.0001 },
+      ]);
+      expect(bars(container)[1].style.width).toBe('0.5%');
     });
   });
 
@@ -100,26 +117,6 @@ describe('SecurityWeightingBars', () => {
     expect(
       screen.getByRole('img', { name: 'Technology: 32.40%' }),
     ).toBeInTheDocument();
-  });
-
-  it('scales the bars against the largest share, not against 100%', () => {
-    const { container } = renderCard([
-      { name: 'Biggest', weight: 0.22 },
-      { name: 'Half of it', weight: 0.11 },
-    ]);
-
-    const [first, second] = bars(container);
-    // A fund whose top sector is 22% would otherwise draw every bar as a sliver.
-    expect(first.style.width).toBe('100%');
-    expect(second.style.width).toBe('50%');
-  });
-
-  it('keeps a tiny share visible rather than drawing nothing', () => {
-    const { container } = renderCard([
-      { name: 'Huge', weight: 0.9 },
-      { name: 'Sliver', weight: 0.0001 },
-    ]);
-    expect(bars(container)[1].style.width).toBe('2%');
   });
 
   describe('missing data', () => {

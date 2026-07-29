@@ -312,7 +312,7 @@ function SecurityDetailContent() {
               column has the room, and the breakdown's bars are capped and
               scrollable so an eleven-sector fund cannot outgrow it.
               `items-start` keeps the cards at their content height. */}
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+          <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <SecurityChartSection
                 security={security}
@@ -324,7 +324,10 @@ function SecurityDetailContent() {
                 onModeChange={setChartMode}
               />
             </div>
-            <div className="space-y-6">
+            {/* A column the height of the chart: Key information takes what it
+                needs and Breakdown fills the rest, so the two end level with the
+                chart rather than stopping short of it. */}
+            <div className="flex min-h-0 flex-col gap-6">
               <SecurityKeyInformation
                 security={security}
                 latestPrice={
