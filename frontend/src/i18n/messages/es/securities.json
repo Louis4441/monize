@@ -78,8 +78,6 @@
       "source": "Fuente del precio más reciente"
     },
     "actions": {
-      "history": "Historial",
-      "prices": "Precios",
       "edit": "Editar",
       "deactivate": "Desactivar",
       "activate": "Activar",
@@ -94,8 +92,6 @@
       "subtitle": "Comienza agregando tu primer valor."
     },
     "contextMenu": {
-      "transactionHistory": "Historial de transacciones",
-      "viewPrices": "Ver precios",
       "editSecurity": "Editar valor",
       "deactivate": "Desactivar",
       "activate": "Activar",
@@ -222,7 +218,6 @@
       "sold": "Venta {quantity} · {account}"
     },
     "empty": "No hay historial de precios disponible",
-    "showingCount": "Mostrando {shown} de {total} precios",
     "columns": {
       "date": "Fecha",
       "close": "Cierre",
@@ -231,7 +226,9 @@
       "low": "Mínimo",
       "volume": "Volumen",
       "source": "Fuente",
-      "actions": "Acciones"
+      "actions": "Acciones",
+      "adjustedClose": "Cierre aj.",
+      "adjustedCloseTitle": "Cierre ajustado por splits y dividendos (rentabilidad total). Vacío cuando el proveedor de precios no lo facilita."
     },
     "toasts": {
       "added": "Precio agregado",
@@ -251,7 +248,10 @@
       "title": "Eliminar precio",
       "message": "¿Eliminar la entrada de precio del {date}?",
       "confirmLabel": "Eliminar"
-    }
+    },
+    "collapseAll": "Contraer todo",
+    "expandAll": "Expandir todo",
+    "groupCount": "{count} precio(s)"
   },
   "transactionHistory": {
     "inactiveBadge": "Inactivo",

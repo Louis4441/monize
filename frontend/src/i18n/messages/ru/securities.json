@@ -78,8 +78,6 @@
       "source": "Источник последней цены"
     },
     "actions": {
-      "history": "История",
-      "prices": "Цены",
       "edit": "Изменить",
       "deactivate": "Деактивировать",
       "activate": "Активировать",
@@ -94,8 +92,6 @@
       "subtitle": "Начните с добавления вашей первой ценной бумаги."
     },
     "contextMenu": {
-      "transactionHistory": "История проводок",
-      "viewPrices": "Просмотр цен",
       "editSecurity": "Редактировать ценную бумагу",
       "deactivate": "Деактивировать",
       "activate": "Активировать",
@@ -222,7 +218,6 @@
       "sold": "Продажа {quantity} · {account}"
     },
     "empty": "История цен недоступна",
-    "showingCount": "Показано {shown} из {total} цен",
     "columns": {
       "date": "Дата",
       "close": "Закрытие",
@@ -231,7 +226,9 @@
       "low": "Минимум",
       "volume": "Объём",
       "source": "Источник",
-      "actions": "Действия"
+      "actions": "Действия",
+      "adjustedClose": "Скоррект. закрытие",
+      "adjustedCloseTitle": "Закрытие, скорректированное на сплиты и дивиденды (полная доходность). Пусто, когда поставщик цен его не даёт."
     },
     "toasts": {
       "added": "Цена добавлена",
@@ -251,7 +248,10 @@
       "title": "Удалить цену",
       "message": "Удалить запись цены за {date}?",
       "confirmLabel": "Удалить"
-    }
+    },
+    "collapseAll": "Свернуть всё",
+    "expandAll": "Развернуть всё",
+    "groupCount": "цен: {count}"
   },
   "transactionHistory": {
     "inactiveBadge": "Неактивная",

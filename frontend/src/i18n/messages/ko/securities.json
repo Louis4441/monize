@@ -78,8 +78,6 @@
       "source": "가장 최근 가격의 출처"
     },
     "actions": {
-      "history": "이력",
-      "prices": "가격",
       "edit": "편집",
       "deactivate": "비활성화",
       "activate": "활성화",
@@ -94,8 +92,6 @@
       "subtitle": "첫 번째 유가증권을 추가하여 시작하세요."
     },
     "contextMenu": {
-      "transactionHistory": "거래 이력",
-      "viewPrices": "가격 보기",
       "editSecurity": "유가증권 편집",
       "deactivate": "비활성화",
       "activate": "활성화",
@@ -222,7 +218,6 @@
       "sold": "매도 {quantity} · {account}"
     },
     "empty": "사용 가능한 가격 이력이 없습니다",
-    "showingCount": "{total}개의 가격 중 {shown}개 표시",
     "columns": {
       "date": "날짜",
       "close": "종가",
@@ -231,7 +226,9 @@
       "low": "저가",
       "volume": "거래량",
       "source": "출처",
-      "actions": "작업"
+      "actions": "작업",
+      "adjustedClose": "수정 종가",
+      "adjustedCloseTitle": "액면분할과 배당을 반영한 수정 종가(총수익). 가격 제공처가 주지 않으면 비어 있습니다."
     },
     "toasts": {
       "added": "가격이 추가되었습니다",
@@ -251,7 +248,10 @@
       "title": "가격 삭제",
       "message": "{date}의 가격 항목을 삭제하시겠습니까?",
       "confirmLabel": "삭제"
-    }
+    },
+    "collapseAll": "모두 접기",
+    "expandAll": "모두 펼치기",
+    "groupCount": "가격 {count}건"
   },
   "transactionHistory": {
     "inactiveBadge": "비활성",

@@ -78,8 +78,6 @@
       "source": "Źródło ostatniej ceny"
     },
     "actions": {
-      "history": "Historia",
-      "prices": "Ceny",
       "edit": "Edytuj",
       "deactivate": "Dezaktywuj",
       "activate": "Aktywuj",
@@ -94,8 +92,6 @@
       "subtitle": "Zacznij od dodania pierwszego papieru wartościowego."
     },
     "contextMenu": {
-      "transactionHistory": "Historia transakcji",
-      "viewPrices": "Pokaż ceny",
       "editSecurity": "Edytuj papier wartościowy",
       "deactivate": "Dezaktywuj",
       "activate": "Aktywuj",
@@ -222,7 +218,6 @@
       "sold": "Sprzedaż {quantity} · {account}"
     },
     "empty": "Brak dostępnej historii cen",
-    "showingCount": "Wyświetlono {shown} z {total} cen",
     "columns": {
       "date": "Data",
       "close": "Zamknij",
@@ -231,7 +226,9 @@
       "low": "Niska",
       "volume": "Wolumen",
       "source": "Źródło",
-      "actions": "Akcje"
+      "actions": "Akcje",
+      "adjustedClose": "Kurs skoryg.",
+      "adjustedCloseTitle": "Kurs zamknięcia skorygowany o splity i dywidendy (całkowity zwrot). Puste, gdy dostawca cen go nie podaje."
     },
     "toasts": {
       "added": "Cena dodana",
@@ -251,7 +248,10 @@
       "title": "Usuń cenę",
       "message": "Usunąć wpis ceny z {date}?",
       "confirmLabel": "Usuń"
-    }
+    },
+    "collapseAll": "Zwiń wszystko",
+    "expandAll": "Rozwiń wszystko",
+    "groupCount": "ceny: {count}"
   },
   "transactionHistory": {
     "inactiveBadge": "Nieaktywny",

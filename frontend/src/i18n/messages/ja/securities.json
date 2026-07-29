@@ -78,8 +78,6 @@
       "source": "直近の株価のソース"
     },
     "actions": {
-      "history": "履歴",
-      "prices": "株価",
       "edit": "編集",
       "deactivate": "無効にする",
       "activate": "有効にする",
@@ -94,8 +92,6 @@
       "subtitle": "最初の有価証券を追加して始めましょう。"
     },
     "contextMenu": {
-      "transactionHistory": "取引履歴",
-      "viewPrices": "株価を表示",
       "editSecurity": "有価証券を編集",
       "deactivate": "無効にする",
       "activate": "有効にする",
@@ -222,7 +218,6 @@
       "sold": "売却 {quantity}・{account}"
     },
     "empty": "株価履歴がありません",
-    "showingCount": "{total} 件中 {shown} 件の株価を表示",
     "columns": {
       "date": "日付",
       "close": "終値",
@@ -231,7 +226,9 @@
       "low": "安値",
       "volume": "出来高",
       "source": "ソース",
-      "actions": "操作"
+      "actions": "操作",
+      "adjustedClose": "調整後終値",
+      "adjustedCloseTitle": "株式分割と配当を調整した終値（トータルリターン）。価格提供元が出さない場合は空欄になります。"
     },
     "toasts": {
       "added": "株価を追加しました",
@@ -251,7 +248,10 @@
       "title": "株価を削除",
       "message": "{date} の株価を削除しますか？",
       "confirmLabel": "削除"
-    }
+    },
+    "collapseAll": "すべて折りたたむ",
+    "expandAll": "すべて展開",
+    "groupCount": "価格 {count} 件"
   },
   "transactionHistory": {
     "inactiveBadge": "無効",

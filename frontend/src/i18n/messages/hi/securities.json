@@ -78,8 +78,6 @@
       "source": "सबसे हाल के मूल्य का स्रोत"
     },
     "actions": {
-      "history": "इतिहास",
-      "prices": "मूल्य",
       "edit": "संपादित करें",
       "deactivate": "निष्क्रिय करें",
       "activate": "सक्रिय करें",
@@ -94,8 +92,6 @@
       "subtitle": "अपनी पहली प्रतिभूति जोड़कर शुरू करें।"
     },
     "contextMenu": {
-      "transactionHistory": "लेन-देन इतिहास",
-      "viewPrices": "मूल्य देखें",
       "editSecurity": "प्रतिभूति संपादित करें",
       "deactivate": "निष्क्रिय करें",
       "activate": "सक्रिय करें",
@@ -222,7 +218,6 @@
       "sold": "बिक्री {quantity} · {account}"
     },
     "empty": "कोई मूल्य इतिहास उपलब्ध नहीं",
-    "showingCount": "{total} में से {shown} मूल्य दिखाए जा रहे हैं",
     "columns": {
       "date": "तिथि",
       "close": "बंद",
@@ -231,7 +226,9 @@
       "low": "निम्न",
       "volume": "वॉल्यूम",
       "source": "स्रोत",
-      "actions": "क्रियाएं"
+      "actions": "क्रियाएं",
+      "adjustedClose": "समायोजित बंद",
+      "adjustedCloseTitle": "स्प्लिट और लाभांश के लिए समायोजित बंद भाव (कुल प्रतिफल)। जब भाव प्रदाता इसे नहीं देता, तो खाली रहता है।"
     },
     "toasts": {
       "added": "मूल्य जोड़ा गया",
@@ -251,7 +248,10 @@
       "title": "मूल्य हटाएं",
       "message": "{date} के लिए मूल्य प्रविष्टि हटाएं?",
       "confirmLabel": "हटाएं"
-    }
+    },
+    "collapseAll": "सब समेटें",
+    "expandAll": "सब खोलें",
+    "groupCount": "{count} भाव"
   },
   "transactionHistory": {
     "inactiveBadge": "निष्क्रिय",

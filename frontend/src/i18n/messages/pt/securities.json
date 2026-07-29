@@ -78,8 +78,6 @@
       "source": "Fonte da cotação mais recente"
     },
     "actions": {
-      "history": "Histórico",
-      "prices": "Cotações",
       "edit": "Editar",
       "deactivate": "Desativar",
       "activate": "Ativar",
@@ -94,8 +92,6 @@
       "subtitle": "Comece por adicionar o seu primeiro título."
     },
     "contextMenu": {
-      "transactionHistory": "Histórico de Transações",
-      "viewPrices": "Ver Cotações",
       "editSecurity": "Editar Título",
       "deactivate": "Desativar",
       "activate": "Ativar",
@@ -222,7 +218,6 @@
       "sold": "Venda {quantity} · {account}"
     },
     "empty": "Sem histórico de cotações disponível",
-    "showingCount": "A mostrar {shown} de {total} cotações",
     "columns": {
       "date": "Data",
       "close": "Fecho",
@@ -231,7 +226,9 @@
       "low": "Mínimo",
       "volume": "Volume",
       "source": "Fonte",
-      "actions": "Ações"
+      "actions": "Ações",
+      "adjustedClose": "Fecho aj.",
+      "adjustedCloseTitle": "Fecho ajustado a desdobramentos e dividendos (rendibilidade total). Vazio quando o fornecedor de cotações não o disponibiliza."
     },
     "toasts": {
       "added": "Cotação adicionada",
@@ -251,7 +248,10 @@
       "title": "Eliminar Cotação",
       "message": "Eliminar a cotação de {date}?",
       "confirmLabel": "Eliminar"
-    }
+    },
+    "collapseAll": "Recolher tudo",
+    "expandAll": "Expandir tudo",
+    "groupCount": "{count} cotação(ões)"
   },
   "transactionHistory": {
     "inactiveBadge": "Inativo",

@@ -78,8 +78,6 @@
       "source": "Source du cours le plus récent"
     },
     "actions": {
-      "history": "Historique",
-      "prices": "Cours",
       "edit": "Modifier",
       "deactivate": "Désactiver",
       "activate": "Activer",
@@ -94,8 +92,6 @@
       "subtitle": "Commencez par ajouter votre premier titre."
     },
     "contextMenu": {
-      "transactionHistory": "Historique des transactions",
-      "viewPrices": "Voir les cours",
       "editSecurity": "Modifier le titre",
       "deactivate": "Désactiver",
       "activate": "Activer",
@@ -222,7 +218,6 @@
       "sold": "Vente {quantity} · {account}"
     },
     "empty": "Aucun historique des cours disponible",
-    "showingCount": "Affichage de {shown} cours sur {total}",
     "columns": {
       "date": "Date",
       "close": "Clôture",
@@ -231,7 +226,9 @@
       "low": "Bas",
       "volume": "Volume",
       "source": "Source",
-      "actions": "Actions"
+      "actions": "Actions",
+      "adjustedClose": "Clôture aj.",
+      "adjustedCloseTitle": "Cours de clôture ajusté des splits et des dividendes (rendement total). Vide lorsque le fournisseur de cours ne le donne pas."
     },
     "toasts": {
       "added": "Cours ajouté",
@@ -251,7 +248,10 @@
       "title": "Supprimer le cours",
       "message": "Supprimer le cours du {date} ?",
       "confirmLabel": "Supprimer"
-    }
+    },
+    "collapseAll": "Tout replier",
+    "expandAll": "Tout déplier",
+    "groupCount": "{count} cours"
   },
   "transactionHistory": {
     "inactiveBadge": "Inactif",
