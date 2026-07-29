@@ -85,6 +85,20 @@ export interface SecurityDetailActivity {
    */
   realizedGain: number | null;
   realizedGainCurrency: string | null;
+  /**
+   * Distinct account currencies the security was sold from, for naming them
+   * when the gains cannot be added up. Excludes sales from an account with no
+   * currency code, so read it together with `realizedSaleCount` rather than as
+   * a count of sales.
+   */
+  realizedGainCurrencies: string[];
+  /**
+   * How many sales the replay found. This is what tells the two reasons
+   * `realizedGain` is null apart: zero means the security was never sold, and
+   * anything else means the gains exist but span currencies. Without it the UI
+   * showed one blank row for both, which are very different statements.
+   */
+  realizedSaleCount: number;
   transactionCount: number;
 }
 
@@ -98,6 +112,13 @@ export interface SecurityDetail {
   /** True when the security was held and has since been sold down to nothing. */
   isPositionClosed: boolean;
 }
+
+/**
+ * Decimal places a per-unit price carries, matching the NUMERIC(24,10) columns
+ * prices are stored in (migration 116). Money totals round to 4; a price per
+ * unit must not, or a sub-cent instrument loses a percentage of its value.
+ */
+const UNIT_PRICE_DECIMALS = 10;
 
 /** One realized-gain entry, narrowed to the fields this service reads. */
 interface RealizedGainRow {
@@ -247,7 +268,9 @@ export class SecurityDetailService {
     // A row the portfolio could not cost or price (a holding in a closed
     // account, or a dust residual it filtered out) makes every total a partial
     // one, and a partial total reads as a real value. Report nothing instead.
-    const isCostComplete = accounts.every((a) => a.costBasis !== null);
+    const isCostComplete = accounts.every(
+      (a) => a.costBasis !== null && a.averageCost !== null,
+    );
     const isPriceComplete =
       accounts.length > 0 && accounts.every((a) => a.marketValue !== null);
 
@@ -264,14 +287,10 @@ export class SecurityDetailService {
 
     return {
       quantity: exactQuantity,
-      // Weighted by construction: total cost over total units, not a mean of
-      // per-account averages (which would misweight unequal positions). Kept at
-      // the 6dp precision `holdings.average_cost` stores, because a sub-cent
-      // quote (LSE pennies, a crypto pair) rounds to zero at the money 4dp.
       averageCost:
-        costBasis === null || exactQuantity === 0
+        !isCostComplete || exactQuantity === 0
           ? null
-          : roundToDecimals(costBasis / exactQuantity, 6),
+          : this.weightedAverageCost(accounts, exactQuantity),
       currentPrice,
       costBasis,
       marketValue,
@@ -281,6 +300,32 @@ export class SecurityDetailService {
           ? null
           : (gainLoss / costBasis) * 100,
     };
+  }
+
+  /**
+   * Average cost per unit across the accounts, weighted by units held.
+   *
+   * Mathematically the same thing as total cost over total units, but computed
+   * from the per-account averages -- which sit at the full precision
+   * `holdings.average_cost` stores -- rather than from the summed cost basis.
+   * That sum is money, so it is rounded to 4dp, and dividing a 4dp figure by a
+   * large unit count throws away most of the significant digits of a sub-cent
+   * price: a holding of 15,000 units costing 1.8518517 in total came back as
+   * 0.00012346 per unit instead of 0.00012345678.
+   *
+   * Weighting matters as much as precision: a plain mean of the per-account
+   * averages would misweight unequal positions.
+   */
+  private weightedAverageCost(
+    accounts: readonly SecurityDetailAccountPosition[],
+    exactQuantity: number,
+  ): number {
+    const totalCost = accounts.reduce(
+      (sum, account) =>
+        sum + account.quantity * (account.averageCost as number),
+      0,
+    );
+    return roundToDecimals(totalCost / exactQuantity, UNIT_PRICE_DECIMALS);
   }
 
   /**
@@ -305,8 +350,12 @@ export class SecurityDetailService {
     const mine = realizedGains.filter(
       (entry) => entry.securityId === securityId,
     );
-    const currencies = new Set(mine.map((entry) => entry.accountCurrencyCode));
-    const hasOneCurrency = currencies.size === 1;
+    // A sale whose account carries no currency code cannot be attributed to
+    // one, so it counts as its own unknown rather than being folded in.
+    const currencies = [
+      ...new Set(mine.map((entry) => entry.accountCurrencyCode ?? "")),
+    ].sort();
+    const hasOneCurrency = currencies.length === 1 && currencies[0] !== "";
 
     const amountsFor = (
       predicate: (tx: SecurityHistoryTransaction) => boolean,
@@ -338,7 +387,9 @@ export class SecurityDetailService {
       realizedGain: hasOneCurrency
         ? sumMoney(mine.map((entry) => entry.realizedGain))
         : null,
-      realizedGainCurrency: hasOneCurrency ? ([...currencies][0] ?? null) : null,
+      realizedGainCurrency: hasOneCurrency ? currencies[0] : null,
+      realizedGainCurrencies: currencies.filter((code) => code !== ""),
+      realizedSaleCount: mine.length,
       transactionCount: transactions.length,
     };
   }

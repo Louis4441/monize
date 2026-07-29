@@ -285,6 +285,14 @@ export interface SecurityDetailActivity {
    */
   realizedGain: number | null;
   realizedGainCurrency: string | null;
+  /** Currencies the security was sold from, for naming them when they differ. */
+  realizedGainCurrencies: string[];
+  /**
+   * Sales the replay found. Distinguishes "never sold" (zero) from "sold across
+   * currencies, so the gains cannot be added" -- both of which leave
+   * `realizedGain` null.
+   */
+  realizedSaleCount: number;
   transactionCount: number;
 }
 

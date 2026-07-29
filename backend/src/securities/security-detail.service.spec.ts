@@ -335,6 +335,39 @@ describe("SecurityDetailService", () => {
       expect(position.averageCost).toBe(120);
     });
 
+    it("keeps a sub-cent average cost instead of rounding it away", async () => {
+      // A crypto or penny holding: 15,000 units at 0.00012345678. Rounded to the
+      // six places prices used to be stored at, the average cost becomes
+      // 0.000123 and the position's cost basis is out by nearly half a percent
+      // -- an error proportional to the position, not a rounding artefact.
+      const dust = holding({
+        quantity: 15000,
+        averageCost: 0.00012345678,
+        costBasis: 1.8518517,
+        marketValue: 2,
+        gainLoss: 0.1481483,
+      });
+      given({
+        historyAccounts: [historyAccount({ currentQuantity: 15000 })],
+        currentQuantityAll: 15000,
+        holdings: [dust],
+        holdingsByAccount: [
+          {
+            accountId: "acct-1",
+            accountName: "Brokerage",
+            currencyCode: "PLN",
+            holdings: [dust],
+          },
+        ],
+      });
+
+      const { position } = await getDetail();
+      expect(position.averageCost).toBeCloseTo(0.00012345678, 10);
+      // Not the 0.000123 a six-place round would leave, which would be a
+      // different number at this magnitude rather than the same one rounded.
+      expect(position.averageCost).not.toBe(0.000123);
+    });
+
     it("keeps the gain and its percentage in agreement", async () => {
       givenTwoAccounts();
       const { position } = await getDetail();
@@ -554,12 +587,37 @@ describe("SecurityDetailService", () => {
       // 1200 of neither currency would be worse than saying nothing.
       expect(activity.realizedGain).toBeNull();
       expect(activity.realizedGainCurrency).toBeNull();
+      // ...but the sales happened, and the page must be able to say so instead
+      // of rendering the same blank it uses for "never sold".
+      expect(activity.realizedSaleCount).toBe(2);
+      expect(activity.realizedGainCurrencies).toEqual(["EUR", "PLN"]);
     });
 
     it("reports nothing when the security was never sold", async () => {
       const { activity } = await getDetail();
       expect(activity.realizedGain).toBeNull();
       expect(activity.realizedGainCurrency).toBeNull();
+      // Zero sales is what tells this case apart from the multi-currency one.
+      expect(activity.realizedSaleCount).toBe(0);
+      expect(activity.realizedGainCurrencies).toEqual([]);
+    });
+
+    it("counts a sale from an account with no currency without naming one", async () => {
+      investmentTransactionsService.getRealizedGains.mockResolvedValue([
+        {
+          securityId: SECURITY_ID,
+          realizedGain: 40,
+          accountCurrencyCode: null,
+        },
+      ]);
+
+      const { activity } = await getDetail();
+      // Unattributable to a currency, so not addable -- but still a sale, and
+      // reporting zero sales here would deny it happened.
+      expect(activity.realizedGain).toBeNull();
+      expect(activity.realizedGainCurrency).toBeNull();
+      expect(activity.realizedSaleCount).toBe(1);
+      expect(activity.realizedGainCurrencies).toEqual([]);
     });
 
     it("scopes the replay to the accounts that traded it", async () => {
