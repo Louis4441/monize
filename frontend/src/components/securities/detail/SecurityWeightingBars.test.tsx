@@ -42,15 +42,16 @@ describe('SecurityWeightingBars', () => {
       expect(screen.queryByRole('button', { name: /Show/ })).toBeNull();
     });
 
-    it('scrolls inside the height it is given, rather than growing the card', () => {
-      // The height comes from the column now, not from a max-height here: the
-      // card ends level with the chart beside it, so its size must not depend on
-      // the contents -- nor on which breakdown tab is open.
+    it('caps its height and scrolls, rather than growing the card', () => {
+      // The cap is what actually bounds it. `flex-1` on its own cannot: the
+      // column takes its height from the grid row, the row takes its height from
+      // its tallest item, and a list sized that way is sizing itself against
+      // itself -- which is how the scrollbar went missing once already.
       const { container } = renderCard(MANY);
       const list = container.querySelector('ul')!;
       expect(list.className).toContain('overflow-y-auto');
+      expect(list.className).toMatch(/max-h-/);
       expect(list.className).toContain('flex-1');
-      expect(list.className).toContain('min-h-0');
     });
 
     it('uses the slim scrollbar, not the native one', () => {

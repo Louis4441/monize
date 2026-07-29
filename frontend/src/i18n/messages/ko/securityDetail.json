@@ -1,0 +1,244 @@
+{
+  "loading": "종목을 불러오는 중...",
+  "loadFailed": "이 종목을 불러올 수 없습니다",
+  "notFound": "종목을 찾을 수 없습니다",
+  "backToSecurities": "종목",
+  "error": {
+    "retry": "다시 시도"
+  },
+  "header": {
+    "priceAt": "{date} 가격",
+    "noPrice": "아직 기록된 가격이 없습니다",
+    "changeToday": "오늘 {change} ({percent})",
+    "changeLast": "최근 변동 {change} ({percent})",
+    "inactiveBadge": "비활성",
+    "edit": "편집",
+    "favourites": "즐겨찾기",
+    "switchSecurity": "다른 종목으로 이동",
+    "switchPlaceholder": "심볼 또는 이름으로 검색...",
+    "switchNoMatches": "일치하는 종목이 없습니다"
+  },
+  "toasts": {
+    "favouriteAdded": "즐겨찾기에 추가했습니다",
+    "favouriteRemoved": "즐겨찾기에서 제거했습니다",
+    "favouriteFailed": "즐겨찾기를 업데이트할 수 없습니다"
+  },
+  "cards": {
+    "marketValue": "평가금액",
+    "costBasis": "취득원가",
+    "unrealizedPl": "미실현 손익",
+    "units": "수량",
+    "avgCostPerUnit": "평균 단가",
+    "heldInAccounts": "보유 계좌",
+    "openAccount": "투자 페이지에서 {name} 보기",
+    "unitsShare": "{units} ({share})",
+    "valueUnknown": "평가 불가",
+    "approx": "약 {amount}",
+    "asOf": "{date} 종가 기준",
+    "asOfStale": "{date} 종가 기준, 기록된 가장 최근 가격입니다",
+    "asOfStaleTitle": "이보다 최근 가격이 저장되어 있지 않아, 오늘이 아니라 그날 시점의 포지션 가치입니다. 제공처에서 가격을 갱신하거나 직접 입력해 주세요."
+  },
+  "chart": {
+    "title": "{symbol} 가격",
+    "seriesAriaLabel": "차트 계열",
+    "modes": {
+      "price": "가격",
+      "value": "투자 평가금액",
+      "return": "수익률"
+    },
+    "titles": {
+      "price": "가격",
+      "value": "투자 평가금액",
+      "return": "수익률"
+    },
+    "summary": {
+      "first": "처음",
+      "latest": "최근",
+      "ending": "마지막",
+      "lowest": "최저"
+    },
+    "panEarlier": "이전 구간의 이력 보기",
+    "panLater": "다음 구간의 이력 보기"
+  },
+  "keyInfo": {
+    "title": "주요 정보",
+    "symbol": "심볼",
+    "securityType": "종목 유형",
+    "distributions": "분배",
+    "distributing": "지급함 (데이터 기준)",
+    "accumulating": "없음 (재투자형)",
+    "distributionsTitle": "가격 이력에서 읽어낸 값입니다. 분배가 있을 때마다 수정 종가가 호가 종가와 벌어집니다. 발행사가 밝힌 것이 아니라 데이터에서 추론한 것입니다.",
+    "exchange": "거래소",
+    "currency": "통화",
+    "sector": "섹터",
+    "industry": "산업",
+    "provider": "제공처",
+    "lastPrice": "최종 가격"
+  },
+  "tabs": {
+    "ariaLabel": "종목 섹션",
+    "overview": "개요",
+    "transactions": "거래",
+    "prices": "가격 이력",
+    "documents": "문서",
+    "news": "뉴스"
+  },
+  "about": {
+    "title": "소개",
+    "noDescription": "이 종목에 저장된 설명이 없습니다.",
+    "sector": "섹터",
+    "industry": "산업",
+    "country": "국가",
+    "website": "웹사이트",
+    "irWebsite": "IR 웹사이트",
+    "tags": "태그",
+    "notStored": "아직 저장되지 않음"
+  },
+  "performance": {
+    "title": "종목 성과",
+    "subject": "보유했는지와 무관하게, 상품 자체가 어떻게 움직였는지입니다. 내 포지션의 성과는 총수익률에 있습니다.",
+    "empty": "수익률을 계산하기에 가격 이력이 아직 부족합니다.",
+    "unavailable": "해당 없음",
+    "periods": {
+      "1m": "1개월",
+      "3m": "3개월",
+      "ytd": "연초 이후",
+      "1y": "1년",
+      "3y": "3년",
+      "5y": "5년"
+    },
+    "includesDividends": "배당 포함",
+    "excludesDividends": "배당 제외",
+    "excludesDividendsTitle": "이 제공처는 수정 종가 계열을 제공하지 않아 이 수익률은 가격만으로 계산됩니다. 분배를 하는 펀드라면 그 분배율만큼 수익률이 낮게 나타납니다."
+  },
+  "positionInfo": {
+    "title": "포지션 정보",
+    "firstTransaction": "첫 거래",
+    "lastTransaction": "마지막 거래",
+    "totalInvested": "총 투자금",
+    "totalSold": "총 매도금",
+    "dividends": "배당",
+    "fees": "수수료",
+    "realizedPl": "실현 손익",
+    "realizedMixed": "{currencies}로 실현되어 합산하지 않았습니다",
+    "totalReturn": "총수익률",
+    "totalReturnValue": "{amount} ({percent})",
+    "totalReturnTitle": "미실현 이익에 매도로 실현한 금액과 받은 수익을 더하고 수수료를 뺀 값을, 투입한 자본에 대비해 나타낸 것입니다. 그 자본에 대한 단순 수익률이며, 연율로 환산하지 않고 각 매수분을 보유 기간으로 가중하지도 않습니다.",
+    "status": "상태",
+    "statusOpen": "보유 중",
+    "statusClosed": "청산됨",
+    "statusNone": "보유한 적 없음"
+  },
+  "accounts": {
+    "title": "계좌",
+    "closedSuffix": "{name} (해지됨)",
+    "total": "합계",
+    "columns": {
+      "account": "계좌",
+      "currency": "통화",
+      "units": "수량",
+      "avgCost": "평균 단가",
+      "marketValue": "평가금액",
+      "costBasis": "취득원가",
+      "unrealizedPl": "미실현 손익"
+    }
+  },
+  "closed": {
+    "title": "포지션 청산됨",
+    "description": "이 종목을 더 이상 보유하지 않습니다. 이력은 아래에 그대로 남아 있습니다.",
+    "realizedPl": "실현 손익",
+    "heldFrom": "보유 시작",
+    "heldRange": "{start} ~ {end}"
+  },
+  "empty": {
+    "noPosition": "포지션 데이터 없음",
+    "noPositionHint": "이 종목에 대한 거래를 아직 기록하지 않았습니다.",
+    "noPrices": "가격 이력이 없습니다",
+    "noPricesHint": "가격을 직접 입력하거나 제공처에서 가격을 갱신하세요.",
+    "noTransactions": "아직 거래가 없습니다",
+    "noAccounts": "이 종목은 어떤 계좌에서도 보유되지 않습니다."
+  },
+  "weightings": {
+    "title": "구성",
+    "ariaLabel": "구성 기준",
+    "sectorTab": "섹터",
+    "countryTab": "국가",
+    "assetClassTab": "자산군",
+    "sectorEmpty": "섹터 구성이 저장되어 있지 않습니다. Monize는 펀드와 ETF에 대해 제공처에서 채워 넣습니다.",
+    "countryEmpty": "국가 구성이 저장되어 있지 않습니다. 종목을 편집할 때 입력할 수 있습니다.",
+    "assetClassEmpty": "자산군 구성이 아직 저장되어 있지 않습니다.",
+    "remainder": "{percent} 미분류"
+  },
+  "documents": {
+    "title": "문서",
+    "add": "문서 추가",
+    "loadFailed": "이 종목의 문서를 불러올 수 없습니다",
+    "noDate": "날짜 없음",
+    "columns": {
+      "type": "유형",
+      "name": "이름",
+      "date": "날짜",
+      "address": "주소",
+      "actions": "작업"
+    },
+    "types": {
+      "FACTSHEET": "운용 개요서",
+      "KIID": "KIID",
+      "PROSPECTUS": "투자설명서",
+      "ANNUAL_REPORT": "연차 보고서",
+      "SEMI_ANNUAL_REPORT": "반기 보고서",
+      "TAX": "세무 서류",
+      "RESEARCH": "리서치",
+      "OTHER": "기타"
+    },
+    "actions": {
+      "open": "열기",
+      "openNamed": "{name}을 새 탭에서 열기",
+      "edit": "편집",
+      "delete": "삭제"
+    },
+    "empty": {
+      "title": "아직 문서가 없습니다",
+      "description": "이 종목의 서류를 한곳에 모아 두세요. 운용 개요서, KIID, 투자설명서, 연차 보고서, 세무 서류 등입니다. 각각 여기서 바로 열 수 있는 링크입니다.",
+      "action": "첫 문서 추가"
+    },
+    "form": {
+      "addTitle": "문서 추가",
+      "editTitle": "문서 편집",
+      "date": "문서 날짜",
+      "dateHint": "오늘이 아니라 문서 자체에 적힌 날짜입니다. 없으면 비워 두세요.",
+      "url": "주소",
+      "notes": "메모",
+      "create": "문서 추가",
+      "save": "문서 저장"
+    },
+    "validation": {
+      "nameRequired": "문서에 이름을 지정하세요",
+      "urlRequired": "주소가 필요합니다",
+      "urlScheme": "주소는 http:// 또는 https://로 시작해야 합니다"
+    },
+    "delete": {
+      "title": "문서를 삭제할까요?",
+      "message": "“{name}”으로 향하는 링크를 제거합니다. 문서 자체는 그대로 남습니다."
+    },
+    "toasts": {
+      "created": "문서를 추가했습니다",
+      "updated": "문서를 수정했습니다",
+      "deleted": "문서를 삭제했습니다",
+      "saveFailed": "문서를 저장할 수 없습니다",
+      "deleteFailed": "문서를 삭제할 수 없습니다"
+    }
+  },
+  "news": {
+    "title": "{symbol}을 언급한 뉴스",
+    "subject": "제공처는 기사에 등장하는 모든 티커에 기사를 연결하므로, 일부는 이 종목을 언급한 다른 회사에 관한 기사입니다.",
+    "loadFailed": "이 종목의 뉴스를 불러올 수 없습니다",
+    "video": "동영상",
+    "alsoMentions": "{tickers}도 언급",
+    "unsupportedProvider": "이 종목의 시세 제공처는 뉴스를 제공하지 않습니다. 종목을 편집해 Yahoo로 바꾸면 여기에 헤드라인이 표시됩니다.",
+    "empty": {
+      "title": "현재 헤드라인이 없습니다",
+      "description": "최근 이 심볼로 게시된 내용이 없습니다. 다시 돌아오면 목록이 갱신됩니다."
+    }
+  }
+}

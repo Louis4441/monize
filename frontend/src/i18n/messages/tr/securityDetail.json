@@ -1,0 +1,244 @@
+{
+  "loading": "Menkul kıymet yükleniyor...",
+  "loadFailed": "Bu menkul kıymet yüklenemedi",
+  "notFound": "Menkul kıymet bulunamadı",
+  "backToSecurities": "Menkul kıymetler",
+  "error": {
+    "retry": "Yeniden dene"
+  },
+  "header": {
+    "priceAt": "{date} fiyatı",
+    "noPrice": "Henüz kayıtlı fiyat yok",
+    "changeToday": "bugün {change} ({percent})",
+    "changeLast": "son hareket {change} ({percent})",
+    "inactiveBadge": "Etkin değil",
+    "edit": "Düzenle",
+    "favourites": "Favoriler",
+    "switchSecurity": "Başka bir menkul kıymete geç",
+    "switchPlaceholder": "Sembole veya ada göre filtrele...",
+    "switchNoMatches": "Eşleşen menkul kıymet yok"
+  },
+  "toasts": {
+    "favouriteAdded": "Favorilerine eklendi",
+    "favouriteRemoved": "Favorilerinden çıkarıldı",
+    "favouriteFailed": "Favorilerin güncellenemedi"
+  },
+  "cards": {
+    "marketValue": "Piyasa değeri",
+    "costBasis": "Maliyet bedeli",
+    "unrealizedPl": "Gerçekleşmemiş K/Z",
+    "units": "Birim",
+    "avgCostPerUnit": "Ort. maliyet / birim",
+    "heldInAccounts": "Hesaplarda tutulan",
+    "openAccount": "{name} hesabını Yatırımlar sayfasında göster",
+    "unitsShare": "{units} ({share})",
+    "valueUnknown": "Fiyatlanmadı",
+    "approx": "~ {amount}",
+    "asOf": "{date} kapanışına göre",
+    "asOfStale": "{date} kapanışına göre; kayıtlı en yeni fiyat",
+    "asOfStaleTitle": "Daha yeni bir fiyat kayıtlı değil, dolayısıyla bu, pozisyonun bugünkü değil o günkü değeridir. Fiyatları sağlayıcıdan güncelleyin ya da elle bir fiyat ekleyin."
+  },
+  "chart": {
+    "title": "{symbol} fiyatı",
+    "seriesAriaLabel": "Grafik serisi",
+    "modes": {
+      "price": "Fiyat",
+      "value": "Yatırım değeri",
+      "return": "Getiri"
+    },
+    "titles": {
+      "price": "Fiyat",
+      "value": "Yatırım değeri",
+      "return": "Getiri"
+    },
+    "summary": {
+      "first": "İlk",
+      "latest": "Son",
+      "ending": "Kapanış",
+      "lowest": "En düşük"
+    },
+    "panEarlier": "Geçmişin önceki bölümünü göster",
+    "panLater": "Geçmişin sonraki bölümünü göster"
+  },
+  "keyInfo": {
+    "title": "Temel bilgiler",
+    "symbol": "Sembol",
+    "securityType": "Menkul kıymet türü",
+    "distributions": "Dağıtımlar",
+    "distributing": "Ödenmiş (gözlemlenen)",
+    "accumulating": "Yok (birikimli)",
+    "distributionsTitle": "Fiyat geçmişinden okundu: her dağıtımda düzeltilmiş kapanış, kote kapanıştan ayrılır. Veriden çıkarıldı; ihraççı tarafından bildirilmedi.",
+    "exchange": "Borsa",
+    "currency": "Para birimi",
+    "sector": "Sektör",
+    "industry": "Endüstri",
+    "provider": "Sağlayıcı",
+    "lastPrice": "Son fiyat"
+  },
+  "tabs": {
+    "ariaLabel": "Menkul kıymet bölümleri",
+    "overview": "Genel bakış",
+    "transactions": "İşlemler",
+    "prices": "Fiyat geçmişi",
+    "documents": "Belgeler",
+    "news": "Haberler"
+  },
+  "about": {
+    "title": "Hakkında",
+    "noDescription": "Bu menkul kıymet için açıklama kaydedilmedi.",
+    "sector": "Sektör",
+    "industry": "Endüstri",
+    "country": "Ülke",
+    "website": "Web sitesi",
+    "irWebsite": "Yatırımcı ilişkileri sitesi",
+    "tags": "Etiketler",
+    "notStored": "Henüz saklanmıyor"
+  },
+  "performance": {
+    "title": "Menkul kıymetin performansı",
+    "subject": "Sen elinde tutmuş olsan da olmasan da, aracın kendisinin nasıl hareket ettiği. Kendi pozisyonunun kazancı Toplam getiri satırında.",
+    "empty": "Getiri ölçmek için henüz yeterli fiyat geçmişi yok.",
+    "unavailable": "yok",
+    "periods": {
+      "1m": "1A",
+      "3m": "3A",
+      "ytd": "Yıl başından",
+      "1y": "1Y",
+      "3y": "3Y",
+      "5y": "5Y"
+    },
+    "includesDividends": "Temettü dahil",
+    "excludesDividends": "Temettü hariç",
+    "excludesDividendsTitle": "Bu sağlayıcı düzeltilmiş kapanış serisi vermiyor, bu yüzden bu getiriler yalnızca fiyattan hesaplanıyor. Dağıtım yapan bir fonda getiriyi, dağıtım oranının tamamı kadar düşük gösterirler."
+  },
+  "positionInfo": {
+    "title": "Pozisyon bilgileri",
+    "firstTransaction": "İlk işlem",
+    "lastTransaction": "Son işlem",
+    "totalInvested": "Toplam yatırılan",
+    "totalSold": "Toplam satılan",
+    "dividends": "Temettüler",
+    "fees": "Ücretler",
+    "realizedPl": "Gerçekleşmiş K/Z",
+    "realizedMixed": "{currencies} para birimlerinde gerçekleşti, bu yüzden toplanmadı",
+    "totalReturn": "Toplam getiri",
+    "totalReturnValue": "{amount} ({percent})",
+    "totalReturnTitle": "Gerçekleşmemiş kazanç, artı satışlarda gerçekleştirdiğin ve gelir olarak aldığın tutar, eksi ücretler; koyduğun sermayeye oranla. O sermaye üzerinde basit bir getiri: yıllıklandırılmamıştır ve dilimleri tutma süresine göre ağırlıklandırmaz.",
+    "status": "Durum",
+    "statusOpen": "Açık",
+    "statusClosed": "Kapalı",
+    "statusNone": "Hiç tutulmadı"
+  },
+  "accounts": {
+    "title": "Hesaplar",
+    "closedSuffix": "{name} (kapalı)",
+    "total": "Toplam",
+    "columns": {
+      "account": "Hesap",
+      "currency": "Para birimi",
+      "units": "Birim",
+      "avgCost": "Ort. maliyet / birim",
+      "marketValue": "Piyasa değeri",
+      "costBasis": "Maliyet bedeli",
+      "unrealizedPl": "Gerçekleşmemiş K/Z"
+    }
+  },
+  "closed": {
+    "title": "Pozisyon kapatıldı",
+    "description": "Bu menkul kıymeti artık tutmuyorsun. Geçmişi aşağıda kalmaya devam ediyor.",
+    "realizedPl": "Gerçekleşmiş K/Z",
+    "heldFrom": "Tutulmaya başlandığı tarih",
+    "heldRange": "{start} - {end}"
+  },
+  "empty": {
+    "noPosition": "Pozisyon verisi yok",
+    "noPositionHint": "Bu menkul kıymet için henüz hiç işlem kaydetmedin.",
+    "noPrices": "Fiyat geçmişi yok",
+    "noPricesHint": "Elle bir fiyat ekle ya da fiyatları sağlayıcıdan güncelle.",
+    "noTransactions": "Henüz işlem yok",
+    "noAccounts": "Bu menkul kıymet hiçbir hesapta tutulmuyor."
+  },
+  "weightings": {
+    "title": "Dağılım",
+    "ariaLabel": "Dağılım boyutu",
+    "sectorTab": "Sektör",
+    "countryTab": "Ülke",
+    "assetClassTab": "Varlık sınıfı",
+    "sectorEmpty": "Sektör dağılımı kayıtlı değil. Monize bunu fonlar ve ETF'ler için sağlayıcıdan doldurur.",
+    "countryEmpty": "Ülke dağılımı kayıtlı değil. Menkul kıymeti düzenlerken girebilirsin.",
+    "assetClassEmpty": "Varlık sınıfı dağılımı henüz kayıtlı değil.",
+    "remainder": "{percent} sınıflandırılmamış"
+  },
+  "documents": {
+    "title": "Belgeler",
+    "add": "Belge ekle",
+    "loadFailed": "Bu menkul kıymetin belgeleri yüklenemedi",
+    "noDate": "Tarih yok",
+    "columns": {
+      "type": "Tür",
+      "name": "Ad",
+      "date": "Tarih",
+      "address": "Adres",
+      "actions": "Eylemler"
+    },
+    "types": {
+      "FACTSHEET": "Tanıtım föyü",
+      "KIID": "KIID",
+      "PROSPECTUS": "İzahname",
+      "ANNUAL_REPORT": "Yıllık rapor",
+      "SEMI_ANNUAL_REPORT": "Altı aylık rapor",
+      "TAX": "Vergi belgesi",
+      "RESEARCH": "Araştırma",
+      "OTHER": "Diğer"
+    },
+    "actions": {
+      "open": "Aç",
+      "openNamed": "{name} belgesini yeni sekmede aç",
+      "edit": "Düzenle",
+      "delete": "Sil"
+    },
+    "empty": {
+      "title": "Henüz belge yok",
+      "description": "Bu menkul kıymete ait evrakı tek bir yerde tut: tanıtım föyü, KIID, izahname, yıllık rapor, vergi belgesi. Her biri, doğrudan buradan açabileceğin bir bağlantı.",
+      "action": "İlk belgeyi ekle"
+    },
+    "form": {
+      "addTitle": "Belge ekle",
+      "editTitle": "Belgeyi düzenle",
+      "date": "Belge tarihi",
+      "dateHint": "Belgenin kendisinde yazan tarih, bugünün tarihi değil. Yoksa boş bırak.",
+      "url": "Adres",
+      "notes": "Notlar",
+      "create": "Belge ekle",
+      "save": "Belgeyi kaydet"
+    },
+    "validation": {
+      "nameRequired": "Belgeye bir ad ver",
+      "urlRequired": "Adres gerekli",
+      "urlScheme": "Adres http:// veya https:// ile başlamalı"
+    },
+    "delete": {
+      "title": "Belge silinsin mi?",
+      "message": "Bu, „{name}” bağlantısını kaldırır. Belgenin kendisine dokunulmaz."
+    },
+    "toasts": {
+      "created": "Belge eklendi",
+      "updated": "Belge güncellendi",
+      "deleted": "Belge silindi",
+      "saveFailed": "Belge kaydedilemedi",
+      "deleteFailed": "Belge silinemedi"
+    }
+  },
+  "news": {
+    "title": "{symbol} sembolünden söz eden haberler",
+    "subject": "Sağlayıcı her haberi, içinde adı geçen tüm sembollere bağlar; dolayısıyla bunların bir kısmı bu şirketten söz eden başka bir şirketle ilgilidir.",
+    "loadFailed": "Bu menkul kıymetin haberleri yüklenemedi",
+    "video": "Video",
+    "alsoMentions": "Ayrıca {tickers} sembollerinden söz ediyor",
+    "unsupportedProvider": "Bu menkul kıymetin fiyat sağlayıcısı haber vermiyor. Menkul kıymeti düzenlerken Yahoo'ya geçirirsen başlıklar burada görünür.",
+    "empty": {
+      "title": "Şu anda başlık yok",
+      "description": "Bu sembolle ilgili son zamanlarda bir şey yayımlanmadı. Buraya döndüğünde liste yenilenir."
+    }
+  }
+}

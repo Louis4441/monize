@@ -1,0 +1,244 @@
+{
+  "loading": "Memuat efek...",
+  "loadFailed": "Efek ini tidak dapat dimuat",
+  "notFound": "Efek tidak ditemukan",
+  "backToSecurities": "Efek",
+  "error": {
+    "retry": "Coba lagi"
+  },
+  "header": {
+    "priceAt": "Harga per {date}",
+    "noPrice": "Belum ada harga yang dicatat",
+    "changeToday": "{change} ({percent}) hari ini",
+    "changeLast": "{change} ({percent}) pergerakan terakhir",
+    "inactiveBadge": "Tidak aktif",
+    "edit": "Ubah",
+    "favourites": "Favorit",
+    "switchSecurity": "Pindah ke efek lain",
+    "switchPlaceholder": "Saring berdasarkan simbol atau nama...",
+    "switchNoMatches": "Tidak ada efek yang cocok"
+  },
+  "toasts": {
+    "favouriteAdded": "Ditambahkan ke favorit Anda",
+    "favouriteRemoved": "Dihapus dari favorit Anda",
+    "favouriteFailed": "Favorit Anda tidak dapat diperbarui"
+  },
+  "cards": {
+    "marketValue": "Nilai pasar",
+    "costBasis": "Harga perolehan",
+    "unrealizedPl": "L/R belum terealisasi",
+    "units": "Unit",
+    "avgCostPerUnit": "Biaya rata-rata / unit",
+    "heldInAccounts": "Dipegang di rekening",
+    "openAccount": "Tampilkan {name} di halaman Investasi",
+    "unitsShare": "{units} ({share})",
+    "valueUnknown": "Belum dinilai",
+    "approx": "~ {amount}",
+    "asOf": "Pada penutupan {date}",
+    "asOfStale": "Pada penutupan {date}, harga terbaru yang tercatat",
+    "asOfStaleTitle": "Tidak ada harga yang lebih baru tersimpan, jadi ini adalah nilai posisi pada hari itu, bukan hari ini. Perbarui harga dari penyedia, atau tambahkan satu secara manual."
+  },
+  "chart": {
+    "title": "Harga {symbol}",
+    "seriesAriaLabel": "Seri grafik",
+    "modes": {
+      "price": "Harga",
+      "value": "Nilai investasi",
+      "return": "Hasil"
+    },
+    "titles": {
+      "price": "Harga",
+      "value": "Nilai investasi",
+      "return": "Hasil"
+    },
+    "summary": {
+      "first": "Pertama",
+      "latest": "Terakhir",
+      "ending": "Akhir",
+      "lowest": "Terendah"
+    },
+    "panEarlier": "Tampilkan bagian riwayat sebelumnya",
+    "panLater": "Tampilkan bagian riwayat berikutnya"
+  },
+  "keyInfo": {
+    "title": "Informasi utama",
+    "symbol": "Simbol",
+    "securityType": "Jenis efek",
+    "distributions": "Distribusi",
+    "distributing": "Dibayarkan (teramati)",
+    "accumulating": "Tidak ada (akumulasi)",
+    "distributionsTitle": "Dibaca dari riwayat harga: penutupan yang disesuaikan menyimpang dari penutupan kuotasi setiap kali distribusi dibayarkan. Disimpulkan dari data, bukan dinyatakan oleh penerbit.",
+    "exchange": "Bursa",
+    "currency": "Mata uang",
+    "sector": "Sektor",
+    "industry": "Industri",
+    "provider": "Penyedia",
+    "lastPrice": "Harga terakhir"
+  },
+  "tabs": {
+    "ariaLabel": "Bagian efek",
+    "overview": "Ringkasan",
+    "transactions": "Transaksi",
+    "prices": "Riwayat harga",
+    "documents": "Dokumen",
+    "news": "Berita"
+  },
+  "about": {
+    "title": "Tentang",
+    "noDescription": "Tidak ada deskripsi yang disimpan untuk efek ini.",
+    "sector": "Sektor",
+    "industry": "Industri",
+    "country": "Negara",
+    "website": "Situs web",
+    "irWebsite": "Situs hubungan investor",
+    "tags": "Tag",
+    "notStored": "Belum disimpan"
+  },
+  "performance": {
+    "title": "Kinerja efek",
+    "subject": "Bagaimana instrumennya sendiri bergerak, terlepas dari apakah Anda memegangnya. Hasil posisi Anda sendiri ada di Hasil total.",
+    "empty": "Riwayat harga belum cukup untuk mengukur hasil.",
+    "unavailable": "t/a",
+    "periods": {
+      "1m": "1B",
+      "3m": "3B",
+      "ytd": "Sejak awal tahun",
+      "1y": "1T",
+      "3y": "3T",
+      "5y": "5T"
+    },
+    "includesDividends": "Termasuk dividen",
+    "excludesDividends": "Tanpa dividen",
+    "excludesDividendsTitle": "Penyedia ini tidak menyediakan seri penutupan yang disesuaikan, jadi hasil ini diukur hanya dari harga. Untuk reksa dana yang membagikan hasil, angka ini terlalu rendah sebesar seluruh tingkat pembagiannya."
+  },
+  "positionInfo": {
+    "title": "Informasi posisi",
+    "firstTransaction": "Transaksi pertama",
+    "lastTransaction": "Transaksi terakhir",
+    "totalInvested": "Total ditanamkan",
+    "totalSold": "Total dijual",
+    "dividends": "Dividen",
+    "fees": "Biaya",
+    "realizedPl": "L/R terealisasi",
+    "realizedMixed": "Terealisasi dalam {currencies}, jadi tidak dijumlahkan",
+    "totalReturn": "Hasil total",
+    "totalReturnValue": "{amount} ({percent})",
+    "totalReturnTitle": "Keuntungan yang belum terealisasi, ditambah yang Anda realisasikan dari penjualan dan terima sebagai pendapatan, dikurangi biaya, dibandingkan modal yang Anda tanamkan. Hasil sederhana atas modal itu: tidak disetahunkan dan tidak menimbang setiap pembelian menurut lama Anda memegangnya.",
+    "status": "Status",
+    "statusOpen": "Terbuka",
+    "statusClosed": "Ditutup",
+    "statusNone": "Belum pernah dipegang"
+  },
+  "accounts": {
+    "title": "Rekening",
+    "closedSuffix": "{name} (ditutup)",
+    "total": "Total",
+    "columns": {
+      "account": "Rekening",
+      "currency": "Mata uang",
+      "units": "Unit",
+      "avgCost": "Biaya rata-rata / unit",
+      "marketValue": "Nilai pasar",
+      "costBasis": "Harga perolehan",
+      "unrealizedPl": "L/R belum terealisasi"
+    }
+  },
+  "closed": {
+    "title": "Posisi ditutup",
+    "description": "Anda tidak lagi memegang efek ini. Riwayatnya tetap tersedia di bawah.",
+    "realizedPl": "L/R terealisasi",
+    "heldFrom": "Dipegang sejak",
+    "heldRange": "{start} sampai {end}"
+  },
+  "empty": {
+    "noPosition": "Tidak ada data posisi",
+    "noPositionHint": "Anda belum mencatat transaksi apa pun untuk efek ini.",
+    "noPrices": "Riwayat harga tidak tersedia",
+    "noPricesHint": "Tambahkan harga secara manual, atau perbarui harga dari penyedia.",
+    "noTransactions": "Belum ada transaksi",
+    "noAccounts": "Efek ini tidak dipegang di rekening mana pun."
+  },
+  "weightings": {
+    "title": "Rincian",
+    "ariaLabel": "Dimensi rincian",
+    "sectorTab": "Sektor",
+    "countryTab": "Negara",
+    "assetClassTab": "Kelas aset",
+    "sectorEmpty": "Rincian sektor tidak tersimpan. Monize mengisinya dari penyedia untuk reksa dana dan ETF.",
+    "countryEmpty": "Rincian negara tidak tersimpan. Anda dapat memasukkannya saat mengubah efek.",
+    "assetClassEmpty": "Rincian kelas aset belum tersimpan.",
+    "remainder": "{percent} tidak terklasifikasi"
+  },
+  "documents": {
+    "title": "Dokumen",
+    "add": "Tambah dokumen",
+    "loadFailed": "Dokumen efek ini tidak dapat dimuat",
+    "noDate": "Tanpa tanggal",
+    "columns": {
+      "type": "Jenis",
+      "name": "Nama",
+      "date": "Tanggal",
+      "address": "Alamat",
+      "actions": "Tindakan"
+    },
+    "types": {
+      "FACTSHEET": "Lembar fakta",
+      "KIID": "KIID",
+      "PROSPECTUS": "Prospektus",
+      "ANNUAL_REPORT": "Laporan tahunan",
+      "SEMI_ANNUAL_REPORT": "Laporan semesteran",
+      "TAX": "Dokumen pajak",
+      "RESEARCH": "Riset",
+      "OTHER": "Lainnya"
+    },
+    "actions": {
+      "open": "Buka",
+      "openNamed": "Buka {name} di tab baru",
+      "edit": "Ubah",
+      "delete": "Hapus"
+    },
+    "empty": {
+      "title": "Belum ada dokumen",
+      "description": "Simpan dokumen efek ini di satu tempat: lembar faktanya, KIID, prospektus, laporan tahunan, bukti pajak. Masing-masing berupa tautan yang bisa Anda buka langsung dari sini.",
+      "action": "Tambahkan dokumen pertama"
+    },
+    "form": {
+      "addTitle": "Tambah dokumen",
+      "editTitle": "Ubah dokumen",
+      "date": "Tanggal dokumen",
+      "dateHint": "Tanggal yang tertera pada dokumen itu sendiri, bukan hari ini. Biarkan kosong jika tidak ada.",
+      "url": "Alamat",
+      "notes": "Catatan",
+      "create": "Tambah dokumen",
+      "save": "Simpan dokumen"
+    },
+    "validation": {
+      "nameRequired": "Beri nama pada dokumen",
+      "urlRequired": "Alamat wajib diisi",
+      "urlScheme": "Alamat harus dimulai dengan http:// atau https://"
+    },
+    "delete": {
+      "title": "Hapus dokumen?",
+      "message": "Ini menghapus tautan ke „{name}”. Dokumennya sendiri tidak tersentuh."
+    },
+    "toasts": {
+      "created": "Dokumen ditambahkan",
+      "updated": "Dokumen diperbarui",
+      "deleted": "Dokumen dihapus",
+      "saveFailed": "Dokumen tidak dapat disimpan",
+      "deleteFailed": "Dokumen tidak dapat dihapus"
+    }
+  },
+  "news": {
+    "title": "Berita yang menyebut {symbol}",
+    "subject": "Penyedia mengaitkan setiap berita dengan semua simbol yang disebutnya, jadi sebagian di antaranya tentang perusahaan lain yang menyebut yang ini.",
+    "loadFailed": "Berita untuk efek ini tidak dapat dimuat",
+    "video": "Video",
+    "alsoMentions": "Juga menyebut {tickers}",
+    "unsupportedProvider": "Penyedia kuotasi untuk efek ini tidak menyediakan berita. Mengubahnya ke Yahoo saat mengubah efek akan menampilkan judul berita di sini.",
+    "empty": {
+      "title": "Belum ada judul berita saat ini",
+      "description": "Belum ada yang dipublikasikan untuk simbol ini baru-baru ini. Daftar akan disegarkan saat Anda kembali ke sini."
+    }
+  }
+}

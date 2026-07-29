@@ -335,10 +335,12 @@ function SecurityDetailContent() {
           )}
 
           {/* Two thirds chart, one third a column of two cards: what the
-              instrument is, and what it is made of. The chart runs tall so that
+              instrument is, and what it is made of. The chart runs tall so the
               column has the room, and the breakdown's bars are capped and
               scrollable so an eleven-sector fund cannot outgrow it.
-              `items-stretch` is what lets the column match it. */}
+              `items-stretch` lets the column reach the row's full height, but the
+              row is only ever as tall as its tallest item -- so the cap on the
+              bars is what keeps this column from being that item. */}
           <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <SecurityChartSection
