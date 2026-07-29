@@ -154,13 +154,20 @@ export class SecuritiesService {
   async getSuggestedDescription(
     symbol: string,
     exchange?: string | null,
-  ): Promise<{ symbol: string; description: string | null }> {
-    const description =
-      await this.yahooFinanceService.fetchSecurityProfileDescription(
+  ): Promise<{
+    symbol: string;
+    description: string | null;
+    website: string | null;
+  }> {
+    // One call gives both: the website rides along in the `summaryProfile` this
+    // already requested. Advisory like the description -- the user reviews the
+    // pre-fill before saving. Null for a fund, where Yahoo publishes no URL.
+    const { description, website } =
+      await this.yahooFinanceService.fetchSecurityProfile(
         symbol,
         exchange ?? null,
       );
-    return { symbol, description };
+    return { symbol, description, website };
   }
 
   /**
@@ -374,6 +381,23 @@ export class SecuritiesService {
     return { name, removedFrom };
   }
 
+  /**
+   * Normalise a user-entered address to an absolute https URL, the way
+   * `InstitutionsService` does for its own website field. The DTO accepts
+   * "apple.com" so nobody has to type a scheme; a stored link needs one.
+   *
+   * Empty string means "clear it", which is how the edit form removes an address.
+   */
+  private normalizeWebsite(
+    value: string | null | undefined,
+  ): string | null | undefined {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  }
+
   async create(
     userId: string,
     createSecurityDto: CreateSecurityDto,
@@ -382,6 +406,14 @@ export class SecuritiesService {
     // spread that builds the entity never tries to persist it as a field.
     const { tagIds, countryWeightings, assetWeightings, ...securityData } =
       createSecurityDto;
+
+    // Both address fields are rendered as links, so they are stored absolute.
+    if ("website" in securityData) {
+      securityData.website = this.normalizeWebsite(securityData.website);
+    }
+    if ("irWebsite" in securityData) {
+      securityData.irWebsite = this.normalizeWebsite(securityData.irWebsite);
+    }
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -525,6 +557,18 @@ export class SecuritiesService {
   ): Promise<Security> {
     const security = await this.findOne(userId, id);
     const beforeData = { ...security };
+
+    // Same normalisation as on create, and `""` clears the field.
+    if ("website" in updateSecurityDto) {
+      updateSecurityDto.website = this.normalizeWebsite(
+        updateSecurityDto.website,
+      );
+    }
+    if ("irWebsite" in updateSecurityDto) {
+      updateSecurityDto.irWebsite = this.normalizeWebsite(
+        updateSecurityDto.irWebsite,
+      );
+    }
 
     // Check for symbol conflicts if updating symbol
     if (

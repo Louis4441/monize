@@ -22,6 +22,8 @@ function security(overrides: Partial<Security> = {}): Security {
     sectorWeightings: null,
     countryWeightings: null,
     assetWeightings: null,
+    website: null,
+    irWebsite: null,
     quoteProvider: 'yahoo',
     msnInstrumentId: null,
     lastPriceSource: null,

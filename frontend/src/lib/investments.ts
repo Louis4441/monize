@@ -107,16 +107,25 @@ export const investmentsApi = {
     return response.data;
   },
 
-  // Suggest a description for a security from the Yahoo provider profile
-  // (advisory pre-fill for the "Fetch from Yahoo" button). Not cached.
+  // Suggest a description and website for a security from the Yahoo provider
+  // profile (advisory pre-fill for the "Fetch from Yahoo" button). Not cached.
+  // `website` is null for funds, where Yahoo publishes no URL, and there is no
+  // investor-relations address to suggest: no provider carries one.
   getSuggestedDescription: async (
     symbol: string,
     exchange?: string,
-  ): Promise<{ symbol: string; description: string | null }> => {
-    const response = await apiClient.get<{ symbol: string; description: string | null }>(
-      '/securities/profile-description',
-      { params: { symbol, ...(exchange ? { exchange } : {}) } },
-    );
+  ): Promise<{
+    symbol: string;
+    description: string | null;
+    website: string | null;
+  }> => {
+    const response = await apiClient.get<{
+      symbol: string;
+      description: string | null;
+      website: string | null;
+    }>('/securities/profile-description', {
+      params: { symbol, ...(exchange ? { exchange } : {}) },
+    });
     return response.data;
   },
 

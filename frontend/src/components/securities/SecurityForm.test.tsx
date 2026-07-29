@@ -88,6 +88,8 @@ function createSecurity(overrides: Partial<Security> = {}): Security {
     sectorWeightings: null,
     countryWeightings: null,
     assetWeightings: null,
+    website: null,
+    irWebsite: null,
     quoteProvider: null,
     msnInstrumentId: null,
     createdAt: '2025-01-01T00:00:00Z',

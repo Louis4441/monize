@@ -1,17 +1,18 @@
 import { ApiProperty } from "@nestjs/swagger";
 import {
-  IsString,
-  IsOptional,
-  MaxLength,
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
-  IsArray,
-  IsUUID,
   IsNumber,
-  Min,
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsUrl,
   Max,
+  MaxLength,
+  Min,
   ValidateNested,
-  ArrayMaxSize,
 } from "class-validator";
 import { Type } from "class-transformer";
 import { SanitizeHtml } from "../../common/decorators/sanitize-html.decorator";
@@ -113,6 +114,42 @@ export class CreateSecurityDto {
   @IsOptional()
   @IsBoolean()
   isFavourite?: boolean;
+
+  @ApiProperty({
+    example: "https://www.apple.com",
+    description:
+      "The issuer's or product's own page. The protocol is optional (https is assumed).",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  // Rendered as a link on the detail page, so the scheme is a security control:
+  // without the protocol whitelist `javascript:...` validates and the anchor
+  // becomes a way to run it. `require_protocol: false` keeps typing "apple.com"
+  // working -- the service normalises it to https before storing.
+  @IsUrl({
+    protocols: ["http", "https"],
+    require_protocol: false,
+    require_tld: true,
+  })
+  website?: string | null;
+
+  @ApiProperty({
+    example: "https://investor.apple.com",
+    description:
+      "The investor-relations page. No quote provider supplies this, so it is manual.",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  @IsUrl({
+    protocols: ["http", "https"],
+    require_protocol: false,
+    require_tld: true,
+  })
+  irWebsite?: string | null;
 
   @ApiProperty({
     example: "msn",

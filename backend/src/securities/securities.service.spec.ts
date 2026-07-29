@@ -102,7 +102,8 @@ describe("SecuritiesService", () => {
     };
 
     mockYahooFinanceService = {
-      fetchSecurityProfileDescription: jest.fn().mockResolvedValue(null),
+      fetchSecurityProfileDescription: jest.fn(),
+      fetchSecurityProfile: jest.fn().mockResolvedValue(null),
     };
 
     securityTagsRepository = {
@@ -1787,30 +1788,52 @@ describe("SecuritiesService", () => {
   });
 
   describe("getSuggestedDescription", () => {
-    it("returns the Yahoo profile description", async () => {
-      mockYahooFinanceService.fetchSecurityProfileDescription.mockResolvedValue(
-        "Apple Inc. designs phones.",
-      );
+    it("returns the Yahoo profile description and website together", async () => {
+      // One call for both: the website rides along in the `summaryProfile` the
+      // description already needed, so there is no second request to make.
+      mockYahooFinanceService.fetchSecurityProfile.mockResolvedValue({
+        description: "Apple Inc. designs phones.",
+        website: "https://www.apple.com",
+      });
 
       const result = await service.getSuggestedDescription("AAPL", "NASDAQ");
 
-      expect(
-        mockYahooFinanceService.fetchSecurityProfileDescription,
-      ).toHaveBeenCalledWith("AAPL", "NASDAQ");
+      expect(mockYahooFinanceService.fetchSecurityProfile).toHaveBeenCalledWith(
+        "AAPL",
+        "NASDAQ",
+      );
       expect(result).toEqual({
         symbol: "AAPL",
         description: "Apple Inc. designs phones.",
+        website: "https://www.apple.com",
       });
     });
 
-    it("returns a null description when Yahoo has nothing", async () => {
-      mockYahooFinanceService.fetchSecurityProfileDescription.mockResolvedValue(
-        null,
-      );
+    it("returns nulls when Yahoo has nothing", async () => {
+      mockYahooFinanceService.fetchSecurityProfile.mockResolvedValue({
+        description: null,
+        website: null,
+      });
 
       const result = await service.getSuggestedDescription("XYZ");
 
-      expect(result).toEqual({ symbol: "XYZ", description: null });
+      expect(result).toEqual({
+        symbol: "XYZ",
+        description: null,
+        website: null,
+      });
+    });
+
+    it("carries a null website for a fund, where Yahoo publishes no URL", async () => {
+      mockYahooFinanceService.fetchSecurityProfile.mockResolvedValue({
+        description: "iShares Core MSCI World (BlackRock). TER 0.20%.",
+        website: null,
+      });
+
+      const result = await service.getSuggestedDescription("IWDA", "AMS");
+
+      expect(result.description).toContain("iShares");
+      expect(result.website).toBeNull();
     });
   });
 

@@ -34,6 +34,10 @@ export interface Security {
   countryWeightings: { name: string; weight: number }[] | null;
   /** Manual ETF/fund asset-class breakdown (free-text names); weight is a decimal 0-1. */
   assetWeightings: { name: string; weight: number }[] | null;
+  /** The issuer's or product's page; auto-filled from Yahoo for shares. */
+  website: string | null;
+  /** The investor-relations page; manual, no provider supplies one. */
+  irWebsite: string | null;
   quoteProvider: QuoteProviderName | null;
   msnInstrumentId: string | null;
   /** Source of the most recent price row for this security (e.g. "yahoo_finance", "msn_finance", "manual"), or null if no prices exist. */
@@ -438,6 +442,9 @@ export interface CreateSecurityData {
   exchange?: string;
   currencyCode: string;
   description?: string;
+  /** Empty string clears the stored address; the backend normalises the rest. */
+  website?: string | null;
+  irWebsite?: string | null;
   tagIds?: string[];
   quoteProvider?: QuoteProviderName | null;
   msnInstrumentId?: string;

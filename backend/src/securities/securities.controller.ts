@@ -264,7 +264,8 @@ export class SecuritiesController {
   @Get("profile-description")
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @ApiOperation({
-    summary: "Suggest a description for a security from Yahoo Finance",
+    summary:
+      "Suggest a description and website for a security from Yahoo Finance",
     description:
       "Best-effort pre-fill: stock prose or a synthesized fund one-liner. Advisory only; persists nothing.",
   })
@@ -278,13 +279,18 @@ export class SecuritiesController {
       properties: {
         symbol: { type: "string" },
         description: { type: "string", nullable: true },
+        website: { type: "string", nullable: true },
       },
     },
   })
   suggestDescription(
     @Query("symbol") symbol: string,
     @Query("exchange") exchange?: string,
-  ): Promise<{ symbol: string; description: string | null }> {
+  ): Promise<{
+    symbol: string;
+    description: string | null;
+    website: string | null;
+  }> {
     const sym = assertStringParam(symbol, "symbol");
     const exch = assertStringParam(exchange, "exchange");
     const safeSymbol = (sym ?? "").slice(0, 20);

@@ -22,6 +22,8 @@ function security(id: string, symbol: string, name: string): Security {
     sectorWeightings: null,
     countryWeightings: null,
     assetWeightings: null,
+    website: null,
+    irWebsite: null,
     quoteProvider: 'yahoo',
     msnInstrumentId: null,
     lastPriceSource: null,

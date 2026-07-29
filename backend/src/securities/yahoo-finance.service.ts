@@ -1120,6 +1120,25 @@ export class YahooFinanceService implements QuoteProvider {
     symbol: string,
     exchange: string | null = null,
   ): Promise<string | null> {
+    return (await this.fetchSecurityProfile(symbol, exchange)).description;
+  }
+
+  /**
+   * The description *and* the issuer's website, from one `quoteSummary` call.
+   *
+   * `summaryProfile.website` rides along in a response this already fetched and
+   * discarded, so surfacing it costs no extra request, no extra crumb and no
+   * extra rate-limit budget. It is populated for shares; for ETFs and funds
+   * Yahoo gives a fund family and no URL, so the field comes back null and the
+   * user types it.
+   *
+   * There is no investor-relations address to read: no `quoteSummary` module
+   * carries one, and neither does MSN. That field stays manual by nature.
+   */
+  async fetchSecurityProfile(
+    symbol: string,
+    exchange: string | null = null,
+  ): Promise<{ description: string | null; website: string | null }> {
     const yahooSymbol = this.getYahooSymbol(symbol, exchange);
     try {
       const modules =
@@ -1131,27 +1150,42 @@ export class YahooFinanceService implements QuoteProvider {
         this.logger.warn(
           `Yahoo Finance profile returned ${response?.status ?? "no response"} for ${yahooSymbol}`,
         );
-        return null;
+        return { description: null, website: null };
       }
 
       const data = await response.json();
       const result = data.quoteSummary?.result?.[0];
-      if (!result) return null;
+      if (!result) return { description: null, website: null };
 
       const prose: string | undefined =
         result.summaryProfile?.longBusinessSummary;
-      if (prose && prose.trim().length > 0) {
-        return prose.trim();
-      }
+      const description =
+        prose && prose.trim().length > 0
+          ? prose.trim()
+          : this.synthesizeFundDescription(result);
 
-      return this.synthesizeFundDescription(result);
+      return { description, website: this.pickWebsite(result) };
     } catch (error) {
       this.logger.error(
-        `Failed to fetch profile description for ${yahooSymbol}`,
+        `Failed to fetch profile for ${yahooSymbol}`,
         error instanceof Error ? error.stack : undefined,
       );
-      return null;
+      return { description: null, website: null };
     }
+  }
+
+  /**
+   * The website from a `quoteSummary` result, or null.
+   *
+   * Only an http(s) address is accepted: the value is a third-party string that
+   * the UI turns into a link, so it is no more trusted than one a user typed.
+   */
+  private pickWebsite(result: Record<string, any>): string | null {
+    const raw: unknown =
+      result.summaryProfile?.website ?? result.assetProfile?.website;
+    if (typeof raw !== "string") return null;
+    const trimmed = raw.trim();
+    return /^https?:\/\//i.test(trimmed) ? trimmed : null;
   }
 
   /**

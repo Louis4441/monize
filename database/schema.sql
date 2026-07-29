@@ -396,6 +396,8 @@ CREATE TABLE securities (
     country_weightings JSONB,        -- manual ETF/fund country breakdown [{name, weight}] (weight is a decimal 0-1)
     asset_weightings JSONB,          -- manual ETF/fund asset-class breakdown [{name, weight}] (free-text names, weight is a decimal 0-1)
     sector_data_updated_at TIMESTAMP, -- cache staleness check
+    website VARCHAR(2048),           -- issuer/product page; auto-filled from Yahoo for shares
+    ir_website VARCHAR(2048),        -- investor-relations page; manual, no provider supplies it
     quote_provider VARCHAR(20),      -- per-security provider override: 'yahoo' | 'msn' | NULL = user default
     msn_instrument_id VARCHAR(50),   -- cached MSN Financial Instrument ID (SecId)
     historical_backfill_attempted_at TIMESTAMP, -- last time we asked the provider for a multi-year backfill

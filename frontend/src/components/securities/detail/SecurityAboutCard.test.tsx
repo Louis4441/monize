@@ -22,6 +22,8 @@ function security(overrides: Partial<Security> = {}): Security {
     sectorWeightings: null,
     countryWeightings: null,
     assetWeightings: null,
+    website: null,
+    irWebsite: null,
     quoteProvider: 'yahoo',
     msnInstrumentId: null,
     lastPriceSource: null,
@@ -118,12 +120,55 @@ describe('SecurityAboutCard', () => {
     });
   });
 
-  it('marks the fields the schema has no column for as not stored', () => {
-    render(<SecurityAboutCard security={security()} />);
-    // Website and IR website are laid out but unbacked; a placeholder is honest
-    // where a fabricated link would not be.
-    expect(screen.getByText('Website')).toBeInTheDocument();
-    expect(screen.getByText('IR Website')).toBeInTheDocument();
-    expect(screen.getAllByText('Not stored yet')).toHaveLength(2);
+  describe('the two addresses', () => {
+    it('links to each one, showing the host', () => {
+      render(
+        <SecurityAboutCard
+          security={security({
+            website: 'https://www.apple.com',
+            irWebsite: 'https://investor.apple.com',
+          })}
+        />,
+      );
+
+      const site = screen.getByRole('link', { name: 'apple.com' });
+      expect(site).toHaveAttribute('href', 'https://www.apple.com');
+      // Opens away from the app, and the destination has no business learning
+      // which page the reader came from.
+      expect(site).toHaveAttribute('target', '_blank');
+      expect(site).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(
+        screen.getByRole('link', { name: 'investor.apple.com' }),
+      ).toBeInTheDocument();
+    });
+
+    it('drops the row when an address is not stored', () => {
+      // These used to read "Not stored yet" because there was no column. There
+      // is one now, so an unset field behaves like every other empty row.
+      render(<SecurityAboutCard security={security()} />);
+      expect(screen.queryByText('Website')).not.toBeInTheDocument();
+      expect(screen.queryByText('IR Website')).not.toBeInTheDocument();
+    });
+
+    it('refuses to build a link from an address that is not http(s)', () => {
+      // The value reaches here from the database; the backend normalises what it
+      // stores, but a link built from an unchecked string is a link that can run
+      // something.
+      render(
+        <SecurityAboutCard
+          security={security({ website: 'javascript:alert(1)' })}
+        />,
+      );
+      expect(screen.queryByRole('link')).not.toBeInTheDocument();
+      expect(screen.queryByText('Website')).not.toBeInTheDocument();
+    });
+
+    it('shows one address without implying the other exists', () => {
+      render(
+        <SecurityAboutCard security={security({ website: 'https://vanguard.co.uk' })} />,
+      );
+      expect(screen.getByRole('link', { name: 'vanguard.co.uk' })).toBeInTheDocument();
+      expect(screen.queryByText('IR Website')).not.toBeInTheDocument();
+    });
   });
 });
