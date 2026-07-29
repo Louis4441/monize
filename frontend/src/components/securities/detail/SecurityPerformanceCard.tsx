@@ -50,9 +50,17 @@ export function SecurityPerformanceCard({
 
   return (
     <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
-      <h3 className="mb-3 text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
         {t('performance.title')}
       </h3>
+      {/* These are the security's returns, not the holder's: they measure the
+          instrument over a window regardless of when it was bought or whether it
+          was held at all. Readers take any "Performance" heading on a page about
+          their own holding to mean their own return, so the card says which one
+          it is and where to find the other. */}
+      <p className="mb-3 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+        {t('performance.subject')}
+      </p>
       {hasAny ? (
         <dl className="space-y-2">
           {returns.map(({ period, value }) => (

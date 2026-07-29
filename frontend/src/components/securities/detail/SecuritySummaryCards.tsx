@@ -12,12 +12,18 @@ import {
   SummaryCardGrid,
   type SummaryCardItem,
 } from '@/components/accounts/shared/SummaryCardGrid';
+import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { gainLossColor } from '@/lib/format';
 import type { SecurityDetail } from '@/types/investment';
 
 interface SecuritySummaryCardsProps {
   detail: SecurityDetail;
+  /**
+   * The close the market value was struck at, and whether it is recent enough to
+   * pass for today's. Null when no price is on record.
+   */
+  quoteAsOf?: { priceDate: string; isCurrent: boolean } | null;
 }
 
 const ICON_CLASS = 'h-4 w-4';
@@ -31,8 +37,12 @@ const ICON_CLASS = 'h-4 w-4';
  * zero: a zero market value is a claim about worth, and "there is no quote" (or
  * "this sits in a closed account") is not that claim.
  */
-export function SecuritySummaryCards({ detail }: SecuritySummaryCardsProps) {
+export function SecuritySummaryCards({
+  detail,
+  quoteAsOf = null,
+}: SecuritySummaryCardsProps) {
   const t = useTranslations('securityDetail');
+  const { formatDate } = useDateFormat();
   const {
     formatCurrency,
     formatCurrencyPrecise,
@@ -63,6 +73,22 @@ export function SecuritySummaryCards({ detail }: SecuritySummaryCardsProps) {
         position.marketValue === null
           ? unknown
           : formatCurrency(position.marketValue, currency),
+      // Market value is quantity times the newest close on record, whatever day
+      // that is. A security whose prices stopped updating in 2019 would
+      // otherwise present a 2019 valuation as today's, with nothing on the card
+      // to say so -- the header already flags a stale quote, and this figure is
+      // derived from the very same price.
+      note:
+        position.marketValue === null || quoteAsOf === null ? undefined : quoteAsOf.isCurrent ? (
+          t('cards.asOf', { date: formatDate(quoteAsOf.priceDate) })
+        ) : (
+          <span
+            className="text-amber-600 dark:text-amber-500"
+            title={t('cards.asOfStaleTitle')}
+          >
+            {t('cards.asOfStale', { date: formatDate(quoteAsOf.priceDate) })}
+          </span>
+        ),
     },
     {
       label: t('cards.costBasis'),

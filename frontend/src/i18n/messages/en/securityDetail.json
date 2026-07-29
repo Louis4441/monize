@@ -32,7 +32,10 @@
     "heldInAccounts": "Held in accounts",
     "total": "Total",
     "unitsShare": "{units} ({share})",
-    "valueUnknown": "Not priced"
+    "valueUnknown": "Not priced",
+    "asOf": "At the close of {date}",
+    "asOfStale": "At the close of {date}, the newest price on record",
+    "asOfStaleTitle": "No newer price is stored, so this is what the position was worth on that day rather than today. Update prices from the provider, or add one by hand."
   },
   "chart": {
     "title": "{symbol} price",
@@ -87,7 +90,8 @@
     "notStored": "Not stored yet"
   },
   "performance": {
-    "title": "Performance",
+    "title": "Security performance",
+    "subject": "How the instrument itself has moved, whether or not you held it. What your own position made is under Total return.",
     "empty": "Not enough price history to measure a return yet.",
     "unavailable": "n/a",
     "periods": {
@@ -111,6 +115,9 @@
     "dividends": "Dividends",
     "fees": "Fees",
     "realizedPl": "Realized P/L",
+    "realizedMixed": "Realized in {currencies}, so not added up",
+    "totalReturn": "Total return",
+    "totalReturnTitle": "Unrealized gain, plus what you realized on sales and received in income, less fees, over the capital you put in. A simple return on that capital: it is not annualized and does not weight tranches by how long you held them.",
     "status": "Status",
     "statusOpen": "Open",
     "statusClosed": "Closed",

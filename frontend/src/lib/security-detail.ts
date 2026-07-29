@@ -268,6 +268,87 @@ export function computePeriodReturn(
   return roundToDecimals((to / from - 1) * 100, 2);
 }
 
+/**
+ * Everything the position's own return needs. Every money field must already be
+ * in `securityCurrency`; nothing here converts, and the guards below refuse the
+ * figure rather than mix units.
+ */
+export interface PositionReturnInput {
+  /** Gross cost of every acquiring leg, commission excluded. */
+  totalInvested: number;
+  /** Worth of what is still held; null when it cannot be known. */
+  marketValue: number | null;
+  /** Cost basis of what is still held; null when it cannot be known. */
+  costBasis: number | null;
+  dividends: number;
+  fees: number;
+  realizedGain: number | null;
+  realizedGainCurrency: string | null;
+  /** Zero means never sold, which is a realised gain of nothing. */
+  realizedSaleCount: number;
+  securityCurrency: string;
+  /** True once the position has been sold down to nothing. */
+  isPositionClosed: boolean;
+}
+
+export interface PositionReturn {
+  /** Unrealised + realised + income - fees, in the security's currency. */
+  profit: number;
+  /** That profit over the capital ever put in, as a percentage. */
+  percent: number;
+}
+
+/**
+ * What the *position* returned, as distinct from what the security did.
+ *
+ * The Performance card answers "how has this instrument moved", which is a fact
+ * about the market. This answers "what did I make on it", which also depends on
+ * when the shares were bought, what was sold, and what it paid out. Readers
+ * conflate the two, so the page has to state both.
+ *
+ * A deliberately simple measure: total profit over the capital ever deployed,
+ * not annualised and not weighted by how long each tranche was held. It is not
+ * TWR and not IRR, and the copy beside it must not imply otherwise -- those need
+ * a full cash-flow series, which lives in the portfolio calculation.
+ *
+ * Returns null rather than a figure whenever a component is unknown or sits in
+ * another currency. A partial total here would read as a complete one.
+ */
+export function computePositionReturn(
+  input: PositionReturnInput,
+): PositionReturn | null {
+  // No capital in means no return to state -- and no denominator either.
+  if (!(input.totalInvested > 0)) return null;
+
+  let realized = 0;
+  if (input.realizedSaleCount > 0) {
+    // Null here means the sales spanned currencies; a different currency means
+    // converting, which this page deliberately never does.
+    if (
+      input.realizedGain === null ||
+      input.realizedGainCurrency !== input.securityCurrency
+    ) {
+      return null;
+    }
+    realized = input.realizedGain;
+  }
+
+  let unrealized = 0;
+  if (!input.isPositionClosed) {
+    if (input.marketValue === null || input.costBasis === null) return null;
+    unrealized = input.marketValue - input.costBasis;
+  }
+
+  const profit = roundToDecimals(
+    unrealized + realized + input.dividends - input.fees,
+    4,
+  );
+  return {
+    profit,
+    percent: roundToDecimals((profit / input.totalInvested) * 100, 2),
+  };
+}
+
 /** Prices within `[start, end]`; an empty `start` means "from the beginning". */
 export function filterPriceWindow(
   series: readonly SecurityPricePoint[],

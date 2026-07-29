@@ -148,6 +148,8 @@ function detailFixture(overrides: Partial<SecurityDetail> = {}): SecurityDetail 
       fees: 48.3,
       realizedGain: null,
       realizedGainCurrency: null,
+      realizedGainCurrencies: [],
+      realizedSaleCount: 0,
       transactionCount: 4,
     },
     hasTransactions: true,
@@ -358,7 +360,9 @@ describe('SecurityDetailPage', () => {
       await renderPage();
       for (const name of [
         'About',
-        'Performance',
+        // Named for its subject: these are the instrument's returns, not the
+        // holder's, and "Performance" alone was read as the latter.
+        'Security performance',
         'Position info',
         'Accounts',
       ]) {

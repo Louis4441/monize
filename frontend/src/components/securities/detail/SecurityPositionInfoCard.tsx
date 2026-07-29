@@ -5,6 +5,7 @@ import { KeyValueList, type KeyValueRow } from '@/components/ui/KeyValueList';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { gainLossColor } from '@/lib/format';
+import { computePositionReturn } from '@/lib/security-detail';
 import type { SecurityDetail } from '@/types/investment';
 
 interface SecurityPositionInfoCardProps {
@@ -21,9 +22,22 @@ export function SecurityPositionInfoCard({
 }: SecurityPositionInfoCardProps) {
   const t = useTranslations('securityDetail');
   const { formatDate } = useDateFormat();
-  const { formatCurrency } = useNumberFormat();
-  const { activity, security } = detail;
+  const { formatCurrency, formatSignedPercent } = useNumberFormat();
+  const { activity, security, position } = detail;
   const currency = security.currencyCode;
+
+  const positionReturn = computePositionReturn({
+    totalInvested: activity.totalInvested,
+    marketValue: position.marketValue,
+    costBasis: position.costBasis,
+    dividends: activity.dividends,
+    fees: activity.fees,
+    realizedGain: activity.realizedGain,
+    realizedGainCurrency: activity.realizedGainCurrency,
+    realizedSaleCount: activity.realizedSaleCount,
+    securityCurrency: currency,
+    isPositionClosed: detail.isPositionClosed,
+  });
 
   const status = !detail.hasTransactions
     ? { label: t('positionInfo.statusNone'), tone: 'neutral' as const }
@@ -69,21 +83,47 @@ export function SecurityPositionInfoCard({
     {
       key: 'realizedPl',
       label: t('positionInfo.realizedPl'),
-      // Denominated in the holding account's currency, not the security's, and
-      // absent entirely when sales spanned several currencies -- KeyValueList
-      // drops the row rather than showing a figure in no currency at all.
+      // Denominated in the holding account's currency, not the security's. When
+      // sales spanned currencies the gains are real but not addable, so the row
+      // says which currencies they sit in instead of going blank -- a blank row
+      // is how "you never sold" reads, and that is a different statement.
       value:
-        activity.realizedGain === null || activity.realizedGainCurrency === null
-          ? null
-          : (
-              <span className={gainLossColor(activity.realizedGain)}>
-                {activity.realizedGain >= 0 ? '+' : ''}
-                {formatCurrency(
-                  activity.realizedGain,
-                  activity.realizedGainCurrency,
-                )}
-              </span>
-            ),
+        activity.realizedGain !== null &&
+        activity.realizedGainCurrency !== null ? (
+          <span className={gainLossColor(activity.realizedGain)}>
+            {activity.realizedGain >= 0 ? '+' : ''}
+            {formatCurrency(
+              activity.realizedGain,
+              activity.realizedGainCurrency,
+            )}
+          </span>
+        ) : activity.realizedSaleCount > 0 ? (
+          <span className="text-gray-500 dark:text-gray-400">
+            {t('positionInfo.realizedMixed', {
+              currencies: activity.realizedGainCurrencies.join(', '),
+            })}
+          </span>
+        ) : null,
+    },
+    {
+      key: 'totalReturn',
+      label: t('positionInfo.totalReturn'),
+      // What the holder made, as opposed to what the instrument did -- the
+      // Performance card answers the latter. Absent whenever a component is
+      // unknown or in another currency; see `computePositionReturn`.
+      value:
+        positionReturn === null ? null : (
+          <span
+            className={gainLossColor(positionReturn.profit)}
+            title={t('positionInfo.totalReturnTitle')}
+          >
+            {positionReturn.profit >= 0 ? '+' : ''}
+            {formatCurrency(positionReturn.profit, currency)}
+            {' ('}
+            {formatSignedPercent(positionReturn.percent)}
+            {')'}
+          </span>
+        ),
     },
     {
       key: 'status',

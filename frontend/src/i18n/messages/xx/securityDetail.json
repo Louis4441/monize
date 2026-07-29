@@ -32,7 +32,10 @@
     "heldInAccounts": "[XX-Held in accounts-XX]",
     "total": "[XX-Total-XX]",
     "unitsShare": "[XX-{units} ({share})-XX]",
-    "valueUnknown": "[XX-Not priced-XX]"
+    "valueUnknown": "[XX-Not priced-XX]",
+    "asOf": "[XX-At the close of {date}-XX]",
+    "asOfStale": "[XX-At the close of {date}, the newest price on record-XX]",
+    "asOfStaleTitle": "[XX-No newer price is stored, so this is what the position was worth on that day rather than today. Update prices from the provider, or add one by hand.-XX]"
   },
   "chart": {
     "title": "[XX-{symbol} price-XX]",
@@ -87,7 +90,8 @@
     "notStored": "[XX-Not stored yet-XX]"
   },
   "performance": {
-    "title": "[XX-Performance-XX]",
+    "title": "[XX-Security performance-XX]",
+    "subject": "[XX-How the instrument itself has moved, whether or not you held it. What your own position made is under Total return.-XX]",
     "empty": "[XX-Not enough price history to measure a return yet.-XX]",
     "unavailable": "[XX-n/a-XX]",
     "periods": {
@@ -111,6 +115,9 @@
     "dividends": "[XX-Dividends-XX]",
     "fees": "[XX-Fees-XX]",
     "realizedPl": "[XX-Realized P/L-XX]",
+    "realizedMixed": "[XX-Realized in {currencies}, so not added up-XX]",
+    "totalReturn": "[XX-Total return-XX]",
+    "totalReturnTitle": "[XX-Unrealized gain, plus what you realized on sales and received in income, less fees, over the capital you put in. A simple return on that capital: it is not annualized and does not weight tranches by how long you held them.-XX]",
     "status": "[XX-Status-XX]",
     "statusOpen": "[XX-Open-XX]",
     "statusClosed": "[XX-Closed-XX]",

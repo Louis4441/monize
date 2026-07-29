@@ -292,7 +292,17 @@ function SecurityDetailContent() {
           {/* Zero-filled cards would claim a position that is not there, so a
               closed or never-held security gets its own panel instead. */}
           {detail.accounts.length > 0 ? (
-            <SecuritySummaryCards detail={detail} />
+            <SecuritySummaryCards
+              detail={detail}
+              // The same newest close the backend valued the position at: both
+              // take the latest `security_prices` row, so dating the card from
+              // the series cannot disagree with the figure on it.
+              quoteAsOf={
+                quote
+                  ? { priceDate: quote.priceDate, isCurrent: quote.isCurrent }
+                  : null
+              }
+            />
           ) : (
             <SecurityPositionState detail={detail} />
           )}
