@@ -121,7 +121,8 @@
     "selectedCount": "{count} seçildi"
   },
   "combobox": {
-    "createOption": "\"{value}\" oluştur"
+    "createOption": "\"{value}\" oluştur",
+    "deleteOption": "\"{value}\" sil"
   },
   "passwordInput": {
     "show": "Girdiyi göster",

@@ -905,8 +905,42 @@ describe("ToolExecutorService", () => {
     it("get_portfolio_summary delegates to portfolioService.getLlmSummary", async () => {
       const result = await service.execute(userId, "get_portfolio_summary", {});
 
-      expect(portfolio.getLlmSummary).toHaveBeenCalledWith(userId, undefined);
+      expect(portfolio.getLlmSummary).toHaveBeenCalledWith(userId, undefined, {
+        includeLookThrough: false,
+      });
       expect(result.sources[0].type).toBe("portfolio");
+    });
+
+    it("get_portfolio_summary requests the look-through when asked", async () => {
+      portfolio.getLlmSummary.mockResolvedValueOnce({
+        holdingCount: 1,
+        totalPortfolioValue: 1000,
+        totalGainLoss: 100,
+        totalGainLossPercent: 10,
+        lookThrough: {
+          totalPortfolioValue: 1000,
+          byCountry: {
+            items: [{ name: "United States", value: 750, percentage: 75 }],
+            unclassifiedValue: 250,
+            unclassifiedPercentage: 25,
+          },
+          byAssetClass: {
+            items: [{ name: "Equity", value: 600, percentage: 60 }],
+            unclassifiedValue: 400,
+            unclassifiedPercentage: 40,
+          },
+        },
+      });
+
+      const result = await service.execute(userId, "get_portfolio_summary", {
+        includeLookThrough: true,
+      });
+
+      expect(portfolio.getLlmSummary).toHaveBeenCalledWith(userId, undefined, {
+        includeLookThrough: true,
+      });
+      expect(result.summary).toContain("1 country");
+      expect(result.summary).toContain("1 asset class");
     });
 
     it("list_investment_transactions delegates to investmentTransactions.getLlmInvestmentTransactions", async () => {
@@ -2511,6 +2545,31 @@ describe("ToolExecutorService", () => {
       });
       expect(securities.previewUpdateSecurity).toHaveBeenCalled();
       expect(result.pendingAction?.type).toBe("update_security");
+    });
+
+    it("update forwards a manual asset allocation as decimals", async () => {
+      await service.execute(userId, "manage_securities", {
+        operation: "update",
+        items: [
+          {
+            symbol: "VBAL",
+            assetWeightings: [
+              { name: "Equity", weight: 60 },
+              { name: "Fixed Income", weight: 40 },
+            ],
+          },
+        ],
+      });
+
+      expect(securities.previewUpdateSecurity).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({
+          assetWeightings: [
+            { name: "Equity", weight: 0.6 },
+            { name: "Fixed Income", weight: 0.4 },
+          ],
+        }),
+      );
     });
 
     it("delete returns a signed delete_security pending action", async () => {

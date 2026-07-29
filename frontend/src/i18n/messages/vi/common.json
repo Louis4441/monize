@@ -121,7 +121,8 @@
     "selectedCount": "Đã chọn {count}"
   },
   "combobox": {
-    "createOption": "Tạo \"{value}\""
+    "createOption": "Tạo \"{value}\"",
+    "deleteOption": "Xóa \"{value}\""
   },
   "passwordInput": {
     "show": "Hiển thị mật khẩu",

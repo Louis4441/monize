@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/Select';
 import { Combobox } from '@/components/ui/Combobox';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SecurityLookupPicker, LookupCandidate } from './SecurityLookupPicker';
 import { AllocationEditor, AllocationRow } from './AllocationEditor';
@@ -30,18 +31,27 @@ import { useFormDirtyNotify } from '@/hooks/useFormDirtyNotify';
 import { FormActions } from '@/components/ui/FormActions';
 import { EXCHANGE_OPTIONS, COUNTRY_OPTIONS } from '@/lib/constants';
 
-// Map stored country weightings (decimal 0-1) to editor rows (percentage strings).
-const toCountryRows = (
+// Map stored weightings (decimal 0-1) to editor rows (percentage strings).
+const toAllocationRows = (
   weightings: { name: string; weight: number }[] | null | undefined,
 ): AllocationRow[] =>
   (weightings ?? [])
-    // A provider "Other" bucket isn't a country: don't surface it as a row --
+    // An "Other" bucket isn't a real slice: don't surface it as a row --
     // it's folded into the editor's computed (100 - total) "Other" remainder.
     .filter((w) => (w.name ?? '').trim().toLowerCase() !== 'other')
     .map((w) => ({
       name: w.name,
       weight: String(Math.round(w.weight * 1000000) / 10000),
     }));
+
+// Editor rows -> API slices: trim names, drop blank/zero rows. Weights stay in
+// percentage units here; the caller converts to the stored decimal 0-1 form.
+const toAllocationSlices = (rows: AllocationRow[]) =>
+  rows
+    .map((row) => ({ name: row.name.trim(), weight: parseFloat(row.weight) }))
+    .filter(
+      (row) => row.name !== '' && Number.isFinite(row.weight) && row.weight > 0,
+    );
 
 const logger = createLogger('SecurityForm');
 
@@ -108,13 +118,24 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
     security?.tags?.map((tag) => tag.id) || [],
   );
   const [countryRows, setCountryRows] = useState<AllocationRow[]>(
-    toCountryRows(security?.countryWeightings),
+    toAllocationRows(security?.countryWeightings),
   );
   // Canonical countries plus the user's custom ones, base-currency country
   // first. Seeded with the static list so the picker works before the fetch.
   const [countryNames, setCountryNames] = useState<string[]>(
     COUNTRY_OPTIONS.map((o) => o.value),
   );
+  const [assetRows, setAssetRows] = useState<AllocationRow[]>(
+    toAllocationRows(security?.assetWeightings),
+  );
+  // Asset classes are free text with no canonical list: the picker offers only
+  // what this user has already saved, so it starts from the security's own rows
+  // until the fetch lands.
+  const [assetNames, setAssetNames] = useState<string[]>(() =>
+    toAllocationRows(security?.assetWeightings).map((row) => row.name),
+  );
+  // Asset class the user asked to delete from the list, pending confirmation.
+  const [assetToDelete, setAssetToDelete] = useState<string | null>(null);
   const [showTagForm, setShowTagForm] = useState(false);
 
   useEffect(() => {
@@ -128,10 +149,33 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    investmentsApi
+      .getAssetOptions()
+      .then(setAssetNames)
+      .catch(() => {});
+  }, []);
+
   const countryOptions = useMemo(
     () => countryNames.map((name) => ({ value: name, label: name })),
     [countryNames],
   );
+
+  // The names on this security's own rows may not be saved yet, so merge them
+  // into the fetched list (case-insensitively) rather than losing them.
+  const assetOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const name of [...assetNames, ...assetRows.map((row) => row.name)]) {
+      const trimmed = name.trim();
+      if (!trimmed || seen.has(trimmed.toLowerCase())) continue;
+      seen.add(trimmed.toLowerCase());
+      names.push(trimmed);
+    }
+    return names
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ value: name, label: name }));
+  }, [assetNames, assetRows]);
 
   useEffect(() => {
     tagsApi.getAll().then(setTags).catch(() => {});
@@ -282,7 +326,8 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
     if (security) {
       reset();
       setSelectedTagIds(security.tags?.map((tag) => tag.id) || []);
-      setCountryRows(toCountryRows(security.countryWeightings));
+      setCountryRows(toAllocationRows(security.countryWeightings));
+      setAssetRows(toAllocationRows(security.assetWeightings));
     } else {
       reset({
         symbol: '',
@@ -297,9 +342,34 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
       });
       setSelectedTagIds([]);
       setCountryRows([]);
+      setAssetRows([]);
     }
     setHasLookupResult(false);
   }, [reset, defaultValues, defaultCurrency, security]);
+
+  // Drop an asset class from the user's list. The backend removes it from every
+  // security that used it; nothing is re-apportioned, so the freed percentage
+  // simply falls into each security's computed "Other" remainder -- including
+  // this form's, once the matching rows are gone.
+  const confirmDeleteAsset = useCallback(async () => {
+    const name = assetToDelete;
+    setAssetToDelete(null);
+    if (!name) return;
+    try {
+      await investmentsApi.deleteAssetOption(name);
+      const lower = name.trim().toLowerCase();
+      setAssetNames((prev) =>
+        prev.filter((option) => option.trim().toLowerCase() !== lower),
+      );
+      setAssetRows((prev) =>
+        prev.filter((row) => row.name.trim().toLowerCase() !== lower),
+      );
+      toast.success(t('form.assetAllocation.deleteSuccess', { name }));
+    } catch (error) {
+      logger.error('Asset class delete failed:', error);
+      toast.error(t('form.assetAllocation.deleteFailed', { name }));
+    }
+  }, [assetToDelete, t]);
 
   // Pre-fill the description from the Yahoo provider profile. Best-effort and
   // always editable; replaces whatever is in the field so the user can review.
@@ -324,15 +394,12 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
       data.securityType === 'ETF' || data.securityType === 'MUTUAL_FUND';
 
     // Editor weights are percentages; persist as decimal 0-1. Drop blank rows.
-    const countrySlices = countryRows
-      .map((row) => ({
-        name: row.name.trim(),
-        weight: parseFloat(row.weight),
-      }))
-      .filter((row) => row.name !== '' && Number.isFinite(row.weight) && row.weight > 0);
+    const countrySlices = toAllocationSlices(countryRows);
+    const assetSlices = toAllocationSlices(assetRows);
 
-    const countryTotal = countrySlices.reduce((sum, row) => sum + row.weight, 0);
-    if (isFund && countryTotal > 100.0001) {
+    const overAllocated = (slices: { weight: number }[]) =>
+      slices.reduce((sum, row) => sum + row.weight, 0) > 100.0001;
+    if (isFund && (overAllocated(countrySlices) || overAllocated(assetSlices))) {
       toast.error(t('form.allocation.overError'));
       return;
     }
@@ -351,10 +418,14 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
       quoteProvider: data.quoteProvider === '' ? null : data.quoteProvider,
       msnInstrumentId: data.msnInstrumentId?.trim() || undefined,
       isFavourite: data.isFavourite ?? false,
-      // Only ETFs/funds carry a manual country breakdown; send [] to clear it.
+      // Only ETFs/funds carry the manual breakdowns; send [] to clear them.
       ...(isFund
         ? {
             countryWeightings: countrySlices.map((row) => ({
+              name: row.name,
+              weight: row.weight / 100,
+            })),
+            assetWeightings: assetSlices.map((row) => ({
               name: row.name,
               weight: row.weight / 100,
             })),
@@ -583,6 +654,42 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
           />
         </div>
       )}
+
+      {/* Manual asset-class allocation (ETFs/funds only). Free text: the picker
+          offers whatever the user has already saved, and entries can be deleted
+          from the list straight from the dropdown. */}
+      {isFundType && (
+        <div>
+          <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('form.assetAllocation.sectionTitle')}
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            {t('form.assetAllocation.help')}
+          </p>
+          <AllocationEditor
+            value={assetRows}
+            onChange={setAssetRows}
+            options={assetOptions}
+            namePlaceholder={t('form.assetAllocation.placeholder')}
+            addRowLabel={t('form.assetAllocation.addRow')}
+            nameAriaLabel={t('form.assetAllocation.nameAriaLabel')}
+            onDeleteOption={setAssetToDelete}
+            deleteOptionAriaLabel={t('form.assetAllocation.deleteOption')}
+          />
+        </div>
+      )}
+
+      <ConfirmDialog
+        isOpen={assetToDelete !== null}
+        title={t('form.assetAllocation.deleteTitle')}
+        message={t('form.assetAllocation.deleteMessage', {
+          name: assetToDelete ?? '',
+        })}
+        confirmLabel={t('form.assetAllocation.deleteConfirm')}
+        onConfirm={confirmDeleteAsset}
+        onCancel={() => setAssetToDelete(null)}
+        pushHistory
+      />
 
       {/* Tag creation modal */}
       <Modal isOpen={showTagForm} onClose={() => setShowTagForm(false)} maxWidth="lg" allowOverflow pushHistory className="p-6">

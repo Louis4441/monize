@@ -32,6 +32,8 @@ export interface Security {
   sectorWeightings: { sector: string; weight: number }[] | null;
   /** Manual ETF/fund country breakdown; weight is a decimal 0-1 (like sectorWeightings). */
   countryWeightings: { name: string; weight: number }[] | null;
+  /** Manual ETF/fund asset-class breakdown (free-text names); weight is a decimal 0-1. */
+  assetWeightings: { name: string; weight: number }[] | null;
   quoteProvider: QuoteProviderName | null;
   msnInstrumentId: string | null;
   /** Source of the most recent price row for this security (e.g. "yahoo_finance", "msn_finance", "manual"), or null if no prices exist. */
@@ -69,6 +71,27 @@ export interface CountryWeightingResult {
   totalPortfolioValue: number;
   totalDirectValue: number;
   totalEtfValue: number;
+  unclassifiedValue: number;
+}
+
+export interface AssetClassWeightingItem {
+  assetClass: string;
+  directValue: number;
+  etfValue: number;
+  totalValue: number;
+  percentage: number;
+}
+
+export interface AssetClassWeightingResult {
+  items: AssetClassWeightingItem[];
+  totalPortfolioValue: number;
+  totalDirectValue: number;
+  totalEtfValue: number;
+  /**
+   * Value with no asset-class classification: fund value beyond the manual
+   * weightings plus securities whose type says nothing definite. Rendered as
+   * the "Other" slice.
+   */
   unclassifiedValue: number;
 }
 
@@ -138,7 +161,7 @@ export interface PortfolioSummary {
 export interface AllocationItem {
   name: string;
   symbol: string | null;
-  type: 'cash' | 'security' | 'tag' | 'untagged' | 'country' | 'other';
+  type: 'cash' | 'security' | 'tag' | 'untagged' | 'country' | 'assetClass' | 'other';
   value: number;
   percentage: number;
   color?: string;
@@ -267,6 +290,8 @@ export interface CreateSecurityData {
   isFavourite?: boolean;
   /** Manual ETF/fund country breakdown; weight is a decimal 0-1 (like sectorWeightings). */
   countryWeightings?: { name: string; weight: number }[];
+  /** Manual ETF/fund asset-class breakdown (free-text names); weight is a decimal 0-1. */
+  assetWeightings?: { name: string; weight: number }[];
 }
 
 /** A favourite security decorated with its latest price and daily change. */

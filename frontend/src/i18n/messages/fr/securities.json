@@ -182,6 +182,19 @@
       "overError": "La répartition dépasse 100 %.",
       "nameAriaLabel": "Pays",
       "weightAriaLabel": "Pourcentage"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Répartition par classe d'actifs",
+      "help": "Les fournisseurs de cotations ne fournissent pas l'exposition par classe d'actifs des ETF et fonds. Ajoutez-la manuellement en pourcentages : saisissez le nom de votre choix, il sera ensuite proposé sur vos autres titres. Tout ce qui est inférieur à 100 % est affiché comme « Autres ».",
+      "placeholder": "Sélectionnez ou saisissez une classe d'actifs",
+      "addRow": "Ajouter une classe d'actifs",
+      "nameAriaLabel": "Classe d'actifs",
+      "deleteOption": "Supprimer la classe d'actifs",
+      "deleteTitle": "Supprimer la classe d'actifs ?",
+      "deleteMessage": "« {name} » sera retirée de votre liste et de tous les titres qui l'utilisent. Ces titres conservent le reste de leur répartition et le pourcentage libéré devient « Autres ».",
+      "deleteConfirm": "Supprimer",
+      "deleteSuccess": "Classe d'actifs « {name} » supprimée",
+      "deleteFailed": "Impossible de supprimer la classe d'actifs « {name} »"
     }
   },
   "priceForm": {

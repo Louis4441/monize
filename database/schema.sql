@@ -394,6 +394,7 @@ CREATE TABLE securities (
     industry VARCHAR(100),           -- stock industry (e.g. 'Consumer Electronics')
     sector_weightings JSONB,         -- ETF sector breakdown [{sector, weight}] (weight is a decimal 0-1, from Yahoo)
     country_weightings JSONB,        -- manual ETF/fund country breakdown [{name, weight}] (weight is a decimal 0-1)
+    asset_weightings JSONB,          -- manual ETF/fund asset-class breakdown [{name, weight}] (free-text names, weight is a decimal 0-1)
     sector_data_updated_at TIMESTAMP, -- cache staleness check
     quote_provider VARCHAR(20),      -- per-security provider override: 'yahoo' | 'msn' | NULL = user default
     msn_instrument_id VARCHAR(50),   -- cached MSN Financial Instrument ID (SecId)

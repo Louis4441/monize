@@ -121,7 +121,8 @@
     "selectedCount": "已選擇 {count}"
   },
   "combobox": {
-    "createOption": "建立「{value}」"
+    "createOption": "建立「{value}」",
+    "deleteOption": "刪除「{value}」"
   },
   "passwordInput": {
     "show": "顯示輸入",

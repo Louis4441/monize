@@ -23,10 +23,12 @@ import { SecurityLookupResult } from "./providers/quote-provider.interface";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
   normalizeCountryName,
+  normalizeAssetName,
   isOtherAllocationName,
   countryForCurrency,
   COUNTRY_OPTIONS,
 } from "./security-enums";
+import { withScopedDb } from "../common/db/scoped-db";
 
 /** A single {name, weight} allocation slice; weight is a decimal 0-1. */
 export interface AllocationWeight {
@@ -91,6 +93,8 @@ export interface UpdateSecurityPreview {
   isFavourite: boolean;
   /** Manual country allocation (decimal 0-1 weights), when the edit sets it. */
   countryWeightings: { name: string; weight: number }[] | null;
+  /** Manual asset-class allocation (decimal 0-1 weights), when the edit sets it. */
+  assetWeightings: { name: string; weight: number }[] | null;
 }
 
 /** Resolved preview of a proposed security deletion. */
@@ -170,23 +174,55 @@ export class SecuritiesService {
   normalizeAllocationWeightings(
     input: AllocationWeight[] | null | undefined,
   ): AllocationWeight[] | null {
+    return this.normalizeWeightings(input, normalizeCountryName);
+  }
+
+  /**
+   * Same cleaning as `normalizeAllocationWeightings`, for the manual asset-class
+   * breakdown. Asset classes have no canonical vocabulary, so names are only
+   * trimmed/whitespace-collapsed (never snapped to a list); duplicates that
+   * differ only by case are summed under the first spelling seen.
+   */
+  normalizeAssetWeightings(
+    input: AllocationWeight[] | null | undefined,
+  ): AllocationWeight[] | null {
+    return this.normalizeWeightings(input, normalizeAssetName);
+  }
+
+  /**
+   * Shared cleaning for a manual {name, weight} breakdown. `normalizeName`
+   * decides how far a raw name is tidied (canonical country vs free-text asset
+   * class); everything else -- de-duping, clamping, dropping the "Other"
+   * bucket, the over-100% guard and the weight-descending sort -- is common.
+   */
+  private normalizeWeightings(
+    input: AllocationWeight[] | null | undefined,
+    normalizeName: (name: string) => string,
+  ): AllocationWeight[] | null {
     if (!input || input.length === 0) return null;
 
-    const byName = new Map<string, number>();
+    // Keyed case-insensitively so "equity" and "Equity" are one slice; the
+    // first spelling seen is the one stored.
+    const byKey = new Map<string, { name: string; weight: number }>();
     for (const slice of input) {
-      const name = normalizeCountryName(slice?.name ?? "");
-      // A provider-supplied "Other" bucket is not a country: drop it so its
+      const name = normalizeName(slice?.name ?? "");
+      // A provider-supplied "Other" bucket is not a real slice: drop it so its
       // weight falls into the computed (100 - sum) remainder instead.
       if (!name || isOtherAllocationName(name)) continue;
       const weight = Number(slice?.weight);
       if (!Number.isFinite(weight) || weight <= 0) continue;
       const clamped = Math.min(weight, 1);
-      byName.set(name, (byName.get(name) ?? 0) + clamped);
+      const key = name.toLowerCase();
+      const existing = byKey.get(key);
+      byKey.set(key, {
+        name: existing?.name ?? name,
+        weight: (existing?.weight ?? 0) + clamped,
+      });
     }
 
-    if (byName.size === 0) return null;
+    if (byKey.size === 0) return null;
 
-    const total = [...byName.values()].reduce((sum, w) => sum + w, 0);
+    const total = [...byKey.values()].reduce((sum, s) => sum + s.weight, 0);
     if (total > 1.0001) {
       throw new BadRequestException(
         tr(
@@ -196,8 +232,8 @@ export class SecuritiesService {
       );
     }
 
-    return [...byName.entries()]
-      .map(([name, weight]) => ({
+    return [...byKey.values()]
+      .map(({ name, weight }) => ({
         name,
         weight: Math.round(weight * 10000) / 10000,
       }))
@@ -256,13 +292,96 @@ export class SecuritiesService {
     return sorted;
   }
 
+  /**
+   * The asset-class names offered by the manual ETF/fund allocation picker for
+   * this user. Unlike countries there is no canonical vocabulary: the list is
+   * exactly what the user has already saved on their own securities, so a class
+   * entered once is available for every other security. Sorted alphabetically.
+   */
+  async getAssetOptions(userId: string): Promise<string[]> {
+    const rows: { name: string | null }[] = await this.securitiesRepository
+      .createQueryBuilder("s")
+      .select(
+        "DISTINCT jsonb_array_elements(s.asset_weightings)->>'name'",
+        "name",
+      )
+      .where("s.user_id = :userId", { userId })
+      .andWhere("s.asset_weightings IS NOT NULL")
+      .getRawMany();
+
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const row of rows) {
+      const name = normalizeAssetName(row.name ?? "");
+      if (!name || isOtherAllocationName(name)) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      names.push(name);
+    }
+
+    return names.sort((a, b) => a.localeCompare(b));
+  }
+
+  /**
+   * Drop an asset class from the user's picker list by removing its slice from
+   * every security that uses it. Nothing is re-apportioned: the freed weight
+   * simply becomes part of each security's computed (100 - sum) "Other"
+   * remainder, which is how a sub-100% breakdown already renders. Returns how
+   * many securities were touched.
+   */
+  async deleteAssetOption(
+    userId: string,
+    rawName: string,
+  ): Promise<{ name: string; removedFrom: number }> {
+    const name = normalizeAssetName(rawName);
+    if (!name) {
+      throw new BadRequestException(
+        tr(
+          "errors.securities.assetOptionNameRequired",
+          "An asset class name is required.",
+        ),
+      );
+    }
+    const key = name.toLowerCase();
+
+    const removedFrom = await withScopedDb(this.dataSource, async (m) => {
+      const repo = m.getRepository(Security);
+      const securities = await repo
+        .createQueryBuilder("s")
+        .where("s.user_id = :userId", { userId })
+        .andWhere("s.asset_weightings IS NOT NULL")
+        .getMany();
+
+      let touched = 0;
+      for (const security of securities) {
+        const remaining = (security.assetWeightings ?? []).filter(
+          (slice) =>
+            normalizeAssetName(slice?.name ?? "").toLowerCase() !== key,
+        );
+        if (remaining.length === (security.assetWeightings ?? []).length) {
+          continue;
+        }
+        await repo.update(
+          { id: security.id, userId },
+          { assetWeightings: remaining.length > 0 ? remaining : null },
+        );
+        touched += 1;
+      }
+      return touched;
+    });
+
+    return { name, removedFrom };
+  }
+
   async create(
     userId: string,
     createSecurityDto: CreateSecurityDto,
   ): Promise<Security> {
     // tagIds is a relation, not a column on securities -- pull it out so the
     // spread that builds the entity never tries to persist it as a field.
-    const { tagIds, countryWeightings, ...securityData } = createSecurityDto;
+    const { tagIds, countryWeightings, assetWeightings, ...securityData } =
+      createSecurityDto;
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -288,6 +407,7 @@ export class SecuritiesService {
         ...securityData,
         countryWeightings:
           this.normalizeAllocationWeightings(countryWeightings),
+        assetWeightings: this.normalizeAssetWeightings(assetWeightings),
         userId,
       });
       saved = await queryRunner.manager.save(security);
@@ -449,6 +569,10 @@ export class SecuritiesService {
     if (updateSecurityDto.countryWeightings !== undefined)
       security.countryWeightings = this.normalizeAllocationWeightings(
         updateSecurityDto.countryWeightings,
+      );
+    if (updateSecurityDto.assetWeightings !== undefined)
+      security.assetWeightings = this.normalizeAssetWeightings(
+        updateSecurityDto.assetWeightings,
       );
 
     // The user explicitly opted into a quote source — auto-clear the
@@ -805,6 +929,7 @@ export class SecuritiesService {
       currencyCode?: string;
       isFavourite?: boolean;
       countryWeightings?: AllocationWeight[];
+      assetWeightings?: AllocationWeight[];
     },
   ): Promise<UpdateSecurityPreview> {
     const security = await this.resolveSecurityForManage(userId, input.query);
@@ -826,6 +951,10 @@ export class SecuritiesService {
         input.countryWeightings !== undefined
           ? this.normalizeAllocationWeightings(input.countryWeightings)
           : (security.countryWeightings ?? null),
+      assetWeightings:
+        input.assetWeightings !== undefined
+          ? this.normalizeAssetWeightings(input.assetWeightings)
+          : (security.assetWeightings ?? null),
     };
   }
 

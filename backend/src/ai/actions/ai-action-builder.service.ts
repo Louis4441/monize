@@ -408,6 +408,7 @@ export class AiActionBuilderService {
       currencyCode: preview.currencyCode,
       isFavourite: preview.isFavourite,
       countryWeightings: preview.countryWeightings,
+      assetWeightings: preview.assetWeightings,
     };
     return {
       actionId,

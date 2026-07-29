@@ -67,11 +67,13 @@
     "noTagData": "Không có khoản nắm giữ nào được gắn thẻ. Thêm thẻ cho chứng khoán của bạn để xem mức độ tiếp xúc theo thẻ.",
     "noCountryData": "Không có dữ liệu phân bổ theo quốc gia.",
     "otherCountries": "Quốc gia khác",
+    "otherAssetClasses": "Loại tài sản khác",
     "groupBy": {
       "security": "Theo chứng khoán",
       "tag": "Theo thẻ",
       "country": "Theo quốc gia",
-      "tagKey": "Theo khóa"
+      "tagKey": "Theo khóa",
+      "assetClass": "Theo loại tài sản"
     },
     "noKeyData": "Không có khoản nắm giữ nào có giá trị cho khóa thẻ này. Gắn thẻ chứng khoán dạng khóa:giá_trị (ví dụ: country:usa) để xem phân tích này.",
     "keySelectorLabel": "Khóa thẻ để tổng hợp"

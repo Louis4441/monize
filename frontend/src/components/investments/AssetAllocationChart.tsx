@@ -8,24 +8,39 @@ import {
   AllocationItem,
   AccountHoldings,
   CountryWeightingResult,
+  AssetClassWeightingResult,
 } from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
 import { CHART_SERIES, chartColors } from '@/lib/chart-colors';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 
-type GroupBy = 'security' | 'tag' | 'tagKey' | 'country';
+type GroupBy = 'security' | 'tag' | 'tagKey' | 'country' | 'assetClass';
+
+/** An empty look-through result, used when a fetch fails. */
+const EMPTY_LOOK_THROUGH = {
+  items: [],
+  totalPortfolioValue: 0,
+  totalDirectValue: 0,
+  totalEtfValue: 0,
+  unclassifiedValue: 0,
+};
 
 /**
- * Collapse a country look-through result into pie slices: the ten largest
- * countries kept individually, everything else (countries ranked 11+ plus the
- * backend's unclassified remainder) merged into a single "Other Countries"
+ * Collapse a look-through result (countries or asset classes) into pie slices:
+ * the ten largest buckets kept individually, everything else (buckets ranked
+ * 11+ plus the backend's unclassified remainder) merged into a single "Other"
  * slice. Colours come from the themed categorical palette since the backend
- * does not assign per-country colours.
+ * does not assign per-bucket colours.
  */
-function buildCountryAllocation(
-  result: CountryWeightingResult,
-  otherCountriesLabel: string,
+function buildLookThroughAllocation(
+  result: {
+    items: { name: string; totalValue: number; percentage: number }[];
+    totalPortfolioValue: number;
+    unclassifiedValue: number;
+  },
+  otherLabel: string,
+  sliceType: AllocationItem['type'],
 ): AssetAllocation {
   const TOP_N = 10;
   const total = result.totalPortfolioValue;
@@ -37,9 +52,9 @@ function buildCountryAllocation(
   const pct = (value: number) => (total > 0 ? (value / total) * 100 : 0);
 
   const allocation: AllocationItem[] = top.map((item, index) => ({
-    name: item.country,
+    name: item.name,
     symbol: null,
-    type: 'country',
+    type: sliceType,
     value: item.totalValue,
     percentage: item.percentage,
     color: CHART_SERIES[index % CHART_SERIES.length],
@@ -53,7 +68,7 @@ function buildCountryAllocation(
   const otherValue = otherCents / 10000;
   if (otherValue > 0.0001) {
     allocation.push({
-      name: otherCountriesLabel,
+      name: otherLabel,
       symbol: null,
       type: 'other',
       value: otherValue,
@@ -63,6 +78,36 @@ function buildCountryAllocation(
   }
 
   return { allocation, totalValue: total };
+}
+
+/** Country look-through -> pie slices. */
+function buildCountryAllocation(
+  result: CountryWeightingResult,
+  otherCountriesLabel: string,
+): AssetAllocation {
+  return buildLookThroughAllocation(
+    {
+      ...result,
+      items: result.items.map((i) => ({ ...i, name: i.country })),
+    },
+    otherCountriesLabel,
+    'country',
+  );
+}
+
+/** Asset-class look-through -> pie slices. */
+function buildAssetClassAllocation(
+  result: AssetClassWeightingResult,
+  otherClassesLabel: string,
+): AssetAllocation {
+  return buildLookThroughAllocation(
+    {
+      ...result,
+      items: result.items.map((i) => ({ ...i, name: i.assetClass })),
+    },
+    otherClassesLabel,
+    'assetClass',
+  );
 }
 
 function AllocationTooltip({
@@ -132,14 +177,17 @@ export function AssetAllocationChart({
   const { defaultCurrency } = useExchangeRates();
 
   const [groupBy, setGroupBy] = useState<GroupBy>('security');
-  // By-tag and by-country data cached per account-filter key so toggling back
-  // and forth (or re-selecting the same accounts) does not refetch. Both are
-  // fetched eagerly so we know which selectors to offer before the user acts:
-  // the tag toggle only appears when tagged holdings exist, and the country
-  // toggle only when the selected accounts carry country allocation data.
+  // By-tag, by-country and by-asset-class data cached per account-filter key so
+  // toggling back and forth (or re-selecting the same accounts) does not
+  // refetch. All are fetched eagerly so we know which selectors to offer before
+  // the user acts: each toggle only appears once its data confirms the selected
+  // accounts actually carry that dimension.
   const [tagCache, setTagCache] = useState<Record<string, AssetAllocation>>({});
   const [countryCache, setCountryCache] = useState<
     Record<string, CountryWeightingResult>
+  >({});
+  const [assetClassCache, setAssetClassCache] = useState<
+    Record<string, AssetClassWeightingResult>
   >({});
   // KEY:VALUE aggregation: the available keys per account-filter, the key the
   // user picked, and the by-key allocation cached per `accountKey|key`.
@@ -195,13 +243,21 @@ export function AssetAllocationChart({
         if (!cancelled)
           setCountryCache((prev) => ({
             ...prev,
-            [accountKey]: {
-              items: [],
-              totalPortfolioValue: 0,
-              totalDirectValue: 0,
-              totalEtfValue: 0,
-              unclassifiedValue: 0,
-            },
+            [accountKey]: EMPTY_LOOK_THROUGH,
+          }));
+      });
+
+    investmentsApi
+      .getAssetClassWeightings(ids)
+      .then((res) => {
+        if (!cancelled)
+          setAssetClassCache((prev) => ({ ...prev, [accountKey]: res }));
+      })
+      .catch(() => {
+        if (!cancelled)
+          setAssetClassCache((prev) => ({
+            ...prev,
+            [accountKey]: EMPTY_LOOK_THROUGH,
           }));
       });
 
@@ -220,12 +276,23 @@ export function AssetAllocationChart({
     [countryResult, otherCountriesLabel],
   );
 
+  const otherClassesLabel = t('assetAllocation.otherAssetClasses');
+  const assetClassResult = assetClassCache[accountKey];
+  const assetClassAllocation = useMemo(
+    () =>
+      assetClassResult
+        ? buildAssetClassAllocation(assetClassResult, otherClassesLabel)
+        : null,
+    [assetClassResult, otherClassesLabel],
+  );
+
   // A selector is only offered once its data confirms it is meaningful for the
   // currently selected accounts: tags in use, or classified country exposure.
   const tagsAvailable =
     enableTagGrouping &&
     (tagCache[accountKey]?.allocation.some((i) => i.type === 'tag') ?? false);
   const countryAvailable = (countryResult?.items.length ?? 0) > 0;
+  const assetClassAvailable = (assetClassResult?.items.length ?? 0) > 0;
 
   // KEY:VALUE aggregation: keys present for this account filter and the key the
   // chart is currently aggregating by (the user's pick, or the first key).
@@ -271,25 +338,32 @@ export function AssetAllocationChart({
         ? 'security'
         : groupBy === 'country' && !countryAvailable
           ? 'security'
-          : groupBy;
+          : groupBy === 'assetClass' && !assetClassAvailable
+            ? 'security'
+            : groupBy;
 
   const isTagView = effectiveGroupBy === 'tag';
   const isTagKeyView = effectiveGroupBy === 'tagKey';
   const isCountryView = effectiveGroupBy === 'country';
+  const isAssetClassView = effectiveGroupBy === 'assetClass';
   const activeAllocation = isTagView
     ? (tagCache[accountKey] ?? null)
     : isTagKeyView
       ? (tagKeyCacheKey ? (tagKeyCache[tagKeyCacheKey] ?? null) : null)
       : isCountryView
         ? countryAllocation
-        : allocation;
+        : isAssetClassView
+          ? assetClassAllocation
+          : allocation;
   const activeLoading = isTagView
     ? !tagCache[accountKey]
     : isTagKeyView
       ? !tagKeyCacheKey || !tagKeyCache[tagKeyCacheKey]
       : isCountryView
         ? !countryResult
-        : isLoading;
+        : isAssetClassView
+          ? !assetClassResult
+          : isLoading;
 
   // When viewing a single foreign-currency account, show values in that
   // currency. The by-tag and by-country allocations are always returned in the
@@ -337,11 +411,13 @@ export function AssetAllocationChart({
     });
   }, [activeAllocation, t]);
 
-  // Security/tag legends cap at the top 10 slices; the country view is already
-  // bounded to 10 countries plus "Other Countries", so show all of them.
-  const legendData = isCountryView ? chartData : chartData.slice(0, 10);
+  // Security/tag legends cap at the top 10 slices; the look-through views are
+  // already bounded to 10 buckets plus their "Other" slice, so show all.
+  const legendData =
+    isCountryView || isAssetClassView ? chartData : chartData.slice(0, 10);
 
-  const showToggle = tagsAvailable || keysAvailable || countryAvailable;
+  const showToggle =
+    tagsAvailable || keysAvailable || countryAvailable || assetClassAvailable;
   const toggleButtonClass = (selected: boolean) =>
     `px-2 py-1 ${
       selected
@@ -387,6 +463,16 @@ export function AssetAllocationChart({
           aria-pressed={isCountryView}
         >
           {t('assetAllocation.groupBy.country')}
+        </button>
+      )}
+      {assetClassAvailable && (
+        <button
+          type="button"
+          onClick={() => setGroupBy('assetClass')}
+          className={toggleButtonClass(isAssetClassView)}
+          aria-pressed={isAssetClassView}
+        >
+          {t('assetAllocation.groupBy.assetClass')}
         </button>
       )}
     </div>

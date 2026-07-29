@@ -34,6 +34,52 @@ describe("tool-input-schemas", () => {
       }
     });
 
+    it("accepts a manage_securities update carrying both allocations", () => {
+      const result = validateToolInput("manage_securities", {
+        operation: "update",
+        items: [
+          {
+            symbol: "VBAL",
+            countryWeightings: [{ name: "Canada", weight: 30 }],
+            assetWeightings: [
+              { name: "Equity", weight: 60 },
+              { name: "Fixed Income", weight: 40 },
+            ],
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects an asset weight outside 0-100", () => {
+      const result = validateToolInput("manage_securities", {
+        operation: "update",
+        items: [
+          {
+            symbol: "VBAL",
+            assetWeightings: [{ name: "Equity", weight: 160 }],
+          },
+        ],
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain("assetWeightings");
+      }
+    });
+
+    it("accepts the get_portfolio_summary look-through flag", () => {
+      const result = validateToolInput("get_portfolio_summary", {
+        includeLookThrough: true,
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.includeLookThrough).toBe(true);
+      }
+    });
+
     it("returns success for unknown tool names (passthrough)", () => {
       const input = { foo: "bar", baz: 42 };
       const result = validateToolInput("unknown_tool", input);

@@ -127,6 +127,75 @@ describe("SecurityToolPrepService", () => {
     ]);
   });
 
+  it("converts asset weighting percentages to decimals before previewing", async () => {
+    securities.previewUpdateSecurity.mockResolvedValue({
+      securityId: "sec-1",
+      symbol: "VBAL",
+      name: "Vanguard Balanced ETF",
+      securityType: "ETF",
+      exchange: "TSX",
+      currencyCode: "CAD",
+      isFavourite: false,
+      countryWeightings: null,
+      assetWeightings: [
+        { name: "Equity", weight: 0.6 },
+        { name: "Fixed Income", weight: 0.4 },
+      ],
+    });
+
+    const result = await prep.prepareUpdateSecurities(USER, [
+      {
+        query: "VBAL",
+        assetWeightings: [
+          { name: "Equity", weight: 60 },
+          { name: "Fixed Income", weight: 40 },
+        ],
+      },
+    ]);
+
+    expect(securities.previewUpdateSecurity).toHaveBeenCalledWith(
+      USER,
+      expect.objectContaining({
+        query: "VBAL",
+        assetWeightings: [
+          { name: "Equity", weight: 0.6 },
+          { name: "Fixed Income", weight: 0.4 },
+        ],
+      }),
+    );
+    // The resolved (decimal) weights flow into the batch row.
+    expect(result.okRows[0].assetWeightings).toEqual([
+      { name: "Equity", weight: 0.6 },
+      { name: "Fixed Income", weight: 0.4 },
+    ]);
+  });
+
+  it("leaves both allocations untouched when the row supplies neither", async () => {
+    securities.previewUpdateSecurity.mockResolvedValue({
+      securityId: "sec-1",
+      symbol: "AAPL",
+      name: "Apple Inc.",
+      securityType: "STOCK",
+      exchange: "NASDAQ",
+      currencyCode: "USD",
+      isFavourite: true,
+      countryWeightings: null,
+      assetWeightings: null,
+    });
+
+    await prep.prepareUpdateSecurities(USER, [
+      { query: "AAPL", isFavourite: true },
+    ]);
+
+    expect(securities.previewUpdateSecurity).toHaveBeenCalledWith(
+      USER,
+      expect.objectContaining({
+        countryWeightings: undefined,
+        assetWeightings: undefined,
+      }),
+    );
+  });
+
   it("prepares delete rows to id-only descriptors", async () => {
     securities.previewDeleteSecurity.mockResolvedValue({
       securityId: "sec-1",

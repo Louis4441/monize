@@ -1,4 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
+import { BadRequestException } from "@nestjs/common";
 import { SecuritiesController } from "./securities.controller";
 import { SecuritiesService } from "./securities.service";
 import { SecurityPriceService } from "./security-price.service";
@@ -44,6 +45,8 @@ describe("SecuritiesController", () => {
       getFavouriteSecurities: jest.fn(),
       getSuggestedDescription: jest.fn(),
       getCountryOptions: jest.fn(),
+      getAssetOptions: jest.fn(),
+      deleteAssetOption: jest.fn(),
     };
 
     securityPriceService = {
@@ -295,6 +298,54 @@ describe("SecuritiesController", () => {
         "user-1",
       );
       expect(result).toEqual(["Canada", "United States"]);
+    });
+  });
+
+  describe("getAssetOptions", () => {
+    it("delegates to securitiesService.getAssetOptions with userId", async () => {
+      securitiesService.getAssetOptions.mockResolvedValue(["Cash", "Equity"]);
+
+      const result = await controller.getAssetOptions(req);
+
+      expect(securitiesService.getAssetOptions).toHaveBeenCalledWith("user-1");
+      expect(result).toEqual(["Cash", "Equity"]);
+    });
+  });
+
+  describe("deleteAssetOption", () => {
+    it("delegates to securitiesService.deleteAssetOption with userId and name", async () => {
+      securitiesService.deleteAssetOption.mockResolvedValue({
+        name: "Equity",
+        removedFrom: 2,
+      });
+
+      const result = await controller.deleteAssetOption(req, "Equity");
+
+      expect(securitiesService.deleteAssetOption).toHaveBeenCalledWith(
+        "user-1",
+        "Equity",
+      );
+      expect(result).toEqual({ name: "Equity", removedFrom: 2 });
+    });
+
+    it("caps an over-long name before it reaches the service", async () => {
+      securitiesService.deleteAssetOption.mockResolvedValue({
+        name: "x".repeat(100),
+        removedFrom: 0,
+      });
+
+      await controller.deleteAssetOption(req, "x".repeat(500));
+
+      expect(securitiesService.deleteAssetOption).toHaveBeenCalledWith(
+        "user-1",
+        "x".repeat(100),
+      );
+    });
+
+    it("rejects a repeated name query param", async () => {
+      expect(() =>
+        controller.deleteAssetOption(req, ["a", "b"] as unknown as string),
+      ).toThrow(BadRequestException);
     });
   });
 

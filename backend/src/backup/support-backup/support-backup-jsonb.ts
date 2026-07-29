@@ -13,7 +13,8 @@ export type JsonbHandlerName =
   | "transferRules"
   | "overrideSplits"
   | "lumpSums"
-  | "reportFilters";
+  | "reportFilters"
+  | "assetWeightings";
 
 type JsonbHandler = (value: unknown, multiplier: number) => unknown;
 
@@ -67,11 +68,28 @@ const reportFilters: JsonbHandler = (value) => {
   return out;
 };
 
+/**
+ * `securities.asset_weightings`: [{ name, weight }]. Unlike country weightings
+ * (a canonical public list, kept as-is) asset-class names are free text the
+ * user types, so the name is masked and only the weight survives intact.
+ */
+const assetWeightings: JsonbHandler = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value.map((slice) => {
+    if (!isRecord(slice)) return {};
+    const out: Record<string, unknown> = {};
+    if ("name" in slice) out.name = maskText(slice.name);
+    if ("weight" in slice) out.weight = slice.weight; // a share, not an amount
+    return out;
+  });
+};
+
 const HANDLERS: Record<JsonbHandlerName, JsonbHandler> = {
   transferRules,
   overrideSplits,
   lumpSums,
   reportFilters,
+  assetWeightings,
 };
 
 export function applyJsonbHandler(

@@ -392,7 +392,8 @@
     "lookupNoCurrency": "Não foi possível determinar a moeda de \"{{ symbol }}\". Adicione o título manualmente.",
     "noUpdateFields": "Indique pelo menos um campo para alterar.",
     "allocationExceedsTotal": "As percentagens de alocação somam mais de 100%.",
-    "invalidTagKey": "É necessária uma chave de etiqueta (1-100 caracteres)"
+    "invalidTagKey": "É necessária uma chave de etiqueta (1-100 caracteres)",
+    "assetOptionNameRequired": "É necessário um nome de classe de ativos."
   },
   "tags": {
     "notFound": "Etiqueta com ID {{ id }} não encontrada",

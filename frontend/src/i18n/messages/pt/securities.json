@@ -182,6 +182,19 @@
       "overError": "A alocação soma mais de 100%.",
       "nameAriaLabel": "País",
       "weightAriaLabel": "Percentagem"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Alocação por classe de ativos",
+      "help": "Os fornecedores de cotações não indicam a exposição por classe de ativos de ETF e fundos. Adicione-a manualmente em percentagens -- escreva o nome que quiser e ele fica disponível nos seus outros títulos. Tudo o que ficar abaixo de 100% é apresentado como «Outros».",
+      "placeholder": "Selecione ou escreva uma classe de ativos",
+      "addRow": "Adicionar classe de ativos",
+      "nameAriaLabel": "Classe de ativos",
+      "deleteOption": "Eliminar classe de ativos",
+      "deleteTitle": "Eliminar a classe de ativos?",
+      "deleteMessage": "«{name}» será removida da sua lista e de todos os títulos que a utilizam. Esses títulos mantêm o resto da sua alocação e a percentagem libertada passa a «Outros».",
+      "deleteConfirm": "Eliminar",
+      "deleteSuccess": "Classe de ativos «{name}» eliminada",
+      "deleteFailed": "Não foi possível eliminar a classe de ativos «{name}»"
     }
   },
   "priceForm": {

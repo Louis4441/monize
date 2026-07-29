@@ -121,7 +121,8 @@
     "selectedCount": "{count} dipilih"
   },
   "combobox": {
-    "createOption": "Buat \"{value}\""
+    "createOption": "Buat \"{value}\"",
+    "deleteOption": "Hapus \"{value}\""
   },
   "passwordInput": {
     "show": "Tampilkan input",

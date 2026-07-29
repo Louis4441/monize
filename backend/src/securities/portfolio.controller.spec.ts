@@ -27,14 +27,17 @@ describe("PortfolioController", () => {
       getIntradayBreakdown: jest.fn(),
     };
 
+    const emptyWeightings = {
+      items: [],
+      totalPortfolioValue: 0,
+      totalDirectValue: 0,
+      totalEtfValue: 0,
+      unclassifiedValue: 0,
+    };
     sectorWeightingService = {
-      getSectorWeightings: jest.fn().mockResolvedValue({
-        items: [],
-        totalPortfolioValue: 0,
-        totalDirectValue: 0,
-        totalEtfValue: 0,
-        unclassifiedValue: 0,
-      }),
+      getSectorWeightings: jest.fn().mockResolvedValue(emptyWeightings),
+      getCountryWeightings: jest.fn().mockResolvedValue(emptyWeightings),
+      getAssetClassWeightings: jest.fn().mockResolvedValue(emptyWeightings),
     };
 
     delegationService = {
@@ -342,6 +345,36 @@ describe("PortfolioController", () => {
           range: "1d",
           accountIds: "not-a-uuid",
         }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe("getAssetClassWeightings", () => {
+    it("delegates to service with parsed account and security IDs", async () => {
+      await controller.getAssetClassWeightings(req, UUID1, UUID2);
+
+      expect(
+        sectorWeightingService.getAssetClassWeightings,
+      ).toHaveBeenCalledWith("user-1", [UUID1], [UUID2]);
+    });
+
+    it("passes undefined when no filters provided", async () => {
+      await controller.getAssetClassWeightings(req);
+
+      expect(
+        sectorWeightingService.getAssetClassWeightings,
+      ).toHaveBeenCalledWith("user-1", undefined, undefined);
+    });
+
+    it("rejects invalid UUID in accountIds", async () => {
+      await expect(
+        controller.getAssetClassWeightings(req, "not-a-uuid"),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it("rejects invalid UUID in securityIds", async () => {
+      await expect(
+        controller.getAssetClassWeightings(req, UUID1, "nope"),
       ).rejects.toThrow(BadRequestException);
     });
   });

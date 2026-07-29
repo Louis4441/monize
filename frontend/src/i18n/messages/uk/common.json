@@ -121,7 +121,8 @@
     "selectedCount": "Вибрано {count}"
   },
   "combobox": {
-    "createOption": "Створити \"{value}\""
+    "createOption": "Створити \"{value}\"",
+    "deleteOption": "Видалити «{value}»"
   },
   "passwordInput": {
     "show": "Показати введення",

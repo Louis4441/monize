@@ -182,6 +182,19 @@
       "overError": "Tahsis toplamı %100'ü aşıyor.",
       "nameAriaLabel": "Ülke",
       "weightAriaLabel": "Yüzde"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Varlık Sınıfı Dağılımı",
+      "help": "Fiyat sağlayıcıları ETF ve fonlar için varlık sınıfı dağılımı vermez. Yüzde olarak elle ekleyin -- istediğiniz adı yazın, sonrasında diğer menkul kıymetlerinizde de kullanılabilir. %100'ün altında kalan kısım \"Diğer\" olarak gösterilir.",
+      "placeholder": "Varlık sınıfı seçin veya yazın",
+      "addRow": "Varlık sınıfı ekle",
+      "nameAriaLabel": "Varlık sınıfı",
+      "deleteOption": "Varlık sınıfını sil",
+      "deleteTitle": "Varlık sınıfı silinsin mi?",
+      "deleteMessage": "\"{name}\" listenizden ve onu kullanan tüm menkul kıymetlerden kaldırılacak. Bu menkul kıymetler dağılımlarının geri kalanını korur ve boşalan yüzde \"Diğer\" olur.",
+      "deleteConfirm": "Sil",
+      "deleteSuccess": "\"{name}\" varlık sınıfı silindi",
+      "deleteFailed": "\"{name}\" varlık sınıfı silinemedi"
     }
   },
   "priceForm": {

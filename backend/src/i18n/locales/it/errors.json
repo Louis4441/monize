@@ -392,7 +392,8 @@
     "lookupNoCurrency": "Impossibile determinare la valuta per \"{{ symbol }}\". Aggiungi il titolo manualmente.",
     "noUpdateFields": "Fornisci almeno un campo da modificare.",
     "allocationExceedsTotal": "Le percentuali di allocazione superano il 100%.",
-    "invalidTagKey": "È richiesta una chiave tag (1-100 caratteri)"
+    "invalidTagKey": "È richiesta una chiave tag (1-100 caratteri)",
+    "assetOptionNameRequired": "È richiesto un nome per la classe di attivo."
   },
   "tags": {
     "notFound": "Etichetta con ID {{ id }} non trovata",

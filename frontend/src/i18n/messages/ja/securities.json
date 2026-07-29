@@ -182,6 +182,19 @@
       "overError": "配分の合計が100%を超えています。",
       "nameAriaLabel": "国",
       "weightAriaLabel": "パーセンテージ"
+    },
+    "assetAllocation": {
+      "sectionTitle": "資産クラス配分",
+      "help": "価格プロバイダーはETFやファンドの資産クラス別エクスポージャーを提供しません。パーセンテージで手動で追加してください。任意の名前を入力でき、その名前は他の銘柄でも選べるようになります。100%に満たない分は「その他」として表示されます。",
+      "placeholder": "資産クラスを選択または入力",
+      "addRow": "資産クラスを追加",
+      "nameAriaLabel": "資産クラス",
+      "deleteOption": "資産クラスを削除",
+      "deleteTitle": "資産クラスを削除しますか?",
+      "deleteMessage": "「{name}」はリストからも、使用しているすべての銘柄からも削除されます。それらの銘柄の残りの配分はそのまま残り、空いた割合は「その他」になります。",
+      "deleteConfirm": "削除",
+      "deleteSuccess": "資産クラス「{name}」を削除しました",
+      "deleteFailed": "資産クラス「{name}」を削除できませんでした"
     }
   },
   "priceForm": {

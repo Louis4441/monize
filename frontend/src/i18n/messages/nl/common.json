@@ -121,7 +121,8 @@
     "selectedCount": "{count} geselecteerd"
   },
   "combobox": {
-    "createOption": "Maak \"{value}\" aan"
+    "createOption": "Maak \"{value}\" aan",
+    "deleteOption": "\"{value}\" verwijderen"
   },
   "passwordInput": {
     "show": "Invoer tonen",

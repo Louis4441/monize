@@ -67,11 +67,13 @@
     "noTagData": "没有可显示的带标签持仓。为你的证券添加标签即可按标签查看敞口。",
     "noCountryData": "暂无国家/地区配置数据。",
     "otherCountries": "其他国家/地区",
+    "otherAssetClasses": "其他资产类别",
     "groupBy": {
       "security": "按证券",
       "tag": "按标签",
       "country": "按国家/地区",
-      "tagKey": "按键"
+      "tagKey": "按键",
+      "assetClass": "按资产类别"
     },
     "noKeyData": "没有持仓包含此标签键的值。将证券标记为 key:value（例如 country:usa）以查看此细分。",
     "keySelectorLabel": "用于汇总的标签键"

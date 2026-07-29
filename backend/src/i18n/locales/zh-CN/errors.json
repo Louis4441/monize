@@ -392,7 +392,8 @@
     "lookupNoCurrency": "无法确定\"{{ symbol }}\"的货币。请改为手动添加该证券。",
     "noUpdateFields": "请至少提供一个要更改的字段。",
     "allocationExceedsTotal": "配置百分比总和超过 100%。",
-    "invalidTagKey": "需要标签键（1-100 个字符）"
+    "invalidTagKey": "需要标签键（1-100 个字符）",
+    "assetOptionNameRequired": "需要填写资产类别名称。"
   },
   "tags": {
     "notFound": "未找到 ID 为 {{ id }} 的标签",

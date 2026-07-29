@@ -54,6 +54,24 @@ describe("JSONB handlers", () => {
     });
   });
 
+  it("assetWeightings masks the class name, keeps the weight, drops foreign keys", () => {
+    const out = applyJsonbHandler(
+      "assetWeightings",
+      [{ name: "Fixed Income", weight: 0.4, note: "from prospectus" }],
+      M,
+    ) as Record<string, unknown>[];
+    expect(out[0].name).toBe("Fi********me");
+    // The weight is a share of the fund, not a private money amount, so the
+    // multiplier must not touch it.
+    expect(out[0].weight).toBe(0.4);
+    expect(out[0]).not.toHaveProperty("note");
+  });
+
+  it("assetWeightings returns an empty array for a non-array value", () => {
+    expect(applyJsonbHandler("assetWeightings", null, M)).toEqual([]);
+    expect(applyJsonbHandler("assetWeightings", [42], M)).toEqual([{}]);
+  });
+
   it("reportFilters keeps id arrays, drops searchText and foreign keys", () => {
     const out = applyJsonbHandler(
       "reportFilters",

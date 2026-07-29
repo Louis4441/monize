@@ -182,6 +182,19 @@
       "overError": "Alokasi berjumlah lebih dari 100%.",
       "nameAriaLabel": "Negara",
       "weightAriaLabel": "Persentase"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Alokasi Kelas Aset",
+      "help": "Penyedia harga tidak menyediakan eksposur kelas aset untuk ETF dan reksa dana. Tambahkan secara manual dalam persen -- ketik nama apa pun dan nama itu akan tersedia untuk efek Anda yang lain. Sisa di bawah 100% ditampilkan sebagai \"Lainnya\".",
+      "placeholder": "Pilih atau ketik kelas aset",
+      "addRow": "Tambah kelas aset",
+      "nameAriaLabel": "Kelas aset",
+      "deleteOption": "Hapus kelas aset",
+      "deleteTitle": "Hapus kelas aset?",
+      "deleteMessage": "\"{name}\" akan dihapus dari daftar Anda dan dari setiap efek yang menggunakannya. Efek tersebut tetap mempertahankan sisa alokasinya, dan persentase yang terbebas menjadi \"Lainnya\".",
+      "deleteConfirm": "Hapus",
+      "deleteSuccess": "Kelas aset \"{name}\" dihapus",
+      "deleteFailed": "Tidak dapat menghapus kelas aset \"{name}\""
     }
   },
   "priceForm": {

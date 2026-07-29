@@ -7,6 +7,7 @@ vi.mock('@/lib/investments', () => ({
   investmentsApi: {
     getAllocationByTag: vi.fn(),
     getCountryWeightings: vi.fn(),
+    getAssetClassWeightings: vi.fn(),
     getPortfolioTagKeys: vi.fn(),
     getAllocationByTagKey: vi.fn(),
   },
@@ -42,6 +43,7 @@ const emptyCountry = {
   totalEtfValue: 0,
   unclassifiedValue: 0,
 };
+const emptyAssetClass = emptyCountry;
 
 // The chart fetches the by-tag and by-country allocations eagerly on mount to
 // decide which selectors to offer, so every render kicks off async effects.
@@ -59,6 +61,7 @@ describe('AssetAllocationChart', () => {
     vi.clearAllMocks();
     (investmentsApi.getAllocationByTag as any).mockResolvedValue(emptyTag);
     (investmentsApi.getCountryWeightings as any).mockResolvedValue(emptyCountry);
+    (investmentsApi.getAssetClassWeightings as any).mockResolvedValue(emptyAssetClass);
     (investmentsApi.getPortfolioTagKeys as any).mockResolvedValue([]);
     (investmentsApi.getAllocationByTagKey as any).mockResolvedValue(emptyTag);
   });
@@ -277,7 +280,62 @@ describe('AssetAllocationChart', () => {
     });
   });
 
-  it('shows all three selectors when tags and country data are both present', async () => {
+  describe('by-asset-class grouping', () => {
+    const assetClassResult = {
+      totalPortfolioValue: 10000,
+      totalDirectValue: 4000,
+      totalEtfValue: 5000,
+      unclassifiedValue: 1000,
+      items: [
+        { assetClass: 'Equity', directValue: 4000, etfValue: 2000, totalValue: 6000, percentage: 60 },
+        { assetClass: 'Fixed Income', directValue: 0, etfValue: 3000, totalValue: 3000, percentage: 30 },
+      ],
+    };
+
+    it('offers and renders the by-asset-class allocation when data exists', async () => {
+      (investmentsApi.getAssetClassWeightings as any).mockResolvedValue(assetClassResult);
+
+      await renderChart({ allocation: securityAllocation, isLoading: false, accountIds: [] });
+
+      expect(investmentsApi.getAssetClassWeightings).toHaveBeenCalledWith(undefined);
+      const button = await screen.findByText('By asset class');
+
+      await act(async () => {
+        fireEvent.click(button);
+      });
+
+      expect(await screen.findByText('Equity')).toBeInTheDocument();
+      expect(screen.getByText('Fixed Income')).toBeInTheDocument();
+      // The unclassified remainder becomes the catch-all slice.
+      expect(screen.getByText('Other Asset Classes')).toBeInTheDocument();
+    });
+
+    it('hides the by-asset-class selector when there is no asset-class data', async () => {
+      await renderChart({ allocation: securityAllocation, isLoading: false, accountIds: [] });
+      expect(screen.queryByText('By asset class')).not.toBeInTheDocument();
+    });
+
+    it('passes the selected accounts to the asset-class fetch', async () => {
+      (investmentsApi.getAssetClassWeightings as any).mockResolvedValue(assetClassResult);
+
+      await renderChart({
+        allocation: securityAllocation,
+        isLoading: false,
+        accountIds: ['acct-1'],
+      });
+
+      expect(investmentsApi.getAssetClassWeightings).toHaveBeenCalledWith(['acct-1']);
+    });
+  });
+
+  it('shows all four selectors when tag, country and asset-class data are present', async () => {
+    (investmentsApi.getAssetClassWeightings as any).mockResolvedValue({
+      totalPortfolioValue: 10000,
+      totalDirectValue: 10000,
+      totalEtfValue: 0,
+      unclassifiedValue: 0,
+      items: [{ assetClass: 'Equity', directValue: 10000, etfValue: 0, totalValue: 10000, percentage: 100 }],
+    });
     (investmentsApi.getAllocationByTag as any).mockResolvedValue({
       totalValue: 10000,
       allocation: [
@@ -296,6 +354,7 @@ describe('AssetAllocationChart', () => {
 
     expect(await screen.findByText('By tag')).toBeInTheDocument();
     expect(screen.getByText('By country')).toBeInTheDocument();
+    expect(screen.getByText('By asset class')).toBeInTheDocument();
     expect(screen.getByText('By security')).toBeInTheDocument();
   });
 });

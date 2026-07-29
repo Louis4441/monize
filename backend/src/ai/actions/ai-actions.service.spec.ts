@@ -467,6 +467,7 @@ describe("AiActionsService", () => {
       currencyCode: "USD",
       isFavourite: true,
       countryWeightings: null,
+      assetWeightings: null,
     };
     const result = await service.confirm(USER, dtoFor(descriptor));
     expect(securities.update).toHaveBeenCalledWith(
@@ -475,6 +476,38 @@ describe("AiActionsService", () => {
       expect.objectContaining({ securityType: "ETF", isFavourite: true }),
     );
     expect(result).toEqual({ type: "update_security", id: "sec-1" });
+  });
+
+  it("applies the manual asset allocation from a confirmed update", async () => {
+    const descriptor = {
+      type: "update_security" as const,
+      userId: USER,
+      actionId: "act-sec-assets",
+      expiresAt: Date.now() + 60_000,
+      securityId: "sec-1",
+      securityType: "ETF",
+      exchange: "TSX",
+      currencyCode: "CAD",
+      isFavourite: false,
+      countryWeightings: null,
+      assetWeightings: [
+        { name: "Equity", weight: 0.6 },
+        { name: "Fixed Income", weight: 0.4 },
+      ],
+    };
+
+    await service.confirm(USER, dtoFor(descriptor));
+
+    expect(securities.update).toHaveBeenCalledWith(
+      USER,
+      "sec-1",
+      expect.objectContaining({
+        assetWeightings: [
+          { name: "Equity", weight: 0.6 },
+          { name: "Fixed Income", weight: 0.4 },
+        ],
+      }),
+    );
   });
 
   it("deletes a security on a valid confirmation", async () => {

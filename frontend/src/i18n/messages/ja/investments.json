@@ -67,11 +67,13 @@
     "noTagData": "表示できるタグ付き保有銘柄がありません。タグ別のエクスポージャーを表示するには、銘柄にタグを追加してください。",
     "noCountryData": "国別配分データがありません。",
     "otherCountries": "その他の国",
+    "otherAssetClasses": "その他の資産クラス",
     "groupBy": {
       "security": "銘柄別",
       "tag": "タグ別",
       "country": "国別",
-      "tagKey": "キー別"
+      "tagKey": "キー別",
+      "assetClass": "資産クラス別"
     },
     "noKeyData": "このタグキーの値を持つ保有銘柄がありません。この内訳を表示するには、銘柄を key:value（例: country:usa）としてタグ付けしてください。",
     "keySelectorLabel": "集計するタグキー"

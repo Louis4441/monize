@@ -121,7 +121,8 @@
     "selectedCount": "{count} चयनित"
   },
   "combobox": {
-    "createOption": "\"{value}\" बनाएं"
+    "createOption": "\"{value}\" बनाएं",
+    "deleteOption": "\"{value}\" हटाएँ"
   },
   "passwordInput": {
     "show": "इनपुट दिखाएं",

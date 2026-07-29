@@ -121,7 +121,8 @@
     "selectedCount": "已选择 {count}"
   },
   "combobox": {
-    "createOption": "创建 \"{value}\""
+    "createOption": "创建 \"{value}\"",
+    "deleteOption": "删除“{value}”"
   },
   "passwordInput": {
     "show": "显示输入",

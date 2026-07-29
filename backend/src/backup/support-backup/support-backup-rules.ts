@@ -318,6 +318,7 @@ export const RULES: Record<string, TableRules> = {
     industry: keep,
     sector_weightings: keep, // public weightings
     country_weightings: keep,
+    asset_weightings: jsonb("assetWeightings"), // free-text class names
     sector_data_updated_at: keep,
     quote_provider: keep,
     msn_instrument_id: drop, // would identify a masked ticker

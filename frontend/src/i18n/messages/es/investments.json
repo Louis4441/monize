@@ -67,11 +67,13 @@
     "noTagData": "No hay posiciones etiquetadas para mostrar. Añade etiquetas a tus valores para ver la exposición por etiqueta.",
     "noCountryData": "No hay datos de asignación por país disponibles.",
     "otherCountries": "Otros países",
+    "otherAssetClasses": "Otras clases de activo",
     "groupBy": {
       "security": "Por valor",
       "tag": "Por etiqueta",
       "country": "Por país",
-      "tagKey": "Por clave"
+      "tagKey": "Por clave",
+      "assetClass": "Por clase de activo"
     },
     "noKeyData": "Ninguna posición tiene un valor para esta clave de etiqueta. Etiquete los valores como clave:valor (p. ej. country:usa) para ver este desglose.",
     "keySelectorLabel": "Clave de etiqueta para agregar"

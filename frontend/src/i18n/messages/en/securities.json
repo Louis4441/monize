@@ -182,6 +182,19 @@
       "overError": "Allocation adds up to more than 100%.",
       "nameAriaLabel": "Country",
       "weightAriaLabel": "Percentage"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Asset Allocation",
+      "help": "Price providers don't supply asset-class exposure for ETFs and funds. Add it manually as percentages -- type any class name you like and it is offered on your other securities afterwards. Anything under 100% is shown as \"Other\".",
+      "placeholder": "Select or type an asset class",
+      "addRow": "Add asset class",
+      "nameAriaLabel": "Asset class",
+      "deleteOption": "Delete asset class",
+      "deleteTitle": "Delete asset class?",
+      "deleteMessage": "\"{name}\" will be removed from your list and from every security that uses it. Those securities keep the rest of their allocation, and the freed percentage becomes \"Other\".",
+      "deleteConfirm": "Delete",
+      "deleteSuccess": "Deleted asset class \"{name}\"",
+      "deleteFailed": "Could not delete asset class \"{name}\""
     }
   },
   "priceForm": {

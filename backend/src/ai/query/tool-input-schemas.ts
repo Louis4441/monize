@@ -82,6 +82,8 @@ export const comparePeriodsSchema = z.object({
 
 export const getPortfolioSummarySchema = z.object({
   accountNames: z.array(z.string().max(100)).optional(),
+  // Opt-in country / asset-class look-through (an extra holdings + FX pass).
+  includeLookThrough: z.boolean().optional(),
 });
 
 export const INVESTMENT_ACTIONS = [
@@ -269,6 +271,17 @@ export const manageSecuritiesSchema = z.object({
         // update only: manual country allocation for an ETF/fund. Weights are
         // PERCENTAGES (0-100); a sub-100 total leaves the rest as "Other".
         countryWeightings: z
+          .array(
+            z.object({
+              name: z.string().min(1).max(100),
+              weight: z.number().min(0).max(100),
+            }),
+          )
+          .max(60)
+          .optional(),
+        // update only: manual asset-class allocation for an ETF/fund. Free-text
+        // names; weights are PERCENTAGES (0-100) with the same "Other" rule.
+        assetWeightings: z
           .array(
             z.object({
               name: z.string().min(1).max(100),

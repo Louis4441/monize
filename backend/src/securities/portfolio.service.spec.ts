@@ -17,6 +17,7 @@ import { UserPreference } from "../users/entities/user-preference.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
+import { SectorWeightingService } from "./sector-weighting.service";
 
 describe("PortfolioService", () => {
   let service: PortfolioService;
@@ -28,6 +29,7 @@ describe("PortfolioService", () => {
   let exchangeRateService: Record<string, jest.Mock>;
   let yahooFinanceService: Record<string, jest.Mock>;
   let quoteProviderRegistry: { resolveForSecurity: jest.Mock };
+  let sectorWeightingService: { getLlmLookThrough: jest.Mock };
 
   const userId = "user-1";
 
@@ -194,6 +196,23 @@ describe("PortfolioService", () => {
       ]),
     };
 
+    // getLlmSummary only calls this when includeLookThrough is set.
+    sectorWeightingService = {
+      getLlmLookThrough: jest.fn().mockResolvedValue({
+        totalPortfolioValue: 1000,
+        byCountry: {
+          items: [{ name: "United States", value: 750, percentage: 75 }],
+          unclassifiedValue: 250,
+          unclassifiedPercentage: 25,
+        },
+        byAssetClass: {
+          items: [{ name: "Equity", value: 600, percentage: 60 }],
+          unclassifiedValue: 400,
+          unclassifiedPercentage: 40,
+        },
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortfolioService,
@@ -229,6 +248,10 @@ describe("PortfolioService", () => {
         {
           provide: QuoteProviderRegistry,
           useValue: quoteProviderRegistry,
+        },
+        {
+          provide: SectorWeightingService,
+          useValue: sectorWeightingService,
         },
       ],
     }).compile();
@@ -1378,6 +1401,43 @@ describe("PortfolioService", () => {
   });
 
   describe("getLlmSummary", () => {
+    it("attaches the country and asset-class look-through when asked", async () => {
+      jest.spyOn(service, "getPortfolioSummary").mockResolvedValue({
+        totalCashValue: 0,
+        totalHoldingsValue: 1000,
+        totalCostBasis: 900,
+        totalNetInvested: 900,
+        totalPortfolioValue: 1000,
+        totalGainLoss: 100,
+        totalGainLossPercent: 11.11,
+        timeWeightedReturn: null,
+        cagr: null,
+        holdings: [],
+        holdingsByAccount: [],
+        allocation: [],
+      } as never);
+
+      const result = await service.getLlmSummary("user-1", ["acct-1"], {
+        includeLookThrough: true,
+      });
+
+      expect(sectorWeightingService.getLlmLookThrough).toHaveBeenCalledWith(
+        "user-1",
+        ["acct-1"],
+      );
+      expect(result.lookThrough?.byCountry.items[0]).toEqual({
+        name: "United States",
+        value: 750,
+        percentage: 75,
+      });
+      expect(result.lookThrough?.byAssetClass.items[0]).toEqual({
+        name: "Equity",
+        value: 600,
+        percentage: 60,
+      });
+      expect(result.lookThrough?.byAssetClass.unclassifiedPercentage).toBe(40);
+    });
+
     it("maps raw holdings into the compact LLM shape and rounds monetary and percentage values", async () => {
       const getPortfolioSummary = jest
         .spyOn(service, "getPortfolioSummary")
@@ -1425,6 +1485,9 @@ describe("PortfolioService", () => {
       const result = await service.getLlmSummary("user-1");
 
       expect(getPortfolioSummary).toHaveBeenCalledWith("user-1", undefined);
+      // Not requested, so the extra holdings/FX pass is skipped entirely.
+      expect(sectorWeightingService.getLlmLookThrough).not.toHaveBeenCalled();
+      expect(result.lookThrough).toBeUndefined();
       expect(result.holdingCount).toBe(1);
       expect(result.totalCashValue).toBe(100.1235);
       expect(result.totalHoldingsValue).toBe(9900.5679);

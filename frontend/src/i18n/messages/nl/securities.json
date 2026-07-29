@@ -182,6 +182,19 @@
       "overError": "De allocatie telt op tot meer dan 100%.",
       "nameAriaLabel": "Land",
       "weightAriaLabel": "Percentage"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Verdeling naar beleggingscategorie",
+      "help": "Koersaanbieders leveren geen verdeling naar beleggingscategorie voor ETF's en fondsen. Voeg die handmatig toe in percentages -- typ een willekeurige naam, daarna is die ook bij je andere effecten beschikbaar. Alles onder 100% wordt weergegeven als \"Overig\".",
+      "placeholder": "Selecteer of typ een beleggingscategorie",
+      "addRow": "Beleggingscategorie toevoegen",
+      "nameAriaLabel": "Beleggingscategorie",
+      "deleteOption": "Beleggingscategorie verwijderen",
+      "deleteTitle": "Beleggingscategorie verwijderen?",
+      "deleteMessage": "\"{name}\" wordt verwijderd uit je lijst en uit elk effect dat de categorie gebruikt. Die effecten behouden de rest van hun verdeling en het vrijgekomen percentage wordt \"Overig\".",
+      "deleteConfirm": "Verwijderen",
+      "deleteSuccess": "Beleggingscategorie \"{name}\" verwijderd",
+      "deleteFailed": "Kan beleggingscategorie \"{name}\" niet verwijderen"
     }
   },
   "priceForm": {

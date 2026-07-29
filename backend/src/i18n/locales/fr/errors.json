@@ -392,7 +392,8 @@
     "lookupNoCurrency": "Impossible de déterminer la devise de « {{ symbol }} ». Ajoutez le titre manuellement à la place.",
     "noUpdateFields": "Indiquez au moins un champ à modifier.",
     "allocationExceedsTotal": "Les pourcentages de répartition dépassent 100 %.",
-    "invalidTagKey": "Une clé d'étiquette (1 à 100 caractères) est requise"
+    "invalidTagKey": "Une clé d'étiquette (1 à 100 caractères) est requise",
+    "assetOptionNameRequired": "Un nom de classe d'actifs est requis."
   },
   "tags": {
     "notFound": "Étiquette avec l'ID {{ id }} introuvable",

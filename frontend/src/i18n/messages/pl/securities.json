@@ -182,6 +182,19 @@
       "overError": "Suma alokacji przekracza 100%.",
       "nameAriaLabel": "Kraj",
       "weightAriaLabel": "Procent"
+    },
+    "assetAllocation": {
+      "sectionTitle": "Alokacja klas aktywów",
+      "help": "Dostawcy notowań nie udostępniają ekspozycji na klasy aktywów dla ETF-ów i funduszy. Dodaj ją ręcznie w procentach -- wpisz dowolną nazwę, a potem będzie dostępna przy pozostałych papierach. Wszystko poniżej 100% jest wyświetlane jako „Pozostałe”.",
+      "placeholder": "Wybierz lub wpisz klasę aktywów",
+      "addRow": "Dodaj klasę aktywów",
+      "nameAriaLabel": "Klasa aktywów",
+      "deleteOption": "Usuń klasę aktywów",
+      "deleteTitle": "Usunąć klasę aktywów?",
+      "deleteMessage": "„{name}” zostanie usunięta z Twojej listy i z każdego papieru, który jej używa. Te papiery zachowują resztę swojej alokacji, a zwolniony procent staje się „Pozostałe”.",
+      "deleteConfirm": "Usuń",
+      "deleteSuccess": "Usunięto klasę aktywów „{name}”",
+      "deleteFailed": "Nie udało się usunąć klasy aktywów „{name}”"
     }
   },
   "priceForm": {

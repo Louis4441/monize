@@ -168,6 +168,48 @@ export function normalizeCountryName(input: string): string {
 }
 
 /**
+ * Default asset class for a security that carries no manual asset breakdown of
+ * its own, by security type -- the asset-class counterpart of
+ * `EXCHANGE_TO_COUNTRY`. A held stock is equity exposure whether or not the
+ * user has spelled that out, and the same goes for a bond or a crypto holding.
+ *
+ * Types whose asset mix genuinely cannot be inferred (ETF/MUTUAL_FUND without a
+ * manual breakdown, OPTION, GIC, OTHER) are intentionally absent: their value
+ * falls into the look-through's unclassified "Other" bucket instead of being
+ * guessed at. The names here are only defaults -- the rollup merges them
+ * case-insensitively with whatever the user has typed on their own securities.
+ */
+export const SECURITY_TYPE_TO_ASSET_CLASS: Record<string, string> = {
+  STOCK: "Equity",
+  Equity: "Equity",
+  BOND: "Fixed Income",
+  CRYPTO: "Crypto",
+  CASH: "Cash",
+};
+
+/**
+ * The default asset class for a security type, or null when the type says
+ * nothing definite about the underlying asset mix.
+ */
+export function assetClassForSecurityType(
+  securityType: string | null | undefined,
+): string | null {
+  if (!securityType) return null;
+  return SECURITY_TYPE_TO_ASSET_CLASS[securityType] ?? null;
+}
+
+/**
+ * Tidy a free-text allocation name (asset classes) without snapping it to any
+ * canonical list: trims and collapses runs of internal whitespace so "Fixed
+ * Income" and "Fixed  Income" are the same value. Empty / blank input returns
+ * "". Unlike countries, asset classes have no canonical vocabulary -- the
+ * picker offers whatever the user has already saved.
+ */
+export function normalizeAssetName(input: string): string {
+  return (input ?? "").trim().replace(/\s+/g, " ");
+}
+
+/**
  * True when an allocation slice name is the catch-all "Other" bucket (which
  * providers often include in their breakdowns). Such slices must NOT be stored
  * or rendered as a country -- their weight is folded into the single computed

@@ -121,7 +121,8 @@
     "selectedCount": "[XX-{count} selected-XX]"
   },
   "combobox": {
-    "createOption": "[XX-Create \"{value}\"-XX]"
+    "createOption": "[XX-Create \"{value}\"-XX]",
+    "deleteOption": "[XX-Delete \"{value}\"-XX]"
   },
   "passwordInput": {
     "show": "[XX-Show input-XX]",

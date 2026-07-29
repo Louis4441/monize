@@ -293,6 +293,50 @@ export class SecuritiesController {
     return this.securitiesService.getCountryOptions(req.user.id);
   }
 
+  @Get("asset-options")
+  @ApiOperation({
+    summary: "Asset-class names for the manual ETF/fund allocation picker",
+    description:
+      "Free-text asset classes the user has already saved on a security, sorted alphabetically.",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Ordered list of asset-class names",
+    schema: { type: "array", items: { type: "string" } },
+  })
+  getAssetOptions(@Request() req): Promise<string[]> {
+    return this.securitiesService.getAssetOptions(req.user.id);
+  }
+
+  @Delete("asset-options")
+  @ApiOperation({
+    summary: "Remove an asset class from the picker list",
+    description:
+      "Deletes the named asset class from every security that uses it. The freed weight is not re-apportioned -- it falls into each security's computed 'Other' remainder.",
+  })
+  @ApiQuery({ name: "name", required: true })
+  @ApiResponse({
+    status: 200,
+    description: "Name removed, with the number of securities updated",
+    schema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        removedFrom: { type: "number" },
+      },
+    },
+  })
+  deleteAssetOption(
+    @Request() req,
+    @Query("name") name: string,
+  ): Promise<{ name: string; removedFrom: number }> {
+    const raw = assertStringParam(name, "name");
+    return this.securitiesService.deleteAssetOption(
+      req.user.id,
+      (raw ?? "").slice(0, 100),
+    );
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "Get a security by ID" })
   @ApiResponse({ status: 200, description: "Security details", type: Security })

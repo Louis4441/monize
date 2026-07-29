@@ -392,7 +392,8 @@
     "lookupNoCurrency": "「{{ symbol }}」の通貨を特定できませんでした。代わりに証券を手動で追加してください。",
     "noUpdateFields": "変更するフィールドを少なくとも1つ指定してください。",
     "allocationExceedsTotal": "配分の割合の合計が100%を超えています。",
-    "invalidTagKey": "タグキー（1〜100文字）が必要です"
+    "invalidTagKey": "タグキー（1〜100文字）が必要です",
+    "assetOptionNameRequired": "資産クラス名が必要です。"
   },
   "tags": {
     "notFound": "ID {{ id }} のタグが見つかりません",

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@/test/render';
+import { render, screen, fireEvent, waitFor, act, within } from '@/test/render';
 import { SecurityForm } from './SecurityForm';
 import { Security } from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
@@ -42,6 +42,10 @@ vi.mock('@/lib/investments', () => ({
     getCountryOptions: vi
       .fn()
       .mockResolvedValue(['United States', 'Canada']),
+    getAssetOptions: vi.fn().mockResolvedValue(['Cash', 'Equity']),
+    deleteAssetOption: vi
+      .fn()
+      .mockResolvedValue({ name: 'Equity', removedFrom: 1 }),
   },
 }));
 
@@ -83,6 +87,7 @@ function createSecurity(overrides: Partial<Security> = {}): Security {
     industry: null,
     sectorWeightings: null,
     countryWeightings: null,
+    assetWeightings: null,
     quoteProvider: null,
     msnInstrumentId: null,
     createdAt: '2025-01-01T00:00:00Z',
@@ -834,6 +839,180 @@ describe('SecurityForm', () => {
           }),
         );
       });
+    });
+  });
+
+  describe('asset allocation', () => {
+    it('hides the asset allocation editor for non-fund securities', async () => {
+      const stock = createSecurity({ securityType: 'STOCK' });
+      render(<SecurityForm security={stock} onSubmit={onSubmit} onCancel={onCancel} />);
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('AAPL')).toBeInTheDocument();
+      });
+      expect(screen.queryByText('Asset Allocation')).not.toBeInTheDocument();
+    });
+
+    it('shows and prefills the asset allocation editor for an ETF', async () => {
+      const etf = createSecurity({
+        securityType: 'ETF',
+        assetWeightings: [
+          { name: 'Equity', weight: 0.6 },
+          { name: 'Fixed Income', weight: 0.3 },
+        ],
+      });
+      render(<SecurityForm security={etf} onSubmit={onSubmit} onCancel={onCancel} />);
+      await waitFor(() => {
+        expect(screen.getByText('Asset Allocation')).toBeInTheDocument();
+      });
+      // Stored decimals are shown as percentages.
+      expect(screen.getByDisplayValue('60')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('30')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Equity')).toBeInTheDocument();
+    });
+
+    it('submits the asset allocation back as decimals (0-1)', async () => {
+      const etf = createSecurity({
+        securityType: 'ETF',
+        assetWeightings: [{ name: 'Equity', weight: 0.6 }],
+      });
+      render(<SecurityForm security={etf} onSubmit={onSubmit} onCancel={onCancel} />);
+      await waitFor(() => {
+        expect(screen.getByText('Asset Allocation')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Update Security'));
+      });
+
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            assetWeightings: [{ name: 'Equity', weight: 0.6 }],
+          }),
+        );
+      });
+    });
+
+    it('offers the asset classes the user has already saved', async () => {
+      const etf = createSecurity({
+        securityType: 'ETF',
+        assetWeightings: [{ name: 'Equity', weight: 0.6 }],
+      });
+      render(<SecurityForm security={etf} onSubmit={onSubmit} onCancel={onCancel} />);
+      await waitFor(() => {
+        expect(screen.getByText('Asset Allocation')).toBeInTheDocument();
+      });
+      expect(investmentsApi.getAssetOptions).toHaveBeenCalled();
+
+      await act(async () => {
+        fireEvent.focus(screen.getByLabelText('Asset class'));
+      });
+      expect(screen.getByText('Cash')).toBeInTheDocument();
+    });
+
+    it('submits a free-text asset class typed straight into a new row', async () => {
+      const etf = createSecurity({ securityType: 'ETF', assetWeightings: [] });
+      render(<SecurityForm security={etf} onSubmit={onSubmit} onCancel={onCancel} />);
+      await waitFor(() => {
+        expect(screen.getByText('Asset Allocation')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Add asset class'));
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Asset class'), {
+          target: { value: 'Preferred Shares' },
+        });
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Percentage'), {
+          target: { value: '40' },
+        });
+      });
+
+      // Mousedown commits the typed custom value; the click then submits.
+      const submit = screen.getByText('Update Security');
+      await act(async () => {
+        fireEvent.mouseDown(submit);
+      });
+      await act(async () => {
+        fireEvent.click(submit);
+      });
+
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            assetWeightings: [{ name: 'Preferred Shares', weight: 0.4 }],
+          }),
+        );
+      });
+    });
+
+    it('deletes an asset class from the list after confirmation', async () => {
+      const etf = createSecurity({
+        securityType: 'ETF',
+        assetWeightings: [
+          { name: 'Equity', weight: 0.6 },
+          { name: 'Cash', weight: 0.1 },
+        ],
+      });
+      render(<SecurityForm security={etf} onSubmit={onSubmit} onCancel={onCancel} />);
+      await waitFor(() => {
+        expect(screen.getByText('Asset Allocation')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.focus(screen.getAllByLabelText('Asset class')[0]);
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Delete asset class: Equity'));
+      });
+
+      // Destructive: nothing happens until the user confirms.
+      expect(screen.getByText('Delete asset class?')).toBeInTheDocument();
+      expect(investmentsApi.deleteAssetOption).not.toHaveBeenCalled();
+
+      const confirmDialog = screen.getByRole('dialog');
+      await act(async () => {
+        fireEvent.click(within(confirmDialog).getByRole('button', { name: 'Delete' }));
+      });
+
+      await waitFor(() => {
+        expect(investmentsApi.deleteAssetOption).toHaveBeenCalledWith('Equity');
+      });
+      // Its row is gone -- the freed 60% becomes the computed "Other" remainder.
+      await waitFor(() => {
+        expect(screen.queryByDisplayValue('60')).not.toBeInTheDocument();
+      });
+      expect(screen.getByDisplayValue('10')).toBeInTheDocument();
+      const remainders = screen.getAllByTestId('allocation-other');
+      expect(remainders[remainders.length - 1]).toHaveTextContent('90.00%');
+    });
+
+    it('keeps the class when the delete is cancelled', async () => {
+      const etf = createSecurity({
+        securityType: 'ETF',
+        assetWeightings: [{ name: 'Equity', weight: 0.6 }],
+      });
+      render(<SecurityForm security={etf} onSubmit={onSubmit} onCancel={onCancel} />);
+      await waitFor(() => {
+        expect(screen.getByText('Asset Allocation')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.focus(screen.getByLabelText('Asset class'));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Delete asset class: Equity'));
+      });
+      const confirmDialog = screen.getByRole('dialog');
+      await act(async () => {
+        fireEvent.click(within(confirmDialog).getByRole('button', { name: 'Cancel' }));
+      });
+
+      expect(investmentsApi.deleteAssetOption).not.toHaveBeenCalled();
+      expect(screen.getByDisplayValue('60')).toBeInTheDocument();
     });
   });
 });

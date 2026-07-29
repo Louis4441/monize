@@ -69,11 +69,13 @@
     "noCountryData": "No country allocation data available.",
     "keySelectorLabel": "Tag key to aggregate by",
     "otherCountries": "Other Countries",
+    "otherAssetClasses": "Other Asset Classes",
     "groupBy": {
       "security": "By security",
       "tag": "By tag",
       "tagKey": "By key",
-      "country": "By country"
+      "country": "By country",
+      "assetClass": "By asset class"
     }
   },
   "holdingsList": {
