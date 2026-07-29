@@ -144,7 +144,12 @@ export function SecuritySummaryCards({
             </p>
           ) : (
             <>
-              <ul className="space-y-0.5">
+              {/* Bounded and scrolling past a handful of accounts, so a security
+                  spread over ten of them leaves this card the same height as one
+                  held in a single account -- it sits in a row with five others,
+                  and growing it drags the whole grid down. `scrollbar-slim`
+                  keeps the bar quiet; the native one is what looked broken. */}
+              <ul className="scrollbar-slim max-h-24 space-y-0.5 overflow-y-auto pr-1">
                 {detail.accounts.map((account) => (
                   <li
                     key={account.accountId}

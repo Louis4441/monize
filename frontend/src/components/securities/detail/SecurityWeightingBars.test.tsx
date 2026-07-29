@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { render } from '@/test/render';
 import { SecurityWeightingBars } from './SecurityWeightingBars';
 
@@ -25,7 +25,7 @@ function bars(container: HTMLElement): HTMLElement[] {
   ) as HTMLElement[];
 }
 
-/** Eight slices, so the list is longer than the collapsed cut. */
+/** Eight slices, more than fit the card's bounded height at once. */
 const MANY = Array.from({ length: 8 }, (_, i) => ({
   name: `Slice ${i + 1}`,
   weight: (8 - i) / 40,
@@ -33,37 +33,40 @@ const MANY = Array.from({ length: 8 }, (_, i) => ({
 
 describe('SecurityWeightingBars', () => {
   describe('a long breakdown', () => {
-    it('shows the largest few and offers the rest', () => {
+    it('renders every share, reachable by scrolling', () => {
       renderCard(MANY);
-      // Not a capped scrolling box: inside a small card that draws a full native
-      // scrollbar against the figures.
-      expect(screen.getAllByRole('listitem')).toHaveLength(5);
-      expect(
-        screen.getByRole('button', { name: 'Show 3 more' }),
-      ).toBeInTheDocument();
-    });
-
-    it('expands and collapses again', () => {
-      renderCard(MANY);
-      fireEvent.click(screen.getByRole('button', { name: 'Show 3 more' }));
+      // No expander and no cut: the card is beside the price chart, so its
+      // height must not depend on how many sectors a fund reports, and the
+      // answer to "what is it mostly" should not need a click.
       expect(screen.getAllByRole('listitem')).toHaveLength(8);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Show fewer' }));
-      expect(screen.getAllByRole('listitem')).toHaveLength(5);
-    });
-
-    it('keeps the bars at the same scale when expanded', () => {
-      const { container } = renderCard(MANY);
-      const before = bars(container)[0].style.width;
-      fireEvent.click(screen.getByRole('button', { name: 'Show 3 more' }));
-      // Scaled against the largest overall, so rows already on screen do not
-      // jump when more arrive.
-      expect(bars(container)[0].style.width).toBe(before);
-    });
-
-    it('offers no button when everything already fits', () => {
-      renderCard(MANY.slice(0, 4));
       expect(screen.queryByRole('button', { name: /Show/ })).toBeNull();
+    });
+
+    it('bounds the list and scrolls it, rather than growing the card', () => {
+      const { container } = renderCard(MANY);
+      const list = container.querySelector('ul')!;
+      expect(list.className).toContain('overflow-y-auto');
+      expect(list.className).toMatch(/max-h-/);
+    });
+
+    it('uses the slim scrollbar, not the native one', () => {
+      // The complaint that started this was the bar's appearance, not its
+      // presence: the native control is wide, arrowed, and drawn against the
+      // figures, which reads as a rendering fault inside a small card.
+      const { container } = renderCard(MANY);
+      expect(container.querySelector('ul')!.className).toContain(
+        'scrollbar-slim',
+      );
+      expect(container.querySelector('ul')!.className).not.toContain(
+        'scrollbar-hide',
+      );
+    });
+
+    it('scales every bar against the largest share', () => {
+      const { container } = renderCard(MANY);
+      // The biggest fills the track; nothing rescales, because nothing is
+      // hidden and then revealed.
+      expect(bars(container)[0].style.width).toBe('100%');
     });
   });
 

@@ -212,6 +212,31 @@ describe('SecuritySummaryCards', () => {
       expect(screen.getByText('Brokerage (closed)')).toBeInTheDocument();
     });
 
+    it('bounds the list with the slim scrollbar so the card keeps its height', () => {
+      const { container } = render(
+        <SecuritySummaryCards
+          detail={detail({
+            accounts: Array.from({ length: 10 }, (_, index) =>
+              account({
+                accountId: `acct-${index}`,
+                accountName: `Account ${index}`,
+                quantity: 10,
+              }),
+            ),
+          })}
+        />,
+      );
+      // This card sits in a row with five others; growing it drags the whole
+      // grid down. The bar stays -- a bounded list needs one -- but it is the
+      // slim one, because the native control is what looked broken.
+      const list = container.querySelector('ul')!;
+      expect(list.className).toContain('overflow-y-auto');
+      expect(list.className).toMatch(/max-h-/);
+      expect(list.className).toContain('scrollbar-slim');
+      // Every account is still there to scroll to, not cut off.
+      expect(list.querySelectorAll('li')).toHaveLength(10);
+    });
+
     it('does not divide by a zero total when the balances cancel out', () => {
       render(
         <SecuritySummaryCards

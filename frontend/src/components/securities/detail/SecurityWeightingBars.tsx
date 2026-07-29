@@ -1,7 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useMemo } from 'react';
 import { chartColors } from '@/lib/chart-colors';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 
@@ -10,13 +9,6 @@ export interface WeightingSlice {
   name: string;
   weight: number;
 }
-
-/**
- * Rows shown before the list asks to be expanded. Enough to answer "what is it
- * mostly" -- the question these bars exist for -- while keeping the card shorter
- * than the chart beside it.
- */
-const COLLAPSED_ROWS = 5;
 
 interface SecurityWeightingBarsProps {
   slices: readonly WeightingSlice[] | null | undefined;
@@ -40,19 +32,20 @@ interface SecurityWeightingBarsProps {
  * Renders its empty state, not empty bars, when the data is absent. A security
  * with no sector data is not a security with zero-length bars.
  *
- * Long breakdowns are cut to the largest few with a button for the rest, rather
- * than made scrollable: a capped, scrolling box inside a small card draws a full
- * native scrollbar right against the figures, which on some platforms is a
- * chunky arrowed bar that reads as a rendering fault.
+ * A long breakdown scrolls inside a fixed height rather than growing the card or
+ * hiding rows behind a button. The card sits beside the price chart, so its
+ * height has to be the same whether a fund reports three sectors or eleven --
+ * an expander left a gap under the chart, and cutting the list needed a click to
+ * answer a question the bars exist to answer at a glance. The scrollbar is
+ * `scrollbar-slim`: the native one is a wide arrowed control drawn against the
+ * figures, which is what made this look broken the first time round.
  */
 export function SecurityWeightingBars({
   slices,
   emptyMessage,
   remainderLabel,
 }: SecurityWeightingBarsProps) {
-  const t = useTranslations('securityDetail');
   const { formatPercent } = useNumberFormat();
-  const [showAll, setShowAll] = useState(false);
 
   const rows = useMemo(() => {
     const usable = (slices ?? []).filter(
@@ -70,12 +63,8 @@ export function SecurityWeightingBars({
     !!remainderLabel && rows.length > 0 && remainder > 0.005;
 
   // Bars are scaled against the largest share, not against 100%: a fund whose
-  // biggest sector is 22% would otherwise draw every bar as a sliver. Scaled
-  // against the largest overall, so expanding the list does not rescale the bars
-  // already on screen.
+  // biggest sector is 22% would otherwise draw every bar as a sliver.
   const scale = rows.length > 0 ? rows[0].weight : 1;
-  const visibleRows = showAll ? rows : rows.slice(0, COLLAPSED_ROWS);
-  const hiddenCount = rows.length - visibleRows.length;
 
   if (rows.length === 0) {
     return (
@@ -85,8 +74,11 @@ export function SecurityWeightingBars({
 
   return (
     <>
-      <ul className="space-y-2">
-        {visibleRows.map((row) => {
+      {/* Fixed height, so the card is the same size for three sectors as for
+          eleven and the column beside the chart stays put. `pr-1` keeps the
+          percentages off the thumb. */}
+      <ul className="scrollbar-slim max-h-56 space-y-2 overflow-y-auto pr-1">
+        {rows.map((row) => {
           const percent = formatPercent(row.weight * 100);
           return (
             <li key={row.name}>
@@ -117,17 +109,6 @@ export function SecurityWeightingBars({
           );
         })}
       </ul>
-      {(hiddenCount > 0 || showAll) && (
-        <button
-          type="button"
-          onClick={() => setShowAll((open) => !open)}
-          className="mt-2 rounded text-xs font-medium text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-blue-400"
-        >
-          {showAll
-            ? t('weightings.showFewer')
-            : t('weightings.showAll', { count: hiddenCount })}
-        </button>
-      )}
       {showRemainder && (
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           {remainderLabel(formatPercent(remainder * 100))}

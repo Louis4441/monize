@@ -162,8 +162,6 @@
     "sectorEmpty": "[XX-No sector breakdown is stored. Monize fills this in from the provider for funds and ETFs.-XX]",
     "countryEmpty": "[XX-No country breakdown is stored. You can enter one when editing the security.-XX]",
     "assetClassEmpty": "[XX-No asset class breakdown is stored yet.-XX]",
-    "remainder": "[XX-{percent} unclassified-XX]",
-    "showAll": "[XX-Show {count} more-XX]",
-    "showFewer": "[XX-Show fewer-XX]"
+    "remainder": "[XX-{percent} unclassified-XX]"
   }
 }
