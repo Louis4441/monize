@@ -90,10 +90,12 @@ test.describe('Microsoft Money (.mny) import', () => {
       page.getByText(/upload transaction files/i).first(),
     ).toBeVisible();
 
-    // The accounts really landed, not just the report.
+    // The accounts really landed, not just the report. `exact` matters here:
+    // the cash sleeve's row carries "Paired with Investments to Watch -
+    // Brokerage", so a substring match resolves to two elements.
     await page.goto('/accounts');
     await expect(
-      page.getByText('Investments to Watch - Brokerage'),
+      page.getByText('Investments to Watch - Brokerage', { exact: true }),
     ).toBeVisible({ timeout: 15000 });
   });
 
