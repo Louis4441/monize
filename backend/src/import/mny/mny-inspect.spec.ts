@@ -4,6 +4,7 @@ import {
   inspect,
   mappingSummary,
   parseInspectArgs,
+  signSummary,
   summarise,
 } from "./mny-inspect";
 import { openMnyFile } from "./msisam/open-mny";
@@ -144,6 +145,38 @@ describe("mappingSummary", () => {
     const lines = mappingSummary(readMnyTables(fakeMnyDatabase({})));
 
     expect(lines).toContain("  accounts:        0 (0 skipped)");
+  });
+});
+
+describe("signSummary", () => {
+  it("counts how TRN.amt is signed and lists the columns TRN has", () => {
+    // Monize has no income/expense column: the sign of `amount` is the
+    // direction. No committed fixture has a banking transaction, so whether
+    // Money signs `amt` at all can only be read off a real file -- which is
+    // what this block exists to answer.
+    const db = openMnyFile(readMnyFixture("money2002"));
+    const lines = signSummary(readMnyTables(db), db);
+
+    expect(lines[0]).toBe("TRN.amt signs:");
+    const block = lines.join("\n");
+    expect(block).toMatch(/positive:\s+\d+/);
+    expect(block).toMatch(/negative:\s+\d+/);
+    expect(block).toMatch(/transfer sides:\s+\d+ \(\d+ positive\)/);
+    // The column list is the lead when the sign turns out not to be in `amt`.
+    expect(block).toContain("amt");
+    expect(block).toContain("hacct");
+  });
+
+  it("says so when the file has no TRN table at all", () => {
+    const db = openMnyFile(readMnyFixture("money2002"));
+    const tables = readMnyTables(db);
+
+    const lines = signSummary(tables, {
+      ...db,
+      getTableOrNull: () => null,
+    });
+
+    expect(lines.join("\n")).toContain("(no TRN table)");
   });
 });
 
