@@ -43,6 +43,7 @@
     "clickToSelect": "點擊以選取檔案",
     "processing": "處理中...",
     "acceptedFormats": "QIF、OFX、QFX 或 CSV",
+    "mnyFailedHeading": "無法開啟這個 Microsoft Money 檔案",
     "wikiNotice": {
       "title": "匯入之前",
       "body": "在匯入任何內容之前，請先閱讀 wiki 中的 <money>Importing from Microsoft Money</money> 或 <quicken>Importing from Quicken</quicken> 一節。"
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "匯入前執行與設定中相同的「刪除我的資料」操作。系統會要求確認。保持關閉可將 Money 檔案加入現有資料中。"
     },
     "warningsHeading": "關於此檔案的說明",
-    "startImport": "開始匯入"
+    "startImport": "開始匯入",
+    "startFailedHeading": "無法開始匯入",
+    "uploadAgain": "重新上傳檔案"
   },
   "mnyBills": {
     "heading": "將建立的定期帳單（{count}）",

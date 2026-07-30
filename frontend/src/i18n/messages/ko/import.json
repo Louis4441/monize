@@ -43,6 +43,7 @@
     "clickToSelect": "파일을 선택하려면 클릭하세요",
     "processing": "처리 중...",
     "acceptedFormats": "QIF, OFX, QFX 또는 CSV",
+    "mnyFailedHeading": "이 Microsoft Money 파일을 열 수 없습니다",
     "wikiNotice": {
       "title": "가져오기 전에",
       "body": "무엇이든 가져오기 전에 위키의 <money>Importing from Microsoft Money</money> 또는 <quicken>Importing from Quicken</quicken> 섹션을 먼저 읽어 보세요."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "가져오기 전에 설정의 내 데이터 삭제와 동일한 작업을 실행합니다. 확인을 요청합니다. 기존 데이터에 Money 파일을 추가하려면 꺼 두세요."
     },
     "warningsHeading": "이 파일에 대한 참고 사항",
-    "startImport": "가져오기 시작"
+    "startImport": "가져오기 시작",
+    "startFailedHeading": "가져오기를 시작할 수 없습니다",
+    "uploadAgain": "파일 다시 업로드"
   },
   "mnyBills": {
     "heading": "생성할 예약된 청구 ({count})",

@@ -43,6 +43,7 @@
     "clickToSelect": "Haz clic para seleccionar archivo(s)",
     "processing": "Procesando...",
     "acceptedFormats": "QIF, OFX, QFX o CSV",
+    "mnyFailedHeading": "No se pudo abrir ese archivo de Microsoft Money",
     "wikiNotice": {
       "title": "Antes de importar",
       "body": "Lee la sección <money>Importing from Microsoft Money</money> o <quicken>Importing from Quicken</quicken> de la wiki antes de importar nada."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "Ejecuta la misma operación Eliminar mis datos que en Ajustes antes de importar. Se te pedirá confirmación. Déjalo desactivado para añadir el archivo de Money a lo que ya tienes."
     },
     "warningsHeading": "Notas sobre este archivo",
-    "startImport": "Iniciar importación"
+    "startImport": "Iniciar importación",
+    "startFailedHeading": "No se pudo iniciar la importación",
+    "uploadAgain": "Volver a subir el archivo"
   },
   "mnyBills": {
     "heading": "Facturas programadas a crear ({count})",

@@ -43,6 +43,7 @@
     "clickToSelect": "फ़ाइल(ें) चुनने के लिए क्लिक करें",
     "processing": "प्रसंस्करण हो रहा है...",
     "acceptedFormats": "QIF, OFX, QFX, या CSV",
+    "mnyFailedHeading": "यह Microsoft Money फ़ाइल खोली नहीं जा सकी",
     "wikiNotice": {
       "title": "आयात करने से पहले",
       "body": "कुछ भी आयात करने से पहले विकी का <money>Importing from Microsoft Money</money> या <quicken>Importing from Quicken</quicken> अनुभाग पढ़ें।"
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "आयात से पहले वही \"मेरा डेटा हटाएँ\" कार्रवाई चलाता है जो सेटिंग्स में है। आपसे पुष्टि माँगी जाएगी। Money फ़ाइल को अपने मौजूदा डेटा में जोड़ने के लिए इसे बंद रखें।"
     },
     "warningsHeading": "इस फ़ाइल के बारे में टिप्पणियाँ",
-    "startImport": "आयात शुरू करें"
+    "startImport": "आयात शुरू करें",
+    "startFailedHeading": "आयात शुरू नहीं किया जा सका",
+    "uploadAgain": "फ़ाइल फिर से अपलोड करें"
   },
   "mnyBills": {
     "heading": "बनाए जाने वाले निर्धारित बिल ({count})",

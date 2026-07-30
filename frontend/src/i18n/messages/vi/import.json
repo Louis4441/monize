@@ -43,6 +43,7 @@
     "clickToSelect": "Nhấp để chọn tệp",
     "processing": "Đang xử lý...",
     "acceptedFormats": "QIF, OFX, QFX hoặc CSV",
+    "mnyFailedHeading": "Không thể mở tệp Microsoft Money đó",
     "wikiNotice": {
       "title": "Trước khi nhập khẩu",
       "body": "Hãy đọc mục <money>Importing from Microsoft Money</money> hoặc <quicken>Importing from Quicken</quicken> trên wiki trước khi nhập khẩu bất cứ dữ liệu nào."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "Chạy cùng thao tác Xóa dữ liệu của tôi như trong Cài đặt trước khi nhập. Bạn sẽ được yêu cầu xác nhận. Để tắt nếu muốn thêm tệp Money vào dữ liệu hiện có."
     },
     "warningsHeading": "Ghi chú về tệp này",
-    "startImport": "Bắt đầu nhập"
+    "startImport": "Bắt đầu nhập",
+    "startFailedHeading": "Không thể bắt đầu quá trình nhập",
+    "uploadAgain": "Tải tệp lên lại"
   },
   "mnyBills": {
     "heading": "Hóa đơn đã lên lịch sẽ tạo ({count})",

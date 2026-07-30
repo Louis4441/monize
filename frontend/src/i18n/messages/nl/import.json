@@ -43,6 +43,7 @@
     "clickToSelect": "Klik om bestand(en) te selecteren",
     "processing": "Verwerken...",
     "acceptedFormats": "QIF, OFX, QFX of CSV",
+    "mnyFailedHeading": "Dit Microsoft Money-bestand kon niet worden geopend",
     "wikiNotice": {
       "title": "Voordat u importeert",
       "body": "Lees het wiki-gedeelte <money>Importing from Microsoft Money</money> of <quicken>Importing from Quicken</quicken> voordat u iets importeert."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "Voert vóór het importeren dezelfde bewerking Mijn gegevens verwijderen uit als in Instellingen. Er wordt om bevestiging gevraagd. Laat dit uit om het Money-bestand toe te voegen aan wat u al hebt."
     },
     "warningsHeading": "Opmerkingen over dit bestand",
-    "startImport": "Import starten"
+    "startImport": "Import starten",
+    "startFailedHeading": "De import kon niet worden gestart",
+    "uploadAgain": "Bestand opnieuw uploaden"
   },
   "mnyBills": {
     "heading": "Aan te maken geplande rekeningen ({count})",

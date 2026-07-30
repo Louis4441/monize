@@ -43,6 +43,7 @@
     "clickToSelect": "Klik untuk memilih file",
     "processing": "Memproses...",
     "acceptedFormats": "QIF, OFX, QFX, atau CSV",
+    "mnyFailedHeading": "Berkas Microsoft Money itu tidak dapat dibuka",
     "wikiNotice": {
       "title": "Sebelum Anda mengimpor",
       "body": "Baca bagian <money>Importing from Microsoft Money</money> atau <quicken>Importing from Quicken</quicken> di wiki sebelum mengimpor apa pun."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "Menjalankan operasi Hapus Data Saya yang sama seperti di Pengaturan sebelum mengimpor. Anda akan diminta konfirmasi. Biarkan mati untuk menambahkan berkas Money ke data yang sudah ada."
     },
     "warningsHeading": "Catatan tentang berkas ini",
-    "startImport": "Mulai impor"
+    "startImport": "Mulai impor",
+    "startFailedHeading": "Impor tidak dapat dimulai",
+    "uploadAgain": "Unggah ulang berkas"
   },
   "mnyBills": {
     "heading": "Tagihan terjadwal yang akan dibuat ({count})",

@@ -43,6 +43,7 @@
     "clickToSelect": "Kliknij, aby wybrać plik(i)",
     "processing": "Przetwarzanie...",
     "acceptedFormats": "QIF, OFX, QFX lub CSV",
+    "mnyFailedHeading": "Nie udało się otworzyć tego pliku Microsoft Money",
     "wikiNotice": {
       "title": "Zanim zaimportujesz",
       "body": "Zanim cokolwiek zaimportujesz, przeczytaj na wiki sekcję <money>Importing from Microsoft Money</money> lub <quicken>Importing from Quicken</quicken>."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "Przed importem wykonuje tę samą operację Usuń moje dane co w Ustawieniach. Zostaniesz poproszony o potwierdzenie. Zostaw wyłączone, aby dodać plik Money do tego, co już masz."
     },
     "warningsHeading": "Uwagi dotyczące tego pliku",
-    "startImport": "Rozpocznij import"
+    "startImport": "Rozpocznij import",
+    "startFailedHeading": "Nie udało się rozpocząć importu",
+    "uploadAgain": "Prześlij plik ponownie"
   },
   "mnyBills": {
     "heading": "Zaplanowane rachunki do utworzenia ({count})",

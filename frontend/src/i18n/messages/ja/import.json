@@ -43,6 +43,7 @@
     "clickToSelect": "クリックしてファイルを選択",
     "processing": "処理中...",
     "acceptedFormats": "QIF、OFX、QFX、または CSV",
+    "mnyFailedHeading": "この Microsoft Money ファイルを開けませんでした",
     "wikiNotice": {
       "title": "インポートする前に",
       "body": "何かをインポートする前に、Wiki の <money>Importing from Microsoft Money</money> または <quicken>Importing from Quicken</quicken> のセクションをお読みください。"
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "インポート前に、設定と同じ「データを削除」操作を実行します。確認を求められます。Money ファイルを既存のデータに追加する場合はオフのままにしてください。"
     },
     "warningsHeading": "このファイルに関する注意",
-    "startImport": "インポートを開始"
+    "startImport": "インポートを開始",
+    "startFailedHeading": "インポートを開始できませんでした",
+    "uploadAgain": "ファイルをもう一度アップロード"
   },
   "mnyBills": {
     "heading": "作成する予定の支払い ({count})",
