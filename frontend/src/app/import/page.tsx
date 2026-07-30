@@ -45,6 +45,12 @@ function ImportContent() {
             preselectedAccount={wizard.preselectedAccount}
             isLoading={wizard.isLoading}
             onFileSelect={wizard.handleFileSelect}
+            // A .mny that would not open leaves the wizard right here, so this
+            // is where the reason has to appear. The password prompt is not a
+            // failure and shows itself.
+            mnyError={
+              wizard.mny.passwordPrompt ? null : wizard.mny.uploadError
+            }
           />
         );
 

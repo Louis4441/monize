@@ -8,6 +8,13 @@ interface UploadStepProps {
   preselectedAccount: Account | undefined;
   isLoading: boolean;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /**
+   * Why the last Microsoft Money file would not open. Shown here rather than
+   * toasted because the useful ones are instructions -- "open and save it once
+   * in Money Plus Sunset, then import the result" -- and a toast takes those
+   * away while the user is still reading them.
+   */
+  mnyError?: { code?: string; message: string } | null;
 }
 
 const MS_MONEY_WIKI_URL = 'https://github.com/kenlasko/monize/wiki/Importing-from-Microsoft-Money';
@@ -28,7 +35,12 @@ function wikiLink(href: string) {
   };
 }
 
-export function UploadStep({ preselectedAccount, isLoading, onFileSelect }: UploadStepProps) {
+export function UploadStep({
+  preselectedAccount,
+  isLoading,
+  onFileSelect,
+  mnyError = null,
+}: UploadStepProps) {
   const t = useTranslations('import');
   const tc = useTranslations('common');
 
@@ -74,6 +86,19 @@ export function UploadStep({ preselectedAccount, isLoading, onFileSelect }: Uplo
         <p className="text-gray-600 dark:text-gray-400 mb-6">
           {t('upload.instructions')}
         </p>
+        {mnyError && (
+          <div
+            role="alert"
+            className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6"
+          >
+            <p className="text-sm font-semibold text-red-800 dark:text-red-300">
+              {t('upload.mnyFailedHeading')}
+            </p>
+            <p className="mt-1 text-sm text-red-700 dark:text-red-300">
+              {mnyError.message || t('mnyErrors.mnyUnreadableDatabase')}
+            </p>
+          </div>
+        )}
         <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
           <input
             type="file"
