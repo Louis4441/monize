@@ -398,6 +398,62 @@ transfer pairs and splits are wired before insert; insert in chunks of ~500 via
 the shared bulk recalc as a cross-check. Prices and FX rates are multi-row upserts. Target: the
 37k-transaction + 68k-price Sunset file in well under 3 minutes end-to-end.
 
+### 6.4 Phase 1 findings (M1.1–M1.10, implemented)
+
+Five things this plan specified turned out differently once code existed. Each is
+settled by a test rather than by argument.
+
+**Progress needed a new primitive, not a "short `withScopedDb`".** ADR-3 says
+progress is written "in their own short `withScopedDb`", but a nested
+`withScopedDb` *joins* the ambient transaction by design (that is what stops the
+pool-exhaustion deadlock), so a write inside the import transaction stays
+invisible until commit -- a frozen progress bar for the whole run. Phase 1 adds
+`runOutsideActiveScopedManager` to `common/db/scoped-db.ts`: it hides the ambient
+manager so the inner call opens its own transaction on its own connection. It is
+documented as correct only for a small statement at a phase boundary; used per
+row it would reproduce exactly the deadlock the nesting rule prevents. An
+integration spec asserts a poller sees progress from inside an open transaction.
+
+**The wipe cannot happen inside the job.** `UsersService.deleteData`
+re-authenticates, so running it in the job body would mean writing the user's
+password into `import_jobs.options`. It runs in `start()` instead, before the job
+row exists: a failed re-authentication fails the request, and the credentials are
+spent on that one call.
+
+**Categories do not route through the QIF entity creator.** ADR-8 hoped to reuse
+`ImportEntityCreatorService` behind a `{manager, query}` shim. Its
+`createCategories` hardcodes `isIncome: false`, which would discard the income
+flag the mapper derives from `CAT.lType`, so Phase 1 has dedicated writers. The
+reuse that *did* land is the one that matters: `postImportProcessing` is extracted
+into `ImportPostProcessingService` and called by both pipelines, so the balance
+query the verification report reconciles against has exactly one definition.
+
+**Mutually-referential links need a patch pass, and pre-generated ids do not
+avoid it.** ADR-9's pre-generated UUIDs let the mapper wire transfer pairs before
+insert, but both `transactions.linked_transaction_id` and
+`accounts.linked_account_id` are self-referencing foreign keys pointing *both*
+ways, so no insertion order satisfies them inline. Both go in as one
+`UPDATE ... FROM (VALUES ...)` pass after the rows exist -- which is also what
+`AccountsService.createInvestmentPair` does. The integration spec caught the
+accounts half; without a real database the inline version looks correct.
+
+**"Orphaned transfer side" had to be narrowed.** Section 8.2 excludes orphaned
+sides, but the phrase covers two very different cases. Phase 1 drops only a
+dangling `TRN_XFER` reference to a row that is not in the file. A counterpart
+that exists in an account the user chose *not* to import keeps its row as a plain
+transaction with a warning: dropping it would silently remove real money from an
+account the user did import, which is the exact class of discrepancy the
+verification report exists to surface.
+
+Two further notes for later phases. Investment rows are identified by carrying a
+security, not by `act`: `act = 0` is BUY and cannot be told apart from a plain
+payment by action code, and every transaction in all five fixtures is an
+investment row -- so the banking mapper defers them by count and Phase 2 reads
+them from the same tables. And the committed fixtures contain **no banking
+transactions at all**, so the transfer, split and loan-payment cases are driven
+from plain-object row builders (`__fixtures__/mny-row-builders.ts`) through the
+real mappers and, in the integration spec, the real INSERT path.
+
 ## 7. Wizard UX
 
 1. **Upload** (existing step): accept gains `.mny`; the file is read as `ArrayBuffer`. If parse
@@ -515,7 +571,7 @@ Exit gate: all five jackcess fixtures parse end-to-end via the CLI; go/no-go on 
 | M0.2 | `msisam/msisam-decrypt.ts`: RC4, key derivation (SHA-1/MD5 flag at `0x298`), salt at `0x72`, page loop 1..0xE, page-number key XOR, old-encryption fallback, password verify near `0x2e9`. Spec: all five fixtures decrypt; wrong password -> typed error; blank-password files open without a password | M0.1 | M | **done** |
 | M0.3 | `msisam/open-mny.ts` wrapper over `mdb-reader` v3.2.0 (`getTableOrNull`, column-presence map, engine sanity checks); confirm the identity-codec path reads pre-decrypted buffers. Spec: table lists + row counts correct for all fixtures | M0.2 | M | **done** (not vendored — see 6.1) |
 | M0.4 | Tolerant table readers (`tables/read-reference.ts`, `read-transactions.ts`, `read-investments.ts`, `read-bills.ts`) + typed raw-row model (`model/mny-rows.ts`) + date/amount normalization utils; build the per-version column-presence matrix across fixtures and encode defaults. Spec: every table reads or degrades gracefully on all fixtures | M0.3 | L | **done** (see 6.2) |
-| M0.5 | Validation-harness CLI: `npm run mny:validate -- file.mny [--password ...]` prints accounts, transaction counts, per-account computed final balances, per-security holdings (replay + LOT), warnings. Acceptance: maintainer runs it on the real Sunset and Money 2001 files; output sane; runtime + memory recorded in the PR | M0.4 | M | reader half shipped as `npm run mny:inspect`: scheme, table list, row/column counts, base currency, entity counts, missing tables/fields, sample rows, per-table failure isolation. Balances and holdings need the mappers |
+| M0.5 | Validation-harness CLI: `npm run mny:validate -- file.mny [--password ...]` prints accounts, transaction counts, per-account computed final balances, per-security holdings (replay + LOT), warnings. Acceptance: maintainer runs it on the real Sunset and Money 2001 files; output sane; runtime + memory recorded in the PR | M0.4 | M | shipped as `npm run mny:inspect`, now including the mapped view Phase 1 made possible: per-account transaction counts, file-computed final balances and grouped warnings, alongside the reader's scheme/table/column report. Holdings still need the investment mappers (M2.3) |
 | M0.6 | Spike report resolving open questions (section 12): DHD base-currency field, CAT `is_income` signal, BILL `st` active semantics (validated against the known "~20 real bills" ground truth), act 5 vs 3 and act 14 semantics, native date decoding vs pivot logic. Constants land in `model/mny-model.ts` with the findings documented | M0.5 | M | **done** (see 6.3). Questions 12.3 and 12.4 need a real file — no fixture has a `BILL` row or an `act` outside {0, 1, 15} |
 
 ### Track B — Parallel, not .mny-specific
@@ -579,18 +635,23 @@ reappears. Phase 3's M3.1 can therefore drop the downgrade-and-warn fallback.
 
 ### Phase 1 — Core banking import, end-to-end behind the wizard (shippable)
 
-| ID | Task | Depends | Size |
-|----|------|---------|------|
-| M1.1 | Entities + migration + RLS: `import_staged_files` (bytea, user-owned, `expires_at`), `import_jobs` (`status`, `options`, `progress`, `result`, `heartbeat_at`); `user_id`-direct RLS policies; `database/schema.sql` mirrored. Acceptance: cross-user isolation spec; ratchet unchanged | — | M |
-| M1.2 | Staging service (`withScopedDb`) + TTL sweep cron + delete-on-complete; `docs/cron-jobs.md` entry. Acceptance: expiry works; sweep idempotent across replicas | M1.1 | S |
-| M1.3 | Reference mapper (`map/map-reference.ts`): currencies (DHD base + `ensureSystemCurrency`), accounts (type/subtype map, `hacctRel` pairs, deferred closure, favourites, opening balances), categories (flatten, `is_income`, referenced-only), payees (junk filter, referenced-only), warnings model. Unit fixtures cover every `at` value, deep category trees, junk payees | M0.4, M0.6 | L |
-| M1.4 | Transaction + transfer mapper (`map/map-transactions.ts`, `map/map-transfers.ts`): inclusion rule (`frq != -1` only — auto-entered rows import), statuses/void, splits, `TRN_XFER` pairing with pre-generated UUIDs, **loan-payment transfer splits**, reference numbers. Acceptance: loan fixture yields a transfer split linked to the loan-side transaction, each side imported exactly once | M1.3 | L |
-| M1.5 | Parser service + preview builder (`mny-parser.service.ts`): orchestrates decrypt -> read -> map; computes per-account final balances (the verification baseline). Acceptance: preview for `money2008.mny` matches hand-computed values | M1.3, M1.4 | M |
-| M1.6 | Controller + DTOs: `POST /import/mny/parse` (multer memoryStorage, `password` field, `MNY_IMPORT_LIMIT_MB`, i18n error taxonomy incl. required-vs-incorrect password and Jet 3 rejection), `POST /import/mny/start`, `GET /import/mny/jobs/:id`, `DELETE /import/mny/staged/:id`. Acceptance: contract specs; password never logged or echoed; oversized file -> clean localized error | M1.1, M1.5 | M |
-| M1.7 | Job service: atomic claim, heartbeat, progress writer in its own `withScopedDb`, stale reaper cron, retry semantics (staged file survives failure). Acceptance: simulated double-claim has a single winner; stale running job reaped to failed-retryable | M1.1 | M |
-| M1.8 | Writer v1 (`mny-import.service.ts`, `writers/write-transactions.ts`): optional wipe via existing `UsersService.deleteData` (own transaction, before the job body), entity creation via the `{manager, query}` shim over `withScopedDb`, chunked inserts + `linked_transaction_id` back-patch, single balance write per account, deferred account closure, **shared `postImportProcessing` extracted** from `ImportService` and called by both pipelines, verification report v1 (balances). Acceptance: integration spec imports a fixture and balances match parser-computed values; QIF suite still green after the extraction; no new ratchet sites | M1.4–M1.7 | L |
-| M1.9 | Frontend: `useMnyImport` hook (upload, options, start, polling, retry) composed into `useImportWizard`; `detectFileType` + ArrayBuffer path; `ImportStep` additions (`mnyReview`, `mnyImporting`) + `page.tsx` step order; `MnyReviewStep`, `MnyImportProgress`; `CompleteStep` verification table; accept-string updated **with** `UploadStep.test.tsx` and the e2e assertion; `lib/import-mny-api.ts` with per-call timeouts; English catalogs + pseudo-locale. Vitest to gates | M1.6 | L |
-| M1.10 | Verification report UI: pass/warn rows, JSON download, trust-builder copy | M1.8, M1.9 | S |
+Exit gate: cleared. A `.mny` file goes through the wizard end to end -- upload,
+review, background import, per-account verification -- and the localization pass
+that section 9 defers to M4.3 was done with it, so Phase 1 is fully translated.
+See 6.4 for what the implementation settled differently from this plan.
+
+| ID | Task | Depends | Size | Status |
+|----|------|---------|------|--------|
+| M1.1 | Entities + migration + RLS: `import_staged_files` (bytea, user-owned, `expires_at`), `import_jobs` (`status`, `options`, `progress`, `result`, `heartbeat_at`); `user_id`-direct RLS policies; `database/schema.sql` mirrored. Acceptance: cross-user isolation spec; ratchet unchanged | — | M | **done** |
+| M1.2 | Staging service (`withScopedDb`) + TTL sweep cron + delete-on-complete; `docs/cron-jobs.md` entry. Acceptance: expiry works; sweep idempotent across replicas | M1.1 | S | **done** |
+| M1.3 | Reference mapper (`map/map-reference.ts`): currencies (DHD base + `ensureSystemCurrency`), accounts (type/subtype map, `hacctRel` pairs, deferred closure, favourites, opening balances), categories (flatten, `is_income`, referenced-only), payees (junk filter, referenced-only), warnings model. Unit fixtures cover every `at` value, deep category trees, junk payees | M0.4, M0.6 | L | **done** |
+| M1.4 | Transaction + transfer mapper (`map/map-transactions.ts`, `map/map-transfers.ts`): inclusion rule (`frq != -1` only — auto-entered rows import), statuses/void, splits, `TRN_XFER` pairing with pre-generated UUIDs, **loan-payment transfer splits**, reference numbers. Acceptance: loan fixture yields a transfer split linked to the loan-side transaction, each side imported exactly once | M1.3 | L | **done** |
+| M1.5 | Parser service + preview builder (`mny-parser.service.ts`): orchestrates decrypt -> read -> map; computes per-account final balances (the verification baseline). Acceptance: preview for `money2008.mny` matches hand-computed values | M1.3, M1.4 | M | **done** |
+| M1.6 | Controller + DTOs: `POST /import/mny/parse` (multer memoryStorage, `password` field, `MNY_IMPORT_LIMIT_MB`, i18n error taxonomy incl. required-vs-incorrect password and Jet 3 rejection), `POST /import/mny/start`, `GET /import/mny/jobs/:id`, `DELETE /import/mny/staged/:id`. Acceptance: contract specs; password never logged or echoed; oversized file -> clean localized error | M1.1, M1.5 | M | **done** |
+| M1.7 | Job service: atomic claim, heartbeat, progress writer in its own `withScopedDb`, stale reaper cron, retry semantics (staged file survives failure). Acceptance: simulated double-claim has a single winner; stale running job reaped to failed-retryable | M1.1 | M | **done** |
+| M1.8 | Writer v1 (`mny-import.service.ts`, `writers/write-transactions.ts`): optional wipe via existing `UsersService.deleteData` (own transaction, before the job body), entity creation via the `{manager, query}` shim over `withScopedDb`, chunked inserts + `linked_transaction_id` back-patch, single balance write per account, deferred account closure, **shared `postImportProcessing` extracted** from `ImportService` and called by both pipelines, verification report v1 (balances). Acceptance: integration spec imports a fixture and balances match parser-computed values; QIF suite still green after the extraction; no new ratchet sites | M1.4–M1.7 | L | **done** |
+| M1.9 | Frontend: `useMnyImport` hook (upload, options, start, polling, retry) composed into `useImportWizard`; `detectFileType` + ArrayBuffer path; `ImportStep` additions (`mnyReview`, `mnyImporting`) + `page.tsx` step order; `MnyReviewStep`, `MnyImportProgress`; `CompleteStep` verification table; accept-string updated **with** `UploadStep.test.tsx` and the e2e assertion; `lib/import-mny-api.ts` with per-call timeouts; English catalogs + pseudo-locale. Vitest to gates | M1.6 | L | **done** |
+| M1.10 | Verification report UI: pass/warn rows, JSON download, trust-builder copy | M1.8, M1.9 | S | **done** |
 
 ### Phase 2 — Investments (shippable increment)
 
