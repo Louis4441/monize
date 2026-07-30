@@ -154,7 +154,7 @@
       "cycleTitle": "點擊以循環切換狀態"
     },
     "row": {
-      "editPayeeTitle": "編輯收款人：{name}",
+      "viewPayeeTitle": "檢視 {name} 的詳細資料",
       "ref": "參考：{number}",
       "investmentLabel": "投資",
       "linkedInvestmentTitle": "在投資中查看",

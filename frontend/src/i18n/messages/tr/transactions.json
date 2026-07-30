@@ -154,7 +154,7 @@
       "cycleTitle": "Durumu döndürmek için tıklayın"
     },
     "row": {
-      "editPayeeTitle": "Alacaklıyı düzenle: {name}",
+      "viewPayeeTitle": "{name} ayrıntılarını görüntüle",
       "ref": "Ref: {number}",
       "investmentLabel": "Yatırım",
       "linkedInvestmentTitle": "Yatırımlarda Görüntüle",

@@ -154,7 +154,7 @@
       "cycleTitle": "클릭하여 상태 순환"
     },
     "row": {
-      "editPayeeTitle": "수취인 편집: {name}",
+      "viewPayeeTitle": "{name} 상세 보기",
       "ref": "참조: {number}",
       "investmentLabel": "투자",
       "linkedInvestmentTitle": "투자에서 보기",

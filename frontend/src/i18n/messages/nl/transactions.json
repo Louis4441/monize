@@ -154,7 +154,7 @@
       "cycleTitle": "Klik om door statussen te wisselen"
     },
     "row": {
-      "editPayeeTitle": "Begunstigde bewerken: {name}",
+      "viewPayeeTitle": "Details van {name} bekijken",
       "ref": "Ref: {number}",
       "investmentLabel": "Belegging",
       "linkedInvestmentTitle": "Bekijk in Beleggingen",

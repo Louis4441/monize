@@ -154,7 +154,7 @@
       "cycleTitle": "Нажмите для изменения статуса"
     },
     "row": {
-      "editPayeeTitle": "Редактировать получателя: {name}",
+      "viewPayeeTitle": "Показать сведения о {name}",
       "ref": "Реф.: {number}",
       "investmentLabel": "Инвестиция",
       "linkedInvestmentTitle": "Просмотр в разделе Инвестиции",

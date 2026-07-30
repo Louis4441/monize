@@ -154,7 +154,7 @@
       "cycleTitle": "点击切换状态"
     },
     "row": {
-      "editPayeeTitle": "编辑收款人：{name}",
+      "viewPayeeTitle": "查看 {name} 的详情",
       "ref": "参考：{number}",
       "investmentLabel": "投资",
       "linkedInvestmentTitle": "在投资中查看",

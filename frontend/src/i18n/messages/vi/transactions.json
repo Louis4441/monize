@@ -154,7 +154,7 @@
       "cycleTitle": "Nhấn để chuyển đổi trạng thái"
     },
     "row": {
-      "editPayeeTitle": "Chỉnh sửa người nhận: {name}",
+      "viewPayeeTitle": "Xem chi tiết {name}",
       "ref": "Tham chiếu: {number}",
       "investmentLabel": "Đầu tư",
       "linkedInvestmentTitle": "Xem trong Đầu tư",

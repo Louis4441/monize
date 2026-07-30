@@ -154,7 +154,7 @@
       "cycleTitle": "Fai clic per cambiare stato"
     },
     "row": {
-      "editPayeeTitle": "Modifica beneficiario: {name}",
+      "viewPayeeTitle": "Vedi i dettagli di {name}",
       "ref": "Rif: {number}",
       "investmentLabel": "Investimento",
       "linkedInvestmentTitle": "Visualizza in Investimenti",

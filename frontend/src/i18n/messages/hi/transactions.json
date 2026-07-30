@@ -154,7 +154,7 @@
       "cycleTitle": "स्थिति बदलने के लिए क्लिक करें"
     },
     "row": {
-      "editPayeeTitle": "भुगतानकर्ता संपादित करें: {name}",
+      "viewPayeeTitle": "{name} का विवरण देखें",
       "ref": "संदर्भ: {number}",
       "investmentLabel": "निवेश",
       "linkedInvestmentTitle": "निवेश में देखें",

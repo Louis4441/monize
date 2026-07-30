@@ -155,7 +155,7 @@
       "cycleTitle": "Click to cycle status"
     },
     "row": {
-      "editPayeeTitle": "Edit payee: {name}",
+      "viewPayeeTitle": "View {name} details",
       "ref": "Ref: {number}",
       "investmentLabel": "Investment",
       "linkedInvestmentTitle": "View in Investments",

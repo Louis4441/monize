@@ -154,7 +154,7 @@
       "cycleTitle": "クリックして状態を切り替え"
     },
     "row": {
-      "editPayeeTitle": "支払先を編集: {name}",
+      "viewPayeeTitle": "{name} の詳細を表示",
       "ref": "参照: {number}",
       "investmentLabel": "投資",
       "linkedInvestmentTitle": "投資で表示",

@@ -154,7 +154,7 @@
       "cycleTitle": "Klik untuk mengubah status"
     },
     "row": {
-      "editPayeeTitle": "Edit penerima: {name}",
+      "viewPayeeTitle": "Lihat detail {name}",
       "ref": "Ref: {number}",
       "investmentLabel": "Investasi",
       "linkedInvestmentTitle": "Lihat di Investasi",

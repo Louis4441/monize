@@ -154,7 +154,7 @@
       "cycleTitle": "Klicken, um Status zu wechseln"
     },
     "row": {
-      "editPayeeTitle": "Zahlungsempfänger bearbeiten: {name}",
+      "viewPayeeTitle": "Details zu {name} anzeigen",
       "ref": "Ref: {number}",
       "investmentLabel": "Investition",
       "linkedInvestmentTitle": "In Investitionen anzeigen",

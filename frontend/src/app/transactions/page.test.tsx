@@ -2,6 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@/test/render';
 import TransactionsPage from './page';
 
+// The global setup mock builds a fresh router per call, so pushes cannot be
+// observed. This one keeps a stable `push` for the navigation assertions; the
+// rest matches the global mock (this file never reads search params).
+const mockPush = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: vi.fn(),
+    back: vi.fn(),
+    prefetch: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  usePathname: () => '/transactions',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 // Mock next/image
 vi.mock('next/image', () => ({
   default: ({ priority, fill, ...props }: any) => <img alt="" {...props} />,
@@ -1390,9 +1406,10 @@ describe('TransactionsPage', () => {
   });
 
   describe('Payee Interaction', () => {
-    it('opens payee edit modal when payee is clicked', async () => {
-      const mockPayee = { id: 'payee-1', name: 'Test Store', defaultCategoryId: null, notes: '' };
-      mockGetPayeeById.mockResolvedValue(mockPayee);
+    // The payee name in a row goes to that payee's page. Editing a payee from
+    // the register is still possible -- the payee info widget's pencil opens
+    // the same form -- but it is no longer the row's primary click.
+    it('navigates to the payee page when a payee is clicked', async () => {
       mockGetAll.mockResolvedValue({
         data: mockTransactions,
         pagination: { page: 1, totalPages: 1, total: 3 },
@@ -1408,30 +1425,10 @@ describe('TransactionsPage', () => {
       fireEvent.click(screen.getByTestId('payee-click-btn'));
 
       await waitFor(() => {
-        expect(mockGetPayeeById).toHaveBeenCalledWith('payee-1');
+        expect(mockPush).toHaveBeenCalledWith('/payees/payee-1');
       });
-    });
-
-    it('shows error toast when payee loading fails', async () => {
-      mockGetPayeeById.mockRejectedValue(new Error('Not found'));
-      mockGetAll.mockResolvedValue({
-        data: mockTransactions,
-        pagination: { page: 1, totalPages: 1, total: 3 },
-      });
-      mockGetSummary.mockResolvedValue({ totalIncome: 0, totalExpenses: 0, netCashFlow: 0, transactionCount: 0 });
-
-      render(<TransactionsPage />);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('payee-click-btn')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByTestId('payee-click-btn'));
-
-      const { showErrorToast } = await import('@/lib/errors');
-      await waitFor(() => {
-        expect(showErrorToast).toHaveBeenCalledWith(expect.any(Error), 'Failed to load payee details');
-      });
+      // No longer fetches the payee to open a form.
+      expect(mockGetPayeeById).not.toHaveBeenCalled();
     });
   });
 
