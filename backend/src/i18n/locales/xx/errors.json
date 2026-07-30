@@ -284,7 +284,18 @@
     "invalidSecurityMapping": "[XX-Security mapping references an invalid security: {{ secId }}-XX]",
     "columnMappingNotFound": "[XX-Column mapping not found-XX]",
     "columnMappingDuplicate": "[XX-A column mapping named \"{{ name }}\" already exists-XX]",
-    "accountNotFound": "[XX-Account not found-XX]"
+    "accountNotFound": "[XX-Account not found-XX]",
+    "mnyNoFile": "[XX-No Money file was uploaded-XX]",
+    "mnyFileTruncated": "[XX-That Money file looks incomplete. The upload may have been interrupted -- try again.-XX]",
+    "mnyNotAMoneyFile": "[XX-That file is not a Microsoft Money (.mny) file-XX]",
+    "mnyUnsupportedVersion": "[XX-That file was written by Money 97 or 98, which Monize cannot read. Open and save it once in the free Money Plus Sunset edition, then import the result.-XX]",
+    "mnyPasswordRequired": "[XX-That Money file is password protected. Enter its password to continue.-XX]",
+    "mnyPasswordIncorrect": "[XX-That password does not open the Money file. Check it and try again.-XX]",
+    "mnyUnreadableDatabase": "[XX-That Money file was decrypted but its contents could not be read. It may be damaged.-XX]",
+    "mnyStagedFileMissing": "[XX-The uploaded Money file is no longer available. Please upload it again.-XX]",
+    "mnyImportAlreadyRunning": "[XX-An import is already running. Wait for it to finish before starting another.-XX]",
+    "mnyJobNotFound": "[XX-Import job not found-XX]",
+    "mnyFileTooLarge": "[XX-That Money file is larger than the {{ limit }} MB import limit.-XX]"
   },
   "monteCarlo": {
     "scenarioNotFound": "[XX-Scenario {{ id }} not found-XX]",

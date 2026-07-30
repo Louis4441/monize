@@ -1,6 +1,7 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ImportController } from "./import.controller";
+import { MnyImportController } from "./mny/mny-import.controller";
 import { ImportService } from "./import.service";
 import { ImportEntityCreatorService } from "./import-entity-creator.service";
 import { ImportInvestmentProcessorService } from "./import-investment-processor.service";
@@ -48,7 +49,7 @@ import { UsersModule } from "../users/users.module";
     forwardRef(() => CurrenciesModule),
     forwardRef(() => UsersModule),
   ],
-  controllers: [ImportController],
+  controllers: [ImportController, MnyImportController],
   providers: [
     ImportService,
     ImportPostProcessingService,
