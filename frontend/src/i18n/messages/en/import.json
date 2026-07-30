@@ -312,9 +312,14 @@
       "payees": "Payees",
       "categories": "Categories",
       "accounts": "Accounts",
+      "securities": "Securities",
+      "investments": "Investment transactions",
+      "investmentDetail": "{transfers} share transfers, {splits} stock splits",
+      "prices": "Price history",
+      "exchangeRates": "Exchange rates",
       "ofTotal": "of {total} in the file"
     },
-    "notYetImported": "Investments and scheduled bills are not imported yet: {investments} investment transactions, {securities} securities and {bills} bill rows are left for a later release. Your banking history imports in full.",
+    "notYetImported": "Scheduled bills are not imported yet: {bills} bill rows are left for a later release. Everything else in this file imports in full.",
     "accountsHeading": "Accounts ({count})",
     "selectAll": "Select all",
     "selectNone": "Select none",
@@ -326,6 +331,7 @@
       "currency": "Currency",
       "currencyForAccount": "Currency for {name}",
       "transactions": "Transactions",
+      "investmentRows": "+ {count, plural, one {# investment} other {# investments}}",
       "openingBalance": "Opening",
       "finalBalance": "Final balance",
       "closed": "Closed",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "Only import categories that are used",
       "referencedOnlyCategoriesHint": "Money seeds a full category tree whether you use it or not. Leave this on to skip the categories you never touched.",
       "importClosedAccounts": "Import closed accounts",
-      "importClosedAccountsHint": "Closed accounts still hold history worth keeping. They are imported closed."
+      "importClosedAccountsHint": "Closed accounts still hold history worth keeping. They are imported closed.",
+      "importPrices": "Import price history",
+      "importPricesHint": "Money's own record of what each security was worth, day by day. Turn this off if you would rather start from live quotes.",
+      "importExchangeRates": "Import exchange rates",
+      "importExchangeRatesHint": "Historical rates between the currencies in your file, so past foreign-currency transactions convert the way Money converted them."
     },
     "warningsHeading": "Notes about this file",
     "startImport": "Start import"
@@ -366,21 +376,31 @@
     "heading": "Import finished",
     "allMatch": "All {count} accounts reconcile: every balance matches the one computed from your Money file.",
     "someDiffer": "{count} accounts do not match the balance computed from your Money file. The rows marked below show the difference.",
+    "someHoldingsDiffer": "Every balance reconciles, but {count, plural, one {# holding does} other {# holdings do}} not match the shares recorded in your Money file. The rows marked below show the difference.",
     "counts": {
       "accounts": "Accounts",
       "transactions": "Transactions",
       "transfers": "Transfers",
       "splits": "Split legs",
       "payees": "Payees",
-      "categories": "Categories"
+      "categories": "Categories",
+      "securities": "Securities",
+      "investments": "Investment transactions",
+      "prices": "Prices",
+      "exchangeRates": "Exchange rates"
     },
     "existingDataRemoved": "Your existing data was removed before this import, as requested.",
     "verificationHeading": "Balance verification",
+    "holdingsHeading": "Holdings verification",
+    "holdingsExplainer": "Shares Monize now holds, against the open tax lots your Money file records. Money reconciles against those lots itself, so they are the number to trust.",
     "table": {
       "account": "Account",
+      "security": "Security",
       "transactions": "Transactions",
       "expected": "From Money file",
       "imported": "In Monize",
+      "lotShares": "Shares in Money",
+      "importedShares": "Shares in Monize",
       "delta": "Difference",
       "check": "Check"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "{count, plural, one {# split leg} other {# split legs}} had no parent transaction and were skipped.",
     "splitSumMismatch": "{count, plural, one {# split} other {# splits}} had legs that do not add up to the transaction total; Money's own totals were kept.",
     "transferAcrossExcludedAccount": "{count, plural, one {# transfer} other {# transfers}} pointed at an account you left out and were imported as ordinary transactions.",
-    "balanceMismatch": "{count, plural, one {# account} other {# accounts}} ended with a balance that differs from the Money file."
+    "balanceMismatch": "{count, plural, one {# account} other {# accounts}} ended with a balance that differs from the Money file.",
+    "duplicateSecuritySymbol": "{count, plural, one {# security shares} other {# securities share}} a symbol with another; the later ones were renamed so they stay separate.",
+    "generatedSecuritySymbol": "{count, plural, one {# security has} other {# securities have}} no symbol in Money, so a placeholder was generated and price updates left off.",
+    "unknownInvestmentAction": "{count, plural, one {# investment transaction} other {# investment transactions}} used an action Monize does not recognize and were skipped.",
+    "unconfirmedInvestmentAction": "{count, plural, one {# investment transaction} other {# investment transactions}} used a Money action whose meaning is inferred rather than documented; check them against Money.",
+    "missingInvestmentDetail": "{count, plural, one {# investment transaction} other {# investment transactions}} had no share detail in the file and were imported for their cash amount only.",
+    "investmentAccountMismatch": "{count, plural, one {# investment transaction} other {# investment transactions}} sat in an account that is not an investment account and were skipped.",
+    "unusableSecuritySplit": "{count, plural, one {# stock split} other {# stock splits}} could not be matched to a security or had an unusable ratio, and were not applied.",
+    "holdingsMismatch": "{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records."
   },
   "mnyErrors": {
     "mnyImportFailed": "Something went wrong while importing. Nothing was saved -- you can try again.",

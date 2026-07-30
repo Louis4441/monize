@@ -42,6 +42,8 @@ export interface MnyPreviewAccount {
   accountSubType: 'INVESTMENT_CASH' | 'INVESTMENT_BROKERAGE' | null;
   currencyCode: string;
   transactionCount: number;
+  /** Investment rows this account will receive; 0 outside a brokerage side. */
+  investmentCount: number;
   openingBalance: number;
   finalBalance: number;
   closed: boolean;
@@ -58,7 +60,14 @@ export interface MnyPreviewCounts {
   transactionsToCreate: number;
   transfersToLink: number;
   transactionsSkipped: number;
-  investmentsDeferred: number;
+  securitiesToCreate: number;
+  securitiesInFile: number;
+  investmentsToCreate: number;
+  investmentsSkipped: number;
+  shareTransfersPaired: number;
+  stockSplitsApplied: number;
+  pricesToImport: number;
+  exchangeRatesToImport: number;
 }
 
 export interface MnyFileCounts {
@@ -119,6 +128,20 @@ export interface MnyAccountVerification {
   matches: boolean;
 }
 
+export interface MnyHoldingVerification {
+  accountName: string;
+  symbol: string;
+  /** Shares Money's open tax lots claim -- the authoritative reading. */
+  lotQuantity: number;
+  /** Shares replaying the mapped investment actions produces. */
+  replayQuantity: number;
+  /** Shares Monize holds after the import. */
+  importedQuantity: number;
+  /** `importedQuantity - lotQuantity`. */
+  delta: number;
+  matches: boolean;
+}
+
 export interface MnyImportResult {
   accountsCreated: number;
   payeesCreated: number;
@@ -139,6 +162,8 @@ export interface MnyImportResult {
   };
   existingDataRemoved: boolean;
   verification: MnyAccountVerification[];
+  /** Empty when the file has no `LOT` table or the import created no holdings. */
+  holdings: MnyHoldingVerification[];
   warnings: MnyWarningSummary[];
 }
 

@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/lib/format';
+import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { MnyImportResult } from '@/lib/import-mny';
 
 interface MnyVerificationReportProps {
@@ -32,9 +33,16 @@ export function MnyVerificationReport({
   onDone,
 }: MnyVerificationReportProps) {
   const t = useTranslations('import');
+  // Share counts go through the app's own quantity formatter, so the report
+  // reads in the user's number locale like every other holdings view.
+  const { formatQuantity } = useNumberFormat();
 
   const mismatches = result.verification.filter((line) => !line.matches);
-  const allMatch = mismatches.length === 0 && result.verification.length > 0;
+  const holdingMismatches = result.holdings.filter((line) => !line.matches);
+  const allMatch =
+    mismatches.length === 0 &&
+    holdingMismatches.length === 0 &&
+    result.verification.length > 0;
 
   const downloadReport = () => {
     const blob = new Blob([JSON.stringify(result, null, 2)], {
@@ -75,7 +83,11 @@ export function MnyVerificationReport({
         >
           {allMatch
             ? t('mnyComplete.allMatch', { count: result.verification.length })
-            : t('mnyComplete.someDiffer', { count: mismatches.length })}
+            : mismatches.length > 0
+              ? t('mnyComplete.someDiffer', { count: mismatches.length })
+              : t('mnyComplete.someHoldingsDiffer', {
+                  count: holdingMismatches.length,
+                })}
         </p>
       </div>
 
@@ -105,6 +117,30 @@ export function MnyVerificationReport({
           label={t('mnyComplete.counts.categories')}
           value={result.categoriesCreated}
         />
+        {result.securitiesCreated > 0 && (
+          <Tile
+            label={t('mnyComplete.counts.securities')}
+            value={result.securitiesCreated}
+          />
+        )}
+        {result.investmentTransactionsCreated > 0 && (
+          <Tile
+            label={t('mnyComplete.counts.investments')}
+            value={result.investmentTransactionsCreated}
+          />
+        )}
+        {result.pricesImported > 0 && (
+          <Tile
+            label={t('mnyComplete.counts.prices')}
+            value={result.pricesImported}
+          />
+        )}
+        {result.exchangeRatesImported > 0 && (
+          <Tile
+            label={t('mnyComplete.counts.exchangeRates')}
+            value={result.exchangeRatesImported}
+          />
+        )}
       </div>
 
       {result.existingDataRemoved && (
@@ -174,6 +210,78 @@ export function MnyVerificationReport({
           </table>
         </div>
       </div>
+
+      {/*
+        Per-holding reconciliation. Money's open tax lots are the authority --
+        they are the record Money itself reconciles against -- so the delta is
+        measured from them, and the replay column shows whether a disagreement
+        came from reading the file or from writing it.
+      */}
+      {result.holdings.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-foreground mb-2">
+            {t('mnyComplete.holdingsHeading')}
+          </h3>
+          <p className="text-xs text-muted-foreground mb-2">
+            {t('mnyComplete.holdingsExplainer')}
+          </p>
+          <div className="bg-card border border-border rounded-lg overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2 text-left font-medium">
+                    {t('mnyComplete.table.account')}
+                  </th>
+                  <th className="px-3 py-2 text-left font-medium">
+                    {t('mnyComplete.table.security')}
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    {t('mnyComplete.table.lotShares')}
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    {t('mnyComplete.table.importedShares')}
+                  </th>
+                  <th className="px-3 py-2 text-right font-medium">
+                    {t('mnyComplete.table.delta')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {result.holdings.map((line) => (
+                  <tr key={`${line.accountName}|${line.symbol}`}>
+                    <td className="px-3 py-2 text-foreground">
+                      {line.accountName}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {line.symbol}
+                      {!line.matches && (
+                        <span className="ml-2 inline-block px-1.5 py-0.5 text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 rounded">
+                          {t('mnyComplete.table.check')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">
+                      {formatQuantity(line.lotQuantity)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-foreground">
+                      {formatQuantity(line.importedQuantity)}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right font-medium ${
+                        line.matches
+                          ? 'text-green-700 dark:text-green-400'
+                          : 'text-amber-700 dark:text-amber-400'
+                      }`}
+                    >
+                      {formatQuantity(line.delta)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Warnings */}
       {result.warnings.length > 0 && (
