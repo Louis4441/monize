@@ -61,8 +61,16 @@ test.describe('Payee detail', () => {
     await page.goto(`/payees/${payee.id}`);
     await page.getByRole('tab', { name: 'Transactions' }).click();
 
-    await expect(page.getByText('Recent Transactions')).toBeVisible();
-    await expect(page.getByText(account.name).first()).toBeVisible();
+    // Scoped to the panel: "Transactions" is also a tab label and a summary
+    // card, and the Overview panel stays mounted (hidden) behind this one.
+    const panel = page.getByRole('tabpanel', { name: 'Transactions' });
+    // The heading carries the payee's full count -- the tab lists every
+    // transaction, not a recent handful -- and the seed made three.
+    await expect(panel.getByText('Transactions (3)')).toBeVisible();
+    await expect(
+      panel.getByRole('button', { name: 'Open in the register' }),
+    ).toBeVisible();
+    await expect(panel.getByText(account.name).first()).toBeVisible();
   });
 
   test('opens directly on a tab named by the query string', async ({
