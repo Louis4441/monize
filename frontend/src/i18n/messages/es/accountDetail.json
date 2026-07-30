@@ -4,9 +4,9 @@
     "reconcile": "Conciliar",
     "edit": "Editar cuenta",
     "back": "Volver a Cuentas",
-    "switchAccount": "Cambiar de cuenta",
+    "switchAccount": "Cambiar a otra cuenta",
     "switchPlaceholder": "Filtrar cuentas...",
-    "switchNoMatches": "No hay cuentas coincidentes"
+    "switchNoMatches": "Ninguna cuenta coincide"
   },
   "loading": "Cargando detalles de la cuenta...",
   "error": {

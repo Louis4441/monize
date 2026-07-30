@@ -11,7 +11,7 @@
     "priceAtTime": "{datetime} {zone} पर मूल्य",
     "marketOpen": "बाज़ार खुला",
     "marketClosed": "बाज़ार बंद",
-    "marketHours": "{open} से {close} तक कारोबार, {zone}. सार्वजनिक अवकाश शामिल नहीं हैं।",
+    "marketHours": "{open} से {close} तक कारोबार, {zone}। सार्वजनिक अवकाश शामिल नहीं हैं।",
     "noPrice": "अभी कोई भाव दर्ज नहीं है",
     "changeToday": "आज {change} ({percent})",
     "changeLast": "पिछला बदलाव {change} ({percent})",

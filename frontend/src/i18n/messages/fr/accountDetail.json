@@ -4,9 +4,9 @@
     "reconcile": "Rapprocher",
     "edit": "Modifier le compte",
     "back": "Retour aux comptes",
-    "switchAccount": "Changer de compte",
+    "switchAccount": "Passer à un autre compte",
     "switchPlaceholder": "Filtrer les comptes...",
-    "switchNoMatches": "Aucun compte correspondant"
+    "switchNoMatches": "Aucun compte ne correspond"
   },
   "loading": "Chargement des détails du compte…",
   "error": {

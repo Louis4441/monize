@@ -4,8 +4,8 @@
     "reconcile": "मिलान करें",
     "edit": "खाता संपादित करें",
     "back": "खातों पर वापस जाएँ",
-    "switchAccount": "खाता बदलें",
-    "switchPlaceholder": "खाते फ़िल्टर करें...",
+    "switchAccount": "किसी दूसरे खाते पर जाएँ",
+    "switchPlaceholder": "खाते छाँटें...",
     "switchNoMatches": "कोई खाता मेल नहीं खाता"
   },
   "loading": "खाता विवरण लोड हो रहा है...",

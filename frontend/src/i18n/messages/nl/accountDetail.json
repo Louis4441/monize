@@ -4,9 +4,9 @@
     "reconcile": "Afstemmen",
     "edit": "Rekening bewerken",
     "back": "Terug naar rekeningen",
-    "switchAccount": "Rekening wisselen",
+    "switchAccount": "Naar een andere rekening gaan",
     "switchPlaceholder": "Rekeningen filteren...",
-    "switchNoMatches": "Geen overeenkomende rekeningen"
+    "switchNoMatches": "Geen rekeningen gevonden"
   },
   "loading": "Rekeninggegevens laden...",
   "error": {

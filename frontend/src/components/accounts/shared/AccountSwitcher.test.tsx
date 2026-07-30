@@ -21,7 +21,7 @@ function open(accounts: Account[], currentId = 'acc-1') {
   render(
     <AccountSwitcher currentId={currentId} accounts={accounts} onSelect={onSelect} />,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Switch account' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
   return { onSelect };
 }
 
@@ -30,7 +30,7 @@ describe('AccountSwitcher', () => {
     render(
       <AccountSwitcher currentId="acc-1" accounts={[two[0]]} onSelect={vi.fn()} />,
     );
-    expect(screen.queryByRole('button', { name: 'Switch account' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Switch to another account' })).toBeNull();
   });
 
   it('lists the other accounts, not the current one', () => {

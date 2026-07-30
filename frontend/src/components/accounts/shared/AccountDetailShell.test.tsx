@@ -109,7 +109,7 @@ describe('AccountDetailShell', () => {
       </AccountDetailShell>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Switch account' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
     fireEvent.click(screen.getByRole('menuitem', { name: /Savings/ }));
     expect(onSelectAccount).toHaveBeenCalledWith('acc-2');
   });
@@ -125,7 +125,7 @@ describe('AccountDetailShell', () => {
       </AccountDetailShell>,
     );
     expect(
-      screen.queryByRole('button', { name: 'Switch account' }),
+      screen.queryByRole('button', { name: 'Switch to another account' }),
     ).not.toBeInTheDocument();
   });
 

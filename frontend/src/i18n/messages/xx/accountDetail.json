@@ -4,7 +4,7 @@
     "reconcile": "[XX-Reconcile-XX]",
     "edit": "[XX-Edit Account-XX]",
     "back": "[XX-Back to Accounts-XX]",
-    "switchAccount": "[XX-Switch account-XX]",
+    "switchAccount": "[XX-Switch to another account-XX]",
     "switchPlaceholder": "[XX-Filter accounts...-XX]",
     "switchNoMatches": "[XX-No accounts match-XX]"
   },

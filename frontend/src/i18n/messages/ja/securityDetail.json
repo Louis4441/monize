@@ -9,8 +9,8 @@
   "header": {
     "priceAt": "{date} の価格",
     "priceAtTime": "{datetime} {zone} 時点の価格",
-    "marketOpen": "市場は取引中",
-    "marketClosed": "市場は閉場",
+    "marketOpen": "取引時間中",
+    "marketClosed": "取引時間外",
     "marketHours": "取引時間は {open} から {close}（{zone}）。祝日は考慮されません。",
     "noPrice": "価格はまだ記録されていません",
     "changeToday": "本日 {change}（{percent}）",

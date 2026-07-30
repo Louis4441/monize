@@ -4,7 +4,7 @@
     "reconcile": "Reconcile",
     "edit": "Edit Account",
     "back": "Back to Accounts",
-    "switchAccount": "Switch account",
+    "switchAccount": "Switch to another account",
     "switchPlaceholder": "Filter accounts...",
     "switchNoMatches": "No accounts match"
   },
