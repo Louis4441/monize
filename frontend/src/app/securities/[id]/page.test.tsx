@@ -61,9 +61,12 @@ const mockBackfillSecurityPrices = vi.fn();
 const mockGetSecurities = vi.fn();
 const mockGetSecurityDocuments = vi.fn();
 const mockGetSecurityNews = vi.fn();
+const mockRefreshSelectedPrices = vi.fn();
 
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
+    refreshSelectedPrices: (...args: unknown[]) =>
+      mockRefreshSelectedPrices(...args),
     getSecurityDetail: (...args: unknown[]) => mockGetSecurityDetail(...args),
     getSecurityPrices: (...args: unknown[]) => mockGetSecurityPrices(...args),
     getSecurityTransactionHistory: (...args: unknown[]) =>
@@ -219,6 +222,14 @@ describe('SecurityDetailPage', () => {
       transactions: [],
       currentQuantityAll: 100,
     });
+    mockRefreshSelectedPrices.mockResolvedValue({
+      totalSecurities: 1,
+      updated: 1,
+      failed: 0,
+      skipped: 0,
+      results: [{ securityId: 'sec-1', symbol: 'AAPL', success: true }],
+      lastUpdated: '2026-07-30T12:00:00.000Z',
+    });
   });
 
   it('names the security as the page heading', async () => {
@@ -233,6 +244,40 @@ describe('SecurityDetailPage', () => {
     // The quote is the largest figure on the page and the one a reader anchors
     // on; the fixture is a USD security and the test default is CAD.
     expect(screen.getByText(/150\.00 USD/)).toBeInTheDocument();
+  });
+
+  it('refreshes only this security from the header, then re-reads the quote', async () => {
+    await renderPage();
+    mockGetSecurityDetail.mockClear();
+    mockGetSecurityPrices.mockClear();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    });
+
+    // Scoped to the security on screen: refreshing the whole catalog from a
+    // single security's page would be a much larger job than the button offers.
+    expect(mockRefreshSelectedPrices).toHaveBeenCalledWith(['sec-1']);
+    await waitFor(() => {
+      expect(mockGetSecurityDetail).toHaveBeenCalled();
+      expect(mockGetSecurityPrices).toHaveBeenCalled();
+    });
+  });
+
+  it('leaves the page up when the post-refresh re-read fails', async () => {
+    await renderPage();
+    mockGetSecurityDetail.mockRejectedValueOnce(new Error('network'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    });
+    await act(async () => {});
+
+    // The previous figures stay on screen rather than collapsing to the error
+    // state -- the refresh itself already reported its own outcome.
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Apple Inc.' }),
+    ).toBeInTheDocument();
   });
 
   it('opens the Investments page filtered to an account', async () => {

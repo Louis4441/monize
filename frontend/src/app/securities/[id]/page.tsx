@@ -23,6 +23,7 @@ import { SecurityAccountsTable } from '@/components/securities/detail/SecurityAc
 import { SecurityBreakdownCard } from '@/components/securities/detail/SecurityBreakdownCard';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
+import { usePriceRefresh } from '@/hooks/usePriceRefresh';
 import { investmentsApi } from '@/lib/investments';
 import { getErrorMessage } from '@/lib/errors';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
@@ -170,6 +171,32 @@ function SecurityDetailContent() {
     }
   }, [securityId, t]);
 
+  // After a price refresh the quote and the market-value cards are stale, but
+  // the page is already on screen -- reload in place rather than through
+  // loadData, whose spinner would blank everything the user was reading.
+  const reloadAfterPriceRefresh = useCallback(async () => {
+    try {
+      const [detailData, priceData] = await Promise.all([
+        investmentsApi.getSecurityDetail(securityId),
+        investmentsApi.getSecurityPrices(securityId, 9999).catch(() => null),
+      ]);
+      setDetail(detailData);
+      if (priceData) setPrices(priceData);
+    } catch {
+      // The refresh itself already reported its own outcome; a failed re-read
+      // leaves the previous figures up, which is better than an error page.
+    }
+  }, [securityId]);
+
+  const {
+    isRefreshing: isRefreshingPrice,
+    triggerManualRefresh: refreshPrices,
+  } = usePriceRefresh({ onRefreshComplete: reloadAfterPriceRefresh });
+
+  const handleRefreshPrice = useCallback(() => {
+    void refreshPrices([securityId]);
+  }, [refreshPrices, securityId]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -307,6 +334,8 @@ function SecurityDetailContent() {
           onEdit={() => setIsEditing(true)}
           onToggleFavourite={handleToggleFavourite}
           isFavouritePending={isFavouritePending}
+          onRefreshPrice={handleRefreshPrice}
+          isRefreshingPrice={isRefreshingPrice}
           securities={securities}
           onSelectSecurity={(id) => router.push(`/securities/${id}`)}
         />

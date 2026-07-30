@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { ChevronLeftIcon, ClockIcon, StarIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/Button';
+import { RefreshPricesButton } from '@/components/investments/RefreshPricesButton';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { withCurrencyCode } from '@/lib/security-detail';
@@ -34,6 +35,9 @@ interface SecurityDetailHeaderProps {
   onEdit: () => void;
   onToggleFavourite: () => void;
   isFavouritePending: boolean;
+  /** Re-fetch this security's quote from its price provider. */
+  onRefreshPrice: () => void;
+  isRefreshingPrice: boolean;
   /** Active securities the caret beside the name can jump to. */
   securities: readonly Security[];
   onSelectSecurity: (id: string) => void;
@@ -55,6 +59,8 @@ export function SecurityDetailHeader({
   onEdit,
   onToggleFavourite,
   isFavouritePending,
+  onRefreshPrice,
+  isRefreshingPrice,
   securities,
   onSelectSecurity,
 }: SecurityDetailHeaderProps) {
@@ -101,8 +107,8 @@ export function SecurityDetailHeader({
             </span>
           )}
 
-          {/* Both actions stay inline at every width: there are only two, and an
-              overflow menu whose items jumped the page to a tab further down
+          {/* The actions stay inline at every width: there are only a few, and
+              an overflow menu whose items jumped the page to a tab further down
               read as the page moving under the user. */}
           <div className="flex items-center gap-2">
             <Button
@@ -126,6 +132,13 @@ export function SecurityDetailHeader({
             <Button variant="outline" size="sm" onClick={onEdit}>
               {t('header.edit')}
             </Button>
+            {/* Scoped to this security, so the quote above updates without a
+                trip back to Investments to refresh the whole catalog. */}
+            <RefreshPricesButton
+              size="sm"
+              onClick={onRefreshPrice}
+              isRefreshing={isRefreshingPrice}
+            />
           </div>
         </div>
 
