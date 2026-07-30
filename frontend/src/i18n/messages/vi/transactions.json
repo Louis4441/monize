@@ -24,6 +24,7 @@
     "inactive": "Không hoạt động",
     "noTransactions": "Không có giao tác trong khoảng thời gian này",
     "editAria": "Chỉnh sửa người nhận",
+    "detailsAria": "Xem chi tiết người nhận",
     "collapseAria": "Ẩn thông tin người nhận",
     "show": "Hiển thị thông tin người nhận"
   },

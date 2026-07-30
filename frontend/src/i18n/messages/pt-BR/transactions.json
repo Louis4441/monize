@@ -24,6 +24,7 @@
     "inactive": "Inativo",
     "noTransactions": "Sem transações neste período",
     "editAria": "Editar beneficiário",
+    "detailsAria": "Ver detalhes do beneficiário",
     "collapseAria": "Ocultar informações do beneficiário",
     "show": "Mostrar informações do beneficiário"
   },

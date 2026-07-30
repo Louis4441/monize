@@ -93,6 +93,8 @@ transactionDate: string;
 
 **Decimal columns** use a `numericTransformer` to convert PostgreSQL's string representation to `number`. **Timestamps** are `@CreateDateColumn({ name: 'created_at' })` and `@UpdateDateColumn({ name: 'updated_at' })`.
 
+**Raw selects bypass both transformers.** `getRawOne`/`getRawMany` return driver values, not entity-hydrated ones, so a DATE column comes back as a JS `Date` and a numeric as a string -- regardless of the transformer on the entity. Select a DATE as text in SQL (`TO_CHAR(col, 'YYYY-MM-DD')`) and pass a numeric through `Number()` before it reaches a DTO that declares `string`/`number`. `main.ts` installs a global DATE string parser, which hides the DATE half of this in the running server but not in tests, jobs, or any other process -- so do not rely on it. `payee-detail.service.ts` is the worked example; its `test/payee-detail.e2e-spec.ts` is what caught it, because a unit spec with mocked query builders cannot.
+
 ## DTO Conventions
 
 ### An optional field with a format validator needs `@ValidateIf`, not just `@IsOptional`

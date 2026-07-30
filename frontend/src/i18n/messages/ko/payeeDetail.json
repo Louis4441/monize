@@ -1,0 +1,120 @@
+{
+  "loading": "수취인을 불러오는 중...",
+  "notFound": "수취인을 찾을 수 없습니다",
+  "loadFailed": "이 수취인을 불러올 수 없습니다",
+  "backToPayees": "수취인",
+  "error": {
+    "retry": "다시 시도"
+  },
+  "header": {
+    "inactiveBadge": "비활성",
+    "edit": "편집",
+    "merge": "병합",
+    "deactivate": "비활성화",
+    "reactivate": "재활성화",
+    "viewTransactions": "거래 보기",
+    "switchPayee": "다른 수취인으로 이동",
+    "switchPlaceholder": "수취인 검색...",
+    "switchNoMatches": "일치하는 수취인이 없습니다",
+    "since": "{date}부터 등록된 수취인"
+  },
+  "toasts": {
+    "deactivated": "{name}을(를) 비활성화했습니다",
+    "deactivateFailed": "수취인을 비활성화할 수 없습니다",
+    "reactivated": "{name}을(를) 재활성화했습니다",
+    "reactivateFailed": "수취인을 재활성화할 수 없습니다"
+  },
+  "deactivate": {
+    "confirmTitle": "수취인 비활성화",
+    "confirmMessage": "{name}을(를) 비활성화하시겠습니까? 기록은 유지되지만 수취인 제안 목록에는 표시되지 않습니다. 언제든지 다시 활성화할 수 있습니다.",
+    "confirmButton": "비활성화"
+  },
+  "summary": {
+    "spentThisYear": "올해 지출",
+    "receivedThisYear": "올해 수령액",
+    "vsLastYear": "전년 동기 대비 {percent}",
+    "vsLastYearNew": "전년 같은 기간에는 기록이 없습니다",
+    "averageTransaction": "평균 거래액",
+    "transactions": "거래",
+    "sinceYear": "{year}년부터",
+    "lastTransaction": "마지막 거래",
+    "recurring": "반복",
+    "recurringValue": "{cadence} · 약 {amount}",
+    "priceUp": "{amount}에서 인상",
+    "priceDown": "{amount}에서 인하",
+    "uncategorized": "미분류",
+    "uncategorizedApply": "클릭하면 기본 카테고리를 적용합니다",
+    "uncategorizedSetDefault": "클릭하면 기본 카테고리를 설정합니다",
+    "convertedNote": "{currency}(으)로 환산"
+  },
+  "cadence": {
+    "weekly": "매주",
+    "biweekly": "2주마다",
+    "monthly": "매월",
+    "quarterly": "분기별",
+    "yearly": "매년"
+  },
+  "topCategories": {
+    "title": "상위 카테고리",
+    "subtitle": "최근 12개월",
+    "empty": "최근 12개월간 지출이 없습니다",
+    "uncategorized": "미분류"
+  },
+  "accountsPanel": {
+    "title": "결제 계좌",
+    "subtitle": "전체 기간",
+    "empty": "아직 거래가 없습니다"
+  },
+  "recurringPanel": {
+    "title": "청구서 및 반복 결제",
+    "empty": "최근 12개월간 반복 패턴이 감지되지 않았습니다",
+    "detectedTooltip": "최근 12개월의 반복 청구에서 감지되었습니다.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "이전 {amount}",
+    "usualDay": "보통 매월 {day}일 무렵",
+    "nextBill": "다음 청구서",
+    "viewBills": "청구서 및 입금에서 보기"
+  },
+  "keyInfo": {
+    "title": "주요 정보",
+    "defaultCategory": "기본 카테고리",
+    "status": "상태",
+    "active": "활성",
+    "inactive": "비활성",
+    "created": "추가일",
+    "firstTransaction": "첫 거래",
+    "lastTransaction": "마지막 거래",
+    "aliases": "별칭",
+    "largestTransaction": "최대 거래",
+    "largestValue": "{date}에 {amount}",
+    "overpaymentFor": "추가 상환 수취인으로 지정된 계좌",
+    "notes": "메모"
+  },
+  "tabs": {
+    "ariaLabel": "수취인 섹션",
+    "overview": "개요",
+    "transactions": "거래",
+    "aliases": "별칭"
+  },
+  "transactionsTab": {
+    "title": "최근 거래",
+    "empty": "이 수취인의 거래가 아직 없습니다",
+    "viewAll": "모든 거래 보기",
+    "date": "날짜",
+    "account": "계좌",
+    "category": "카테고리",
+    "amount": "금액",
+    "uncategorized": "미분류",
+    "loadFailed": "거래를 불러올 수 없습니다"
+  },
+  "aliasesTab": {
+    "description": "별칭은 가져온 거래명을 이 수취인에 연결합니다. 와일드카드를 사용할 수 있습니다(예: STARBUCKS*)."
+  },
+  "applyDefault": {
+    "confirmTitle": "기본 카테고리 적용",
+    "confirmMessage": "{name}의 {count, plural, one {미분류 거래 #건} other {미분류 거래 #건}}에 {category}을(를) 지정하시겠습니까? 직접 분류한 거래는 변경되지 않습니다.",
+    "confirmButton": "적용",
+    "applied": "{count, plural, one {거래 #건을 분류했습니다} other {거래 #건을 분류했습니다}}",
+    "failed": "기본 카테고리를 적용할 수 없습니다"
+  }
+}

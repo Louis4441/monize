@@ -1,0 +1,120 @@
+{
+  "loading": "Carregando o beneficiário...",
+  "notFound": "Beneficiário não encontrado",
+  "loadFailed": "Não foi possível carregar este beneficiário",
+  "backToPayees": "Beneficiários",
+  "error": {
+    "retry": "Tentar novamente"
+  },
+  "header": {
+    "inactiveBadge": "Inativo",
+    "edit": "Editar",
+    "merge": "Unir",
+    "deactivate": "Desativar",
+    "reactivate": "Reativar",
+    "viewTransactions": "Ver transações",
+    "switchPayee": "Mudar para outro beneficiário",
+    "switchPlaceholder": "Filtrar beneficiários...",
+    "switchNoMatches": "Nenhum beneficiário corresponde",
+    "since": "Beneficiário desde {date}"
+  },
+  "toasts": {
+    "deactivated": "{name} desativado",
+    "deactivateFailed": "Não foi possível desativar o beneficiário",
+    "reactivated": "{name} reativado",
+    "reactivateFailed": "Não foi possível reativar o beneficiário"
+  },
+  "deactivate": {
+    "confirmTitle": "Desativar beneficiário",
+    "confirmMessage": "Desativar {name}? O histórico é mantido, mas o beneficiário deixa de aparecer nas sugestões. Você pode reativá-lo a qualquer momento.",
+    "confirmButton": "Desativar"
+  },
+  "summary": {
+    "spentThisYear": "Gasto este ano",
+    "receivedThisYear": "Recebido este ano",
+    "vsLastYear": "{percent} em relação ao mesmo período do ano anterior",
+    "vsLastYearNew": "Nada neste período no ano anterior",
+    "averageTransaction": "Transação média",
+    "transactions": "Transações",
+    "sinceYear": "Desde {year}",
+    "lastTransaction": "Última transação",
+    "recurring": "Recorrente",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Subiu de {amount}",
+    "priceDown": "Desceu de {amount}",
+    "uncategorized": "Sem categoria",
+    "uncategorizedApply": "Clique para aplicar a categoria padrão",
+    "uncategorizedSetDefault": "Clique para definir uma categoria padrão",
+    "convertedNote": "Convertido para {currency}"
+  },
+  "cadence": {
+    "weekly": "Semanal",
+    "biweekly": "A cada 2 semanas",
+    "monthly": "Mensal",
+    "quarterly": "Trimestral",
+    "yearly": "Anual"
+  },
+  "topCategories": {
+    "title": "Categorias principais",
+    "subtitle": "Últimos 12 meses",
+    "empty": "Sem despesas nos últimos 12 meses",
+    "uncategorized": "Sem categoria"
+  },
+  "accountsPanel": {
+    "title": "Pago a partir das contas",
+    "subtitle": "Todo o histórico",
+    "empty": "Ainda sem transações"
+  },
+  "recurringPanel": {
+    "title": "Faturas e recorrências",
+    "empty": "Nenhum padrão recorrente detectado nos últimos 12 meses",
+    "detectedTooltip": "Detectado a partir de cobranças repetidas nos últimos 12 meses.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "antes {amount}",
+    "usualDay": "Normalmente por volta do dia {day} do mês",
+    "nextBill": "Próxima fatura",
+    "viewBills": "Ver em Faturas e Depósitos"
+  },
+  "keyInfo": {
+    "title": "Informações principais",
+    "defaultCategory": "Categoria padrão",
+    "status": "Status",
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "created": "Adicionado",
+    "firstTransaction": "Primeira transação",
+    "lastTransaction": "Última transação",
+    "aliases": "Apelidos",
+    "largestTransaction": "Maior transação",
+    "largestValue": "{amount} em {date}",
+    "overpaymentFor": "Beneficiário de amortização extra de",
+    "notes": "Notas"
+  },
+  "tabs": {
+    "ariaLabel": "Seções do beneficiário",
+    "overview": "Visão geral",
+    "transactions": "Transações",
+    "aliases": "Apelidos"
+  },
+  "transactionsTab": {
+    "title": "Transações recentes",
+    "empty": "Este beneficiário ainda não tem transações",
+    "viewAll": "Ver todas as transações",
+    "date": "Data",
+    "account": "Conta",
+    "category": "Categoria",
+    "amount": "Valor",
+    "uncategorized": "Sem categoria",
+    "loadFailed": "Não foi possível carregar as transações"
+  },
+  "aliasesTab": {
+    "description": "Os apelidos associam os nomes das transações importadas a este beneficiário. Curingas são permitidos, por exemplo STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Aplicar categoria padrão",
+    "confirmMessage": "Atribuir {category} a {count, plural, one {# transação sem categoria} other {# transações sem categoria}} de {name}? As transações categorizadas manualmente ficam inalteradas.",
+    "confirmButton": "Aplicar",
+    "applied": "{count, plural, one {# transação categorizada} other {# transações categorizadas}}",
+    "failed": "Não foi possível aplicar a categoria padrão"
+  }
+}

@@ -24,6 +24,7 @@
     "inactive": "Inaktiv",
     "noTransactions": "Keine Buchungen in diesem Zeitraum",
     "editAria": "Zahlungsempfänger bearbeiten",
+    "detailsAria": "Zahlungsempfänger-Details anzeigen",
     "collapseAria": "Zahlungsempfänger-Informationen ausblenden",
     "show": "Zahlungsempfänger-Informationen anzeigen"
   },

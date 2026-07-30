@@ -1,0 +1,120 @@
+{
+  "loading": "Alacaklı yükleniyor...",
+  "notFound": "Alacaklı bulunamadı",
+  "loadFailed": "Bu alacaklı yüklenemedi",
+  "backToPayees": "Alacaklılar",
+  "error": {
+    "retry": "Yeniden dene"
+  },
+  "header": {
+    "inactiveBadge": "Pasif",
+    "edit": "Düzenle",
+    "merge": "Birleştir",
+    "deactivate": "Devre dışı bırak",
+    "reactivate": "Yeniden Etkinleştir",
+    "viewTransactions": "İşlemleri görüntüle",
+    "switchPayee": "Başka bir alacaklıya geç",
+    "switchPlaceholder": "Alacaklıları filtrele...",
+    "switchNoMatches": "Eşleşen alacaklı yok",
+    "since": "{date} tarihinden beri alacaklı"
+  },
+  "toasts": {
+    "deactivated": "{name} devre dışı bırakıldı",
+    "deactivateFailed": "Alacaklı devre dışı bırakılamadı",
+    "reactivated": "{name} yeniden etkinleştirildi",
+    "reactivateFailed": "Alacaklı yeniden etkinleştirilemedi"
+  },
+  "deactivate": {
+    "confirmTitle": "Alacaklıyı Devre Dışı Bırak",
+    "confirmMessage": "{name} devre dışı bırakılsın mı? Geçmişi korunur ancak alacaklı önerilerde görünmez. Dilediğiniz zaman yeniden etkinleştirebilirsiniz.",
+    "confirmButton": "Devre dışı bırak"
+  },
+  "summary": {
+    "spentThisYear": "Bu Yıl Harcanan",
+    "receivedThisYear": "Bu Yıl Alınan",
+    "vsLastYear": "Geçen yılın aynı dönemine göre {percent}",
+    "vsLastYearNew": "Geçen yıl bu dönemde kayıt yok",
+    "averageTransaction": "Ortalama İşlem",
+    "transactions": "İşlemler",
+    "sinceYear": "{year} yılından beri",
+    "lastTransaction": "Son İşlem",
+    "recurring": "Yinelenen",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "{amount} tutarından arttı",
+    "priceDown": "{amount} tutarından azaldı",
+    "uncategorized": "Kategorisiz",
+    "uncategorizedApply": "Varsayılan kategoriyi uygulamak için tıklayın",
+    "uncategorizedSetDefault": "Varsayılan kategori belirlemek için tıklayın",
+    "convertedNote": "{currency} birimine çevrildi"
+  },
+  "cadence": {
+    "weekly": "Haftalık",
+    "biweekly": "Her 2 Haftada Bir",
+    "monthly": "Aylık",
+    "quarterly": "Üç Aylık",
+    "yearly": "Yıllık"
+  },
+  "topCategories": {
+    "title": "En Çok Kullanılan Kategoriler",
+    "subtitle": "Son 12 ay",
+    "empty": "Son 12 ayda harcama yok",
+    "uncategorized": "Kategorisiz"
+  },
+  "accountsPanel": {
+    "title": "Ödemenin Yapıldığı Hesaplar",
+    "subtitle": "Tüm geçmiş",
+    "empty": "Henüz işlem yok"
+  },
+  "recurringPanel": {
+    "title": "Faturalar ve Yinelenenler",
+    "empty": "Son 12 ayda yinelenen bir düzen bulunamadı",
+    "detectedTooltip": "Son 12 aydaki tekrarlanan ödemelerden tespit edildi.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "önceki {amount}",
+    "usualDay": "Genellikle ayın {day}. günü civarında",
+    "nextBill": "Sonraki Fatura",
+    "viewBills": "Faturalar ve Mevduatlarda Görüntüle"
+  },
+  "keyInfo": {
+    "title": "Temel bilgiler",
+    "defaultCategory": "Varsayılan Kategori",
+    "status": "Durum",
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "created": "Eklendi",
+    "firstTransaction": "İlk İşlem",
+    "lastTransaction": "Son İşlem",
+    "aliases": "Takma Adlar",
+    "largestTransaction": "En Büyük İşlem",
+    "largestValue": "{date} tarihinde {amount}",
+    "overpaymentFor": "Şu hesabın ek ödeme alacaklısı",
+    "notes": "Notlar"
+  },
+  "tabs": {
+    "ariaLabel": "Alacaklı bölümleri",
+    "overview": "Genel bakış",
+    "transactions": "İşlemler",
+    "aliases": "Takma Adlar"
+  },
+  "transactionsTab": {
+    "title": "Son İşlemler",
+    "empty": "Bu alacaklının henüz işlemi yok",
+    "viewAll": "Tüm işlemleri görüntüle",
+    "date": "Tarih",
+    "account": "Hesap",
+    "category": "Kategori",
+    "amount": "Tutar",
+    "uncategorized": "Kategorisiz",
+    "loadFailed": "İşlemler yüklenemedi"
+  },
+  "aliasesTab": {
+    "description": "Takma adlar, içe aktarılan işlem adlarını bu alacaklıyla eşleştirir. Joker karakterler kullanılabilir, örneğin STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Varsayılan Kategoriyi Uygula",
+    "confirmMessage": "{name} alacaklısının {count, plural, one {# kategorisiz işlemine} other {# kategorisiz işlemine}} {category} atansın mı? Elle kategorilendirilen işlemler değişmez.",
+    "confirmButton": "Uygula",
+    "applied": "{count, plural, one {# işlem kategorize edildi} other {# işlem kategorize edildi}}",
+    "failed": "Varsayılan kategori uygulanamadı"
+  }
+}

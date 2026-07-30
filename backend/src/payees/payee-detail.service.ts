@@ -21,10 +21,25 @@ import {
  * twice). This mirrors the analytics service's scope, so the counts here agree
  * with the summary and grouped-totals endpoints the detail page also calls.
  */
-function realTransactionScope(qb: ReturnType<EntityManager["createQueryBuilder"]>) {
+function realTransactionScope(
+  qb: ReturnType<EntityManager["createQueryBuilder"]>,
+) {
   return qb
     .andWhere("t.status != 'VOID'")
     .andWhere("t.parent_transaction_id IS NULL");
+}
+
+/**
+ * A DATE column selected as `yyyy-MM-dd` text.
+ *
+ * Raw selects bypass the entity's date transformer, so a DATE arrives as
+ * whatever the driver's type parser makes of it -- a JS `Date` unless the
+ * process happens to have installed the string parser `main.ts` sets. Formatting
+ * in Postgres makes the column text for every caller, which is what the DTO
+ * promises, and keeps the day from shifting through a timezone on the way out.
+ */
+function dateText(expression: string): string {
+  return `TO_CHAR(${expression}, 'YYYY-MM-DD')`;
 }
 
 /**
@@ -78,8 +93,8 @@ export class PayeeDetailService {
       m
         .createQueryBuilder(Transaction, "t")
         .select("COUNT(*)", "count")
-        .addSelect("MIN(t.transaction_date)", "first")
-        .addSelect("MAX(t.transaction_date)", "last")
+        .addSelect(dateText("MIN(t.transaction_date)"), "first")
+        .addSelect(dateText("MAX(t.transaction_date)"), "last")
         .where("t.user_id = :userId", { userId })
         .andWhere("t.payee_id = :payeeId", { payeeId }),
     ).getRawOne<{ count: string; first: string | null; last: string | null }>();
@@ -113,7 +128,7 @@ export class PayeeDetailService {
         .addSelect("account.currency_code", "currencyCode")
         .addSelect("COUNT(*)", "transactionCount")
         .addSelect("SUM(t.amount)", "total")
-        .addSelect("MAX(t.transaction_date)", "lastTransactionDate")
+        .addSelect(dateText("MAX(t.transaction_date)"), "lastTransactionDate")
         .where("t.user_id = :userId", { userId })
         .andWhere("t.payee_id = :payeeId", { payeeId }),
     )
@@ -153,7 +168,7 @@ export class PayeeDetailService {
         .createQueryBuilder(Transaction, "t")
         .innerJoin(Account, "account", "account.id = t.account_id")
         .select("t.id", "id")
-        .addSelect("t.transaction_date", "transactionDate")
+        .addSelect(dateText("t.transaction_date"), "transactionDate")
         .addSelect("t.amount", "amount")
         .addSelect("t.currency_code", "currencyCode")
         .addSelect("t.description", "description")

@@ -24,6 +24,7 @@
     "inactive": "Inactif",
     "noTransactions": "Aucune transaction sur cette période",
     "editAria": "Modifier le bénéficiaire",
+    "detailsAria": "Voir les détails du bénéficiaire",
     "collapseAria": "Masquer les informations du bénéficiaire",
     "show": "Afficher les informations du bénéficiaire"
   },

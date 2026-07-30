@@ -1,0 +1,120 @@
+{
+  "loading": "Đang tải người nhận...",
+  "notFound": "Không tìm thấy người nhận",
+  "loadFailed": "Không thể tải người nhận này",
+  "backToPayees": "Người nhận thanh toán",
+  "error": {
+    "retry": "Thử lại"
+  },
+  "header": {
+    "inactiveBadge": "Không hoạt động",
+    "edit": "Sửa",
+    "merge": "Gộp",
+    "deactivate": "Vô hiệu hóa",
+    "reactivate": "Kích hoạt lại",
+    "viewTransactions": "Xem giao tác",
+    "switchPayee": "Chuyển sang người nhận khác",
+    "switchPlaceholder": "Lọc người nhận...",
+    "switchNoMatches": "Không có người nhận nào khớp",
+    "since": "Người nhận từ {date}"
+  },
+  "toasts": {
+    "deactivated": "Đã vô hiệu hóa {name}",
+    "deactivateFailed": "Không thể vô hiệu hóa người nhận",
+    "reactivated": "Đã kích hoạt lại {name}",
+    "reactivateFailed": "Không thể kích hoạt lại người nhận"
+  },
+  "deactivate": {
+    "confirmTitle": "Vô hiệu hóa người nhận",
+    "confirmMessage": "Vô hiệu hóa {name}? Lịch sử vẫn được giữ lại, nhưng người nhận sẽ không còn xuất hiện trong gợi ý. Bạn có thể kích hoạt lại bất cứ lúc nào.",
+    "confirmButton": "Vô hiệu hóa"
+  },
+  "summary": {
+    "spentThisYear": "Chi tiêu năm nay",
+    "receivedThisYear": "Nhận được năm nay",
+    "vsLastYear": "{percent} so với cùng kỳ năm trước",
+    "vsLastYearNew": "Không có gì trong kỳ này năm trước",
+    "averageTransaction": "Giao tác trung bình",
+    "transactions": "Giao tác",
+    "sinceYear": "Từ {year}",
+    "lastTransaction": "Giao tác gần nhất",
+    "recurring": "Định kỳ",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Tăng từ {amount}",
+    "priceDown": "Giảm từ {amount}",
+    "uncategorized": "Chưa phân loại",
+    "uncategorizedApply": "Nhấn để áp dụng danh mục mặc định",
+    "uncategorizedSetDefault": "Nhấn để đặt danh mục mặc định",
+    "convertedNote": "Đã chuyển sang {currency}"
+  },
+  "cadence": {
+    "weekly": "Hàng tuần",
+    "biweekly": "Mỗi 2 tuần",
+    "monthly": "Hàng tháng",
+    "quarterly": "Hàng quý",
+    "yearly": "Hàng năm"
+  },
+  "topCategories": {
+    "title": "Danh mục hàng đầu",
+    "subtitle": "12 tháng gần nhất",
+    "empty": "Không có chi tiêu trong 12 tháng gần nhất",
+    "uncategorized": "Chưa phân loại"
+  },
+  "accountsPanel": {
+    "title": "Thanh toán từ các tài khoản",
+    "subtitle": "Toàn bộ lịch sử",
+    "empty": "Chưa có giao tác"
+  },
+  "recurringPanel": {
+    "title": "Hóa đơn & định kỳ",
+    "empty": "Không phát hiện mẫu định kỳ nào trong 12 tháng gần nhất",
+    "detectedTooltip": "Được phát hiện từ các khoản thanh toán lặp lại trong 12 tháng gần nhất.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "trước là {amount}",
+    "usualDay": "Thường vào khoảng ngày {day} mỗi tháng",
+    "nextBill": "Hóa đơn tiếp theo",
+    "viewBills": "Xem trong Hóa đơn & Tiền gửi"
+  },
+  "keyInfo": {
+    "title": "Thông tin chính",
+    "defaultCategory": "Danh mục mặc định",
+    "status": "Trạng thái",
+    "active": "Đang hoạt động",
+    "inactive": "Không hoạt động",
+    "created": "Đã thêm",
+    "firstTransaction": "Giao tác đầu tiên",
+    "lastTransaction": "Giao tác gần nhất",
+    "aliases": "Bí danh",
+    "largestTransaction": "Giao tác lớn nhất",
+    "largestValue": "{amount} vào {date}",
+    "overpaymentFor": "Người nhận khoản trả thêm cho",
+    "notes": "Ghi chú"
+  },
+  "tabs": {
+    "ariaLabel": "Các phần của người nhận",
+    "overview": "Tổng quan",
+    "transactions": "Giao tác",
+    "aliases": "Bí danh"
+  },
+  "transactionsTab": {
+    "title": "Giao tác gần đây",
+    "empty": "Người nhận này chưa có giao tác nào",
+    "viewAll": "Xem tất cả giao tác",
+    "date": "Ngày",
+    "account": "Tài khoản",
+    "category": "Danh mục",
+    "amount": "Số tiền",
+    "uncategorized": "Chưa phân loại",
+    "loadFailed": "Không thể tải giao tác"
+  },
+  "aliasesTab": {
+    "description": "Bí danh liên kết tên giao tác được nhập với người nhận này. Cho phép ký tự đại diện, ví dụ STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Áp dụng danh mục mặc định",
+    "confirmMessage": "Gán {category} cho {count, plural, one {# giao tác chưa phân loại} other {# giao tác chưa phân loại}} của {name}? Các giao tác đã phân loại thủ công sẽ không thay đổi.",
+    "confirmButton": "Áp dụng",
+    "applied": "{count, plural, one {Đã phân loại # giao tác} other {Đã phân loại # giao tác}}",
+    "failed": "Không thể áp dụng danh mục mặc định"
+  }
+}

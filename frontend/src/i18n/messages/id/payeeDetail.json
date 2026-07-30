@@ -1,0 +1,120 @@
+{
+  "loading": "Memuat penerima...",
+  "notFound": "Penerima tidak ditemukan",
+  "loadFailed": "Penerima ini tidak dapat dimuat",
+  "backToPayees": "Penerima",
+  "error": {
+    "retry": "Coba lagi"
+  },
+  "header": {
+    "inactiveBadge": "Tidak aktif",
+    "edit": "Ubah",
+    "merge": "Gabungkan",
+    "deactivate": "Nonaktifkan",
+    "reactivate": "Aktifkan Kembali",
+    "viewTransactions": "Lihat transaksi",
+    "switchPayee": "Pindah ke penerima lain",
+    "switchPlaceholder": "Saring penerima...",
+    "switchNoMatches": "Tidak ada penerima yang cocok",
+    "since": "Penerima sejak {date}"
+  },
+  "toasts": {
+    "deactivated": "{name} dinonaktifkan",
+    "deactivateFailed": "Gagal menonaktifkan penerima",
+    "reactivated": "{name} diaktifkan kembali",
+    "reactivateFailed": "Gagal mengaktifkan kembali penerima"
+  },
+  "deactivate": {
+    "confirmTitle": "Nonaktifkan Penerima",
+    "confirmMessage": "Nonaktifkan {name}? Riwayatnya tetap tersimpan, tetapi penerima ini tidak lagi muncul di saran. Anda dapat mengaktifkannya kembali kapan saja.",
+    "confirmButton": "Nonaktifkan"
+  },
+  "summary": {
+    "spentThisYear": "Pengeluaran Tahun Ini",
+    "receivedThisYear": "Diterima Tahun Ini",
+    "vsLastYear": "{percent} dibanding periode yang sama tahun lalu",
+    "vsLastYearNew": "Tidak ada apa pun pada periode ini tahun lalu",
+    "averageTransaction": "Transaksi Rata-rata",
+    "transactions": "Transaksi",
+    "sinceYear": "Sejak {year}",
+    "lastTransaction": "Transaksi Terakhir",
+    "recurring": "Berulang",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Naik dari {amount}",
+    "priceDown": "Turun dari {amount}",
+    "uncategorized": "Belum Dikategorikan",
+    "uncategorizedApply": "Klik untuk menerapkan kategori default",
+    "uncategorizedSetDefault": "Klik untuk menetapkan kategori default",
+    "convertedNote": "Dikonversi ke {currency}"
+  },
+  "cadence": {
+    "weekly": "Mingguan",
+    "biweekly": "Setiap 2 Minggu",
+    "monthly": "Bulanan",
+    "quarterly": "Kuartalan",
+    "yearly": "Tahunan"
+  },
+  "topCategories": {
+    "title": "Kategori Teratas",
+    "subtitle": "12 bulan terakhir",
+    "empty": "Tidak ada pengeluaran dalam 12 bulan terakhir",
+    "uncategorized": "Belum Dikategorikan"
+  },
+  "accountsPanel": {
+    "title": "Dibayar dari Akun",
+    "subtitle": "Seluruh riwayat",
+    "empty": "Belum ada transaksi"
+  },
+  "recurringPanel": {
+    "title": "Tagihan & Berulang",
+    "empty": "Tidak ada pola berulang yang terdeteksi dalam 12 bulan terakhir",
+    "detectedTooltip": "Terdeteksi dari tagihan berulang dalam 12 bulan terakhir.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "sebelumnya {amount}",
+    "usualDay": "Biasanya sekitar tanggal {day} setiap bulan",
+    "nextBill": "Tagihan Berikutnya",
+    "viewBills": "Lihat di Tagihan & Setoran"
+  },
+  "keyInfo": {
+    "title": "Informasi utama",
+    "defaultCategory": "Kategori Default",
+    "status": "Status",
+    "active": "Aktif",
+    "inactive": "Tidak Aktif",
+    "created": "Ditambahkan",
+    "firstTransaction": "Transaksi Pertama",
+    "lastTransaction": "Transaksi Terakhir",
+    "aliases": "Alias",
+    "largestTransaction": "Transaksi Terbesar",
+    "largestValue": "{amount} pada {date}",
+    "overpaymentFor": "Penerima Pembayaran Ekstra untuk",
+    "notes": "Catatan"
+  },
+  "tabs": {
+    "ariaLabel": "Bagian penerima",
+    "overview": "Ringkasan",
+    "transactions": "Transaksi",
+    "aliases": "Alias"
+  },
+  "transactionsTab": {
+    "title": "Transaksi Terbaru",
+    "empty": "Penerima ini belum memiliki transaksi",
+    "viewAll": "Lihat semua transaksi",
+    "date": "Tanggal",
+    "account": "Akun",
+    "category": "Kategori",
+    "amount": "Jumlah",
+    "uncategorized": "Belum Dikategorikan",
+    "loadFailed": "Gagal memuat transaksi"
+  },
+  "aliasesTab": {
+    "description": "Alias memetakan nama transaksi yang diimpor ke penerima ini. Karakter pengganti diizinkan, misalnya STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Terapkan Kategori Default",
+    "confirmMessage": "Tetapkan {category} ke {count, plural, one {# transaksi tanpa kategori} other {# transaksi tanpa kategori}} dari {name}? Transaksi yang dikategorikan manual tidak diubah.",
+    "confirmButton": "Terapkan",
+    "applied": "{count, plural, one {Dikategorikan # transaksi} other {Dikategorikan # transaksi}}",
+    "failed": "Gagal menerapkan kategori default"
+  }
+}

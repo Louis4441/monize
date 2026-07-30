@@ -24,6 +24,7 @@
     "inactive": "已停用",
     "noTransactions": "此期间没有交易",
     "editAria": "编辑收款人",
+    "detailsAria": "查看收款人详情",
     "collapseAria": "隐藏收款人信息",
     "show": "显示收款人信息"
   },

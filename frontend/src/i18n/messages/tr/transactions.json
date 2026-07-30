@@ -24,6 +24,7 @@
     "inactive": "Pasif",
     "noTransactions": "Bu dönemde işlem yok",
     "editAria": "Alacaklıyı düzenle",
+    "detailsAria": "Alacaklı ayrıntılarını görüntüle",
     "collapseAria": "Alacaklı bilgisini gizle",
     "show": "Alacaklı bilgisini göster"
   },

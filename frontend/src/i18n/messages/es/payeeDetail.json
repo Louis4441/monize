@@ -1,0 +1,120 @@
+{
+  "loading": "Cargando el beneficiario...",
+  "notFound": "Beneficiario no encontrado",
+  "loadFailed": "No se pudo cargar este beneficiario",
+  "backToPayees": "Beneficiarios",
+  "error": {
+    "retry": "Reintentar"
+  },
+  "header": {
+    "inactiveBadge": "Inactivo",
+    "edit": "Editar",
+    "merge": "Fusionar",
+    "deactivate": "Desactivar",
+    "reactivate": "Reactivar",
+    "viewTransactions": "Ver transacciones",
+    "switchPayee": "Cambiar a otro beneficiario",
+    "switchPlaceholder": "Filtrar beneficiarios...",
+    "switchNoMatches": "Ningún beneficiario coincide",
+    "since": "Beneficiario desde {date}"
+  },
+  "toasts": {
+    "deactivated": "{name} desactivado",
+    "deactivateFailed": "No se pudo desactivar el beneficiario",
+    "reactivated": "{name} reactivado",
+    "reactivateFailed": "No se pudo reactivar el beneficiario"
+  },
+  "deactivate": {
+    "confirmTitle": "Desactivar beneficiario",
+    "confirmMessage": "¿Desactivar {name}? Conserva su historial pero deja de aparecer en las sugerencias de beneficiarios. Puedes reactivarlo en cualquier momento.",
+    "confirmButton": "Desactivar"
+  },
+  "summary": {
+    "spentThisYear": "Gastado este año",
+    "receivedThisYear": "Recibido este año",
+    "vsLastYear": "{percent} frente al mismo período del año anterior",
+    "vsLastYearNew": "Nada en este período el año anterior",
+    "averageTransaction": "Transacción promedio",
+    "transactions": "Transacciones",
+    "sinceYear": "Desde {year}",
+    "lastTransaction": "Última transacción",
+    "recurring": "Recurrente",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Subió desde {amount}",
+    "priceDown": "Bajó desde {amount}",
+    "uncategorized": "Sin categoría",
+    "uncategorizedApply": "Haz clic para aplicar la categoría predeterminada",
+    "uncategorizedSetDefault": "Haz clic para definir una categoría predeterminada",
+    "convertedNote": "Convertido a {currency}"
+  },
+  "cadence": {
+    "weekly": "Semanal",
+    "biweekly": "Cada 2 semanas",
+    "monthly": "Mensual",
+    "quarterly": "Trimestral",
+    "yearly": "Anual"
+  },
+  "topCategories": {
+    "title": "Categorías principales",
+    "subtitle": "Últimos 12 meses",
+    "empty": "Sin gastos en los últimos 12 meses",
+    "uncategorized": "Sin categoría"
+  },
+  "accountsPanel": {
+    "title": "Pagado desde cuentas",
+    "subtitle": "Todo el historial",
+    "empty": "Aún no hay transacciones"
+  },
+  "recurringPanel": {
+    "title": "Facturas y recurrencias",
+    "empty": "No se detectó ningún patrón recurrente en los últimos 12 meses",
+    "detectedTooltip": "Detectado a partir de cargos repetidos en los últimos 12 meses.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "antes {amount}",
+    "usualDay": "Normalmente alrededor del día {day} del mes",
+    "nextBill": "Próxima factura",
+    "viewBills": "Ver en Facturas y depósitos"
+  },
+  "keyInfo": {
+    "title": "Información clave",
+    "defaultCategory": "Categoría predeterminada",
+    "status": "Estado",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "created": "Añadido",
+    "firstTransaction": "Primera transacción",
+    "lastTransaction": "Última transacción",
+    "aliases": "Alias",
+    "largestTransaction": "Transacción más grande",
+    "largestValue": "{amount} el {date}",
+    "overpaymentFor": "Beneficiario de amortización anticipada de",
+    "notes": "Notas"
+  },
+  "tabs": {
+    "ariaLabel": "Secciones del beneficiario",
+    "overview": "Resumen",
+    "transactions": "Transacciones",
+    "aliases": "Alias"
+  },
+  "transactionsTab": {
+    "title": "Transacciones recientes",
+    "empty": "Este beneficiario aún no tiene transacciones",
+    "viewAll": "Ver todas las transacciones",
+    "date": "Fecha",
+    "account": "Cuenta",
+    "category": "Categoría",
+    "amount": "Importe",
+    "uncategorized": "Sin categoría",
+    "loadFailed": "No se pudieron cargar las transacciones"
+  },
+  "aliasesTab": {
+    "description": "Los alias asignan los nombres de transacciones importadas a este beneficiario. Se admiten comodines, por ejemplo STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Aplicar categoría predeterminada",
+    "confirmMessage": "¿Asignar {category} a {count, plural, one {# transacción sin categoría} other {# transacciones sin categoría}} de {name}? Las transacciones categorizadas manualmente no se modifican.",
+    "confirmButton": "Aplicar",
+    "applied": "{count, plural, one {# transacción categorizada} other {# transacciones categorizadas}}",
+    "failed": "No se pudo aplicar la categoría predeterminada"
+  }
+}

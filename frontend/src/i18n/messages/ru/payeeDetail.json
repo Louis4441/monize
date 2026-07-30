@@ -1,0 +1,120 @@
+{
+  "loading": "Загрузка получателя...",
+  "notFound": "Получатель не найден",
+  "loadFailed": "Не удалось загрузить этого получателя",
+  "backToPayees": "Получатели",
+  "error": {
+    "retry": "Повторить"
+  },
+  "header": {
+    "inactiveBadge": "Неактивен",
+    "edit": "Изменить",
+    "merge": "Объединить",
+    "deactivate": "Деактивировать",
+    "reactivate": "Реактивировать",
+    "viewTransactions": "Показать проводки",
+    "switchPayee": "Перейти к другому получателю",
+    "switchPlaceholder": "Фильтр получателей...",
+    "switchNoMatches": "Нет подходящих получателей",
+    "since": "Получатель с {date}"
+  },
+  "toasts": {
+    "deactivated": "Получатель {name} деактивирован",
+    "deactivateFailed": "Не удалось деактивировать получателя",
+    "reactivated": "Получатель {name} реактивирован",
+    "reactivateFailed": "Не удалось реактивировать получателя"
+  },
+  "deactivate": {
+    "confirmTitle": "Деактивировать получателя",
+    "confirmMessage": "Деактивировать {name}? История сохранится, но получатель перестанет появляться в подсказках. Его можно реактивировать в любой момент.",
+    "confirmButton": "Деактивировать"
+  },
+  "summary": {
+    "spentThisYear": "Потрачено в этом году",
+    "receivedThisYear": "Получено в этом году",
+    "vsLastYear": "{percent} к тому же периоду прошлого года",
+    "vsLastYearNew": "В этом периоде год назад ничего не было",
+    "averageTransaction": "Средняя проводка",
+    "transactions": "Проводки",
+    "sinceYear": "С {year}",
+    "lastTransaction": "Последняя проводка",
+    "recurring": "Регулярно",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Выросло с {amount}",
+    "priceDown": "Снизилось с {amount}",
+    "uncategorized": "Без категории",
+    "uncategorizedApply": "Нажмите, чтобы применить категорию по умолчанию",
+    "uncategorizedSetDefault": "Нажмите, чтобы задать категорию по умолчанию",
+    "convertedNote": "Пересчитано в {currency}"
+  },
+  "cadence": {
+    "weekly": "Еженедельно",
+    "biweekly": "Каждые 2 недели",
+    "monthly": "Ежемесячно",
+    "quarterly": "Ежеквартально",
+    "yearly": "Ежегодно"
+  },
+  "topCategories": {
+    "title": "Основные категории",
+    "subtitle": "Последние 12 месяцев",
+    "empty": "Нет расходов за последние 12 месяцев",
+    "uncategorized": "Без категории"
+  },
+  "accountsPanel": {
+    "title": "Оплачивается со счетов",
+    "subtitle": "За всё время",
+    "empty": "Проводок пока нет"
+  },
+  "recurringPanel": {
+    "title": "Счета и регулярные платежи",
+    "empty": "За последние 12 месяцев регулярность не обнаружена",
+    "detectedTooltip": "Определено по повторяющимся списаниям за последние 12 месяцев.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "было {amount}",
+    "usualDay": "Обычно около {day}-го числа месяца",
+    "nextBill": "Следующий счёт",
+    "viewBills": "Просмотр в разделе Счета и депозиты"
+  },
+  "keyInfo": {
+    "title": "Основные сведения",
+    "defaultCategory": "Категория по умолчанию",
+    "status": "Статус",
+    "active": "Активный",
+    "inactive": "Неактивный",
+    "created": "Добавлен",
+    "firstTransaction": "Первая проводка",
+    "lastTransaction": "Последняя проводка",
+    "aliases": "Псевдонимы",
+    "largestTransaction": "Крупнейшая проводка",
+    "largestValue": "{amount} — {date}",
+    "overpaymentFor": "Получатель досрочных платежей для",
+    "notes": "Примечания"
+  },
+  "tabs": {
+    "ariaLabel": "Разделы получателя",
+    "overview": "Обзор",
+    "transactions": "Проводки",
+    "aliases": "Псевдонимы"
+  },
+  "transactionsTab": {
+    "title": "Последние проводки",
+    "empty": "У этого получателя пока нет проводок",
+    "viewAll": "Показать все проводки",
+    "date": "Дата",
+    "account": "Счёт",
+    "category": "Категория",
+    "amount": "Сумма",
+    "uncategorized": "Без категории",
+    "loadFailed": "Не удалось загрузить проводки"
+  },
+  "aliasesTab": {
+    "description": "Псевдонимы сопоставляют имена импортированных проводок с этим получателем. Допускаются подстановочные знаки, например STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Применить категорию по умолчанию",
+    "confirmMessage": "Назначить {category} для {count, plural, one {# проводки без категории} other {# проводок без категории}} получателя {name}? Проводки, категоризированные вручную, останутся без изменений.",
+    "confirmButton": "Применить",
+    "applied": "{count, plural, one {Категоризирована # проводка} other {Категоризировано # проводок}}",
+    "failed": "Не удалось применить категорию по умолчанию"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "loading": "Завантаження одержувача...",
+  "notFound": "Одержувача не знайдено",
+  "loadFailed": "Не вдалося завантажити цього одержувача",
+  "backToPayees": "Одержувачі платежів",
+  "error": {
+    "retry": "Повторити"
+  },
+  "header": {
+    "inactiveBadge": "Неактивний",
+    "edit": "Редагувати",
+    "merge": "Об'єднати",
+    "deactivate": "Деактивувати",
+    "reactivate": "Реактивувати",
+    "viewTransactions": "Показати транзакції",
+    "switchPayee": "Перейти до іншого одержувача",
+    "switchPlaceholder": "Фільтр одержувачів...",
+    "switchNoMatches": "Немає відповідних одержувачів",
+    "since": "Одержувач з {date}"
+  },
+  "toasts": {
+    "deactivated": "Одержувача {name} деактивовано",
+    "deactivateFailed": "Не вдалося деактивувати одержувача",
+    "reactivated": "Одержувача {name} реактивовано",
+    "reactivateFailed": "Не вдалося реактивувати одержувача"
+  },
+  "deactivate": {
+    "confirmTitle": "Деактивувати одержувача",
+    "confirmMessage": "Деактивувати {name}? Історія збережеться, але одержувач більше не з’являтиметься у підказках. Його можна реактивувати будь-коли.",
+    "confirmButton": "Деактивувати"
+  },
+  "summary": {
+    "spentThisYear": "Витрачено цього року",
+    "receivedThisYear": "Отримано цього року",
+    "vsLastYear": "{percent} до того самого періоду минулого року",
+    "vsLastYearNew": "У цьому періоді рік тому нічого не було",
+    "averageTransaction": "Середня транзакція",
+    "transactions": "Транзакції",
+    "sinceYear": "З {year}",
+    "lastTransaction": "Остання транзакція",
+    "recurring": "Регулярно",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Зросло з {amount}",
+    "priceDown": "Зменшилося з {amount}",
+    "uncategorized": "Без категорії",
+    "uncategorizedApply": "Натисніть, щоб застосувати категорію за замовчуванням",
+    "uncategorizedSetDefault": "Натисніть, щоб задати категорію за замовчуванням",
+    "convertedNote": "Переведено в {currency}"
+  },
+  "cadence": {
+    "weekly": "Щотижня",
+    "biweekly": "Кожні 2 тижні",
+    "monthly": "Щомісяця",
+    "quarterly": "Щокварталу",
+    "yearly": "Щороку"
+  },
+  "topCategories": {
+    "title": "Основні категорії",
+    "subtitle": "Останні 12 місяців",
+    "empty": "Немає витрат за останні 12 місяців",
+    "uncategorized": "Без категорії"
+  },
+  "accountsPanel": {
+    "title": "Оплачується з рахунків",
+    "subtitle": "За весь час",
+    "empty": "Транзакцій ще немає"
+  },
+  "recurringPanel": {
+    "title": "Рахунки та регулярні платежі",
+    "empty": "За останні 12 місяців регулярності не виявлено",
+    "detectedTooltip": "Визначено за повторюваними списаннями за останні 12 місяців.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "було {amount}",
+    "usualDay": "Зазвичай близько {day}-го числа місяця",
+    "nextBill": "Наступний рахунок",
+    "viewBills": "Переглянути в рахунках та депозитах"
+  },
+  "keyInfo": {
+    "title": "Основні відомості",
+    "defaultCategory": "Категорія за замовчуванням",
+    "status": "Статус",
+    "active": "Активний",
+    "inactive": "Неактивний",
+    "created": "Додано",
+    "firstTransaction": "Перша транзакція",
+    "lastTransaction": "Остання транзакція",
+    "aliases": "Псевдоніми",
+    "largestTransaction": "Найбільша транзакція",
+    "largestValue": "{amount} — {date}",
+    "overpaymentFor": "Одержувач додаткових платежів для",
+    "notes": "Примітки"
+  },
+  "tabs": {
+    "ariaLabel": "Розділи одержувача",
+    "overview": "Огляд",
+    "transactions": "Транзакції",
+    "aliases": "Псевдоніми"
+  },
+  "transactionsTab": {
+    "title": "Останні транзакції",
+    "empty": "У цього одержувача ще немає транзакцій",
+    "viewAll": "Показати всі транзакції",
+    "date": "Дата",
+    "account": "Рахунок",
+    "category": "Категорія",
+    "amount": "Сума",
+    "uncategorized": "Без категорії",
+    "loadFailed": "Не вдалося завантажити транзакції"
+  },
+  "aliasesTab": {
+    "description": "Псевдоніми співставляють назви імпортованих транзакцій із цим одержувачем. Дозволені символи підстановки, наприклад STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Застосувати категорію за замовчуванням",
+    "confirmMessage": "Призначити {category} для {count, plural, one {# транзакції без категорії} other {# транзакцій без категорії}} одержувача {name}? Транзакції, категоризовані вручну, залишаться без змін.",
+    "confirmButton": "Застосувати",
+    "applied": "{count, plural, one {Категоризовано # транзакцію} other {Категоризовано # транзакцій}}",
+    "failed": "Не вдалося застосувати категорію за замовчуванням"
+  }
+}

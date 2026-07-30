@@ -1,0 +1,120 @@
+{
+  "loading": "Wczytywanie odbiorcy...",
+  "notFound": "Nie znaleziono odbiorcy",
+  "loadFailed": "Nie udało się wczytać tego odbiorcy",
+  "backToPayees": "Odbiorcy",
+  "error": {
+    "retry": "Ponów"
+  },
+  "header": {
+    "inactiveBadge": "Nieaktywny",
+    "edit": "Edytuj",
+    "merge": "Scal",
+    "deactivate": "Dezaktywuj",
+    "reactivate": "Przywróć",
+    "viewTransactions": "Zobacz transakcje",
+    "switchPayee": "Przejdź do innego odbiorcy",
+    "switchPlaceholder": "Filtruj odbiorców...",
+    "switchNoMatches": "Brak dopasowanych odbiorców",
+    "since": "Odbiorca od {date}"
+  },
+  "toasts": {
+    "deactivated": "Odbiorca {name} został dezaktywowany",
+    "deactivateFailed": "Nie udało się dezaktywować odbiorcy",
+    "reactivated": "Odbiorca {name} został przywrócony",
+    "reactivateFailed": "Nie udało się przywrócić odbiorcy"
+  },
+  "deactivate": {
+    "confirmTitle": "Dezaktywuj odbiorcę",
+    "confirmMessage": "Dezaktywować {name}? Historia zostanie zachowana, ale odbiorca przestanie pojawiać się w podpowiedziach. Możesz go przywrócić w dowolnym momencie.",
+    "confirmButton": "Dezaktywuj"
+  },
+  "summary": {
+    "spentThisYear": "Wydatki w tym roku",
+    "receivedThisYear": "Wpływy w tym roku",
+    "vsLastYear": "{percent} wobec tego samego okresu w poprzednim roku",
+    "vsLastYearNew": "W tym okresie rok temu nic nie było",
+    "averageTransaction": "Średnia transakcja",
+    "transactions": "Transakcje",
+    "sinceYear": "Od {year}",
+    "lastTransaction": "Ostatnia transakcja",
+    "recurring": "Cykliczne",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Wzrost z {amount}",
+    "priceDown": "Spadek z {amount}",
+    "uncategorized": "Bez kategorii",
+    "uncategorizedApply": "Kliknij, aby zastosować domyślną kategorię",
+    "uncategorizedSetDefault": "Kliknij, aby ustawić domyślną kategorię",
+    "convertedNote": "Przeliczono na {currency}"
+  },
+  "cadence": {
+    "weekly": "Co tydzień",
+    "biweekly": "Co 2 tygodnie",
+    "monthly": "Co miesiąc",
+    "quarterly": "Co kwartał",
+    "yearly": "Co rok"
+  },
+  "topCategories": {
+    "title": "Najczęstsze kategorie",
+    "subtitle": "Ostatnie 12 miesięcy",
+    "empty": "Brak wydatków w ostatnich 12 miesiącach",
+    "uncategorized": "Bez kategorii"
+  },
+  "accountsPanel": {
+    "title": "Płacone z kont",
+    "subtitle": "Cała historia",
+    "empty": "Brak transakcji"
+  },
+  "recurringPanel": {
+    "title": "Rachunki i płatności cykliczne",
+    "empty": "Nie wykryto cyklicznego wzorca w ostatnich 12 miesiącach",
+    "detectedTooltip": "Wykryto na podstawie powtarzających się obciążeń z ostatnich 12 miesięcy.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "wcześniej {amount}",
+    "usualDay": "Zwykle około {day}. dnia miesiąca",
+    "nextBill": "Następny rachunek",
+    "viewBills": "Zobacz w Rachunki i wpłaty"
+  },
+  "keyInfo": {
+    "title": "Kluczowe informacje",
+    "defaultCategory": "Domyślna kategoria",
+    "status": "Status",
+    "active": "Aktywny",
+    "inactive": "Nieaktywny",
+    "created": "Dodano",
+    "firstTransaction": "Pierwsza transakcja",
+    "lastTransaction": "Ostatnia transakcja",
+    "aliases": "Aliasy",
+    "largestTransaction": "Największa transakcja",
+    "largestValue": "{amount} dnia {date}",
+    "overpaymentFor": "Odbiorca nadpłat dla",
+    "notes": "Notatki"
+  },
+  "tabs": {
+    "ariaLabel": "Sekcje odbiorcy",
+    "overview": "Przegląd",
+    "transactions": "Transakcje",
+    "aliases": "Aliasy"
+  },
+  "transactionsTab": {
+    "title": "Ostatnie transakcje",
+    "empty": "Ten odbiorca nie ma jeszcze transakcji",
+    "viewAll": "Zobacz wszystkie transakcje",
+    "date": "Data",
+    "account": "Konto",
+    "category": "Kategoria",
+    "amount": "Kwota",
+    "uncategorized": "Bez kategorii",
+    "loadFailed": "Nie udało się wczytać transakcji"
+  },
+  "aliasesTab": {
+    "description": "Aliasy przypisują nazwy importowanych transakcji do tego odbiorcy. Dozwolone są znaki wieloznaczne, np. STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Zastosuj domyślną kategorię",
+    "confirmMessage": "Przypisać {category} do {count, plural, one {# transakcji bez kategorii} few {# transakcji bez kategorii} many {# transakcji bez kategorii} other {# transakcji bez kategorii}} odbiorcy {name}? Transakcje skategoryzowane ręcznie pozostaną bez zmian.",
+    "confirmButton": "Zastosuj",
+    "applied": "{count, plural, one {Skategoryzowano # transakcję} few {Skategoryzowano # transakcje} many {Skategoryzowano # transakcji} other {Skategoryzowano # transakcji}}",
+    "failed": "Nie udało się zastosować domyślnej kategorii"
+  }
+}
