@@ -359,7 +359,7 @@
   },
   "mnyBills": {
     "heading": "[XX-Scheduled bills to create ({count})-XX]",
-    "explainer": "[XX-Money keeps a row for every occurrence of a bill, so a long history holds thousands of them. These are the series that still look active. Untick any you do not want -- unticked bills are not created at all.-XX]",
+    "explainer": "[XX-Money keeps a row for every occurrence of a bill, so a long history holds thousands of them. These are the series that still look active. Untick any you do not want — unticked bills are not created at all.-XX]",
     "unsupported": "[XX-This Money version predates scheduled bills, so there are none to import.-XX]",
     "skipped": "[XX-{count, plural, one {# bill series was} other {# bill series were}} missing a template or a usable date and cannot be imported.-XX]",
     "table": {
