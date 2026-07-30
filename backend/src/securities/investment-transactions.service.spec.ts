@@ -5370,6 +5370,25 @@ describe("InvestmentTransactionsService", () => {
       });
     });
 
+    it("reads the history in chronological order, which callers depend on", async () => {
+      // Two readers rely on this ordering and neither can recover it: the
+      // running totals below are computed by replaying the rows in sequence, and
+      // the detail page's chart takes the last row of each day as that day's
+      // closing balance (`buildQuantitySteps`). Same-day order cannot be derived
+      // from the date alone, so sorting on the client is not an option -- the
+      // order is part of this method's contract, and a future change to the
+      // query should fail here rather than quietly skew a chart.
+      investmentTransactionsRepository.find.mockResolvedValue([]);
+
+      await service.getSecurityTransactionHistory(userId, securityId);
+
+      expect(investmentTransactionsRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          order: { transactionDate: "ASC", createdAt: "ASC" },
+        }),
+      );
+    });
+
     it("computes per-account and cross-account running totals without snapping", async () => {
       investmentTransactionsRepository.find.mockResolvedValue([
         tx(
