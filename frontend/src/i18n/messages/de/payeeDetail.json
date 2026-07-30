@@ -97,15 +97,11 @@
     "aliases": "Aliasse"
   },
   "transactionsTab": {
-    "title": "Letzte Buchungen",
+    "title": "Buchungen",
     "empty": "Für diesen Zahlungsempfänger gibt es noch keine Buchungen",
-    "viewAll": "Alle Buchungen anzeigen",
-    "date": "Datum",
-    "account": "Konto",
-    "category": "Kategorie",
-    "amount": "Betrag",
-    "uncategorized": "Nicht kategorisiert",
-    "loadFailed": "Buchungen konnten nicht geladen werden"
+    "loadFailed": "Buchungen konnten nicht geladen werden",
+    "titleWithCount": "Buchungen ({count})",
+    "openInRegister": "Im Kontobuch öffnen"
   },
   "aliasesTab": {
     "description": "Aliasse ordnen importierte Buchungsnamen diesem Zahlungsempfänger zu. Platzhalter sind erlaubt, z. B. STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Anwenden",
     "applied": "{count, plural, one {# Buchung kategorisiert} other {# Buchungen kategorisiert}}",
     "failed": "Standardkategorie konnte nicht angewendet werden"
+  },
+  "seasonality": {
+    "title": "Saisonalität",
+    "tooltip": "Was ein typischer Monat bei diesem Zahlungsempfänger kostet, gemittelt über alle Jahre der Historie.",
+    "peak": "Die Ausgaben konzentrieren sich im {month}.",
+    "even": "Die Ausgaben sind gleichmäßig über das Jahr verteilt.",
+    "needsMoreHistory": "Es sind mindestens {years} Jahre Historie nötig, um ein saisonales Muster von Zufall zu unterscheiden.",
+    "empty": "Noch keine Ausgaben für eine Monatsaufteilung",
+    "monthTooltip": "{month}: durchschnittlich {amount} über {years, plural, one {# Jahr} other {# Jahre}}"
   }
 }

@@ -17,6 +17,7 @@ import { PayeeDetailHeader } from '@/components/payees/detail/PayeeDetailHeader'
 import { PayeeSummaryCards } from '@/components/payees/detail/PayeeSummaryCards';
 import { PayeeKeyInfoCard } from '@/components/payees/detail/PayeeKeyInfoCard';
 import { PayeeRecurringPanel } from '@/components/payees/detail/PayeeRecurringPanel';
+import { PayeeSeasonalityPanel } from '@/components/payees/detail/PayeeSeasonalityPanel';
 import { TopGroupsPanel } from '@/components/accounts/shared/TopGroupsPanel';
 import { ReactivatePayeeDialog } from '@/components/payees/ReactivatePayeeDialog';
 import { useFormModal } from '@/hooks/useFormModal';
@@ -28,7 +29,7 @@ import { transactionsApi } from '@/lib/transactions';
 import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { categoriesApi } from '@/lib/categories';
 import { getNextScheduled } from '@/lib/scheduled-utils';
-import { buildCategoryLabelMap } from '@/lib/categoryUtils';
+import { buildCategoryColorMap, buildCategoryLabelMap } from '@/lib/categoryUtils';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import {
@@ -77,10 +78,10 @@ const PayeeAliasManager = dynamic(
   { ssr: false },
 );
 
-const PayeeRecentTransactions = dynamic(
+const PayeeTransactionsTab = dynamic(
   () =>
-    import('@/components/payees/detail/PayeeRecentTransactions').then((m) => ({
-      default: m.PayeeRecentTransactions,
+    import('@/components/payees/detail/PayeeTransactionsTab').then((m) => ({
+      default: m.PayeeTransactionsTab,
     })),
   { ssr: false },
 );
@@ -179,7 +180,6 @@ function PayeeDetailContent() {
 
       const today = isoDaysAgo(0);
       const yearAgo = isoDaysAgo(365);
-      const twoYearsAgo = isoDaysAgo(730);
       const thisYearStart = `${today.slice(0, 4)}-01-01`;
       const lastYearStart = `${Number(today.slice(0, 4)) - 1}-01-01`;
       const lastYearSameDate = `${Number(today.slice(0, 4)) - 1}${today.slice(4)}`;
@@ -206,8 +206,12 @@ function PayeeDetailContent() {
             endDate: lastYearSameDate,
           })
           .catch(() => null),
+        // No date range: the chart covers the payee's whole history, and its
+        // own granularity control buckets by quarter or year once that history
+        // outgrows monthly bars. A window here would silently hide the years
+        // before it, which is the opposite of what a detail page is for.
         transactionsApi
-          .getMonthlyTotals({ payeeIds: [payeeId], startDate: twoYearsAgo, endDate: today })
+          .getMonthlyTotals({ payeeIds: [payeeId] })
           .catch(() => [] as MonthlyTotal[]),
         transactionsApi
           .getGroupedTotals({
@@ -328,6 +332,7 @@ function PayeeDetailContent() {
   }, [analytics?.recurringCharges]);
 
   const categoryLabelMap = useMemo(() => buildCategoryLabelMap(categories), [categories]);
+  const categoryColorMap = useMemo(() => buildCategoryColorMap(categories), [categories]);
 
   // Category rows aggregated across currencies into the display currency, with
   // the hierarchy-aware labels the rest of the app uses.
@@ -371,9 +376,22 @@ function PayeeDetailContent() {
     [scheduled, detail],
   );
 
+  // Every link out of this page goes to the register filtered to this payee.
+  //
+  // `accountStatus=all` is not optional here: the register prunes selected
+  // accounts against its stored Show Accounts toggle, and when that toggle is
+  // "active" it also scopes an unfiltered query to the open accounts only. A
+  // payee's history is a lifetime of it, so without this a payment made from an
+  // account since closed simply vanishes -- and the account row for that closed
+  // account would link to an empty list. Same reasoning as the Institutions
+  // page and `ai-entity-links.ts`, which pass it for the same reason.
   const goToRegister = useCallback(
     (query: Record<string, string> = {}) => {
-      const search = new URLSearchParams({ payeeId, ...query });
+      const search = new URLSearchParams({
+        payeeId,
+        accountStatus: 'all',
+        ...query,
+      });
       router.push(`/transactions?${search.toString()}`);
     },
     [router, payeeId],
@@ -569,7 +587,12 @@ function PayeeDetailContent() {
                   </div>
                   <PayeeKeyInfoCard
                     detail={detail}
-                    onViewTransactions={() => goToRegister()}
+                    categoryLabelMap={categoryLabelMap}
+                    // The largest transaction narrows the register to its own
+                    // day, so the row it names is the one on screen.
+                    onSelectDate={(date) =>
+                      goToRegister({ startDate: date, endDate: date })
+                    }
                     onSelectAccount={(accountId) => router.push(`/accounts/${accountId}`)}
                   />
                 </div>
@@ -602,12 +625,19 @@ function PayeeDetailContent() {
                   />
                 </div>
 
-                <PayeeRecurringPanel
-                  charges={analytics?.recurringCharges ?? []}
-                  nextBill={nextBill}
-                  currencyStrategy={currencyStrategy}
-                  isLoading={false}
-                />
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <PayeeRecurringPanel
+                    charges={analytics?.recurringCharges ?? []}
+                    nextBill={nextBill}
+                    currencyStrategy={currencyStrategy}
+                    isLoading={false}
+                  />
+                  <PayeeSeasonalityPanel
+                    monthly={analytics?.monthlyTotals ?? []}
+                    currencyStrategy={currencyStrategy}
+                    isLoading={false}
+                  />
+                </div>
               </TabPanel>
 
               <TabPanel
@@ -619,10 +649,16 @@ function PayeeDetailContent() {
                 keepMounted
                 className="mt-6"
               >
-                <PayeeRecentTransactions
+                <PayeeTransactionsTab
                   payeeId={payee.id}
                   refreshKey={refreshKey}
-                  onViewAll={() => goToRegister()}
+                  categoryLabelMap={categoryLabelMap}
+                  categoryColorMap={categoryColorMap}
+                  onChanged={loadData}
+                  onViewInRegister={() => goToRegister()}
+                  onSelectDate={(date) =>
+                    goToRegister({ startDate: date, endDate: date })
+                  }
                 />
               </TabPanel>
 

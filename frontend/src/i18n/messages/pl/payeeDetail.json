@@ -97,15 +97,11 @@
     "aliases": "Aliasy"
   },
   "transactionsTab": {
-    "title": "Ostatnie transakcje",
+    "title": "Transakcje",
     "empty": "Ten odbiorca nie ma jeszcze transakcji",
-    "viewAll": "Zobacz wszystkie transakcje",
-    "date": "Data",
-    "account": "Konto",
-    "category": "Kategoria",
-    "amount": "Kwota",
-    "uncategorized": "Bez kategorii",
-    "loadFailed": "Nie udało się wczytać transakcji"
+    "loadFailed": "Nie udało się wczytać transakcji",
+    "titleWithCount": "Transakcje ({count})",
+    "openInRegister": "Otwórz w rejestrze"
   },
   "aliasesTab": {
     "description": "Aliasy przypisują nazwy importowanych transakcji do tego odbiorcy. Dozwolone są znaki wieloznaczne, np. STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Zastosuj",
     "applied": "{count, plural, one {Skategoryzowano # transakcję} few {Skategoryzowano # transakcje} many {Skategoryzowano # transakcji} other {Skategoryzowano # transakcji}}",
     "failed": "Nie udało się zastosować domyślnej kategorii"
+  },
+  "seasonality": {
+    "title": "Sezonowość",
+    "tooltip": "Ile kosztuje typowy miesiąc u tego odbiorcy, średnio z wszystkich lat historii.",
+    "peak": "Wydatki koncentrują się w {month}.",
+    "even": "Wydatki są równomiernie rozłożone w roku.",
+    "needsMoreHistory": "Potrzeba co najmniej {years} lat historii, aby odróżnić wzorzec sezonowy od przypadku.",
+    "empty": "Brak wydatków do podziału na miesiące",
+    "monthTooltip": "{month}: średnio {amount} z {years, plural, one {# roku} few {# lat} many {# lat} other {# lat}}"
   }
 }

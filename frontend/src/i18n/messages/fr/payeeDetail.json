@@ -97,15 +97,11 @@
     "aliases": "Alias"
   },
   "transactionsTab": {
-    "title": "Transactions récentes",
+    "title": "Transactions",
     "empty": "Aucune transaction pour ce bénéficiaire",
-    "viewAll": "Voir toutes les transactions",
-    "date": "Date",
-    "account": "Compte",
-    "category": "Catégorie",
-    "amount": "Montant",
-    "uncategorized": "Non catégorisé",
-    "loadFailed": "Impossible de charger les transactions"
+    "loadFailed": "Impossible de charger les transactions",
+    "titleWithCount": "Transactions ({count})",
+    "openInRegister": "Ouvrir dans le registre"
   },
   "aliasesTab": {
     "description": "Les alias associent les noms de transactions importées à ce bénéficiaire. Les jokers sont acceptés, par exemple STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Appliquer",
     "applied": "{count, plural, one {# transaction catégorisée} other {# transactions catégorisées}}",
     "failed": "Impossible d’appliquer la catégorie par défaut"
+  },
+  "seasonality": {
+    "title": "Saisonnalité",
+    "tooltip": "Ce que coûte un mois typique avec ce bénéficiaire, en moyenne sur toutes les années d’historique.",
+    "peak": "Les dépenses se concentrent en {month}.",
+    "even": "Les dépenses sont réparties uniformément sur l’année.",
+    "needsMoreHistory": "Il faut au moins {years} ans d’historique pour distinguer une saisonnalité du hasard.",
+    "empty": "Aucune dépense à répartir par mois pour le moment",
+    "monthTooltip": "{month} : {amount} en moyenne sur {years, plural, one {# an} other {# ans}}"
   }
 }

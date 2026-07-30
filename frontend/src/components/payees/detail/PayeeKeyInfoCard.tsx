@@ -8,8 +8,14 @@ import type { PayeeDetail } from '@/types/payee';
 
 interface PayeeKeyInfoCardProps {
   detail: PayeeDetail;
-  /** Open the register filtered to this payee (for the largest transaction). */
-  onViewTransactions: () => void;
+  /**
+   * Hierarchical category labels ("Parent: Child"), so the default category
+   * reads the same here as it does in the payee list and the filter dropdowns.
+   * A bare leaf name is ambiguous -- several parents can own a "Fees".
+   */
+  categoryLabelMap: Map<string, string>;
+  /** Narrow the register to one day (for the largest transaction). */
+  onSelectDate: (date: string) => void;
   /** Open an account's detail page (for the overpayment designation). */
   onSelectAccount: (accountId: string) => void;
 }
@@ -21,7 +27,8 @@ interface PayeeKeyInfoCardProps {
  */
 export function PayeeKeyInfoCard({
   detail,
-  onViewTransactions,
+  categoryLabelMap,
+  onSelectDate,
   onSelectAccount,
 }: PayeeKeyInfoCardProps) {
   const t = useTranslations('payeeDetail');
@@ -34,7 +41,13 @@ export function PayeeKeyInfoCard({
     {
       key: 'defaultCategory',
       label: t('keyInfo.defaultCategory'),
-      value: payee.defaultCategory?.name ?? null,
+      // The map wins over the relation's own name: it carries the parent, and
+      // the relation only ever holds the leaf.
+      value: payee.defaultCategoryId
+        ? (categoryLabelMap.get(payee.defaultCategoryId) ??
+          payee.defaultCategory?.name ??
+          null)
+        : null,
     },
     {
       key: 'status',
@@ -67,7 +80,7 @@ export function PayeeKeyInfoCard({
       value: largestTransaction ? (
         <button
           type="button"
-          onClick={onViewTransactions}
+          onClick={() => onSelectDate(largestTransaction.transactionDate)}
           className="text-right text-blue-600 hover:underline dark:text-blue-400"
         >
           {t('keyInfo.largestValue', {

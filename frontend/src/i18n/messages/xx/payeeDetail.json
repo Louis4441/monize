@@ -97,15 +97,11 @@
     "aliases": "[XX-Aliases-XX]"
   },
   "transactionsTab": {
-    "title": "[XX-Recent Transactions-XX]",
+    "title": "[XX-Transactions-XX]",
     "empty": "[XX-No transactions for this payee yet-XX]",
-    "viewAll": "[XX-View all in the register-XX]",
-    "date": "[XX-Date-XX]",
-    "account": "[XX-Account-XX]",
-    "category": "[XX-Category-XX]",
-    "amount": "[XX-Amount-XX]",
-    "uncategorized": "[XX-Uncategorized-XX]",
-    "loadFailed": "[XX-Failed to load transactions-XX]"
+    "loadFailed": "[XX-Failed to load transactions-XX]",
+    "titleWithCount": "[XX-Transactions ({count})-XX]",
+    "openInRegister": "[XX-Open in the register-XX]"
   },
   "aliasesTab": {
     "description": "[XX-Aliases map imported transaction names onto this payee. Wildcards are allowed, e.g. STARBUCKS*.-XX]"
@@ -116,5 +112,14 @@
     "confirmButton": "[XX-Apply-XX]",
     "applied": "[XX-{count, plural, one {# transaction categorized} other {# transactions categorized}}-XX]",
     "failed": "[XX-Failed to apply the default category-XX]"
+  },
+  "seasonality": {
+    "title": "[XX-Seasonality-XX]",
+    "tooltip": "[XX-What a typical month with this payee costs, averaged over every year of history.-XX]",
+    "peak": "[XX-Spending concentrates in {month}.-XX]",
+    "even": "[XX-Spending is spread evenly across the year.-XX]",
+    "needsMoreHistory": "[XX-At least {years} years of history are needed before a seasonal pattern can be told from noise.-XX]",
+    "empty": "[XX-No spending to break down by month yet-XX]",
+    "monthTooltip": "[XX-{month}: {amount} on average across {years, plural, one {# year} other {# years}}-XX]"
   }
 }

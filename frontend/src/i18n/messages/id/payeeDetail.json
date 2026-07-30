@@ -97,15 +97,11 @@
     "aliases": "Alias"
   },
   "transactionsTab": {
-    "title": "Transaksi Terbaru",
+    "title": "Transaksi",
     "empty": "Penerima ini belum memiliki transaksi",
-    "viewAll": "Lihat semua transaksi",
-    "date": "Tanggal",
-    "account": "Akun",
-    "category": "Kategori",
-    "amount": "Jumlah",
-    "uncategorized": "Belum Dikategorikan",
-    "loadFailed": "Gagal memuat transaksi"
+    "loadFailed": "Gagal memuat transaksi",
+    "titleWithCount": "Transaksi ({count})",
+    "openInRegister": "Buka di register"
   },
   "aliasesTab": {
     "description": "Alias memetakan nama transaksi yang diimpor ke penerima ini. Karakter pengganti diizinkan, misalnya STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Terapkan",
     "applied": "{count, plural, one {Dikategorikan # transaksi} other {Dikategorikan # transaksi}}",
     "failed": "Gagal menerapkan kategori default"
+  },
+  "seasonality": {
+    "title": "Musiman",
+    "tooltip": "Biaya bulan tipikal untuk penerima ini, dirata-ratakan atas seluruh tahun riwayat.",
+    "peak": "Pengeluaran terpusat di {month}.",
+    "even": "Pengeluaran tersebar merata sepanjang tahun.",
+    "needsMoreHistory": "Diperlukan setidaknya {years} tahun riwayat untuk membedakan pola musiman dari kebetulan.",
+    "empty": "Belum ada pengeluaran untuk dirinci per bulan",
+    "monthTooltip": "{month}: rata-rata {amount} selama {years, plural, one {# tahun} other {# tahun}}"
   }
 }

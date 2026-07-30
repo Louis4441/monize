@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, fireEvent, waitFor } from '@/test/render';
+import { render, screen, act, fireEvent, waitFor, within } from '@/test/render';
 import toast from 'react-hot-toast';
 import PayeeDetailPage from './page';
 import type { PayeeDetail } from '@/types/payee';
@@ -239,7 +239,50 @@ describe('PayeeDetailPage', () => {
     await renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: 'View Transactions' }));
-    expect(mockPush).toHaveBeenCalledWith('/transactions?payeeId=payee-1');
+    // accountStatus=all, or the register hides payments made from an account
+    // that has since been closed.
+    expect(mockPush).toHaveBeenCalledWith(
+      '/transactions?payeeId=payee-1&accountStatus=all',
+    );
+  });
+
+  it('filters by payee and account together when an account row is clicked', async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getByText('Chequing'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      '/transactions?payeeId=payee-1&accountStatus=all&accountId=acct-1',
+    );
+  });
+
+  it('carries accountStatus=all on a category row too', async () => {
+    await renderPage();
+
+    // "Coffee" is also the payee's default category in Key Information, so the
+    // click is scoped to the Top Categories panel.
+    const panel = screen.getByText('Top Categories').closest('section')!;
+    fireEvent.click(within(panel).getByText('Coffee'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      '/transactions?payeeId=payee-1&accountStatus=all&categoryId=cat-1',
+    );
+  });
+
+  it('narrows the register to one day from the largest transaction', async () => {
+    await renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /95\.20/ }));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      '/transactions?payeeId=payee-1&accountStatus=all&startDate=2025-12-24&endDate=2025-12-24',
+    );
+  });
+
+  it('asks for the whole history for the chart, not a window', async () => {
+    await renderPage();
+
+    expect(mockGetMonthlyTotals).toHaveBeenCalledWith({ payeeIds: ['payee-1'] });
   });
 
   it('applies the default category from the Uncategorized card', async () => {

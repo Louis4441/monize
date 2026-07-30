@@ -41,33 +41,47 @@ function detailFixture(overrides: Partial<PayeeDetail> = {}): PayeeDetail {
   };
 }
 
-function renderCard(detail = detailFixture()) {
-  const onViewTransactions = vi.fn();
+/** Hierarchical labels, as the page builds them from the category tree. */
+const categoryLabelMap = new Map([['cat-1', 'Utilities: Hydro']]);
+
+function renderCard(detail = detailFixture(), labels = categoryLabelMap) {
+  const onSelectDate = vi.fn();
   const onSelectAccount = vi.fn();
   render(
     <PayeeKeyInfoCard
       detail={detail}
-      onViewTransactions={onViewTransactions}
+      categoryLabelMap={labels}
+      onSelectDate={onSelectDate}
       onSelectAccount={onSelectAccount}
     />,
   );
-  return { onViewTransactions, onSelectAccount };
+  return { onSelectDate, onSelectAccount };
 }
 
 describe('PayeeKeyInfoCard', () => {
   it('shows the reference facts', () => {
     renderCard();
     expect(screen.getByText('Key Information')).toBeInTheDocument();
-    expect(screen.getByText('Utilities')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('Electricity provider')).toBeInTheDocument();
   });
 
-  it('links the largest transaction to the register', () => {
-    const { onViewTransactions } = renderCard();
+  it('shows the default category with its parent, not the bare leaf', () => {
+    renderCard();
+    expect(screen.getByText('Utilities: Hydro')).toBeInTheDocument();
+    expect(screen.queryByText('Utilities')).toBeNull();
+  });
+
+  it('falls back to the relation name when the map has no entry', () => {
+    renderCard(detailFixture(), new Map());
+    expect(screen.getByText('Utilities')).toBeInTheDocument();
+  });
+
+  it('filters the register to the largest transaction own date', () => {
+    const { onSelectDate } = renderCard();
     fireEvent.click(screen.getByRole('button', { name: /412\.50/ }));
-    expect(onViewTransactions).toHaveBeenCalled();
+    expect(onSelectDate).toHaveBeenCalledWith('2025-12-24');
   });
 
   it('links the overpayment designation to the loan account', () => {

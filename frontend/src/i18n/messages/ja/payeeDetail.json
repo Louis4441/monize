@@ -97,15 +97,11 @@
     "aliases": "エイリアス"
   },
   "transactionsTab": {
-    "title": "最近の取引",
+    "title": "取引",
     "empty": "この支払先の取引はまだありません",
-    "viewAll": "すべての取引を表示",
-    "date": "日付",
-    "account": "口座",
-    "category": "カテゴリ",
-    "amount": "金額",
-    "uncategorized": "未分類",
-    "loadFailed": "取引を読み込めませんでした"
+    "loadFailed": "取引を読み込めませんでした",
+    "titleWithCount": "取引 ({count})",
+    "openInRegister": "取引一覧で開く"
   },
   "aliasesTab": {
     "description": "エイリアスはインポートした取引名をこの支払先に対応付けます。ワイルドカードを使用できます（例: STARBUCKS*）。"
@@ -116,5 +112,14 @@
     "confirmButton": "適用",
     "applied": "{count, plural, one {# 件の取引を分類しました} other {# 件の取引を分類しました}}",
     "failed": "デフォルトカテゴリを適用できませんでした"
+  },
+  "seasonality": {
+    "title": "季節性",
+    "tooltip": "この支払先の平均的な1か月の金額を、履歴のある全年で平均した値です。",
+    "peak": "支出は{month}に集中しています。",
+    "even": "支出は年間を通じて均等です。",
+    "needsMoreHistory": "季節的な傾向を偶然と区別するには、少なくとも{years}年分の履歴が必要です。",
+    "empty": "月別に分ける支出がまだありません",
+    "monthTooltip": "{month}: {years, plural, one {# 年} other {# 年}}平均で {amount}"
   }
 }

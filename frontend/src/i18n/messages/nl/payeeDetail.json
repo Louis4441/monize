@@ -97,15 +97,11 @@
     "aliases": "Aliassen"
   },
   "transactionsTab": {
-    "title": "Recente transacties",
+    "title": "Transacties",
     "empty": "Deze begunstigde heeft nog geen transacties",
-    "viewAll": "Alle transacties bekijken",
-    "date": "Datum",
-    "account": "Rekening",
-    "category": "Categorie",
-    "amount": "Bedrag",
-    "uncategorized": "Zonder categorie",
-    "loadFailed": "Transacties konden niet worden geladen"
+    "loadFailed": "Transacties konden niet worden geladen",
+    "titleWithCount": "Transacties ({count})",
+    "openInRegister": "Openen in het overzicht"
   },
   "aliasesTab": {
     "description": "Aliassen koppelen geïmporteerde transactienamen aan deze begunstigde. Jokertekens zijn toegestaan, bijvoorbeeld STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Toepassen",
     "applied": "{count, plural, one {# transactie gecategoriseerd} other {# transacties gecategoriseerd}}",
     "failed": "Standaardcategorie kon niet worden toegepast"
+  },
+  "seasonality": {
+    "title": "Seizoenspatroon",
+    "tooltip": "Wat een typische maand bij deze begunstigde kost, gemiddeld over alle jaren historie.",
+    "peak": "De uitgaven concentreren zich in {month}.",
+    "even": "De uitgaven zijn gelijkmatig over het jaar verdeeld.",
+    "needsMoreHistory": "Er is minstens {years} jaar historie nodig om een seizoenspatroon van ruis te onderscheiden.",
+    "empty": "Nog geen uitgaven om per maand uit te splitsen",
+    "monthTooltip": "{month}: gemiddeld {amount} over {years, plural, one {# jaar} other {# jaar}}"
   }
 }

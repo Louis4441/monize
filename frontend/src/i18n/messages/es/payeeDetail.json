@@ -97,15 +97,11 @@
     "aliases": "Alias"
   },
   "transactionsTab": {
-    "title": "Transacciones recientes",
+    "title": "Transacciones",
     "empty": "Este beneficiario aún no tiene transacciones",
-    "viewAll": "Ver todas las transacciones",
-    "date": "Fecha",
-    "account": "Cuenta",
-    "category": "Categoría",
-    "amount": "Importe",
-    "uncategorized": "Sin categoría",
-    "loadFailed": "No se pudieron cargar las transacciones"
+    "loadFailed": "No se pudieron cargar las transacciones",
+    "titleWithCount": "Transacciones ({count})",
+    "openInRegister": "Abrir en el registro"
   },
   "aliasesTab": {
     "description": "Los alias asignan los nombres de transacciones importadas a este beneficiario. Se admiten comodines, por ejemplo STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Aplicar",
     "applied": "{count, plural, one {# transacción categorizada} other {# transacciones categorizadas}}",
     "failed": "No se pudo aplicar la categoría predeterminada"
+  },
+  "seasonality": {
+    "title": "Estacionalidad",
+    "tooltip": "Lo que cuesta un mes típico con este beneficiario, promediado sobre todos los años de historial.",
+    "peak": "El gasto se concentra en {month}.",
+    "even": "El gasto se reparte de forma uniforme durante el año.",
+    "needsMoreHistory": "Se necesitan al menos {years} años de historial para distinguir un patrón estacional del ruido.",
+    "empty": "Aún no hay gastos para desglosar por mes",
+    "monthTooltip": "{month}: {amount} de media en {years, plural, one {# año} other {# años}}"
   }
 }

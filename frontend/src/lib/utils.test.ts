@@ -59,6 +59,16 @@ describe('parseLocalDate', () => {
     expect(date.getDate()).toBe(1);
     expect(date.getMonth()).toBe(0);
   });
+
+  // Entity createdAt/updatedAt are timestamps, not dates. Splitting the whole
+  // string on "-" made the day NaN, and the invalid Date formatted as
+  // "NaN-NaN-NaN" rather than throwing.
+  it('takes the calendar day from an ISO timestamp', () => {
+    const date = parseLocalDate('2026-01-24T18:30:00.000Z');
+    expect(date.getFullYear()).toBe(2026);
+    expect(date.getMonth()).toBe(0);
+    expect(date.getDate()).toBe(24);
+  });
 });
 
 describe('formatDate', () => {
@@ -76,6 +86,11 @@ describe('formatDate', () => {
 
   it('formats DD-MMM-YYYY', () => {
     expect(formatDate('2026-01-24', 'DD-MMM-YYYY')).toBe('24-Jan-2026');
+  });
+
+  it('formats an ISO timestamp rather than rendering NaN', () => {
+    expect(formatDate('2026-01-24T18:30:00.000Z', 'YYYY-MM-DD')).toBe('2026-01-24');
+    expect(formatDate('2026-01-24T18:30:00.000Z', 'DD-MMM-YYYY')).toBe('24-Jan-2026');
   });
 
   it('accepts Date objects', () => {

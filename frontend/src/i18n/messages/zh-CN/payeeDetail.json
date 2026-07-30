@@ -97,15 +97,11 @@
     "aliases": "别名"
   },
   "transactionsTab": {
-    "title": "最近交易",
+    "title": "交易",
     "empty": "该收款人暂无交易",
-    "viewAll": "查看全部交易",
-    "date": "日期",
-    "account": "账户",
-    "category": "分类",
-    "amount": "金额",
-    "uncategorized": "未分类",
-    "loadFailed": "无法加载交易"
+    "loadFailed": "无法加载交易",
+    "titleWithCount": "交易 ({count})",
+    "openInRegister": "在交易列表中打开"
   },
   "aliasesTab": {
     "description": "别名将导入的交易名称对应到该收款人。支持通配符，例如 STARBUCKS*。"
@@ -116,5 +112,14 @@
     "confirmButton": "应用",
     "applied": "{count, plural, one {已分类 # 笔交易} other {已分类 # 笔交易}}",
     "failed": "无法应用默认分类"
+  },
+  "seasonality": {
+    "title": "季节性",
+    "tooltip": "该收款人一个典型月份的金额，按所有历史年份取平均。",
+    "peak": "支出集中在{month}。",
+    "even": "支出全年分布均匀。",
+    "needsMoreHistory": "至少需要 {years} 年的历史才能把季节性规律与偶然区分开。",
+    "empty": "暂无支出可按月分解",
+    "monthTooltip": "{month}：{years, plural, one {# 年} other {# 年}}平均 {amount}"
   }
 }

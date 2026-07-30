@@ -97,15 +97,11 @@
     "aliases": "Bí danh"
   },
   "transactionsTab": {
-    "title": "Giao tác gần đây",
+    "title": "Giao tác",
     "empty": "Người nhận này chưa có giao tác nào",
-    "viewAll": "Xem tất cả giao tác",
-    "date": "Ngày",
-    "account": "Tài khoản",
-    "category": "Danh mục",
-    "amount": "Số tiền",
-    "uncategorized": "Chưa phân loại",
-    "loadFailed": "Không thể tải giao tác"
+    "loadFailed": "Không thể tải giao tác",
+    "titleWithCount": "Giao tác ({count})",
+    "openInRegister": "Mở trong sổ ghi"
   },
   "aliasesTab": {
     "description": "Bí danh liên kết tên giao tác được nhập với người nhận này. Cho phép ký tự đại diện, ví dụ STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Áp dụng",
     "applied": "{count, plural, one {Đã phân loại # giao tác} other {Đã phân loại # giao tác}}",
     "failed": "Không thể áp dụng danh mục mặc định"
+  },
+  "seasonality": {
+    "title": "Tính mùa vụ",
+    "tooltip": "Chi phí của một tháng điển hình với người nhận này, tính trung bình trên mọi năm lịch sử.",
+    "peak": "Chi tiêu tập trung vào {month}.",
+    "even": "Chi tiêu phân bố đều trong năm.",
+    "needsMoreHistory": "Cần ít nhất {years} năm lịch sử để phân biệt mẫu theo mùa với sự tình cờ.",
+    "empty": "Chưa có chi tiêu để phân tách theo tháng",
+    "monthTooltip": "{month}: trung bình {amount} qua {years, plural, one {# năm} other {# năm}}"
   }
 }

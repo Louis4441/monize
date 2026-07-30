@@ -97,15 +97,11 @@
     "aliases": "別名"
   },
   "transactionsTab": {
-    "title": "最近交易",
+    "title": "交易",
     "empty": "該收款人尚無交易",
-    "viewAll": "檢視全部交易",
-    "date": "日期",
-    "account": "帳戶",
-    "category": "分類",
-    "amount": "金額",
-    "uncategorized": "未分類",
-    "loadFailed": "無法載入交易"
+    "loadFailed": "無法載入交易",
+    "titleWithCount": "交易 ({count})",
+    "openInRegister": "在交易列表中開啟"
   },
   "aliasesTab": {
     "description": "別名將匯入的交易名稱對應到該收款人。支援通用字元，例如 STARBUCKS*。"
@@ -116,5 +112,14 @@
     "confirmButton": "套用",
     "applied": "{count, plural, one {已分類 # 筆交易} other {已分類 # 筆交易}}",
     "failed": "無法套用預設分類"
+  },
+  "seasonality": {
+    "title": "季節性",
+    "tooltip": "該收款人一個典型月份的金額，按所有歷史年份取平均。",
+    "peak": "支出集中在{month}。",
+    "even": "支出全年分布均勻。",
+    "needsMoreHistory": "至少需要 {years} 年的歷史才能把季節性規律與偶然區分開。",
+    "empty": "尚無支出可按月分解",
+    "monthTooltip": "{month}：{years, plural, one {# 年} other {# 年}}平均 {amount}"
   }
 }

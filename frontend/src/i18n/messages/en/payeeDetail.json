@@ -97,15 +97,11 @@
     "aliases": "Aliases"
   },
   "transactionsTab": {
-    "title": "Recent Transactions",
+    "title": "Transactions",
     "empty": "No transactions for this payee yet",
-    "viewAll": "View all in the register",
-    "date": "Date",
-    "account": "Account",
-    "category": "Category",
-    "amount": "Amount",
-    "uncategorized": "Uncategorized",
-    "loadFailed": "Failed to load transactions"
+    "loadFailed": "Failed to load transactions",
+    "titleWithCount": "Transactions ({count})",
+    "openInRegister": "Open in the register"
   },
   "aliasesTab": {
     "description": "Aliases map imported transaction names onto this payee. Wildcards are allowed, e.g. STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Apply",
     "applied": "{count, plural, one {# transaction categorized} other {# transactions categorized}}",
     "failed": "Failed to apply the default category"
+  },
+  "seasonality": {
+    "title": "Seasonality",
+    "tooltip": "What a typical month with this payee costs, averaged over every year of history.",
+    "peak": "Spending concentrates in {month}.",
+    "even": "Spending is spread evenly across the year.",
+    "needsMoreHistory": "At least {years} years of history are needed before a seasonal pattern can be told from noise.",
+    "empty": "No spending to break down by month yet",
+    "monthTooltip": "{month}: {amount} on average across {years, plural, one {# year} other {# years}}"
   }
 }

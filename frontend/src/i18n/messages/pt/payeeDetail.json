@@ -97,15 +97,11 @@
     "aliases": "Alias"
   },
   "transactionsTab": {
-    "title": "Transações recentes",
+    "title": "Transações",
     "empty": "Este beneficiário ainda não tem transações",
-    "viewAll": "Ver todas as transações",
-    "date": "Data",
-    "account": "Conta",
-    "category": "Categoria",
-    "amount": "Valor",
-    "uncategorized": "Sem categoria",
-    "loadFailed": "Não foi possível carregar as transações"
+    "loadFailed": "Não foi possível carregar as transações",
+    "titleWithCount": "Transações ({count})",
+    "openInRegister": "Abrir no registo"
   },
   "aliasesTab": {
     "description": "Os alias associam os nomes das transações importadas a este beneficiário. São permitidos caracteres universais, por exemplo STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Aplicar",
     "applied": "{count, plural, one {# transação categorizada} other {# transações categorizadas}}",
     "failed": "Não foi possível aplicar a categoria predefinida"
+  },
+  "seasonality": {
+    "title": "Sazonalidade",
+    "tooltip": "Quanto custa um mês típico com este beneficiário, em média ao longo de todos os anos de histórico.",
+    "peak": "As despesas concentram-se em {month}.",
+    "even": "As despesas estão distribuídas uniformemente ao longo do ano.",
+    "needsMoreHistory": "São necessários pelo menos {years} anos de histórico para distinguir um padrão sazonal do acaso.",
+    "empty": "Ainda não há despesas para dividir por mês",
+    "monthTooltip": "{month}: {amount} em média em {years, plural, one {# ano} other {# anos}}"
   }
 }

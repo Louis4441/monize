@@ -97,15 +97,11 @@
     "aliases": "Takma Adlar"
   },
   "transactionsTab": {
-    "title": "Son İşlemler",
+    "title": "İşlemler",
     "empty": "Bu alacaklının henüz işlemi yok",
-    "viewAll": "Tüm işlemleri görüntüle",
-    "date": "Tarih",
-    "account": "Hesap",
-    "category": "Kategori",
-    "amount": "Tutar",
-    "uncategorized": "Kategorisiz",
-    "loadFailed": "İşlemler yüklenemedi"
+    "loadFailed": "İşlemler yüklenemedi",
+    "titleWithCount": "İşlemler ({count})",
+    "openInRegister": "Kayıt defterinde aç"
   },
   "aliasesTab": {
     "description": "Takma adlar, içe aktarılan işlem adlarını bu alacaklıyla eşleştirir. Joker karakterler kullanılabilir, örneğin STARBUCKS*."
@@ -116,5 +112,14 @@
     "confirmButton": "Uygula",
     "applied": "{count, plural, one {# işlem kategorize edildi} other {# işlem kategorize edildi}}",
     "failed": "Varsayılan kategori uygulanamadı"
+  },
+  "seasonality": {
+    "title": "Mevsimsellik",
+    "tooltip": "Bu alacaklıyla tipik bir ayın maliyeti, tüm geçmiş yılların ortalaması.",
+    "peak": "Harcama {month} ayında yoğunlaşıyor.",
+    "even": "Harcama yıl boyunca eşit dağılmış.",
+    "needsMoreHistory": "Mevsimsel bir deseni rastlantıdan ayırmak için en az {years} yıllık geçmiş gerekir.",
+    "empty": "Aylara ayırmak için henüz harcama yok",
+    "monthTooltip": "{month}: {years, plural, one {# yılda} other {# yılda}} ortalama {amount}"
   }
 }
