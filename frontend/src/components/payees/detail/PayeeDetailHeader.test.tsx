@@ -18,7 +18,10 @@ function payee(overrides: Partial<Payee> = {}): Payee {
   };
 }
 
-function renderHeader(overrides: Partial<Payee> = {}) {
+function renderHeader(
+  overrides: Partial<Payee> = {},
+  firstTransactionDate: string | null = null,
+) {
   const handlers = {
     onBack: vi.fn(),
     onViewTransactions: vi.fn(),
@@ -30,6 +33,7 @@ function renderHeader(overrides: Partial<Payee> = {}) {
   render(
     <PayeeDetailHeader
       payee={payee(overrides)}
+      firstTransactionDate={firstTransactionDate}
       isTogglePending={false}
       payees={[]}
       {...handlers}
@@ -61,6 +65,21 @@ describe('PayeeDetailHeader', () => {
     expect(screen.queryByText('Inactive')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Deactivate' }));
     expect(handlers.onToggleActive).toHaveBeenCalled();
+  });
+
+  it('shows the creation date as "since" when there are no transactions', () => {
+    renderHeader();
+    expect(screen.getByText(/Payee since/).textContent).toContain('2024');
+  });
+
+  it('uses the first transaction date as "since" when it predates the record', () => {
+    renderHeader({}, '2019-03-01');
+    expect(screen.getByText(/Payee since/).textContent).toContain('2019');
+  });
+
+  it('keeps the creation date as "since" when the first transaction came later', () => {
+    renderHeader({}, '2025-06-01');
+    expect(screen.getByText(/Payee since/).textContent).toContain('2024');
   });
 
   it('offers Reactivate, hides Merge and badges an inactive payee', () => {

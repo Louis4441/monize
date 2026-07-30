@@ -4,11 +4,18 @@ import { useTranslations } from 'next-intl';
 import { ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/Button';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { parseLocalDate } from '@/lib/utils';
 import type { Payee } from '@/types/payee';
 import { PayeeSwitcher } from './PayeeSwitcher';
 
 interface PayeeDetailHeaderProps {
   payee: Payee;
+  /**
+   * Transactions can predate the payee record (imports assign them to a payee
+   * created afterwards), so "Payee since" is the earlier of the first
+   * transaction and the record's creation.
+   */
+  firstTransactionDate: string | null;
   onBack: () => void;
   onViewTransactions: () => void;
   onEdit: () => void;
@@ -28,6 +35,7 @@ interface PayeeDetailHeaderProps {
  */
 export function PayeeDetailHeader({
   payee,
+  firstTransactionDate,
   onBack,
   onViewTransactions,
   onEdit,
@@ -39,6 +47,14 @@ export function PayeeDetailHeader({
 }: PayeeDetailHeaderProps) {
   const t = useTranslations('payeeDetail');
   const { formatDate } = useDateFormat();
+
+  // Compare calendar days (parseLocalDate drops the time), matching what
+  // formatDate renders.
+  const sinceDate =
+    firstTransactionDate &&
+    parseLocalDate(firstTransactionDate) < parseLocalDate(payee.createdAt)
+      ? firstTransactionDate
+      : payee.createdAt;
 
   return (
     <div className="mb-6">
@@ -97,7 +113,7 @@ export function PayeeDetailHeader({
       </div>
 
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        {t('header.since', { date: formatDate(payee.createdAt) })}
+        {t('header.since', { date: formatDate(sinceDate) })}
       </p>
     </div>
   );
