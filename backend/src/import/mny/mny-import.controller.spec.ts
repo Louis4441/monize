@@ -106,6 +106,20 @@ describe("MnyImportController", () => {
       expect(staging.stage).not.toHaveBeenCalled();
     });
 
+    it("rejects a buffer past the import limit before decrypting it", async () => {
+      // multer's own limit is interceptor configuration; this is the bound the
+      // handler asserts on the bytes it was actually handed.
+      const oversized = {
+        originalname: "huge.mny",
+        buffer: { length: MNY_IMPORT_LIMIT_BYTES + 1 } as unknown as Buffer,
+      } as Express.Multer.File;
+
+      await expect(
+        controller.parse(USER, oversized, {}),
+      ).rejects.toBeInstanceOf(PayloadTooLargeException);
+      expect(staging.stage).not.toHaveBeenCalled();
+    });
+
     it("rejects a request with no file", async () => {
       await expect(
         controller.parse(USER, undefined as never, {}),

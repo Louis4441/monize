@@ -445,6 +445,16 @@ transaction with a warning: dropping it would silently remove real money from an
 account the user did import, which is the exact class of discrepancy the
 verification report exists to surface.
 
+**The upload limit had to exist in code, not only in interceptor config.** The
+size ceiling was multer configuration (`limits.fileSize`), which no static
+analyser can see -- so CodeQL reported the RC4 page loop as iterating a
+user-controlled buffer of unbounded length. `parse()` now re-asserts
+`MNY_IMPORT_LIMIT_BYTES` against the buffer it was actually handed, sharing the
+one localized "too large" error with the interceptor. Bearer's three
+observable-timing findings on the wizard's `mnyPasswordRequired` /
+`mnyPasswordIncorrect` comparison are false positives (the compared value is an
+error code, not a password) and carry dated exceptions in `ci.yml`.
+
 Two further notes for later phases. Investment rows are identified by carrying a
 security, not by `act`: `act = 0` is BUY and cannot be told apart from a plain
 payment by action code, and every transaction in all five fixtures is an

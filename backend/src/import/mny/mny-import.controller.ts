@@ -32,7 +32,10 @@ import { MnyImportService } from "./mny-import.service";
 import { MnyParserService } from "./mny-parser.service";
 import { MnyStagingService } from "./mny-staging.service";
 import { MnyPreview, buildPreview } from "./mny-preview";
-import { MnyUploadErrorInterceptor } from "./mny-upload-error.interceptor";
+import {
+  MnyUploadErrorInterceptor,
+  mnyFileTooLargeException,
+} from "./mny-upload-error.interceptor";
 import {
   MnyImportJobDto,
   ParseMnyDto,
@@ -127,13 +130,23 @@ export class MnyImportController {
       );
     }
 
+    // multer already refuses an over-limit upload, but the bound is re-asserted
+    // on the buffer that actually arrived. It is the only place the size of the
+    // bytes entering the decryptor is checked in code rather than in interceptor
+    // configuration -- which is also what makes the page loop in `rc4InPlace`
+    // provably finite (CodeQL js/loop-bound-injection).
+    const bytes = file.buffer;
+    if (bytes.length > MNY_IMPORT_LIMIT_BYTES) {
+      throw mnyFileTooLargeException(MNY_IMPORT_LIMIT_MB);
+    }
+
     // Parse first, stage second: an unreadable file, or one whose password is
     // wrong, must not leave bytes behind. The buffer is decrypted in place, so
     // what gets staged is already plaintext and the password is spent here.
-    const parsed = this.parseOrTranslate(file.buffer, dto.password);
+    const parsed = this.parseOrTranslate(bytes, dto.password);
     const staged = await this.staging.stage(req.user.id, {
       filename: file.originalname,
-      data: file.buffer,
+      data: bytes,
     });
 
     return buildPreview({
