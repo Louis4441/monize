@@ -1,0 +1,129 @@
+{
+  "loading": "Chargement du bénéficiaire...",
+  "notFound": "Bénéficiaire introuvable",
+  "loadFailed": "Impossible de charger ce bénéficiaire",
+  "backToPayees": "Bénéficiaires",
+  "error": {
+    "retry": "Réessayer"
+  },
+  "header": {
+    "inactiveBadge": "Inactif",
+    "edit": "Modifier",
+    "merge": "Fusionner",
+    "deactivate": "Désactiver",
+    "reactivate": "Réactiver",
+    "viewTransactions": "Voir les transactions",
+    "switchPayee": "Passer à un autre bénéficiaire",
+    "switchPlaceholder": "Filtrer les bénéficiaires...",
+    "switchNoMatches": "Aucun bénéficiaire ne correspond",
+    "since": "Bénéficiaire depuis {date}"
+  },
+  "toasts": {
+    "deactivated": "{name} désactivé",
+    "deactivateFailed": "Impossible de désactiver le bénéficiaire",
+    "reactivated": "{name} réactivé",
+    "reactivateFailed": "Impossible de réactiver le bénéficiaire"
+  },
+  "deactivate": {
+    "confirmTitle": "Désactiver le bénéficiaire",
+    "confirmMessage": "Désactiver {name} ? Son historique est conservé, mais il n’apparaîtra plus dans les suggestions. Vous pouvez le réactiver à tout moment.",
+    "confirmButton": "Désactiver"
+  },
+  "summary": {
+    "spentThisYear": "Dépensé cette année",
+    "receivedThisYear": "Reçu cette année",
+    "vsLastYear": "{percent} par rapport à la même période l’an dernier",
+    "vsLastYearNew": "Rien sur cette période l’an dernier",
+    "averageTransaction": "Transaction moyenne",
+    "transactions": "Transactions",
+    "sinceYear": "Depuis {year}",
+    "lastTransaction": "Dernière transaction",
+    "recurring": "Récurrent",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "En hausse depuis {amount}",
+    "priceDown": "En baisse depuis {amount}",
+    "uncategorized": "Non catégorisé",
+    "uncategorizedApply": "Cliquez pour appliquer la catégorie par défaut",
+    "uncategorizedSetDefault": "Cliquez pour définir une catégorie par défaut",
+    "convertedNote": "Converti en {currency}"
+  },
+  "cadence": {
+    "weekly": "Hebdomadaire",
+    "biweekly": "Toutes les 2 semaines",
+    "monthly": "Mensuel",
+    "quarterly": "Trimestriel",
+    "yearly": "Annuel"
+  },
+  "topCategories": {
+    "title": "Principales catégories",
+    "subtitle": "12 derniers mois",
+    "empty": "Aucune dépense sur les 12 derniers mois",
+    "uncategorized": "Non catégorisé",
+    "subtitleAllTime": "Depuis le début",
+    "emptyAllTime": "Aucune dépense enregistrée pour ce bénéficiaire",
+    "range12m": "12 mois",
+    "rangeAll": "Tout"
+  },
+  "accountsPanel": {
+    "title": "Payé depuis les comptes",
+    "subtitle": "Depuis le début",
+    "empty": "Aucune transaction pour le moment"
+  },
+  "recurringPanel": {
+    "title": "Factures et récurrences",
+    "empty": "Aucun rythme récurrent détecté sur les 12 derniers mois",
+    "detectedTooltip": "Détecté à partir de débits répétés sur les 12 derniers mois.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "auparavant {amount}",
+    "usualDay": "Généralement vers le {day} du mois",
+    "nextBill": "Prochaine facture",
+    "viewBills": "Voir dans Factures & Dépôts"
+  },
+  "keyInfo": {
+    "title": "Informations clés",
+    "defaultCategory": "Catégorie par défaut",
+    "status": "Statut",
+    "active": "Actif",
+    "inactive": "Inactif",
+    "created": "Ajouté",
+    "firstTransaction": "Première transaction",
+    "lastTransaction": "Dernière transaction",
+    "aliases": "Alias",
+    "largestTransaction": "Transaction la plus élevée",
+    "largestValue": "{amount} le {date}",
+    "overpaymentFor": "Bénéficiaire de remboursement anticipé pour",
+    "notes": "Notes"
+  },
+  "tabs": {
+    "ariaLabel": "Sections du bénéficiaire",
+    "overview": "Aperçu",
+    "transactions": "Transactions",
+    "aliases": "Alias"
+  },
+  "transactionsTab": {
+    "title": "Transactions",
+    "empty": "Aucune transaction pour ce bénéficiaire",
+    "loadFailed": "Impossible de charger les transactions",
+    "titleWithCount": "Transactions ({count})",
+    "openInRegister": "Ouvrir dans le registre"
+  },
+  "aliasesTab": {
+    "description": "Les alias associent les noms de transactions importées à ce bénéficiaire. Les jokers sont acceptés, par exemple STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Appliquer la catégorie par défaut",
+    "confirmMessage": "Attribuer {category} à {count, plural, one {# transaction non catégorisée} other {# transactions non catégorisées}} de {name} ? Les transactions catégorisées manuellement restent inchangées.",
+    "confirmButton": "Appliquer",
+    "applied": "{count, plural, one {# transaction catégorisée} other {# transactions catégorisées}}",
+    "failed": "Impossible d’appliquer la catégorie par défaut"
+  },
+  "seasonality": {
+    "title": "Saisonnalité",
+    "tooltip": "Ce que coûte un mois typique avec ce bénéficiaire, en moyenne sur toutes les années d’historique.",
+    "peak": "Les dépenses se concentrent en {month}.",
+    "even": "Les dépenses sont réparties uniformément sur l’année.",
+    "needsMoreHistory": "Il faut au moins {years} ans d’historique pour distinguer une saisonnalité du hasard.",
+    "empty": "Aucune dépense à répartir par mois pour le moment",
+    "monthTooltip": "{month} : {amount} en moyenne sur {years, plural, one {# an} other {# ans}}"
+  }
+}

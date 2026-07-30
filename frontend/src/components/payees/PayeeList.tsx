@@ -324,9 +324,16 @@ export function PayeeList({
     router.push(`/transactions?payeeId=${payee.id}`);
   }, [router]);
 
+  // A row click opens the payee's detail page; editing stays one step away in
+  // the row actions and on the detail page itself -- the same primary-click
+  // decision the accounts and securities lists made.
+  const handleViewDetails = useCallback((payee: Payee) => {
+    router.push(`/payees/${payee.id}`);
+  }, [router]);
+
   const { getRowHandlers } = useLongPress<Payee>({
     onLongPress: (payee) => setActionSheet({ open: true, payee }),
-    onClick: onEdit,
+    onClick: handleViewDetails,
   });
 
   const handleConfirmDelete = async () => {

@@ -24,6 +24,7 @@
     "inactive": "Pasif",
     "noTransactions": "Bu dönemde işlem yok",
     "editAria": "Alacaklıyı düzenle",
+    "detailsAria": "Alacaklı ayrıntılarını görüntüle",
     "collapseAria": "Alacaklı bilgisini gizle",
     "show": "Alacaklı bilgisini göster"
   },
@@ -153,7 +154,7 @@
       "cycleTitle": "Durumu döndürmek için tıklayın"
     },
     "row": {
-      "editPayeeTitle": "Alacaklıyı düzenle: {name}",
+      "viewPayeeTitle": "{name} ayrıntılarını görüntüle",
       "ref": "Ref: {number}",
       "investmentLabel": "Yatırım",
       "linkedInvestmentTitle": "Yatırımlarda Görüntüle",

@@ -7,6 +7,13 @@ import { DateInput } from './DateInput';
 interface DateRangeSelectorProps {
   /** Ordered list of preset range keys to display as buttons. */
   ranges: readonly string[];
+  /**
+   * Localized label per range key. Without it the keys are labelled by
+   * `formatLabel`, whose output is English ("All Time") -- fine for the
+   * abbreviation presets the dashboard widgets use, but not for a caller whose
+   * labels are words. Supply this whenever a label has to be translated.
+   */
+  labels?: Readonly<Record<string, string>>;
   /** Currently selected range. */
   value: string;
   /** Called when a range button is clicked. */
@@ -37,6 +44,7 @@ const formatLabel = (range: string): string => {
 
 export function DateRangeSelector({
   ranges,
+  labels,
   value,
   onChange,
   showCustom = false,
@@ -70,7 +78,7 @@ export function DateRangeSelector({
                 : inactiveClasses
             )}
           >
-            {formatLabel(range)}
+            {labels?.[range] ?? formatLabel(range)}
           </button>
         ))}
         {showCustom && (

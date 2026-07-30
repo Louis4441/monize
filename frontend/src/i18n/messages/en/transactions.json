@@ -24,6 +24,7 @@
     "inactive": "Inactive",
     "noTransactions": "No transactions in this period",
     "editAria": "Edit payee",
+    "detailsAria": "View payee details",
     "collapseAria": "Hide payee info",
     "show": "Show payee info"
   },
@@ -154,7 +155,7 @@
       "cycleTitle": "Click to cycle status"
     },
     "row": {
-      "editPayeeTitle": "Edit payee: {name}",
+      "viewPayeeTitle": "View {name} details",
       "ref": "Ref: {number}",
       "investmentLabel": "Investment",
       "linkedInvestmentTitle": "View in Investments",

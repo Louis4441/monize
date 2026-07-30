@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { GroupedTotal } from '@/types/transaction';
 
@@ -18,6 +18,11 @@ interface TopGroupsPanelProps {
   onSelect?: (id: string | null) => void;
   /** Allow the unidentified (e.g. uncategorised) row to be selectable too. */
   selectableWhenUnidentified?: boolean;
+  /**
+   * Control rendered at the right of the heading row (e.g. a range toggle).
+   * Omitted, the heading keeps the full width exactly as before.
+   */
+  headerAction?: ReactNode;
 }
 
 /**
@@ -36,6 +41,7 @@ export function TopGroupsPanel({
   limit = 6,
   onSelect,
   selectableWhenUnidentified = false,
+  headerAction,
 }: TopGroupsPanelProps) {
   const { formatCurrency } = useNumberFormat();
 
@@ -50,9 +56,12 @@ export function TopGroupsPanel({
 
   return (
     <section>
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
-        {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>}
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
+          {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>}
+        </div>
+        {headerAction && <div className="shrink-0">{headerAction}</div>}
       </div>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4">
         {isLoading ? (

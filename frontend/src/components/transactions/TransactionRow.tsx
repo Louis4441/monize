@@ -271,7 +271,7 @@ export const TransactionRow = memo(function TransactionRow({
           <button
             onClick={(e) => { e.stopPropagation(); onPayeeClick(transaction.payeeId!); }}
             className={`text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block truncate sm:max-w-[280px] text-left ${isVoid ? 'line-through' : ''}`}
-            title={t('list.row.editPayeeTitle', { name: payeeLabel ?? '' })}
+            title={t('list.row.viewPayeeTitle', { name: payeeLabel ?? '' })}
           >
             {payeeLabel || '-'}
           </button>

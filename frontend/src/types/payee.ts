@@ -15,6 +15,49 @@ export interface Payee {
   uncategorizedCount?: number;
 }
 
+/**
+ * One account the payee has been transacted from, in the account's own
+ * currency. Mirrors the backend's PayeeAccountBreakdownRow.
+ */
+export interface PayeeAccountBreakdownRow {
+  accountId: string;
+  accountName: string;
+  accountType: string;
+  currencyCode: string;
+  transactionCount: number;
+  total: number;
+  lastTransactionDate: string | null;
+}
+
+/** The payee's single largest transaction by absolute amount. */
+export interface PayeeLargestTransaction {
+  id: string;
+  transactionDate: string;
+  amount: number;
+  currencyCode: string;
+  accountId: string;
+  accountName: string;
+  description: string | null;
+}
+
+/** Lifetime facts computed over real (non-void, non-split-child) transactions. */
+export interface PayeeDetailStats {
+  transactionCount: number;
+  firstTransactionDate: string | null;
+  lastTransactionDate: string | null;
+  uncategorizedCount: number;
+  aliasCount: number;
+}
+
+/** The detail-page aggregate from GET /payees/:id/detail. */
+export interface PayeeDetail {
+  payee: Payee;
+  stats: PayeeDetailStats;
+  accounts: PayeeAccountBreakdownRow[];
+  largestTransaction: PayeeLargestTransaction | null;
+  overpaymentForAccounts: { accountId: string; accountName: string }[];
+}
+
 export interface PayeeAlias {
   id: string;
   payeeId: string;

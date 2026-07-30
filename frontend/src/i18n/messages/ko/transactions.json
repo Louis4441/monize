@@ -24,6 +24,7 @@
     "inactive": "비활성",
     "noTransactions": "이 기간에 거래가 없습니다",
     "editAria": "수취인 편집",
+    "detailsAria": "수취인 상세 보기",
     "collapseAria": "수취인 정보 숨기기",
     "show": "수취인 정보 표시"
   },
@@ -153,7 +154,7 @@
       "cycleTitle": "클릭하여 상태 순환"
     },
     "row": {
-      "editPayeeTitle": "수취인 편집: {name}",
+      "viewPayeeTitle": "{name} 상세 보기",
       "ref": "참조: {number}",
       "investmentLabel": "투자",
       "linkedInvestmentTitle": "투자에서 보기",

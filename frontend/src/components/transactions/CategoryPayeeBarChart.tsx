@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { gainLossColor, sumMoney } from '@/lib/format';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
@@ -103,7 +103,15 @@ function MonthlyTotalTooltip({
   return null;
 }
 
-export function CategoryPayeeBarChart({
+/**
+ * Memoized: the bars carry an entry animation, and Recharts withholds a bar's
+ * `LabelList` until that animation finishes. So an unrelated re-render from a
+ * parent -- a sibling panel's filter changing, say -- makes every value label
+ * blank and fade back in, which reads as the chart reloading data it has not
+ * reloaded. Skipping the render when the props are unchanged is what stops
+ * that; callers should hand it a stable `onMonthClick`.
+ */
+export const CategoryPayeeBarChart = memo(function CategoryPayeeBarChart({
   data,
   isLoading,
   onMonthClick,
@@ -378,4 +386,4 @@ export function CategoryPayeeBarChart({
       )}
     </div>
   );
-}
+});

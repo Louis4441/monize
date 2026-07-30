@@ -53,9 +53,16 @@ export function getDateStringInTimezone(
  * When JavaScript's `new Date('2026-01-24')` is called, it interprets the string as
  * UTC midnight, which then gets shifted to the previous day in local timezones that
  * are behind UTC. This function parses the date parts directly to avoid that issue.
+ *
+ * An ISO timestamp (`2026-01-24T18:30:00.000Z`) is accepted too, and its calendar
+ * day is used. Entity `createdAt`/`updatedAt` columns are timestamps rather than
+ * dates, and splitting the whole string on "-" made `Number("24T18:30:00.000Z")`
+ * NaN, so the caller rendered "NaN-NaN-NaN" instead of a date -- silently, because
+ * an invalid Date formats rather than throwing.
  */
 export function parseLocalDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
+  const [datePart] = dateStr.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
   return new Date(year, month - 1, day);
 }
 

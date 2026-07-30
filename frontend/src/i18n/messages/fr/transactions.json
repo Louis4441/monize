@@ -24,6 +24,7 @@
     "inactive": "Inactif",
     "noTransactions": "Aucune transaction sur cette période",
     "editAria": "Modifier le bénéficiaire",
+    "detailsAria": "Voir les détails du bénéficiaire",
     "collapseAria": "Masquer les informations du bénéficiaire",
     "show": "Afficher les informations du bénéficiaire"
   },
@@ -153,7 +154,7 @@
       "cycleTitle": "Cliquer pour changer le statut"
     },
     "row": {
-      "editPayeeTitle": "Modifier le bénéficiaire : {name}",
+      "viewPayeeTitle": "Voir les détails de {name}",
       "ref": "Réf. : {number}",
       "investmentLabel": "Investissement",
       "linkedInvestmentTitle": "Voir dans Investissements",

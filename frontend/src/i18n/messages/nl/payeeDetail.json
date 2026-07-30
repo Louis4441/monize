@@ -1,0 +1,129 @@
+{
+  "loading": "Begunstigde wordt geladen...",
+  "notFound": "Begunstigde niet gevonden",
+  "loadFailed": "Deze begunstigde kon niet worden geladen",
+  "backToPayees": "Begunstigden",
+  "error": {
+    "retry": "Opnieuw proberen"
+  },
+  "header": {
+    "inactiveBadge": "Inactief",
+    "edit": "Bewerken",
+    "merge": "Samenvoegen",
+    "deactivate": "Deactiveren",
+    "reactivate": "Heractiveren",
+    "viewTransactions": "Transacties bekijken",
+    "switchPayee": "Naar een andere begunstigde gaan",
+    "switchPlaceholder": "Begunstigden filteren...",
+    "switchNoMatches": "Geen begunstigden gevonden",
+    "since": "Begunstigde sinds {date}"
+  },
+  "toasts": {
+    "deactivated": "{name} gedeactiveerd",
+    "deactivateFailed": "Deactiveren van begunstigde is mislukt",
+    "reactivated": "{name} geheractiveerd",
+    "reactivateFailed": "Heractiveren van begunstigde is mislukt"
+  },
+  "deactivate": {
+    "confirmTitle": "Begunstigde deactiveren",
+    "confirmMessage": "{name} deactiveren? De geschiedenis blijft bewaard, maar de begunstigde verschijnt niet meer in de suggesties. Je kunt hem altijd weer heractiveren.",
+    "confirmButton": "Deactiveren"
+  },
+  "summary": {
+    "spentThisYear": "Dit jaar uitgegeven",
+    "receivedThisYear": "Dit jaar ontvangen",
+    "vsLastYear": "{percent} ten opzichte van dezelfde periode vorig jaar",
+    "vsLastYearNew": "Vorig jaar niets in deze periode",
+    "averageTransaction": "Gemiddelde transactie",
+    "transactions": "Transacties",
+    "sinceYear": "Sinds {year}",
+    "lastTransaction": "Laatste transactie",
+    "recurring": "Terugkerend",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Gestegen vanaf {amount}",
+    "priceDown": "Gedaald vanaf {amount}",
+    "uncategorized": "Zonder categorie",
+    "uncategorizedApply": "Klik om de standaardcategorie toe te passen",
+    "uncategorizedSetDefault": "Klik om een standaardcategorie in te stellen",
+    "convertedNote": "Omgerekend naar {currency}"
+  },
+  "cadence": {
+    "weekly": "Wekelijks",
+    "biweekly": "Elke 2 weken",
+    "monthly": "Maandelijks",
+    "quarterly": "Elk kwartaal",
+    "yearly": "Jaarlijks"
+  },
+  "topCategories": {
+    "title": "Topcategorieën",
+    "subtitle": "Afgelopen 12 maanden",
+    "empty": "Geen uitgaven in de afgelopen 12 maanden",
+    "uncategorized": "Zonder categorie",
+    "subtitleAllTime": "Volledige historie",
+    "emptyAllTime": "Geen uitgaven vastgelegd voor deze begunstigde",
+    "range12m": "12 maanden",
+    "rangeAll": "Alles"
+  },
+  "accountsPanel": {
+    "title": "Betaald vanaf rekeningen",
+    "subtitle": "Volledige historie",
+    "empty": "Nog geen transacties"
+  },
+  "recurringPanel": {
+    "title": "Rekeningen & terugkerend",
+    "empty": "Geen terugkerend patroon gevonden in de afgelopen 12 maanden",
+    "detectedTooltip": "Gedetecteerd op basis van herhaalde afschrijvingen in de afgelopen 12 maanden.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "was {amount}",
+    "usualDay": "Meestal rond dag {day} van de maand",
+    "nextBill": "Volgende rekening",
+    "viewBills": "Bekijk in rekeningen & stortingen"
+  },
+  "keyInfo": {
+    "title": "Kerngegevens",
+    "defaultCategory": "Standaardcategorie",
+    "status": "Status",
+    "active": "Actief",
+    "inactive": "Inactief",
+    "created": "Toegevoegd",
+    "firstTransaction": "Eerste transactie",
+    "lastTransaction": "Laatste transactie",
+    "aliases": "Aliassen",
+    "largestTransaction": "Grootste transactie",
+    "largestValue": "{amount} op {date}",
+    "overpaymentFor": "Begunstigde voor extra aflossing van",
+    "notes": "Notities"
+  },
+  "tabs": {
+    "ariaLabel": "Onderdelen van de begunstigde",
+    "overview": "Overzicht",
+    "transactions": "Transacties",
+    "aliases": "Aliassen"
+  },
+  "transactionsTab": {
+    "title": "Transacties",
+    "empty": "Deze begunstigde heeft nog geen transacties",
+    "loadFailed": "Transacties konden niet worden geladen",
+    "titleWithCount": "Transacties ({count})",
+    "openInRegister": "Openen in het overzicht"
+  },
+  "aliasesTab": {
+    "description": "Aliassen koppelen geïmporteerde transactienamen aan deze begunstigde. Jokertekens zijn toegestaan, bijvoorbeeld STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Standaardcategorie toepassen",
+    "confirmMessage": "{category} toewijzen aan {count, plural, one {# transactie zonder categorie} other {# transacties zonder categorie}} van {name}? Handmatig gecategoriseerde transacties blijven ongewijzigd.",
+    "confirmButton": "Toepassen",
+    "applied": "{count, plural, one {# transactie gecategoriseerd} other {# transacties gecategoriseerd}}",
+    "failed": "Standaardcategorie kon niet worden toegepast"
+  },
+  "seasonality": {
+    "title": "Seizoenspatroon",
+    "tooltip": "Wat een typische maand bij deze begunstigde kost, gemiddeld over alle jaren historie.",
+    "peak": "De uitgaven concentreren zich in {month}.",
+    "even": "De uitgaven zijn gelijkmatig over het jaar verdeeld.",
+    "needsMoreHistory": "Er is minstens {years} jaar historie nodig om een seizoenspatroon van ruis te onderscheiden.",
+    "empty": "Nog geen uitgaven om per maand uit te splitsen",
+    "monthTooltip": "{month}: gemiddeld {amount} over {years, plural, one {# jaar} other {# jaar}}"
+  }
+}

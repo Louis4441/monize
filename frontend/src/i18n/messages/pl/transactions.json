@@ -24,6 +24,7 @@
     "inactive": "Nieaktywny",
     "noTransactions": "Brak transakcji w tym okresie",
     "editAria": "Edytuj odbiorcę",
+    "detailsAria": "Zobacz szczegóły odbiorcy",
     "collapseAria": "Ukryj informacje o odbiorcy",
     "show": "Pokaż informacje o odbiorcy"
   },
@@ -153,7 +154,7 @@
       "cycleTitle": "Kliknij, aby zmienić status"
     },
     "row": {
-      "editPayeeTitle": "Edytuj odbiorcę: {name}",
+      "viewPayeeTitle": "Zobacz szczegóły {name}",
       "ref": "Nr: {number}",
       "investmentLabel": "Inwestycja",
       "linkedInvestmentTitle": "Zobacz w Inwestycjach",

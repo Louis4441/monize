@@ -24,6 +24,7 @@
     "inactive": "Không hoạt động",
     "noTransactions": "Không có giao tác trong khoảng thời gian này",
     "editAria": "Chỉnh sửa người nhận",
+    "detailsAria": "Xem chi tiết người nhận",
     "collapseAria": "Ẩn thông tin người nhận",
     "show": "Hiển thị thông tin người nhận"
   },
@@ -153,7 +154,7 @@
       "cycleTitle": "Nhấn để chuyển đổi trạng thái"
     },
     "row": {
-      "editPayeeTitle": "Chỉnh sửa người nhận: {name}",
+      "viewPayeeTitle": "Xem chi tiết {name}",
       "ref": "Tham chiếu: {number}",
       "investmentLabel": "Đầu tư",
       "linkedInvestmentTitle": "Xem trong Đầu tư",

@@ -463,6 +463,13 @@ function TransactionsContent() {
     loadData();
   };
 
+  // A payee name in a row opens that payee's page. Editing the payee lives
+  // there (and on the payee info widget's pencil), so the row's primary click
+  // goes to the fuller view rather than straight into a form.
+  const handlePayeeView = (payeeId: string) => {
+    router.push(`/payees/${payeeId}`);
+  };
+
   const handlePayeeClick = async (payeeId: string) => {
     try {
       const payee = await payeesApi.getById(payeeId);
@@ -1242,7 +1249,7 @@ function TransactionsContent() {
               onScheduleRecurring={handleScheduleRecurring}
               onRefresh={loadAllData}
               onTransactionUpdate={handleTransactionUpdate}
-              onPayeeClick={handlePayeeClick}
+              onPayeeClick={handlePayeeView}
               onTransferClick={filters.handleTransferClick}
               onCategoryClick={filters.handleCategoryClick}
               onTagClick={filters.handleTagFilterClick}

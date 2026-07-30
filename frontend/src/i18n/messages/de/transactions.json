@@ -24,6 +24,7 @@
     "inactive": "Inaktiv",
     "noTransactions": "Keine Buchungen in diesem Zeitraum",
     "editAria": "Zahlungsempfänger bearbeiten",
+    "detailsAria": "Zahlungsempfänger-Details anzeigen",
     "collapseAria": "Zahlungsempfänger-Informationen ausblenden",
     "show": "Zahlungsempfänger-Informationen anzeigen"
   },
@@ -153,7 +154,7 @@
       "cycleTitle": "Klicken, um Status zu wechseln"
     },
     "row": {
-      "editPayeeTitle": "Zahlungsempfänger bearbeiten: {name}",
+      "viewPayeeTitle": "Details zu {name} anzeigen",
       "ref": "Ref: {number}",
       "investmentLabel": "Investition",
       "linkedInvestmentTitle": "In Investitionen anzeigen",

@@ -24,6 +24,7 @@
     "inactive": "Tidak Aktif",
     "noTransactions": "Tidak ada transaksi pada periode ini",
     "editAria": "Edit penerima",
+    "detailsAria": "Lihat detail penerima",
     "collapseAria": "Sembunyikan info penerima",
     "show": "Tampilkan info penerima"
   },
@@ -153,7 +154,7 @@
       "cycleTitle": "Klik untuk mengubah status"
     },
     "row": {
-      "editPayeeTitle": "Edit penerima: {name}",
+      "viewPayeeTitle": "Lihat detail {name}",
       "ref": "Ref: {number}",
       "investmentLabel": "Investasi",
       "linkedInvestmentTitle": "Lihat di Investasi",

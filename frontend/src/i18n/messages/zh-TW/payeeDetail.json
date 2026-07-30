@@ -1,0 +1,129 @@
+{
+  "loading": "正在載入收款人...",
+  "notFound": "找不到該收款人",
+  "loadFailed": "無法載入該收款人",
+  "backToPayees": "收款人",
+  "error": {
+    "retry": "重試"
+  },
+  "header": {
+    "inactiveBadge": "已停用",
+    "edit": "編輯",
+    "merge": "合併",
+    "deactivate": "停用",
+    "reactivate": "重新啟用",
+    "viewTransactions": "檢視交易",
+    "switchPayee": "切換到其他收款人",
+    "switchPlaceholder": "篩選收款人...",
+    "switchNoMatches": "沒有符合的收款人",
+    "since": "自 {date} 起的收款人"
+  },
+  "toasts": {
+    "deactivated": "已停用 {name}",
+    "deactivateFailed": "停用收款人失敗",
+    "reactivated": "已重新啟用 {name}",
+    "reactivateFailed": "重新啟用收款人失敗"
+  },
+  "deactivate": {
+    "confirmTitle": "停用收款人",
+    "confirmMessage": "要停用 {name} 嗎？其歷史記錄會保留，但不再出現在收款人建議中。你可以隨時重新啟用。",
+    "confirmButton": "停用"
+  },
+  "summary": {
+    "spentThisYear": "今年支出",
+    "receivedThisYear": "今年收入",
+    "vsLastYear": "較去年同期 {percent}",
+    "vsLastYearNew": "去年同期沒有記錄",
+    "averageTransaction": "平均交易金額",
+    "transactions": "交易",
+    "sinceYear": "自 {year} 年起",
+    "lastTransaction": "最近交易",
+    "recurring": "定期",
+    "recurringValue": "{cadence} · 約 {amount}",
+    "priceUp": "已從 {amount} 上漲",
+    "priceDown": "已從 {amount} 下降",
+    "uncategorized": "未分類",
+    "uncategorizedApply": "點擊以套用預設分類",
+    "uncategorizedSetDefault": "點擊以設定預設分類",
+    "convertedNote": "已換算為 {currency}"
+  },
+  "cadence": {
+    "weekly": "每週",
+    "biweekly": "每兩週",
+    "monthly": "每月",
+    "quarterly": "每季",
+    "yearly": "每年"
+  },
+  "topCategories": {
+    "title": "主要分類",
+    "subtitle": "最近12個月",
+    "empty": "最近12個月沒有支出",
+    "uncategorized": "未分類",
+    "subtitleAllTime": "全部歷史",
+    "emptyAllTime": "該收款人沒有支出記錄",
+    "range12m": "12個月",
+    "rangeAll": "全部"
+  },
+  "accountsPanel": {
+    "title": "付款帳戶",
+    "subtitle": "全部歷史",
+    "empty": "尚無交易"
+  },
+  "recurringPanel": {
+    "title": "帳單與定期支出",
+    "empty": "最近12個月未偵測到定期規律",
+    "detectedTooltip": "根據最近12個月內的重複扣款偵測得出。",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "先前為 {amount}",
+    "usualDay": "通常在每月 {day} 日前後",
+    "nextBill": "下一筆帳單",
+    "viewBills": "在帳單與存款中查看"
+  },
+  "keyInfo": {
+    "title": "關鍵資訊",
+    "defaultCategory": "預設分類",
+    "status": "狀態",
+    "active": "啟用中",
+    "inactive": "未啟用",
+    "created": "新增時間",
+    "firstTransaction": "首筆交易",
+    "lastTransaction": "最近交易",
+    "aliases": "別名",
+    "largestTransaction": "最大交易",
+    "largestValue": "{date} 的 {amount}",
+    "overpaymentFor": "作為以下帳戶的額外還款收款人",
+    "notes": "備註"
+  },
+  "tabs": {
+    "ariaLabel": "收款人各區塊",
+    "overview": "總覽",
+    "transactions": "交易",
+    "aliases": "別名"
+  },
+  "transactionsTab": {
+    "title": "交易",
+    "empty": "該收款人尚無交易",
+    "loadFailed": "無法載入交易",
+    "titleWithCount": "交易 ({count})",
+    "openInRegister": "在交易列表中開啟"
+  },
+  "aliasesTab": {
+    "description": "別名將匯入的交易名稱對應到該收款人。支援通用字元，例如 STARBUCKS*。"
+  },
+  "applyDefault": {
+    "confirmTitle": "套用預設分類",
+    "confirmMessage": "要為 {name} 的{count, plural, one {# 筆未分類交易} other {# 筆未分類交易}}指定「{category}」嗎？手動分類的交易不會變更。",
+    "confirmButton": "套用",
+    "applied": "{count, plural, one {已分類 # 筆交易} other {已分類 # 筆交易}}",
+    "failed": "無法套用預設分類"
+  },
+  "seasonality": {
+    "title": "季節性",
+    "tooltip": "該收款人一個典型月份的金額，按所有歷史年份取平均。",
+    "peak": "支出集中在{month}。",
+    "even": "支出全年分布均勻。",
+    "needsMoreHistory": "至少需要 {years} 年的歷史才能把季節性規律與偶然區分開。",
+    "empty": "尚無支出可按月分解",
+    "monthTooltip": "{month}：{years, plural, one {# 年} other {# 年}}平均 {amount}"
+  }
+}

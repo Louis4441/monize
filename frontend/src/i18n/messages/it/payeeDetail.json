@@ -1,0 +1,129 @@
+{
+  "loading": "Caricamento del beneficiario...",
+  "notFound": "Beneficiario non trovato",
+  "loadFailed": "Impossibile caricare questo beneficiario",
+  "backToPayees": "Beneficiari",
+  "error": {
+    "retry": "Riprova"
+  },
+  "header": {
+    "inactiveBadge": "Non attivo",
+    "edit": "Modifica",
+    "merge": "Unisci",
+    "deactivate": "Disattiva",
+    "reactivate": "Riattiva",
+    "viewTransactions": "Vedi transazioni",
+    "switchPayee": "Passa a un altro beneficiario",
+    "switchPlaceholder": "Filtra i beneficiari...",
+    "switchNoMatches": "Nessun beneficiario corrisponde",
+    "since": "Beneficiario dal {date}"
+  },
+  "toasts": {
+    "deactivated": "{name} disattivato",
+    "deactivateFailed": "Impossibile disattivare il beneficiario",
+    "reactivated": "{name} riattivato",
+    "reactivateFailed": "Impossibile riattivare il beneficiario"
+  },
+  "deactivate": {
+    "confirmTitle": "Disattiva beneficiario",
+    "confirmMessage": "Disattivare {name}? La cronologia viene conservata, ma il beneficiario non apparirà più tra i suggerimenti. Puoi riattivarlo in qualsiasi momento.",
+    "confirmButton": "Disattiva"
+  },
+  "summary": {
+    "spentThisYear": "Speso quest’anno",
+    "receivedThisYear": "Ricevuto quest’anno",
+    "vsLastYear": "{percent} rispetto allo stesso periodo dell’anno scorso",
+    "vsLastYearNew": "Nessun importo in questo periodo l’anno scorso",
+    "averageTransaction": "Transazione media",
+    "transactions": "Transazioni",
+    "sinceYear": "Dal {year}",
+    "lastTransaction": "Ultima transazione",
+    "recurring": "Ricorrente",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "In aumento da {amount}",
+    "priceDown": "In calo da {amount}",
+    "uncategorized": "Non categorizzata",
+    "uncategorizedApply": "Fai clic per applicare la categoria predefinita",
+    "uncategorizedSetDefault": "Fai clic per impostare una categoria predefinita",
+    "convertedNote": "Convertito in {currency}"
+  },
+  "cadence": {
+    "weekly": "Settimanale",
+    "biweekly": "Ogni 2 settimane",
+    "monthly": "Mensile",
+    "quarterly": "Trimestrale",
+    "yearly": "Annuale"
+  },
+  "topCategories": {
+    "title": "Categorie principali",
+    "subtitle": "Ultimi 12 mesi",
+    "empty": "Nessuna spesa negli ultimi 12 mesi",
+    "uncategorized": "Non categorizzata",
+    "subtitleAllTime": "Dall’inizio",
+    "emptyAllTime": "Nessuna spesa registrata per questo beneficiario",
+    "range12m": "12 mesi",
+    "rangeAll": "Tutto"
+  },
+  "accountsPanel": {
+    "title": "Pagato dai conti",
+    "subtitle": "Dall’inizio",
+    "empty": "Nessuna transazione per ora"
+  },
+  "recurringPanel": {
+    "title": "Fatture e ricorrenze",
+    "empty": "Nessuno schema ricorrente rilevato negli ultimi 12 mesi",
+    "detectedTooltip": "Rilevato da addebiti ripetuti negli ultimi 12 mesi.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "prima {amount}",
+    "usualDay": "Di solito intorno al giorno {day} del mese",
+    "nextBill": "Prossima fattura",
+    "viewBills": "Visualizza in Fatture e Versamenti"
+  },
+  "keyInfo": {
+    "title": "Informazioni principali",
+    "defaultCategory": "Categoria predefinita",
+    "status": "Stato",
+    "active": "Attivo",
+    "inactive": "Non attivo",
+    "created": "Aggiunto",
+    "firstTransaction": "Prima transazione",
+    "lastTransaction": "Ultima transazione",
+    "aliases": "Alias",
+    "largestTransaction": "Transazione più alta",
+    "largestValue": "{amount} il {date}",
+    "overpaymentFor": "Beneficiario dei versamenti extra per",
+    "notes": "Note"
+  },
+  "tabs": {
+    "ariaLabel": "Sezioni del beneficiario",
+    "overview": "Panoramica",
+    "transactions": "Transazioni",
+    "aliases": "Alias"
+  },
+  "transactionsTab": {
+    "title": "Transazioni",
+    "empty": "Questo beneficiario non ha ancora transazioni",
+    "loadFailed": "Impossibile caricare le transazioni",
+    "titleWithCount": "Transazioni ({count})",
+    "openInRegister": "Apri nel registro"
+  },
+  "aliasesTab": {
+    "description": "Gli alias associano i nomi delle transazioni importate a questo beneficiario. Sono ammessi i caratteri jolly, ad esempio STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Applica categoria predefinita",
+    "confirmMessage": "Assegnare {category} a {count, plural, one {# transazione non categorizzata} other {# transazioni non categorizzate}} di {name}? Le transazioni categorizzate manualmente restano invariate.",
+    "confirmButton": "Applica",
+    "applied": "{count, plural, one {# transazione categorizzata} other {# transazioni categorizzate}}",
+    "failed": "Impossibile applicare la categoria predefinita"
+  },
+  "seasonality": {
+    "title": "Stagionalità",
+    "tooltip": "Quanto costa un mese tipico con questo beneficiario, come media su tutti gli anni di cronologia.",
+    "peak": "La spesa si concentra a {month}.",
+    "even": "La spesa è distribuita uniformemente nell’anno.",
+    "needsMoreHistory": "Servono almeno {years} anni di cronologia per distinguere uno schema stagionale dal caso.",
+    "empty": "Nessuna spesa da suddividere per mese",
+    "monthTooltip": "{month}: {amount} in media su {years, plural, one {# anno} other {# anni}}"
+  }
+}

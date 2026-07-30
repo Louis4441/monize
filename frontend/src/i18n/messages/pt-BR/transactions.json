@@ -24,6 +24,7 @@
     "inactive": "Inativo",
     "noTransactions": "Sem transações neste período",
     "editAria": "Editar beneficiário",
+    "detailsAria": "Ver detalhes do beneficiário",
     "collapseAria": "Ocultar informações do beneficiário",
     "show": "Mostrar informações do beneficiário"
   },
@@ -153,7 +154,7 @@
       "cycleTitle": "Clique para alterar o status"
     },
     "row": {
-      "editPayeeTitle": "Editar beneficiário: {name}",
+      "viewPayeeTitle": "Ver detalhes de {name}",
       "ref": "Ref: {number}",
       "investmentLabel": "Investimento",
       "linkedInvestmentTitle": "Ver em Investimentos",

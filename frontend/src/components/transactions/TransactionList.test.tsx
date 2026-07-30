@@ -1920,7 +1920,7 @@ describe('TransactionList', () => {
         />
       );
 
-      const payeeButton = screen.getByTitle('Edit payee: Grocery Store');
+      const payeeButton = screen.getByTitle('View Grocery Store details');
       fireEvent.click(payeeButton);
 
       await waitFor(() => {

@@ -1,0 +1,129 @@
+{
+  "loading": "A carregar o beneficiário...",
+  "notFound": "Beneficiário não encontrado",
+  "loadFailed": "Não foi possível carregar este beneficiário",
+  "backToPayees": "Beneficiários",
+  "error": {
+    "retry": "Tentar novamente"
+  },
+  "header": {
+    "inactiveBadge": "Inativo",
+    "edit": "Editar",
+    "merge": "Unir",
+    "deactivate": "Desativar",
+    "reactivate": "Reativar",
+    "viewTransactions": "Ver transações",
+    "switchPayee": "Mudar para outro beneficiário",
+    "switchPlaceholder": "Filtrar beneficiários...",
+    "switchNoMatches": "Nenhum beneficiário corresponde",
+    "since": "Beneficiário desde {date}"
+  },
+  "toasts": {
+    "deactivated": "{name} desativado",
+    "deactivateFailed": "Não foi possível desativar o beneficiário",
+    "reactivated": "{name} reativado",
+    "reactivateFailed": "Não foi possível reativar o beneficiário"
+  },
+  "deactivate": {
+    "confirmTitle": "Desativar beneficiário",
+    "confirmMessage": "Desativar {name}? O histórico é mantido, mas o beneficiário deixa de aparecer nas sugestões. Pode reativá-lo em qualquer momento.",
+    "confirmButton": "Desativar"
+  },
+  "summary": {
+    "spentThisYear": "Gasto este ano",
+    "receivedThisYear": "Recebido este ano",
+    "vsLastYear": "{percent} face ao mesmo período do ano anterior",
+    "vsLastYearNew": "Nada neste período no ano anterior",
+    "averageTransaction": "Transação média",
+    "transactions": "Transações",
+    "sinceYear": "Desde {year}",
+    "lastTransaction": "Última transação",
+    "recurring": "Recorrente",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Subiu de {amount}",
+    "priceDown": "Desceu de {amount}",
+    "uncategorized": "Sem categoria",
+    "uncategorizedApply": "Clique para aplicar a categoria predefinida",
+    "uncategorizedSetDefault": "Clique para definir uma categoria predefinida",
+    "convertedNote": "Convertido para {currency}"
+  },
+  "cadence": {
+    "weekly": "Semanal",
+    "biweekly": "A cada 2 semanas",
+    "monthly": "Mensal",
+    "quarterly": "Trimestral",
+    "yearly": "Anual"
+  },
+  "topCategories": {
+    "title": "Categorias principais",
+    "subtitle": "Últimos 12 meses",
+    "empty": "Sem despesas nos últimos 12 meses",
+    "uncategorized": "Sem categoria",
+    "subtitleAllTime": "Todo o histórico",
+    "emptyAllTime": "Sem despesas registadas para este beneficiário",
+    "range12m": "12 meses",
+    "rangeAll": "Tudo"
+  },
+  "accountsPanel": {
+    "title": "Pago a partir de contas",
+    "subtitle": "Todo o histórico",
+    "empty": "Ainda sem transações"
+  },
+  "recurringPanel": {
+    "title": "Faturas e recorrências",
+    "empty": "Nenhum padrão recorrente detetado nos últimos 12 meses",
+    "detectedTooltip": "Detetado a partir de débitos repetidos nos últimos 12 meses.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "antes {amount}",
+    "usualDay": "Normalmente por volta do dia {day} do mês",
+    "nextBill": "Próxima fatura",
+    "viewBills": "Ver em Faturas e Depósitos"
+  },
+  "keyInfo": {
+    "title": "Informação essencial",
+    "defaultCategory": "Categoria predefinida",
+    "status": "Estado",
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "created": "Adicionado",
+    "firstTransaction": "Primeira transação",
+    "lastTransaction": "Última transação",
+    "aliases": "Alias",
+    "largestTransaction": "Maior transação",
+    "largestValue": "{amount} em {date}",
+    "overpaymentFor": "Beneficiário de amortização extra de",
+    "notes": "Notas"
+  },
+  "tabs": {
+    "ariaLabel": "Secções do beneficiário",
+    "overview": "Visão geral",
+    "transactions": "Transações",
+    "aliases": "Alias"
+  },
+  "transactionsTab": {
+    "title": "Transações",
+    "empty": "Este beneficiário ainda não tem transações",
+    "loadFailed": "Não foi possível carregar as transações",
+    "titleWithCount": "Transações ({count})",
+    "openInRegister": "Abrir no registo"
+  },
+  "aliasesTab": {
+    "description": "Os alias associam os nomes das transações importadas a este beneficiário. São permitidos caracteres universais, por exemplo STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Aplicar categoria predefinida",
+    "confirmMessage": "Atribuir {category} a {count, plural, one {# transação sem categoria} other {# transações sem categoria}} de {name}? As transações categorizadas manualmente ficam inalteradas.",
+    "confirmButton": "Aplicar",
+    "applied": "{count, plural, one {# transação categorizada} other {# transações categorizadas}}",
+    "failed": "Não foi possível aplicar a categoria predefinida"
+  },
+  "seasonality": {
+    "title": "Sazonalidade",
+    "tooltip": "Quanto custa um mês típico com este beneficiário, em média ao longo de todos os anos de histórico.",
+    "peak": "As despesas concentram-se em {month}.",
+    "even": "As despesas estão distribuídas uniformemente ao longo do ano.",
+    "needsMoreHistory": "São necessários pelo menos {years} anos de histórico para distinguir um padrão sazonal do acaso.",
+    "empty": "Ainda não há despesas para dividir por mês",
+    "monthTooltip": "{month}: {amount} em média em {years, plural, one {# ano} other {# anos}}"
+  }
+}

@@ -71,9 +71,11 @@ export function SpendingByPayeeWidget({ isLoading }: SpendingByPayeeWidgetProps)
 
   const totalExpenses = response?.totalSpending ?? 0;
 
+  // A payee in the widget opens its detail page; the date-ranged transaction
+  // drill-down lives on the detail page's own chart and links.
   const handlePayeeClick = (payeeId: string) => {
     if (payeeId) {
-      router.push(`/transactions?payeeId=${payeeId}&startDate=${start}&endDate=${end}`);
+      router.push(`/payees/${payeeId}`);
     }
   };
 

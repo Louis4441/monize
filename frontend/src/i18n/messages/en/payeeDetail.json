@@ -1,0 +1,129 @@
+{
+  "loading": "Loading payee details...",
+  "notFound": "Payee not found",
+  "loadFailed": "Failed to load payee details",
+  "backToPayees": "Back to Payees",
+  "error": {
+    "retry": "Retry"
+  },
+  "header": {
+    "inactiveBadge": "Inactive",
+    "edit": "Edit",
+    "merge": "Merge",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "viewTransactions": "View Transactions",
+    "switchPayee": "Switch payee",
+    "switchPlaceholder": "Filter payees...",
+    "switchNoMatches": "No payees match",
+    "since": "Payee since {date}"
+  },
+  "toasts": {
+    "deactivated": "{name} deactivated",
+    "deactivateFailed": "Failed to deactivate payee",
+    "reactivated": "{name} reactivated",
+    "reactivateFailed": "Failed to reactivate payee"
+  },
+  "deactivate": {
+    "confirmTitle": "Deactivate Payee",
+    "confirmMessage": "Deactivate {name}? It keeps its history but stops appearing in payee suggestions. You can reactivate it at any time.",
+    "confirmButton": "Deactivate"
+  },
+  "summary": {
+    "spentThisYear": "Spent This Year",
+    "receivedThisYear": "Received This Year",
+    "vsLastYear": "{percent} vs same period last year",
+    "vsLastYearNew": "Nothing in this period last year",
+    "averageTransaction": "Average Transaction",
+    "transactions": "Transactions",
+    "sinceYear": "Since {year}",
+    "lastTransaction": "Last Transaction",
+    "recurring": "Recurring",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Up from {amount}",
+    "priceDown": "Down from {amount}",
+    "uncategorized": "Uncategorized",
+    "uncategorizedApply": "Click to apply the default category",
+    "uncategorizedSetDefault": "Click to set a default category",
+    "convertedNote": "Converted to {currency}"
+  },
+  "cadence": {
+    "weekly": "Weekly",
+    "biweekly": "Every 2 Weeks",
+    "monthly": "Monthly",
+    "quarterly": "Quarterly",
+    "yearly": "Yearly"
+  },
+  "topCategories": {
+    "title": "Top Categories",
+    "subtitle": "Trailing 12 months",
+    "empty": "No spending in the last 12 months",
+    "uncategorized": "Uncategorized",
+    "subtitleAllTime": "All time",
+    "emptyAllTime": "No spending recorded for this payee",
+    "range12m": "12 months",
+    "rangeAll": "All time"
+  },
+  "accountsPanel": {
+    "title": "Paid From Accounts",
+    "subtitle": "All time",
+    "empty": "No transactions yet"
+  },
+  "recurringPanel": {
+    "title": "Bills & Recurring",
+    "empty": "No recurring pattern detected in the last 12 months",
+    "detectedTooltip": "Detected from repeated charges over the last 12 months.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "was {amount}",
+    "usualDay": "Usually around day {day} of the month",
+    "nextBill": "Next Bill",
+    "viewBills": "View in Bills & Deposits"
+  },
+  "keyInfo": {
+    "title": "Key Information",
+    "defaultCategory": "Default Category",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "created": "Added",
+    "firstTransaction": "First Transaction",
+    "lastTransaction": "Last Transaction",
+    "aliases": "Aliases",
+    "largestTransaction": "Largest Transaction",
+    "largestValue": "{amount} on {date}",
+    "overpaymentFor": "Overpayment Payee For",
+    "notes": "Notes"
+  },
+  "tabs": {
+    "ariaLabel": "Payee detail sections",
+    "overview": "Overview",
+    "transactions": "Transactions",
+    "aliases": "Aliases"
+  },
+  "transactionsTab": {
+    "title": "Transactions",
+    "empty": "No transactions for this payee yet",
+    "loadFailed": "Failed to load transactions",
+    "titleWithCount": "Transactions ({count})",
+    "openInRegister": "Open in the register"
+  },
+  "aliasesTab": {
+    "description": "Aliases map imported transaction names onto this payee. Wildcards are allowed, e.g. STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Apply Default Category",
+    "confirmMessage": "Assign {category} to {count, plural, one {# uncategorized transaction} other {# uncategorized transactions}} from {name}? Manually categorized transactions are left unchanged.",
+    "confirmButton": "Apply",
+    "applied": "{count, plural, one {# transaction categorized} other {# transactions categorized}}",
+    "failed": "Failed to apply the default category"
+  },
+  "seasonality": {
+    "title": "Seasonality",
+    "tooltip": "What a typical month with this payee costs, averaged over every year of history.",
+    "peak": "Spending concentrates in {month}.",
+    "even": "Spending is spread evenly across the year.",
+    "needsMoreHistory": "At least {years} years of history are needed before a seasonal pattern can be told from noise.",
+    "empty": "No spending to break down by month yet",
+    "monthTooltip": "{month}: {amount} on average across {years, plural, one {# year} other {# years}}"
+  }
+}

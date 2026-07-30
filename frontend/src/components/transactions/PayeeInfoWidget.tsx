@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { PencilSquareIcon, ChevronDoubleLeftIcon } from '@heroicons/react/24/outline';
+import {
+  PencilSquareIcon,
+  ChevronDoubleLeftIcon,
+  EyeIcon,
+} from '@heroicons/react/24/outline';
 import { Payee, PayeeAlias } from '@/types/payee';
 import { Category } from '@/types/category';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
@@ -159,10 +163,14 @@ export function PayeeInfoWidget({
   const transactionCount = summary?.transactionCount ?? 0;
   const averageAmount =
     totals && transactionCount > 0 ? (totals.income + totals.expenses) / transactionCount : null;
-  const defaultCategoryName =
-    payee.defaultCategory?.name ??
-    (payee.defaultCategoryId ? categoryLabelMap.get(payee.defaultCategoryId) : undefined) ??
-    null;
+  // The label map wins over the relation's own name: it carries the parent
+  // ("Utilities: Hydro"), and the relation only ever holds the leaf, which is
+  // ambiguous when several parents own a category of the same name.
+  const defaultCategoryName = payee.defaultCategoryId
+    ? (categoryLabelMap.get(payee.defaultCategoryId) ??
+      payee.defaultCategory?.name ??
+      null)
+    : null;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 sm:p-6 mb-6 lg:mb-0 lg:absolute lg:inset-x-0 lg:top-0 lg:bottom-6 lg:overflow-y-auto flex flex-col">
@@ -178,6 +186,15 @@ export function PayeeInfoWidget({
           )}
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => router.push(`/payees/${payee.id}`)}
+            aria-label={t('payeeWidget.detailsAria')}
+            title={t('payeeWidget.detailsAria')}
+            className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1"
+          >
+            <EyeIcon className="h-5 w-5" />
+          </button>
           <button
             type="button"
             onClick={onEdit}

@@ -1,0 +1,129 @@
+{
+  "loading": "भुगतानकर्ता लोड हो रहा है...",
+  "notFound": "भुगतानकर्ता नहीं मिला",
+  "loadFailed": "यह भुगतानकर्ता लोड नहीं हो सका",
+  "backToPayees": "भुगतानकर्ता",
+  "error": {
+    "retry": "फिर कोशिश करें"
+  },
+  "header": {
+    "inactiveBadge": "निष्क्रिय",
+    "edit": "संपादित करें",
+    "merge": "मर्ज करें",
+    "deactivate": "निष्क्रिय करें",
+    "reactivate": "पुनः सक्रिय करें",
+    "viewTransactions": "लेन-देन देखें",
+    "switchPayee": "किसी दूसरे भुगतानकर्ता पर जाएँ",
+    "switchPlaceholder": "भुगतानकर्ता छाँटें...",
+    "switchNoMatches": "कोई भुगतानकर्ता मेल नहीं खाता",
+    "since": "{date} से भुगतानकर्ता"
+  },
+  "toasts": {
+    "deactivated": "{name} निष्क्रिय किया गया",
+    "deactivateFailed": "भुगतानकर्ता निष्क्रिय नहीं हो सका",
+    "reactivated": "{name} पुनः सक्रिय किया गया",
+    "reactivateFailed": "भुगतानकर्ता पुनः सक्रिय नहीं हो सका"
+  },
+  "deactivate": {
+    "confirmTitle": "भुगतानकर्ता निष्क्रिय करें",
+    "confirmMessage": "{name} को निष्क्रिय करें? इसका इतिहास बना रहेगा, लेकिन यह भुगतानकर्ता सुझावों में नहीं दिखेगा। आप इसे कभी भी पुनः सक्रिय कर सकते हैं।",
+    "confirmButton": "निष्क्रिय करें"
+  },
+  "summary": {
+    "spentThisYear": "इस वर्ष खर्च",
+    "receivedThisYear": "इस वर्ष प्राप्त",
+    "vsLastYear": "पिछले वर्ष की समान अवधि से {percent}",
+    "vsLastYearNew": "पिछले वर्ष इस अवधि में कुछ नहीं",
+    "averageTransaction": "औसत लेन-देन",
+    "transactions": "लेन-देन",
+    "sinceYear": "{year} से",
+    "lastTransaction": "अंतिम लेन-देन",
+    "recurring": "आवर्ती",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "{amount} से बढ़ा",
+    "priceDown": "{amount} से घटा",
+    "uncategorized": "अवर्गीकृत",
+    "uncategorizedApply": "डिफ़ॉल्ट श्रेणी लागू करने के लिए क्लिक करें",
+    "uncategorizedSetDefault": "डिफ़ॉल्ट श्रेणी सेट करने के लिए क्लिक करें",
+    "convertedNote": "{currency} में परिवर्तित"
+  },
+  "cadence": {
+    "weekly": "साप्ताहिक",
+    "biweekly": "हर 2 सप्ताह",
+    "monthly": "मासिक",
+    "quarterly": "त्रैमासिक",
+    "yearly": "वार्षिक"
+  },
+  "topCategories": {
+    "title": "शीर्ष श्रेणियाँ",
+    "subtitle": "पिछले 12 महीने",
+    "empty": "पिछले 12 महीनों में कोई खर्च नहीं",
+    "uncategorized": "अवर्गीकृत",
+    "subtitleAllTime": "पूरा इतिहास",
+    "emptyAllTime": "इस भुगतानकर्ता के लिए कोई खर्च दर्ज नहीं",
+    "range12m": "12 महीने",
+    "rangeAll": "सभी"
+  },
+  "accountsPanel": {
+    "title": "इन खातों से भुगतान",
+    "subtitle": "पूरा इतिहास",
+    "empty": "अभी कोई लेन-देन नहीं"
+  },
+  "recurringPanel": {
+    "title": "बिल और आवर्ती भुगतान",
+    "empty": "पिछले 12 महीनों में कोई आवर्ती पैटर्न नहीं मिला",
+    "detectedTooltip": "पिछले 12 महीनों में बार-बार हुए शुल्कों से पता चला।",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "पहले {amount}",
+    "usualDay": "आमतौर पर महीने की {day} तारीख के आसपास",
+    "nextBill": "अगला बिल",
+    "viewBills": "बिल और जमा में देखें"
+  },
+  "keyInfo": {
+    "title": "मुख्य जानकारी",
+    "defaultCategory": "डिफ़ॉल्ट श्रेणी",
+    "status": "स्थिति",
+    "active": "सक्रिय",
+    "inactive": "निष्क्रिय",
+    "created": "जोड़ा गया",
+    "firstTransaction": "पहला लेन-देन",
+    "lastTransaction": "अंतिम लेन-देन",
+    "aliases": "उपनाम",
+    "largestTransaction": "सबसे बड़ा लेन-देन",
+    "largestValue": "{date} को {amount}",
+    "overpaymentFor": "इनके अतिरिक्त भुगतान का भुगतानकर्ता",
+    "notes": "नोट्स"
+  },
+  "tabs": {
+    "ariaLabel": "भुगतानकर्ता के अनुभाग",
+    "overview": "अवलोकन",
+    "transactions": "लेन-देन",
+    "aliases": "उपनाम"
+  },
+  "transactionsTab": {
+    "title": "लेन-देन",
+    "empty": "इस भुगतानकर्ता का अभी कोई लेन-देन नहीं है",
+    "loadFailed": "लेन-देन लोड नहीं हो सके",
+    "titleWithCount": "लेन-देन ({count})",
+    "openInRegister": "रजिस्टर में खोलें"
+  },
+  "aliasesTab": {
+    "description": "उपनाम आयातित लेन-देन के नामों को इस भुगतानकर्ता से जोड़ते हैं। वाइल्डकार्ड मान्य हैं, जैसे STARBUCKS*।"
+  },
+  "applyDefault": {
+    "confirmTitle": "डिफ़ॉल्ट श्रेणी लागू करें",
+    "confirmMessage": "{name} के {count, plural, one {# अवर्गीकृत लेन-देन} other {# अवर्गीकृत लेन-देन}} को {category} सौंपें? मैन्युअल रूप से वर्गीकृत लेन-देन अपरिवर्तित रहेंगे।",
+    "confirmButton": "लागू करें",
+    "applied": "{count, plural, one {# लेनदेन वर्गीकृत हुआ} other {# लेनदेन वर्गीकृत हुए}}",
+    "failed": "डिफ़ॉल्ट श्रेणी लागू नहीं हो सकी"
+  },
+  "seasonality": {
+    "title": "मौसमी रुझान",
+    "tooltip": "इस भुगतानकर्ता के साथ एक सामान्य महीने का खर्च, पूरे इतिहास के वर्षों का औसत।",
+    "peak": "खर्च {month} में केंद्रित है।",
+    "even": "खर्च पूरे वर्ष समान रूप से फैला है।",
+    "needsMoreHistory": "मौसमी रुझान को संयोग से अलग करने के लिए कम से कम {years} वर्ष का इतिहास चाहिए।",
+    "empty": "महीने के अनुसार बाँटने के लिए अभी कोई खर्च नहीं",
+    "monthTooltip": "{month}: {years, plural, one {# वर्ष} other {# वर्षों}} में औसतन {amount}"
+  }
+}

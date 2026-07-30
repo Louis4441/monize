@@ -147,13 +147,15 @@ describe('BankingDetailView', () => {
     expect(mockPush).toHaveBeenCalledWith(
       expect.stringMatching(/^\/transactions\?accountId=chq-1&categoryId=c1&startDate=.+&endDate=.+$/),
     );
+  });
 
+  it('links a top payee to its detail page', async () => {
+    await renderView();
+    await waitFor(() => expect(screen.getByText('Corner Store')).toBeInTheDocument());
     await act(async () => {
       fireEvent.click(screen.getByText('Corner Store'));
     });
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/transactions\?accountId=chq-1&payeeId=p1&startDate=.+&endDate=.+$/),
-    );
+    expect(mockPush).toHaveBeenCalledWith('/payees/p1');
   });
 
   it('links Money In and Money Out to amount-filtered transactions', async () => {

@@ -114,6 +114,8 @@ export function createTransaction(
     accountId: string;
     amount?: number;
     payeeName?: string;
+    /** Link the row to a stored payee, as the payee detail page requires. */
+    payeeId?: string;
     transactionDate?: string;
     currencyCode?: string;
     categoryId?: string;
@@ -126,6 +128,7 @@ export function createTransaction(
     payeeName: data.payeeName ?? `E2E Txn ${uniqueId()}`,
     transactionDate: data.transactionDate ?? new Date().toISOString().slice(0, 10),
     currencyCode: data.currencyCode ?? 'USD',
+    ...(data.payeeId !== undefined ? { payeeId: data.payeeId } : {}),
     ...(data.categoryId !== undefined ? { categoryId: data.categoryId } : {}),
     ...(data.status !== undefined ? { status: data.status } : {}),
   });

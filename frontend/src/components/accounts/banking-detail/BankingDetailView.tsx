@@ -12,7 +12,7 @@ import { BalanceHistoryChart } from '@/components/transactions/BalanceHistoryCha
 import { RecurringChargesPanel } from '@/components/accounts/shared/RecurringChargesPanel';
 import { BankingSummaryCards } from './BankingSummaryCards';
 import { CashFlowMiniReport } from './CashFlowMiniReport';
-import { TopGroupsPanel } from './TopGroupsPanel';
+import { TopGroupsPanel } from '../shared/TopGroupsPanel';
 import type { Account } from '@/types/account';
 import type { GroupedTotal, MonthlyTotal } from '@/types/transaction';
 
@@ -240,12 +240,9 @@ export function BankingDetailView({ account }: BankingDetailViewProps) {
           totals={topPayees}
           currencyCode={currency}
           isLoading={isLoading}
-          onSelect={(payeeId) =>
-            payeeId &&
-            router.push(
-              `/transactions?accountId=${account.id}&payeeId=${payeeId}&${monthRangeQuery}`,
-            )
-          }
+          // A payee row opens the payee's own page; the account+month-scoped
+          // register is one click further, from that page's breakdowns.
+          onSelect={(payeeId) => payeeId && router.push(`/payees/${payeeId}`)}
         />
       </div>
 

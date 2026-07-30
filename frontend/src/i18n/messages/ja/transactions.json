@@ -24,6 +24,7 @@
     "inactive": "無効",
     "noTransactions": "この期間の取引はありません",
     "editAria": "支払先を編集",
+    "detailsAria": "支払先の詳細を表示",
     "collapseAria": "支払先情報を非表示",
     "show": "支払先情報を表示"
   },
@@ -153,7 +154,7 @@
       "cycleTitle": "クリックして状態を切り替え"
     },
     "row": {
-      "editPayeeTitle": "支払先を編集: {name}",
+      "viewPayeeTitle": "{name} の詳細を表示",
       "ref": "参照: {number}",
       "investmentLabel": "投資",
       "linkedInvestmentTitle": "投資で表示",

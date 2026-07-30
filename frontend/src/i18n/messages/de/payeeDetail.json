@@ -1,0 +1,129 @@
+{
+  "loading": "Zahlungsempfänger wird geladen...",
+  "notFound": "Zahlungsempfänger nicht gefunden",
+  "loadFailed": "Dieser Zahlungsempfänger konnte nicht geladen werden",
+  "backToPayees": "Zahlungsempfänger",
+  "error": {
+    "retry": "Erneut versuchen"
+  },
+  "header": {
+    "inactiveBadge": "Inaktiv",
+    "edit": "Bearbeiten",
+    "merge": "Zusammenführen",
+    "deactivate": "Deaktivieren",
+    "reactivate": "Reaktivieren",
+    "viewTransactions": "Buchungen anzeigen",
+    "switchPayee": "Zu einem anderen Zahlungsempfänger wechseln",
+    "switchPlaceholder": "Zahlungsempfänger filtern...",
+    "switchNoMatches": "Keine Zahlungsempfänger gefunden",
+    "since": "Zahlungsempfänger seit {date}"
+  },
+  "toasts": {
+    "deactivated": "{name} deaktiviert",
+    "deactivateFailed": "Zahlungsempfänger konnte nicht deaktiviert werden",
+    "reactivated": "{name} reaktiviert",
+    "reactivateFailed": "Zahlungsempfänger konnte nicht reaktiviert werden"
+  },
+  "deactivate": {
+    "confirmTitle": "Zahlungsempfänger deaktivieren",
+    "confirmMessage": "{name} deaktivieren? Der Verlauf bleibt erhalten, der Zahlungsempfänger erscheint aber nicht mehr in den Vorschlägen. Sie können ihn jederzeit reaktivieren.",
+    "confirmButton": "Deaktivieren"
+  },
+  "summary": {
+    "spentThisYear": "Ausgaben dieses Jahr",
+    "receivedThisYear": "Einnahmen dieses Jahr",
+    "vsLastYear": "{percent} gegenüber dem Vorjahreszeitraum",
+    "vsLastYearNew": "Im Vorjahreszeitraum nichts vorhanden",
+    "averageTransaction": "Durchschnittliche Buchung",
+    "transactions": "Buchungen",
+    "sinceYear": "Seit {year}",
+    "lastTransaction": "Letzte Buchung",
+    "recurring": "Wiederkehrend",
+    "recurringValue": "{cadence} · ~{amount}",
+    "priceUp": "Gestiegen von {amount}",
+    "priceDown": "Gesunken von {amount}",
+    "uncategorized": "Nicht kategorisiert",
+    "uncategorizedApply": "Klicken, um die Standardkategorie anzuwenden",
+    "uncategorizedSetDefault": "Klicken, um eine Standardkategorie festzulegen",
+    "convertedNote": "Umgerechnet in {currency}"
+  },
+  "cadence": {
+    "weekly": "Wöchentlich",
+    "biweekly": "Alle 2 Wochen",
+    "monthly": "Monatlich",
+    "quarterly": "Vierteljährlich",
+    "yearly": "Jährlich"
+  },
+  "topCategories": {
+    "title": "Top-Kategorien",
+    "subtitle": "Letzte 12 Monate",
+    "empty": "Keine Ausgaben in den letzten 12 Monaten",
+    "uncategorized": "Nicht kategorisiert",
+    "subtitleAllTime": "Gesamter Zeitraum",
+    "emptyAllTime": "Für diesen Zahlungsempfänger sind keine Ausgaben erfasst",
+    "range12m": "12 Monate",
+    "rangeAll": "Gesamt"
+  },
+  "accountsPanel": {
+    "title": "Bezahlt von Konten",
+    "subtitle": "Gesamter Zeitraum",
+    "empty": "Noch keine Buchungen"
+  },
+  "recurringPanel": {
+    "title": "Rechnungen & Wiederkehrendes",
+    "empty": "In den letzten 12 Monaten kein wiederkehrendes Muster erkannt",
+    "detectedTooltip": "Erkannt anhand wiederholter Abbuchungen in den letzten 12 Monaten.",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "vorher {amount}",
+    "usualDay": "Meist um den {day}. des Monats",
+    "nextBill": "Nächste Rechnung",
+    "viewBills": "In Rechnungen & Einzahlungen anzeigen"
+  },
+  "keyInfo": {
+    "title": "Kerndaten",
+    "defaultCategory": "Standardkategorie",
+    "status": "Status",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "created": "Hinzugefügt",
+    "firstTransaction": "Erste Buchung",
+    "lastTransaction": "Letzte Buchung",
+    "aliases": "Aliasse",
+    "largestTransaction": "Größte Buchung",
+    "largestValue": "{amount} am {date}",
+    "overpaymentFor": "Sondertilgungs-Empfänger für",
+    "notes": "Notizen"
+  },
+  "tabs": {
+    "ariaLabel": "Zahlungsempfänger-Abschnitte",
+    "overview": "Überblick",
+    "transactions": "Buchungen",
+    "aliases": "Aliasse"
+  },
+  "transactionsTab": {
+    "title": "Buchungen",
+    "empty": "Für diesen Zahlungsempfänger gibt es noch keine Buchungen",
+    "loadFailed": "Buchungen konnten nicht geladen werden",
+    "titleWithCount": "Buchungen ({count})",
+    "openInRegister": "Im Kontobuch öffnen"
+  },
+  "aliasesTab": {
+    "description": "Aliasse ordnen importierte Buchungsnamen diesem Zahlungsempfänger zu. Platzhalter sind erlaubt, z. B. STARBUCKS*."
+  },
+  "applyDefault": {
+    "confirmTitle": "Standardkategorie anwenden",
+    "confirmMessage": "{category} auf {count, plural, one {# nicht kategorisierte Buchung} other {# nicht kategorisierte Buchungen}} von {name} anwenden? Manuell kategorisierte Buchungen bleiben unverändert.",
+    "confirmButton": "Anwenden",
+    "applied": "{count, plural, one {# Buchung kategorisiert} other {# Buchungen kategorisiert}}",
+    "failed": "Standardkategorie konnte nicht angewendet werden"
+  },
+  "seasonality": {
+    "title": "Saisonalität",
+    "tooltip": "Was ein typischer Monat bei diesem Zahlungsempfänger kostet, gemittelt über alle Jahre der Historie.",
+    "peak": "Die Ausgaben konzentrieren sich im {month}.",
+    "even": "Die Ausgaben sind gleichmäßig über das Jahr verteilt.",
+    "needsMoreHistory": "Es sind mindestens {years} Jahre Historie nötig, um ein saisonales Muster von Zufall zu unterscheiden.",
+    "empty": "Noch keine Ausgaben für eine Monatsaufteilung",
+    "monthTooltip": "{month}: durchschnittlich {amount} über {years, plural, one {# Jahr} other {# Jahre}}"
+  }
+}

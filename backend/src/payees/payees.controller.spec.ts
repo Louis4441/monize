@@ -1,11 +1,13 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { PayeesController } from "./payees.controller";
 import { PayeesService } from "./payees.service";
+import { PayeeDetailService } from "./payee-detail.service";
 import { PayeeAutoMergeService } from "./payee-auto-merge.service";
 
 describe("PayeesController", () => {
   let controller: PayeesController;
   let mockPayeesService: Record<string, jest.Mock>;
+  let mockPayeeDetailService: Record<string, jest.Mock>;
   let mockAutoMergeService: Record<string, jest.Mock>;
   const mockReq = { user: { id: "user-1" } };
 
@@ -13,6 +15,9 @@ describe("PayeesController", () => {
     mockAutoMergeService = {
       previewAutoMerge: jest.fn(),
       applyAutoMerge: jest.fn(),
+    };
+    mockPayeeDetailService = {
+      getDetail: jest.fn(),
     };
     mockPayeesService = {
       create: jest.fn(),
@@ -44,6 +49,10 @@ describe("PayeesController", () => {
         {
           provide: PayeesService,
           useValue: mockPayeesService,
+        },
+        {
+          provide: PayeeDetailService,
+          useValue: mockPayeeDetailService,
         },
         {
           provide: PayeeAutoMergeService,
@@ -211,6 +220,21 @@ describe("PayeesController", () => {
       expect(mockPayeesService.applyCategorySuggestions).toHaveBeenCalledWith(
         "user-1",
         assignments,
+      );
+    });
+  });
+
+  describe("getDetail()", () => {
+    it("delegates to payeeDetailService.getDetail with userId and id", async () => {
+      const expected = { payee: { id: "payee-1" }, stats: {} };
+      mockPayeeDetailService.getDetail.mockResolvedValue(expected);
+
+      const result = await controller.getDetail(mockReq, "payee-1");
+
+      expect(result).toEqual(expected);
+      expect(mockPayeeDetailService.getDetail).toHaveBeenCalledWith(
+        "user-1",
+        "payee-1",
       );
     });
   });

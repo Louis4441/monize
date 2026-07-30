@@ -412,4 +412,15 @@ describe('CategoryPayeeBarChart', () => {
       expect(capturedProps.barChart.data).toHaveLength(4);
     });
   });
+
+  // Recharts withholds a bar's LabelList until the entry animation finishes, so
+  // an unrelated re-render from a parent blanks every value label and fades it
+  // back -- it reads as the chart reloading data it never reloaded. Memo is what
+  // stops a parent's unrelated state change from reaching the chart at all.
+  describe('memoization', () => {
+    it('is a memo component, so equal props skip the render', () => {
+      const asMemo = CategoryPayeeBarChart as unknown as { $$typeof?: symbol };
+      expect(asMemo.$$typeof).toBe(Symbol.for('react.memo'));
+    });
+  });
 });

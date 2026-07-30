@@ -1,0 +1,129 @@
+{
+  "loading": "正在加载收款人...",
+  "notFound": "未找到该收款人",
+  "loadFailed": "无法加载该收款人",
+  "backToPayees": "收款人",
+  "error": {
+    "retry": "重试"
+  },
+  "header": {
+    "inactiveBadge": "已停用",
+    "edit": "编辑",
+    "merge": "合并",
+    "deactivate": "停用",
+    "reactivate": "重新激活",
+    "viewTransactions": "查看交易",
+    "switchPayee": "切换到其他收款人",
+    "switchPlaceholder": "筛选收款人...",
+    "switchNoMatches": "没有匹配的收款人",
+    "since": "自 {date} 起的收款人"
+  },
+  "toasts": {
+    "deactivated": "已停用 {name}",
+    "deactivateFailed": "停用收款人失败",
+    "reactivated": "已重新激活 {name}",
+    "reactivateFailed": "重新激活收款人失败"
+  },
+  "deactivate": {
+    "confirmTitle": "停用收款人",
+    "confirmMessage": "要停用 {name} 吗？其历史记录会保留，但不再出现在收款人建议中。你可以随时重新激活。",
+    "confirmButton": "停用"
+  },
+  "summary": {
+    "spentThisYear": "今年支出",
+    "receivedThisYear": "今年收入",
+    "vsLastYear": "较去年同期 {percent}",
+    "vsLastYearNew": "去年同期没有记录",
+    "averageTransaction": "平均交易金额",
+    "transactions": "交易",
+    "sinceYear": "自 {year} 年起",
+    "lastTransaction": "最近交易",
+    "recurring": "定期",
+    "recurringValue": "{cadence} · 约 {amount}",
+    "priceUp": "已从 {amount} 上涨",
+    "priceDown": "已从 {amount} 下降",
+    "uncategorized": "未分类",
+    "uncategorizedApply": "点击以应用默认分类",
+    "uncategorizedSetDefault": "点击以设置默认分类",
+    "convertedNote": "已换算为 {currency}"
+  },
+  "cadence": {
+    "weekly": "每周",
+    "biweekly": "每两周",
+    "monthly": "每月",
+    "quarterly": "每季",
+    "yearly": "每年"
+  },
+  "topCategories": {
+    "title": "主要分类",
+    "subtitle": "最近12个月",
+    "empty": "最近12个月没有支出",
+    "uncategorized": "未分类",
+    "subtitleAllTime": "全部历史",
+    "emptyAllTime": "该收款人没有支出记录",
+    "range12m": "12个月",
+    "rangeAll": "全部"
+  },
+  "accountsPanel": {
+    "title": "付款账户",
+    "subtitle": "全部历史",
+    "empty": "暂无交易"
+  },
+  "recurringPanel": {
+    "title": "账单与定期支出",
+    "empty": "最近12个月未检测到定期规律",
+    "detectedTooltip": "根据最近12个月内的重复扣款检测得出。",
+    "frequencyValue": "{cadence} · {amount}",
+    "wasAmount": "此前为 {amount}",
+    "usualDay": "通常在每月 {day} 日前后",
+    "nextBill": "下一笔账单",
+    "viewBills": "在账单与存款中查看"
+  },
+  "keyInfo": {
+    "title": "关键信息",
+    "defaultCategory": "默认分类",
+    "status": "状态",
+    "active": "活跃",
+    "inactive": "非活跃",
+    "created": "添加时间",
+    "firstTransaction": "首笔交易",
+    "lastTransaction": "最近交易",
+    "aliases": "别名",
+    "largestTransaction": "最大交易",
+    "largestValue": "{date} 的 {amount}",
+    "overpaymentFor": "作为以下账户的额外还款收款人",
+    "notes": "备注"
+  },
+  "tabs": {
+    "ariaLabel": "收款人各部分",
+    "overview": "概览",
+    "transactions": "交易",
+    "aliases": "别名"
+  },
+  "transactionsTab": {
+    "title": "交易",
+    "empty": "该收款人暂无交易",
+    "loadFailed": "无法加载交易",
+    "titleWithCount": "交易 ({count})",
+    "openInRegister": "在交易列表中打开"
+  },
+  "aliasesTab": {
+    "description": "别名将导入的交易名称对应到该收款人。支持通配符，例如 STARBUCKS*。"
+  },
+  "applyDefault": {
+    "confirmTitle": "应用默认分类",
+    "confirmMessage": "要为 {name} 的{count, plural, one {# 笔未分类交易} other {# 笔未分类交易}}指定“{category}”吗？手动分类的交易不会更改。",
+    "confirmButton": "应用",
+    "applied": "{count, plural, one {已分类 # 笔交易} other {已分类 # 笔交易}}",
+    "failed": "无法应用默认分类"
+  },
+  "seasonality": {
+    "title": "季节性",
+    "tooltip": "该收款人一个典型月份的金额，按所有历史年份取平均。",
+    "peak": "支出集中在{month}。",
+    "even": "支出全年分布均匀。",
+    "needsMoreHistory": "至少需要 {years} 年的历史才能把季节性规律与偶然区分开。",
+    "empty": "暂无支出可按月分解",
+    "monthTooltip": "{month}：{years, plural, one {# 年} other {# 年}}平均 {amount}"
+  }
+}
