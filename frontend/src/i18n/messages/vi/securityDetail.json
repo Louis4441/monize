@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "Giá ngày {date}",
+    "priceAtTime": "Giá lúc {datetime} {zone}",
+    "marketOpen": "Thị trường mở cửa",
+    "marketClosed": "Thị trường đóng cửa",
+    "marketHours": "Giao dịch từ {open} đến {close}, {zone}. Không tính ngày lễ.",
     "noPrice": "Chưa ghi nhận giá nào",
     "changeToday": "{change} ({percent}) hôm nay",
     "changeLast": "{change} ({percent}) lần biến động gần nhất",
@@ -33,10 +37,7 @@
     "openAccount": "Xem {name} trên trang Đầu tư",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Chưa có giá",
-    "approx": "~ {amount}",
-    "asOf": "Tại giá đóng cửa ngày {date}",
-    "asOfStale": "Tại giá đóng cửa ngày {date}, giá mới nhất được ghi nhận",
-    "asOfStaleTitle": "Không có giá nào mới hơn được lưu, nên đây là giá trị của vị thế vào ngày đó chứ không phải hôm nay. Hãy cập nhật giá từ nhà cung cấp, hoặc thêm một giá bằng tay."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "Giá {symbol}",

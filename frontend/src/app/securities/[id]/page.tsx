@@ -234,6 +234,10 @@ function SecurityDetailContent() {
     return {
       price: latest.close,
       priceDate: latest.date,
+      // When the provider told us the moment, the header shows it. Rows
+      // predating the column, manual entries and transaction-derived prices
+      // have none, and fall back to the date alone.
+      quotedAt: latest.quotedAt ?? null,
       change,
       changePercent:
         previous && previous.close !== 0 && change !== null
@@ -349,14 +353,6 @@ function SecurityDetailContent() {
             <div {...tourAnchor(TOUR_ANCHORS.securityDetailSummary)}>
               <SecuritySummaryCards
                 detail={detail}
-                // The same newest close the backend valued the position at:
-                // both take the latest `security_prices` row, so dating the
-                // card from the series cannot disagree with the figure on it.
-                quoteAsOf={
-                  quote
-                    ? { priceDate: quote.priceDate, isCurrent: quote.isCurrent }
-                    : null
-                }
                 // The Investments page already accepts `?accountId=`; the
                 // Accounts list links to it the same way.
                 onSelectAccount={(accountId) =>

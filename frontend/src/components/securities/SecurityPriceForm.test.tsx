@@ -42,6 +42,7 @@ describe('SecurityPriceForm', () => {
       adjustedClose: null,
       volume: 50000000,
       source: 'manual',
+      quotedAt: null,
       createdAt: '2025-06-01T00:00:00Z',
     };
 
@@ -61,6 +62,7 @@ describe('SecurityPriceForm', () => {
       adjustedClose: null,
       volume: 50000000,
       source: 'manual',
+      quotedAt: null,
       createdAt: '2025-06-01T00:00:00Z',
     };
 

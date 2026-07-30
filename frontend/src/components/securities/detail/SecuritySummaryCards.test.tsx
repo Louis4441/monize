@@ -197,47 +197,11 @@ describe('SecuritySummaryCards', () => {
   });
 
   describe('dating the market value', () => {
-    it('says which close the value was struck at', () => {
-      render(
-        <SecuritySummaryCards
-          detail={detail()}
-          quoteAsOf={{ priceDate: '2026-07-28', isCurrent: true }}
-        />,
-      );
-      expect(screen.getByText(/At the close of/)).toBeInTheDocument();
-    });
-
-    it('flags a value struck at a price nobody has updated since', () => {
-      render(
-        <SecuritySummaryCards
-          detail={detail()}
-          quoteAsOf={{ priceDate: '2019-04-01', isCurrent: false }}
-        />,
-      );
-      // Without this the card presents a 2019 valuation as today's worth.
-      const note = screen.getByText(/the newest price on record/);
-      expect(note).toBeInTheDocument();
-      expect(note).toHaveAttribute('title', expect.stringContaining('No newer price'));
-    });
-
-    it('dates nothing when the position could not be priced at all', () => {
-      render(
-        <SecuritySummaryCards
-          detail={detail({
-            position: {
-              quantity: 100,
-              averageCost: 120,
-              currentPrice: null,
-              costBasis: 12000,
-              marketValue: null,
-              gainLoss: null,
-              gainLossPercent: null,
-            },
-          })}
-          quoteAsOf={{ priceDate: '2026-07-28', isCurrent: true }}
-        />,
-      );
-      // Dating a figure that is not there would imply there is one.
+    // The card used to carry an "At the close of {date}" line. Intraday that
+    // was simply false -- the newest row is the latest quote, not a close --
+    // so the timing moved to the header, which states it to the minute.
+    it('does not date the value on the card', () => {
+      render(<SecuritySummaryCards detail={detail()} />);
       expect(screen.queryByText(/At the close of/)).not.toBeInTheDocument();
     });
   });

@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "Price at {date}",
+    "priceAtTime": "Price at {datetime} {zone}",
+    "marketOpen": "Market open",
+    "marketClosed": "Market closed",
+    "marketHours": "Trades {open} to {close}, {zone}. Public holidays are not accounted for.",
     "noPrice": "No price recorded yet",
     "changeToday": "{change} ({percent}) today",
     "changeLast": "{change} ({percent}) last move",
@@ -33,10 +37,7 @@
     "openAccount": "Show {name} on the Investments page",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Not priced",
-    "approx": "~ {amount}",
-    "asOf": "At the close of {date}",
-    "asOfStale": "At the close of {date}, the newest price on record",
-    "asOfStaleTitle": "No newer price is stored, so this is what the position was worth on that day rather than today. Update prices from the provider, or add one by hand."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "{symbol} price",

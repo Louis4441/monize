@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "{date} का भाव",
+    "priceAtTime": "{datetime} {zone} पर मूल्य",
+    "marketOpen": "बाज़ार खुला",
+    "marketClosed": "बाज़ार बंद",
+    "marketHours": "{open} से {close} तक कारोबार, {zone}. सार्वजनिक अवकाश शामिल नहीं हैं।",
     "noPrice": "अभी कोई भाव दर्ज नहीं है",
     "changeToday": "आज {change} ({percent})",
     "changeLast": "पिछला बदलाव {change} ({percent})",
@@ -33,10 +37,7 @@
     "openAccount": "{name} को निवेश पृष्ठ पर दिखाएँ",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "मूल्यांकन उपलब्ध नहीं",
-    "approx": "~ {amount}",
-    "asOf": "{date} के बंद भाव पर",
-    "asOfStale": "{date} के बंद भाव पर, यही सबसे नया दर्ज भाव है",
-    "asOfStaleTitle": "इससे नया कोई भाव संग्रहित नहीं है, इसलिए यह उस दिन की स्थिति का मूल्य है, आज का नहीं। प्रदाता से भाव अपडेट करें या हाथ से एक भाव जोड़ें।"
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "{symbol} का भाव",

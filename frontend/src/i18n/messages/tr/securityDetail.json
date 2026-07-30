@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "{date} fiyatı",
+    "priceAtTime": "{datetime} {zone} fiyatı",
+    "marketOpen": "Piyasa açık",
+    "marketClosed": "Piyasa kapalı",
+    "marketHours": "{open} - {close} arası işlem, {zone}. Resmi tatiller hesaba katılmaz.",
     "noPrice": "Henüz kayıtlı fiyat yok",
     "changeToday": "bugün {change} ({percent})",
     "changeLast": "son hareket {change} ({percent})",
@@ -33,10 +37,7 @@
     "openAccount": "{name} hesabını Yatırımlar sayfasında göster",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Fiyatlanmadı",
-    "approx": "~ {amount}",
-    "asOf": "{date} kapanışına göre",
-    "asOfStale": "{date} kapanışına göre; kayıtlı en yeni fiyat",
-    "asOfStaleTitle": "Daha yeni bir fiyat kayıtlı değil, dolayısıyla bu, pozisyonun bugünkü değil o günkü değeridir. Fiyatları sağlayıcıdan güncelleyin ya da elle bir fiyat ekleyin."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "{symbol} fiyatı",

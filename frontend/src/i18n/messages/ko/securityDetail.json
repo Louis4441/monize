@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "{date} 가격",
+    "priceAtTime": "{datetime} {zone} 기준 가격",
+    "marketOpen": "시장 개장",
+    "marketClosed": "시장 마감",
+    "marketHours": "{open}부터 {close}까지 거래, {zone}. 공휴일은 반영되지 않습니다.",
     "noPrice": "아직 기록된 가격이 없습니다",
     "changeToday": "오늘 {change} ({percent})",
     "changeLast": "최근 변동 {change} ({percent})",
@@ -33,10 +37,7 @@
     "openAccount": "투자 페이지에서 {name} 보기",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "평가 불가",
-    "approx": "약 {amount}",
-    "asOf": "{date} 종가 기준",
-    "asOfStale": "{date} 종가 기준, 기록된 가장 최근 가격입니다",
-    "asOfStaleTitle": "이보다 최근 가격이 저장되어 있지 않아, 오늘이 아니라 그날 시점의 포지션 가치입니다. 제공처에서 가격을 갱신하거나 직접 입력해 주세요."
+    "approx": "약 {amount}"
   },
   "chart": {
     "title": "{symbol} 가격",

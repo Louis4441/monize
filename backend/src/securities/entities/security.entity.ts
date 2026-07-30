@@ -185,6 +185,30 @@ export class Security {
   })
   historicalBackfillAttemptedAt: Date | null;
 
+  /**
+   * Where and when this instrument trades, as reported by the provider rather
+   * than guessed from the exchange code -- a code can be an alias, a provider's
+   * display name, or free text from an import, and a wrong guess would claim a
+   * market is open when it is not. The session times are local to
+   * `marketTimezone`. All three are null until a refresh reports them.
+   */
+  @ApiProperty({ required: false, nullable: true })
+  @Column({
+    type: "varchar",
+    length: 64,
+    nullable: true,
+    name: "market_timezone",
+  })
+  marketTimezone: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Column({ type: "time", nullable: true, name: "market_open_time" })
+  marketOpenTime: string | null;
+
+  @ApiProperty({ required: false, nullable: true })
+  @Column({ type: "time", nullable: true, name: "market_close_time" })
+  marketCloseTime: string | null;
+
   @ApiProperty({ description: "User-defined tags classifying this security" })
   @ManyToMany(() => Tag)
   @JoinTable({

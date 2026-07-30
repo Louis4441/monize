@@ -8,6 +8,19 @@ export interface QuoteResult {
   regularMarketDayLow?: number;
   regularMarketVolume?: number;
   regularMarketTime?: number;
+  /**
+   * IANA zone the instrument trades in, when the provider reports one. Read
+   * from the instrument itself rather than mapped from the exchange code,
+   * which can be an alias, a provider display name, or free text from an
+   * import.
+   */
+  exchangeTimezone?: string | null;
+  /**
+   * The regular trading session for the day this quote came from, as epoch
+   * seconds. Providers give the actual window, so a holiday or a half day is
+   * reflected rather than assumed away.
+   */
+  regularSession?: { start: number; end: number } | null;
   provider?: QuoteProviderName;
   /**
    * The instrument's actual trading currency as reported by the provider

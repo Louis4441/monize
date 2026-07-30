@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "Cours du {date}",
+    "priceAtTime": "Cours du {datetime} {zone}",
+    "marketOpen": "Marché ouvert",
+    "marketClosed": "Marché fermé",
+    "marketHours": "Négocié de {open} à {close}, {zone}. Les jours fériés ne sont pas pris en compte.",
     "noPrice": "Aucun cours enregistré",
     "changeToday": "{change} ({percent}) aujourd'hui",
     "changeLast": "{change} ({percent}) dernière variation",
@@ -33,10 +37,7 @@
     "openAccount": "Afficher {name} sur la page Investissements",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Non valorisé",
-    "approx": "~ {amount}",
-    "asOf": "À la clôture du {date}",
-    "asOfStale": "À la clôture du {date}, le cours le plus récent enregistré",
-    "asOfStaleTitle": "Aucun cours plus récent n'est enregistré : c'est donc la valeur de la position ce jour-là, et non aujourd'hui. Mettez à jour les cours depuis le fournisseur ou saisissez-en un à la main."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "Cours de {symbol}",

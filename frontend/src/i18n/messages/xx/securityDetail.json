@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "[XX-Price at {date}-XX]",
+    "priceAtTime": "[XX-Price at {datetime} {zone}-XX]",
+    "marketOpen": "[XX-Market open-XX]",
+    "marketClosed": "[XX-Market closed-XX]",
+    "marketHours": "[XX-Trades {open} to {close}, {zone}. Public holidays are not accounted for.-XX]",
     "noPrice": "[XX-No price recorded yet-XX]",
     "changeToday": "[XX-{change} ({percent}) today-XX]",
     "changeLast": "[XX-{change} ({percent}) last move-XX]",
@@ -33,10 +37,7 @@
     "openAccount": "[XX-Show {name} on the Investments page-XX]",
     "unitsShare": "[XX-{units} ({share})-XX]",
     "valueUnknown": "[XX-Not priced-XX]",
-    "approx": "[XX-~ {amount}-XX]",
-    "asOf": "[XX-At the close of {date}-XX]",
-    "asOfStale": "[XX-At the close of {date}, the newest price on record-XX]",
-    "asOfStaleTitle": "[XX-No newer price is stored, so this is what the position was worth on that day rather than today. Update prices from the provider, or add one by hand.-XX]"
+    "approx": "[XX-~ {amount}-XX]"
   },
   "chart": {
     "title": "[XX-{symbol} price-XX]",
