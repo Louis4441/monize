@@ -208,14 +208,12 @@
     "submitUpdate": "Update Price"
   },
   "priceHistory": {
-    "title": "{symbol} - Price History",
     "forceUpdateButton": "Force Update Prices",
     "forceUpdateTitle": "Re-fetch historical prices for the entire period you've held this security",
     "addPriceButton": "+ Add Price",
     "addPriceSection": "Add Price",
     "editPriceSection": "Edit Price",
     "loading": "Loading prices...",
-    "chartTitle": "Price History",
     "markers": {
       "bought": "Bought {quantity} · {account}",
       "sold": "Sold {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "Failed to update prices for {symbol}",
       "updateFetchFailed": "Failed to update prices"
     },
-    "closeButton": "Close",
     "deleteConfirm": {
       "title": "Delete Price",
       "message": "Delete price entry for {date}?",
@@ -257,8 +254,6 @@
     "collapseAll": "Collapse all"
   },
   "transactionHistory": {
-    "inactiveBadge": "Inactive",
-    "currentShares": "Current shares",
     "accountLabel": "Account",
     "allAccounts": "All accounts ({shares})",
     "accountClosed": "{name} (closed)",

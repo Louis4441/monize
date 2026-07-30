@@ -27,24 +27,13 @@ const logger = createLogger('SecurityTxHistory');
 
 interface SecurityTransactionHistoryProps {
   security: Security;
-  /** Omitted when embedded, where there is no modal to close. */
-  onClose?: () => void;
   /** Called after a transaction is added so callers can refresh dependent data. */
   onChanged?: () => void;
-  /**
-   * Rendered inside the security detail page rather than in its own modal. Drops
-   * the modal-only chrome -- the symbol/name heading and share count the page
-   * header and summary cards already carry, and the Close button -- and keeps
-   * the account filter, the table and the add/edit flows.
-   */
-  embedded?: boolean;
 }
 
 export function SecurityTransactionHistory({
   security,
-  onClose,
   onChanged,
-  embedded = false,
 }: SecurityTransactionHistoryProps) {
   const t = useTranslations('securities');
   const tc = useTranslations('common');
@@ -120,15 +109,6 @@ export function SecurityTransactionHistory({
     return txns.filter((t) => t.accountId === selectedAccountId);
   }, [history, selectedAccountId]);
 
-  // Shares currently held for the current view (selected account, or total).
-  const currentShares = useMemo(() => {
-    if (!history) return 0;
-    if (selectedAccountId === 'all') return history.currentQuantityAll;
-    return (
-      accounts.find((a) => a.accountId === selectedAccountId)?.currentQuantity ?? 0
-    );
-  }, [history, selectedAccountId, accounts]);
-
   const defaultAdjustAccountId =
     selectedAccountId !== 'all' ? selectedAccountId : accounts[0]?.accountId;
 
@@ -140,30 +120,8 @@ export function SecurityTransactionHistory({
 
   return (
     <div>
-      {!embedded && (
-        <div className="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {security.symbol}
-              {!security.isActive && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                  {t('transactionHistory.inactiveBadge')}
-                </span>
-              )}
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{security.name}</p>
-          </div>
-          <div className="text-right">
-            <div className="text-xs uppercase tracking-wider text-gray-400 dark:text-gray-500">
-              {t('transactionHistory.currentShares')}
-            </div>
-            <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {formatShareQuantity(currentShares)}
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* No heading or share count: the detail page's header and summary cards
+          already carry both. */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         {accounts.length > 0 && (
           <div className="w-full sm:max-w-xs">
@@ -274,15 +232,8 @@ export function SecurityTransactionHistory({
         </div>
       )}
 
-      {onClose && (
-        <div className="mt-6 flex justify-end">
-          <Button variant="outline" onClick={onClose}>
-            {tc('close')}
-          </Button>
-        </div>
-      )}
-
-      {/* Edit transaction modal (stacked on the history modal) */}
+      {/* Edit transaction modal, opened from a row on the detail page's
+          Transactions tab. */}
       <Modal
         isOpen={!!editTransaction}
         onClose={() => setEditTransaction(null)}

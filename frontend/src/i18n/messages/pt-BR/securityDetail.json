@@ -92,8 +92,7 @@
     "country": "País",
     "website": "Site",
     "irWebsite": "Site de relações com investidores",
-    "tags": "Etiquetas",
-    "notStored": "Ainda não armazenado"
+    "tags": "Etiquetas"
   },
   "performance": {
     "title": "Desempenho do ativo",
@@ -155,8 +154,6 @@
     "noPosition": "Sem dados de posição",
     "noPositionHint": "Você ainda não registrou nenhuma transação para este ativo.",
     "noPrices": "Sem histórico de preços disponível",
-    "noPricesHint": "Informe um preço manualmente ou atualize os preços pelo fornecedor.",
-    "noTransactions": "Ainda sem transações",
     "noAccounts": "Este ativo não está mantido em nenhuma conta."
   },
   "weightings": {

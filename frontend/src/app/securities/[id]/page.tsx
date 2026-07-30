@@ -458,11 +458,7 @@ function SecurityDetailContent() {
                 className="mt-6"
               >
                 <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
-                  <SecurityTransactionHistory
-                    security={security}
-                    onChanged={loadData}
-                    embedded
-                  />
+                  <SecurityTransactionHistory security={security} onChanged={loadData} />
                 </div>
               </TabPanel>
 
@@ -474,7 +470,7 @@ function SecurityDetailContent() {
                 className="mt-6"
               >
                 <div className="rounded-lg bg-white p-4 shadow dark:bg-gray-800 dark:shadow-gray-700/50">
-                  <SecurityPriceHistory security={security} embedded />
+                  <SecurityPriceHistory security={security} />
                 </div>
               </TabPanel>
 

@@ -92,8 +92,7 @@
     "country": "Pays",
     "website": "Site web",
     "irWebsite": "Site relations investisseurs",
-    "tags": "Étiquettes",
-    "notStored": "Pas encore enregistré"
+    "tags": "Étiquettes"
   },
   "performance": {
     "title": "Performance du titre",
@@ -155,8 +154,6 @@
     "noPosition": "Aucune donnée de position",
     "noPositionHint": "Vous n'avez encore enregistré aucune transaction pour ce titre.",
     "noPrices": "Aucun historique de cours disponible",
-    "noPricesHint": "Saisissez un cours à la main ou mettez à jour les cours depuis le fournisseur.",
-    "noTransactions": "Aucune transaction",
     "noAccounts": "Ce titre n'est détenu dans aucun compte."
   },
   "weightings": {

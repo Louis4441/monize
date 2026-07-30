@@ -92,8 +92,7 @@
     "country": "Ülke",
     "website": "Web sitesi",
     "irWebsite": "Yatırımcı ilişkileri sitesi",
-    "tags": "Etiketler",
-    "notStored": "Henüz saklanmıyor"
+    "tags": "Etiketler"
   },
   "performance": {
     "title": "Menkul kıymetin performansı",
@@ -155,8 +154,6 @@
     "noPosition": "Pozisyon verisi yok",
     "noPositionHint": "Bu menkul kıymet için henüz hiç işlem kaydetmedin.",
     "noPrices": "Fiyat geçmişi yok",
-    "noPricesHint": "Elle bir fiyat ekle ya da fiyatları sağlayıcıdan güncelle.",
-    "noTransactions": "Henüz işlem yok",
     "noAccounts": "Bu menkul kıymet hiçbir hesapta tutulmuyor."
   },
   "weightings": {

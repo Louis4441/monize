@@ -11,7 +11,6 @@ import {
   Security,
   SecurityPrice,
   CreateSecurityPriceData,
-  SecurityHistoryTransaction,
 } from '@/types/investment';
 import { investmentsApi } from '@/lib/investments';
 import { useDateFormat } from '@/hooks/useDateFormat';
@@ -25,23 +24,9 @@ import {
   priceDecimals,
 } from '@/lib/security-detail';
 import { SecurityPriceForm } from './SecurityPriceForm';
-import {
-  BalanceHistoryChart,
-  type ChartMarker,
-} from '@/components/transactions/BalanceHistoryChart';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
 
 interface SecurityPriceHistoryProps {
   security: Security;
-  /** Omitted when embedded, where there is no modal to close. */
-  onClose?: () => void;
-  /**
-   * Rendered inside the security detail page rather than in its own modal. Drops
-   * the modal-only chrome -- the heading that repeats the page title, the Close
-   * button, and the chart the page already shows full width above the tabs --
-   * and keeps the price table and its actions.
-   */
-  embedded?: boolean;
 }
 
 function getSourceLabel(source: string | null): string {
@@ -86,17 +71,10 @@ function formatPrice(value: number | null, decimals: number): string {
   });
 }
 
-export function SecurityPriceHistory({
-  security,
-  onClose,
-  embedded = false,
-}: SecurityPriceHistoryProps) {
+export function SecurityPriceHistory({ security }: SecurityPriceHistoryProps) {
   const t = useTranslations('securities');
   const { formatDate, formatMonth } = useDateFormat();
   const [prices, setPrices] = useState<SecurityPrice[]>([]);
-  // Trades, only for the chart's markers. A failed lookup costs the markers,
-  // never the price list the modal is actually for.
-  const [trades, setTrades] = useState<SecurityHistoryTransaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingPrice, setEditingPrice] = useState<SecurityPrice | undefined>();
@@ -105,8 +83,6 @@ export function SecurityPriceHistory({
   // Mobile has no per-row action buttons -- a long-press (or right-click on a
   // desktop pointer) opens the shared action sheet instead.
   const [contextPrice, setContextPrice] = useState<SecurityPrice | undefined>();
-
-  const { formatQuantity } = useNumberFormat();
 
   // Which year and month sections are open, keyed as `yyyy` and `yyyy-MM`. Only
   // an open month mounts its rows, so a decade of daily closes costs nothing
@@ -132,26 +108,6 @@ export function SecurityPriceHistory({
   useEffect(() => {
     loadPrices();
   }, [loadPrices]);
-
-  useEffect(() => {
-    // The trades exist only to mark up the chart, so an embedded instance --
-    // which renders no chart -- should not fetch them at all.
-    if (embedded) return;
-    let cancelled = false;
-    investmentsApi
-      .getSecurityTransactionHistory(security.id)
-      .then((history) => {
-        if (!cancelled) setTrades(history.transactions);
-      })
-      // Markers are a nicety: without them the chart still reads, so a failed
-      // lookup stays silent rather than raising a toast over the price list.
-      .catch(() => {
-        if (!cancelled) setTrades([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [security.id, embedded]);
 
   const handleAdd = useCallback(async (data: CreateSecurityPriceData) => {
     try {
@@ -220,52 +176,6 @@ export function SecurityPriceHistory({
     }
   }, [security.id, deletingPrice, loadPrices, t]);
 
-  // The same shape the account balance chart takes, so the price history can
-  // reuse it: oldest first (the API returns newest first) and the close price as
-  // the series value.
-  const chartData = useMemo(
-    () =>
-      prices
-        .map((price) => ({
-          date: price.priceDate.slice(0, 10),
-          balance: Number(price.closePrice),
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date)),
-    [prices],
-  );
-
-  // Which way each action moved the position. Actions with no share movement
-  // (dividends, interest, capital gains) carry no quantity and are left off the
-  // chart -- a dot with nothing to say is noise.
-  const chartMarkers = useMemo<ChartMarker[]>(() => {
-    const direction: Partial<Record<SecurityHistoryTransaction['action'], 'in' | 'out'>> = {
-      BUY: 'in',
-      REINVEST: 'in',
-      TRANSFER_IN: 'in',
-      ADD_SHARES: 'in',
-      SELL: 'out',
-      TRANSFER_OUT: 'out',
-      REMOVE_SHARES: 'out',
-    };
-    return trades.flatMap((trade) => {
-      const way = direction[trade.action];
-      if (!way || trade.quantity === null) return [];
-      const quantity = formatQuantity(Math.abs(Number(trade.quantity)));
-      return [
-        {
-          date: trade.transactionDate.slice(0, 10),
-          direction: way,
-          label: t(
-            way === 'in'
-              ? 'priceHistory.markers.bought'
-              : 'priceHistory.markers.sold',
-            { quantity, account: trade.accountName },
-          ),
-        },
-      ];
-    });
-  }, [trades, formatQuantity, t]);
-
   const handleForceUpdate = useCallback(async () => {
     setIsUpdating(true);
     try {
@@ -321,48 +231,38 @@ export function SecurityPriceHistory({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        {!embedded && (
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {t('priceHistory.title', { symbol: security.symbol })}
-          </h2>
-        )}
-        <div className={`flex gap-2 ${embedded ? 'ml-auto' : ''}`}>
-          {!isFormOpen && (
-            <>
+      {/* The detail page's own header carries the symbol, so this pane opens
+          straight into its actions. */}
+      <div className="flex items-center justify-end gap-2">
+        {!isFormOpen && (
+          <>
+            <Button
+              variant="outline"
+              onClick={handleForceUpdate}
+              size="sm"
+              isLoading={isUpdating}
+              title={t('priceHistory.forceUpdateTitle')}
+            >
+              {t('priceHistory.forceUpdateButton')}
+            </Button>
+            <Button onClick={() => setShowAddForm(true)} size="sm" disabled={isUpdating}>
+              {t('priceHistory.addPriceButton')}
+            </Button>
+            {yearGroups.length > 0 && (
               <Button
                 variant="outline"
-                onClick={handleForceUpdate}
                 size="sm"
-                isLoading={isUpdating}
-                title={t('priceHistory.forceUpdateTitle')}
+                onClick={() =>
+                  setOpenGroups(allOpen ? new Set() : new Set(allKeys))
+                }
               >
-                {t('priceHistory.forceUpdateButton')}
+                {allOpen
+                  ? t('priceHistory.collapseAll')
+                  : t('priceHistory.expandAll')}
               </Button>
-              <Button onClick={() => setShowAddForm(true)} size="sm" disabled={isUpdating}>
-                {t('priceHistory.addPriceButton')}
-              </Button>
-              {yearGroups.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setOpenGroups(allOpen ? new Set() : new Set(allKeys))
-                  }
-                >
-                  {allOpen
-                    ? t('priceHistory.collapseAll')
-                    : t('priceHistory.expandAll')}
-                </Button>
-              )}
-            </>
-          )}
-          {onClose && (
-            <Button variant="outline" onClick={onClose} size="sm">
-              {t('priceHistory.closeButton')}
-            </Button>
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Add/Edit Form */}
@@ -385,23 +285,6 @@ export function SecurityPriceHistory({
             onCancel={() => setEditingPrice(undefined)}
           />
         </div>
-      )}
-
-      {/* Price chart. Deliberately the account balance-history chart: same
-          shape of data, so the two screens read the same way -- title and
-          neutral colouring are the only differences (a price has no good or
-          bad sign). */}
-      {!embedded && !isLoading && chartData.length > 1 && (
-        <BalanceHistoryChart
-          data={chartData}
-          isLoading={false}
-          currencyCode={security.currencyCode}
-          accountName={security.symbol}
-          title={t('priceHistory.chartTitle')}
-          neutralValues
-          precise
-          markers={chartMarkers}
-        />
       )}
 
       {/* Price Table */}

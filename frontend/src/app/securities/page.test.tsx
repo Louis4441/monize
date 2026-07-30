@@ -26,21 +26,12 @@ vi.mock('next/image', () => ({
   default: ({ priority, fill, ...props }: any) => <img alt="" {...props} />,
 }));
 
-// Mock next/dynamic to return a stub that exposes the loaded component name
+// Mock next/dynamic to return a stub that exposes the loaded component name.
+// SecurityForm is the only component this page loads dynamically; the price and
+// transaction history panes live on the detail page.
 vi.mock('next/dynamic', () => ({
   default: (_loader: any) => {
-    // Return a generic component depending on what was loaded
     const Stub = (props: any) => {
-      // Detect via props which dynamic component this is (PriceHistory takes 'security' prop and 'onClose')
-      if (props.onClose && props.security && !props.onSubmit) {
-        return (
-          <div data-testid="price-history">
-            PriceHistory
-            <button data-testid="price-history-close" onClick={props.onClose}>Close</button>
-          </div>
-        );
-      }
-      // SecurityForm
       return (
         <div data-testid="security-form">
           SecurityForm

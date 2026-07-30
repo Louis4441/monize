@@ -208,14 +208,12 @@
     "submitUpdate": "Обновить цену"
   },
   "priceHistory": {
-    "title": "{symbol} — История цен",
     "forceUpdateButton": "Принудительно обновить цены",
     "forceUpdateTitle": "Повторно загрузить исторические цены за весь период владения этой ценной бумагой",
     "addPriceButton": "+ Добавить цену",
     "addPriceSection": "Добавить цену",
     "editPriceSection": "Редактировать цену",
     "loading": "Загрузка цен...",
-    "chartTitle": "История цены",
     "markers": {
       "bought": "Покупка {quantity} · {account}",
       "sold": "Продажа {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "Не удалось обновить цены для {symbol}",
       "updateFetchFailed": "Не удалось обновить цены"
     },
-    "closeButton": "Закрыть",
     "deleteConfirm": {
       "title": "Удалить цену",
       "message": "Удалить запись цены за {date}?",
@@ -257,8 +254,6 @@
     "groupCount": "цен: {count}"
   },
   "transactionHistory": {
-    "inactiveBadge": "Неактивная",
-    "currentShares": "Текущие акции",
     "accountLabel": "Счёт",
     "allAccounts": "Все счета ({shares})",
     "accountClosed": "{name} (закрыт)",

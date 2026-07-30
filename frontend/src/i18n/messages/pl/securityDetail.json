@@ -92,8 +92,7 @@
     "country": "Kraj",
     "website": "Strona internetowa",
     "irWebsite": "Strona relacji inwestorskich",
-    "tags": "Tagi",
-    "notStored": "Jeszcze nieprzechowywane"
+    "tags": "Tagi"
   },
   "performance": {
     "title": "Wyniki papieru",
@@ -155,8 +154,6 @@
     "noPosition": "Brak danych o pozycji",
     "noPositionHint": "Nie zapisałeś jeszcze żadnej transakcji dla tego papieru wartościowego.",
     "noPrices": "Brak historii cen",
-    "noPricesHint": "Dodaj cenę ręcznie albo zaktualizuj ceny od dostawcy.",
-    "noTransactions": "Brak transakcji",
     "noAccounts": "Ten papier wartościowy nie jest trzymany na żadnym koncie."
   },
   "weightings": {

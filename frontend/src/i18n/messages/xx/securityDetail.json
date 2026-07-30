@@ -92,8 +92,7 @@
     "country": "[XX-Country-XX]",
     "website": "[XX-Website-XX]",
     "irWebsite": "[XX-IR Website-XX]",
-    "tags": "[XX-Tags-XX]",
-    "notStored": "[XX-Not stored yet-XX]"
+    "tags": "[XX-Tags-XX]"
   },
   "performance": {
     "title": "[XX-Security performance-XX]",
@@ -155,8 +154,6 @@
     "noPosition": "[XX-No position data-XX]",
     "noPositionHint": "[XX-You have not recorded any transactions for this security yet.-XX]",
     "noPrices": "[XX-No price history available-XX]",
-    "noPricesHint": "[XX-Add a price manually, or update prices from the provider.-XX]",
-    "noTransactions": "[XX-No transactions yet-XX]",
     "noAccounts": "[XX-This security is not held in any account.-XX]"
   },
   "weightings": {

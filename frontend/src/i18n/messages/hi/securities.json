@@ -208,14 +208,12 @@
     "submitUpdate": "मूल्य अपडेट करें"
   },
   "priceHistory": {
-    "title": "{symbol} - मूल्य इतिहास",
     "forceUpdateButton": "मूल्य जबरन अपडेट करें",
     "forceUpdateTitle": "इस प्रतिभूति को रखने की पूरी अवधि के लिए ऐतिहासिक मूल्य फिर से प्राप्त करें",
     "addPriceButton": "+ मूल्य जोड़ें",
     "addPriceSection": "मूल्य जोड़ें",
     "editPriceSection": "मूल्य संपादित करें",
     "loading": "मूल्य लोड हो रहे हैं...",
-    "chartTitle": "मूल्य इतिहास",
     "markers": {
       "bought": "खरीद {quantity} · {account}",
       "sold": "बिक्री {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "{symbol} के लिए मूल्य अपडेट करने में विफल",
       "updateFetchFailed": "मूल्य अपडेट करने में विफल"
     },
-    "closeButton": "बंद करें",
     "deleteConfirm": {
       "title": "मूल्य हटाएं",
       "message": "{date} के लिए मूल्य प्रविष्टि हटाएं?",
@@ -257,8 +254,6 @@
     "groupCount": "{count} भाव"
   },
   "transactionHistory": {
-    "inactiveBadge": "निष्क्रिय",
-    "currentShares": "वर्तमान शेयर",
     "accountLabel": "खाता",
     "allAccounts": "सभी खाते ({shares})",
     "accountClosed": "{name} (बंद)",

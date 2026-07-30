@@ -208,14 +208,12 @@
     "submitUpdate": "Perbarui Harga"
   },
   "priceHistory": {
-    "title": "{symbol} - Riwayat Harga",
     "forceUpdateButton": "Paksa Perbarui Harga",
     "forceUpdateTitle": "Ambil ulang harga historis untuk seluruh periode Anda memegang sekuritas ini",
     "addPriceButton": "+ Tambah Harga",
     "addPriceSection": "Tambah Harga",
     "editPriceSection": "Edit Harga",
     "loading": "Memuat harga...",
-    "chartTitle": "Riwayat harga",
     "markers": {
       "bought": "Beli {quantity} · {account}",
       "sold": "Jual {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "Gagal memperbarui harga untuk {symbol}",
       "updateFetchFailed": "Gagal memperbarui harga"
     },
-    "closeButton": "Tutup",
     "deleteConfirm": {
       "title": "Hapus Harga",
       "message": "Hapus entri harga untuk {date}?",
@@ -257,8 +254,6 @@
     "groupCount": "{count} harga"
   },
   "transactionHistory": {
-    "inactiveBadge": "Tidak Aktif",
-    "currentShares": "Lembar saat ini",
     "accountLabel": "Akun",
     "allAccounts": "Semua akun ({shares})",
     "accountClosed": "{name} (ditutup)",

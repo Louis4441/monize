@@ -92,8 +92,7 @@
     "country": "国",
     "website": "ウェブサイト",
     "irWebsite": "IR サイト",
-    "tags": "タグ",
-    "notStored": "未保存"
+    "tags": "タグ"
   },
   "performance": {
     "title": "銘柄のパフォーマンス",
@@ -155,8 +154,6 @@
     "noPosition": "ポジションのデータがありません",
     "noPositionHint": "この銘柄の取引はまだ記録されていません。",
     "noPrices": "価格履歴がありません",
-    "noPricesHint": "価格を手入力で追加するか、提供元から価格を更新してください。",
-    "noTransactions": "取引はまだありません",
     "noAccounts": "この銘柄はどの口座でも保有されていません。"
   },
   "weightings": {

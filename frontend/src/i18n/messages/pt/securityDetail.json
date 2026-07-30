@@ -92,8 +92,7 @@
     "country": "País",
     "website": "Site",
     "irWebsite": "Site de relação com investidores",
-    "tags": "Etiquetas",
-    "notStored": "Ainda não guardado"
+    "tags": "Etiquetas"
   },
   "performance": {
     "title": "Desempenho do título",
@@ -155,8 +154,6 @@
     "noPosition": "Sem dados de posição",
     "noPositionHint": "Ainda não registou nenhuma transação para este título.",
     "noPrices": "Sem histórico de cotações disponível",
-    "noPricesHint": "Introduza uma cotação à mão ou atualize as cotações junto do fornecedor.",
-    "noTransactions": "Ainda sem transações",
     "noAccounts": "Este título não está detido em nenhuma conta."
   },
   "weightings": {

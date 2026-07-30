@@ -208,14 +208,12 @@
     "submitUpdate": "Cập nhật giá"
   },
   "priceHistory": {
-    "title": "{symbol} - Lịch sử giá",
     "forceUpdateButton": "Buộc cập nhật giá",
     "forceUpdateTitle": "Tải lại giá lịch sử cho toàn bộ thời gian bạn nắm giữ giấy chứng khoán này",
     "addPriceButton": "+ Thêm giá",
     "addPriceSection": "Thêm giá",
     "editPriceSection": "Chỉnh sửa giá",
     "loading": "Đang tải giá...",
-    "chartTitle": "Lịch sử giá",
     "markers": {
       "bought": "Mua {quantity} · {account}",
       "sold": "Bán {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "Không thể cập nhật giá cho {symbol}",
       "updateFetchFailed": "Không thể cập nhật giá"
     },
-    "closeButton": "Đóng",
     "deleteConfirm": {
       "title": "Xóa giá",
       "message": "Xóa bản ghi giá cho {date}?",
@@ -257,8 +254,6 @@
     "groupCount": "{count} giá"
   },
   "transactionHistory": {
-    "inactiveBadge": "Không hoạt động",
-    "currentShares": "Cổ phiếu hiện tại",
     "accountLabel": "Tài khoản",
     "allAccounts": "Tất cả tài khoản ({shares})",
     "accountClosed": "{name} (đã đóng)",

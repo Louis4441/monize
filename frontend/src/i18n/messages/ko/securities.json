@@ -208,14 +208,12 @@
     "submitUpdate": "가격 업데이트"
   },
   "priceHistory": {
-    "title": "{symbol} - 가격 이력",
     "forceUpdateButton": "가격 강제 업데이트",
     "forceUpdateTitle": "이 유가증권을 보유한 전체 기간의 과거 가격을 다시 가져옵니다",
     "addPriceButton": "+ 가격 추가",
     "addPriceSection": "가격 추가",
     "editPriceSection": "가격 편집",
     "loading": "가격 불러오는 중...",
-    "chartTitle": "가격 이력",
     "markers": {
       "bought": "매수 {quantity} · {account}",
       "sold": "매도 {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "{symbol}의 가격 업데이트에 실패했습니다",
       "updateFetchFailed": "가격 업데이트에 실패했습니다"
     },
-    "closeButton": "닫기",
     "deleteConfirm": {
       "title": "가격 삭제",
       "message": "{date}의 가격 항목을 삭제하시겠습니까?",
@@ -257,8 +254,6 @@
     "groupCount": "가격 {count}건"
   },
   "transactionHistory": {
-    "inactiveBadge": "비활성",
-    "currentShares": "현재 주식수",
     "accountLabel": "계정",
     "allAccounts": "모든 계정 ({shares})",
     "accountClosed": "{name} (마감됨)",

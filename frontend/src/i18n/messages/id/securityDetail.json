@@ -92,8 +92,7 @@
     "country": "Negara",
     "website": "Situs web",
     "irWebsite": "Situs hubungan investor",
-    "tags": "Tag",
-    "notStored": "Belum disimpan"
+    "tags": "Tag"
   },
   "performance": {
     "title": "Kinerja efek",
@@ -155,8 +154,6 @@
     "noPosition": "Tidak ada data posisi",
     "noPositionHint": "Anda belum mencatat transaksi apa pun untuk efek ini.",
     "noPrices": "Riwayat harga tidak tersedia",
-    "noPricesHint": "Tambahkan harga secara manual, atau perbarui harga dari penyedia.",
-    "noTransactions": "Belum ada transaksi",
     "noAccounts": "Efek ini tidak dipegang di rekening mana pun."
   },
   "weightings": {

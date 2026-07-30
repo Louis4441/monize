@@ -92,8 +92,7 @@
     "country": "国家",
     "website": "网站",
     "irWebsite": "投资者关系网站",
-    "tags": "标签",
-    "notStored": "尚未存储"
+    "tags": "标签"
   },
   "performance": {
     "title": "证券表现",
@@ -155,8 +154,6 @@
     "noPosition": "没有持仓数据",
     "noPositionHint": "你还没有为该证券记录任何交易。",
     "noPrices": "没有价格历史",
-    "noPricesHint": "手动添加一条价格，或从数据源更新价格。",
-    "noTransactions": "还没有交易",
     "noAccounts": "该证券没有在任何账户中持有。"
   },
   "weightings": {
