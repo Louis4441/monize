@@ -25,6 +25,7 @@
     "accounts": "Comptes",
     "budgets": "Budgets",
     "reports": "Rapports",
+    "investments": "Investissements",
     "settings": "Paramètres"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "Et voilà",
             "body": "Vous pouvez revenir sur ces points marquants quand vous le souhaitez, ici dans les Paramètres."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Page de détail du titre",
+        "steps": {
+          "welcome": {
+            "title": "Chaque titre sur une seule page",
+            "body": "Les titres étaient auparavant répartis dans trois boîtes de dialogue. Chacun a désormais sa page, qui rassemble le tout : ce que vous détenez, comment il a évolué et tout ce que Monize sait de lui. Voici la version courte."
+          },
+          "openDetail": {
+            "title": "Ouvrir un titre",
+            "body": "Cliquez sur n'importe quel titre de la liste : la ligne entière ouvre sa page. Un appui long, ou un clic droit, affiche à la place les autres actions de la ligne."
+          },
+          "summary": {
+            "title": "Votre position d'un coup d'œil",
+            "body": "Valeur de marché, prix de revient, gain latent, nombre de parts et comptes qui les détiennent. Les montants sont dans la devise du titre lui-même — celle dans laquelle son cours est coté — et la valeur de marché indique de quelle clôture elle provient.",
+            "fallbackBody": "Cette rangée montre normalement votre position. Vous ne détenez plus ce titre, la page affiche donc ce que vous avez réalisé dessus. Ouvrez-en un que vous détenez encore pour voir les chiffres."
+          },
+          "chart": {
+            "title": "Trois façons de lire l'historique",
+            "body": "Basculez entre le **cours**, la **valeur de votre position** et le **rendement** sur la fenêtre. Les achats et les ventes sont marqués sur chaque série. Les boutons de droite règlent la profondeur d'historique, et les **flèches** à côté déplacent cette fenêtre dans l'historique antérieur au même zoom — choisissez 1A et reculez année par année plutôt que de passer à 5A."
+          },
+          "keyInfo": {
+            "title": "Ce qu'est l'instrument",
+            "body": "À côté du graphique : type de titre, place de cotation, devise, le fournisseur de cours utilisé par Monize et le dernier cours enregistré. En dessous, la carte **Répartition** montre de quoi un fonds est composé — basculez entre les répartitions sectorielle, par pays et par classe d'actifs."
+          },
+          "tabs": {
+            "title": "Le détail en dessous",
+            "body": "**Aperçu** contient la description, les rendements du titre lui-même, votre rendement total sur la position et vos avoirs par compte. **Transactions** et **Historique des cours** sont les tableaux que contenaient les anciennes boîtes de dialogue. **Documents** accueille une fiche technique ou un rapport annuel, et **Actualités** apporte les titres récents qui mentionnent le symbole."
+          },
+          "finish": {
+            "title": "Fin de la visite",
+            "body": "Tous les liens qui pointaient vers les anciennes boîtes de dialogue arrivent ici — les widgets de cours du tableau de bord ouvrent cette page directement sur l'onglet Historique des cours. C'est une vraie page : vous pouvez la mettre en favori et y revenir."
           }
         }
       }

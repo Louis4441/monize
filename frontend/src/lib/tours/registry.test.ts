@@ -58,9 +58,15 @@ describe('tour registry', () => {
       expect(getReleaseTours('1.13.7')).toHaveLength(2);
     });
 
-    it('offers no release tours for other minor lines', () => {
+    it('offers each minor line its own tours', () => {
+      expect(getReleaseTours('1.14.0').map((t) => t.id)).toEqual([
+        'release-1.14.0/security-detail',
+      ]);
+    });
+
+    it('offers no release tours for a minor line that has none', () => {
       expect(getReleaseTours('1.12.1')).toHaveLength(0);
-      expect(getReleaseTours('1.14.0')).toHaveLength(0);
+      expect(getReleaseTours('1.99.0')).toHaveLength(0);
     });
   });
 

@@ -25,6 +25,7 @@ import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { investmentsApi } from '@/lib/investments';
 import { getErrorMessage } from '@/lib/errors';
+import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { roundToDecimals } from '@/lib/format';
 import {
   toPriceSeries,
@@ -312,24 +313,28 @@ function SecurityDetailContent() {
 
         <div className="space-y-6">
           {/* Zero-filled cards would claim a position that is not there, so a
-              closed or never-held security gets its own panel instead. */}
+              closed or never-held security gets its own panel instead. The tour
+              anchor sits on the cards only: with no position there is nothing
+              for that step to point at, and it says so instead. */}
           {detail.accounts.length > 0 ? (
-            <SecuritySummaryCards
-              detail={detail}
-              // The Investments page already accepts `?accountId=`; the Accounts
-              // list links to it the same way.
-              onSelectAccount={(accountId) =>
-                router.push(`/investments?accountId=${accountId}`)
-              }
-              // The same newest close the backend valued the position at: both
-              // take the latest `security_prices` row, so dating the card from
-              // the series cannot disagree with the figure on it.
-              quoteAsOf={
-                quote
-                  ? { priceDate: quote.priceDate, isCurrent: quote.isCurrent }
-                  : null
-              }
-            />
+            <div {...tourAnchor(TOUR_ANCHORS.securityDetailSummary)}>
+              <SecuritySummaryCards
+                detail={detail}
+                // The same newest close the backend valued the position at:
+                // both take the latest `security_prices` row, so dating the
+                // card from the series cannot disagree with the figure on it.
+                quoteAsOf={
+                  quote
+                    ? { priceDate: quote.priceDate, isCurrent: quote.isCurrent }
+                    : null
+                }
+                // The Investments page already accepts `?accountId=`; the
+                // Accounts list links to it the same way.
+                onSelectAccount={(accountId) =>
+                  router.push(`/investments?accountId=${accountId}`)
+                }
+              />
+            </div>
           ) : (
             <SecurityPositionState detail={detail} />
           )}
@@ -342,7 +347,10 @@ function SecurityDetailContent() {
               row is only ever as tall as its tallest item -- so the cap on the
               bars is what keeps this column from being that item. */}
           <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+            <div
+              className="lg:col-span-2"
+              {...tourAnchor(TOUR_ANCHORS.securityDetailChart)}
+            >
               <SecurityChartSection
                 security={security}
                 prices={priceSeries}
@@ -356,7 +364,10 @@ function SecurityDetailContent() {
             {/* A column the height of the chart: Key information takes what it
                 needs and Breakdown fills the rest, so the two end level with the
                 chart rather than stopping short of it. */}
-            <div className="flex min-h-0 flex-col gap-6">
+            <div
+              className="flex min-h-0 flex-col gap-6"
+              {...tourAnchor(TOUR_ANCHORS.securityDetailKeyInfo)}
+            >
               <SecurityKeyInformation
                 security={security}
                 latestPrice={
@@ -371,13 +382,15 @@ function SecurityDetailContent() {
           </div>
 
           <div>
-            <Tabs
-              tabs={tabs}
-              value={tab}
-              onChange={setTab}
-              idPrefix="securityDetail"
-              ariaLabel={t('tabs.ariaLabel')}
-            />
+            <div {...tourAnchor(TOUR_ANCHORS.securityDetailTabs)}>
+              <Tabs
+                tabs={tabs}
+                value={tab}
+                onChange={setTab}
+                idPrefix="securityDetail"
+                ariaLabel={t('tabs.ariaLabel')}
+              />
+            </div>
 
             {/* A floor under the panel area, so switching tabs cannot shorten
                 the document. Overview is much taller than the two tables, and

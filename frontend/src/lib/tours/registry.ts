@@ -1,6 +1,7 @@
 import type { TourDefinition } from './types';
 import { INTRO_TOUR } from './definitions/intro';
 import { RELEASE_1_13_TOURS } from './definitions/release-1.13.0';
+import { RELEASE_1_14_TOURS } from './definitions/release-1.14.0';
 
 export { INTRO_TOUR } from './definitions/intro';
 
@@ -8,6 +9,7 @@ export { INTRO_TOUR } from './definitions/intro';
 export const ALL_TOURS: readonly TourDefinition[] = [
   INTRO_TOUR,
   ...RELEASE_1_13_TOURS,
+  ...RELEASE_1_14_TOURS,
 ];
 
 /** Look up a tour by its persistence id. */

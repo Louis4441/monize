@@ -25,6 +25,7 @@
     "accounts": "Cuentas",
     "budgets": "Presupuestos",
     "reports": "Informes",
+    "investments": "Inversiones",
     "settings": "Ajustes"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "Eso es todo",
             "body": "Puedes volver a consultar estas novedades cuando quieras desde aquí en Ajustes."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Página de detalle del valor",
+        "steps": {
+          "welcome": {
+            "title": "Cada valor en una sola página",
+            "body": "Antes los valores estaban repartidos en tres diálogos. Ahora cada uno tiene su página, que lo reúne todo: lo que tienes, cómo se ha comportado y todo lo que Monize sabe de él. Esta es la versión breve."
+          },
+          "openDetail": {
+            "title": "Abrir un valor",
+            "body": "Haz clic en cualquier valor de la lista: la fila entera abre su página. Una pulsación larga, o el clic derecho, muestra en su lugar las demás acciones de la fila."
+          },
+          "summary": {
+            "title": "Tu posición de un vistazo",
+            "body": "Valor de mercado, coste de adquisición, ganancia no realizada, participaciones y en qué cuentas están. Los importes van en la moneda del propio valor —la de su cotización— y el valor de mercado dice de qué cierre proviene.",
+            "fallbackBody": "Esta fila suele mostrar tu posición. Ya no tienes este valor, así que la página muestra lo que realizaste con él. Abre uno que sigas teniendo para ver las cifras."
+          },
+          "chart": {
+            "title": "Tres formas de leer el historial",
+            "body": "Cambia entre el **precio**, el **valor de tu posición** y la **rentabilidad** en la ventana. Las compras y ventas están marcadas en todas las series. Los botones de la derecha fijan cuánto historial se muestra, y las **flechas** de al lado desplazan esa ventana por el historial anterior con el mismo zoom: elige 1A y retrocede año a año en vez de cambiar a 5A."
+          },
+          "keyInfo": {
+            "title": "Qué es el instrumento",
+            "body": "Junto al gráfico: tipo de valor, mercado, moneda, el proveedor de cotizaciones que usa Monize y el último precio registrado. Debajo, la tarjeta **Desglose** muestra de qué está hecho un fondo: cambia entre el desglose por sector, por país y por clase de activo."
+          },
+          "tabs": {
+            "title": "El detalle de más abajo",
+            "body": "**Resumen** contiene la descripción, las rentabilidades del propio valor, tu rentabilidad total sobre la posición y tus tenencias por cuenta. **Transacciones** e **Historial de precios** son las mismas tablas que contenían los diálogos antiguos. **Documentos** es el sitio para una ficha técnica o un informe anual, y **Noticias** trae los titulares recientes que mencionan el símbolo."
+          },
+          "finish": {
+            "title": "Ese es el recorrido",
+            "body": "Todos los enlaces que apuntaban a los diálogos antiguos llegan aquí: los widgets de precios del panel abren esta página directamente en la pestaña Historial de precios. Es una página de verdad, así que puedes guardarla en marcadores y volver a ella."
           }
         }
       }

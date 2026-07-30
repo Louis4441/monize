@@ -7,6 +7,7 @@ export type TourArea =
   | 'accounts'
   | 'budgets'
   | 'reports'
+  | 'investments'
   | 'settings';
 
 /**
@@ -36,8 +37,11 @@ export type TourPlacement = 'top' | 'bottom' | 'left' | 'right' | 'auto';
  *   can be created inline -- which the walkthrough itself teaches. Gating on
  *   those too would hide the tour's most useful section from exactly the new
  *   users it is for.
+ * - `securitiesExist` the user has at least one active security. A tour of the
+ *   security detail page has nothing to open without one, and every step after
+ *   the first would be a dead end.
  */
-export type TourRequirement = 'transactionEntry';
+export type TourRequirement = 'transactionEntry' | 'securitiesExist';
 
 export interface TourStep {
   /** i18n leaf: tours.<i18nPrefix>.steps.<id>.{title,body}. */
@@ -129,6 +133,17 @@ export interface TourDefinition {
   version?: string;
   /** i18n prefix under the `tours` namespace (e.g. 'intro.basics'). */
   i18nPrefix: string;
+  /**
+   * Data the tour as a whole needs before it is worth *offering*. Where a step's
+   * `requires` omits one step from a tour that still makes sense without it,
+   * this hides the tour entirely: a walkthrough of the security detail page has
+   * nothing to walk through for a user who owns no securities, and offering it
+   * would strand them on its first step.
+   *
+   * The offer surfaces (the What's New list, the Settings list) resolve it and
+   * leave the row out until they know it is met.
+   */
+  requiresData?: TourRequirement;
   /**
    * Disable the transaction form's Split controls while this tour runs, so the
    * walkthrough keeps to the single path it covers. They stay visible (just

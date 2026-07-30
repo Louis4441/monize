@@ -25,6 +25,7 @@
     "accounts": "Conti",
     "budgets": "Budget",
     "reports": "Report",
+    "investments": "Investimenti",
     "settings": "Impostazioni"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "È tutto",
             "body": "Puoi rivedere queste novità quando vuoi da qui, nelle Impostazioni."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Pagina di dettaglio del titolo",
+        "steps": {
+          "welcome": {
+            "title": "Ogni titolo su una sola pagina",
+            "body": "I titoli erano prima divisi in tre finestre di dialogo. Ora ciascuno ha una pagina che raccoglie tutto: cosa detieni, come è andato e tutto ciò che Monize sa di lui. Ecco la versione breve."
+          },
+          "openDetail": {
+            "title": "Aprire un titolo",
+            "body": "Fai clic su qualunque titolo nell’elenco: l’intera riga apre la sua pagina. Una pressione prolungata, o il clic destro, mostra invece le altre azioni della riga."
+          },
+          "summary": {
+            "title": "La tua posizione a colpo d’occhio",
+            "body": "Valore di mercato, costo di acquisto, utile non realizzato, quote detenute e in quali conti si trovano. Gli importi sono nella valuta del titolo stesso — quella in cui è quotato il suo prezzo — e il valore di mercato dice da quale chiusura proviene.",
+            "fallbackBody": "Questa fila mostra di norma la tua posizione. Non detieni più questo titolo, quindi la pagina mostra invece quanto hai realizzato su di esso. Apri uno che detieni ancora per vedere i numeri."
+          },
+          "chart": {
+            "title": "Tre modi di leggere lo storico",
+            "body": "Passa tra il **prezzo**, il **valore della tua posizione** e il **rendimento** nella finestra. Acquisti e vendite sono segnati su ogni serie. I pulsanti a destra stabiliscono quanto indietro si va, e le **frecce** accanto spostano quella finestra nello storico precedente con lo stesso zoom: scegli 1A e torna indietro un anno alla volta invece di passare a 5A."
+          },
+          "keyInfo": {
+            "title": "Che cos’è lo strumento",
+            "body": "Accanto al grafico: tipo di titolo, borsa, valuta, il fornitore di quotazioni che Monize usa e l’ultimo prezzo registrato. Sotto, la scheda **Composizione** mostra di cosa è fatto un fondo: passa tra la suddivisione per settore, per paese e per classe di attivo."
+          },
+          "tabs": {
+            "title": "Il dettaglio più sotto",
+            "body": "**Panoramica** contiene la descrizione, i rendimenti del titolo stesso, il tuo rendimento totale sulla posizione e le tue consistenze per conto. **Transazioni** e **Storico prezzi** sono le stesse tabelle che stavano nelle vecchie finestre. **Documenti** è il posto per una scheda informativa o una relazione annuale, e **Notizie** porta i titoli recenti che citano il simbolo."
+          },
+          "finish": {
+            "title": "Questo è tutto",
+            "body": "Ogni collegamento che puntava alle vecchie finestre arriva qui: i widget dei prezzi nella dashboard aprono questa pagina direttamente sulla scheda Storico prezzi. È una pagina vera, quindi puoi aggiungerla ai preferiti e tornarci."
           }
         }
       }

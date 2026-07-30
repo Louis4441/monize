@@ -25,6 +25,7 @@
     "accounts": "Contas",
     "budgets": "Orçamentos",
     "reports": "Relatórios",
+    "investments": "Investimentos",
     "settings": "Configurações"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "É isso",
             "body": "Você pode revisitar esses destaques quando quiser aqui em Configurações."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Página de detalhe do ativo",
+        "steps": {
+          "welcome": {
+            "title": "Cada ativo em uma só página",
+            "body": "Os ativos ficavam antes espalhados por três janelas. Agora cada um tem a sua página, que reúne tudo: o que você tem, como se comportou e tudo o que o Monize sabe sobre ele. Esta é a versão curta."
+          },
+          "openDetail": {
+            "title": "Abrir um ativo",
+            "body": "Clique em qualquer ativo da lista: a linha inteira abre a página dele. Um toque longo, ou o clique com o botão direito, mostra em vez disso as demais ações da linha."
+          },
+          "summary": {
+            "title": "Sua posição de relance",
+            "body": "Valor de mercado, custo de aquisição, ganho não realizado, cotas mantidas e em quais contas estão. Os valores vêm na moeda do próprio ativo — a da cotação dele — e o valor de mercado informa de qual fechamento veio.",
+            "fallbackBody": "Esta fila normalmente mostra sua posição. Você não mantém mais este ativo, então a página mostra o que você realizou nele. Abra um que ainda mantenha para ver os números."
+          },
+          "chart": {
+            "title": "Três formas de ler o histórico",
+            "body": "Alterne entre o **preço**, o **valor da sua posição** e o **retorno** na janela. As compras e vendas estão marcadas em todas as séries. Os botões da direita definem quanto histórico aparece, e as **setas** ao lado deslocam essa janela pelo histórico anterior no mesmo zoom: escolha 1A e volte ano a ano em vez de mudar para 5A."
+          },
+          "keyInfo": {
+            "title": "O que é o instrumento",
+            "body": "Ao lado do gráfico: tipo de ativo, bolsa, moeda, o fornecedor de cotações que o Monize usa e o último preço registrado. Abaixo, o cartão **Composição** mostra do que um fundo é feito: alterne entre a composição por setor, por país e por classe de ativos."
+          },
+          "tabs": {
+            "title": "O detalhe mais abaixo",
+            "body": "**Visão geral** traz a descrição, os retornos do próprio ativo, seu retorno total na posição e suas posições por conta. **Transações** e **Histórico de preços** são as mesmas tabelas que as janelas antigas continham. **Documentos** é o lugar para uma ficha técnica ou um relatório anual, e **Notícias** traz as manchetes recentes que citam o símbolo."
+          },
+          "finish": {
+            "title": "É esse o tour",
+            "body": "Todo link que apontava para as janelas antigas chega aqui: os widgets de preços no painel abrem esta página direto na aba Histórico de preços. É uma página de verdade, então você pode salvá-la nos favoritos e voltar."
           }
         }
       }

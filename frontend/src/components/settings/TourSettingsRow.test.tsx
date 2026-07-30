@@ -10,12 +10,26 @@ vi.mock('@/lib/tours-api', () => ({
   },
 }));
 
+// Data-gated tours are filtered out of the list, so the requirement lookup is
+// stubbed rather than left to resolve asynchronously mid-assertion.
+const requirements = vi.fn(() => ({
+  transactionEntry: true,
+  securitiesExist: true,
+}));
+vi.mock('@/hooks/useTourRequirements', () => ({
+  useTourRequirements: () => requirements(),
+}));
+
 import { TourSettingsRow } from './TourSettingsRow';
 import { useTourStore } from '@/store/tourStore';
 import { ALL_TOURS } from '@/lib/tours/registry';
 
 beforeEach(() => {
   resetProgress.mockClear();
+  requirements.mockReturnValue({
+    transactionEntry: true,
+    securitiesExist: true,
+  });
   useTourStore.setState({
     active: null,
     progress: { 'intro/basics': { status: 'completed', updatedAt: 'now' } },
@@ -76,6 +90,27 @@ describe('TourSettingsRow', () => {
     // The release tours are otherwise only reachable from the What's New modal.
     expect(screen.getByText('Foreign currency transactions')).toBeInTheDocument();
     expect(screen.getByText("What's New digest")).toBeInTheDocument();
+  });
+
+  it('leaves out a tour whose data the user does not have', () => {
+    requirements.mockReturnValue({
+      transactionEntry: true,
+      securitiesExist: false,
+    });
+    renderExpanded();
+
+    // A tour of the security detail page has nothing to open for a user who
+    // owns no securities, so it is not offered as a dead end.
+    expect(screen.queryByText('Security detail page')).toBeNull();
+    expect(screen.getAllByRole('listitem')).toHaveLength(ALL_TOURS.length - 1);
+    // The ungated tours are untouched.
+    expect(screen.getByText('Foreign currency transactions')).toBeInTheDocument();
+  });
+
+  it('waits for the lookup rather than flashing a gated tour', () => {
+    requirements.mockReturnValue(null as never);
+    renderExpanded();
+    expect(screen.queryByText('Security detail page')).toBeNull();
   });
 
   it('shows each tour area and viewed state', () => {

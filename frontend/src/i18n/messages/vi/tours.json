@@ -25,6 +25,7 @@
     "accounts": "Tài khoản",
     "budgets": "Ngân sách",
     "reports": "Báo cáo",
+    "investments": "Đầu tư",
     "settings": "Cài đặt"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "Vậy là xong",
             "body": "Bạn có thể xem lại những điểm nổi bật này bất cứ khi nào bạn muốn ngay tại đây trong Cài đặt."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Trang chi tiết chứng khoán",
+        "steps": {
+          "welcome": {
+            "title": "Mỗi chứng khoán trên một trang",
+            "body": "Trước đây chứng khoán nằm rải trong ba hộp thoại. Giờ mỗi mã có một trang riêng gom hết mọi thứ: bạn đang nắm gì, nó đã đi thế nào, và tất cả những gì Monize biết về nó. Đây là bản ngắn."
+          },
+          "openDetail": {
+            "title": "Mở một chứng khoán",
+            "body": "Nhấp vào bất kỳ chứng khoán nào trong danh sách: cả dòng sẽ mở trang của nó. Nhấn giữ, hoặc nhấp chuột phải, sẽ hiện các hành động khác của dòng đó."
+          },
+          "summary": {
+            "title": "Vị thế của bạn trong một cái nhìn",
+            "body": "Giá trị thị trường, giá vốn, lãi chưa thực hiện, số đơn vị đang nắm và chúng nằm ở tài khoản nào. Các số tiền theo đúng tiền tệ của chứng khoán — loại tiền niêm yết giá của nó — và giá trị thị trường cho biết nó lấy từ phiên đóng cửa nào.",
+            "fallbackBody": "Hàng này thường hiển thị vị thế của bạn. Bạn không còn nắm chứng khoán này, nên trang hiển thị phần bạn đã thực hiện được trên nó. Hãy mở một mã bạn vẫn nắm để thấy các con số."
+          },
+          "chart": {
+            "title": "Ba cách đọc lịch sử",
+            "body": "Chuyển giữa **giá**, **giá trị vị thế của bạn** và **lợi nhuận** trong khung thời gian. Các lần mua và bán được đánh dấu trên mọi chuỗi. Các nút bên phải đặt độ dài lịch sử, còn các **mũi tên** bên cạnh dịch khung đó qua phần lịch sử trước đó với cùng mức phóng: chọn 1N rồi lùi từng năm thay vì chuyển sang 5N."
+          },
+          "keyInfo": {
+            "title": "Công cụ này là gì",
+            "body": "Bên cạnh biểu đồ: loại chứng khoán, sàn giao dịch, tiền tệ, nhà cung cấp giá mà Monize dùng, và giá gần nhất được ghi nhận. Bên dưới, thẻ **Cơ cấu** cho thấy một quỹ gồm những gì: chuyển giữa cơ cấu theo ngành, theo quốc gia và theo loại tài sản."
+          },
+          "tabs": {
+            "title": "Chi tiết bên dưới",
+            "body": "**Tổng quan** chứa mô tả, lợi nhuận của chính chứng khoán, tổng lợi nhuận của bạn trên vị thế, và số dư theo từng tài khoản. **Giao dịch** và **Lịch sử giá** là chính những bảng mà các hộp thoại cũ từng chứa. **Tài liệu** là nơi đặt bản thông tin nhanh hay báo cáo thường niên, còn **Tin tức** mang về những tiêu đề gần đây có nhắc tới mã này."
+          },
+          "finish": {
+            "title": "Vậy là xong phần hướng dẫn",
+            "body": "Mọi liên kết từng trỏ tới các hộp thoại cũ giờ đều dẫn về đây: các tiện ích giá trên bảng điều khiển mở trang này ngay tại tab Lịch sử giá. Đây là một trang thật, nên bạn có thể đánh dấu và quay lại."
           }
         }
       }

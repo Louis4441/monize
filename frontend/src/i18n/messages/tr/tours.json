@@ -25,6 +25,7 @@
     "accounts": "Hesaplar",
     "budgets": "Bütçeler",
     "reports": "Raporlar",
+    "investments": "Yatırımlar",
     "settings": "Ayarlar"
   },
   "gettingStarted": {
@@ -190,6 +191,42 @@
           "done": {
             "title": "Hepsi bu",
             "body": "Bu öne çıkanları istediğiniz zaman buradan, Ayarlar içinden yeniden gözden geçirebilirsiniz."
+          }
+        }
+      }
+    },
+    "v1_14_0": {
+      "securityDetail": {
+        "title": "Menkul kıymet detay sayfası",
+        "steps": {
+          "welcome": {
+            "title": "Her menkul kıymet tek bir sayfada",
+            "body": "Menkul kıymetler eskiden üç ayrı pencereye dağılmıştı. Artık her birinin kendi sayfası var ve hepsini bir arada topluyor: neyi tuttuğunu, nasıl gittiğini ve Monize’ın onun hakkında bildiği her şeyi. İşte kısa hâli."
+          },
+          "openDetail": {
+            "title": "Bir menkul kıymet aç",
+            "body": "Listedeki herhangi bir menkul kıymete tıkla: satırın tamamı sayfasını açar. Uzun basmak ya da sağ tıklamak ise satırın diğer eylemlerini gösterir."
+          },
+          "summary": {
+            "title": "Pozisyonun bir bakışta",
+            "body": "Piyasa değeri, maliyet bedeli, gerçekleşmemiş kazanç, elde tutulan birimler ve hangi hesaplarda oldukları. Tutarlar menkul kıymetin kendi para biriminde — fiyatının kote edildiği birimde — ve piyasa değeri hangi kapanıştan geldiğini söylüyor.",
+            "fallbackBody": "Bu sıra normalde pozisyonunu gösterir. Bu menkul kıymeti artık tutmuyorsun, bu yüzden sayfa onda ne gerçekleştirdiğini gösteriyor. Hâlâ tuttuğun birini açarsan sayıları görürsün."
+          },
+          "chart": {
+            "title": "Geçmişi okumanın üç yolu",
+            "body": "Pencere içinde **fiyat**, **pozisyonunun değeri** ve **getiri** arasında geçiş yap. Alışlar ve satışlar her seride işaretli. Sağdaki düğmeler ne kadar geriye gidileceğini belirler, yanındaki **oklar** ise o pencereyi aynı yakınlaştırmada daha eski geçmişe taşır: 1Y seç ve 5Y’ye geçmek yerine yıl yıl geriye git."
+          },
+          "keyInfo": {
+            "title": "Bu araç nedir",
+            "body": "Grafiğin yanında: menkul kıymet türü, borsa, para birimi, Monize’ın kullandığı fiyat sağlayıcısı ve kaydedilen son fiyat. Altında **Dağılım** kartı bir fonun neyden oluştuğunu gösterir: sektör, ülke ve varlık sınıfı dağılımları arasında geçiş yap."
+          },
+          "tabs": {
+            "title": "Alttaki ayrıntı",
+            "body": "**Genel bakış** açıklamayı, menkul kıymetin kendi getirilerini, pozisyondaki toplam getirini ve hesap bazındaki bakiyelerini içerir. **İşlemler** ve **Fiyat geçmişi**, eski pencerelerdeki aynı tablolardır. **Belgeler** bir tanıtım föyü ya da yıllık raporun yeridir, **Haberler** ise sembolden söz eden güncel başlıkları getirir."
+          },
+          "finish": {
+            "title": "Tur bu kadar",
+            "body": "Eski pencerelere işaret eden her bağlantı artık buraya geliyor: panodaki fiyat bileşenleri bu sayfayı doğrudan Fiyat geçmişi sekmesinde açar. Bu gerçek bir sayfa, yer imlerine ekleyip geri dönebilirsin."
           }
         }
       }
