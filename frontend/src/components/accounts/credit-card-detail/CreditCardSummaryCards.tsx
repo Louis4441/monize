@@ -3,7 +3,11 @@
 import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { utilizationColour } from '@/lib/credit-utilization';
-import { SummaryCardGrid, SummaryCardItem } from '@/components/accounts/shared/SummaryCardGrid';
+import {
+  SummaryCardGrid,
+  SummaryCardItem,
+  summaryGridClass,
+} from '@/components/accounts/shared/SummaryCardGrid';
 import type { Account } from '@/types/account';
 
 interface CreditCardSummaryCardsProps {
@@ -66,9 +70,6 @@ export function CreditCardSummaryCards({ account }: CreditCardSummaryCardsProps)
   }
 
   return (
-    <SummaryCardGrid
-      cards={cards}
-      className={`grid grid-cols-2 md:grid-cols-3 ${hasLimit ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4`}
-    />
+    <SummaryCardGrid cards={cards} className={summaryGridClass(cards.length)} />
   );
 }

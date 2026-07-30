@@ -2,7 +2,11 @@
 
 import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { SummaryCardGrid, SummaryCardItem } from '@/components/accounts/shared/SummaryCardGrid';
+import {
+  SummaryCardGrid,
+  SummaryCardItem,
+  summaryGridClass,
+} from '@/components/accounts/shared/SummaryCardGrid';
 import type { Account } from '@/types/account';
 
 interface BankingSummaryCardsProps {
@@ -88,7 +92,7 @@ export function BankingSummaryCards({
     });
   }
 
-  return (
-    <SummaryCardGrid cards={cards} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" />
-  );
+  // Five, six or seven cards depending on the account's interest, so the grid
+  // is sized to the row rather than fixed.
+  return <SummaryCardGrid cards={cards} className={summaryGridClass(cards.length)} />;
 }

@@ -5,7 +5,11 @@ import { Account } from '@/types/account';
 import { LoanScheduleResult } from '@/lib/loan-schedule';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
-import { SummaryCardGrid, SummaryCardItem } from '@/components/accounts/shared/SummaryCardGrid';
+import {
+  SummaryCardGrid,
+  SummaryCardItem,
+  summaryGridClass,
+} from '@/components/accounts/shared/SummaryCardGrid';
 
 interface LoanSummaryCardsProps {
   account: Account;
@@ -94,5 +98,5 @@ export function LoanSummaryCards({
     },
   ];
 
-  return <SummaryCardGrid cards={cards} />;
+  return <SummaryCardGrid cards={cards} className={summaryGridClass(cards.length)} />;
 }

@@ -1,12 +1,45 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
-import { SummaryCardGrid, DEFAULT_SUMMARY_GRID, SummaryCardItem } from './SummaryCardGrid';
+import {
+  SummaryCardGrid,
+  DEFAULT_SUMMARY_GRID,
+  SummaryCardItem,
+  summaryGridClass,
+} from './SummaryCardGrid';
 
 describe('SummaryCardGrid', () => {
   const cards: SummaryCardItem[] = [
     { label: 'Current Balance', value: '$1,200.00', valueClass: 'text-red-600' },
     { label: 'Available Credit', value: '$3,800.00', note: '76% remaining' },
   ];
+
+  describe('summaryGridClass', () => {
+    // A banking account grows from five cards to seven as it gains an interest
+    // rate and then earns interest; every one of those has to sit on one row.
+    it.each([
+      [4, 'lg:grid-cols-4'],
+      [5, 'lg:grid-cols-5'],
+      [6, 'lg:grid-cols-6'],
+      [7, 'lg:grid-cols-7'],
+    ])('gives %i cards their own column each', (count, expected) => {
+      expect(summaryGridClass(count)).toContain(expected);
+    });
+
+    it('still wraps on smaller screens, where one row would not fit', () => {
+      expect(summaryGridClass(7)).toContain('grid-cols-2');
+      expect(summaryGridClass(7)).toContain('md:grid-cols-3');
+    });
+
+    it('stops widening past the point the cards become unreadable', () => {
+      expect(summaryGridClass(20)).toContain('lg:grid-cols-8');
+    });
+
+    it('never emits an interpolated class Tailwind cannot see', () => {
+      // Guards the reason the column classes are written out longhand.
+      expect(summaryGridClass(0)).toContain('lg:grid-cols-1');
+      expect(summaryGridClass(3)).not.toContain('undefined');
+    });
+  });
 
   it('renders each card label and value', () => {
     render(<SummaryCardGrid cards={cards} />);

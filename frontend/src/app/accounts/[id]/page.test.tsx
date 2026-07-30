@@ -45,12 +45,14 @@ vi.mock('@/hooks/useNumberFormat', () => ({
 }));
 
 const mockGetById = vi.fn();
+const mockGetAll = vi.fn();
 const mockDetectLoanPayments = vi.fn();
 const mockGetDailyBalances = vi.fn();
 const mockGetBalanceForecast = vi.fn();
 vi.mock('@/lib/accounts', () => ({
   accountsApi: {
     getById: (...args: unknown[]) => mockGetById(...args),
+    getAll: (...args: unknown[]) => mockGetAll(...args),
     detectLoanPayments: (...args: unknown[]) => mockDetectLoanPayments(...args),
     getDailyBalances: (...args: unknown[]) => mockGetDailyBalances(...args),
     getBalanceForecast: (...args: unknown[]) => mockGetBalanceForecast(...args),
@@ -165,6 +167,7 @@ async function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetAll.mockResolvedValue([]);
   mockDetectLoanPayments.mockResolvedValue(null);
   mockGetDailyBalances.mockResolvedValue([]);
   mockGetAllScenarios.mockResolvedValue([]);

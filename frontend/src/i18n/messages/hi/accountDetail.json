@@ -3,7 +3,10 @@
     "viewTransactions": "लेनदेन देखें",
     "reconcile": "मिलान करें",
     "edit": "खाता संपादित करें",
-    "back": "खातों पर वापस जाएँ"
+    "back": "खातों पर वापस जाएँ",
+    "switchAccount": "खाता बदलें",
+    "switchPlaceholder": "खाते फ़िल्टर करें...",
+    "switchNoMatches": "कोई खाता मेल नहीं खाता"
   },
   "loading": "खाता विवरण लोड हो रहा है...",
   "error": {

@@ -80,6 +80,8 @@ function AccountDetailContent() {
   const [rateChanges, setRateChanges] = useState<LoanRateChange[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Only for the caret beside the name; a failure costs the switcher, not the page.
+  const [accounts, setAccounts] = useState<Account[]>([]);
   // Populated by LoanDetailView so the loan's PDF export can live in the shared
   // header, on the same row as View Transactions.
   const loanExportRef = useRef<(() => Promise<void>) | null>(null);
@@ -142,6 +144,22 @@ function AccountDetailContent() {
 
   useOnUndoRedo(loadData);
   useOnAiAction(loadData);
+
+  useEffect(() => {
+    let cancelled = false;
+    accountsApi
+      .getAll()
+      .then((list) => {
+        if (!cancelled) setAccounts(list);
+      })
+      // The switcher simply does not render without a list; the page is fine.
+      .catch(() => {
+        if (!cancelled) setAccounts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const reloadScenarios = useCallback(async () => {
     try {
@@ -235,6 +253,8 @@ function AccountDetailContent() {
             detailView === 'loan' ? () => loanExportRef.current?.() : undefined
           }
           onBack={() => router.push('/accounts')}
+          accounts={accounts}
+          onSelectAccount={(id) => router.push(`/accounts/${id}`)}
         >
           <div className="space-y-6">
             {detailView === 'creditCard' ? (

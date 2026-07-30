@@ -3,7 +3,10 @@
     "viewTransactions": "View Transactions",
     "reconcile": "Reconcile",
     "edit": "Edit Account",
-    "back": "Back to Accounts"
+    "back": "Back to Accounts",
+    "switchAccount": "Switch account",
+    "switchPlaceholder": "Filter accounts...",
+    "switchNoMatches": "No accounts match"
   },
   "loading": "Loading account details...",
   "error": {
