@@ -13,6 +13,24 @@ export type TourRequirementMap = Record<TourRequirement, boolean>;
 const ASSUME_MET = true;
 
 /**
+ * Run one lookup, falling back to ASSUME_MET on any failure.
+ *
+ * The lookup is a thunk rather than a promise so that a *synchronous* throw is
+ * caught too. `api.getThing().catch(...)` only handles a rejection: if the call
+ * itself throws -- the module is not what we expect, the method is missing --
+ * the error escapes before `.catch` is ever attached, and an offer surface that
+ * merely wanted to know whether to list a tour takes the whole page down with
+ * it. Deciding which tours to show is never worth that.
+ */
+async function isMet(lookup: () => Promise<boolean>): Promise<boolean> {
+  try {
+    return await lookup();
+  } catch {
+    return ASSUME_MET;
+  }
+}
+
+/**
  * Resolve every data requirement in one pass.
  *
  * Shared by the tour engine (which omits individual steps) and by the offer
@@ -21,17 +39,13 @@ const ASSUME_MET = true;
  */
 export async function resolveTourRequirements(): Promise<TourRequirementMap> {
   const [transactionEntry, securitiesExist] = await Promise.all([
-    accountsApi
-      .getAll(false)
-      .then((accounts) => accounts.length > 0)
-      .catch(() => ASSUME_MET),
+    isMet(() => accountsApi.getAll(false).then((accounts) => accounts.length > 0)),
     // Active securities only, matching what the securities list shows by
     // default: a tour that asks the user to open one from that list should not
     // be offered on the strength of a security they would have to unhide first.
-    investmentsApi
-      .getSecurities()
-      .then((securities) => securities.length > 0)
-      .catch(() => ASSUME_MET),
+    isMet(() =>
+      investmentsApi.getSecurities().then((securities) => securities.length > 0),
+    ),
   ]);
   return { transactionEntry, securitiesExist };
 }

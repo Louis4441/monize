@@ -22,9 +22,15 @@ export function useTourRequirements(enabled: boolean): TourRequirementMap | null
   useEffect(() => {
     if (!enabled || requirements !== null) return;
     let cancelled = false;
-    resolveTourRequirements().then((resolved) => {
-      if (!cancelled) setRequirements(resolved);
-    });
+    // `resolveTourRequirements` swallows its own lookup failures, so this catch
+    // is only for the unforeseeable. Left in because an unhandled rejection in
+    // an effect surfaces as a page-level error, and the worst this hook is
+    // allowed to do is leave a gated tour unoffered.
+    resolveTourRequirements()
+      .then((resolved) => {
+        if (!cancelled) setRequirements(resolved);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

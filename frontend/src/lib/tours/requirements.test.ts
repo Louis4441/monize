@@ -69,6 +69,21 @@ describe('resolveTourRequirements', () => {
     });
   });
 
+  it('survives a lookup that throws instead of rejecting', async () => {
+    // The case that broke CI: a test file mocking `investmentsApi` without
+    // `getSecurities` makes the call itself throw, so `.catch()` on the returned
+    // promise is never reached and the rejection escapes the hook that asked.
+    // Whatever the cause, failing to decide which tours to offer must not be
+    // able to take a page down.
+    getSecurities.mockImplementation(() => {
+      throw new TypeError('investmentsApi.getSecurities is not a function');
+    });
+
+    await expect(resolveTourRequirements()).resolves.toMatchObject({
+      securitiesExist: true,
+    });
+  });
+
   it('does not let one failed lookup mask the other answer', async () => {
     getAllAccounts.mockRejectedValue(new Error('offline'));
     getSecurities.mockResolvedValue([]);
