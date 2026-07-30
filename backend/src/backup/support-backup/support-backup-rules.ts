@@ -322,6 +322,12 @@ export const RULES: Record<string, TableRules> = {
     asset_weightings: jsonb("assetWeightings"), // free-text class names
     sector_data_updated_at: keep,
     quote_provider: keep,
+    // The exchange's regular session, from the provider. Public reference data
+    // about the venue, not the holder, and far too coarse to undo the symbol
+    // mask -- 09:30-16:00 America/New_York names an exchange, not an instrument.
+    market_timezone: keep,
+    market_open_time: keep,
+    market_close_time: keep,
     website: drop, // a public URL names the instrument the masked symbol hides
     ir_website: drop,
     msn_instrument_id: drop, // would identify a masked ticker
@@ -340,6 +346,7 @@ export const RULES: Record<string, TableRules> = {
     adjusted_close: keep,
     volume: keep,
     source: keep,
+    quoted_at: keep, // when the quote was struck; price_date beside it is kept too
     created_at: keep,
   },
   security_documents: {
