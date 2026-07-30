@@ -3,9 +3,26 @@ const packageJson = require('./package.json');
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
+// Every /api/* call is forwarded by proxy.ts, and Next caps a proxied request
+// body at 10MB by default -- silently: it truncates the body, forwards the
+// stump, and the backend sees an aborted upload. That is far below what a
+// Microsoft Money (.mny) file needs (a Money Plus profile with decades of
+// history runs to hundreds of MB), so the ceiling has to match the backend's
+// own MNY_IMPORT_LIMIT_MB rather than sit under it. Same variable and default,
+// so lowering it lowers both ends together.
+//
+// The proxy buffers the body it forwards, so the frontend container needs
+// roughly this much memory available on top of its baseline. See helm/README.md.
+const IMPORT_LIMIT_MB = Number(process.env.MNY_IMPORT_LIMIT_MB) || 300;
+// Multipart framing (boundaries, part headers) rides along with the file.
+const PROXY_BODY_LIMIT_MB = IMPORT_LIMIT_MB + 8;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    proxyClientMaxBodySize: `${PROXY_BODY_LIMIT_MB}mb`,
+  },
   // Pin the dev (Turbopack) workspace root to this app so it doesn't scan the
   // whole monorepo (the backend tree) on every compile. The repo has multiple
   // lockfiles, which otherwise makes Next infer the monorepo root and slows

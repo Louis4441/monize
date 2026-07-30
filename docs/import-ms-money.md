@@ -149,10 +149,18 @@ data as it was and the uploaded file is kept for one more attempt.
 | "The uploaded Money file is no longer available" | Uploaded files are kept 24 hours. Upload it again |
 | "An import is already running" | Wait for it to finish -- possibly in another tab |
 
-If a self-hosted server is killed partway through every attempt, it is almost
-certainly running out of memory: a Money file is held in memory while it is read,
-so the container needs roughly twice the file size available. See
-`helm/README.md` for the sizing rule.
+Two self-hosting failures look like the app is broken and are configuration:
+
+- **The upload dies immediately and the backend logs `Request aborted`.** The
+  Next.js proxy in front of the API caps a forwarded request body at 10MB by
+  default, and *truncates* rather than rejecting anything larger, so nothing
+  reports a size problem. `MNY_IMPORT_LIMIT_MB` sizes that ceiling and must be
+  set on the **frontend** as well as the backend.
+- **The server is killed partway through every attempt.** It is running out of
+  memory. A Money file is held in memory while it is read, so the backend needs
+  roughly twice the file size available, and the frontend needs another copy
+  because the proxy buffers the upload. See `helm/README.md` for the sizing
+  rules.
 
 ## Accuracy, and how to check it
 

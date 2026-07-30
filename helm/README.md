@@ -127,6 +127,16 @@ Lowering `MNY_IMPORT_LIMIT_MB` is the cheaper option when the files being
 imported are small: the wizard then rejects an oversized file with a clear
 message before any memory is committed to it.
 
+**The frontend needs headroom too.** Every `/api/*` call is forwarded by the
+Next.js proxy, which buffers the request body before sending it on, so a `.mny`
+upload is held in the frontend container as well as the backend. Set
+`frontend.resources.limits.memory` to at least `MNY_IMPORT_LIMIT_MB` plus its
+`100Mi` baseline — so `400Mi` at the default 300.
+
+Set `MNY_IMPORT_LIMIT_MB` on **both** deployments if you change it. The frontend
+reads it to size the proxy's own body ceiling (Next caps proxied bodies at 10MB
+otherwise, and truncates rather than rejecting anything larger).
+
 ### Frontend
 
 | Parameter | Description | Default |

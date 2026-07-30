@@ -9,3 +9,6 @@ data:
   NODE_ENV: {{ .Values.frontend.app.NODE_ENV | quote }}
   INTERNAL_API_URL: {{ include "monize.internalApiUrl" . | quote }}
   PUBLIC_APP_URL: {{ .Values.frontend.app.PUBLIC_APP_URL | default (include "monize.publicAppUrl" .) | quote }}
+  # Sizes the Next proxy's request-body ceiling; must match the backend's limit.
+  {{- $mnyImport := .Values.frontend.mnyImport | default dict }}
+  MNY_IMPORT_LIMIT_MB: {{ $mnyImport.MNY_IMPORT_LIMIT_MB | default "300" | quote }}
