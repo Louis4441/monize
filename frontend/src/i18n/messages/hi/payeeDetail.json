@@ -58,7 +58,11 @@
     "title": "शीर्ष श्रेणियाँ",
     "subtitle": "पिछले 12 महीने",
     "empty": "पिछले 12 महीनों में कोई खर्च नहीं",
-    "uncategorized": "अवर्गीकृत"
+    "uncategorized": "अवर्गीकृत",
+    "subtitleAllTime": "पूरा इतिहास",
+    "emptyAllTime": "इस भुगतानकर्ता के लिए कोई खर्च दर्ज नहीं",
+    "range12m": "12 महीने",
+    "rangeAll": "सभी"
   },
   "accountsPanel": {
     "title": "इन खातों से भुगतान",

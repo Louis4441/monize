@@ -58,7 +58,11 @@
     "title": "En Çok Kullanılan Kategoriler",
     "subtitle": "Son 12 ay",
     "empty": "Son 12 ayda harcama yok",
-    "uncategorized": "Kategorisiz"
+    "uncategorized": "Kategorisiz",
+    "subtitleAllTime": "Tüm geçmiş",
+    "emptyAllTime": "Bu alacaklı için kayıtlı harcama yok",
+    "range12m": "12 ay",
+    "rangeAll": "Tümü"
   },
   "accountsPanel": {
     "title": "Ödemenin Yapıldığı Hesaplar",

@@ -58,7 +58,11 @@
     "title": "上位カテゴリ",
     "subtitle": "過去12か月",
     "empty": "過去12か月の支出はありません",
-    "uncategorized": "未分類"
+    "uncategorized": "未分類",
+    "subtitleAllTime": "全期間",
+    "emptyAllTime": "この支払先の支出は記録されていません",
+    "range12m": "12か月",
+    "rangeAll": "全期間"
   },
   "accountsPanel": {
     "title": "支払元の口座",

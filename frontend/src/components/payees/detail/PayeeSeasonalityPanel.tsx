@@ -119,12 +119,19 @@ export function PayeeSeasonalityPanel({
                             amount,
                             years: entry.years,
                           })}
+                          // Colour carries the sign, matching the app's other
+                          // CSS bars (TopGroupsPanel, CashFlowMiniReport):
+                          // money out red, money in green. The peak is the same
+                          // hue a couple of steps darker rather than a colour of
+                          // its own, so highlighting it does not cost the sign.
                           className={`w-full rounded-t ${
-                            isPeak
-                              ? 'bg-blue-500 dark:bg-blue-400'
-                              : average > 0
-                                ? 'bg-green-400 dark:bg-green-500'
-                                : 'bg-gray-300 dark:bg-gray-600'
+                            average > 0
+                              ? isPeak
+                                ? 'bg-green-600 dark:bg-green-400'
+                                : 'bg-green-400 dark:bg-green-600'
+                              : isPeak
+                                ? 'bg-red-600 dark:bg-red-400'
+                                : 'bg-red-400 dark:bg-red-600'
                           }`}
                           // A month with history but a zero average still shows
                           // a sliver, so it reads as "billed, netted out"

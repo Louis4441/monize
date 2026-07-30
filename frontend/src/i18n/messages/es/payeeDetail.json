@@ -58,7 +58,11 @@
     "title": "Categorías principales",
     "subtitle": "Últimos 12 meses",
     "empty": "Sin gastos en los últimos 12 meses",
-    "uncategorized": "Sin categoría"
+    "uncategorized": "Sin categoría",
+    "subtitleAllTime": "Todo el historial",
+    "emptyAllTime": "No hay gastos registrados para este beneficiario",
+    "range12m": "12 meses",
+    "rangeAll": "Todo"
   },
   "accountsPanel": {
     "title": "Pagado desde cuentas",

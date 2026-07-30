@@ -92,4 +92,33 @@ describe('DateRangeSelector', () => {
     fireEvent.change(endInput, { target: { value: '2025-12-31' } });
     expect(onCustomEndDateChange).toHaveBeenCalledWith('2025-12-31');
   });
+
+  // `formatLabel` produces English ("All Time"), which is fine for the
+  // abbreviation presets but not for a caller whose labels are words.
+  it('prefers supplied labels over the built-in English ones', () => {
+    render(
+      <DateRangeSelector
+        ranges={['year', 'all']}
+        labels={{ year: '12 Monate', all: 'Gesamt' }}
+        value="year"
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('button', { name: '12 Monate' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Gesamt' })).toBeInTheDocument();
+    expect(screen.queryByText('All Time')).toBeNull();
+  });
+
+  it('falls back to the built-in label for a key the map omits', () => {
+    render(
+      <DateRangeSelector
+        ranges={['3m', 'all']}
+        labels={{ all: 'Everything' }}
+        value="3m"
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('button', { name: '3M' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Everything' })).toBeInTheDocument();
+  });
 });

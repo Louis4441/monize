@@ -97,4 +97,34 @@ describe('TopGroupsPanel', () => {
     );
     expect(screen.getByText('This month')).toBeInTheDocument();
   });
+
+  it('renders a header action beside the title when given one', () => {
+    render(
+      <TopGroupsPanel
+        title="Top Categories"
+        emptyLabel="No activity"
+        fallbackLabel="Uncategorised"
+        totals={totals}
+        currencyCode="CAD"
+        isLoading={false}
+        headerAction={<button type="button">All time</button>}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'All time' })).toBeInTheDocument();
+  });
+
+  it('renders no action container when none is given', () => {
+    render(
+      <TopGroupsPanel
+        title="Top Categories"
+        emptyLabel="No activity"
+        fallbackLabel="Uncategorised"
+        totals={totals}
+        currencyCode="CAD"
+        isLoading={false}
+      />,
+    );
+    expect(screen.getByText('Top Categories')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'All time' })).toBeNull();
+  });
 });

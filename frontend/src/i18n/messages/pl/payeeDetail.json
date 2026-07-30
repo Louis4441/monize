@@ -58,7 +58,11 @@
     "title": "Najczęstsze kategorie",
     "subtitle": "Ostatnie 12 miesięcy",
     "empty": "Brak wydatków w ostatnich 12 miesiącach",
-    "uncategorized": "Bez kategorii"
+    "uncategorized": "Bez kategorii",
+    "subtitleAllTime": "Cała historia",
+    "emptyAllTime": "Brak zarejestrowanych wydatków dla tego odbiorcy",
+    "range12m": "12 miesięcy",
+    "rangeAll": "Wszystko"
   },
   "accountsPanel": {
     "title": "Płacone z kont",

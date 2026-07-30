@@ -8,7 +8,6 @@ import {
   ChevronDoubleLeftIcon,
   EyeIcon,
   EyeSlashIcon,
-  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import { Account } from '@/types/account';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
@@ -177,7 +176,8 @@ export function AccountInfoWidget({
             title={t('accountWidget.viewDetailsAria')}
             className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1"
           >
-            <ChartBarIcon className="h-5 w-5" />
+            {/* Eye, matching the payee widget's link to its own detail page. */}
+            <EyeIcon className="h-5 w-5" />
           </button>
           <button
             type="button"

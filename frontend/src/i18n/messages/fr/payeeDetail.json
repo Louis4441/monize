@@ -58,7 +58,11 @@
     "title": "Principales catégories",
     "subtitle": "12 derniers mois",
     "empty": "Aucune dépense sur les 12 derniers mois",
-    "uncategorized": "Non catégorisé"
+    "uncategorized": "Non catégorisé",
+    "subtitleAllTime": "Depuis le début",
+    "emptyAllTime": "Aucune dépense enregistrée pour ce bénéficiaire",
+    "range12m": "12 mois",
+    "rangeAll": "Tout"
   },
   "accountsPanel": {
     "title": "Payé depuis les comptes",

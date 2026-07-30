@@ -19,6 +19,7 @@ import { PayeeKeyInfoCard } from '@/components/payees/detail/PayeeKeyInfoCard';
 import { PayeeRecurringPanel } from '@/components/payees/detail/PayeeRecurringPanel';
 import { PayeeSeasonalityPanel } from '@/components/payees/detail/PayeeSeasonalityPanel';
 import { TopGroupsPanel } from '@/components/accounts/shared/TopGroupsPanel';
+import { DateRangeSelector } from '@/components/ui/DateRangeSelector';
 import { ReactivatePayeeDialog } from '@/components/payees/ReactivatePayeeDialog';
 import { useFormModal } from '@/hooks/useFormModal';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
@@ -118,9 +119,16 @@ interface PayeeAnalytics {
   thisYearSummary: TransactionSummary | null;
   lastYearSummary: TransactionSummary | null;
   monthlyTotals: MonthlyTotal[];
+  /** Trailing 12 months, the default range for the Top Categories panel. */
   categoryTotals: GroupedTotal[];
+  /** The same breakdown over the payee's whole history. */
+  categoryTotalsAllTime: GroupedTotal[];
   recurringCharges: RecurringChargeInfo[];
 }
+
+/** Which window the Top Categories panel is showing. */
+type CategoryRange = 'year' | 'all';
+const CATEGORY_RANGES: readonly CategoryRange[] = ['year', 'all'];
 
 export default function PayeeDetailPage() {
   return (
@@ -149,6 +157,7 @@ function PayeeDetailContent() {
   const [refreshKey, setRefreshKey] = useState(0);
   // Read once, from the link that opened the page; later changes are the user's.
   const [tab, setTab] = useState<TabKey>(() => tabFromQuery(searchParams.get('tab')));
+  const [categoryRange, setCategoryRange] = useState<CategoryRange>('year');
   const [isMerging, setIsMerging] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isReactivating, setIsReactivating] = useState(false);
@@ -190,6 +199,7 @@ function PayeeDetailContent() {
         lastYearSummary,
         monthlyTotals,
         categoryTotals,
+        categoryTotalsAllTime,
         recurringCharges,
       ] = await Promise.all([
         transactionsApi.getSummary({ payeeIds: [payeeId] }).catch((err) => {
@@ -222,6 +232,17 @@ function PayeeDetailContent() {
             limit: 25,
           })
           .catch(() => [] as GroupedTotal[]),
+        // Both ranges are fetched up front so the Top Categories toggle is
+        // instant. They are two cheap grouped queries, and switching range is a
+        // comparison -- putting a spinner between the two halves of it would
+        // make the comparison harder than the request is expensive.
+        transactionsApi
+          .getGroupedTotals({
+            groupBy: 'category',
+            payeeIds: [payeeId],
+            limit: 25,
+          })
+          .catch(() => [] as GroupedTotal[]),
         transactionsApi
           .getRecurringCharges({ payeeIds: [payeeId], startDate: yearAgo, endDate: today })
           .catch(() => [] as RecurringChargeInfo[]),
@@ -234,6 +255,7 @@ function PayeeDetailContent() {
         lastYearSummary,
         monthlyTotals,
         categoryTotals,
+        categoryTotalsAllTime,
         recurringCharges,
       });
       setRefreshKey((key) => key + 1);
@@ -336,19 +358,25 @@ function PayeeDetailContent() {
 
   // Category rows aggregated across currencies into the display currency, with
   // the hierarchy-aware labels the rest of the app uses.
-  const categoryPanelTotals = useMemo<GroupedTotal[]>(
-    () =>
-      aggregateGroupedTotals(analytics?.categoryTotals ?? [], currencyStrategy).map(
-        (row) => ({
-          id: row.id,
-          name: row.id ? (categoryLabelMap.get(row.id) ?? row.name) : row.name,
-          currencyCode: currencyStrategy.displayCurrency,
-          total: row.total,
-          count: row.count,
-        }),
-      ),
-    [analytics?.categoryTotals, currencyStrategy, categoryLabelMap],
-  );
+  const categoryPanelTotals = useMemo<GroupedTotal[]>(() => {
+    const source =
+      categoryRange === 'all'
+        ? (analytics?.categoryTotalsAllTime ?? [])
+        : (analytics?.categoryTotals ?? []);
+    return aggregateGroupedTotals(source, currencyStrategy).map((row) => ({
+      id: row.id,
+      name: row.id ? (categoryLabelMap.get(row.id) ?? row.name) : row.name,
+      currencyCode: currencyStrategy.displayCurrency,
+      total: row.total,
+      count: row.count,
+    }));
+  }, [
+    analytics?.categoryTotals,
+    analytics?.categoryTotalsAllTime,
+    categoryRange,
+    currencyStrategy,
+    categoryLabelMap,
+  ]);
 
   // One row per account, converted so the bars stay comparable.
   const accountPanelTotals = useMemo<GroupedTotal[]>(
@@ -600,16 +628,48 @@ function PayeeDetailContent() {
                 <div className="grid gap-6 lg:grid-cols-2">
                   <TopGroupsPanel
                     title={t('topCategories.title')}
-                    subtitle={t('topCategories.subtitle')}
-                    emptyLabel={t('topCategories.empty')}
+                    subtitle={t(
+                      categoryRange === 'all'
+                        ? 'topCategories.subtitleAllTime'
+                        : 'topCategories.subtitle',
+                    )}
+                    emptyLabel={t(
+                      categoryRange === 'all'
+                        ? 'topCategories.emptyAllTime'
+                        : 'topCategories.empty',
+                    )}
                     fallbackLabel={t('topCategories.uncategorized')}
                     totals={categoryPanelTotals}
                     currencyCode={currencyStrategy.displayCurrency}
                     isLoading={false}
                     onSelect={(categoryId) =>
-                      goToRegister(categoryId ? { categoryId } : {})
+                      goToRegister(
+                        categoryId
+                          ? {
+                              categoryId,
+                              // The register opens on the range the panel was
+                              // showing, so the figure clicked is the figure
+                              // the list adds up to.
+                              ...(categoryRange === 'year'
+                                ? { startDate: isoDaysAgo(365), endDate: isoDaysAgo(0) }
+                                : {}),
+                            }
+                          : {},
+                      )
                     }
                     selectableWhenUnidentified
+                    headerAction={
+                      <DateRangeSelector
+                        ranges={CATEGORY_RANGES}
+                        labels={{
+                          year: t('topCategories.range12m'),
+                          all: t('topCategories.rangeAll'),
+                        }}
+                        value={categoryRange}
+                        onChange={(range) => setCategoryRange(range as CategoryRange)}
+                        size="sm"
+                      />
+                    }
                   />
                   <TopGroupsPanel
                     title={t('accountsPanel.title')}

@@ -58,7 +58,11 @@
     "title": "Top-Kategorien",
     "subtitle": "Letzte 12 Monate",
     "empty": "Keine Ausgaben in den letzten 12 Monaten",
-    "uncategorized": "Nicht kategorisiert"
+    "uncategorized": "Nicht kategorisiert",
+    "subtitleAllTime": "Gesamter Zeitraum",
+    "emptyAllTime": "Für diesen Zahlungsempfänger sind keine Ausgaben erfasst",
+    "range12m": "12 Monate",
+    "rangeAll": "Gesamt"
   },
   "accountsPanel": {
     "title": "Bezahlt von Konten",

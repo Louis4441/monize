@@ -58,7 +58,11 @@
     "title": "Kategori Teratas",
     "subtitle": "12 bulan terakhir",
     "empty": "Tidak ada pengeluaran dalam 12 bulan terakhir",
-    "uncategorized": "Belum Dikategorikan"
+    "uncategorized": "Belum Dikategorikan",
+    "subtitleAllTime": "Seluruh riwayat",
+    "emptyAllTime": "Tidak ada pengeluaran tercatat untuk penerima ini",
+    "range12m": "12 bulan",
+    "rangeAll": "Semua"
   },
   "accountsPanel": {
     "title": "Dibayar dari Akun",

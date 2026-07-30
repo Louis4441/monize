@@ -58,7 +58,11 @@
     "title": "Top Categories",
     "subtitle": "Trailing 12 months",
     "empty": "No spending in the last 12 months",
-    "uncategorized": "Uncategorized"
+    "uncategorized": "Uncategorized",
+    "subtitleAllTime": "All time",
+    "emptyAllTime": "No spending recorded for this payee",
+    "range12m": "12 months",
+    "rangeAll": "All time"
   },
   "accountsPanel": {
     "title": "Paid From Accounts",

@@ -58,7 +58,11 @@
     "title": "主要分类",
     "subtitle": "最近12个月",
     "empty": "最近12个月没有支出",
-    "uncategorized": "未分类"
+    "uncategorized": "未分类",
+    "subtitleAllTime": "全部历史",
+    "emptyAllTime": "该收款人没有支出记录",
+    "range12m": "12个月",
+    "rangeAll": "全部"
   },
   "accountsPanel": {
     "title": "付款账户",

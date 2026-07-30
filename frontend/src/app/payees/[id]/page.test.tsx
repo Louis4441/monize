@@ -264,9 +264,12 @@ describe('PayeeDetailPage', () => {
     const panel = screen.getByText('Top Categories').closest('section')!;
     fireEvent.click(within(panel).getByText('Coffee'));
 
-    expect(mockPush).toHaveBeenCalledWith(
-      '/transactions?payeeId=payee-1&accountStatus=all&categoryId=cat-1',
-    );
+    // The panel's range also lands in the link; what matters here is that a
+    // closed account is not pruned out of the result.
+    const url = mockPush.mock.calls.at(-1)![0] as string;
+    expect(url).toContain('payeeId=payee-1');
+    expect(url).toContain('accountStatus=all');
+    expect(url).toContain('categoryId=cat-1');
   });
 
   it('narrows the register to one day from the largest transaction', async () => {
@@ -283,6 +286,80 @@ describe('PayeeDetailPage', () => {
     await renderPage();
 
     expect(mockGetMonthlyTotals).toHaveBeenCalledWith({ payeeIds: ['payee-1'] });
+  });
+
+  describe('Top Categories range toggle', () => {
+    beforeEach(() => {
+      // Trailing 12 months and all time return different breakdowns, so the
+      // panel visibly changes when the range does.
+      mockGetGroupedTotals.mockImplementation((params: { startDate?: string }) =>
+        Promise.resolve(
+          params.startDate
+            ? [{ id: 'cat-1', name: 'Coffee', currencyCode: 'CAD', total: -100, count: 5 }]
+            : [{ id: 'cat-2', name: 'Pastry', currencyCode: 'CAD', total: -900, count: 60 }],
+        ),
+      );
+    });
+
+    it('fetches both ranges up front so switching needs no request', async () => {
+      await renderPage();
+
+      expect(mockGetGroupedTotals).toHaveBeenCalledWith(
+        expect.objectContaining({ groupBy: 'category', startDate: expect.any(String) }),
+      );
+      const allTimeCall = mockGetGroupedTotals.mock.calls.find(
+        ([params]) => params.groupBy === 'category' && params.startDate === undefined,
+      );
+      expect(allTimeCall).toBeDefined();
+    });
+
+    it('opens on the trailing 12 months', async () => {
+      await renderPage();
+
+      const panel = screen.getByText('Top Categories').closest('section')!;
+      expect(within(panel).getByText('Trailing 12 months')).toBeInTheDocument();
+      expect(within(panel).getByText('Coffee')).toBeInTheDocument();
+    });
+
+    it('switches to all time without refetching', async () => {
+      await renderPage();
+      const callsBefore = mockGetGroupedTotals.mock.calls.length;
+
+      const panel = screen.getByText('Top Categories').closest('section')!;
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'All time' }));
+      });
+
+      expect(within(panel).getByText('Pastry')).toBeInTheDocument();
+      expect(within(panel).queryByText('Coffee')).toBeNull();
+      expect(mockGetGroupedTotals.mock.calls.length).toBe(callsBefore);
+    });
+
+    it('drops the date filter from a category link when showing all time', async () => {
+      await renderPage();
+
+      const panel = screen.getByText('Top Categories').closest('section')!;
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'All time' }));
+      });
+      fireEvent.click(within(panel).getByText('Pastry'));
+
+      expect(mockPush).toHaveBeenCalledWith(
+        '/transactions?payeeId=payee-1&accountStatus=all&categoryId=cat-2',
+      );
+    });
+
+    it('carries the 12-month window into a category link', async () => {
+      await renderPage();
+
+      const panel = screen.getByText('Top Categories').closest('section')!;
+      fireEvent.click(within(panel).getByText('Coffee'));
+
+      const url = mockPush.mock.calls.at(-1)![0] as string;
+      expect(url).toContain('categoryId=cat-1');
+      expect(url).toContain('startDate=');
+      expect(url).toContain('endDate=');
+    });
   });
 
   it('applies the default category from the Uncategorized card', async () => {

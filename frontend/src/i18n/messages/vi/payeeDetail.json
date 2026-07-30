@@ -58,7 +58,11 @@
     "title": "Danh mục hàng đầu",
     "subtitle": "12 tháng gần nhất",
     "empty": "Không có chi tiêu trong 12 tháng gần nhất",
-    "uncategorized": "Chưa phân loại"
+    "uncategorized": "Chưa phân loại",
+    "subtitleAllTime": "Toàn bộ lịch sử",
+    "emptyAllTime": "Chưa ghi nhận chi tiêu nào cho người nhận này",
+    "range12m": "12 tháng",
+    "rangeAll": "Tất cả"
   },
   "accountsPanel": {
     "title": "Thanh toán từ các tài khoản",

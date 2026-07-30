@@ -58,7 +58,11 @@
     "title": "[XX-Top Categories-XX]",
     "subtitle": "[XX-Trailing 12 months-XX]",
     "empty": "[XX-No spending in the last 12 months-XX]",
-    "uncategorized": "[XX-Uncategorized-XX]"
+    "uncategorized": "[XX-Uncategorized-XX]",
+    "subtitleAllTime": "[XX-All time-XX]",
+    "emptyAllTime": "[XX-No spending recorded for this payee-XX]",
+    "range12m": "[XX-12 months-XX]",
+    "rangeAll": "[XX-All time-XX]"
   },
   "accountsPanel": {
     "title": "[XX-Paid From Accounts-XX]",

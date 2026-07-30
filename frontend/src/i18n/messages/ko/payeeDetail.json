@@ -58,7 +58,11 @@
     "title": "상위 카테고리",
     "subtitle": "최근 12개월",
     "empty": "최근 12개월간 지출이 없습니다",
-    "uncategorized": "미분류"
+    "uncategorized": "미분류",
+    "subtitleAllTime": "전체 기간",
+    "emptyAllTime": "이 수취인의 지출 기록이 없습니다",
+    "range12m": "12개월",
+    "rangeAll": "전체"
   },
   "accountsPanel": {
     "title": "결제 계좌",

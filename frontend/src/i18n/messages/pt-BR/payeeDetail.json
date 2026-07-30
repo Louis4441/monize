@@ -58,7 +58,11 @@
     "title": "Categorias principais",
     "subtitle": "Últimos 12 meses",
     "empty": "Sem despesas nos últimos 12 meses",
-    "uncategorized": "Sem categoria"
+    "uncategorized": "Sem categoria",
+    "subtitleAllTime": "Todo o histórico",
+    "emptyAllTime": "Sem gastos registrados para este beneficiário",
+    "range12m": "12 meses",
+    "rangeAll": "Tudo"
   },
   "accountsPanel": {
     "title": "Pago a partir das contas",

@@ -58,7 +58,11 @@
     "title": "Topcategorieën",
     "subtitle": "Afgelopen 12 maanden",
     "empty": "Geen uitgaven in de afgelopen 12 maanden",
-    "uncategorized": "Zonder categorie"
+    "uncategorized": "Zonder categorie",
+    "subtitleAllTime": "Volledige historie",
+    "emptyAllTime": "Geen uitgaven vastgelegd voor deze begunstigde",
+    "range12m": "12 maanden",
+    "rangeAll": "Alles"
   },
   "accountsPanel": {
     "title": "Betaald vanaf rekeningen",
