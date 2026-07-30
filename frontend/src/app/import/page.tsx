@@ -13,6 +13,10 @@ import { MapAccountsStep } from '@/components/import/MapAccountsStep';
 import { ReviewStep } from '@/components/import/ReviewStep';
 import { CompleteStep } from '@/components/import/CompleteStep';
 import { MultiAccountReviewStep } from '@/components/import/MultiAccountReviewStep';
+import { MnyReviewStep } from '@/components/import/MnyReviewStep';
+import { MnyImportProgress } from '@/components/import/MnyImportProgress';
+import { MnyVerificationReport } from '@/components/import/MnyVerificationReport';
+import { MnyPasswordDialog } from '@/components/import/MnyPasswordDialog';
 import { useImportWizard } from '@/hooks/useImportWizard';
 import { formatCategoryPath } from './import-utils';
 
@@ -184,6 +188,44 @@ function ImportContent() {
           />
         ) : null;
 
+      case 'mnyReview':
+        return wizard.mny.preview ? (
+          <MnyReviewStep
+            preview={wizard.mny.preview}
+            excludedHandles={wizard.mny.excludedHandles}
+            currencyOverrides={wizard.mny.currencyOverrides}
+            options={wizard.mny.options}
+            currencyOptions={wizard.currencyOptions}
+            isLoading={wizard.mny.isStarting}
+            onToggleAccount={wizard.mny.toggleAccount}
+            onSetAllAccounts={wizard.mny.setAllAccounts}
+            onSetAccountCurrency={wizard.mny.setAccountCurrency}
+            onSetOption={wizard.mny.setOption}
+            onBack={wizard.handleMnyDone}
+            onImport={() => wizard.handleMnyStart()}
+          />
+        ) : null;
+
+      case 'mnyImporting':
+        // The same step covers running, failed and finished: the job row is the
+        // single source of truth for which of the three the user is looking at.
+        return wizard.mny.job?.status === 'completed' &&
+          wizard.mny.job.result ? (
+          <MnyVerificationReport
+            result={wizard.mny.job.result}
+            currencyCode={wizard.mny.preview?.baseCurrency ?? 'USD'}
+            filename={wizard.mnyFileName}
+            onDone={wizard.handleMnyDone}
+          />
+        ) : (
+          <MnyImportProgress
+            job={wizard.mny.job}
+            isStarting={wizard.mny.isStarting}
+            onRetry={wizard.mny.retry}
+            onStartOver={wizard.handleMnyDone}
+          />
+        );
+
       case 'complete':
         return (
           <CompleteStep
@@ -202,6 +244,13 @@ function ImportContent() {
 
   return (
     <PageLayout>
+      <MnyPasswordDialog
+        isOpen={wizard.mny.passwordPrompt !== null}
+        isRetry={wizard.mny.passwordPrompt?.retry ?? false}
+        isLoading={wizard.mny.isUploading}
+        onSubmit={wizard.handleMnyPasswordSubmit}
+        onCancel={wizard.mny.cancelPasswordPrompt}
+      />
       <main className="px-4 sm:px-6 lg:px-12 pt-6 pb-8">
         <PageHeader
           title={t('page.title')}

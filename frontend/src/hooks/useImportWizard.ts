@@ -41,6 +41,7 @@ import {
   SECURITY_TYPE_OPTIONS,
   getCurrencyFromExchange,
 } from '@/app/import/import-utils';
+import { useMnyImport } from '@/hooks/useMnyImport';
 import {
   matchFilenameToAccount,
   buildCategoryMappings,
@@ -55,6 +56,9 @@ function detectFileType(fileName: string): ImportFileType {
   const ext = fileName.toLowerCase().split('.').pop() || '';
   if (ext === 'ofx' || ext === 'qfx') return 'ofx';
   if (ext === 'csv') return 'csv';
+  // Checked before anything reads the file: a .mny is a Jet database, and the
+  // QIF fallback would hand its bytes to File.text().
+  if (ext === 'mny') return 'mny';
   return 'qif';
 }
 
@@ -82,6 +86,19 @@ export function useImportWizard() {
   const preferredExchanges = useMemo(() => rawPreferredExchanges || [], [rawPreferredExchanges]);
 
   const [step, setStep] = useState<ImportStep>('upload');
+  // Microsoft Money imports run on their own state machine: no account
+  // selection, no category mapping, but a password prompt and a polled job.
+  const mny = useMnyImport();
+  // Destructured because the hook returns a fresh object each render while its
+  // callbacks are stable; depending on `mny` itself would defeat every
+  // useCallback below it.
+  const {
+    upload: uploadMny,
+    retryWithPassword: retryMnyWithPassword,
+    start: startMny,
+    reset: resetMny,
+  } = mny;
+  const [mnyFileName, setMnyFileName] = useState('');
   const [importFiles, setImportFiles] = useState<ImportFileData[]>([]);
   const fileContent = importFiles[0]?.fileContent || '';
   const fileName = importFiles[0]?.fileName || '';
@@ -357,6 +374,23 @@ export function useImportWizard() {
       const detectedFileType = uniqueTypes[0];
       setFileType(detectedFileType);
 
+      if (detectedFileType === 'mny') {
+        // One file only: a Money file is a whole profile, not a statement.
+        if (fileArray.length > 1) {
+          toast.error(t('toasts.mnySingleFileOnly'));
+          setIsLoading(false);
+          return;
+        }
+        const file = fileArray[0];
+        setMnyFileName(file.name);
+        // The File goes up as multipart. Nothing reads it as text.
+        if (await uploadMny(file)) {
+          setStep('mnyReview');
+        }
+        setIsLoading(false);
+        return;
+      }
+
       if (detectedFileType === 'csv') {
         // For CSV, read the first file and get headers
         const firstFile = fileArray[0];
@@ -489,7 +523,7 @@ export function useImportWizard() {
     } finally {
       setIsLoading(false);
     }
-  }, [accounts, categories, securities, defaultCurrency, preselectedAccountId, t]);
+  }, [accounts, categories, securities, defaultCurrency, preselectedAccountId, t, uploadMny]);
 
   // CSV column mapping handlers
   const handleCsvColumnMappingChange = useCallback((mapping: CsvColumnMappingConfig) => {
@@ -1052,6 +1086,36 @@ export function useImportWizard() {
     setCsvTransferRules([]);
   };
 
+  /** Retries the upload with the password the dialog collected. */
+  const handleMnyPasswordSubmit = useCallback(
+    async (password: string) => {
+      setIsLoading(true);
+      if (await retryMnyWithPassword(password)) {
+        setStep('mnyReview');
+      }
+      setIsLoading(false);
+    },
+    [retryMnyWithPassword],
+  );
+
+  const handleMnyStart = useCallback(
+    async (wipePassword?: string) => {
+      // Move to the progress step first: the job is already running server-side
+      // and the wizard's job is to show it.
+      if (await startMny(wipePassword)) {
+        setStep('mnyImporting');
+      }
+    },
+    [startMny],
+  );
+
+  const handleMnyDone = useCallback(() => {
+    resetMny();
+    setMnyFileName('');
+    setImportFiles([]);
+    setStep('upload');
+  }, [resetMny]);
+
   return {
     step, setStep,
     importFiles, isBulkImport, fileName, parsedData, selectedAccountId, setSelectedAccountId, setFileAccountId, fileContent,
@@ -1082,5 +1146,7 @@ export function useImportWizard() {
     handleSaveColumnMapping,
     handleLoadColumnMapping,
     handleDeleteColumnMapping,
+    // Microsoft Money (.mny)
+    mny, mnyFileName, handleMnyPasswordSubmit, handleMnyStart, handleMnyDone,
   };
 }

@@ -77,7 +77,7 @@ export function UploadStep({ preselectedAccount, isLoading, onFileSelect }: Uplo
         <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center">
           <input
             type="file"
-            accept=".qif,.ofx,.qfx,.csv"
+            accept=".qif,.ofx,.qfx,.csv,.mny"
             multiple
             onChange={onFileSelect}
             className="hidden"
