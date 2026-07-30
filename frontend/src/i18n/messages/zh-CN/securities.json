@@ -208,14 +208,12 @@
     "submitUpdate": "更新价格"
   },
   "priceHistory": {
-    "title": "{symbol} - 价格历史",
     "forceUpdateButton": "强制更新价格",
     "forceUpdateTitle": "重新获取您持有此证券整个期间的历史价格",
     "addPriceButton": "+ 添加价格",
     "addPriceSection": "添加价格",
     "editPriceSection": "编辑价格",
     "loading": "正在加载价格...",
-    "chartTitle": "价格历史",
     "markers": {
       "bought": "买入 {quantity} · {account}",
       "sold": "卖出 {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "更新 {symbol} 价格失败",
       "updateFetchFailed": "更新价格失败"
     },
-    "closeButton": "关闭",
     "deleteConfirm": {
       "title": "删除价格",
       "message": "确定要删除 {date} 的价格记录吗？",
@@ -257,8 +254,6 @@
     "groupCount": "{count} 条价格"
   },
   "transactionHistory": {
-    "inactiveBadge": "非活跃",
-    "currentShares": "当前股数",
     "accountLabel": "账户",
     "allAccounts": "所有账户（{shares} 股）",
     "accountClosed": "{name}（已关闭）",

@@ -127,8 +127,8 @@ function SecuritiesContent() {
     openEdit(security);
   };
 
-  // The list's modals stay for a quick look; the detail page is the whole
-  // picture, and the linkable place other screens point at.
+  // The detail page owns every view of a security, and is the linkable place
+  // other screens point at.
   const handleOpen = useCallback(
     (security: Security) => {
       router.push(`/securities/${security.id}`);

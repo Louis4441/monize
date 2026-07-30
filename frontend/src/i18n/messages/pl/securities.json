@@ -208,14 +208,12 @@
     "submitUpdate": "Zaktualizuj cenę"
   },
   "priceHistory": {
-    "title": "{symbol} - Historia cen",
     "forceUpdateButton": "Wymuś aktualizację cen",
     "forceUpdateTitle": "Pobierz ponownie historyczne ceny za cały okres posiadania tego papieru wartościowego",
     "addPriceButton": "+ Dodaj cenę",
     "addPriceSection": "Dodaj cenę",
     "editPriceSection": "Edytuj cenę",
     "loading": "Wczytywanie cen...",
-    "chartTitle": "Historia ceny",
     "markers": {
       "bought": "Kupno {quantity} · {account}",
       "sold": "Sprzedaż {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "Nie udało się zaktualizować cen dla {symbol}",
       "updateFetchFailed": "Nie udało się zaktualizować cen"
     },
-    "closeButton": "Zamknij",
     "deleteConfirm": {
       "title": "Usuń cenę",
       "message": "Usunąć wpis ceny z {date}?",
@@ -257,8 +254,6 @@
     "groupCount": "ceny: {count}"
   },
   "transactionHistory": {
-    "inactiveBadge": "Nieaktywny",
-    "currentShares": "Aktualne udziały",
     "accountLabel": "Konto",
     "allAccounts": "Wszystkie konta ({shares})",
     "accountClosed": "{name} (zamknięte)",

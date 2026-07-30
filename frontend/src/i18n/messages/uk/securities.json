@@ -208,14 +208,12 @@
     "submitUpdate": "Оновити ціну"
   },
   "priceHistory": {
-    "title": "{symbol} — Історія цін",
     "forceUpdateButton": "Примусово оновити ціни",
     "forceUpdateTitle": "Повторно завантажити історію цін за весь період, протягом якого ви тримали цей цінний папір",
     "addPriceButton": "+ Додати ціну",
     "addPriceSection": "Додати ціну",
     "editPriceSection": "Редагувати ціну",
     "loading": "Завантаження цін...",
-    "chartTitle": "Історія ціни",
     "markers": {
       "bought": "Купівля {quantity} · {account}",
       "sold": "Продаж {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "Не вдалося оновити ціни для {symbol}",
       "updateFetchFailed": "Не вдалося оновити ціни"
     },
-    "closeButton": "Закрити",
     "deleteConfirm": {
       "title": "Видалити ціну",
       "message": "Видалити запис ціни за {date}?",
@@ -257,8 +254,6 @@
     "groupCount": "цін: {count}"
   },
   "transactionHistory": {
-    "inactiveBadge": "Неактивний",
-    "currentShares": "Поточні акції",
     "accountLabel": "Рахунок",
     "allAccounts": "Всі рахунки ({shares})",
     "accountClosed": "{name} (закритий)",

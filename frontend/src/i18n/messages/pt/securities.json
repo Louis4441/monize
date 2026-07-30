@@ -208,14 +208,12 @@
     "submitUpdate": "Atualizar Cotação"
   },
   "priceHistory": {
-    "title": "{symbol} - Histórico de Cotações",
     "forceUpdateButton": "Forçar Atualização de Cotações",
     "forceUpdateTitle": "Reobter cotações históricas para todo o período em que deteve este título",
     "addPriceButton": "+ Adicionar Cotação",
     "addPriceSection": "Adicionar Cotação",
     "editPriceSection": "Editar Cotação",
     "loading": "A carregar cotações...",
-    "chartTitle": "Histórico de preços",
     "markers": {
       "bought": "Compra {quantity} · {account}",
       "sold": "Venda {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "Falha ao atualizar cotações para {symbol}",
       "updateFetchFailed": "Falha ao atualizar cotações"
     },
-    "closeButton": "Fechar",
     "deleteConfirm": {
       "title": "Eliminar Cotação",
       "message": "Eliminar a cotação de {date}?",
@@ -257,8 +254,6 @@
     "groupCount": "{count} cotação(ões)"
   },
   "transactionHistory": {
-    "inactiveBadge": "Inativo",
-    "currentShares": "Ações atuais",
     "accountLabel": "Conta",
     "allAccounts": "Todas as contas ({shares})",
     "accountClosed": "{name} (encerrada)",

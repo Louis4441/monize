@@ -208,14 +208,12 @@
     "submitUpdate": "Fiyatı Güncelle"
   },
   "priceHistory": {
-    "title": "{symbol} - Fiyat Geçmişi",
     "forceUpdateButton": "Fiyatları Zorla Güncelle",
     "forceUpdateTitle": "Bu menkul kıymeti tuttuğunuz sürenin tamamı için geçmiş fiyatları yeniden çekin",
     "addPriceButton": "+ Fiyat Ekle",
     "addPriceSection": "Fiyat Ekle",
     "editPriceSection": "Fiyatı Düzenle",
     "loading": "Fiyatlar yükleniyor...",
-    "chartTitle": "Fiyat geçmişi",
     "markers": {
       "bought": "Alım {quantity} · {account}",
       "sold": "Satım {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "{symbol} için fiyatlar güncellenemedi",
       "updateFetchFailed": "Fiyatlar güncellenemedi"
     },
-    "closeButton": "Kapat",
     "deleteConfirm": {
       "title": "Fiyatı Sil",
       "message": "{date} tarihli fiyat kaydı silinsin mi?",
@@ -257,8 +254,6 @@
     "groupCount": "{count} fiyat"
   },
   "transactionHistory": {
-    "inactiveBadge": "Pasif",
-    "currentShares": "Güncel hisse",
     "accountLabel": "Hesap",
     "allAccounts": "Tüm hesaplar ({shares})",
     "accountClosed": "{name} (kapalı)",

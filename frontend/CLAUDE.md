@@ -108,6 +108,15 @@ worked examples.
 from the content being cut. Never use it on a vertical list: hiding a bar you need
 is worse than a plain one.
 
+### A view that graduates to its own page -- delete the modal, do not flag it
+
+Remove the modal mode instead of keeping it behind a prop: an `onClose?` nobody
+passes and an `embedded` flag whose only caller always sets it leave every
+`!embedded` branch compiling, tested and unreachable, still fetching the data
+they no longer show. Delete the props, those branches, the orphaned catalog
+strings in every locale, and whatever in a shared component only that modal used
+(a `Modal` prop, a row-action icon).
+
 ### Copy -- `--` is comment style, never UI text
 
 This repo writes `--` in code comments, and the habit is strong enough that it

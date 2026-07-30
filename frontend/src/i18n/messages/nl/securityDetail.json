@@ -92,8 +92,7 @@
     "country": "Land",
     "website": "Website",
     "irWebsite": "Website investor relations",
-    "tags": "Labels",
-    "notStored": "Nog niet opgeslagen"
+    "tags": "Labels"
   },
   "performance": {
     "title": "Rendement van het effect",
@@ -155,8 +154,6 @@
     "noPosition": "Geen positiegegevens",
     "noPositionHint": "Je hebt voor dit effect nog geen transacties vastgelegd.",
     "noPrices": "Geen koershistorie beschikbaar",
-    "noPricesHint": "Voeg met de hand een koers toe of werk de koersen bij via de aanbieder.",
-    "noTransactions": "Nog geen transacties",
     "noAccounts": "Dit effect wordt in geen enkele rekening aangehouden."
   },
   "weightings": {

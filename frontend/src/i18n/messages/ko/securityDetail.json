@@ -92,8 +92,7 @@
     "country": "국가",
     "website": "웹사이트",
     "irWebsite": "IR 웹사이트",
-    "tags": "태그",
-    "notStored": "아직 저장되지 않음"
+    "tags": "태그"
   },
   "performance": {
     "title": "종목 성과",
@@ -155,8 +154,6 @@
     "noPosition": "포지션 데이터 없음",
     "noPositionHint": "이 종목에 대한 거래를 아직 기록하지 않았습니다.",
     "noPrices": "가격 이력이 없습니다",
-    "noPricesHint": "가격을 직접 입력하거나 제공처에서 가격을 갱신하세요.",
-    "noTransactions": "아직 거래가 없습니다",
     "noAccounts": "이 종목은 어떤 계좌에서도 보유되지 않습니다."
   },
   "weightings": {

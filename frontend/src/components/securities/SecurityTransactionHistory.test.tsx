@@ -95,7 +95,6 @@ async function renderHistory(props: Partial<Record<string, unknown>> = {}) {
     render(
       <SecurityTransactionHistory
         security={security}
-        onClose={vi.fn()}
         onChanged={(props.onChanged as () => void) ?? vi.fn()}
       />,
     );
@@ -108,22 +107,34 @@ describe('SecurityTransactionHistory', () => {
     vi.mocked(investmentsApi.getSecurityTransactionHistory).mockResolvedValue(historyData as any);
   });
 
-  it('loads and shows transactions with the cross-account running total and current shares', async () => {
+  it('loads and shows transactions with the cross-account running total', async () => {
     await renderHistory();
     await waitFor(() => {
-      expect(screen.getByText('ACME')).toBeInTheDocument();
+      expect(screen.getByLabelText('Account')).toBeInTheDocument();
     });
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
     // Cross-account running totals are shown in "All accounts" mode.
     expect(screen.getByText('150')).toBeInTheDocument();
-    // Current shares (exact) appears (header + final running row).
     expect(screen.getAllByText('50.0003').length).toBeGreaterThan(0);
+  });
+
+  it('leaves the symbol, the inactive badge and the share count to the detail page', async () => {
+    // Regression guard: this pane used to be a modal opened from the securities
+    // list and carried its own heading. On the detail page that heading is the
+    // page header, and rendering it again duplicated it on screen.
+    await renderHistory();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Account')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('ACME')).not.toBeInTheDocument();
+    expect(screen.queryByText('Inactive')).not.toBeInTheDocument();
+    expect(screen.queryByText('Current shares')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
   });
 
   it('filters to a single account and shows its per-account running total', async () => {
     await renderHistory();
     await waitFor(() => {
-      expect(screen.getByText('ACME')).toBeInTheDocument();
+      expect(screen.getByLabelText('Account')).toBeInTheDocument();
     });
 
     await act(async () => {
@@ -140,7 +151,7 @@ describe('SecurityTransactionHistory', () => {
     const onChanged = vi.fn();
     await renderHistory({ onChanged });
     await waitFor(() => {
-      expect(screen.getByText('ACME')).toBeInTheDocument();
+      expect(screen.getByLabelText('Account')).toBeInTheDocument();
     });
     expect(investmentsApi.getSecurityTransactionHistory).toHaveBeenCalledTimes(1);
 
@@ -176,7 +187,7 @@ describe('SecurityTransactionHistory', () => {
     const onChanged = vi.fn();
     await renderHistory({ onChanged });
     await waitFor(() => {
-      expect(screen.getByText('ACME')).toBeInTheDocument();
+      expect(screen.getByLabelText('Account')).toBeInTheDocument();
     });
     expect(investmentsApi.getSecurityTransactionHistory).toHaveBeenCalledTimes(1);
 

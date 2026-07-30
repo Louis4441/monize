@@ -92,8 +92,7 @@
     "country": "País",
     "website": "Sitio web",
     "irWebsite": "Sitio de relación con inversores",
-    "tags": "Etiquetas",
-    "notStored": "Todavía no se guarda"
+    "tags": "Etiquetas"
   },
   "performance": {
     "title": "Rentabilidad del valor",
@@ -155,8 +154,6 @@
     "noPosition": "Sin datos de posición",
     "noPositionHint": "Todavía no has registrado ninguna transacción para este valor.",
     "noPrices": "No hay historial de precios disponible",
-    "noPricesHint": "Añade un precio a mano o actualiza los precios desde el proveedor.",
-    "noTransactions": "Aún no hay transacciones",
     "noAccounts": "Este valor no está en ninguna cuenta."
   },
   "weightings": {

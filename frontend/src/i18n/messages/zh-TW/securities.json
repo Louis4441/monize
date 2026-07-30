@@ -208,14 +208,12 @@
     "submitUpdate": "更新價格"
   },
   "priceHistory": {
-    "title": "{symbol} - 價格歷史",
     "forceUpdateButton": "強制更新價格",
     "forceUpdateTitle": "重新取得您持有此證券整個期間的歷史價格",
     "addPriceButton": "+ 新增價格",
     "addPriceSection": "新增價格",
     "editPriceSection": "編輯價格",
     "loading": "載入價格中...",
-    "chartTitle": "價格歷史",
     "markers": {
       "bought": "買入 {quantity} · {account}",
       "sold": "賣出 {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "更新 {symbol} 的價格失敗",
       "updateFetchFailed": "更新價格失敗"
     },
-    "closeButton": "關閉",
     "deleteConfirm": {
       "title": "刪除價格",
       "message": "確定要刪除 {date} 的價格記錄嗎？",
@@ -257,8 +254,6 @@
     "groupCount": "{count} 筆價格"
   },
   "transactionHistory": {
-    "inactiveBadge": "非活躍",
-    "currentShares": "目前股數",
     "accountLabel": "科目",
     "allAccounts": "所有科目（{shares}）",
     "accountClosed": "{name}（已關閉）",

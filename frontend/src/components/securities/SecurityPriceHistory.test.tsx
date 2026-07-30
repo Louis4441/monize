@@ -2,25 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@/test/render';
 import { SecurityPriceHistory } from './SecurityPriceHistory';
 
-// The chart itself is covered by BalanceHistoryChart.test; here it stands in
-// for itself so the props the modal builds -- the title and the trade markers
-// -- can be asserted directly.
-vi.mock('@/components/transactions/BalanceHistoryChart', () => ({
-  BalanceHistoryChart: ({ title, markers }: any) => (
-    <div data-testid="price-chart">
-      {title}
-      {(markers ?? []).map((marker: any, i: number) => (
-        <span key={i} data-testid="chart-marker">
-          {marker.direction}: {marker.label}
-        </span>
-      ))}
-    </div>
-  ),
-}));
-
 vi.mock('@/lib/investments', () => ({
   investmentsApi: {
     getSecurityPrices: vi.fn(),
+    // Kept mocked although this pane no longer calls it, so the guard test
+    // below can assert that it stays uncalled.
     getSecurityTransactionHistory: vi.fn(),
     createSecurityPrice: vi.fn(),
     updateSecurityPrice: vi.fn(),
@@ -147,8 +133,6 @@ vi.stubGlobal(
 );
 
 describe('SecurityPriceHistory', () => {
-  const onClose = vi.fn();
-
   // The component intentionally rethrows from handleAdd/handleEdit so the real
   // SecurityPriceForm keeps its submitting state. react-hook-form's handleSubmit
   // surfaces that as a rejected promise the test never awaits, which vitest
@@ -165,16 +149,6 @@ describe('SecurityPriceHistory', () => {
     liveObservers.length = 0;
     window.addEventListener('unhandledrejection', swallowExpected);
     (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(mockPrices);
-    (investmentsApi.getSecurityTransactionHistory as ReturnType<typeof vi.fn>).mockResolvedValue({
-      securityId: 'sec-1',
-      symbol: 'AAPL',
-      name: 'Apple Inc.',
-      currencyCode: 'USD',
-      isActive: true,
-      accounts: [],
-      transactions: [],
-      currentQuantityAll: 0,
-    });
   });
 
   afterEach(() => {
@@ -184,7 +158,7 @@ describe('SecurityPriceHistory', () => {
   async function renderComponent() {
     let result: ReturnType<typeof render>;
     await act(async () => {
-      result = render(<SecurityPriceHistory security={mockSecurity} onClose={onClose} />);
+      result = render(<SecurityPriceHistory security={mockSecurity} />);
     });
     return result!;
   }
@@ -209,7 +183,6 @@ describe('SecurityPriceHistory', () => {
   it('renders price history with source badges', async () => {
     await renderExpanded();
 
-    expect(screen.getByText('AAPL - Price History')).toBeInTheDocument();
     expect(screen.getByText('Yahoo')).toBeInTheDocument();
     expect(screen.getByText('Buy')).toBeInTheDocument();
     expect(screen.getByText('Manual')).toBeInTheDocument();
@@ -234,11 +207,16 @@ describe('SecurityPriceHistory', () => {
     expect(screen.getByLabelText('Close Price')).toBeInTheDocument();
   });
 
-  it('calls onClose when close button clicked', async () => {
+  it('renders only the price pane, leaving the heading and chart to the detail page', async () => {
+    // Regression guard: this pane used to be a modal opened from the securities
+    // list, with its own heading, Close button and chart. The detail page draws
+    // the header and the chart itself, and the trade lookup existed only to mark
+    // up that chart -- so a request for it here is dead weight on every visit.
     await renderComponent();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(onClose).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Price History')).not.toBeInTheDocument();
+    expect(investmentsApi.getSecurityTransactionHistory).not.toHaveBeenCalled();
   });
 
   it('shows the adjusted close, and a dash where the provider gives none', async () => {
@@ -272,7 +250,7 @@ describe('SecurityPriceHistory', () => {
     (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockReturnValue(
       new Promise(() => {}),
     );
-    render(<SecurityPriceHistory security={mockSecurity} onClose={onClose} />);
+    render(<SecurityPriceHistory security={mockSecurity} />);
     expect(screen.getByText('Loading prices...')).toBeInTheDocument();
   });
 
@@ -551,15 +529,6 @@ describe('SecurityPriceHistory', () => {
       expect(screen.getByText('75 price(s)')).toBeInTheDocument();
     });
 
-    it('keeps the chart alongside however little of the table is unfolded', async () => {
-      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue(
-        manyPrices(75),
-      );
-      await renderComponent();
-
-      // Folding is about the table only; the chart still plots the whole series.
-      expect(screen.getByTestId('price-chart')).toBeInTheDocument();
-    });
   });
 
   describe('mobile long-press actions', () => {
@@ -641,63 +610,6 @@ describe('SecurityPriceHistory', () => {
       });
 
       expect(investmentsApi.deleteSecurityPrice).toHaveBeenCalledWith('sec-1', 1);
-    });
-  });
-
-  describe('price chart', () => {
-    it('charts the price series above the table', async () => {
-      await renderComponent();
-
-      // Deliberately the account balance-history chart, so the two screens
-      // read the same way; only the title and the neutral colouring differ.
-      expect(screen.getByText('Price History')).toBeInTheDocument();
-      expect(screen.getByText(/AAPL/)).toBeInTheDocument();
-    });
-
-    it('marks the days shares moved, and how many', async () => {
-      (investmentsApi.getSecurityTransactionHistory as ReturnType<typeof vi.fn>).mockResolvedValue({
-        securityId: 'sec-1',
-        symbol: 'AAPL',
-        name: 'Apple Inc.',
-        currencyCode: 'USD',
-        isActive: true,
-        accounts: [],
-        currentQuantityAll: 8,
-        transactions: [
-          { id: 't1', transactionDate: '2025-05-30', accountId: 'a1', accountName: 'RRSP', action: 'BUY', quantity: 10, price: 150, commission: 0, totalAmount: 1500, description: null, runningQuantityAccount: 10, runningQuantityAll: 10 },
-          { id: 't2', transactionDate: '2025-06-01', accountId: 'a1', accountName: 'RRSP', action: 'SELL', quantity: 2, price: 193, commission: 0, totalAmount: 386, description: null, runningQuantityAccount: 8, runningQuantityAll: 8 },
-          // No shares moved, so nothing to pin on the chart.
-          { id: 't3', transactionDate: '2025-06-01', accountId: 'a1', accountName: 'RRSP', action: 'DIVIDEND', quantity: null, price: null, commission: 0, totalAmount: 12, description: null, runningQuantityAccount: 8, runningQuantityAll: 8 },
-        ],
-      });
-
-      await renderComponent();
-
-      const markers = screen.getAllByTestId('chart-marker');
-      expect(markers).toHaveLength(2);
-      expect(markers[0]).toHaveTextContent('in: Bought 10 · RRSP');
-      expect(markers[1]).toHaveTextContent('out: Sold 2 · RRSP');
-    });
-
-    it('keeps the chart when the trade lookup fails', async () => {
-      (investmentsApi.getSecurityTransactionHistory as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error('nope'),
-      );
-      await renderComponent();
-
-      // Markers are a nicety; the price history is the point of the modal.
-      expect(screen.getByTestId('price-chart')).toBeInTheDocument();
-      expect(screen.queryAllByTestId('chart-marker')).toHaveLength(0);
-    });
-
-    it('leaves the chart out when there is nothing to plot', async () => {
-      (investmentsApi.getSecurityPrices as ReturnType<typeof vi.fn>).mockResolvedValue([
-        mockPrices[0],
-      ]);
-      await renderComponent();
-
-      // A single point is a dot, not a history.
-      expect(screen.queryByText('Price History')).not.toBeInTheDocument();
     });
   });
 

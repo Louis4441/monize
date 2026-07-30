@@ -208,14 +208,12 @@
     "submitUpdate": "株価を更新"
   },
   "priceHistory": {
-    "title": "{symbol} - 株価履歴",
     "forceUpdateButton": "株価を強制更新",
     "forceUpdateTitle": "この有価証券を保有している期間全体の過去の株価を再取得する",
     "addPriceButton": "+ 株価を追加",
     "addPriceSection": "株価を追加",
     "editPriceSection": "株価を編集",
     "loading": "株価を読み込み中...",
-    "chartTitle": "価格履歴",
     "markers": {
       "bought": "買付 {quantity}・{account}",
       "sold": "売却 {quantity}・{account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "{symbol} の株価更新に失敗しました",
       "updateFetchFailed": "株価の更新に失敗しました"
     },
-    "closeButton": "閉じる",
     "deleteConfirm": {
       "title": "株価を削除",
       "message": "{date} の株価を削除しますか？",
@@ -257,8 +254,6 @@
     "groupCount": "価格 {count} 件"
   },
   "transactionHistory": {
-    "inactiveBadge": "無効",
-    "currentShares": "現在の株数",
     "accountLabel": "勘定科目",
     "allAccounts": "すべての勘定科目（{shares} 株）",
     "accountClosed": "{name}（閉鎖済み）",

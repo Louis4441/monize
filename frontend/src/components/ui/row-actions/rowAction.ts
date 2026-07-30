@@ -28,8 +28,6 @@ export type ActionIconKey =
   | 'deactivate'
   | 'activate'
   | 'favorite'
-  | 'prices'
-  | 'history'
   | 'transactions'
   | 'filter';
 

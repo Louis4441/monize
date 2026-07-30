@@ -92,8 +92,7 @@
     "country": "国家",
     "website": "網站",
     "irWebsite": "投資人關係網站",
-    "tags": "標籤",
-    "notStored": "尚未儲存"
+    "tags": "標籤"
   },
   "performance": {
     "title": "證券表現",
@@ -155,8 +154,6 @@
     "noPosition": "沒有部位資料",
     "noPositionHint": "你還沒有為該證券記錄任何交易。",
     "noPrices": "沒有價格歷史",
-    "noPricesHint": "手動新增一筆價格，或從資料來源更新價格。",
-    "noTransactions": "还没有交易",
     "noAccounts": "該證券沒有在任何帳戶中持有。"
   },
   "weightings": {

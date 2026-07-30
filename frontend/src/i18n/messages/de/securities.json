@@ -208,14 +208,12 @@
     "submitUpdate": "Kurs aktualisieren"
   },
   "priceHistory": {
-    "title": "{symbol} – Kursverlauf",
     "forceUpdateButton": "Kurse neu abrufen",
     "forceUpdateTitle": "Historische Kurse für den gesamten Haltezeitraum dieses Wertpapiers neu abrufen",
     "addPriceButton": "+ Kurs hinzufügen",
     "addPriceSection": "Kurs hinzufügen",
     "editPriceSection": "Kurs bearbeiten",
     "loading": "Kurse werden geladen...",
-    "chartTitle": "Kursverlauf",
     "markers": {
       "bought": "Kauf {quantity} · {account}",
       "sold": "Verkauf {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "Kurse für {symbol} konnten nicht aktualisiert werden",
       "updateFetchFailed": "Kurse konnten nicht aktualisiert werden"
     },
-    "closeButton": "Schließen",
     "deleteConfirm": {
       "title": "Kurs löschen",
       "message": "Kurseintrag für {date} löschen?",
@@ -257,8 +254,6 @@
     "groupCount": "{count} Kurs(e)"
   },
   "transactionHistory": {
-    "inactiveBadge": "Inaktiv",
-    "currentShares": "Aktuelle Anteile",
     "accountLabel": "Konto",
     "allAccounts": "Alle Konten ({shares})",
     "accountClosed": "{name} (geschlossen)",

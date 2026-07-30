@@ -92,8 +92,7 @@
     "country": "Paese",
     "website": "Sito web",
     "irWebsite": "Sito investor relations",
-    "tags": "Tag",
-    "notStored": "Non ancora memorizzato"
+    "tags": "Tag"
   },
   "performance": {
     "title": "Andamento del titolo",
@@ -155,8 +154,6 @@
     "noPosition": "Nessun dato di posizione",
     "noPositionHint": "Non hai ancora registrato alcuna transazione per questo titolo.",
     "noPrices": "Nessuno storico prezzi disponibile",
-    "noPricesHint": "Inserisci un prezzo a mano oppure aggiorna i prezzi dal fornitore.",
-    "noTransactions": "Ancora nessuna transazione",
     "noAccounts": "Questo titolo non è detenuto in alcun conto."
   },
   "weightings": {

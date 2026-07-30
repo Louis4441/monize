@@ -208,14 +208,12 @@
     "submitUpdate": "Actualizar precio"
   },
   "priceHistory": {
-    "title": "{symbol} - Historial de precios",
     "forceUpdateButton": "Forzar actualización de precios",
     "forceUpdateTitle": "Volver a obtener el historial de precios de todo el período en que has tenido este valor",
     "addPriceButton": "+ Agregar precio",
     "addPriceSection": "Agregar precio",
     "editPriceSection": "Editar precio",
     "loading": "Cargando precios...",
-    "chartTitle": "Historial de precios",
     "markers": {
       "bought": "Compra {quantity} · {account}",
       "sold": "Venta {quantity} · {account}"
@@ -246,7 +244,6 @@
       "updatePricesFailed": "Error al actualizar los precios para {symbol}",
       "updateFetchFailed": "Error al actualizar los precios"
     },
-    "closeButton": "Cerrar",
     "deleteConfirm": {
       "title": "Eliminar precio",
       "message": "¿Eliminar la entrada de precio del {date}?",
@@ -257,8 +254,6 @@
     "groupCount": "{count} precio(s)"
   },
   "transactionHistory": {
-    "inactiveBadge": "Inactivo",
-    "currentShares": "Acciones actuales",
     "accountLabel": "Cuenta",
     "allAccounts": "Todas las cuentas ({shares})",
     "accountClosed": "{name} (cerrada)",

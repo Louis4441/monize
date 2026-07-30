@@ -92,8 +92,7 @@
     "country": "Quốc gia",
     "website": "Trang web",
     "irWebsite": "Trang quan hệ nhà đầu tư",
-    "tags": "Thẻ",
-    "notStored": "Chưa được lưu"
+    "tags": "Thẻ"
   },
   "performance": {
     "title": "Hiệu suất của chứng khoán",
@@ -155,8 +154,6 @@
     "noPosition": "Không có dữ liệu vị thế",
     "noPositionHint": "Bạn chưa ghi nhận giao dịch nào cho chứng khoán này.",
     "noPrices": "Không có lịch sử giá",
-    "noPricesHint": "Hãy thêm một giá bằng tay, hoặc cập nhật giá từ nhà cung cấp.",
-    "noTransactions": "Chưa có giao dịch",
     "noAccounts": "Chứng khoán này không được nắm giữ trong tài khoản nào."
   },
   "weightings": {

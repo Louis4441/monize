@@ -92,8 +92,7 @@
     "country": "Land",
     "website": "Website",
     "irWebsite": "IR-Website",
-    "tags": "Tags",
-    "notStored": "Noch nicht gespeichert"
+    "tags": "Tags"
   },
   "performance": {
     "title": "Wertentwicklung des Wertpapiers",
@@ -155,8 +154,6 @@
     "noPosition": "Keine Positionsdaten",
     "noPositionHint": "Du hast für dieses Wertpapier noch keine Transaktionen erfasst.",
     "noPrices": "Keine Kurshistorie verfügbar",
-    "noPricesHint": "Trage einen Kurs von Hand ein oder aktualisiere die Kurse beim Anbieter.",
-    "noTransactions": "Noch keine Transaktionen",
     "noAccounts": "Dieses Wertpapier wird in keinem Konto gehalten."
   },
   "weightings": {
