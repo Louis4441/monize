@@ -80,14 +80,46 @@ Note that unlike `DateInput`, this rule has no guard test in `ui-conventions.tes
 
 Do not put the click on a button around the symbol or the name instead. It looks identical and is not: the rest of the row -- all the cell padding, every other column -- becomes dead, and clicking a row "does nothing" for the majority of its area. Controls *inside* the row (a favourite star, `RowActions`) must `stopPropagation` so they act on themselves; both already do.
 
-### A long list -- page it, or bound it with an expander
+### A long list -- page it, or bound it and scroll with `scrollbar-slim`
 
 Two patterns, depending on where it lives:
 
 - A full-page list uses `components/ui/Pagination.tsx`.
-- A list inside a card shows the first few rows and a "Show N more" button.
+- A list inside a card caps its height and scrolls: `scrollbar-slim max-h-* overflow-y-auto pr-1`.
 
-Do not cap a card's height with `overflow-y-auto`. In a small card that draws a full native scrollbar hard against the content, which on Linux is a chunky arrowed bar that reads as a rendering fault -- and it hides the rest of the list behind a gutter nobody notices. The `overflow-y-auto` regions that do exist are panels, modals and sidebars, not cards. `scrollbar-hide` is for a horizontal strip of chips, and hiding a scrollbar you need is worse than not needing one.
+The thing to avoid is the *default* scrollbar, not scrolling. On Linux and Windows
+the native bar is a wide arrowed control drawn hard against the content, and inside
+a small card it reads as a rendering fault rather than as an affordance. That is
+what gets complained about. `scrollbar-slim` keeps the bar -- a bounded list needs
+one, or the rest of it is invisible -- as a thin rounded thumb on an empty track,
+in the theme's greys, light and dark. The utility is defined in `globals.css`
+alongside `scrollbar-hide`; it arrives with the security-detail branch, so on a
+branch that predates it, add it there rather than styling a bar inline.
+
+Bound the height rather than letting the card grow, and rather than hiding rows
+behind a "Show N more" expander. A card in a grid or beside a chart has to be the
+same height whatever its contents, or it drags the layout around: a breakdown card
+next to the price chart left a gap under the chart when it collapsed, and an
+expander also puts a click in front of information the card exists to show at a
+glance. `SecurityWeightingBars` and the detail page's "Held in accounts" are the
+worked examples.
+
+`scrollbar-hide` is for a horizontal strip of chips, where the overflow is obvious
+from the content being cut. Never use it on a vertical list: hiding a bar you need
+is worse than a plain one.
+
+### Copy -- `--` is comment style, never UI text
+
+This repo writes `--` in code comments, and the habit is strong enough that it
+leaks into catalog strings, where it renders literally on screen and reads as a
+typo. In copy use an em dash, or recast the sentence and drop the aside.
+`messages.punctuation.test.ts` fails the build on a new one; it carries a
+shrink-only baseline of the strings that already had them.
+
+The same applies to anything else that is punctuation rather than words: compose
+it in the catalog, not in JSX. `"{units} ({share})"` is one string a translator
+can reorder; `{value}{' ('}{share}{')'}` in a component is three fragments they
+cannot reach.
 
 ## Form Patterns
 

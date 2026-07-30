@@ -58,3 +58,33 @@ describe('date entry goes through DateInput', () => {
     expect(RAW_DATE_INPUT.test(wrapper)).toBe(true);
   });
 });
+
+describe('a scrollbar you need is not hidden', () => {
+  /**
+   * `scrollbar-hide` is for a horizontal strip of chips, where the content being
+   * cut off is itself the signal that there is more. On a vertical list it hides
+   * the only indication that rows exist below the fold, which is strictly worse
+   * than the plain bar someone was trying to get rid of. The fix for an ugly bar
+   * is `scrollbar-slim`, not no bar.
+   *
+   * Matched per class attribute rather than per file, so an unrelated
+   * `scrollbar-hide` elsewhere in the same component does not trip it.
+   */
+  const CLASS_ATTR = /class(?:Name)?=(?:"([^"]*)"|'([^']*)'|\{`([^`]*)`\})/g;
+
+  it('never puts scrollbar-hide on a vertically scrolling element', () => {
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      for (const match of content.matchAll(CLASS_ATTR)) {
+        const classes = match[1] ?? match[2] ?? match[3] ?? '';
+        if (
+          classes.includes('scrollbar-hide') &&
+          /\boverflow-y-(auto|scroll)\b/.test(classes)
+        ) {
+          offenders.push(`${path}: ${classes.trim()}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});

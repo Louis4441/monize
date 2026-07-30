@@ -62,6 +62,15 @@ Before writing a UI control, a data access path, or anything a user interacts wi
 
 The point is that the next agent inherits the correction. A fix that lives only in one file will be re-broken in the next one.
 
+### Running the suites locally -- two ways a green branch reads as red
+
+CI runs in UTC with one Playwright worker. A local run does neither, and both differences produce failures that look like regressions and are not.
+
+- **`TZ=UTC` for the unit suites.** A handful of tests read `new Date()` and count completed periods against fixtures; under any other offset they can land on the wrong side of a boundary. `backend/src/ai/insights/insights-aggregator.service.spec.ts` and `backend/src/net-worth/net-worth.service.spec.ts` are the ones that bite. `TZ=UTC npm run test:unit` matches CI; without it, believing the failures means chasing a bug that does not exist.
+- **`--workers=1` for the whole E2E suite.** `playwright.config.ts` sets one worker only when `CI` is set, so a local `npx playwright test` runs several in parallel -- and `e2e/tests/zz-danger-zone.spec.ts` deletes the shared account. The `zz-` prefix orders it last, which only means anything when the run is serial; in parallel it takes out whatever is still running. A single spec file is safe to run without the flag.
+
+Also: `scripts/verify-schema.sh` reproduces the "Schema vs Migrations Drift" job locally and needs nothing but Docker. Every migration has to be a no-op replayed on top of `schema.sql` (`CREATE ... IF NOT EXISTS`, `DROP ... IF EXISTS` before `CREATE POLICY`/`TRIGGER`), because that is also how the app boots: `db-init` applies `schema.sql` and `db-migrate` then replays the whole directory. A migration missing its guard does not just fail the drift check -- it aborts container start-up, and the E2E and Lighthouse jobs then report only "backend exited (1)".
+
 ### Code Intelligence
 Prefer LSP over Grep/Read for code navigation — it's faster, precise, and avoids reading entire files:
 - `workspaceSymbol` to find where something is defined
