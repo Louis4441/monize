@@ -56,6 +56,7 @@ function preview(overrides: Partial<MnyPreview> = {}): MnyPreview {
         favourite: false,
       },
     ],
+    bills: [],
     counts: {
       accountsIncluded: 2,
       accountsInFile: 2,
@@ -74,6 +75,8 @@ function preview(overrides: Partial<MnyPreview> = {}): MnyPreview {
       stockSplitsApplied: 0,
       pricesToImport: 0,
       exchangeRatesToImport: 0,
+      billsDetected: 0,
+      billsSkipped: 0,
     },
     fileCounts: {
       accounts: 2,
@@ -299,6 +302,110 @@ describe('useMnyImport', () => {
         }),
         undefined,
       );
+    });
+  });
+
+  describe('bill selection', () => {
+    /** A preview carrying two detected-active bills. */
+    const withBills = () => {
+      mockedApi.parse.mockResolvedValue(
+        preview({
+          bills: [
+            {
+              handle: 7,
+              name: 'Hydro One',
+              accountName: 'Chequing',
+              amount: -95.5,
+              currencyCode: 'USD',
+              frequency: 'MONTHLY',
+              approximate: false,
+              nextDueDate: '2026-08-02',
+              isTransfer: false,
+              isInvestment: false,
+              splitCount: 0,
+              status: 0,
+            },
+            {
+              handle: 8,
+              name: 'Rent',
+              accountName: 'Chequing',
+              amount: -1500,
+              currencyCode: 'USD',
+              frequency: 'MONTHLY',
+              approximate: false,
+              nextDueDate: '2026-08-01',
+              isTransfer: false,
+              isInvestment: false,
+              splitCount: 0,
+              status: 0,
+            },
+          ],
+        }),
+      );
+    };
+
+    it('starts with every detected-active bill ticked', async () => {
+      withBills();
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      expect([...result.current.selectedBillHandles].sort()).toEqual([7, 8]);
+    });
+
+    it('sends only the ticked bills', async () => {
+      withBills();
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.toggleBill(8));
+      await act(async () => {
+        await result.current.start();
+      });
+
+      expect(mockedApi.start).toHaveBeenCalledWith(
+        'staged-1',
+        expect.objectContaining({ bills: [7] }),
+        undefined,
+      );
+    });
+
+    it('sends an explicit empty list when every bill is unticked', async () => {
+      // Omitting the field would mean "import every candidate" server-side,
+      // which is the opposite of what unticking all of them asks for.
+      withBills();
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.setAllBills(false));
+      await act(async () => {
+        await result.current.start();
+      });
+
+      expect(mockedApi.start).toHaveBeenCalledWith(
+        'staged-1',
+        expect.objectContaining({ bills: [] }),
+        undefined,
+      );
+    });
+
+    it('re-ticks every bill at once', async () => {
+      withBills();
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.setAllBills(false));
+      expect(result.current.selectedBillHandles.size).toBe(0);
+
+      act(() => result.current.setAllBills(true));
+      expect([...result.current.selectedBillHandles].sort()).toEqual([7, 8]);
     });
   });
 

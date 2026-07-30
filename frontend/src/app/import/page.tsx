@@ -17,7 +17,9 @@ import { MnyReviewStep } from '@/components/import/MnyReviewStep';
 import { MnyImportProgress } from '@/components/import/MnyImportProgress';
 import { MnyVerificationReport } from '@/components/import/MnyVerificationReport';
 import { MnyPasswordDialog } from '@/components/import/MnyPasswordDialog';
+import { MnyWipeConfirmDialog } from '@/components/import/MnyWipeConfirmDialog';
 import { useImportWizard } from '@/hooks/useImportWizard';
+import { useAuthStore } from '@/store/authStore';
 import { formatCategoryPath } from './import-utils';
 
 export default function ImportPage() {
@@ -31,6 +33,9 @@ export default function ImportPage() {
 function ImportContent() {
   const t = useTranslations('import');
   const wizard = useImportWizard();
+  // An OIDC account confirms the optional wipe by re-authenticating with its
+  // provider rather than by typing a password.
+  const user = useAuthStore((state) => state.user);
 
   const renderStep = () => {
     switch (wizard.step) {
@@ -194,15 +199,18 @@ function ImportContent() {
             preview={wizard.mny.preview}
             excludedHandles={wizard.mny.excludedHandles}
             currencyOverrides={wizard.mny.currencyOverrides}
+            selectedBillHandles={wizard.mny.selectedBillHandles}
             options={wizard.mny.options}
             currencyOptions={wizard.currencyOptions}
             isLoading={wizard.mny.isStarting}
             onToggleAccount={wizard.mny.toggleAccount}
             onSetAllAccounts={wizard.mny.setAllAccounts}
             onSetAccountCurrency={wizard.mny.setAccountCurrency}
+            onToggleBill={wizard.mny.toggleBill}
+            onSetAllBills={wizard.mny.setAllBills}
             onSetOption={wizard.mny.setOption}
             onBack={wizard.handleMnyDone}
-            onImport={() => wizard.handleMnyStart()}
+            onImport={wizard.handleMnyImportClick}
           />
         ) : null;
 
@@ -250,6 +258,13 @@ function ImportContent() {
         isLoading={wizard.mny.isUploading}
         onSubmit={wizard.handleMnyPasswordSubmit}
         onCancel={wizard.mny.cancelPasswordPrompt}
+      />
+      <MnyWipeConfirmDialog
+        isOpen={wizard.showMnyWipeConfirm}
+        isOidc={user?.authProvider === 'oidc'}
+        isLoading={wizard.mny.isStarting}
+        onConfirm={wizard.handleMnyWipeConfirm}
+        onCancel={wizard.cancelMnyWipeConfirm}
       />
       <main className="px-4 sm:px-6 lg:px-12 pt-6 pb-8">
         <PageHeader

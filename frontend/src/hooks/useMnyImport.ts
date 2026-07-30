@@ -45,6 +45,12 @@ export interface UseMnyImportResult {
   excludedHandles: ReadonlySet<number>;
   /** Per-account currency overrides, keyed by Money handle. */
   currencyOverrides: ReadonlyMap<number, string>;
+  /**
+   * `BILL.hbill` handles the user has ticked. Tracked as an inclusion set
+   * rather than an exclusion one because the import writes exactly this list:
+   * an unticked bill is never created, not created inactive.
+   */
+  selectedBillHandles: ReadonlySet<number>;
   options: MnyImportOptionsInput;
   upload: (file: File, password?: string) => Promise<boolean>;
   /** Re-uploads the file already chosen, with the password just entered. */
@@ -52,6 +58,8 @@ export interface UseMnyImportResult {
   toggleAccount: (handle: number) => void;
   setAllAccounts: (include: boolean) => void;
   setAccountCurrency: (handle: number, currencyCode: string | null) => void;
+  toggleBill: (handle: number) => void;
+  setAllBills: (include: boolean) => void;
   setOption: <K extends keyof MnyImportOptionsInput>(
     key: K,
     value: MnyImportOptionsInput[K],
@@ -77,6 +85,9 @@ export function useMnyImport(): UseMnyImportResult {
   const [currencyOverrides, setCurrencyOverrides] = useState<
     Map<number, string>
   >(new Map());
+  const [selectedBillHandles, setSelectedBillHandles] = useState<Set<number>>(
+    new Set(),
+  );
   const [options, setOptions] = useState<MnyImportOptionsInput>({});
 
   // The file is kept so a password retry can re-upload it without asking the
@@ -127,6 +138,11 @@ export function useMnyImport(): UseMnyImportResult {
         setOptions(parsed.options);
         setExcludedHandles(new Set());
         setCurrencyOverrides(new Map());
+        // Detected-active candidates start ticked: the detection is the
+        // recommendation and the checkboxes are the user's veto over it.
+        setSelectedBillHandles(
+          new Set(parsed.bills.map((bill) => bill.handle)),
+        );
         setPasswordPrompt(null);
         return true;
       } catch (error) {
@@ -206,6 +222,29 @@ export function useMnyImport(): UseMnyImportResult {
     [],
   );
 
+  const toggleBill = useCallback((handle: number) => {
+    setSelectedBillHandles((current) => {
+      const next = new Set(current);
+      if (next.has(handle)) {
+        next.delete(handle);
+      } else {
+        next.add(handle);
+      }
+      return next;
+    });
+  }, []);
+
+  const setAllBills = useCallback(
+    (include: boolean) => {
+      setSelectedBillHandles(
+        include
+          ? new Set((preview?.bills ?? []).map((bill) => bill.handle))
+          : new Set<number>(),
+      );
+    },
+    [preview],
+  );
+
   const setOption = useCallback(
     <K extends keyof MnyImportOptionsInput>(
       key: K,
@@ -234,8 +273,11 @@ export function useMnyImport(): UseMnyImportResult {
         include: !excludedHandles.has(handle),
         currencyOverride: currencyOverrides.get(handle) ?? null,
       })),
+      // Always explicit, including when empty: omitting the field would mean
+      // "every candidate" server-side, which is the opposite of unticking all.
+      bills: [...selectedBillHandles],
     };
-  }, [options, excludedHandles, currencyOverrides]);
+  }, [options, excludedHandles, currencyOverrides, selectedBillHandles]);
 
   const startWith = useCallback(
     async (stagedFileId: string, wipePassword?: string): Promise<boolean> => {
@@ -291,6 +333,7 @@ export function useMnyImport(): UseMnyImportResult {
     setUploadError(null);
     setExcludedHandles(new Set());
     setCurrencyOverrides(new Map());
+    setSelectedBillHandles(new Set());
     setOptions({});
     pendingFile.current = null;
   }, [stopPolling]);
@@ -304,12 +347,15 @@ export function useMnyImport(): UseMnyImportResult {
     uploadError,
     excludedHandles,
     currencyOverrides,
+    selectedBillHandles,
     options,
     upload,
     retryWithPassword,
     toggleAccount,
     setAllAccounts,
     setAccountCurrency,
+    toggleBill,
+    setAllBills,
     setOption,
     start,
     retry,

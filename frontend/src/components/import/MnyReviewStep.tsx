@@ -6,17 +6,22 @@ import { Select } from '@/components/ui/Select';
 import { formatCurrency } from '@/lib/format';
 import { formatAccountType } from '@/lib/account-utils';
 import { MnyImportOptionsInput, MnyPreview } from '@/lib/import-mny';
+import { MnyBillsPanel } from './MnyBillsPanel';
 
 interface MnyReviewStepProps {
   preview: MnyPreview;
   excludedHandles: ReadonlySet<number>;
   currencyOverrides: ReadonlyMap<number, string>;
+  /** Bill handles the user has ticked; only these are imported. */
+  selectedBillHandles: ReadonlySet<number>;
   options: MnyImportOptionsInput;
   currencyOptions: Array<{ value: string; label: string }>;
   isLoading: boolean;
   onToggleAccount: (handle: number) => void;
   onSetAllAccounts: (include: boolean) => void;
   onSetAccountCurrency: (handle: number, currencyCode: string | null) => void;
+  onToggleBill: (handle: number) => void;
+  onSetAllBills: (include: boolean) => void;
   onSetOption: <K extends keyof MnyImportOptionsInput>(
     key: K,
     value: MnyImportOptionsInput[K],
@@ -38,12 +43,15 @@ export function MnyReviewStep({
   preview,
   excludedHandles,
   currencyOverrides,
+  selectedBillHandles,
   options,
   currencyOptions,
   isLoading,
   onToggleAccount,
   onSetAllAccounts,
   onSetAccountCurrency,
+  onToggleBill,
+  onSetAllBills,
   onSetOption,
   onBack,
   onImport,
@@ -145,12 +153,16 @@ export function MnyReviewStep({
         </div>
       )}
 
-      {/* Things Phase 2 does not import yet */}
+      {/* Bills: how many rows the file holds versus how many are live series */}
       {fileCounts.bills > 0 && (
-        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <p className="text-sm text-blue-700 dark:text-blue-300">
-            {t('mnyReview.notYetImported', { bills: fileCounts.bills })}
-          </p>
+        <div className="mb-6">
+          <SummaryTile
+            label={t('mnyReview.counts.bills')}
+            value={String(counts.billsDetected)}
+            detail={t('mnyReview.counts.billsOfRows', {
+              rows: fileCounts.bills,
+            })}
+          />
         </div>
       )}
 
@@ -300,6 +312,16 @@ export function MnyReviewStep({
         </div>
       </div>
 
+      {/* Bills the import will create, ticked individually */}
+      <MnyBillsPanel
+        bills={preview.bills}
+        selectedHandles={selectedBillHandles}
+        unsupported={preview.missingTables.includes('BILL')}
+        skipped={counts.billsSkipped}
+        onToggleBill={onToggleBill}
+        onSetAllBills={onSetAllBills}
+      />
+
       {/* Options */}
       <div className="mb-6 bg-card border border-border rounded-lg p-4">
         <h3 className="text-sm font-semibold text-foreground mb-3">
@@ -336,6 +358,30 @@ export function MnyReviewStep({
             checked={options.importExchangeRates ?? true}
             onChange={(value) => onSetOption('importExchangeRates', value)}
           />
+        </div>
+
+        {/*
+          The wipe is separated and styled as the destructive option it is: it
+          runs the same delete-my-data operation as Settings, and ticking it
+          only arms a typed confirmation -- nothing is deleted until then.
+        */}
+        <div className="mt-4 pt-4 border-t border-border">
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={options.wipeExistingData ?? false}
+              onChange={(e) => onSetOption('wipeExistingData', e.target.checked)}
+              className="mt-0.5 rounded border-border"
+            />
+            <span>
+              <span className="text-sm font-medium text-red-600 dark:text-red-400">
+                {t('mnyReview.options.wipeExistingData')}
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {t('mnyReview.options.wipeExistingDataHint')}
+              </span>
+            </span>
+          </label>
         </div>
       </div>
 

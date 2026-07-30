@@ -317,9 +317,10 @@
       "investmentDetail": "[XX-{transfers} share transfers, {splits} stock splits-XX]",
       "prices": "[XX-Price history-XX]",
       "exchangeRates": "[XX-Exchange rates-XX]",
-      "ofTotal": "[XX-of {total} in the file-XX]"
+      "ofTotal": "[XX-of {total} in the file-XX]",
+      "bills": "[XX-Scheduled bills-XX]",
+      "billsOfRows": "[XX-active of {rows} bill rows-XX]"
     },
-    "notYetImported": "[XX-Scheduled bills are not imported yet: {bills} bill rows are left for a later release. Everything else in this file imports in full.-XX]",
     "accountsHeading": "[XX-Accounts ({count})-XX]",
     "selectAll": "[XX-Select all-XX]",
     "selectNone": "[XX-Select none-XX]",
@@ -349,10 +350,47 @@
       "importPrices": "[XX-Import price history-XX]",
       "importPricesHint": "[XX-Money's own record of what each security was worth, day by day. Turn this off if you would rather start from live quotes.-XX]",
       "importExchangeRates": "[XX-Import exchange rates-XX]",
-      "importExchangeRatesHint": "[XX-Historical rates between the currencies in your file, so past foreign-currency transactions convert the way Money converted them.-XX]"
+      "importExchangeRatesHint": "[XX-Historical rates between the currencies in your file, so past foreign-currency transactions convert the way Money converted them.-XX]",
+      "wipeExistingData": "[XX-Start fresh: remove my existing Monize data first-XX]",
+      "wipeExistingDataHint": "[XX-Runs the same Delete My Data operation as Settings before importing. You will be asked to confirm. Leave this off to add the Money file to what you already have.-XX]"
     },
     "warningsHeading": "[XX-Notes about this file-XX]",
     "startImport": "[XX-Start import-XX]"
+  },
+  "mnyBills": {
+    "heading": "[XX-Scheduled bills to create ({count})-XX]",
+    "explainer": "[XX-Money keeps a row for every occurrence of a bill, so a long history holds thousands of them. These are the series that still look active. Untick any you do not want -- unticked bills are not created at all.-XX]",
+    "unsupported": "[XX-This Money version predates scheduled bills, so there are none to import.-XX]",
+    "skipped": "[XX-{count, plural, one {# bill series was} other {# bill series were}} missing a template or a usable date and cannot be imported.-XX]",
+    "table": {
+      "include": "[XX-Import-XX]",
+      "includeBill": "[XX-Import {name}-XX]",
+      "bill": "[XX-Bill-XX]",
+      "account": "[XX-Account-XX]",
+      "frequency": "[XX-Frequency-XX]",
+      "nextDue": "[XX-Next due-XX]",
+      "amount": "[XX-Amount-XX]",
+      "transfer": "[XX-Transfer-XX]",
+      "investment": "[XX-Investment-XX]",
+      "splits": "[XX-{count, plural, one {# split} other {# splits}}-XX]",
+      "approximate": "[XX-Closest Monize frequency-XX]"
+    }
+  },
+  "mnyWipe": {
+    "heading": "[XX-Remove your existing data first?-XX]",
+    "body": "[XX-This runs the same Delete My Data operation as Settings -> Danger Zone, before the import begins. It removes:-XX]",
+    "removes": {
+      "transactions": "[XX-Every transaction and split-XX]",
+      "scheduled": "[XX-Every scheduled and recurring transaction-XX]",
+      "investments": "[XX-Every security, price, holding and investment transaction-XX]",
+      "accounts": "[XX-Every account, category and payee-XX]",
+      "budgets": "[XX-Every budget, custom report, tag and import mapping-XX]"
+    },
+    "irreversible": "[XX-This cannot be undone. If the import then fails, the removed data does not come back.-XX]",
+    "typeToConfirm": "[XX-Type {word} to confirm:-XX]",
+    "passwordLabel": "[XX-Enter your password:-XX]",
+    "oidcNote": "[XX-Your identity provider already confirmed this session, so no password is needed.-XX]",
+    "confirm": "[XX-Delete my data and import-XX]"
   },
   "mnyImporting": {
     "heading": "[XX-Importing your Money file-XX]",
@@ -387,7 +425,8 @@
       "securities": "[XX-Securities-XX]",
       "investments": "[XX-Investment transactions-XX]",
       "prices": "[XX-Prices-XX]",
-      "exchangeRates": "[XX-Exchange rates-XX]"
+      "exchangeRates": "[XX-Exchange rates-XX]",
+      "bills": "[XX-Scheduled bills-XX]"
     },
     "existingDataRemoved": "[XX-Your existing data was removed before this import, as requested.-XX]",
     "verificationHeading": "[XX-Balance verification-XX]",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} had no share detail in the file and were imported for their cash amount only.-XX]",
     "investmentAccountMismatch": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} sat in an account that is not an investment account and were skipped.-XX]",
     "unusableSecuritySplit": "[XX-{count, plural, one {# stock split} other {# stock splits}} could not be matched to a security or had an unusable ratio, and were not applied.-XX]",
-    "holdingsMismatch": "[XX-{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records.-XX]"
+    "holdingsMismatch": "[XX-{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records.-XX]",
+    "billTemplateMissing": "[XX-{count, plural, one {# scheduled bill} other {# scheduled bills}} had no template transaction in the file and were skipped.-XX]",
+    "unusableBill": "[XX-{count, plural, one {# scheduled bill} other {# scheduled bills}} had no account, no usable date or an unrecognized recurrence, and were skipped.-XX]",
+    "billFrequencyApproximated": "[XX-{count, plural, one {# scheduled bill uses} other {# scheduled bills use}} a repeat interval Monize cannot express exactly, so the closest shorter one was used.-XX]"
   },
   "mnyErrors": {
     "mnyImportFailed": "[XX-Something went wrong while importing. Nothing was saved -- you can try again.-XX]",

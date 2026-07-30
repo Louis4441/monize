@@ -3,8 +3,13 @@
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/lib/format';
+import { formatAccountType } from '@/lib/account-utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { MnyImportResult } from '@/lib/import-mny';
+import { AccountType } from '@/types/account';
+
+/** Account types whose verification line is badged, per the comment below. */
+const LOAN_TYPES: ReadonlySet<string> = new Set(['LOAN', 'MORTGAGE']);
 
 interface MnyVerificationReportProps {
   result: MnyImportResult;
@@ -33,6 +38,7 @@ export function MnyVerificationReport({
   onDone,
 }: MnyVerificationReportProps) {
   const t = useTranslations('import');
+  const tc = useTranslations('common');
   // Share counts go through the app's own quantity formatter, so the report
   // reads in the user's number locale like every other holdings view.
   const { formatQuantity } = useNumberFormat();
@@ -129,6 +135,12 @@ export function MnyVerificationReport({
             value={result.investmentTransactionsCreated}
           />
         )}
+        {result.billsCreated > 0 && (
+          <Tile
+            label={t('mnyComplete.counts.bills')}
+            value={result.billsCreated}
+          />
+        )}
         {result.pricesImported > 0 && (
           <Tile
             label={t('mnyComplete.counts.prices')}
@@ -180,6 +192,17 @@ export function MnyVerificationReport({
                 <tr key={line.accountName}>
                   <td className="px-3 py-2">
                     <span className="text-foreground">{line.accountName}</span>
+                    {/*
+                      Loans and mortgages are badged because they are where
+                      PR #192's phantom-row filter silently emptied accounts:
+                      a user scanning this table should be able to find them
+                      without knowing which of their names are loans.
+                    */}
+                    {LOAN_TYPES.has(line.accountType) && (
+                      <span className="ml-2 inline-block px-1.5 py-0.5 text-xs bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded">
+                        {formatAccountType(line.accountType as AccountType, tc)}
+                      </span>
+                    )}
                     {!line.matches && (
                       <span className="ml-2 inline-block px-1.5 py-0.5 text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 rounded">
                         {t('mnyComplete.table.check')}

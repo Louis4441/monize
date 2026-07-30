@@ -42,8 +42,10 @@ export interface MnyImportOptions {
    */
   readonly accounts: readonly MnyAccountOption[];
   /**
-   * `BILL.hbill` handles the user ticked. Empty means no bills, which is also
-   * the Phase 1 behaviour -- bills arrive in Phase 3.
+   * `BILL.hbill` handles the user ticked. An explicit empty list means no
+   * bills; a request that omits the field entirely gets the server default of
+   * every detected-active candidate (the parser resolves this, since only it
+   * knows the candidates).
    */
   readonly bills: readonly number[];
 }

@@ -1,4 +1,5 @@
 import { AccountType } from "../../accounts/entities/account.entity";
+import { FrequencyType } from "../../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { TransactionStatus } from "../../transactions/entities/transaction.entity";
 import { MNY_FIXTURES, readMnyFixture } from "./__fixtures__/mny-fixtures";
 import {
@@ -9,7 +10,7 @@ import {
 } from "./__fixtures__/mny-row-builders";
 import { mapAccounts } from "./map/map-reference";
 import { DEFAULT_MNY_IMPORT_OPTIONS } from "./model/mny-import-options";
-import { MappedTransactions } from "./model/mny-import-model";
+import { MappedBill, MappedTransactions } from "./model/mny-import-model";
 import {
   MnyParserService,
   computeExpectedBalances,
@@ -397,5 +398,129 @@ describe("buildPreview", () => {
       expect(typeof warning.count).toBe("number");
       expect(warning.samples.length).toBeLessThanOrEqual(5);
     }
+  });
+
+  describe("bills", () => {
+    /**
+     * No committed fixture has a single `BILL` row (open question 12.3), so
+     * the review step's bill list is driven from a mapped bill grafted onto a
+     * real parse -- the same split the design's test strategy uses everywhere
+     * the corpus falls short.
+     */
+    function bill(overrides: Partial<MappedBill> = {}): MappedBill {
+      return {
+        handle: 7,
+        seriesKey: 7,
+        status: 3,
+        name: "Hydro One",
+        // The first account of the money2002 parse, resolved below.
+        accountKey: "",
+        payeeHandle: null,
+        categoryHandle: null,
+        amount: -95.5,
+        currencyCode: "GBP",
+        frequency: FrequencyType.MONTHLY,
+        approximate: false,
+        nextDueDate: "2026-08-02",
+        endDate: null,
+        description: null,
+        isTransfer: false,
+        transferAccountKey: null,
+        investment: null,
+        splits: [],
+        ...overrides,
+      };
+    }
+
+    function previewWithBills(bills: MappedBill[]) {
+      const parsed = service.parse({
+        buffer: readMnyFixture("money2002"),
+        userDefaultCurrency: "CAD",
+        asOf: "2026-07-29",
+      });
+      const accountKey = parsed.accounts.accounts[0].key;
+
+      return buildPreview({
+        parsed: {
+          ...parsed,
+          bills: {
+            bills: bills.map((entry) => ({ ...entry, accountKey })),
+            seriesInFile: 4,
+            skipped: 2,
+            supported: true,
+            warnings: [],
+          },
+        },
+        stagedFileId: "staged-1",
+        filename: "money2002.mny",
+        sizeBytes: 123456,
+      });
+    }
+
+    it("lists each candidate with the account name the user will recognize", () => {
+      const preview = previewWithBills([bill()]);
+
+      expect(preview.bills).toHaveLength(1);
+      expect(preview.bills[0]).toMatchObject({
+        handle: 7,
+        name: "Hydro One",
+        amount: -95.5,
+        frequency: FrequencyType.MONTHLY,
+        nextDueDate: "2026-08-02",
+        isTransfer: false,
+        isInvestment: false,
+        splitCount: 0,
+        // Carried untouched so a real file can pin what `st` means.
+        status: 3,
+      });
+      expect(preview.bills[0].accountName).toBe(preview.accounts[0].name);
+    });
+
+    it("counts candidates against the file's raw bill rows", () => {
+      const preview = previewWithBills([bill(), bill({ handle: 8 })]);
+
+      expect(preview.counts.billsDetected).toBe(2);
+      expect(preview.counts.billsSkipped).toBe(2);
+    });
+
+    it("flags a transfer, investment or split bill for the checkbox list", () => {
+      const preview = previewWithBills([
+        bill({
+          handle: 9,
+          isTransfer: true,
+          transferAccountKey: "acct-2",
+          approximate: true,
+          investment: {
+            action: "BUY" as never,
+            securityHandle: 1,
+            quantity: 1,
+            price: 1,
+            commission: 0,
+          },
+          splits: [
+            {
+              kind: "CATEGORY" as never,
+              categoryHandle: 61,
+              transferAccountKey: null,
+              amount: -50,
+              memo: null,
+            },
+          ],
+        }),
+      ]);
+
+      expect(preview.bills[0]).toMatchObject({
+        isTransfer: true,
+        isInvestment: true,
+        approximate: true,
+        splitCount: 1,
+      });
+    });
+
+    it("has an empty bill list for a file with no BILL table", () => {
+      // money2002 itself: the table exists but holds no rows.
+      expect(preview().bills).toEqual([]);
+      expect(preview().counts.billsDetected).toBe(0);
+    });
   });
 });

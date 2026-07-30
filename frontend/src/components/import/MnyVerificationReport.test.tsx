@@ -12,6 +12,7 @@ function line(
 ): MnyAccountVerification {
   return {
     accountName: 'Chequing',
+    accountType: 'CHEQUING',
     accountId: 'acct-uuid',
     expectedBalance: 2500.5,
     importedBalance: 2500.5,
@@ -50,7 +51,7 @@ function result(overrides: Partial<MnyImportResult> = {}): MnyImportResult {
     pricesImported: 0,
     exchangeRatesImported: 0,
     billsCreated: 0,
-    skipped: { accounts: 0, payees: 0, categories: 0, transactions: 0 },
+    skipped: { accounts: 0, payees: 0, categories: 0, transactions: 0, bills: 0 },
     existingDataRemoved: false,
     holdings: [],
     verification: [line()],
@@ -275,5 +276,38 @@ describe('MnyVerificationReport', () => {
       expect(clickSpy).toHaveBeenCalled();
       expect(revokeObjectURL).toHaveBeenCalledWith('blob:report');
     });
+  });
+
+  it('badges loan and mortgage lines so they are findable in a long table', () => {
+    // Loans are where PR #192's phantom-row filter silently produced empty
+    // accounts, so a user checking this report has to be able to spot them.
+    render(
+      <MnyVerificationReport
+        {...defaultProps}
+        result={result({
+          verification: [
+            line(),
+            line({ accountName: 'Mortgage', accountType: 'MORTGAGE' }),
+          ],
+        })}
+      />,
+    );
+
+    // Two matches: the account's own name, and the type badge beside it. The
+    // chequing line above it gets no badge at all.
+    expect(screen.getAllByText('Mortgage')).toHaveLength(2);
+    expect(screen.queryByText('Chequing Account')).not.toBeInTheDocument();
+  });
+
+  it('counts the scheduled bills it created', () => {
+    render(
+      <MnyVerificationReport
+        {...defaultProps}
+        result={result({ billsCreated: 21 })}
+      />,
+    );
+
+    expect(screen.getByText('Scheduled bills')).toBeInTheDocument();
+    expect(screen.getByText('21')).toBeInTheDocument();
   });
 });

@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} share transfers, {splits} stock splits",
       "prices": "Price history",
       "exchangeRates": "Exchange rates",
-      "ofTotal": "of {total} in the file"
+      "ofTotal": "of {total} in the file",
+      "bills": "Scheduled bills",
+      "billsOfRows": "active of {rows} bill rows"
     },
-    "notYetImported": "Scheduled bills are not imported yet: {bills} bill rows are left for a later release. Everything else in this file imports in full.",
     "accountsHeading": "Accounts ({count})",
     "selectAll": "Select all",
     "selectNone": "Select none",
@@ -349,10 +350,47 @@
       "importPrices": "Import price history",
       "importPricesHint": "Money's own record of what each security was worth, day by day. Turn this off if you would rather start from live quotes.",
       "importExchangeRates": "Import exchange rates",
-      "importExchangeRatesHint": "Historical rates between the currencies in your file, so past foreign-currency transactions convert the way Money converted them."
+      "importExchangeRatesHint": "Historical rates between the currencies in your file, so past foreign-currency transactions convert the way Money converted them.",
+      "wipeExistingData": "Start fresh: remove my existing Monize data first",
+      "wipeExistingDataHint": "Runs the same Delete My Data operation as Settings before importing. You will be asked to confirm. Leave this off to add the Money file to what you already have."
     },
     "warningsHeading": "Notes about this file",
     "startImport": "Start import"
+  },
+  "mnyBills": {
+    "heading": "Scheduled bills to create ({count})",
+    "explainer": "Money keeps a row for every occurrence of a bill, so a long history holds thousands of them. These are the series that still look active. Untick any you do not want -- unticked bills are not created at all.",
+    "unsupported": "This Money version predates scheduled bills, so there are none to import.",
+    "skipped": "{count, plural, one {# bill series was} other {# bill series were}} missing a template or a usable date and cannot be imported.",
+    "table": {
+      "include": "Import",
+      "includeBill": "Import {name}",
+      "bill": "Bill",
+      "account": "Account",
+      "frequency": "Frequency",
+      "nextDue": "Next due",
+      "amount": "Amount",
+      "transfer": "Transfer",
+      "investment": "Investment",
+      "splits": "{count, plural, one {# split} other {# splits}}",
+      "approximate": "Closest Monize frequency"
+    }
+  },
+  "mnyWipe": {
+    "heading": "Remove your existing data first?",
+    "body": "This runs the same Delete My Data operation as Settings -> Danger Zone, before the import begins. It removes:",
+    "removes": {
+      "transactions": "Every transaction and split",
+      "scheduled": "Every scheduled and recurring transaction",
+      "investments": "Every security, price, holding and investment transaction",
+      "accounts": "Every account, category and payee",
+      "budgets": "Every budget, custom report, tag and import mapping"
+    },
+    "irreversible": "This cannot be undone. If the import then fails, the removed data does not come back.",
+    "typeToConfirm": "Type {word} to confirm:",
+    "passwordLabel": "Enter your password:",
+    "oidcNote": "Your identity provider already confirmed this session, so no password is needed.",
+    "confirm": "Delete my data and import"
   },
   "mnyImporting": {
     "heading": "Importing your Money file",
@@ -387,7 +425,8 @@
       "securities": "Securities",
       "investments": "Investment transactions",
       "prices": "Prices",
-      "exchangeRates": "Exchange rates"
+      "exchangeRates": "Exchange rates",
+      "bills": "Scheduled bills"
     },
     "existingDataRemoved": "Your existing data was removed before this import, as requested.",
     "verificationHeading": "Balance verification",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, one {# investment transaction} other {# investment transactions}} had no share detail in the file and were imported for their cash amount only.",
     "investmentAccountMismatch": "{count, plural, one {# investment transaction} other {# investment transactions}} sat in an account that is not an investment account and were skipped.",
     "unusableSecuritySplit": "{count, plural, one {# stock split} other {# stock splits}} could not be matched to a security or had an unusable ratio, and were not applied.",
-    "holdingsMismatch": "{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records."
+    "holdingsMismatch": "{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records.",
+    "billTemplateMissing": "{count, plural, one {# scheduled bill} other {# scheduled bills}} had no template transaction in the file and were skipped.",
+    "unusableBill": "{count, plural, one {# scheduled bill} other {# scheduled bills}} had no account, no usable date or an unrecognized recurrence, and were skipped.",
+    "billFrequencyApproximated": "{count, plural, one {# scheduled bill uses} other {# scheduled bills use}} a repeat interval Monize cannot express exactly, so the closest shorter one was used."
   },
   "mnyErrors": {
     "mnyImportFailed": "Something went wrong while importing. Nothing was saved -- you can try again.",

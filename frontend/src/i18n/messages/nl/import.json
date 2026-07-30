@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} effectenoverboekingen, {splits} aandelensplitsingen",
       "prices": "Koersgeschiedenis",
       "exchangeRates": "Wisselkoersen",
-      "ofTotal": "van {total} in het bestand"
+      "ofTotal": "van {total} in het bestand",
+      "bills": "Geplande rekeningen",
+      "billsOfRows": "actief van {rows} rekeningregels"
     },
-    "notYetImported": "Geplande rekeningen worden nog niet geïmporteerd: {bills} rekeningregels blijven voor een latere versie. Al het overige in dit bestand wordt volledig geïmporteerd.",
     "accountsHeading": "Rekeningen ({count})",
     "selectAll": "Alles selecteren",
     "selectNone": "Niets selecteren",
@@ -349,10 +350,47 @@
       "importPrices": "Koersgeschiedenis importeren",
       "importPricesHint": "De eigen registratie van Money van wat elk effect dag na dag waard was. Zet dit uit als u liever met actuele koersen begint.",
       "importExchangeRates": "Wisselkoersen importeren",
-      "importExchangeRatesHint": "Historische koersen tussen de valuta's in uw bestand, zodat oude transacties in vreemde valuta net zo worden omgerekend als Money ze omrekende."
+      "importExchangeRatesHint": "Historische koersen tussen de valuta's in uw bestand, zodat oude transacties in vreemde valuta net zo worden omgerekend als Money ze omrekende.",
+      "wipeExistingData": "Opnieuw beginnen: verwijder eerst mijn bestaande Monize-gegevens",
+      "wipeExistingDataHint": "Voert vóór het importeren dezelfde bewerking Mijn gegevens verwijderen uit als in Instellingen. Er wordt om bevestiging gevraagd. Laat dit uit om het Money-bestand toe te voegen aan wat u al hebt."
     },
     "warningsHeading": "Opmerkingen over dit bestand",
     "startImport": "Import starten"
+  },
+  "mnyBills": {
+    "heading": "Aan te maken geplande rekeningen ({count})",
+    "explainer": "Money bewaart een regel voor elke keer dat een rekening voorkomt, dus een lange historie bevat er duizenden. Dit zijn de reeksen die nog actief lijken. Vink af wat u niet wilt -- niet-aangevinkte rekeningen worden helemaal niet aangemaakt.",
+    "unsupported": "Deze Money-versie dateert van vóór geplande rekeningen, dus er zijn er geen om te importeren.",
+    "skipped": "{count, plural, one {# rekeningreeks had} other {# rekeningreeksen hadden}} geen sjabloon of bruikbare datum en kunnen niet worden geïmporteerd.",
+    "table": {
+      "include": "Importeren",
+      "includeBill": "{name} importeren",
+      "bill": "Rekening",
+      "account": "Rekening",
+      "frequency": "Frequentie",
+      "nextDue": "Volgende vervaldatum",
+      "amount": "Bedrag",
+      "transfer": "Overboeking",
+      "investment": "Belegging",
+      "splits": "{count, plural, one {# splitsing} other {# splitsingen}}",
+      "approximate": "Dichtstbijzijnde Monize-frequentie"
+    }
+  },
+  "mnyWipe": {
+    "heading": "Eerst uw bestaande gegevens verwijderen?",
+    "body": "Dit voert dezelfde bewerking Mijn gegevens verwijderen uit als in Instellingen -> Gevarenzone, vóór het importeren begint. Het verwijdert:",
+    "removes": {
+      "transactions": "Elke transactie en splitsing",
+      "scheduled": "Elke geplande en terugkerende transactie",
+      "investments": "Elk effect, elke koers, elke positie en elke beleggingstransactie",
+      "accounts": "Elke rekening, categorie en begunstigde",
+      "budgets": "Elk budget, aangepast rapport, label en importtoewijzing"
+    },
+    "irreversible": "Dit kan niet ongedaan worden gemaakt. Als het importeren daarna mislukt, komen de verwijderde gegevens niet terug.",
+    "typeToConfirm": "Typ {word} om te bevestigen:",
+    "passwordLabel": "Voer uw wachtwoord in:",
+    "oidcNote": "Uw identiteitsprovider heeft deze sessie al bevestigd, dus er is geen wachtwoord nodig.",
+    "confirm": "Mijn gegevens verwijderen en importeren"
   },
   "mnyImporting": {
     "heading": "Uw Money-bestand wordt geïmporteerd",
@@ -387,7 +425,8 @@
       "securities": "Effecten",
       "investments": "Beleggingstransacties",
       "prices": "Koersen",
-      "exchangeRates": "Wisselkoersen"
+      "exchangeRates": "Wisselkoersen",
+      "bills": "Geplande rekeningen"
     },
     "existingDataRemoved": "Uw bestaande gegevens zijn vóór deze import verwijderd, zoals gevraagd.",
     "verificationHeading": "Saldoverificatie",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, one {# beleggingstransactie had} other {# beleggingstransacties hadden}} geen aandelengegevens in het bestand en zijn alleen op hun geldbedrag geïmporteerd.",
     "investmentAccountMismatch": "{count, plural, one {# beleggingstransactie stond} other {# beleggingstransacties stonden}} op een rekening die geen beleggingsrekening is en zijn overgeslagen.",
     "unusableSecuritySplit": "{count, plural, one {# aandelensplitsing kon} other {# aandelensplitsingen konden}} niet aan een effect worden gekoppeld of had een onbruikbare verhouding, en is niet toegepast.",
-    "holdingsMismatch": "{count, plural, one {# positie komt} other {# posities komen}} niet overeen met de aandelen in uw Money-bestand."
+    "holdingsMismatch": "{count, plural, one {# positie komt} other {# posities komen}} niet overeen met de aandelen in uw Money-bestand.",
+    "billTemplateMissing": "{count, plural, one {# geplande rekening had} other {# geplande rekeningen hadden}} geen sjabloontransactie in het bestand en zijn overgeslagen.",
+    "unusableBill": "{count, plural, one {# geplande rekening had} other {# geplande rekeningen hadden}} geen rekening, geen bruikbare datum of een onbekende herhaling en zijn overgeslagen.",
+    "billFrequencyApproximated": "{count, plural, one {# geplande rekening gebruikt} other {# geplande rekeningen gebruiken}} een herhalingsinterval dat Monize niet exact kan weergeven, dus het dichtstbijzijnde kortere interval is gebruikt."
   },
   "mnyErrors": {
     "mnyImportFailed": "Er is iets misgegaan tijdens de import. Er is niets opgeslagen -- u kunt het opnieuw proberen.",

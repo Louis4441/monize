@@ -43,6 +43,13 @@ export interface MnyImportProgress {
 /** One account's line in the verification report. */
 export interface MnyAccountVerification {
   readonly accountName: string;
+  /**
+   * So the report can show *what kind* of account a discrepancy is on. Loans
+   * and mortgages are the ones worth calling out: they are where PR #192's
+   * phantom-row filter silently produced empty accounts, and a delta there
+   * means something different than a delta on a chequing account.
+   */
+  readonly accountType: string;
   /** Null when the account was skipped or failed to create. */
   readonly accountId: string | null;
   /** Final balance computed from the Money file by the parser. */
@@ -97,6 +104,8 @@ export interface MnyImportResult {
     readonly payees: number;
     readonly categories: number;
     readonly transactions: number;
+    /** Bill series with no usable template or date -- not unticked ones. */
+    readonly bills: number;
   };
   /** True when the wizard's wipe option ran the delete-my-data pre-step. */
   readonly existingDataRemoved: boolean;

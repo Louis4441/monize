@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} traspasos de valores, {splits} divisiones de acciones",
       "prices": "Historial de precios",
       "exchangeRates": "Tipos de cambio",
-      "ofTotal": "de {total} en el archivo"
+      "ofTotal": "de {total} en el archivo",
+      "bills": "Facturas programadas",
+      "billsOfRows": "activas de {rows} filas de facturas"
     },
-    "notYetImported": "Las facturas programadas aún no se importan: {bills} filas de facturas quedan para una versión posterior. Todo lo demás de este archivo se importa por completo.",
     "accountsHeading": "Cuentas ({count})",
     "selectAll": "Seleccionar todo",
     "selectNone": "No seleccionar nada",
@@ -349,10 +350,47 @@
       "importPrices": "Importar el historial de precios",
       "importPricesHint": "El registro que Money guarda de cuánto valía cada valor, día a día. Desactívelo si prefiere partir de cotizaciones actuales.",
       "importExchangeRates": "Importar los tipos de cambio",
-      "importExchangeRatesHint": "Tipos históricos entre las monedas de su archivo, para que las operaciones antiguas en moneda extranjera se conviertan igual que en Money."
+      "importExchangeRatesHint": "Tipos históricos entre las monedas de su archivo, para que las operaciones antiguas en moneda extranjera se conviertan igual que en Money.",
+      "wipeExistingData": "Empezar de cero: eliminar primero mis datos actuales de Monize",
+      "wipeExistingDataHint": "Ejecuta la misma operación Eliminar mis datos que en Ajustes antes de importar. Se te pedirá confirmación. Déjalo desactivado para añadir el archivo de Money a lo que ya tienes."
     },
     "warningsHeading": "Notas sobre este archivo",
     "startImport": "Iniciar importación"
+  },
+  "mnyBills": {
+    "heading": "Facturas programadas a crear ({count})",
+    "explainer": "Money guarda una fila por cada aparición de una factura, así que un historial largo contiene miles. Estas son las series que aún parecen activas. Desmarca las que no quieras: las facturas sin marcar no se crean en absoluto.",
+    "unsupported": "Esta versión de Money es anterior a las facturas programadas, así que no hay ninguna que importar.",
+    "skipped": "{count, plural, one {# serie de facturas no tenía} other {# series de facturas no tenían}} plantilla ni una fecha utilizable y no se pueden importar.",
+    "table": {
+      "include": "Importar",
+      "includeBill": "Importar {name}",
+      "bill": "Factura",
+      "account": "Cuenta",
+      "frequency": "Frecuencia",
+      "nextDue": "Próximo vencimiento",
+      "amount": "Importe",
+      "transfer": "Transferencia",
+      "investment": "Inversión",
+      "splits": "{count, plural, one {# desglose} other {# desgloses}}",
+      "approximate": "Frecuencia de Monize más cercana"
+    }
+  },
+  "mnyWipe": {
+    "heading": "¿Eliminar primero tus datos actuales?",
+    "body": "Esto ejecuta la misma operación Eliminar mis datos que en Ajustes -> Zona de peligro, antes de que empiece la importación. Elimina:",
+    "removes": {
+      "transactions": "Todas las transacciones y sus desgloses",
+      "scheduled": "Todas las transacciones programadas y recurrentes",
+      "investments": "Todos los valores, precios, posiciones y transacciones de inversión",
+      "accounts": "Todas las cuentas, categorías y beneficiarios",
+      "budgets": "Todos los presupuestos, informes personalizados, etiquetas y asignaciones de importación"
+    },
+    "irreversible": "Esto no se puede deshacer. Si la importación falla después, los datos eliminados no vuelven.",
+    "typeToConfirm": "Escribe {word} para confirmar:",
+    "passwordLabel": "Introduce tu contraseña:",
+    "oidcNote": "Tu proveedor de identidad ya confirmó esta sesión, así que no hace falta contraseña.",
+    "confirm": "Eliminar mis datos e importar"
   },
   "mnyImporting": {
     "heading": "Importando su archivo de Money",
@@ -387,7 +425,8 @@
       "securities": "Valores",
       "investments": "Transacciones de inversión",
       "prices": "Precios",
-      "exchangeRates": "Tipos de cambio"
+      "exchangeRates": "Tipos de cambio",
+      "bills": "Facturas programadas"
     },
     "existingDataRemoved": "Sus datos existentes se eliminaron antes de esta importación, tal como solicitó.",
     "verificationHeading": "Verificación de saldos",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, one {# transacción de inversión no tenía} other {# transacciones de inversión no tenían}} detalle de acciones en el archivo y se importaron solo por su importe en efectivo.",
     "investmentAccountMismatch": "{count, plural, one {# transacción de inversión estaba} other {# transacciones de inversión estaban}} en una cuenta que no es de inversión y se omitieron.",
     "unusableSecuritySplit": "{count, plural, one {# división de acciones no pudo} other {# divisiones de acciones no pudieron}} asociarse a un valor o tenía una proporción inservible, y no se aplicaron.",
-    "holdingsMismatch": "{count, plural, one {# posición no coincide} other {# posiciones no coinciden}} con las acciones que registra su archivo de Money."
+    "holdingsMismatch": "{count, plural, one {# posición no coincide} other {# posiciones no coinciden}} con las acciones que registra su archivo de Money.",
+    "billTemplateMissing": "{count, plural, one {# factura programada no tenía} other {# facturas programadas no tenían}} transacción de plantilla en el archivo y se omitieron.",
+    "unusableBill": "{count, plural, one {# factura programada no tenía} other {# facturas programadas no tenían}} cuenta, fecha utilizable o periodicidad reconocida, y se omitieron.",
+    "billFrequencyApproximated": "{count, plural, one {# factura programada usa} other {# facturas programadas usan}} un intervalo de repetición que Monize no puede expresar con exactitud, así que se usó el más corto más cercano."
   },
   "mnyErrors": {
     "mnyImportFailed": "Algo salió mal durante la importación. No se guardó nada: puede volver a intentarlo.",

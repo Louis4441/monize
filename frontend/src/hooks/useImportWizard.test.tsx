@@ -88,6 +88,18 @@ vi.mock('@/lib/categoryUtils', () => ({
 
 vi.mock('@/lib/errors', () => ({
   getErrorMessage: (_error: any, fallback: string) => fallback,
+  getErrorCode: () => undefined,
+}));
+
+const mockMnyParse = vi.fn();
+const mockMnyStart = vi.fn();
+vi.mock('@/lib/import-mny', () => ({
+  mnyImportApi: {
+    parse: (...args: any[]) => mockMnyParse(...args),
+    start: (...args: any[]) => mockMnyStart(...args),
+    getJob: vi.fn(),
+    discardStagedFile: vi.fn(),
+  },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -1535,5 +1547,116 @@ describe('useImportWizard - shouldShowMapAccounts', () => {
       ]));
     });
     expect(result.current.shouldShowMapAccounts).toBe(false);
+  });
+});
+
+describe('useImportWizard - .mny wipe confirmation', () => {
+  const mnyPreview = {
+    stagedFileId: 'staged-1',
+    filename: 'finances.mny',
+    sizeBytes: 1024,
+    era: 'moneyPlus',
+    passwordProtected: false,
+    baseCurrency: 'USD',
+    accounts: [],
+    bills: [],
+    counts: {},
+    fileCounts: {},
+    missingTables: [],
+    missingFields: [],
+    warnings: [],
+    options: {
+      wipeExistingData: false,
+      referencedOnlyPayees: true,
+      referencedOnlyCategories: true,
+      importClosedAccounts: true,
+      importPrices: true,
+      importExchangeRates: true,
+      accounts: [],
+      bills: [],
+    },
+  };
+
+  async function uploadMny() {
+    mockGetAllAccounts.mockResolvedValue([baseAccount()]);
+    mockMnyParse.mockResolvedValue(mnyPreview);
+    mockMnyStart.mockResolvedValue({
+      id: 'job-1',
+      status: 'running',
+      progress: null,
+      result: null,
+      errorKey: null,
+      retryable: false,
+      startedAt: null,
+      completedAt: null,
+    });
+
+    const { result } = renderHook(() => useImportWizard(), { wrapper });
+    await waitFor(() => expect(result.current.accounts).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.handleFileSelect(
+        fileEvent([makeFile('finances.mny', 'binary')]),
+      );
+    });
+    return result;
+  }
+
+  it('starts the import directly when nothing will be deleted', async () => {
+    const result = await uploadMny();
+
+    await act(async () => {
+      result.current.handleMnyImportClick();
+    });
+
+    expect(result.current.showMnyWipeConfirm).toBe(false);
+    expect(mockMnyStart).toHaveBeenCalled();
+  });
+
+  it('asks for confirmation instead of starting when the wipe is armed', async () => {
+    // PR #192's script deleted everything unconditionally. Arming the option
+    // must not be enough on its own to remove a single row.
+    const result = await uploadMny();
+
+    act(() => result.current.mny.setOption('wipeExistingData', true));
+    await act(async () => {
+      result.current.handleMnyImportClick();
+    });
+
+    expect(result.current.showMnyWipeConfirm).toBe(true);
+    expect(mockMnyStart).not.toHaveBeenCalled();
+  });
+
+  it('starts with the confirmed password once the dialog is answered', async () => {
+    const result = await uploadMny();
+
+    act(() => result.current.mny.setOption('wipeExistingData', true));
+    await act(async () => {
+      result.current.handleMnyImportClick();
+    });
+    await act(async () => {
+      await result.current.handleMnyWipeConfirm('hunter2');
+    });
+
+    expect(result.current.showMnyWipeConfirm).toBe(false);
+    expect(mockMnyStart).toHaveBeenCalledWith(
+      'staged-1',
+      expect.objectContaining({ wipeExistingData: true }),
+      { password: 'hunter2' },
+    );
+    expect(result.current.step).toBe('mnyImporting');
+  });
+
+  it('deletes nothing when the confirmation is cancelled', async () => {
+    const result = await uploadMny();
+
+    act(() => result.current.mny.setOption('wipeExistingData', true));
+    await act(async () => {
+      result.current.handleMnyImportClick();
+    });
+    act(() => result.current.cancelMnyWipeConfirm());
+
+    expect(result.current.showMnyWipeConfirm).toBe(false);
+    expect(mockMnyStart).not.toHaveBeenCalled();
   });
 });

@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} kıymet transferi, {splits} hisse bölünmesi",
       "prices": "Fiyat geçmişi",
       "exchangeRates": "Döviz kurları",
-      "ofTotal": "dosyadaki {total} içinden"
+      "ofTotal": "dosyadaki {total} içinden",
+      "bills": "Planlanmış faturalar",
+      "billsOfRows": "{rows} fatura satırından etkin olanlar"
     },
-    "notYetImported": "Planlanmış faturalar henüz içe aktarılmıyor: {bills} fatura satırı sonraki bir sürüme bırakıldı. Bu dosyadaki diğer her şey eksiksiz içe aktarılır.",
     "accountsHeading": "Hesaplar ({count})",
     "selectAll": "Tümünü seç",
     "selectNone": "Hiçbirini seçme",
@@ -349,10 +350,47 @@
       "importPrices": "Fiyat geçmişini içe aktar",
       "importPricesHint": "Money'nin her menkul kıymetin gün gün ne ettiğine dair kendi kaydı. Güncel kotasyonlarla başlamayı tercih ediyorsanız bunu kapatın.",
       "importExchangeRates": "Döviz kurlarını içe aktar",
-      "importExchangeRatesHint": "Dosyanızdaki para birimleri arasındaki geçmiş kurlar; böylece eski yabancı para işlemleri Money'nin çevirdiği gibi çevrilir."
+      "importExchangeRatesHint": "Dosyanızdaki para birimleri arasındaki geçmiş kurlar; böylece eski yabancı para işlemleri Money'nin çevirdiği gibi çevrilir.",
+      "wipeExistingData": "Sıfırdan başla: önce mevcut Monize verilerimi kaldır",
+      "wipeExistingDataHint": "İçe aktarmadan önce Ayarlar'daki Verilerimi Sil işleminin aynısını çalıştırır. Onaylamanız istenir. Money dosyasını mevcut verilerinize eklemek için kapalı bırakın."
     },
     "warningsHeading": "Bu dosyayla ilgili notlar",
     "startImport": "İçe aktarmayı başlat"
+  },
+  "mnyBills": {
+    "heading": "Oluşturulacak planlanmış faturalar ({count})",
+    "explainer": "Money, bir faturanın her tekrarı için bir satır tutar; bu yüzden uzun bir geçmişte binlercesi birikir. Burada görünenler hâlâ etkin görünen serilerdir. İstemediklerinizin işaretini kaldırın; işareti kaldırılan faturalar hiç oluşturulmaz.",
+    "unsupported": "Bu Money sürümü planlanmış faturalardan önce geldiği için içe aktarılacak fatura yok.",
+    "skipped": "{count, plural, other {# fatura serisinin}} şablonu veya kullanılabilir tarihi yoktu ve içe aktarılamıyor.",
+    "table": {
+      "include": "İçe aktar",
+      "includeBill": "{name} içe aktar",
+      "bill": "Fatura",
+      "account": "Hesap",
+      "frequency": "Sıklık",
+      "nextDue": "Sonraki vade",
+      "amount": "Tutar",
+      "transfer": "Transfer",
+      "investment": "Yatırım",
+      "splits": "{count, plural, other {# bölme}}",
+      "approximate": "En yakın Monize sıklığı"
+    }
+  },
+  "mnyWipe": {
+    "heading": "Önce mevcut verileriniz kaldırılsın mı?",
+    "body": "Bu, içe aktarma başlamadan önce Ayarlar -> Tehlikeli Bölge'deki Verilerimi Sil işleminin aynısını çalıştırır. Şunları kaldırır:",
+    "removes": {
+      "transactions": "Her işlem ve bölme",
+      "scheduled": "Her planlanmış ve yinelenen işlem",
+      "investments": "Her menkul kıymet, fiyat, pozisyon ve yatırım işlemi",
+      "accounts": "Her hesap, kategori ve alacaklı",
+      "budgets": "Her bütçe, özel rapor, etiket ve içe aktarma eşlemesi"
+    },
+    "irreversible": "Bu geri alınamaz. İçe aktarma sonrasında başarısız olursa kaldırılan veriler geri gelmez.",
+    "typeToConfirm": "Onaylamak için {word} yazın:",
+    "passwordLabel": "Parolanızı girin:",
+    "oidcNote": "Kimlik sağlayıcınız bu oturumu zaten doğruladı, bu yüzden parola gerekmiyor.",
+    "confirm": "Verilerimi sil ve içe aktar"
   },
   "mnyImporting": {
     "heading": "Money dosyanız içe aktarılıyor",
@@ -387,7 +425,8 @@
       "securities": "Menkul kıymetler",
       "investments": "Yatırım işlemleri",
       "prices": "Fiyatlar",
-      "exchangeRates": "Döviz kurları"
+      "exchangeRates": "Döviz kurları",
+      "bills": "Planlanmış faturalar"
     },
     "existingDataRemoved": "Mevcut verileriniz, istediğiniz gibi bu içe aktarmadan önce kaldırıldı.",
     "verificationHeading": "Bakiye doğrulaması",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, other {# yatırım işleminin}} dosyada hisse ayrıntısı yoktu ve yalnızca nakit tutarıyla içe aktarıldı.",
     "investmentAccountMismatch": "{count, plural, other {# yatırım işlemi}} yatırım hesabı olmayan bir hesaptaydı ve atlandı.",
     "unusableSecuritySplit": "{count, plural, other {# hisse bölünmesi}} bir menkul kıymetle eşleştirilemedi ya da kullanılamaz bir orana sahipti; uygulanmadı.",
-    "holdingsMismatch": "{count, plural, other {# pozisyon}} Money dosyanızda kayıtlı hisse adediyle uyuşmuyor."
+    "holdingsMismatch": "{count, plural, other {# pozisyon}} Money dosyanızda kayıtlı hisse adediyle uyuşmuyor.",
+    "billTemplateMissing": "{count, plural, other {# planlanmış faturanın}} dosyada şablon işlemi yoktu ve atlandı.",
+    "unusableBill": "{count, plural, other {# planlanmış faturanın}} hesabı, kullanılabilir tarihi veya tanınan bir yinelenmesi yoktu ve atlandı.",
+    "billFrequencyApproximated": "{count, plural, other {# planlanmış fatura}} Monize'ın tam olarak ifade edemediği bir yineleme aralığı kullanıyor; en yakın daha kısa aralık kullanıldı."
   },
   "mnyErrors": {
     "mnyImportFailed": "İçe aktarma sırasında bir şeyler ters gitti. Hiçbir şey kaydedilmedi -- yeniden denebilirsiniz.",

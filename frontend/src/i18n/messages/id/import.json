@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} transfer efek, {splits} pemecahan saham",
       "prices": "Riwayat harga",
       "exchangeRates": "Kurs tukar",
-      "ofTotal": "dari {total} di berkas"
+      "ofTotal": "dari {total} di berkas",
+      "bills": "Tagihan terjadwal",
+      "billsOfRows": "aktif dari {rows} baris tagihan"
     },
-    "notYetImported": "Tagihan terjadwal belum diimpor: {bills} baris tagihan ditinggalkan untuk rilis berikutnya. Semua isi berkas ini selain itu diimpor sepenuhnya.",
     "accountsHeading": "Akun ({count})",
     "selectAll": "Pilih semua",
     "selectNone": "Jangan pilih apa pun",
@@ -349,10 +350,47 @@
       "importPrices": "Impor riwayat harga",
       "importPricesHint": "Catatan Money sendiri tentang nilai setiap efek dari hari ke hari. Matikan jika Anda lebih suka mulai dari kuotasi terkini.",
       "importExchangeRates": "Impor kurs tukar",
-      "importExchangeRatesHint": "Kurs historis antar mata uang di berkas Anda, agar transaksi valuta asing lama dikonversi seperti yang dilakukan Money."
+      "importExchangeRatesHint": "Kurs historis antar mata uang di berkas Anda, agar transaksi valuta asing lama dikonversi seperti yang dilakukan Money.",
+      "wipeExistingData": "Mulai dari awal: hapus dulu data Monize saya yang ada",
+      "wipeExistingDataHint": "Menjalankan operasi Hapus Data Saya yang sama seperti di Pengaturan sebelum mengimpor. Anda akan diminta konfirmasi. Biarkan mati untuk menambahkan berkas Money ke data yang sudah ada."
     },
     "warningsHeading": "Catatan tentang berkas ini",
     "startImport": "Mulai impor"
+  },
+  "mnyBills": {
+    "heading": "Tagihan terjadwal yang akan dibuat ({count})",
+    "explainer": "Money menyimpan satu baris untuk setiap kemunculan tagihan, sehingga riwayat panjang berisi ribuan baris. Ini adalah seri yang masih tampak aktif. Hapus centang yang tidak Anda inginkan -- tagihan yang tidak dicentang sama sekali tidak dibuat.",
+    "unsupported": "Versi Money ini lebih tua daripada fitur tagihan terjadwal, jadi tidak ada yang bisa diimpor.",
+    "skipped": "{count, plural, other {# seri tagihan}} tidak memiliki templat atau tanggal yang bisa dipakai dan tidak dapat diimpor.",
+    "table": {
+      "include": "Impor",
+      "includeBill": "Impor {name}",
+      "bill": "Tagihan",
+      "account": "Akun",
+      "frequency": "Frekuensi",
+      "nextDue": "Jatuh tempo berikutnya",
+      "amount": "Jumlah",
+      "transfer": "Transfer",
+      "investment": "Investasi",
+      "splits": "{count, plural, other {# pemecahan}}",
+      "approximate": "Frekuensi Monize terdekat"
+    }
+  },
+  "mnyWipe": {
+    "heading": "Hapus dulu data Anda yang ada?",
+    "body": "Ini menjalankan operasi Hapus Data Saya yang sama seperti di Pengaturan -> Zona Berbahaya, sebelum impor dimulai. Ini menghapus:",
+    "removes": {
+      "transactions": "Setiap transaksi dan pemecahannya",
+      "scheduled": "Setiap transaksi terjadwal dan berulang",
+      "investments": "Setiap efek, harga, kepemilikan, dan transaksi investasi",
+      "accounts": "Setiap akun, kategori, dan penerima",
+      "budgets": "Setiap anggaran, laporan khusus, tag, dan pemetaan impor"
+    },
+    "irreversible": "Ini tidak bisa dibatalkan. Jika impor kemudian gagal, data yang dihapus tidak kembali.",
+    "typeToConfirm": "Ketik {word} untuk mengonfirmasi:",
+    "passwordLabel": "Masukkan kata sandi Anda:",
+    "oidcNote": "Penyedia identitas Anda sudah mengonfirmasi sesi ini, jadi kata sandi tidak diperlukan.",
+    "confirm": "Hapus data saya dan impor"
   },
   "mnyImporting": {
     "heading": "Mengimpor berkas Money Anda",
@@ -387,7 +425,8 @@
       "securities": "Efek",
       "investments": "Transaksi investasi",
       "prices": "Harga",
-      "exchangeRates": "Kurs tukar"
+      "exchangeRates": "Kurs tukar",
+      "bills": "Tagihan terjadwal"
     },
     "existingDataRemoved": "Data Anda yang ada dihapus sebelum impor ini, sesuai permintaan.",
     "verificationHeading": "Verifikasi saldo",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, other {# transaksi investasi}} tidak memiliki rincian lembar di berkas dan hanya diimpor sebesar jumlah tunainya.",
     "investmentAccountMismatch": "{count, plural, other {# transaksi investasi}} berada di akun yang bukan akun investasi dan dilewati.",
     "unusableSecuritySplit": "{count, plural, other {# pemecahan saham}} tidak dapat dicocokkan dengan suatu efek atau memiliki rasio yang tidak dapat dipakai, dan tidak diterapkan.",
-    "holdingsMismatch": "{count, plural, other {# kepemilikan}} tidak sesuai dengan jumlah lembar yang dicatat berkas Money Anda."
+    "holdingsMismatch": "{count, plural, other {# kepemilikan}} tidak sesuai dengan jumlah lembar yang dicatat berkas Money Anda.",
+    "billTemplateMissing": "{count, plural, other {# tagihan terjadwal}} tidak memiliki transaksi templat dalam berkas dan dilewati.",
+    "unusableBill": "{count, plural, other {# tagihan terjadwal}} tidak memiliki akun, tanggal yang bisa dipakai, atau pengulangan yang dikenali, sehingga dilewati.",
+    "billFrequencyApproximated": "{count, plural, other {# tagihan terjadwal}} memakai interval pengulangan yang tidak bisa dinyatakan persis oleh Monize, jadi dipakai interval terpendek terdekat."
   },
   "mnyErrors": {
     "mnyImportFailed": "Terjadi kesalahan saat mengimpor. Tidak ada yang disimpan -- Anda dapat mencoba lagi.",

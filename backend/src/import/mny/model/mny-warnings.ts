@@ -61,6 +61,17 @@ export const MNY_WARNING_CODES = [
   "unusableSecuritySplit",
   /** LOT-derived open shares and the action replay disagree for a holding. */
   "holdingsMismatch",
+  /** A `BILL` series whose template transaction is missing from the file. */
+  "billTemplateMissing",
+  /** A `BILL` series with no usable due date, account or recurrence code. */
+  "unusableBill",
+  /** A bill recurrence Monize cannot express exactly; the next shorter period is used. */
+  "billFrequencyApproximated",
+  /**
+   * A loan's payments name more than one non-principal category (interest plus
+   * escrow, typically), so its interest category was left for the user to set.
+   */
+  "loanInterestCategoryUnclear",
 ] as const;
 
 export type MnyWarningCode = (typeof MNY_WARNING_CODES)[number];

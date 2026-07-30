@@ -2,6 +2,7 @@ import {
   AccountSubType,
   AccountType,
 } from "../../accounts/entities/account.entity";
+import { FrequencyType } from "../../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { MnyImportOptions } from "./model/mny-import-options";
 import { MnyWarningSummary, summarizeWarnings } from "./model/mny-warnings";
 import { MnyEra, MnyFileCounts, MnyParsedFile } from "./mny-parser.service";
@@ -36,6 +37,29 @@ export interface MnyPreviewAccount {
   readonly favourite: boolean;
 }
 
+/**
+ * One detected-active bill in the wizard's checkbox list. Selection travels
+ * back as `options.bills` (the `handle` values the user kept ticked).
+ */
+export interface MnyPreviewBill {
+  /** Representative `BILL.hbill` -- the selection key. */
+  readonly handle: number;
+  readonly name: string;
+  /** Monize name of the account the bill posts from. */
+  readonly accountName: string;
+  readonly amount: number;
+  readonly currencyCode: string;
+  readonly frequency: FrequencyType;
+  /** True when the Money interval had no exact Monize frequency. */
+  readonly approximate: boolean;
+  readonly nextDueDate: string;
+  readonly isTransfer: boolean;
+  readonly isInvestment: boolean;
+  readonly splitCount: number;
+  /** Raw `BILL.st`, surfaced for real-file diagnosis (open question 12.3). */
+  readonly status: number;
+}
+
 export interface MnyPreviewCounts {
   readonly accountsIncluded: number;
   readonly accountsInFile: number;
@@ -59,6 +83,10 @@ export interface MnyPreviewCounts {
   readonly pricesToImport: number;
   /** Exchange-rate rows; 0 when the toggle is off. */
   readonly exchangeRatesToImport: number;
+  /** Detected-active bill series offered in the checkbox list. */
+  readonly billsDetected: number;
+  /** Bill series the mapper could not use (no template, no usable date). */
+  readonly billsSkipped: number;
 }
 
 export interface MnyPreview {
@@ -70,6 +98,12 @@ export interface MnyPreview {
   readonly passwordProtected: boolean;
   readonly baseCurrency: string;
   readonly accounts: readonly MnyPreviewAccount[];
+  /**
+   * Detected-active bills for the wizard's checkbox list. Empty both when the
+   * file has none and when this Money version predates the `BILL` table --
+   * `missingTables` tells those apart.
+   */
+  readonly bills: readonly MnyPreviewBill[];
   readonly counts: MnyPreviewCounts;
   /** Raw file counts, including the things Phase 1 does not import yet. */
   readonly fileCounts: MnyFileCounts;
@@ -91,6 +125,24 @@ export interface BuildPreviewInput {
 
 export function buildPreview(input: BuildPreviewInput): MnyPreview {
   const { parsed } = input;
+
+  const accountNameByKey = new Map(
+    parsed.accounts.accounts.map((account) => [account.key, account.name]),
+  );
+  const bills: MnyPreviewBill[] = parsed.bills.bills.map((bill) => ({
+    handle: bill.handle,
+    name: bill.name,
+    accountName: accountNameByKey.get(bill.accountKey) ?? bill.accountKey,
+    amount: bill.amount,
+    currencyCode: bill.currencyCode,
+    frequency: bill.frequency,
+    approximate: bill.approximate,
+    nextDueDate: bill.nextDueDate,
+    isTransfer: bill.isTransfer,
+    isInvestment: bill.investment !== null,
+    splitCount: bill.splits.length,
+    status: bill.status,
+  }));
 
   const accounts: MnyPreviewAccount[] = parsed.accounts.accounts.map(
     (account) => ({
@@ -118,6 +170,7 @@ export function buildPreview(input: BuildPreviewInput): MnyPreview {
     passwordProtected: parsed.passwordProtected,
     baseCurrency: parsed.baseCurrency,
     accounts,
+    bills,
     counts: {
       accountsIncluded: accounts.length,
       accountsInFile: parsed.fileCounts.accounts,
@@ -140,6 +193,8 @@ export function buildPreview(input: BuildPreviewInput): MnyPreview {
       exchangeRatesToImport: parsed.options.importExchangeRates
         ? parsed.fileCounts.exchangeRates
         : 0,
+      billsDetected: parsed.bills.bills.length,
+      billsSkipped: parsed.bills.skipped,
     },
     fileCounts: parsed.fileCounts,
     missingTables: parsed.missingTables,

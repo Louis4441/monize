@@ -15,6 +15,7 @@ import {
   MnyTransactionSplit,
   MnyTransfer,
 } from "../model/mny-rows";
+import { MnyBillData } from "../tables/read-bills";
 import { MnyInvestmentData } from "../tables/read-investments";
 import { MnyReferenceData } from "../tables/read-reference";
 import { MnyTransactionData } from "../tables/read-transactions";
@@ -225,6 +226,22 @@ export function mnyLot(overrides: Partial<MnyLot> = {}): MnyLot {
     sellTransaction: null,
     boughtOn: null,
     soldOn: null,
+    ...overrides,
+  };
+}
+
+/** `MnyBillData` for a Money version that has the `BILL` table. */
+export function billData(overrides: Partial<MnyBillData> = {}): MnyBillData {
+  return {
+    bills: [],
+    supported: true,
+    availability: {
+      table: "BILL",
+      present: true,
+      rowCount: overrides.bills?.length ?? 0,
+      missingFields: [],
+      resolvedColumns: {},
+    },
     ...overrides,
   };
 }
