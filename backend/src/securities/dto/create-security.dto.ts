@@ -12,6 +12,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
@@ -122,6 +123,11 @@ export class CreateSecurityDto {
     required: false,
   })
   @IsOptional()
+  // An optional field cleared in the form arrives as "", and `@IsOptional`
+  // only waives validation for undefined and null -- so without this the URL
+  // check runs on the empty string, rejects it, and every save from a form that
+  // leaves the address blank returns 400. The service reads "" as "clear it".
+  @ValidateIf((_o, value) => value !== null && value !== "")
   @IsString()
   @MaxLength(2048)
   // Rendered as a link on the detail page, so the scheme is a security control:
@@ -142,6 +148,7 @@ export class CreateSecurityDto {
     required: false,
   })
   @IsOptional()
+  @ValidateIf((_o, value) => value !== null && value !== "")
   @IsString()
   @MaxLength(2048)
   @IsUrl({

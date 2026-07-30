@@ -91,6 +91,14 @@ transactionDate: string;
 
 **Decimal columns** use a `numericTransformer` to convert PostgreSQL's string representation to `number`. **Timestamps** are `@CreateDateColumn({ name: 'created_at' })` and `@UpdateDateColumn({ name: 'updated_at' })`.
 
+## DTO Conventions
+
+### An optional field with a format validator needs `@ValidateIf`, not just `@IsOptional`
+
+`@IsOptional()` waives validation for `undefined` and `null` only. A text input the user left alone arrives as `""` -- react-hook-form gives the empty string and the form sends it -- so an `@IsUrl` / `@IsEmail` sitting beside `@IsOptional()` still runs on it and rejects it. Because validation fails per *request*, one blank optional field breaks every save from that form, not just the field. Add `@ValidateIf((_o, value) => value !== null && value !== "")` for a column that is nullable, so a blank clears it. `src/common/optional-url-dto.spec.ts` sweeps every URL-validated DTO property and fails on a new one; a field whose column is NOT NULL belongs on that file's exemption list with the reason, not silently rejecting a blank.
+
+This class of bug is invisible to unit tests, which construct payloads by hand and never send what the form sends. It surfaces in E2E or in production.
+
 ## Testing Conventions
 
 Mock repositories use `Record<string, jest.Mock>`; tests use `Test.createTestingModule` with mocks injected via `getRepositoryToken()`. E2E tests live in `test/` with helpers under `test/helpers/` (`auth-helper.ts`, `test-database.ts`, `test-factories.ts`).
