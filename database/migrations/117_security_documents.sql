@@ -15,7 +15,7 @@
 -- so a security cannot own a row in it, and widening that module is its own
 -- change rather than a column added here that nothing could fill.
 
-CREATE TABLE security_documents (
+CREATE TABLE IF NOT EXISTS security_documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     security_id UUID NOT NULL REFERENCES securities(id) ON DELETE CASCADE,
@@ -34,8 +34,9 @@ CREATE TABLE security_documents (
 );
 
 -- The list is always read for one security, newest document first.
-CREATE INDEX idx_security_documents_security
+CREATE INDEX IF NOT EXISTS idx_security_documents_security
   ON security_documents(security_id, document_date DESC NULLS LAST);
 
 -- Every tenant-scoped read filters on user_id.
-CREATE INDEX idx_security_documents_user ON security_documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_security_documents_user
+  ON security_documents(user_id);

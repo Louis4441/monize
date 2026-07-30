@@ -321,6 +321,8 @@ export const RULES: Record<string, TableRules> = {
     asset_weightings: jsonb("assetWeightings"), // free-text class names
     sector_data_updated_at: keep,
     quote_provider: keep,
+    website: drop, // a public URL names the instrument the masked symbol hides
+    ir_website: drop,
     msn_instrument_id: drop, // would identify a masked ticker
     historical_backfill_attempted_at: keep,
     created_at: keep,
