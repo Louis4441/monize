@@ -8,6 +8,7 @@
     }
   },
   "mnyWarnings": {
-    "unknownAccountType": "{count, plural, one {# account} other {# accounts}} had an account type Monize does not recognise and were skipped."
+    "unknownAccountType": "{count, plural, one {# account} other {# accounts}} had an account type Monize does not recognise and were skipped.",
+    "unknownInvestmentAction": "{count, plural, one {# investment transaction} other {# investment transactions}} used an action Monize does not recognise and were skipped."
   }
 }

@@ -20,6 +20,12 @@ import {
   writeAccountBalances,
   writeTransactions,
 } from "./writers/write-transactions";
+import { writeInvestments, writeSecurities } from "./writers/write-investments";
+import {
+  writeExchangeRates,
+  writeSecurityPrices,
+} from "./writers/write-prices";
+import { HoldingsService } from "../../securities/holdings.service";
 
 jest.mock("../../common/db/scoped-db", () => ({
   withScopedDb: jest.fn(),
@@ -43,6 +49,16 @@ jest.mock("./writers/write-transactions", () => ({
   writeAccountBalances: jest.fn(),
 }));
 
+jest.mock("./writers/write-investments", () => ({
+  writeSecurities: jest.fn(),
+  writeInvestments: jest.fn(),
+}));
+
+jest.mock("./writers/write-prices", () => ({
+  writeSecurityPrices: jest.fn(),
+  writeExchangeRates: jest.fn(),
+}));
+
 const mockedScopedDb = withScopedDb as jest.MockedFunction<typeof withScopedDb>;
 const mockedWriteAccounts = writeAccounts as jest.MockedFunction<
   typeof writeAccounts
@@ -61,6 +77,18 @@ const mockedWriteBalances = writeAccountBalances as jest.MockedFunction<
 >;
 const mockedClosures = applyDeferredClosures as jest.MockedFunction<
   typeof applyDeferredClosures
+>;
+const mockedWriteSecurities = writeSecurities as jest.MockedFunction<
+  typeof writeSecurities
+>;
+const mockedWriteInvestments = writeInvestments as jest.MockedFunction<
+  typeof writeInvestments
+>;
+const mockedWritePrices = writeSecurityPrices as jest.MockedFunction<
+  typeof writeSecurityPrices
+>;
+const mockedWriteRates = writeExchangeRates as jest.MockedFunction<
+  typeof writeExchangeRates
 >;
 
 /**
@@ -141,8 +169,39 @@ function parsedFile(overrides: Partial<MnyParsedFile> = {}): MnyParsedFile {
       skipped: 0,
       warnings: [],
     },
+    securities: {
+      securities: [
+        {
+          handle: 20,
+          symbol: "VOO",
+          moneySymbol: "VOO",
+          name: "Vanguard S&P 500",
+          currencyCode: "CAD",
+          skipPriceUpdates: false,
+        },
+      ],
+      byHandle: new Map(),
+      skipped: 0,
+      warnings: [],
+    },
+    investments: {
+      transactions: [],
+      referencedSecurities: new Set(),
+      referencedPayees: new Set(),
+      referencedCategories: new Set(),
+      transfersPaired: 0,
+      splitsApplied: 0,
+      skipped: 0,
+      warnings: [],
+    },
+    rawPrices: [],
+    rawExchangeRates: [],
+    currencyByHandle: new Map([[1, "CAD"]]),
+    holdingChecks: [],
+    currencyCodes: ["CAD"],
     expectedBalances: new Map([["acct-1", 120.5]]),
     transactionCounts: new Map([["acct-1", 3]]),
+    investmentCounts: new Map(),
     fileCounts: {
       accounts: 1,
       payees: 1,
@@ -167,6 +226,7 @@ describe("MnyImportService", () => {
   let postProcessing: Record<string, jest.Mock>;
   let usersService: Record<string, jest.Mock>;
   let currencies: Record<string, jest.Mock>;
+  let holdingsService: Record<string, jest.Mock>;
   let accountRepo: Record<string, jest.Mock>;
   let preferenceRepo: Record<string, jest.Mock>;
   let service: MnyImportService;
@@ -232,6 +292,24 @@ describe("MnyImportService", () => {
     });
     mockedWriteBalances.mockResolvedValue(1);
     mockedClosures.mockResolvedValue(0);
+    mockedWriteSecurities.mockResolvedValue({
+      idByHandle: new Map([[20, "security-1"]]),
+      created: 1,
+      reused: 0,
+    });
+    mockedWriteInvestments.mockResolvedValue({
+      investmentTransactionsCreated: 3,
+      cashTransactionsCreated: 2,
+      linksApplied: 1,
+      affectedAccountIds: new Set(["account-1"]),
+      brokerageAccountIds: new Set(["account-1"]),
+    });
+    mockedWritePrices.mockResolvedValue(11);
+    mockedWriteRates.mockResolvedValue(5);
+
+    holdingsService = {
+      rebuildAccountsFromTransactions: jest.fn().mockResolvedValue(undefined),
+    };
 
     service = new MnyImportService(
       {} as DataSource,
@@ -241,6 +319,7 @@ describe("MnyImportService", () => {
       postProcessing as unknown as ImportPostProcessingService,
       usersService as unknown as UsersService,
       currencies as unknown as CurrenciesService,
+      holdingsService as unknown as HoldingsService,
     );
     jest.spyOn(service["logger"], "log").mockImplementation(() => undefined);
     jest.spyOn(service["logger"], "error").mockImplementation(() => undefined);
@@ -391,14 +470,12 @@ describe("MnyImportService", () => {
       );
     });
 
+    // Not just the accounts' currencies: a security can be denominated in one no
+    // account uses, and `exchange_rates` has a foreign key to `currencies` on
+    // both sides.
     it("ensures every currency the file names before the transaction opens", async () => {
       parser.parse.mockReturnValue(
-        parsedFile({
-          accounts: {
-            ...parsedFile().accounts,
-            currencyCodes: ["CAD", "USD"],
-          },
-        }),
+        parsedFile({ currencyCodes: ["CAD", "USD"] }),
       );
 
       await run();
@@ -477,7 +554,7 @@ describe("MnyImportService", () => {
       expect(staging.remove).toHaveBeenCalledWith("user-1", "staged-1");
     });
 
-    it("reports what was created, skipped and deferred", async () => {
+    it("reports what was created and skipped", async () => {
       const result = await run();
 
       expect(result).toMatchObject({
@@ -487,9 +564,12 @@ describe("MnyImportService", () => {
         transactionsCreated: 7,
         splitsCreated: 2,
         transfersLinked: 4,
-        // Phase 2 fills these; reported as zero so the shape does not change.
-        securitiesCreated: 0,
-        investmentTransactionsCreated: 0,
+        securitiesCreated: 1,
+        investmentTransactionsCreated: 3,
+        pricesImported: 11,
+        exchangeRatesImported: 5,
+        // Phase 3 fills this; reported as zero so the shape does not change.
+        billsCreated: 0,
         existingDataRemoved: false,
         skipped: { accounts: 0, payees: 0, categories: 0, transactions: 1 },
       });
@@ -599,6 +679,205 @@ describe("MnyImportService", () => {
       );
 
       expect(result.existingDataRemoved).toBe(true);
+    });
+  });
+
+  describe("investments", () => {
+    const run = () =>
+      service.runImport(
+        "user-1",
+        "staged-1",
+        DEFAULT_MNY_IMPORT_OPTIONS,
+        context,
+      );
+
+    it("writes securities and investments after transactions, prices last", async () => {
+      await run();
+
+      const order = [
+        mockedWriteTransactions,
+        mockedWriteSecurities,
+        mockedWriteInvestments,
+        mockedWritePrices,
+        mockedWriteRates,
+        mockedWriteBalances,
+        mockedClosures,
+      ].map((mock) => mock.mock.invocationCallOrder[0]);
+
+      expect(order).toEqual([...order].sort((a, b) => a - b));
+    });
+
+    it("gives the investment writer the same handle maps the transactions used", async () => {
+      await run();
+
+      const [, , input] = mockedWriteInvestments.mock.calls[0];
+      expect(input.securityIdByHandle.get(20)).toBe("security-1");
+      expect(input.categoryIdByHandle.get(10)).toBe("category-1");
+      expect(input.payeeIdByHandle.get(5)).toBe("payee-1");
+      expect(input.symbolByHandle.get(20)).toBe("VOO");
+    });
+
+    // Holdings come only from the canonical rebuild, on the import
+    // transaction's own manager: a second connection would deadlock against it.
+    it("rebuilds holdings for the brokerage accounts inside the transaction", async () => {
+      await run();
+
+      expect(
+        holdingsService.rebuildAccountsFromTransactions,
+      ).toHaveBeenCalledWith("user-1", ["account-1"], expect.anything());
+      const [, , runner] = (
+        holdingsService.rebuildAccountsFromTransactions as jest.Mock
+      ).mock.calls[0];
+      expect(runner.manager).toBeDefined();
+    });
+
+    it("does not rebuild holdings when no brokerage account was touched", async () => {
+      mockedWriteInvestments.mockResolvedValue({
+        investmentTransactionsCreated: 0,
+        cashTransactionsCreated: 0,
+        linksApplied: 0,
+        affectedAccountIds: new Set<string>(),
+        brokerageAccountIds: new Set<string>(),
+      });
+
+      await run();
+
+      expect(
+        holdingsService.rebuildAccountsFromTransactions,
+      ).not.toHaveBeenCalled();
+    });
+
+    it("honours the price and exchange-rate toggles", async () => {
+      parser.parse.mockReturnValue(
+        parsedFile({
+          options: {
+            ...DEFAULT_MNY_IMPORT_OPTIONS,
+            importPrices: false,
+            importExchangeRates: false,
+          },
+        }),
+      );
+
+      const result = await run();
+
+      expect(mockedWritePrices).not.toHaveBeenCalled();
+      expect(mockedWriteRates).not.toHaveBeenCalled();
+      expect(result.pricesImported).toBe(0);
+      expect(result.exchangeRatesImported).toBe(0);
+    });
+
+    it("asks post-processing for the price backfill only when investments landed", async () => {
+      const base = parsedFile();
+      parser.parse.mockReturnValue(
+        parsedFile({
+          investments: {
+            ...base.investments,
+            transactions: [
+              {
+                id: "inv-1",
+              } as unknown as (typeof base.investments.transactions)[number],
+            ],
+          },
+        }),
+      );
+
+      await run();
+
+      expect(postProcessing.run).toHaveBeenCalledWith(
+        "user-1",
+        true,
+        expect.any(Set),
+      );
+    });
+
+    it("reports each holding against Money's open lots", async () => {
+      accountRepo.find.mockImplementation((options: { select?: string[] }) =>
+        options.select?.includes("quantity")
+          ? [
+              {
+                accountId: "account-1",
+                securityId: "security-1",
+                quantity: "10.00000000",
+              },
+            ]
+          : [{ id: "account-1", currentBalance: "120.5000" }],
+      );
+      parser.parse.mockReturnValue(
+        parsedFile({
+          holdingChecks: [
+            {
+              accountKey: "acct-1",
+              securityHandle: 20,
+              symbol: "VOO",
+              lotQuantity: 10,
+              replayQuantity: 10,
+              delta: 0,
+              matches: true,
+            },
+          ],
+        }),
+      );
+
+      const result = await run();
+
+      expect(result.holdings).toEqual([
+        {
+          accountName: "Chequing",
+          symbol: "VOO",
+          lotQuantity: 10,
+          replayQuantity: 10,
+          importedQuantity: 10,
+          delta: 0,
+          matches: true,
+        },
+      ]);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it("raises a holdings mismatch as a warning rather than failing", async () => {
+      accountRepo.find.mockImplementation((options: { select?: string[] }) =>
+        options.select?.includes("quantity")
+          ? [
+              {
+                accountId: "account-1",
+                securityId: "security-1",
+                quantity: "4.00000000",
+              },
+            ]
+          : [{ id: "account-1", currentBalance: "120.5000" }],
+      );
+      parser.parse.mockReturnValue(
+        parsedFile({
+          holdingChecks: [
+            {
+              accountKey: "acct-1",
+              securityHandle: 20,
+              symbol: "VOO",
+              lotQuantity: 10,
+              replayQuantity: 10,
+              delta: 0,
+              matches: true,
+            },
+          ],
+        }),
+      );
+
+      const result = await run();
+
+      expect(result.holdings[0]).toMatchObject({
+        importedQuantity: 4,
+        delta: -6,
+        matches: false,
+      });
+      expect(result.warnings).toContainEqual(
+        expect.objectContaining({ code: "holdingsMismatch", count: 1 }),
+      );
+    });
+
+    it("reports no holdings when the file has no LOT table", async () => {
+      const result = await run();
+
+      expect(result.holdings).toEqual([]);
     });
   });
 });

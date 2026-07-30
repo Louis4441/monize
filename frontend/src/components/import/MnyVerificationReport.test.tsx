@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { MnyVerificationReport } from './MnyVerificationReport';
-import type { MnyAccountVerification, MnyImportResult } from '@/lib/import-mny';
+import type {
+  MnyAccountVerification,
+  MnyHoldingVerification,
+  MnyImportResult,
+} from '@/lib/import-mny';
 
 function line(
   overrides: Partial<MnyAccountVerification> = {},
@@ -13,6 +17,21 @@ function line(
     importedBalance: 2500.5,
     delta: 0,
     transactionCount: 120,
+    matches: true,
+    ...overrides,
+  };
+}
+
+function holding(
+  overrides: Partial<MnyHoldingVerification> = {},
+): MnyHoldingVerification {
+  return {
+    accountName: 'Brokerage - Investments',
+    symbol: 'VOO',
+    lotQuantity: 137.5,
+    replayQuantity: 137.5,
+    importedQuantity: 137.5,
+    delta: 0,
     matches: true,
     ...overrides,
   };
@@ -33,6 +52,7 @@ function result(overrides: Partial<MnyImportResult> = {}): MnyImportResult {
     billsCreated: 0,
     skipped: { accounts: 0, payees: 0, categories: 0, transactions: 0 },
     existingDataRemoved: false,
+    holdings: [],
     verification: [line()],
     warnings: [],
     ...overrides,
@@ -149,6 +169,79 @@ describe('MnyVerificationReport', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(defaultProps.onDone).toHaveBeenCalled();
+  });
+
+  describe('holdings', () => {
+    it('shows nothing when the file carried no tax lots', () => {
+      render(<MnyVerificationReport {...defaultProps} />);
+
+      expect(
+        screen.queryByText('Holdings verification'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('reconciles each holding against the shares Money records', () => {
+      render(
+        <MnyVerificationReport
+          {...defaultProps}
+          result={result({ holdings: [holding()] })}
+        />,
+      );
+
+      expect(screen.getByText('Holdings verification')).toBeInTheDocument();
+      expect(screen.getByText('VOO')).toBeInTheDocument();
+      // Money's lots and Monize's holding, both through the shared quantity
+      // formatter so the report reads in the user's number locale.
+      expect(screen.getAllByText('137.5')).toHaveLength(2);
+    });
+
+    // A wrong share count is exactly the PR #192 failure mode, so it has to be
+    // visible in the verdict, not only in a row far down the page.
+    it('says so in the banner when only the holdings disagree', () => {
+      render(
+        <MnyVerificationReport
+          {...defaultProps}
+          result={result({
+            holdings: [
+              holding({ importedQuantity: 60, delta: -60, matches: false }),
+            ],
+          })}
+        />,
+      );
+
+      expect(
+        screen.getByText(/1 holding does not match the shares/),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/All 1 accounts reconcile/)).toBeNull();
+    });
+
+    it('keeps the all-clear verdict when every holding matches', () => {
+      render(
+        <MnyVerificationReport
+          {...defaultProps}
+          result={result({ holdings: [holding()] })}
+        />,
+      );
+
+      expect(screen.getByText(/All 1 accounts reconcile/)).toBeInTheDocument();
+    });
+
+    it('counts the investment rows it created', () => {
+      render(
+        <MnyVerificationReport
+          {...defaultProps}
+          result={result({
+            securitiesCreated: 86,
+            investmentTransactionsCreated: 412,
+            pricesImported: 68000,
+          })}
+        />,
+      );
+
+      expect(screen.getByText('86')).toBeInTheDocument();
+      expect(screen.getByText('412')).toBeInTheDocument();
+      expect(screen.getByText('68000')).toBeInTheDocument();
+    });
   });
 
   describe('report download', () => {

@@ -10,14 +10,18 @@
  * that a real-world file -- a 200 MB Money Plus Sunset file, a Money 2001 file
  * -- decrypts, reads and maps to sane numbers before an import is attempted.
  *
- * Per-account balances are the Phase 1 mappers' own output, so they are the same
- * numbers the verification report reconciles against. Holdings still need the
- * investment mappers (task M2.3), so the validation harness from M0.5 is not
- * complete until Phase 2.
+ * Per-account balances and per-security holdings are the mappers' own output, so
+ * they are the same numbers the verification report reconciles against. That
+ * makes this the validation harness task M0.5 asked for, now complete: a
+ * per-account or per-holding discrepancy can be traced against a real file
+ * without importing anything.
  */
 import { MnyImportError } from "./mny-errors";
-import { mapAccounts } from "./map/map-reference";
+import { currencyCodesByHandle, mapAccounts } from "./map/map-reference";
 import { mapTransactions } from "./map/map-transactions";
+import { mapSecurities } from "./map/map-securities";
+import { mapInvestments } from "./map/map-investments";
+import { crossCheckHoldings } from "./map/check-holdings";
 import { computeExpectedBalances, todayIsoDate } from "./mny-parser.service";
 import { DEFAULT_MNY_IMPORT_OPTIONS } from "./model/mny-import-options";
 import { summarizeWarnings } from "./model/mny-warnings";
@@ -100,7 +104,10 @@ export function summarise(tables: MnyTables): string[] {
  * running this against a real file is how a per-account discrepancy gets traced
  * before an import is ever attempted (task M0.5).
  *
- * Investment transactions are reported as deferred: Phase 1 imports banking data.
+ * The holdings block is the trust-builder for investments: Money's open tax lots
+ * against the mapper's own action replay, per account and security. A file where
+ * those two disagree is one where an action code is being read wrong, and this
+ * says which security to look at.
  */
 export function mappingSummary(tables: MnyTables): string[] {
   const accounts = mapAccounts(
@@ -114,10 +121,29 @@ export function mappingSummary(tables: MnyTables): string[] {
     currencyByHandle: accounts.currencyByHandle,
     bills: tables.bills.bills,
   });
+  const securities = mapSecurities({
+    securities: tables.investments.securities,
+    currencyByHandle: currencyCodesByHandle(tables.reference),
+    baseCurrency: accounts.baseCurrency,
+  });
+  const investments = mapInvestments({
+    transactions: tables.transactions,
+    investments: tables.investments,
+    accounts,
+    securities,
+    bills: tables.bills.bills,
+  });
+  const holdings = crossCheckHoldings({
+    transactions: investments.transactions,
+    lots: tables.investments.lots,
+    accounts,
+    securities,
+  });
   const balances = computeExpectedBalances(
     accounts,
     transactions,
     todayIsoDate(),
+    investments,
   );
 
   const counts = new Map<string, number>();
@@ -127,12 +153,17 @@ export function mappingSummary(tables: MnyTables): string[] {
       (counts.get(transaction.accountKey) ?? 0) + 1,
     );
   }
+  const nameByKey = new Map(
+    accounts.accounts.map((account) => [account.key, account.name]),
+  );
 
   return [
     "mapped import:",
     `  base currency:   ${accounts.baseCurrency}`,
     `  accounts:        ${accounts.accounts.length} (${accounts.skipped} skipped)`,
-    `  transactions:    ${transactions.transactions.length} (${transactions.transfersLinked} transfers linked, ${transactions.skipped} skipped, ${transactions.deferredInvestments} investment rows deferred)`,
+    `  transactions:    ${transactions.transactions.length} (${transactions.transfersLinked} transfers linked, ${transactions.skipped} skipped)`,
+    `  securities:      ${securities.securities.length} (${securities.skipped} skipped as currencies or unusable)`,
+    `  investments:     ${investments.transactions.length} (${investments.transfersPaired} share transfers paired, ${investments.splitsApplied} stock splits, ${investments.skipped} skipped)`,
     "",
     "  account                                    ccy   txns        opening          final",
     ...accounts.accounts.map((account) =>
@@ -144,12 +175,34 @@ export function mappingSummary(tables: MnyTables): string[] {
         (balances.get(account.key) ?? 0).toFixed(2).padStart(15),
       ].join(" "),
     ),
+    ...(holdings.checks.length > 0
+      ? [
+          "",
+          "  holdings (open lots vs action replay):",
+          "  account                        symbol            lots          replay  ",
+          ...holdings.checks.map((check) =>
+            [
+              `  ${(nameByKey.get(check.accountKey) ?? check.accountKey).slice(0, 28).padEnd(28)}`,
+              check.symbol.padEnd(10),
+              check.lotQuantity.toFixed(4).padStart(15),
+              check.replayQuantity.toFixed(4).padStart(15),
+              check.matches ? "  ok" : "  MISMATCH",
+            ].join(" "),
+          ),
+        ]
+      : []),
     "",
     "  warnings:",
-    ...(summarizeWarnings([...accounts.warnings, ...transactions.warnings]).map(
+    ...summarizeWarnings([
+      ...accounts.warnings,
+      ...transactions.warnings,
+      ...securities.warnings,
+      ...investments.warnings,
+      ...holdings.warnings,
+    ]).map(
       (warning) =>
         `    ${warning.code.padEnd(32)} ${String(warning.count).padStart(6)}  ${warning.samples.join(", ")}`,
-    ) || []),
+    ),
   ];
 }
 

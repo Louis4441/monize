@@ -312,9 +312,14 @@
       "payees": "Người nhận",
       "categories": "Danh mục",
       "accounts": "Tài khoản",
+      "securities": "Chứng khoán",
+      "investments": "Giao dịch đầu tư",
+      "investmentDetail": "{transfers} lần chuyển chứng khoán, {splits} lần tách cổ phiếu",
+      "prices": "Lịch sử giá",
+      "exchangeRates": "Tỷ giá hối đoái",
       "ofTotal": "trong {total} có trong tệp"
     },
-    "notYetImported": "Đầu tư và hoá đơn định kỳ chưa được nhập: {investments} giao dịch đầu tư, {securities} chứng khoán và {bills} dòng hoá đơn dành cho bản phát hành sau. Toàn bộ lịch sử ngân hàng của bạn vẫn được nhập đầy đủ.",
+    "notYetImported": "Hóa đơn định kỳ chưa được nhập: {bills} dòng hóa đơn để dành cho bản phát hành sau. Mọi thứ còn lại trong tệp này đều được nhập đầy đủ.",
     "accountsHeading": "Tài khoản ({count})",
     "selectAll": "Chọn tất cả",
     "selectNone": "Bỏ chọn tất cả",
@@ -326,6 +331,7 @@
       "currency": "Tiền tệ",
       "currencyForAccount": "Tiền tệ cho {name}",
       "transactions": "Giao dịch",
+      "investmentRows": "+ {count, plural, other {# giao dịch đầu tư}}",
       "openingBalance": "Số dư đầu",
       "finalBalance": "Số dư cuối",
       "closed": "Đã đóng",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "Chỉ nhập những danh mục có sử dụng",
       "referencedOnlyCategoriesHint": "Money tạo sẵn cả cây danh mục dù bạn có dùng hay không. Hãy để bật để bỏ qua những danh mục bạn chưa từng dùng.",
       "importClosedAccounts": "Nhập các tài khoản đã đóng",
-      "importClosedAccountsHint": "Tài khoản đã đóng vẫn giữ lịch sử đáng lưu. Chúng được nhập ở trạng thái đã đóng."
+      "importClosedAccountsHint": "Tài khoản đã đóng vẫn giữ lịch sử đáng lưu. Chúng được nhập ở trạng thái đã đóng.",
+      "importPrices": "Nhập lịch sử giá",
+      "importPricesHint": "Bản ghi của chính Money về giá trị từng chứng khoán theo từng ngày. Tắt tùy chọn này nếu bạn muốn bắt đầu từ giá hiện tại.",
+      "importExchangeRates": "Nhập tỷ giá hối đoái",
+      "importExchangeRatesHint": "Tỷ giá lịch sử giữa các loại tiền trong tệp của bạn, để các giao dịch ngoại tệ cũ được quy đổi đúng như Money đã quy đổi."
     },
     "warningsHeading": "Ghi chú về tệp này",
     "startImport": "Bắt đầu nhập"
@@ -366,21 +376,31 @@
     "heading": "Đã nhập xong",
     "allMatch": "Cả {count} tài khoản đều khớp: mọi số dư trùng với số dư tính từ tệp Money của bạn.",
     "someDiffer": "{count} tài khoản không khớp với số dư tính từ tệp Money của bạn. Các dòng được đánh dấu bên dưới cho thấy khoảng lệch.",
+    "someHoldingsDiffer": "Mọi số dư đều khớp, nhưng {count, plural, other {# khoản nắm giữ}} không khớp với số cổ phiếu ghi trong tệp Money của bạn. Các dòng được đánh dấu bên dưới cho thấy chênh lệch.",
     "counts": {
       "accounts": "Tài khoản",
       "transactions": "Giao dịch",
       "transfers": "Chuyển khoản",
       "splits": "Dòng phân tách",
       "payees": "Người nhận",
-      "categories": "Danh mục"
+      "categories": "Danh mục",
+      "securities": "Chứng khoán",
+      "investments": "Giao dịch đầu tư",
+      "prices": "Giá",
+      "exchangeRates": "Tỷ giá hối đoái"
     },
     "existingDataRemoved": "Dữ liệu hiện có của bạn đã được xoá trước lần nhập này, theo yêu cầu.",
     "verificationHeading": "Kiểm tra số dư",
+    "holdingsHeading": "Đối chiếu nắm giữ",
+    "holdingsExplainer": "Số cổ phiếu Monize đang nắm giữ, so với các lô thuế còn mở ghi trong tệp Money của bạn. Chính Money cũng đối chiếu theo các lô đó, nên đây là con số đáng tin.",
     "table": {
       "account": "Tài khoản",
+      "security": "Chứng khoán",
       "transactions": "Giao dịch",
       "expected": "Từ tệp Money",
       "imported": "Trong Monize",
+      "lotShares": "Cổ phiếu trong Money",
+      "importedShares": "Cổ phiếu trong Monize",
       "delta": "Chênh lệch",
       "check": "Cần kiểm tra"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "{count, plural, other {# dòng phân tách}} không có giao dịch cha và đã bị bỏ qua.",
     "splitSumMismatch": "{count, plural, other {# lần phân tách}} có các dòng không cộng đúng tổng giao dịch; các tổng của Money được giữ nguyên.",
     "transferAcrossExcludedAccount": "{count, plural, other {# chuyển khoản}} trỏ tới tài khoản bạn đã loại trừ và được nhập thành giao dịch thường.",
-    "balanceMismatch": "{count, plural, other {# tài khoản}} có số dư cuối khác với tệp Money."
+    "balanceMismatch": "{count, plural, other {# tài khoản}} có số dư cuối khác với tệp Money.",
+    "duplicateSecuritySymbol": "{count, plural, other {# chứng khoán}} dùng chung mã với chứng khoán khác; những mã sau đã được đổi tên để giữ riêng biệt.",
+    "generatedSecuritySymbol": "{count, plural, other {# chứng khoán}} không có mã trong Money, nên một mã tạm đã được tạo và việc cập nhật giá được tắt.",
+    "unknownInvestmentAction": "{count, plural, other {# giao dịch đầu tư}} dùng một thao tác mà Monize không nhận ra và đã bị bỏ qua.",
+    "unconfirmedInvestmentAction": "{count, plural, other {# giao dịch đầu tư}} dùng một thao tác Money có ý nghĩa được suy đoán chứ không được ghi nhận; hãy đối chiếu với Money.",
+    "missingInvestmentDetail": "{count, plural, other {# giao dịch đầu tư}} không có chi tiết cổ phiếu trong tệp và chỉ được nhập theo số tiền mặt.",
+    "investmentAccountMismatch": "{count, plural, other {# giao dịch đầu tư}} nằm trong tài khoản không phải tài khoản đầu tư và đã bị bỏ qua.",
+    "unusableSecuritySplit": "{count, plural, other {# lần tách cổ phiếu}} không khớp được với chứng khoán nào hoặc có tỷ lệ không dùng được, nên không được áp dụng.",
+    "holdingsMismatch": "{count, plural, other {# khoản nắm giữ}} không khớp với số cổ phiếu ghi trong tệp Money của bạn."
   },
   "mnyErrors": {
     "mnyImportFailed": "Đã xảy ra lỗi khi nhập. Không có gì được lưu -- bạn có thể thử lại.",

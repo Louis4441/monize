@@ -312,9 +312,14 @@
       "payees": "[XX-Payees-XX]",
       "categories": "[XX-Categories-XX]",
       "accounts": "[XX-Accounts-XX]",
+      "securities": "[XX-Securities-XX]",
+      "investments": "[XX-Investment transactions-XX]",
+      "investmentDetail": "[XX-{transfers} share transfers, {splits} stock splits-XX]",
+      "prices": "[XX-Price history-XX]",
+      "exchangeRates": "[XX-Exchange rates-XX]",
       "ofTotal": "[XX-of {total} in the file-XX]"
     },
-    "notYetImported": "[XX-Investments and scheduled bills are not imported yet: {investments} investment transactions, {securities} securities and {bills} bill rows are left for a later release. Your banking history imports in full.-XX]",
+    "notYetImported": "[XX-Scheduled bills are not imported yet: {bills} bill rows are left for a later release. Everything else in this file imports in full.-XX]",
     "accountsHeading": "[XX-Accounts ({count})-XX]",
     "selectAll": "[XX-Select all-XX]",
     "selectNone": "[XX-Select none-XX]",
@@ -326,6 +331,7 @@
       "currency": "[XX-Currency-XX]",
       "currencyForAccount": "[XX-Currency for {name}-XX]",
       "transactions": "[XX-Transactions-XX]",
+      "investmentRows": "[XX-+ {count, plural, one {# investment} other {# investments}}-XX]",
       "openingBalance": "[XX-Opening-XX]",
       "finalBalance": "[XX-Final balance-XX]",
       "closed": "[XX-Closed-XX]",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "[XX-Only import categories that are used-XX]",
       "referencedOnlyCategoriesHint": "[XX-Money seeds a full category tree whether you use it or not. Leave this on to skip the categories you never touched.-XX]",
       "importClosedAccounts": "[XX-Import closed accounts-XX]",
-      "importClosedAccountsHint": "[XX-Closed accounts still hold history worth keeping. They are imported closed.-XX]"
+      "importClosedAccountsHint": "[XX-Closed accounts still hold history worth keeping. They are imported closed.-XX]",
+      "importPrices": "[XX-Import price history-XX]",
+      "importPricesHint": "[XX-Money's own record of what each security was worth, day by day. Turn this off if you would rather start from live quotes.-XX]",
+      "importExchangeRates": "[XX-Import exchange rates-XX]",
+      "importExchangeRatesHint": "[XX-Historical rates between the currencies in your file, so past foreign-currency transactions convert the way Money converted them.-XX]"
     },
     "warningsHeading": "[XX-Notes about this file-XX]",
     "startImport": "[XX-Start import-XX]"
@@ -366,21 +376,31 @@
     "heading": "[XX-Import finished-XX]",
     "allMatch": "[XX-All {count} accounts reconcile: every balance matches the one computed from your Money file.-XX]",
     "someDiffer": "[XX-{count} accounts do not match the balance computed from your Money file. The rows marked below show the difference.-XX]",
+    "someHoldingsDiffer": "[XX-Every balance reconciles, but {count, plural, one {# holding does} other {# holdings do}} not match the shares recorded in your Money file. The rows marked below show the difference.-XX]",
     "counts": {
       "accounts": "[XX-Accounts-XX]",
       "transactions": "[XX-Transactions-XX]",
       "transfers": "[XX-Transfers-XX]",
       "splits": "[XX-Split legs-XX]",
       "payees": "[XX-Payees-XX]",
-      "categories": "[XX-Categories-XX]"
+      "categories": "[XX-Categories-XX]",
+      "securities": "[XX-Securities-XX]",
+      "investments": "[XX-Investment transactions-XX]",
+      "prices": "[XX-Prices-XX]",
+      "exchangeRates": "[XX-Exchange rates-XX]"
     },
     "existingDataRemoved": "[XX-Your existing data was removed before this import, as requested.-XX]",
     "verificationHeading": "[XX-Balance verification-XX]",
+    "holdingsHeading": "[XX-Holdings verification-XX]",
+    "holdingsExplainer": "[XX-Shares Monize now holds, against the open tax lots your Money file records. Money reconciles against those lots itself, so they are the number to trust.-XX]",
     "table": {
       "account": "[XX-Account-XX]",
+      "security": "[XX-Security-XX]",
       "transactions": "[XX-Transactions-XX]",
       "expected": "[XX-From Money file-XX]",
       "imported": "[XX-In Monize-XX]",
+      "lotShares": "[XX-Shares in Money-XX]",
+      "importedShares": "[XX-Shares in Monize-XX]",
       "delta": "[XX-Difference-XX]",
       "check": "[XX-Check-XX]"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "[XX-{count, plural, one {# split leg} other {# split legs}} had no parent transaction and were skipped.-XX]",
     "splitSumMismatch": "[XX-{count, plural, one {# split} other {# splits}} had legs that do not add up to the transaction total; Money's own totals were kept.-XX]",
     "transferAcrossExcludedAccount": "[XX-{count, plural, one {# transfer} other {# transfers}} pointed at an account you left out and were imported as ordinary transactions.-XX]",
-    "balanceMismatch": "[XX-{count, plural, one {# account} other {# accounts}} ended with a balance that differs from the Money file.-XX]"
+    "balanceMismatch": "[XX-{count, plural, one {# account} other {# accounts}} ended with a balance that differs from the Money file.-XX]",
+    "duplicateSecuritySymbol": "[XX-{count, plural, one {# security shares} other {# securities share}} a symbol with another; the later ones were renamed so they stay separate.-XX]",
+    "generatedSecuritySymbol": "[XX-{count, plural, one {# security has} other {# securities have}} no symbol in Money, so a placeholder was generated and price updates left off.-XX]",
+    "unknownInvestmentAction": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} used an action Monize does not recognize and were skipped.-XX]",
+    "unconfirmedInvestmentAction": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} used a Money action whose meaning is inferred rather than documented; check them against Money.-XX]",
+    "missingInvestmentDetail": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} had no share detail in the file and were imported for their cash amount only.-XX]",
+    "investmentAccountMismatch": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} sat in an account that is not an investment account and were skipped.-XX]",
+    "unusableSecuritySplit": "[XX-{count, plural, one {# stock split} other {# stock splits}} could not be matched to a security or had an unusable ratio, and were not applied.-XX]",
+    "holdingsMismatch": "[XX-{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records.-XX]"
   },
   "mnyErrors": {
     "mnyImportFailed": "[XX-Something went wrong while importing. Nothing was saved -- you can try again.-XX]",

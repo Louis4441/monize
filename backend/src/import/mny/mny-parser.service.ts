@@ -6,19 +6,31 @@ import {
   missingTables,
   readMnyTables,
 } from "./tables/read-mny-tables";
-import { mapAccounts, mapCategories, mapPayees } from "./map/map-reference";
+import {
+  currencyCodesByHandle,
+  mapAccounts,
+  mapCategories,
+  mapPayees,
+} from "./map/map-reference";
 import { mapTransactions } from "./map/map-transactions";
+import { mapSecurities } from "./map/map-securities";
+import { mapInvestments } from "./map/map-investments";
+import { crossCheckHoldings } from "./map/check-holdings";
 import {
   MappedAccounts,
   MappedCategories,
+  MappedInvestments,
   MappedPayees,
+  MappedSecurities,
   MappedTransactions,
+  MnyHoldingCheck,
 } from "./model/mny-import-model";
 import {
   MnyImportOptions,
   resolveImportOptions,
 } from "./model/mny-import-options";
 import { MnyWarning } from "./model/mny-warnings";
+import { MnyExchangeRate, MnySecurityPrice } from "./model/mny-rows";
 import { isCurrencyPseudoSecurity } from "./model/mny-model";
 import { TransactionStatus } from "../../transactions/entities/transaction.entity";
 import { roundMoney } from "../../common/round.util";
@@ -60,14 +72,36 @@ export interface MnyParsedFile {
   readonly passwordProtected: boolean;
   readonly options: MnyImportOptions;
   readonly baseCurrency: string;
+  /**
+   * Every ISO code the import touches -- accounts, securities and exchange-rate
+   * history -- so `ensureSystemCurrency` runs once per code before any row that
+   * references it is written.
+   */
+  readonly currencyCodes: readonly string[];
   readonly accounts: MappedAccounts;
   readonly transactions: MappedTransactions;
   readonly categories: MappedCategories;
   readonly payees: MappedPayees;
+  readonly securities: MappedSecurities;
+  readonly investments: MappedInvestments;
+  /**
+   * `SP` and `CRNC_EXCHG` rows, and the currency handle map, passed straight
+   * through to the price and rate writers. These two tables are the largest
+   * thing a real file carries (68,000 price rows in the maintainer's Money Plus
+   * file) and there is nothing to map -- deduping and resolving handles happens
+   * in the writer, so no second copy of them is materialized here.
+   */
+  readonly rawPrices: readonly MnySecurityPrice[];
+  readonly rawExchangeRates: readonly MnyExchangeRate[];
+  readonly currencyByHandle: ReadonlyMap<number, string>;
+  /** Open-lot positions versus the action replay; empty when the file has no `LOT`. */
+  readonly holdingChecks: readonly MnyHoldingCheck[];
   /** Account key -> final balance computed from the file itself. */
   readonly expectedBalances: ReadonlyMap<string, number>;
   /** Account key -> number of transactions this import will create. */
   readonly transactionCounts: ReadonlyMap<string, number>;
+  /** Brokerage account key -> number of investment rows this import will create. */
+  readonly investmentCounts: ReadonlyMap<string, number>;
   /** Raw file counts for the things Phase 1 does not import yet. */
   readonly fileCounts: MnyFileCounts;
   readonly missingTables: readonly string[];
@@ -125,6 +159,7 @@ export function computeExpectedBalances(
   accounts: MappedAccounts,
   transactions: MappedTransactions,
   asOf: string,
+  investments?: MappedInvestments,
 ): Map<string, number> {
   const totals = new Map<string, number>(
     accounts.accounts.map((account) => [
@@ -133,21 +168,40 @@ export function computeExpectedBalances(
     ]),
   );
 
-  for (const transaction of transactions.transactions) {
-    if (
-      transaction.status === TransactionStatus.VOID ||
-      transaction.transactionDate > asOf
-    ) {
-      continue;
+  // Integer minor units throughout: 37,000 float additions drift.
+  const add = (key: string | null, amount: number, date: string): void => {
+    if (key === null || date > asOf) {
+      return;
     }
-    const current = totals.get(transaction.accountKey);
+    const current = totals.get(key);
     if (current === undefined) {
+      return;
+    }
+    totals.set(key, current + Math.round(amount * 10000));
+  };
+
+  for (const transaction of transactions.transactions) {
+    if (transaction.status === TransactionStatus.VOID) {
       continue;
     }
-    // Integer minor units throughout: 37,000 float additions drift.
-    totals.set(
+    add(
       transaction.accountKey,
-      current + Math.round(transaction.amount * 10000),
+      transaction.amount,
+      transaction.transactionDate,
+    );
+  }
+
+  // An investment's cash leg lands in the sleeve, so the sleeve's expected
+  // balance has to know about it or every brokerage cash account reports a
+  // discrepancy the size of its trading history.
+  for (const investment of investments?.transactions ?? []) {
+    if (investment.status === TransactionStatus.VOID) {
+      continue;
+    }
+    add(
+      investment.cashAccountKey,
+      investment.cashAmount,
+      investment.transactionDate,
     );
   }
 
@@ -161,15 +215,82 @@ export function computeExpectedBalances(
 
 function countTransactionsByAccount(
   transactions: MappedTransactions,
+  investments: MappedInvestments,
 ): Map<string, number> {
   const counts = new Map<string, number>();
+  const bump = (key: string | null): void => {
+    if (key !== null) {
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  };
+
   for (const transaction of transactions.transactions) {
+    bump(transaction.accountKey);
+  }
+  // The cash leg is a row in the sleeve like any other, so it counts there.
+  for (const investment of investments.transactions) {
+    if (investment.cashAmount !== 0) {
+      bump(investment.cashAccountKey);
+    }
+  }
+
+  return counts;
+}
+
+function countInvestmentsByAccount(
+  investments: MappedInvestments,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const investment of investments.transactions) {
     counts.set(
-      transaction.accountKey,
-      (counts.get(transaction.accountKey) ?? 0) + 1,
+      investment.accountKey,
+      (counts.get(investment.accountKey) ?? 0) + 1,
     );
   }
   return counts;
+}
+
+/** Union of two referenced-handle sets, for the referenced-only filters. */
+function union(
+  first: ReadonlySet<number>,
+  second: ReadonlySet<number>,
+): Set<number> {
+  return new Set([...first, ...second]);
+}
+
+/**
+ * Every currency the import will reference.
+ *
+ * `exchange_rates` has a foreign key to `currencies` on both sides, so a rate
+ * between two currencies no account happens to use still needs both codes to
+ * exist -- and a security can be denominated in a currency none of the accounts
+ * are. Rate currencies are only collected when rates are actually being
+ * imported, so unticking that box does not create currencies for nothing.
+ */
+function importedCurrencyCodes(
+  accounts: MappedAccounts,
+  securities: MappedSecurities,
+  tables: MnyTables,
+  currencyByHandle: ReadonlyMap<number, string>,
+  options: MnyImportOptions,
+): string[] {
+  const codes = new Set<string>([
+    ...accounts.currencyCodes,
+    ...securities.securities.map((security) => security.currencyCode),
+  ]);
+
+  if (options.importExchangeRates) {
+    for (const rate of tables.reference.exchangeRates) {
+      for (const handle of [rate.fromCurrency, rate.toCurrency]) {
+        const code = handle === null ? undefined : currencyByHandle.get(handle);
+        if (code) {
+          codes.add(code);
+        }
+      }
+    }
+  }
+
+  return [...codes];
 }
 
 function fileCounts(tables: MnyTables): MnyFileCounts {
@@ -218,15 +339,43 @@ export class MnyParserService {
       currencyByHandle: accounts.currencyByHandle,
       bills: tables.bills.bills,
     });
+
+    const currencyByHandle = currencyCodesByHandle(tables.reference);
+    const securities = mapSecurities({
+      securities: tables.investments.securities,
+      currencyByHandle,
+      baseCurrency: accounts.baseCurrency,
+    });
+    const investments = mapInvestments({
+      transactions: tables.transactions,
+      investments: tables.investments,
+      accounts,
+      securities,
+      bills: tables.bills.bills,
+    });
+    const holdings = crossCheckHoldings({
+      transactions: investments.transactions,
+      lots: tables.investments.lots,
+      accounts,
+      securities,
+    });
+
+    // Referenced-only filtering has to see both pipelines: a payee or category
+    // only a dividend uses is still referenced.
     const categories = mapCategories(
       tables.reference,
       options.referencedOnlyCategories
-        ? transactions.referencedCategories
+        ? union(
+            transactions.referencedCategories,
+            investments.referencedCategories,
+          )
         : null,
     );
     const payees = mapPayees(
       tables.reference.payees,
-      options.referencedOnlyPayees ? transactions.referencedPayees : null,
+      options.referencedOnlyPayees
+        ? union(transactions.referencedPayees, investments.referencedPayees)
+        : null,
     );
 
     const absentTables = missingTables(tables);
@@ -235,7 +384,8 @@ export class MnyParserService {
     this.logger.log(
       `Parsed ${era} file: ${accounts.accounts.length} accounts, ` +
         `${transactions.transactions.length} transactions, ` +
-        `${transactions.deferredInvestments} investment rows deferred`,
+        `${securities.securities.length} securities, ` +
+        `${investments.transactions.length} investment rows`,
     );
 
     return {
@@ -243,16 +393,31 @@ export class MnyParserService {
       passwordProtected: db.passwordProtected,
       options,
       baseCurrency: accounts.baseCurrency,
+      currencyCodes: importedCurrencyCodes(
+        accounts,
+        securities,
+        tables,
+        currencyByHandle,
+        options,
+      ),
       accounts,
       transactions,
       categories,
       payees,
+      securities,
+      investments,
+      rawPrices: tables.investments.prices,
+      rawExchangeRates: tables.reference.exchangeRates,
+      currencyByHandle,
+      holdingChecks: holdings.checks,
       expectedBalances: computeExpectedBalances(
         accounts,
         transactions,
         input.asOf ?? todayIsoDate(),
+        investments,
       ),
-      transactionCounts: countTransactionsByAccount(transactions),
+      transactionCounts: countTransactionsByAccount(transactions, investments),
+      investmentCounts: countInvestmentsByAccount(investments),
       fileCounts: fileCounts(tables),
       missingTables: absentTables,
       missingFields: defaultedFields,
@@ -267,6 +432,9 @@ export class MnyParserService {
         })),
         ...accounts.warnings,
         ...transactions.warnings,
+        ...securities.warnings,
+        ...investments.warnings,
+        ...holdings.warnings,
         ...categories.warnings,
         ...payees.warnings,
       ],

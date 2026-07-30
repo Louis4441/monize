@@ -41,6 +41,26 @@ export const MNY_WARNING_CODES = [
   "transferAcrossExcludedAccount",
   /** The account's file-computed final balance and its imported balance differ. */
   "balanceMismatch",
+  /**
+   * Two `SEC` rows resolve to the same symbol, so the second is suffixed
+   * (`VOO-2`). PR #192 upserted on the symbol instead and silently collapsed
+   * distinct funds into one security.
+   */
+  "duplicateSecuritySymbol",
+  /** A `SEC` row has no symbol; a placeholder was generated and price updates disabled. */
+  "generatedSecuritySymbol",
+  /** `TRN.act` held a code outside the known set; the investment row is skipped. */
+  "unknownInvestmentAction",
+  /** The row was mapped through an action whose meaning is inferred, not observed. */
+  "unconfirmedInvestmentAction",
+  /** A security-carrying `TRN` row with no `TRN_INV` detail and no way to infer one. */
+  "missingInvestmentDetail",
+  /** An investment row in an account that is not an investment account. */
+  "investmentAccountMismatch",
+  /** A `SEC_SPLIT` row no price row resolves to a security, or with an unusable ratio. */
+  "unusableSecuritySplit",
+  /** LOT-derived open shares and the action replay disagree for a holding. */
+  "holdingsMismatch",
 ] as const;
 
 export type MnyWarningCode = (typeof MNY_WARNING_CODES)[number];

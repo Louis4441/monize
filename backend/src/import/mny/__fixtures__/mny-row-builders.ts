@@ -5,12 +5,17 @@ import {
   MnyCurrency,
   MnyExchangeRate,
   MnyFileDefaults,
+  MnyInvestmentDetail,
+  MnyLot,
   MnyPayee,
   MnySecurity,
+  MnySecurityPrice,
+  MnySecuritySplit,
   MnyTransaction,
   MnyTransactionSplit,
   MnyTransfer,
 } from "../model/mny-rows";
+import { MnyInvestmentData } from "../tables/read-investments";
 import { MnyReferenceData } from "../tables/read-reference";
 import { MnyTransactionData } from "../tables/read-transactions";
 
@@ -169,6 +174,61 @@ export function mnyBill(overrides: Partial<MnyBill> = {}): MnyBill {
   };
 }
 
+export function mnySecuritySplit(
+  overrides: Partial<MnySecuritySplit> = {},
+): MnySecuritySplit {
+  return {
+    handle: 1,
+    sharesBefore: 1,
+    sharesAfter: 2,
+    recordDate: "2026-01-15",
+    price: 0,
+    ...overrides,
+  };
+}
+
+export function mnySecurityPrice(
+  overrides: Partial<MnySecurityPrice> = {},
+): MnySecurityPrice {
+  return {
+    handle: 1,
+    security: 1,
+    date: "2026-01-15",
+    price: 10,
+    split: null,
+    ...overrides,
+  };
+}
+
+/** `TRN_INV` detail. `qty` is always positive, as Money stores it. */
+export function mnyInvestmentDetail(
+  overrides: Partial<MnyInvestmentDetail> = {},
+): MnyInvestmentDetail {
+  return {
+    transaction: 1,
+    price: 0,
+    quantity: 0,
+    commission: 0,
+    interest: 0,
+    ...overrides,
+  };
+}
+
+/** A `LOT` row. `sellTransaction` null means the lot is still open. */
+export function mnyLot(overrides: Partial<MnyLot> = {}): MnyLot {
+  return {
+    handle: 1,
+    account: 1,
+    security: 1,
+    quantity: 0,
+    buyTransaction: null,
+    sellTransaction: null,
+    boughtOn: null,
+    soldOn: null,
+    ...overrides,
+  };
+}
+
 /** `MnyReferenceData` with empty tables, ready to be filled per spec. */
 export function referenceData(
   overrides: Partial<MnyReferenceData> = {},
@@ -193,6 +253,38 @@ export function transactionData(
     transactions: [],
     splits: [],
     transfers: [],
+    availability: [],
+    ...overrides,
+  };
+}
+
+/**
+ * `MnyInvestmentData` with empty tables. `splitSecurities` defaults to the map
+ * the reader would derive from whatever `prices` the spec supplies, so a spec
+ * that sets up a `SEC_SPLIT` only has to state the price row that points at it.
+ */
+export function investmentData(
+  overrides: Partial<MnyInvestmentData> = {},
+): MnyInvestmentData {
+  const prices = overrides.prices ?? [];
+  const derived = new Map<number, number>();
+  for (const price of prices) {
+    if (
+      price.split !== null &&
+      price.security !== null &&
+      !derived.has(price.split)
+    ) {
+      derived.set(price.split, price.security);
+    }
+  }
+
+  return {
+    securities: [],
+    securitySplits: [],
+    prices: [],
+    investmentDetails: [],
+    lots: [],
+    splitSecurities: derived,
     availability: [],
     ...overrides,
   };

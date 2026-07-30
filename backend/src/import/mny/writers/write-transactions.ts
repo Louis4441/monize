@@ -5,6 +5,7 @@ import { TransactionSplit } from "../../../transactions/entities/transaction-spl
 import { SplitKind } from "../../../transactions/entities/split-kind.enum";
 import { roundMoney } from "../../../common/round.util";
 import { MappedTransaction } from "../model/mny-import-model";
+import { INSERT_CHUNK_SIZE, chunk } from "./chunk";
 
 /**
  * Bulk writer for transactions and their splits (design ADR-9).
@@ -20,9 +21,7 @@ import { MappedTransaction } from "../model/mny-import-model";
  * whichever side went first.
  */
 
-/** Rows per INSERT. Large enough to amortise the round trip, small enough to
- * stay well under Postgres's 65,535 bind-parameter ceiling. */
-export const INSERT_CHUNK_SIZE = 500;
+export { INSERT_CHUNK_SIZE };
 
 export interface WriteTransactionsInput {
   readonly transactions: readonly MappedTransaction[];
@@ -44,14 +43,6 @@ export interface WrittenTransactions {
   readonly linksApplied: number;
   /** Account ids that received at least one row, for post-processing. */
   readonly affectedAccountIds: ReadonlySet<string>;
-}
-
-function chunk<T>(items: readonly T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let index = 0; index < items.length; index += size) {
-    chunks.push(items.slice(index, index + size));
-  }
-  return chunks;
 }
 
 export async function writeTransactions(

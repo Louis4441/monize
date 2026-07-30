@@ -15,6 +15,12 @@ import { CurrenciesService } from "@/currencies/currencies.service";
 import { NetWorthService } from "@/net-worth/net-worth.service";
 import { SecurityPriceService } from "@/securities/security-price.service";
 import { ExchangeRateService } from "@/currencies/exchange-rate.service";
+import { Security } from "@/securities/entities/security.entity";
+import { SecurityPrice } from "@/securities/entities/security-price.entity";
+import { Holding } from "@/securities/entities/holding.entity";
+import { InvestmentTransaction } from "@/securities/entities/investment-transaction.entity";
+import { HoldingsService } from "@/securities/holdings.service";
+import { ExchangeRate } from "@/currencies/entities/exchange-rate.entity";
 import { ImportPostProcessingService } from "@/import/import-post-processing.service";
 import { ImportJob } from "@/import/mny/entities/import-job.entity";
 import { ImportStagedFile } from "@/import/mny/entities/import-staged-file.entity";
@@ -79,13 +85,18 @@ describe("mny writers (integration)", () => {
   let userId: string;
 
   const TABLES = [
+    "holdings",
+    "investment_transactions",
     "transaction_splits",
     "transactions",
+    "security_prices",
+    "securities",
     "import_jobs",
     "import_staged_files",
     "accounts",
     "categories",
     "payees",
+    "exchange_rates",
   ];
 
   /** Mirrors CurrenciesService.ensureSystemCurrency, which the FKs require. */
@@ -111,6 +122,11 @@ describe("mny writers (integration)", () => {
           UserPreference,
           ImportJob,
           ImportStagedFile,
+          Security,
+          SecurityPrice,
+          Holding,
+          InvestmentTransaction,
+          ExchangeRate,
         ]),
       ],
       providers: [
@@ -143,6 +159,25 @@ describe("mny writers (integration)", () => {
           useValue: {
             ensureSystemCurrency: (code: string) => ensureCurrency(code),
           },
+        },
+        // The real holdings rebuild -- the whole point of the investment half of
+        // this suite is that the canonical fold, not an importer's private one,
+        // produces the positions. It reaches the database only through the
+        // `queryRunner.manager` it is handed, so its own injected repositories
+        // and the AccountsService/SecuritiesService graph behind them are never
+        // touched by `rebuildAccountsFromTransactions`.
+        {
+          provide: HoldingsService,
+          useFactory: (source: DataSource) =>
+            new HoldingsService(
+              null as never,
+              null as never,
+              null as never,
+              null as never,
+              null as never,
+              source,
+            ),
+          inject: [DataSource],
         },
       ],
     }).compile();
@@ -722,7 +757,10 @@ describe("mny writers (integration)", () => {
       jobs = module.get(MnyImportJobService);
     });
 
-    async function runImport(fixture: "money2002" | "money2008") {
+    async function runImport(
+      fixture: "money2002" | "money2008",
+      options?: Parameters<typeof importService.start>[1]["options"],
+    ) {
       const staged = await withUserContext(userId, () =>
         staging.stage(userId, {
           filename: `${fixture}.mny`,
@@ -730,7 +768,7 @@ describe("mny writers (integration)", () => {
         }),
       );
       const job = await withUserContext(userId, () =>
-        importService.start(userId, { stagedFileId: staged.id }),
+        importService.start(userId, { stagedFileId: staged.id, options }),
       );
 
       // start() runs the body unawaited; wait for the row to settle.
@@ -817,6 +855,113 @@ describe("mny writers (integration)", () => {
           }),
         ),
       ).rejects.toThrow(/no longer available/i);
+    });
+
+    /*
+     * money2002.mny is the investment fixture: 86 real securities, 60 `act` 15
+     * transactions and 60 open `LOT` rows across 30 securities. That makes it
+     * the one file in the corpus where the holdings a real import produces can
+     * be checked against Money's own tax-lot record end to end.
+     */
+    describe("investments", () => {
+      it("creates the securities, excluding Money's currency pseudo-securities", async () => {
+        const job = await runImport("money2002");
+
+        expect(job.result!.securitiesCreated).toBe(86);
+        const securities = await dataSource
+          .getRepository(Security)
+          .find({ where: { userId } });
+        expect(securities).toHaveLength(86);
+        // A currency pseudo-security would arrive with a `/GBPUS`-shaped symbol.
+        expect(
+          securities.filter((security) => security.symbol.startsWith("/")),
+        ).toHaveLength(0);
+      });
+
+      it("gives every security a unique symbol rather than collapsing funds", async () => {
+        await runImport("money2002");
+
+        const symbols = (
+          await dataSource.getRepository(Security).find({ where: { userId } })
+        ).map((security) => security.symbol.toUpperCase());
+
+        expect(new Set(symbols).size).toBe(symbols.length);
+      });
+
+      it("writes the investment transactions", async () => {
+        const job = await runImport("money2002");
+
+        expect(job.result!.investmentTransactionsCreated).toBe(60);
+        const rows = await dataSource
+          .getRepository(InvestmentTransaction)
+          .find({ where: { userId } });
+        expect(rows).toHaveLength(60);
+        // Every row in this file is an act=15 with no cash side.
+        expect(rows.every((row) => row.action === "ADD_SHARES")).toBe(true);
+        expect(rows.every((row) => row.securityId !== null)).toBe(true);
+      });
+
+      // The acceptance criterion for M2.4: what Monize holds must equal what
+      // Money's open lots say, with no negative positions anywhere. PR #192
+      // produced both wrong share counts and negative holdings.
+      it("produces holdings equal to the LOT-derived positions", async () => {
+        const job = await runImport("money2002");
+
+        const holdings = await dataSource.getRepository(Holding).find();
+        expect(holdings).toHaveLength(30);
+        expect(holdings.every((holding) => Number(holding.quantity) > 0)).toBe(
+          true,
+        );
+
+        expect(job.result!.holdings).toHaveLength(30);
+        for (const line of job.result!.holdings) {
+          expect(line.lotQuantity).toBeGreaterThan(0);
+          expect(line.importedQuantity).toBe(line.lotQuantity);
+          expect(line.matches).toBe(true);
+        }
+        expect(
+          job
+            .result!.warnings.map((warning) => warning.code)
+            .includes("holdingsMismatch"),
+        ).toBe(false);
+      });
+
+      it("imports the price history, deduped on (security, date)", async () => {
+        const job = await runImport("money2002");
+
+        expect(job.result!.pricesImported).toBe(60);
+        const prices = await dataSource.getRepository(SecurityPrice).find();
+        expect(prices).toHaveLength(60);
+        expect(prices.every((price) => price.source === "mny_import")).toBe(
+          true,
+        );
+      });
+
+      it("imports the exchange-rate history additively", async () => {
+        const job = await runImport("money2002");
+
+        expect(job.result!.exchangeRatesImported).toBeGreaterThan(0);
+        const rates = await dataSource.getRepository(ExchangeRate).find();
+        expect(rates.length).toBe(job.result!.exchangeRatesImported);
+
+        // A second import of the same file must converge, not duplicate.
+        await runImport("money2002");
+        const after = await dataSource.getRepository(ExchangeRate).find();
+        expect(after.length).toBe(rates.length);
+      });
+
+      it("leaves prices and rates alone when the toggles are off", async () => {
+        const job = await runImport("money2002", {
+          importPrices: false,
+          importExchangeRates: false,
+        });
+
+        expect(job.status).toBe("completed");
+        expect(await dataSource.getRepository(SecurityPrice).count()).toBe(0);
+        expect(await dataSource.getRepository(ExchangeRate).count()).toBe(0);
+        // Securities and investment rows are not price history and still land.
+        expect(job.result!.securitiesCreated).toBe(86);
+      });
     });
   });
 });

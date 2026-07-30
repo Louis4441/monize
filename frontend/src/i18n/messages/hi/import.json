@@ -312,9 +312,14 @@
       "payees": "प्राप्तकर्ता",
       "categories": "श्रेणियाँ",
       "accounts": "खाते",
+      "securities": "प्रतिभूतियाँ",
+      "investments": "निवेश लेन-देन",
+      "investmentDetail": "{transfers} प्रतिभूति स्थानांतरण, {splits} स्टॉक विभाजन",
+      "prices": "मूल्य इतिहास",
+      "exchangeRates": "विनिमय दरें",
       "ofTotal": "फ़ाइल में {total} में से"
     },
-    "notYetImported": "निवेश और निर्धारित बिल अभी आयात नहीं होते: {investments} निवेश लेन-देन, {securities} प्रतिभूतियाँ और {bills} बिल पंक्तियाँ किसी बाद के रिलीज़ के लिए रखी गई हैं। आपका बैंकिंग इतिहास पूरा आयात होता है।",
+    "notYetImported": "निर्धारित बिल अभी आयात नहीं होते: {bills} बिल पंक्तियाँ किसी बाद के रिलीज़ के लिए रखी गई हैं। इस फ़ाइल का बाकी सब कुछ पूरा आयात होता है।",
     "accountsHeading": "खाते ({count})",
     "selectAll": "सभी चुनें",
     "selectNone": "कोई नहीं चुनें",
@@ -326,6 +331,7 @@
       "currency": "मुद्रा",
       "currencyForAccount": "{name} के लिए मुद्रा",
       "transactions": "लेन-देन",
+      "investmentRows": "+ {count, plural, one {# निवेश} other {# निवेश}}",
       "openingBalance": "प्रारंभिक शेष",
       "finalBalance": "अंतिम शेष",
       "closed": "बंद",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "केवल उपयोग में आई श्रेणियाँ आयात करें",
       "referencedOnlyCategoriesHint": "Money पूरी श्रेणी संरचना बनाता है, चाहे आप उसका उपयोग करें या नहीं। कभी उपयोग न की गई श्रेणियाँ छोड़ने के लिए इसे चालू रखें।",
       "importClosedAccounts": "बंद खाते आयात करें",
-      "importClosedAccountsHint": "बंद खातों में भी सहेजने योग्य इतिहास होता है। वे बंद स्थिति में ही आयात होते हैं।"
+      "importClosedAccountsHint": "बंद खातों में भी सहेजने योग्य इतिहास होता है। वे बंद स्थिति में ही आयात होते हैं।",
+      "importPrices": "मूल्य इतिहास आयात करें",
+      "importPricesHint": "Money का अपना रिकॉर्ड कि हर प्रतिभूति दिन-प्रतिदिन कितने की थी। यदि आप मौजूदा भावों से शुरू करना चाहें तो इसे बंद कर दें।",
+      "importExchangeRates": "विनिमय दरें आयात करें",
+      "importExchangeRatesHint": "आपकी फ़ाइल की मुद्राओं के बीच ऐतिहासिक दरें, ताकि पुराने विदेशी मुद्रा लेन-देन उसी तरह परिवर्तित हों जैसे Money करता था।"
     },
     "warningsHeading": "इस फ़ाइल के बारे में टिप्पणियाँ",
     "startImport": "आयात शुरू करें"
@@ -366,21 +376,31 @@
     "heading": "आयात पूरा हुआ",
     "allMatch": "सभी {count} खाते मिलान करते हैं: प्रत्येक शेष आपकी Money फ़ाइल से गणना किए गए शेष के बराबर है।",
     "someDiffer": "{count} खाते आपकी Money फ़ाइल से गणना किए गए शेष से मेल नहीं खाते। नीचे चिह्नित पंक्तियाँ अंतर दिखाती हैं।",
+    "someHoldingsDiffer": "सभी शेष मिलते हैं, पर {count, plural, one {# होल्डिंग} other {# होल्डिंग्स}} आपकी Money फ़ाइल में दर्ज शेयरों से मेल नहीं खाती। नीचे चिह्नित पंक्तियाँ अंतर दिखाती हैं।",
     "counts": {
       "accounts": "खाते",
       "transactions": "लेन-देन",
       "transfers": "स्थानांतरण",
       "splits": "विभाजन पंक्तियाँ",
       "payees": "प्राप्तकर्ता",
-      "categories": "श्रेणियाँ"
+      "categories": "श्रेणियाँ",
+      "securities": "प्रतिभूतियाँ",
+      "investments": "निवेश लेन-देन",
+      "prices": "मूल्य",
+      "exchangeRates": "विनिमय दरें"
     },
     "existingDataRemoved": "आपके अनुरोध के अनुसार, इस आयात से पहले आपका मौजूदा डेटा हटा दिया गया।",
     "verificationHeading": "शेष सत्यापन",
+    "holdingsHeading": "होल्डिंग्स सत्यापन",
+    "holdingsExplainer": "Monize के पास अब जितने शेयर हैं, उनकी तुलना आपकी Money फ़ाइल में दर्ज खुले टैक्स लॉट से। Money स्वयं इन्हीं लॉट से मिलान करता है, इसलिए यही भरोसेमंद संख्या है।",
     "table": {
       "account": "खाता",
+      "security": "प्रतिभूति",
       "transactions": "लेन-देन",
       "expected": "Money फ़ाइल से",
       "imported": "Monize में",
+      "lotShares": "Money में शेयर",
+      "importedShares": "Monize में शेयर",
       "delta": "अंतर",
       "check": "जाँचें"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "{count, plural, one {# विभाजन पंक्ति} other {# विभाजन पंक्तियों}} का कोई मूल लेन-देन नहीं था, इसलिए उन्हें छोड़ दिया गया।",
     "splitSumMismatch": "{count, plural, one {# विभाजन} other {# विभाजनों}} में पंक्तियों का योग लेन-देन की कुल राशि से मेल नहीं खाता; Money के कुल मान बनाए रखे गए।",
     "transferAcrossExcludedAccount": "{count, plural, one {# स्थानांतरण} other {# स्थानांतरण}} आपके छोड़े गए खाते की ओर संकेत करते थे और सामान्य लेन-देन के रूप में आयात किए गए।",
-    "balanceMismatch": "{count, plural, one {# खाते} other {# खातों}} का अंतिम शेष Money फ़ाइल से भिन्न है।"
+    "balanceMismatch": "{count, plural, one {# खाते} other {# खातों}} का अंतिम शेष Money फ़ाइल से भिन्न है।",
+    "duplicateSecuritySymbol": "{count, plural, one {# प्रतिभूति} other {# प्रतिभूतियाँ}} किसी अन्य के साथ प्रतीक साझा करती थीं; अलग बनी रहें इसलिए बाद वाली का नाम बदल दिया गया।",
+    "generatedSecuritySymbol": "{count, plural, one {# प्रतिभूति} other {# प्रतिभूतियों}} का Money में कोई प्रतीक नहीं है, इसलिए एक अस्थायी प्रतीक बनाया गया और मूल्य अद्यतन बंद रखे गए।",
+    "unknownInvestmentAction": "{count, plural, one {# निवेश लेन-देन} other {# निवेश लेन-देन}} में ऐसी क्रिया थी जिसे Monize नहीं पहचानता, और उन्हें छोड़ दिया गया।",
+    "unconfirmedInvestmentAction": "{count, plural, one {# निवेश लेन-देन} other {# निवेश लेन-देन}} में Money की ऐसी क्रिया थी जिसका अर्थ अनुमानित है, प्रलेखित नहीं; उन्हें Money से मिलाकर देखें।",
+    "missingInvestmentDetail": "{count, plural, one {# निवेश लेन-देन} other {# निवेश लेन-देन}} में फ़ाइल में शेयर विवरण नहीं था और उन्हें केवल नकद राशि के रूप में आयात किया गया।",
+    "investmentAccountMismatch": "{count, plural, one {# निवेश लेन-देन} other {# निवेश लेन-देन}} ऐसे खाते में था जो निवेश खाता नहीं है, और उन्हें छोड़ दिया गया।",
+    "unusableSecuritySplit": "{count, plural, one {# स्टॉक विभाजन} other {# स्टॉक विभाजन}} किसी प्रतिभूति से नहीं जुड़ सका या उसका अनुपात अनुपयोगी था, और वह लागू नहीं किया गया।",
+    "holdingsMismatch": "{count, plural, one {# होल्डिंग} other {# होल्डिंग्स}} आपकी Money फ़ाइल में दर्ज शेयरों से मेल नहीं खाती।"
   },
   "mnyErrors": {
     "mnyImportFailed": "आयात के दौरान कुछ गड़बड़ हुई। कुछ भी सहेजा नहीं गया -- आप फिर से प्रयास कर सकते हैं।",

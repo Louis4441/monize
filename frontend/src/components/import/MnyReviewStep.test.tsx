@@ -15,6 +15,7 @@ function account(
     accountSubType: null,
     currencyCode: 'USD',
     transactionCount: 120,
+    investmentCount: 0,
     openingBalance: 100,
     finalBalance: 2500.5,
     closed: false,
@@ -42,7 +43,14 @@ function preview(overrides: Partial<MnyPreview> = {}): MnyPreview {
       transactionsToCreate: 120,
       transfersToLink: 12,
       transactionsSkipped: 0,
-      investmentsDeferred: 0,
+      securitiesToCreate: 0,
+      securitiesInFile: 0,
+      investmentsToCreate: 0,
+      investmentsSkipped: 0,
+      shareTransfersPaired: 0,
+      stockSplitsApplied: 0,
+      pricesToImport: 0,
+      exchangeRatesToImport: 0,
     },
     fileCounts: {
       accounts: 3,
@@ -194,20 +202,82 @@ describe('MnyReviewStep', () => {
     expect(screen.getByText(/no BILL table/)).toBeInTheDocument();
   });
 
-  it('says plainly that investments and bills are not imported yet', () => {
+  it('says plainly that scheduled bills are not imported yet', () => {
     render(
       <MnyReviewStep
         {...defaultProps}
         preview={preview({
-          counts: { ...preview().counts, investmentsDeferred: 40 },
           fileCounts: { ...preview().fileCounts, securities: 98, bills: 1844 },
         })}
       />,
     );
 
     expect(
-      screen.getByText(/Investments and scheduled bills are not imported yet/),
+      screen.getByText(/Scheduled bills are not imported yet/),
     ).toBeInTheDocument();
+  });
+
+  describe('investments', () => {
+    const withInvestments = () =>
+      preview({
+        counts: {
+          ...preview().counts,
+          securitiesToCreate: 86,
+          securitiesInFile: 98,
+          investmentsToCreate: 412,
+          shareTransfersPaired: 4,
+          stockSplitsApplied: 2,
+          pricesToImport: 68000,
+          exchangeRatesToImport: 120,
+        },
+        fileCounts: {
+          ...preview().fileCounts,
+          securities: 98,
+          securityPrices: 68000,
+          exchangeRates: 120,
+        },
+        accounts: [account({ investmentCount: 412 })],
+      });
+
+    it('summarises the securities, investments, prices and rates', () => {
+      render(
+        <MnyReviewStep {...defaultProps} preview={withInvestments()} />,
+      );
+
+      expect(screen.getByText('86')).toBeInTheDocument();
+      expect(screen.getByText('412')).toBeInTheDocument();
+      expect(screen.getByText('68000')).toBeInTheDocument();
+      expect(
+        screen.getByText(/4 share transfers, 2 stock splits/),
+      ).toBeInTheDocument();
+    });
+
+    it('shows an account its investment rows alongside its transactions', () => {
+      render(
+        <MnyReviewStep {...defaultProps} preview={withInvestments()} />,
+      );
+
+      expect(screen.getByText('+ 412 investments')).toBeInTheDocument();
+    });
+
+    it('hides the investment summary for a file with no securities', () => {
+      render(<MnyReviewStep {...defaultProps} />);
+
+      expect(screen.queryByText('Securities')).not.toBeInTheDocument();
+    });
+
+    it('lets the user turn the price and rate history off', () => {
+      render(
+        <MnyReviewStep {...defaultProps} preview={withInvestments()} />,
+      );
+
+      fireEvent.click(screen.getByText('Import price history'));
+
+      expect(defaultProps.onSetOption).toHaveBeenCalledWith(
+        'importPrices',
+        false,
+      );
+    });
   });
 
   it('surfaces mapper warnings with their counts and samples', () => {

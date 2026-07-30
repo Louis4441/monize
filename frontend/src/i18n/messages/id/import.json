@@ -312,9 +312,14 @@
       "payees": "Penerima",
       "categories": "Kategori",
       "accounts": "Akun",
+      "securities": "Efek",
+      "investments": "Transaksi investasi",
+      "investmentDetail": "{transfers} transfer efek, {splits} pemecahan saham",
+      "prices": "Riwayat harga",
+      "exchangeRates": "Kurs tukar",
       "ofTotal": "dari {total} di berkas"
     },
-    "notYetImported": "Investasi dan tagihan terjadwal belum diimpor: {investments} transaksi investasi, {securities} efek, dan {bills} baris tagihan ditinggalkan untuk rilis berikutnya. Riwayat bank Anda diimpor sepenuhnya.",
+    "notYetImported": "Tagihan terjadwal belum diimpor: {bills} baris tagihan ditinggalkan untuk rilis berikutnya. Semua isi berkas ini selain itu diimpor sepenuhnya.",
     "accountsHeading": "Akun ({count})",
     "selectAll": "Pilih semua",
     "selectNone": "Jangan pilih apa pun",
@@ -326,6 +331,7 @@
       "currency": "Mata uang",
       "currencyForAccount": "Mata uang untuk {name}",
       "transactions": "Transaksi",
+      "investmentRows": "+ {count, plural, other {# investasi}}",
       "openingBalance": "Saldo awal",
       "finalBalance": "Saldo akhir",
       "closed": "Ditutup",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "Hanya impor kategori yang dipakai",
       "referencedOnlyCategoriesHint": "Money membuat pohon kategori lengkap, dipakai atau tidak. Biarkan aktif untuk melewati kategori yang tidak pernah Anda gunakan.",
       "importClosedAccounts": "Impor akun yang ditutup",
-      "importClosedAccountsHint": "Akun yang ditutup masih menyimpan riwayat yang layak disimpan. Akun tersebut diimpor dalam keadaan tertutup."
+      "importClosedAccountsHint": "Akun yang ditutup masih menyimpan riwayat yang layak disimpan. Akun tersebut diimpor dalam keadaan tertutup.",
+      "importPrices": "Impor riwayat harga",
+      "importPricesHint": "Catatan Money sendiri tentang nilai setiap efek dari hari ke hari. Matikan jika Anda lebih suka mulai dari kuotasi terkini.",
+      "importExchangeRates": "Impor kurs tukar",
+      "importExchangeRatesHint": "Kurs historis antar mata uang di berkas Anda, agar transaksi valuta asing lama dikonversi seperti yang dilakukan Money."
     },
     "warningsHeading": "Catatan tentang berkas ini",
     "startImport": "Mulai impor"
@@ -366,21 +376,31 @@
     "heading": "Impor selesai",
     "allMatch": "Semua {count} akun cocok: setiap saldo sama dengan yang dihitung dari berkas Money Anda.",
     "someDiffer": "{count} akun tidak cocok dengan saldo yang dihitung dari berkas Money Anda. Baris yang ditandai di bawah menunjukkan selisihnya.",
+    "someHoldingsDiffer": "Semua saldo cocok, tetapi {count, plural, other {# kepemilikan}} tidak sesuai dengan jumlah lembar yang tercatat di berkas Money Anda. Baris yang ditandai di bawah menunjukkan selisihnya.",
     "counts": {
       "accounts": "Akun",
       "transactions": "Transaksi",
       "transfers": "Transfer",
       "splits": "Baris pemecahan",
       "payees": "Penerima",
-      "categories": "Kategori"
+      "categories": "Kategori",
+      "securities": "Efek",
+      "investments": "Transaksi investasi",
+      "prices": "Harga",
+      "exchangeRates": "Kurs tukar"
     },
     "existingDataRemoved": "Data Anda yang ada dihapus sebelum impor ini, sesuai permintaan.",
     "verificationHeading": "Verifikasi saldo",
+    "holdingsHeading": "Verifikasi kepemilikan",
+    "holdingsExplainer": "Lembar yang kini dipegang Monize, dibandingkan lot pajak terbuka yang dicatat berkas Money Anda. Money sendiri merekonsiliasi terhadap lot tersebut, jadi itulah angka yang dapat dipercaya.",
     "table": {
       "account": "Akun",
+      "security": "Sekuritas",
       "transactions": "Transaksi",
       "expected": "Dari berkas Money",
       "imported": "Di Monize",
+      "lotShares": "Lembar di Money",
+      "importedShares": "Lembar di Monize",
       "delta": "Selisih",
       "check": "Periksa"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "{count, plural, other {# baris pemecahan}} tidak memiliki transaksi induk dan dilewati.",
     "splitSumMismatch": "{count, plural, other {# pemecahan}} memiliki baris yang jumlahnya tidak sama dengan total transaksi; total dari Money dipertahankan.",
     "transferAcrossExcludedAccount": "{count, plural, other {# transfer}} menunjuk ke akun yang Anda kecualikan dan diimpor sebagai transaksi biasa.",
-    "balanceMismatch": "{count, plural, other {# akun}} berakhir dengan saldo yang berbeda dari berkas Money."
+    "balanceMismatch": "{count, plural, other {# akun}} berakhir dengan saldo yang berbeda dari berkas Money.",
+    "duplicateSecuritySymbol": "{count, plural, other {# efek}} berbagi simbol dengan efek lain; yang berikutnya diganti namanya agar tetap terpisah.",
+    "generatedSecuritySymbol": "{count, plural, other {# efek}} tidak memiliki simbol di Money, jadi simbol sementara dibuat dan pembaruan harga dibiarkan mati.",
+    "unknownInvestmentAction": "{count, plural, other {# transaksi investasi}} memakai aksi yang tidak dikenali Monize dan dilewati.",
+    "unconfirmedInvestmentAction": "{count, plural, other {# transaksi investasi}} memakai aksi Money yang artinya disimpulkan, bukan terdokumentasi; periksa terhadap Money.",
+    "missingInvestmentDetail": "{count, plural, other {# transaksi investasi}} tidak memiliki rincian lembar di berkas dan hanya diimpor sebesar jumlah tunainya.",
+    "investmentAccountMismatch": "{count, plural, other {# transaksi investasi}} berada di akun yang bukan akun investasi dan dilewati.",
+    "unusableSecuritySplit": "{count, plural, other {# pemecahan saham}} tidak dapat dicocokkan dengan suatu efek atau memiliki rasio yang tidak dapat dipakai, dan tidak diterapkan.",
+    "holdingsMismatch": "{count, plural, other {# kepemilikan}} tidak sesuai dengan jumlah lembar yang dicatat berkas Money Anda."
   },
   "mnyErrors": {
     "mnyImportFailed": "Terjadi kesalahan saat mengimpor. Tidak ada yang disimpan -- Anda dapat mencoba lagi.",

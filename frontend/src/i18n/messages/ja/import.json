@@ -312,9 +312,14 @@
       "payees": "支払先",
       "categories": "カテゴリ",
       "accounts": "口座",
+      "securities": "有価証券",
+      "investments": "投資取引",
+      "investmentDetail": "証券振替 {transfers} 件、株式分割 {splits} 件",
+      "prices": "価格履歴",
+      "exchangeRates": "為替レート",
       "ofTotal": "ファイル内 {total} 件のうち"
     },
-    "notYetImported": "投資と定期請求はまだインポートされません。投資取引 {investments} 件、証券 {securities} 件、請求行 {bills} 件は後のリリースに残されます。銀行取引の履歴はすべてインポートされます。",
+    "notYetImported": "予定された請求はまだ取り込まれません。請求行 {bills} 件は今後のリリースに残されます。このファイルのそれ以外はすべて取り込まれます。",
     "accountsHeading": "口座 ({count})",
     "selectAll": "すべて選択",
     "selectNone": "選択を解除",
@@ -326,6 +331,7 @@
       "currency": "通貨",
       "currencyForAccount": "{name} の通貨",
       "transactions": "取引",
+      "investmentRows": "+ 投資 {count, plural, other {# 件}}",
       "openingBalance": "期首残高",
       "finalBalance": "最終残高",
       "closed": "解約済み",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "使用されているカテゴリのみインポート",
       "referencedOnlyCategoriesHint": "Money は使うかどうかに関係なく完全なカテゴリツリーを作成します。まったく使っていないカテゴリをスキップするには、オンのままにしてください。",
       "importClosedAccounts": "解約済みの口座もインポート",
-      "importClosedAccountsHint": "解約済みの口座にも残す価値のある履歴があります。解約済みの状態でインポートされます。"
+      "importClosedAccountsHint": "解約済みの口座にも残す価値のある履歴があります。解約済みの状態でインポートされます。",
+      "importPrices": "価格履歴を取り込む",
+      "importPricesHint": "各銘柄が日々いくらだったかという Money 自身の記録です。現在の相場から始めたい場合はオフにしてください。",
+      "importExchangeRates": "為替レートを取り込む",
+      "importExchangeRatesHint": "ファイル内の通貨間の過去レートです。これにより過去の外貨取引が Money と同じように換算されます。"
     },
     "warningsHeading": "このファイルに関する注意",
     "startImport": "インポートを開始"
@@ -366,21 +376,31 @@
     "heading": "インポート完了",
     "allMatch": "{count} 件すべての口座が一致しました。どの残高も Money ファイルから計算した金額と同じです。",
     "someDiffer": "{count} 件の口座が Money ファイルから計算した残高と一致しません。以下の印の付いた行に差額が表示されています。",
+    "someHoldingsDiffer": "残高はすべて一致しましたが、{count, plural, other {# 件の保有銘柄}} が Money ファイルに記録された株数と一致しません。下に印を付けた行に差分が表示されています。",
     "counts": {
       "accounts": "口座",
       "transactions": "取引",
       "transfers": "振替",
       "splits": "分割行",
       "payees": "支払先",
-      "categories": "カテゴリ"
+      "categories": "カテゴリ",
+      "securities": "有価証券",
+      "investments": "投資取引",
+      "prices": "価格",
+      "exchangeRates": "為替レート"
     },
     "existingDataRemoved": "ご指定どおり、このインポートの前に既存データを削除しました。",
     "verificationHeading": "残高の検証",
+    "holdingsHeading": "保有銘柄の検証",
+    "holdingsExplainer": "Monize が現在保有している株数と、Money ファイルに記録された未決済の税務ロットとの比較です。Money 自身がこのロットで照合しているため、こちらが信頼できる数値です。",
     "table": {
       "account": "口座",
+      "security": "有価証券",
       "transactions": "取引",
       "expected": "Money ファイルより",
       "imported": "Monize 上",
+      "lotShares": "Money の株数",
+      "importedShares": "Monize の株数",
       "delta": "差額",
       "check": "要確認"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "{count, plural, other {# 件の分割行}} に親取引がなかったため、スキップしました。",
     "splitSumMismatch": "{count, plural, other {# 件の分割}} で内訳の合計が取引合計と一致しません。Money 側の合計をそのまま使用しました。",
     "transferAcrossExcludedAccount": "{count, plural, other {# 件の振替}} が除外した口座を指していたため、通常の取引としてインポートしました。",
-    "balanceMismatch": "{count, plural, other {# 件の口座}} の最終残高が Money ファイルと異なります。"
+    "balanceMismatch": "{count, plural, other {# 件の口座}} の最終残高が Money ファイルと異なります。",
+    "duplicateSecuritySymbol": "{count, plural, other {# 件の証券}} が他の証券とシンボルを共有していました。別々のまま保つため、後のものは名前を変更しました。",
+    "generatedSecuritySymbol": "{count, plural, other {# 件の証券}} には Money 上でシンボルがないため、仮のシンボルを生成し、価格更新はオフのままにしました。",
+    "unknownInvestmentAction": "{count, plural, other {# 件の投資取引}} に Monize が認識できないアクションが使われていたため、スキップしました。",
+    "unconfirmedInvestmentAction": "{count, plural, other {# 件の投資取引}} に、意味が文書化されておらず推定にとどまる Money のアクションが使われています。Money と照合して確認してください。",
+    "missingInvestmentDetail": "{count, plural, other {# 件の投資取引}} にはファイル内に株数の明細がなかったため、現金額のみで取り込みました。",
+    "investmentAccountMismatch": "{count, plural, other {# 件の投資取引}} が投資口座ではない口座にあったため、スキップしました。",
+    "unusableSecuritySplit": "{count, plural, other {# 件の株式分割}} は証券と対応付けられないか比率が使用できなかったため、適用しませんでした。",
+    "holdingsMismatch": "{count, plural, other {# 件の保有銘柄}} が Money ファイルに記録された株数と一致しません。"
   },
   "mnyErrors": {
     "mnyImportFailed": "インポート中に問題が発生しました。何も保存されていないため、やり直せます。",

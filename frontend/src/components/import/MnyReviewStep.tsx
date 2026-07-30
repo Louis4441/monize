@@ -110,15 +110,46 @@ export function MnyReviewStep({
         />
       </div>
 
-      {/* Things Phase 1 does not import yet */}
-      {(counts.investmentsDeferred > 0 || fileCounts.bills > 0) && (
+      {/* Investments */}
+      {counts.securitiesToCreate > 0 && (
+        <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <SummaryTile
+            label={t('mnyReview.counts.securities')}
+            value={String(counts.securitiesToCreate)}
+            detail={t('mnyReview.counts.ofTotal', {
+              total: counts.securitiesInFile,
+            })}
+          />
+          <SummaryTile
+            label={t('mnyReview.counts.investments')}
+            value={String(counts.investmentsToCreate)}
+            detail={t('mnyReview.counts.investmentDetail', {
+              transfers: counts.shareTransfersPaired,
+              splits: counts.stockSplitsApplied,
+            })}
+          />
+          <SummaryTile
+            label={t('mnyReview.counts.prices')}
+            value={String(counts.pricesToImport)}
+            detail={t('mnyReview.counts.ofTotal', {
+              total: fileCounts.securityPrices,
+            })}
+          />
+          <SummaryTile
+            label={t('mnyReview.counts.exchangeRates')}
+            value={String(counts.exchangeRatesToImport)}
+            detail={t('mnyReview.counts.ofTotal', {
+              total: fileCounts.exchangeRates,
+            })}
+          />
+        </div>
+      )}
+
+      {/* Things Phase 2 does not import yet */}
+      {fileCounts.bills > 0 && (
         <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm text-blue-700 dark:text-blue-300">
-            {t('mnyReview.notYetImported', {
-              investments: counts.investmentsDeferred,
-              securities: fileCounts.securities,
-              bills: fileCounts.bills,
-            })}
+            {t('mnyReview.notYetImported', { bills: fileCounts.bills })}
           </p>
         </div>
       )}
@@ -247,6 +278,13 @@ export function MnyReviewStep({
                     </td>
                     <td className="px-3 py-2 text-right text-muted-foreground">
                       {account.transactionCount}
+                      {account.investmentCount > 0 && (
+                        <span className="block text-xs">
+                          {t('mnyReview.table.investmentRows', {
+                            count: account.investmentCount,
+                          })}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right text-muted-foreground">
                       {formatCurrency(account.openingBalance, currency)}
@@ -285,6 +323,18 @@ export function MnyReviewStep({
             hint={t('mnyReview.options.importClosedAccountsHint')}
             checked={options.importClosedAccounts ?? true}
             onChange={(value) => onSetOption('importClosedAccounts', value)}
+          />
+          <OptionCheckbox
+            label={t('mnyReview.options.importPrices')}
+            hint={t('mnyReview.options.importPricesHint')}
+            checked={options.importPrices ?? true}
+            onChange={(value) => onSetOption('importPrices', value)}
+          />
+          <OptionCheckbox
+            label={t('mnyReview.options.importExchangeRates')}
+            hint={t('mnyReview.options.importExchangeRatesHint')}
+            checked={options.importExchangeRates ?? true}
+            onChange={(value) => onSetOption('importExchangeRates', value)}
           />
         </div>
       </div>

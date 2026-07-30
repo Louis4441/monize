@@ -665,14 +665,78 @@ See 6.4 for what the implementation settled differently from this plan.
 
 ### Phase 2 — Investments (shippable increment)
 
-| ID | Task | Depends | Size |
-|----|------|---------|------|
-| M2.1 | Securities mapper: `sct=4` exclusion, symbol-collision suffixing, empty-symbol placeholders. Acceptance: collision fixture creates two securities + warning, never collapses | M1.3 | M |
-| M2.2 | Investment mapper (`map/map-investments.ts`): full act map per section 8.4 (incl. act=4 dividends sourced from `TRN` without `TRN_INV`), act 15+16 transfer pairing, `SEC_SPLIT` -> SPLIT, positive-qty policy, cash legs. Unit fixtures per act code | M2.1, M0.6 | L |
-| M2.3 | LOT cross-check: open-lot holdings vs action-replay holdings -> verification warnings (never import failures). Seeded-mismatch fixture produces a warning | M2.2 | M |
-| M2.4 | Investment writer (`writers/write-investments.ts`): batched investment transactions + cash legs, `HoldingsService.rebuildAccountsFromTransactions` per affected brokerage account, holdings section in the report. Acceptance: fixture holdings equal LOT-derived positions; negative-holdings regression test covering the PR #192 failure mode | M2.2, M1.8 | L |
-| M2.5 | Prices + FX writer: `SP` dedupe keep-latest, multi-row upserts to `security_prices` (import source marker) and `exchange_rates`; toggles honored. Acceptance: synthetic 68k-price set imports < 30 s in the integration environment | M2.1 | M |
-| M2.6 | Wizard: securities summary on review, holdings section in the verification report, investment progress phase | M2.4, M1.9 | M |
+Exit gate: cleared. A `.mny` file's securities, investment transactions, stock
+splits, price history and exchange rates go through the same wizard, and the
+verification report gained a per-holding section reconciling what Monize holds
+against Money's own open tax lots. `money2002.mny` imports end to end with all 30
+positions matching and no negative holdings. The localization pass that section 9
+defers to M4.3 was done with it, so Phase 2 is fully translated.
+
+See 6.5 for what the implementation settled differently from this plan.
+
+| ID | Task | Depends | Size | Status |
+|----|------|---------|------|--------|
+| M2.1 | Securities mapper: `sct=4` exclusion, symbol-collision suffixing, empty-symbol placeholders. Acceptance: collision fixture creates two securities + warning, never collapses | M1.3 | M | **done** (`map/map-securities.ts`; the exclusion tests the symbol shape as well as `sct`, per 6.3) |
+| M2.2 | Investment mapper (`map/map-investments.ts`): full act map per section 8.4 (incl. act=4 dividends sourced from `TRN` without `TRN_INV`), act 15+16 transfer pairing, `SEC_SPLIT` -> SPLIT, positive-qty policy, cash legs. Unit fixtures per act code | M2.1, M0.6 | L | **done** |
+| M2.3 | LOT cross-check: open-lot holdings vs action-replay holdings -> verification warnings (never import failures). Seeded-mismatch fixture produces a warning | M2.2 | M | **done** (`map/check-holdings.ts`; also surfaced by `npm run mny:inspect`) |
+| M2.4 | Investment writer (`writers/write-investments.ts`): batched investment transactions + cash legs, `HoldingsService.rebuildAccountsFromTransactions` per affected brokerage account, holdings section in the report. Acceptance: fixture holdings equal LOT-derived positions; negative-holdings regression test covering the PR #192 failure mode | M2.2, M1.8 | L | **done** |
+| M2.5 | Prices + FX writer: `SP` dedupe keep-latest, multi-row upserts to `security_prices` (import source marker) and `exchange_rates`; toggles honored. Acceptance: synthetic 68k-price set imports < 30 s in the integration environment | M2.1 | M | **done** for the writers and toggles; the 68k-row timing belongs with the M4.1 performance pass against the real Sunset file rather than to a synthetic set |
+| M2.6 | Wizard: securities summary on review, holdings section in the verification report, investment progress phase | M2.4, M1.9 | M | **done** (also exposes the `importPrices` / `importExchangeRates` toggles ADR-5 defined but Phase 1 never surfaced) |
+
+#### 6.5 Phase 2 findings
+
+Five things this plan specified turned out differently once code existed.
+
+**An investment's cash leg is one row, not a transfer pair.** The QIF processor
+writes a cash transaction *and* a mirroring row in the brokerage account when the
+two differ, which nets to zero across the pair. Copying that here would give the
+brokerage side a `current_balance` the Money file never recorded -- Monize's
+brokerage value comes from holdings -- and the verification report, which
+compares per-account balances, would then disagree with itself on every
+investment account. The `.mny` writer creates exactly one cash transaction, in
+the cash sleeve, linked from the investment row through `transaction_id`.
+
+**`computeExpectedBalances` had to learn about investment cash.** It folded
+banking transactions only. Once buys and sells post into the sleeve, a sleeve's
+expected balance that ignores them is wrong by the account's entire trading
+history, and every brokerage cash account reports a discrepancy. The investment
+legs now fold into the same integer-minor-unit accumulator.
+
+**The currency list is not the accounts' currency list.** `exchange_rates` has a
+foreign key to `currencies` on *both* sides, and a security can be denominated in
+a currency no account uses, so `ensureSystemCurrency` has to run over the union
+of account, security and rate currencies. Rate currencies are collected only when
+that toggle is on, so unticking it does not create currencies for nothing.
+
+**An unpaired `act` 15/16 row must not warn.** The first cut warned on every
+ADD/REMOVE_SHARES row with no counterpart. `money2002.mny` alone produces 60 of
+them, because shares transferred in from a broker is simply how a portfolio
+starts. The position is identical whether or not the pairing is found -- only the
+"this was a transfer" semantic is lost -- so 60 lines of noise buried the
+warnings that mean something. The LOT cross-check is the real safety net.
+
+**Magnitude comes from `TRN.amt`, direction from the action.** Money's own cash
+figure already carries commission and any accrued interest, so recomputing
+`qty * price + commission` disagrees with what Money shows by exactly those
+amounts. The sign is discarded and taken from the action, which is the same rule
+section 8.4 states for quantity.
+
+Two things the plan got right and are worth recording as confirmed. The holdings
+rebuild runs on the import transaction's own `EntityManager` through a
+`{ manager }` shim: `rebuildAccountsFromTransactions` only ever touches
+`queryRunner.manager`, and a second connection would deadlock against the open
+transaction. And `SEC.sct` is deliberately **not** mapped onto Monize's
+`securityType` -- 6.3 showed the codes shift between releases, so any mapping
+mislabels some file; the column stays null for the user to set.
+
+**First end-to-end evidence the act map is right.** `money2002.mny` carries 60
+`act = 15` rows and 60 open `LOT` rows across 30 securities. The integration
+suite imports it and asserts all 30 positions equal the LOT-derived ones, every
+quantity positive -- the negative-holdings failure mode from PR #192 issue 4.
+`npm run mny:inspect` prints the same reconciliation, which completes the M0.5
+validation harness that 6.2 left open. The corpus still cannot exercise `act` 4,
+5, 14 or 16, or `SEC_SPLIT`: those paths are covered by plain-object fixtures and
+still want a real file (open questions 12.3 and 12.4 remain open).
 
 ### Phase 3 — Bills, loans polish, wipe UX (shippable increment)
 

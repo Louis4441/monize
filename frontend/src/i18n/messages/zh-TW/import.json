@@ -312,9 +312,14 @@
       "payees": "收款人",
       "categories": "類別",
       "accounts": "帳戶",
+      "securities": "證券",
+      "investments": "投資交易",
+      "investmentDetail": "{transfers} 筆證券移轉、{splits} 次股票分割",
+      "prices": "價格歷史",
+      "exchangeRates": "匯率",
       "ofTotal": "共 {total} 項"
     },
-    "notYetImported": "投資與排定帳單尚未匯入：{investments} 筆投資交易、{securities} 檔證券與 {bills} 列帳單留待後續版本。您的銀行紀錄會完整匯入。",
+    "notYetImported": "排定帳單尚未匯入：{bills} 列帳單留待後續版本。此檔案中的其他內容都會完整匯入。",
     "accountsHeading": "帳戶（{count}）",
     "selectAll": "全選",
     "selectNone": "全不選",
@@ -326,6 +331,7 @@
       "currency": "貨幣",
       "currencyForAccount": "{name} 的貨幣",
       "transactions": "交易",
+      "investmentRows": "+ {count, plural, other {# 筆投資}}",
       "openingBalance": "期初餘額",
       "finalBalance": "最終餘額",
       "closed": "已結清",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "僅匯入使用過的類別",
       "referencedOnlyCategoriesHint": "無論您是否使用，Money 都會建立完整的類別樹。保持開啟可略過從未用過的類別。",
       "importClosedAccounts": "匯入已結清的帳戶",
-      "importClosedAccountsHint": "已結清的帳戶仍保有值得留存的紀錄，匯入後維持結清狀態。"
+      "importClosedAccountsHint": "已結清的帳戶仍保有值得留存的紀錄，匯入後維持結清狀態。",
+      "importPrices": "匯入價格歷史",
+      "importPricesHint": "Money 自己記錄的每檔證券逐日價值。若您想從目前報價開始，請關閉此項。",
+      "importExchangeRates": "匯入匯率",
+      "importExchangeRatesHint": "檔案中各幣別之間的歷史匯率，讓過去的外幣交易依 Money 當時的方式換算。"
     },
     "warningsHeading": "關於此檔案的說明",
     "startImport": "開始匯入"
@@ -366,21 +376,31 @@
     "heading": "匯入完成",
     "allMatch": "全部 {count} 個帳戶均核對一致：每個餘額都與依 Money 檔案計算的結果相同。",
     "someDiffer": "{count} 個帳戶與依 Money 檔案計算的餘額不一致。下面標記的列顯示差額。",
+    "someHoldingsDiffer": "所有餘額都已核對一致，但{count, plural, other {# 項持倉}}與 Money 檔案記錄的股數不符。下面標記的列顯示差額。",
     "counts": {
       "accounts": "帳戶",
       "transactions": "交易",
       "transfers": "轉帳",
       "splits": "拆分明細",
       "payees": "收款人",
-      "categories": "類別"
+      "categories": "類別",
+      "securities": "證券",
+      "investments": "投資交易",
+      "prices": "價格",
+      "exchangeRates": "匯率"
     },
     "existingDataRemoved": "已依您的要求，在本次匯入前刪除原有資料。",
     "verificationHeading": "餘額驗證",
+    "holdingsHeading": "持倉核對",
+    "holdingsExplainer": "Monize 目前持有的股數，與 Money 檔案記錄的未平倉稅務批次對照。Money 本身就以這些批次核對，因此是可信的數字。",
     "table": {
       "account": "帳戶",
+      "security": "證券",
       "transactions": "交易",
       "expected": "來自 Money 檔案",
       "imported": "Monize 中",
+      "lotShares": "Money 中的股數",
+      "importedShares": "Monize 中的股數",
       "delta": "差額",
       "check": "待核對"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "{count, plural, other {# 列拆分明細}}沒有對應的上層交易，已略過。",
     "splitSumMismatch": "{count, plural, other {# 筆拆分}}的明細金額與交易總額不符，已保留 Money 自身的金額。",
     "transferAcrossExcludedAccount": "{count, plural, other {# 筆轉帳}}指向您排除的帳戶，已作為一般交易匯入。",
-    "balanceMismatch": "{count, plural, other {# 個帳戶}}的最終餘額與 Money 檔案不一致。"
+    "balanceMismatch": "{count, plural, other {# 個帳戶}}的最終餘額與 Money 檔案不一致。",
+    "duplicateSecuritySymbol": "{count, plural, other {# 檔證券}}與另一檔共用代號；為維持區分，較晚者已重新命名。",
+    "generatedSecuritySymbol": "{count, plural, other {# 檔證券}}在 Money 中沒有代號，因此產生了預留代號，並維持價格更新為關閉。",
+    "unknownInvestmentAction": "{count, plural, other {# 筆投資交易}}使用了 Monize 無法辨識的動作，已略過。",
+    "unconfirmedInvestmentAction": "{count, plural, other {# 筆投資交易}}使用了語意靠推斷而非有文件佐證的 Money 動作，請與 Money 核對。",
+    "missingInvestmentDetail": "{count, plural, other {# 筆投資交易}}在檔案中沒有股數明細，僅依其現金金額匯入。",
+    "investmentAccountMismatch": "{count, plural, other {# 筆投資交易}}位於非投資帳戶中，已略過。",
+    "unusableSecuritySplit": "{count, plural, other {# 次股票分割}}無法對應到證券，或比例無法使用，因此未套用。",
+    "holdingsMismatch": "{count, plural, other {# 項持倉}}與 Money 檔案記錄的股數不符。"
   },
   "mnyErrors": {
     "mnyImportFailed": "匯入過程中發生問題。沒有儲存任何內容 -- 您可以重試。",
