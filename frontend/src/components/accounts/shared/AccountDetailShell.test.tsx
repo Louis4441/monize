@@ -77,6 +77,58 @@ describe('AccountDetailShell', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  it('puts going back above the name rather than in the action row', () => {
+    render(
+      <AccountDetailShell
+        account={makeAccount()}
+        onViewTransactions={vi.fn()}
+        onBack={vi.fn()}
+      >
+        <div />
+      </AccountDetailShell>,
+    );
+
+    // Same shape as the securities and payees detail headers: a quiet link
+    // above the heading, not another outline button competing with the actions.
+    const back = screen.getByRole('button', { name: 'Back to Accounts' });
+    const heading = screen.getByRole('heading', { level: 1 });
+    expect(
+      back.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('offers a caret to switch accounts when a list is supplied', () => {
+    const onSelectAccount = vi.fn();
+    render(
+      <AccountDetailShell
+        account={makeAccount()}
+        accounts={[makeAccount(), makeAccount({ id: 'acc-2', name: 'Savings' })]}
+        onSelectAccount={onSelectAccount}
+      >
+        <div />
+      </AccountDetailShell>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to another account' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Savings/ }));
+    expect(onSelectAccount).toHaveBeenCalledWith('acc-2');
+  });
+
+  it('hides the caret when there is nowhere else to go', () => {
+    render(
+      <AccountDetailShell
+        account={makeAccount()}
+        accounts={[makeAccount()]}
+        onSelectAccount={vi.fn()}
+      >
+        <div />
+      </AccountDetailShell>,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Switch to another account' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('renders type-specific header actions', () => {
     render(
       <AccountDetailShell

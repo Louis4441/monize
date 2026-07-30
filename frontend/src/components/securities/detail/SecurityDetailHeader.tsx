@@ -4,8 +4,11 @@ import { useTranslations } from 'next-intl';
 import { ChevronLeftIcon, ClockIcon, StarIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import { Button } from '@/components/ui/Button';
+import { RefreshPricesButton } from '@/components/investments/RefreshPricesButton';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { useNow } from '@/hooks/useNow';
+import { getMarketState } from '@/lib/market-hours';
 import { withCurrencyCode } from '@/lib/security-detail';
 import { gainLossColor } from '@/lib/format';
 import type { Security } from '@/types/investment';
@@ -16,6 +19,12 @@ export interface SecurityQuote {
   price: number;
   /** ISO date of the price row the quote comes from. */
   priceDate: string;
+  /**
+   * ISO instant the quote was struck, when the provider reported one. Null for
+   * manual entries and rows stored before the time was kept, which show the
+   * date alone rather than a time we would be inventing.
+   */
+  quotedAt?: string | null;
   /** Change against the previous close; null when there is no earlier price. */
   change: number | null;
   changePercent: number | null;
@@ -34,6 +43,9 @@ interface SecurityDetailHeaderProps {
   onEdit: () => void;
   onToggleFavourite: () => void;
   isFavouritePending: boolean;
+  /** Re-fetch this security's quote from its price provider. */
+  onRefreshPrice: () => void;
+  isRefreshingPrice: boolean;
   /** Active securities the caret beside the name can jump to. */
   securities: readonly Security[];
   onSelectSecurity: (id: string) => void;
@@ -55,19 +67,48 @@ export function SecurityDetailHeader({
   onEdit,
   onToggleFavourite,
   isFavouritePending,
+  onRefreshPrice,
+  isRefreshingPrice,
   securities,
   onSelectSecurity,
 }: SecurityDetailHeaderProps) {
   const t = useTranslations('securityDetail');
   const ts = useTranslations('securities');
-  const { formatDate } = useDateFormat();
+  const { formatDate, formatDateTime, formatTimeZoneAbbrev } = useDateFormat();
   const { formatCurrencyPrecise, formatSignedPercent, defaultCurrency } =
     useNumberFormat();
+  // The badge below is a statement about the clock, not about the data, so it
+  // has to re-read the clock or it goes stale where it sits.
+  const now = useNow();
 
   const FavouriteIcon = security.isFavourite ? StarSolidIcon : StarIcon;
   const favouriteLabel = security.isFavourite
     ? ts('list.favouriteButton.remove')
     : ts('list.favouriteButton.add');
+
+  // Empty when the row carries no instant, or when the instant will not parse;
+  // the header then falls back to naming the day, which it always can.
+  const quotedAtLabel = quote?.quotedAt ? formatDateTime(quote.quotedAt) : '';
+  const zoneAbbrev = formatTimeZoneAbbrev(
+    quote?.quotedAt ? new Date(quote.quotedAt) : now,
+  );
+
+  const marketState = getMarketState(
+    {
+      timezone: security.marketTimezone,
+      openTime: security.marketOpenTime,
+      closeTime: security.marketCloseTime,
+    },
+    now,
+  );
+  const marketHoursTitle =
+    security.marketOpenTime && security.marketCloseTime && security.marketTimezone
+      ? t('header.marketHours', {
+          open: security.marketOpenTime.slice(0, 5),
+          close: security.marketCloseTime.slice(0, 5),
+          zone: security.marketTimezone,
+        })
+      : undefined;
 
   return (
     <div className="mb-6">
@@ -101,8 +142,8 @@ export function SecurityDetailHeader({
             </span>
           )}
 
-          {/* Both actions stay inline at every width: there are only two, and an
-              overflow menu whose items jumped the page to a tab further down
+          {/* The actions stay inline at every width: there are only a few, and
+              an overflow menu whose items jumped the page to a tab further down
               read as the page moving under the user. */}
           <div className="flex items-center gap-2">
             <Button
@@ -126,6 +167,13 @@ export function SecurityDetailHeader({
             <Button variant="outline" size="sm" onClick={onEdit}>
               {t('header.edit')}
             </Button>
+            {/* Scoped to this security, so the quote above updates without a
+                trip back to Investments to refresh the whole catalog. */}
+            <RefreshPricesButton
+              size="sm"
+              onClick={onRefreshPrice}
+              isRefreshing={isRefreshingPrice}
+            />
           </div>
         </div>
 
@@ -168,9 +216,36 @@ export function SecurityDetailHeader({
                   </span>
                 )}
               </div>
-              <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                {t('header.priceAt', { date: formatDate(quote.priceDate) })}
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 lg:justify-end dark:text-gray-400">
+                <span className="inline-flex items-center gap-1">
+                  <ClockIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  {quotedAtLabel
+                    ? t('header.priceAtTime', {
+                        datetime: quotedAtLabel,
+                        zone: zoneAbbrev,
+                      })
+                    : t('header.priceAt', { date: formatDate(quote.priceDate) })}
+                </span>
+                {marketState !== 'unknown' && (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${
+                      marketState === 'open'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                        : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                    }`}
+                    title={marketHoursTitle}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        marketState === 'open' ? 'bg-green-500' : 'bg-gray-400'
+                      }`}
+                    />
+                    {marketState === 'open'
+                      ? t('header.marketOpen')
+                      : t('header.marketClosed')}
+                  </span>
+                )}
               </p>
             </>
           ) : (

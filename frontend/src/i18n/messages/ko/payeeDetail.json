@@ -16,6 +16,7 @@
     "switchPayee": "다른 수취인으로 이동",
     "switchPlaceholder": "수취인 검색...",
     "switchNoMatches": "일치하는 수취인이 없습니다",
+    "visitWebsite": "{name} 웹사이트를 새 탭에서 열기",
     "since": "{date}부터 등록된 수취인"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "최대 거래",
     "largestValue": "{date}에 {amount}",
     "overpaymentFor": "추가 상환 수취인으로 지정된 계좌",
+    "website": "웹사이트",
     "notes": "메모"
   },
   "tabs": {

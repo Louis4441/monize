@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "Kurs vom {date}",
+    "priceAtTime": "Kurs am {datetime} {zone}",
+    "marketOpen": "Markt offen",
+    "marketClosed": "Markt geschlossen",
+    "marketHours": "Handel von {open} bis {close}, {zone}. Feiertage werden nicht berücksichtigt.",
     "noPrice": "Noch kein Kurs erfasst",
     "changeToday": "{change} ({percent}) heute",
     "changeLast": "{change} ({percent}) letzte Bewegung",
@@ -33,10 +37,7 @@
     "openAccount": "{name} auf der Seite Investitionen anzeigen",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Kein Kurs",
-    "approx": "~ {amount}",
-    "asOf": "Zum Schlusskurs vom {date}",
-    "asOfStale": "Zum Schlusskurs vom {date}, dem neuesten erfassten Kurs",
-    "asOfStaleTitle": "Es ist kein neuerer Kurs gespeichert, daher ist dies der Wert der Position an jenem Tag und nicht heute. Aktualisiere die Kurse beim Anbieter oder trage einen von Hand ein."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "Kurs {symbol}",

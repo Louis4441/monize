@@ -1,14 +1,25 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { ChevronLeftIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowTopRightOnSquareIcon,
+  ChevronLeftIcon,
+} from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/Button';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { parseLocalDate } from '@/lib/utils';
+import { toSafeExternalUrl } from '@/lib/external-url';
 import type { Payee } from '@/types/payee';
 import { PayeeSwitcher } from './PayeeSwitcher';
 
 interface PayeeDetailHeaderProps {
   payee: Payee;
+  /**
+   * Transactions can predate the payee record (imports assign them to a payee
+   * created afterwards), so "Payee since" is the earlier of the first
+   * transaction and the record's creation.
+   */
+  firstTransactionDate: string | null;
   onBack: () => void;
   onViewTransactions: () => void;
   onEdit: () => void;
@@ -28,6 +39,7 @@ interface PayeeDetailHeaderProps {
  */
 export function PayeeDetailHeader({
   payee,
+  firstTransactionDate,
   onBack,
   onViewTransactions,
   onEdit,
@@ -39,6 +51,18 @@ export function PayeeDetailHeader({
 }: PayeeDetailHeaderProps) {
   const t = useTranslations('payeeDetail');
   const { formatDate } = useDateFormat();
+
+  // Null unless the stored address is really http(s); a link built from an
+  // unchecked string is a link that can run something.
+  const websiteUrl = toSafeExternalUrl(payee.website);
+
+  // Compare calendar days (parseLocalDate drops the time), matching what
+  // formatDate renders.
+  const sinceDate =
+    firstTransactionDate &&
+    parseLocalDate(firstTransactionDate) < parseLocalDate(payee.createdAt)
+      ? firstTransactionDate
+      : payee.createdAt;
 
   return (
     <div className="mb-6">
@@ -64,6 +88,23 @@ export function PayeeDetailHeader({
               payees={payees}
               onSelect={onSelectPayee}
             />
+            {websiteUrl && (
+              // `noopener` is the security control, not decoration: without it
+              // the opened page gets a handle on this one via window.opener.
+              <a
+                href={websiteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t('header.visitWebsite', { name: payee.name })}
+                title={websiteUrl}
+                className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+              >
+                <ArrowTopRightOnSquareIcon
+                  className="h-5 w-5"
+                  aria-hidden="true"
+                />
+              </a>
+            )}
           </div>
 
           {!payee.isActive && (
@@ -97,7 +138,7 @@ export function PayeeDetailHeader({
       </div>
 
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        {t('header.since', { date: formatDate(payee.createdAt) })}
+        {t('header.since', { date: formatDate(sinceDate) })}
       </p>
     </div>
   );

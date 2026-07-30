@@ -16,6 +16,7 @@
     "switchPayee": "切換到其他收款人",
     "switchPlaceholder": "篩選收款人...",
     "switchNoMatches": "沒有符合的收款人",
+    "visitWebsite": "在新分頁中開啟 {name} 的網站",
     "since": "自 {date} 起的收款人"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "最大交易",
     "largestValue": "{date} 的 {amount}",
     "overpaymentFor": "作為以下帳戶的額外還款收款人",
+    "website": "網站",
     "notes": "備註"
   },
   "tabs": {

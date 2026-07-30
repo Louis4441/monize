@@ -27,6 +27,7 @@ import {
 } from "./payee-backfill.util";
 import { stripHtml } from "../common/sanitization.util";
 import { withScopedDb } from "../common/db/scoped-db";
+import { normalizeWebsite } from "../common/normalize-website";
 
 /**
  * Resolved, sanitized preview of a proposed new payee. Shared by the AI
@@ -110,6 +111,9 @@ export class PayeesService {
 
       const payee = repo.create({
         ...createPayeeDto,
+        // The DTO accepts "starbucks.com"; a stored link needs its scheme or
+        // the anchor resolves it relative to the current page.
+        website: normalizeWebsite(createPayeeDto.website) ?? null,
         userId,
       });
 
@@ -124,6 +128,7 @@ export class PayeesService {
         id: saved.id,
         name: saved.name,
         notes: saved.notes,
+        website: saved.website,
         defaultCategoryId: saved.defaultCategoryId,
         isActive: saved.isActive,
       },
@@ -594,6 +599,7 @@ export class PayeesService {
     const beforeData = {
       name: payee.name,
       notes: payee.notes,
+      website: payee.website,
       defaultCategoryId: payee.defaultCategoryId,
       isActive: payee.isActive,
     };
@@ -636,6 +642,10 @@ export class PayeesService {
       updateFields.defaultCategoryId = updatePayeeDto.defaultCategoryId;
     if (updatePayeeDto.notes !== undefined)
       updateFields.notes = updatePayeeDto.notes;
+    if (updatePayeeDto.website !== undefined)
+      // "" is what the form sends for an address the user emptied, and
+      // `normalizeWebsite` reads it as "clear it".
+      updateFields.website = normalizeWebsite(updatePayeeDto.website) ?? null;
     if (updatePayeeDto.isActive !== undefined)
       updateFields.isActive = updatePayeeDto.isActive;
 
@@ -727,6 +737,7 @@ export class PayeesService {
       id: payee.id,
       name: payee.name,
       notes: payee.notes,
+      website: payee.website,
       defaultCategoryId: payee.defaultCategoryId,
       isActive: payee.isActive,
     };

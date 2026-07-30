@@ -3,7 +3,10 @@
     "viewTransactions": "Lihat Transaksi",
     "reconcile": "Rekonsiliasi",
     "edit": "Edit Akun",
-    "back": "Kembali ke Akun"
+    "back": "Kembali ke Akun",
+    "switchAccount": "Pindah ke akun lain",
+    "switchPlaceholder": "Saring akun...",
+    "switchNoMatches": "Tidak ada akun yang cocok"
   },
   "loading": "Memuat detail akun...",
   "error": {

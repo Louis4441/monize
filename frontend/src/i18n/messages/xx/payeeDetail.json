@@ -16,6 +16,7 @@
     "switchPayee": "[XX-Switch payee-XX]",
     "switchPlaceholder": "[XX-Filter payees...-XX]",
     "switchNoMatches": "[XX-No payees match-XX]",
+    "visitWebsite": "[XX-Open {name}'s website in a new tab-XX]",
     "since": "[XX-Payee since {date}-XX]"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "[XX-Largest Transaction-XX]",
     "largestValue": "[XX-{amount} on {date}-XX]",
     "overpaymentFor": "[XX-Overpayment Payee For-XX]",
+    "website": "[XX-Website-XX]",
     "notes": "[XX-Notes-XX]"
   },
   "tabs": {

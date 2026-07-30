@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "Koers van {date}",
+    "priceAtTime": "Koers op {datetime} {zone}",
+    "marketOpen": "Markt open",
+    "marketClosed": "Markt gesloten",
+    "marketHours": "Verhandeld van {open} tot {close}, {zone}. Feestdagen worden niet meegerekend.",
     "noPrice": "Nog geen koers vastgelegd",
     "changeToday": "{change} ({percent}) vandaag",
     "changeLast": "{change} ({percent}) laatste beweging",
@@ -33,10 +37,7 @@
     "openAccount": "{name} op de pagina Beleggingen laten zien",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Geen koers",
-    "approx": "~ {amount}",
-    "asOf": "Op de slotkoers van {date}",
-    "asOfStale": "Op de slotkoers van {date}, de meest recente vastgelegde koers",
-    "asOfStaleTitle": "Er is geen nieuwere koers opgeslagen, dus dit is wat de positie op die dag waard was en niet vandaag. Werk de koersen bij via de aanbieder of voeg er met de hand een toe."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "Koers van {symbol}",

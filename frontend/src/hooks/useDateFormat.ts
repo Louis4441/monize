@@ -1,6 +1,12 @@
 import { useCallback } from 'react';
 import { usePreferencesStore } from '@/store/preferencesStore';
-import { formatDate as formatDateUtil, formatMonth as formatMonthUtil } from '@/lib/utils';
+import {
+  formatDate as formatDateUtil,
+  formatMonth as formatMonthUtil,
+  formatDatetimeLocal,
+  isoToDatetimeLocal,
+  resolveTimezone,
+} from '@/lib/utils';
 
 /**
  * Hook to format dates according to user preferences.
@@ -13,6 +19,8 @@ export function useDateFormat() {
   // Subscribe directly to dateFormat to ensure reactivity when it changes
   const dateFormat = usePreferencesStore((state) => state.preferences?.dateFormat) || 'browser';
   const language = usePreferencesStore((state) => state.preferences?.language);
+  const timeFormat = usePreferencesStore((state) => state.preferences?.timeFormat) || '24h';
+  const timezone = usePreferencesStore((state) => state.preferences?.timezone);
 
   const formatDate = useCallback(
     (date: Date | string): string => {
@@ -32,5 +40,54 @@ export function useDateFormat() {
     [dateFormat, language]
   );
 
-  return { formatDate, formatMonth, dateFormat };
+  /**
+   * An instant as date and time of day, in the timezone the user chose in
+   * Preferences rather than the browser's.
+   *
+   * `formatDate` deliberately does not do this: it takes calendar dates
+   * (`2026-07-30`), which have no instant to convert and would shift a day if
+   * treated as one. Use this only for values that really are timestamps.
+   */
+  const formatDateTime = useCallback(
+    (isoInstant: string): string => {
+      try {
+        const local = isoToDatetimeLocal(isoInstant, resolveTimezone(timezone));
+        return formatDatetimeLocal(local, dateFormat, timeFormat);
+      } catch {
+        // An unparseable instant is worth less than the date beside it; the
+        // caller already has that, so say nothing rather than "Invalid Date".
+        return '';
+      }
+    },
+    [dateFormat, timeFormat, timezone],
+  );
+
+  /**
+   * The short zone name for the user's timezone at a given instant, e.g. "EDT".
+   * Named at the instant because it changes across a daylight-saving boundary.
+   */
+  const formatTimeZoneAbbrev = useCallback(
+    (at: Date = new Date()): string => {
+      try {
+        const parts = new Intl.DateTimeFormat('en-US', {
+          timeZone: resolveTimezone(timezone),
+          timeZoneName: 'short',
+        }).formatToParts(at);
+        return parts.find((p) => p.type === 'timeZoneName')?.value ?? '';
+      } catch {
+        return '';
+      }
+    },
+    [timezone],
+  );
+
+  return {
+    formatDate,
+    formatMonth,
+    formatDateTime,
+    formatTimeZoneAbbrev,
+    dateFormat,
+    timeFormat,
+    timezone,
+  };
 }

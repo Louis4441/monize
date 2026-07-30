@@ -40,6 +40,7 @@ describe("PayeesService", () => {
     name: "Starbucks",
     defaultCategoryId: "cat-1",
     notes: "Coffee shop",
+    website: null,
     defaultCategory: { id: "cat-1", name: "Food & Drink" } as any,
     isActive: true,
     createdAt: new Date("2025-01-01"),
@@ -51,6 +52,7 @@ describe("PayeesService", () => {
     name: "Amazon",
     defaultCategoryId: null,
     notes: "" as any,
+    website: null,
     defaultCategory: null as any,
     isActive: true,
     createdAt: new Date("2025-01-02"),
@@ -197,7 +199,11 @@ describe("PayeesService", () => {
       expect(payeesRepository.findOne).toHaveBeenCalledWith({
         where: { userId, name: "NewPayee" },
       });
-      expect(payeesRepository.create).toHaveBeenCalledWith({ ...dto, userId });
+      expect(payeesRepository.create).toHaveBeenCalledWith({
+        ...dto,
+        website: null,
+        userId,
+      });
       expect(payeesRepository.save).toHaveBeenCalled();
       expect(result).toMatchObject({ name: "NewPayee", userId });
     });
@@ -210,6 +216,32 @@ describe("PayeesService", () => {
       ).rejects.toThrow(ConflictException);
     });
 
+    it("stores a schemeless website as https", async () => {
+      payeesRepository.findOne.mockResolvedValue(null);
+      await service.create(userId, {
+        name: "Starbucks",
+        website: "starbucks.com",
+      });
+
+      expect(payeesRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ website: "https://starbucks.com" }),
+      );
+    });
+
+    it("keeps an explicit http website rather than upgrading it", async () => {
+      // Someone who typed http:// usually did so for a host that serves
+      // nothing else; upgrading them yields a link that fails to connect.
+      payeesRepository.findOne.mockResolvedValue(null);
+      await service.create(userId, {
+        name: "Corner Shop",
+        website: "http://corner.example",
+      });
+
+      expect(payeesRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ website: "http://corner.example" }),
+      );
+    });
+
     it("should create a payee without optional fields", async () => {
       payeesRepository.findOne.mockResolvedValue(null);
       const dto = { name: "MinimalPayee" };
@@ -217,6 +249,7 @@ describe("PayeesService", () => {
 
       expect(payeesRepository.create).toHaveBeenCalledWith({
         name: "MinimalPayee",
+        website: null,
         userId,
       });
     });
@@ -423,6 +456,7 @@ describe("PayeesService", () => {
       expect(payeesRepository.create).toHaveBeenCalledWith({
         name: "NewPlace",
         defaultCategoryId: "cat-2",
+        website: null,
         userId,
       });
       expect(payeesRepository.save).toHaveBeenCalled();
@@ -436,6 +470,7 @@ describe("PayeesService", () => {
       expect(payeesRepository.create).toHaveBeenCalledWith({
         name: "NewPlace",
         defaultCategoryId: undefined,
+        website: null,
         userId,
       });
     });
@@ -444,6 +479,52 @@ describe("PayeesService", () => {
   // ─── update ──────────────────────────────────────────────────────────
 
   describe("update", () => {
+    /**
+     * The two findOne calls an update makes when the name is unchanged: the
+     * ownership check and the re-fetch afterwards. The name-conflict lookup in
+     * between only runs when the name actually changes.
+     */
+    function mockUpdateLookups(payee = mockPayee) {
+      payeesRepository.findOne
+        .mockResolvedValueOnce({ ...payee })
+        .mockResolvedValueOnce({ ...payee });
+    }
+
+    it("normalises a website on the way in", async () => {
+      mockUpdateLookups();
+      await service.update(userId, "payee-1", { website: "starbucks.com" });
+
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+        Payee,
+        { id: "payee-1", userId },
+        { website: "https://starbucks.com" },
+      );
+    });
+
+    it("clears the website when the form sends an emptied field", async () => {
+      // react-hook-form gives "" for an input the user cleared, not null, so
+      // reading only null would leave the old address in place.
+      mockUpdateLookups();
+      await service.update(userId, "payee-1", { website: "" });
+
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+        Payee,
+        { id: "payee-1", userId },
+        { website: null },
+      );
+    });
+
+    it("leaves the website alone when the field is absent", async () => {
+      mockUpdateLookups();
+      await service.update(userId, "payee-1", { notes: "just notes" });
+
+      expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
+        Payee,
+        { id: "payee-1", userId },
+        { notes: "just notes" },
+      );
+    });
+
     it("should update payee properties", async () => {
       const existingPayee = { ...mockPayee };
       const refreshedPayee = {

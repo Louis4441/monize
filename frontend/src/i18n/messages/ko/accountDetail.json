@@ -3,7 +3,10 @@
     "viewTransactions": "거래 내역 보기",
     "reconcile": "조정",
     "edit": "계정 수정",
-    "back": "계정으로 돌아가기"
+    "back": "계정으로 돌아가기",
+    "switchAccount": "다른 계좌로 이동",
+    "switchPlaceholder": "계좌 검색...",
+    "switchNoMatches": "일치하는 계좌가 없습니다"
   },
   "loading": "계정 상세 정보를 불러오는 중...",
   "error": {

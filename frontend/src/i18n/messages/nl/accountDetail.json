@@ -3,7 +3,10 @@
     "viewTransactions": "Transacties bekijken",
     "reconcile": "Afstemmen",
     "edit": "Rekening bewerken",
-    "back": "Terug naar rekeningen"
+    "back": "Terug naar rekeningen",
+    "switchAccount": "Naar een andere rekening gaan",
+    "switchPlaceholder": "Rekeningen filteren...",
+    "switchNoMatches": "Geen rekeningen gevonden"
   },
   "loading": "Rekeninggegevens laden...",
   "error": {

@@ -16,6 +16,7 @@
     "switchPayee": "Başka bir alacaklıya geç",
     "switchPlaceholder": "Alacaklıları filtrele...",
     "switchNoMatches": "Eşleşen alacaklı yok",
+    "visitWebsite": "{name} web sitesini yeni sekmede aç",
     "since": "{date} tarihinden beri alacaklı"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "En Büyük İşlem",
     "largestValue": "{date} tarihinde {amount}",
     "overpaymentFor": "Şu hesabın ek ödeme alacaklısı",
+    "website": "Web sitesi",
     "notes": "Notlar"
   },
   "tabs": {

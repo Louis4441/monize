@@ -87,6 +87,7 @@
     "nameLabel": "Name des Zahlungsempfängers",
     "categoryLabel": "Standardkategorie",
     "notesLabel": "Notizen (optional)",
+    "websiteLabel": "Website",
     "submitCreate": "Zahlungsempfänger erstellen",
     "submitUpdate": "Zahlungsempfänger aktualisieren",
     "applyCategoryLabel": "Diese Kategorie auf vorhandene Transaktionen anwenden",

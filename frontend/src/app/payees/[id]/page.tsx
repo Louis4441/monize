@@ -566,6 +566,7 @@ function PayeeDetailContent() {
       <main className="px-4 sm:px-6 lg:px-12 pt-6 pb-8">
         <PayeeDetailHeader
           payee={payee}
+          firstTransactionDate={detail.stats.firstTransactionDate}
           onBack={() => router.push('/payees')}
           onViewTransactions={() => goToRegister()}
           onEdit={() => openEdit(payee)}

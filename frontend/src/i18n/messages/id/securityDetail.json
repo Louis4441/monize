@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "Harga per {date}",
+    "priceAtTime": "Harga pada {datetime} {zone}",
+    "marketOpen": "Pasar buka",
+    "marketClosed": "Pasar tutup",
+    "marketHours": "Diperdagangkan {open} sampai {close}, {zone}. Hari libur tidak diperhitungkan.",
     "noPrice": "Belum ada harga yang dicatat",
     "changeToday": "{change} ({percent}) hari ini",
     "changeLast": "{change} ({percent}) pergerakan terakhir",
@@ -33,10 +37,7 @@
     "openAccount": "Tampilkan {name} di halaman Investasi",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Belum dinilai",
-    "approx": "~ {amount}",
-    "asOf": "Pada penutupan {date}",
-    "asOfStale": "Pada penutupan {date}, harga terbaru yang tercatat",
-    "asOfStaleTitle": "Tidak ada harga yang lebih baru tersimpan, jadi ini adalah nilai posisi pada hari itu, bukan hari ini. Perbarui harga dari penyedia, atau tambahkan satu secara manual."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "Harga {symbol}",

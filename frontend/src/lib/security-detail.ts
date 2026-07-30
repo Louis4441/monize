@@ -35,6 +35,12 @@ export interface SecurityPricePoint {
    * `totalReturnOf` rather than touching this directly.
    */
   totalReturnClose?: number;
+  /**
+   * ISO instant the quote was struck, when the row carries one. `date` says
+   * which trading day the price belongs to; this says when within it, which is
+   * the difference between "today's price" and "today's close".
+   */
+  quotedAt?: string;
 }
 
 /**
@@ -80,6 +86,7 @@ export function toPriceSeries(
           price.adjustedClose !== null && isFinite(adjusted) && adjusted > 0
             ? adjusted
             : undefined,
+        quotedAt: price.quotedAt ?? undefined,
       };
     })
     .filter((point) => isFinite(point.close))

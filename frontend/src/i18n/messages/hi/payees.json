@@ -87,6 +87,7 @@
     "nameLabel": "भुगतानकर्ता का नाम",
     "categoryLabel": "डिफ़ॉल्ट श्रेणी",
     "notesLabel": "नोट्स (वैकल्पिक)",
+    "websiteLabel": "वेबसाइट",
     "submitCreate": "भुगतानकर्ता बनाएं",
     "submitUpdate": "भुगतानकर्ता अपडेट करें",
     "applyCategoryLabel": "यह श्रेणी मौजूदा लेनदेनों पर लागू करें",

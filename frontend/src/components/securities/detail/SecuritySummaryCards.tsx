@@ -12,7 +12,6 @@ import {
   SummaryCardGrid,
   type SummaryCardItem,
 } from '@/components/accounts/shared/SummaryCardGrid';
-import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { gainLossColor } from '@/lib/format';
@@ -26,11 +25,6 @@ interface SecuritySummaryCardsProps {
    * render read-only without it.
    */
   onSelectAccount?: (accountId: string) => void;
-  /**
-   * The close the market value was struck at, and whether it is recent enough to
-   * pass for today's. Null when no price is on record.
-   */
-  quoteAsOf?: { priceDate: string; isCurrent: boolean } | null;
 }
 
 const ICON_CLASS = 'h-4 w-4';
@@ -46,11 +40,9 @@ const ICON_CLASS = 'h-4 w-4';
  */
 export function SecuritySummaryCards({
   detail,
-  quoteAsOf = null,
   onSelectAccount,
 }: SecuritySummaryCardsProps) {
   const t = useTranslations('securityDetail');
-  const { formatDate } = useDateFormat();
   const {
     formatCurrency,
     formatCurrencyPrecise,
@@ -117,30 +109,12 @@ export function SecuritySummaryCards({
         position.marketValue === null
           ? unknown
           : money(position.marketValue),
-      // Market value is quantity times the newest close on record, whatever day
-      // that is. A security whose prices stopped updating in 2019 would
-      // otherwise present a 2019 valuation as today's, with nothing on the card
-      // to say so -- the header already flags a stale quote, and this figure is
-      // derived from the very same price.
-      note: (
-        <>
-          {converted(position.marketValue) && (
-            <div>{converted(position.marketValue)}</div>
-          )}
-          {position.marketValue !== null &&
-            quoteAsOf !== null &&
-            (quoteAsOf.isCurrent ? (
-              <div>{t('cards.asOf', { date: formatDate(quoteAsOf.priceDate) })}</div>
-            ) : (
-              <div
-                className="text-amber-600 dark:text-amber-500"
-                title={t('cards.asOfStaleTitle')}
-              >
-                {t('cards.asOfStale', { date: formatDate(quoteAsOf.priceDate) })}
-              </div>
-            ))}
-        </>
-      ),
+      // No "as of" line here. It read "At the close of {date}", which is a
+      // claim the price cannot support intraday: the newest row is that day's
+      // last quote, not its close, and calling it one misdates every valuation
+      // struck while the market is open. The header states when the price is
+      // from, to the minute, and that is the one place to read it.
+      note: converted(position.marketValue),
     },
     {
       label: t('cards.costBasis'),

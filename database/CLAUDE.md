@@ -41,7 +41,21 @@ Credentials are in the root `.env` file (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGR
 
 5. **Update frontend types** in `frontend/src/types/` to match
 
-6. **Restart the backend** — migrations will be applied automatically on startup
+6. **Classify any new column in the support backup** if its table is exported —
+   `backend/src/backup/support-backup/support-backup-rules.ts`. `RULES` is an
+   allowlist, so an unclassified column is dropped from the output rather than
+   leaked, but the golden test in
+   `backend/test/integration/support-backup.integration.spec.ts` still fails
+   until you classify it deliberately. That failure is the point: it forces a
+   decision about a new field instead of letting a migration quietly change what
+   a de-identified backup contains. Pick `keep` for structure, dates, enums,
+   flags and FKs; `mask` for names; `drop` for free text, secrets, and anything
+   that re-identifies a value masked elsewhere — a URL beside a masked name
+   names the thing the mask hides, which is why `payees.website`,
+   `securities.website` and `securities.msn_instrument_id` are all dropped. Use
+   `const` instead of `drop` when the column is NOT NULL.
+
+7. **Restart the backend** — migrations will be applied automatically on startup
 
 ## Migration File Conventions
 - Numbered prefix for ordering: `NNN_description.sql` (e.g., `079_securities_is_favourite.sql`)

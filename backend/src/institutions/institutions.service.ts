@@ -20,6 +20,7 @@ import {
 } from "./institution-logo.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { withScopedDb } from "../common/db/scoped-db";
+import { normalizeWebsite } from "../common/normalize-website";
 
 /**
  * Client-facing institution shape. The cached favicon bytes
@@ -53,12 +54,13 @@ export class InstitutionsService {
    * Normalise a user-entered website to an absolute https URL so it works both
    * as a stored link and as input to the favicon resolver.
    */
+  /**
+   * Shared with securities and payees; see `common/normalize-website`. An
+   * institution's website is required, so the empty cases the shared helper
+   * reports as null cannot arise here and the return stays a plain string.
+   */
   private normalizeWebsite(website: string): string {
-    const trimmed = website.trim();
-    if (!/^https?:\/\//i.test(trimmed)) {
-      return `https://${trimmed}`;
-    }
-    return trimmed;
+    return normalizeWebsite(website) ?? "";
   }
 
   private toView(

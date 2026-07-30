@@ -209,6 +209,7 @@ CREATE TABLE payees (
     name VARCHAR(255) NOT NULL,
     default_category_id UUID REFERENCES categories(id),
     notes TEXT,
+    website VARCHAR(2048), -- the payee's site; stored absolute (https unless an explicit http:// was given)
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, name)
@@ -401,6 +402,9 @@ CREATE TABLE securities (
     quote_provider VARCHAR(20),      -- per-security provider override: 'yahoo' | 'msn' | NULL = user default
     msn_instrument_id VARCHAR(50),   -- cached MSN Financial Instrument ID (SecId)
     historical_backfill_attempted_at TIMESTAMP, -- last time we asked the provider for a multi-year backfill
+    market_timezone VARCHAR(64),     -- IANA zone the instrument trades in, from the provider (e.g. America/New_York)
+    market_open_time TIME,           -- start of the regular session, in market_timezone local time
+    market_close_time TIME,          -- end of the regular session, in market_timezone local time
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, symbol),
@@ -593,6 +597,7 @@ CREATE TABLE security_prices (
     adjusted_close NUMERIC(24, 10),
     volume BIGINT,
     source VARCHAR(50), -- yahoo_finance, msn_finance, manual, or transaction action (buy, sell, reinvest, transfer_in, transfer_out)
+    quoted_at TIMESTAMPTZ, -- instant the provider says the quote was struck; NULL for manual/transaction-derived rows
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(security_id, price_date)
 );

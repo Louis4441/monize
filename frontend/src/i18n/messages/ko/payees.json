@@ -87,6 +87,7 @@
     "nameLabel": "수취인 이름",
     "categoryLabel": "기본 카테고리",
     "notesLabel": "메모 (선택)",
+    "websiteLabel": "웹사이트",
     "submitCreate": "수취인 만들기",
     "submitUpdate": "수취인 업데이트",
     "applyCategoryLabel": "기존 거래에 이 카테고리 적용",

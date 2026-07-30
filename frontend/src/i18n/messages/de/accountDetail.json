@@ -3,7 +3,10 @@
     "viewTransactions": "Buchungen anzeigen",
     "reconcile": "Abgleichen",
     "edit": "Konto bearbeiten",
-    "back": "Zurück zu den Konten"
+    "back": "Zurück zu den Konten",
+    "switchAccount": "Zu einem anderen Konto wechseln",
+    "switchPlaceholder": "Konten filtern...",
+    "switchNoMatches": "Keine Konten gefunden"
   },
   "loading": "Kontodetails werden geladen...",
   "error": {

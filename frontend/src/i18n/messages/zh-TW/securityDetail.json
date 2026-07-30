@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "{date} 的价格",
+    "priceAtTime": "{datetime} {zone} 價格",
+    "marketOpen": "市場開市",
+    "marketClosed": "市場休市",
+    "marketHours": "交易時間 {open} 至 {close}（{zone}）。未考量公眾假期。",
     "noPrice": "尚未記錄任何價格",
     "changeToday": "今日 {change}（{percent}）",
     "changeLast": "最近變動 {change}（{percent}）",
@@ -33,10 +37,7 @@
     "openAccount": "在「投資」頁面中查看 {name}",
     "unitsShare": "{units}（{share}）",
     "valueUnknown": "無法估值",
-    "approx": "约 {amount}",
-    "asOf": "按 {date} 收盤價",
-    "asOfStale": "按 {date} 收盤價，這是記錄中最新的價格",
-    "asOfStaleTitle": "沒有更新的價格，所以這是該部位在那一天的價值，而不是今天的。請從資料來源更新價格，或手動新增一筆。"
+    "approx": "约 {amount}"
   },
   "chart": {
     "title": "{symbol} 价格",

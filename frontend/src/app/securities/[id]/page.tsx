@@ -23,6 +23,7 @@ import { SecurityAccountsTable } from '@/components/securities/detail/SecurityAc
 import { SecurityBreakdownCard } from '@/components/securities/detail/SecurityBreakdownCard';
 import { useOnUndoRedo } from '@/hooks/useOnUndoRedo';
 import { useOnAiAction } from '@/hooks/useOnAiAction';
+import { usePriceRefresh } from '@/hooks/usePriceRefresh';
 import { investmentsApi } from '@/lib/investments';
 import { getErrorMessage } from '@/lib/errors';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
@@ -170,6 +171,32 @@ function SecurityDetailContent() {
     }
   }, [securityId, t]);
 
+  // After a price refresh the quote and the market-value cards are stale, but
+  // the page is already on screen -- reload in place rather than through
+  // loadData, whose spinner would blank everything the user was reading.
+  const reloadAfterPriceRefresh = useCallback(async () => {
+    try {
+      const [detailData, priceData] = await Promise.all([
+        investmentsApi.getSecurityDetail(securityId),
+        investmentsApi.getSecurityPrices(securityId, 9999).catch(() => null),
+      ]);
+      setDetail(detailData);
+      if (priceData) setPrices(priceData);
+    } catch {
+      // The refresh itself already reported its own outcome; a failed re-read
+      // leaves the previous figures up, which is better than an error page.
+    }
+  }, [securityId]);
+
+  const {
+    isRefreshing: isRefreshingPrice,
+    triggerManualRefresh: refreshPrices,
+  } = usePriceRefresh({ onRefreshComplete: reloadAfterPriceRefresh });
+
+  const handleRefreshPrice = useCallback(() => {
+    void refreshPrices([securityId]);
+  }, [refreshPrices, securityId]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -207,6 +234,10 @@ function SecurityDetailContent() {
     return {
       price: latest.close,
       priceDate: latest.date,
+      // When the provider told us the moment, the header shows it. Rows
+      // predating the column, manual entries and transaction-derived prices
+      // have none, and fall back to the date alone.
+      quotedAt: latest.quotedAt ?? null,
       change,
       changePercent:
         previous && previous.close !== 0 && change !== null
@@ -307,6 +338,8 @@ function SecurityDetailContent() {
           onEdit={() => setIsEditing(true)}
           onToggleFavourite={handleToggleFavourite}
           isFavouritePending={isFavouritePending}
+          onRefreshPrice={handleRefreshPrice}
+          isRefreshingPrice={isRefreshingPrice}
           securities={securities}
           onSelectSecurity={(id) => router.push(`/securities/${id}`)}
         />
@@ -320,14 +353,6 @@ function SecurityDetailContent() {
             <div {...tourAnchor(TOUR_ANCHORS.securityDetailSummary)}>
               <SecuritySummaryCards
                 detail={detail}
-                // The same newest close the backend valued the position at:
-                // both take the latest `security_prices` row, so dating the
-                // card from the series cannot disagree with the figure on it.
-                quoteAsOf={
-                  quote
-                    ? { priceDate: quote.priceDate, isCurrent: quote.isCurrent }
-                    : null
-                }
                 // The Investments page already accepts `?accountId=`; the
                 // Accounts list links to it the same way.
                 onSelectAccount={(accountId) =>

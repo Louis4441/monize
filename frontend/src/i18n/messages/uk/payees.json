@@ -87,6 +87,7 @@
     "nameLabel": "Назва одержувача",
     "categoryLabel": "Категорія за замовчуванням",
     "notesLabel": "Примітки (необов'язково)",
+    "websiteLabel": "Сайт",
     "submitCreate": "Створити одержувача",
     "submitUpdate": "Оновити одержувача",
     "applyCategoryLabel": "Застосувати цю категорію до наявних транзакцій",

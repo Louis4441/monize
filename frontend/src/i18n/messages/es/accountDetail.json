@@ -3,7 +3,10 @@
     "viewTransactions": "Ver transacciones",
     "reconcile": "Conciliar",
     "edit": "Editar cuenta",
-    "back": "Volver a Cuentas"
+    "back": "Volver a Cuentas",
+    "switchAccount": "Cambiar a otra cuenta",
+    "switchPlaceholder": "Filtrar cuentas...",
+    "switchNoMatches": "Ninguna cuenta coincide"
   },
   "loading": "Cargando detalles de la cuenta...",
   "error": {

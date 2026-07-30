@@ -87,6 +87,7 @@
     "nameLabel": "支払先名",
     "categoryLabel": "デフォルトカテゴリ",
     "notesLabel": "メモ（任意）",
+    "websiteLabel": "ウェブサイト",
     "submitCreate": "支払先を作成",
     "submitUpdate": "支払先を更新",
     "applyCategoryLabel": "このカテゴリを既存の取引に適用",

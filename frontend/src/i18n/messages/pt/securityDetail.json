@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "Cotação de {date}",
+    "priceAtTime": "Preço em {datetime} {zone}",
+    "marketOpen": "Mercado aberto",
+    "marketClosed": "Mercado fechado",
+    "marketHours": "Negociado das {open} às {close}, {zone}. Os feriados não são considerados.",
     "noPrice": "Ainda não há cotação registada",
     "changeToday": "{change} ({percent}) hoje",
     "changeLast": "{change} ({percent}) última variação",
@@ -33,10 +37,7 @@
     "openAccount": "Mostrar {name} na página Investimentos",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Sem cotação",
-    "approx": "~ {amount}",
-    "asOf": "Ao fecho de {date}",
-    "asOfStale": "Ao fecho de {date}, a cotação mais recente registada",
-    "asOfStaleTitle": "Não há cotação mais recente guardada, pelo que este é o valor da posição nesse dia e não hoje. Atualize as cotações junto do fornecedor ou introduza uma à mão."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "Cotação de {symbol}",

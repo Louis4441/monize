@@ -87,6 +87,7 @@
     "nameLabel": "Nombre del beneficiario",
     "categoryLabel": "Categoría predeterminada",
     "notesLabel": "Notas (opcional)",
+    "websiteLabel": "Sitio web",
     "submitCreate": "Crear beneficiario",
     "submitUpdate": "Actualizar beneficiario",
     "applyCategoryLabel": "Aplicar esta categoría a las transacciones existentes",

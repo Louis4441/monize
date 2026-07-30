@@ -16,6 +16,7 @@
     "switchPayee": "Passa a un altro beneficiario",
     "switchPlaceholder": "Filtra i beneficiari...",
     "switchNoMatches": "Nessun beneficiario corrisponde",
+    "visitWebsite": "Apri il sito web di {name} in una nuova scheda",
     "since": "Beneficiario dal {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Transazione più alta",
     "largestValue": "{amount} il {date}",
     "overpaymentFor": "Beneficiario dei versamenti extra per",
+    "website": "Sito web",
     "notes": "Note"
   },
   "tabs": {

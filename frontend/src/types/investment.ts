@@ -40,6 +40,14 @@ export interface Security {
   irWebsite: string | null;
   quoteProvider: QuoteProviderName | null;
   msnInstrumentId: string | null;
+  /**
+   * Where and when the instrument trades, as reported by the provider. The
+   * session times are local to `marketTimezone` ("HH:mm:ss"). All three are
+   * null until a price refresh reports them, and for providers that do not.
+   */
+  marketTimezone?: string | null;
+  marketOpenTime?: string | null;
+  marketCloseTime?: string | null;
   /** Source of the most recent price row for this security (e.g. "yahoo_finance", "msn_finance", "manual"), or null if no prices exist. */
   lastPriceSource?: string | null;
   createdAt: string;
@@ -423,6 +431,14 @@ export interface SecurityPrice {
   adjustedClose: number | null;
   volume: number | null;
   source: string | null;
+  /**
+   * The instant the provider says this quote was struck. Distinct from
+   * `priceDate` (the calendar day) and from `createdAt` (when the row was
+   * first written -- a same-day refresh updates it in place, so createdAt does
+   * not advance). Null for manual entries, rows derived from transactions, and
+   * anything stored before the column existed.
+   */
+  quotedAt: string | null;
   createdAt: string;
 }
 

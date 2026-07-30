@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl';
 import dynamic from 'next/dynamic';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { PageHeader } from '@/components/layout/PageHeader';
-import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { UnsavedChangesDialog } from '@/components/ui/UnsavedChangesDialog';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
@@ -17,6 +16,7 @@ import { GroupedHoldingsList } from '@/components/investments/GroupedHoldingsLis
 import { AssetAllocationChart } from '@/components/investments/AssetAllocationChart';
 import { InvestmentTransactionList } from '@/components/investments/InvestmentTransactionList';
 import { NewTransactionButton } from '@/components/investments/NewTransactionButton';
+import { RefreshPricesButton } from '@/components/investments/RefreshPricesButton';
 import { DensityLevel, nextDensity } from '@/hooks/useTableDensity';
 import { InvestmentTransactionForm } from '@/components/investments/InvestmentTransactionForm';
 import {
@@ -33,7 +33,6 @@ import { Account } from '@/types/account';
 import { buildAccountFilterLabel } from '@/lib/account-utils';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { PAGE_SIZE } from '@/lib/constants';
-import { formatRelativeTime } from '@/lib/format';
 
 const TransactionForm = dynamic(() => import('@/components/transactions/TransactionForm').then(m => m.TransactionForm), { ssr: false });
 
@@ -196,35 +195,11 @@ function InvestmentsContent() {
                       }))}
                     />
                   </div>
-                  <Button
-                    variant="outline"
+                  <RefreshPricesButton
                     onClick={handleRefreshClick}
-                    disabled={data.isRefreshingPrices}
-                    className="whitespace-nowrap"
-                    title={data.lastPriceUpdate ? `Last updated: ${formatRelativeTime(data.lastPriceUpdate)}` : 'Never updated'}
-                  >
-                    {data.isRefreshingPrices ? (
-                      <>
-                        <svg className="animate-spin sm:-ml-1 sm:mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span className="hidden sm:inline">{t('page.updating')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="sm:mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        <span className="hidden sm:inline">{t('page.refresh')}</span>
-                        {data.lastPriceUpdate && (
-                          <span className="hidden sm:inline ml-1.5 text-xs text-gray-500 dark:text-gray-400">
-                            ({formatRelativeTime(data.lastPriceUpdate)})
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </Button>
+                    isRefreshing={data.isRefreshingPrices}
+                    lastPriceUpdate={data.lastPriceUpdate}
+                  />
                 </div>
                 <NewTransactionButton
                   onNewInvestment={data.handleNewTransaction}

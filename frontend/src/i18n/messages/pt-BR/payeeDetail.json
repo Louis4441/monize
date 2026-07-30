@@ -16,6 +16,7 @@
     "switchPayee": "Mudar para outro beneficiário",
     "switchPlaceholder": "Filtrar beneficiários...",
     "switchNoMatches": "Nenhum beneficiário corresponde",
+    "visitWebsite": "Abrir o site de {name} em uma nova aba",
     "since": "Beneficiário desde {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Maior transação",
     "largestValue": "{amount} em {date}",
     "overpaymentFor": "Beneficiário de amortização extra de",
+    "website": "Site",
     "notes": "Notas"
   },
   "tabs": {

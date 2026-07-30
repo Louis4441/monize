@@ -16,6 +16,7 @@
     "switchPayee": "Passer à un autre bénéficiaire",
     "switchPlaceholder": "Filtrer les bénéficiaires...",
     "switchNoMatches": "Aucun bénéficiaire ne correspond",
+    "visitWebsite": "Ouvrir le site web de {name} dans un nouvel onglet",
     "since": "Bénéficiaire depuis {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Transaction la plus élevée",
     "largestValue": "{amount} le {date}",
     "overpaymentFor": "Bénéficiaire de remboursement anticipé pour",
+    "website": "Site web",
     "notes": "Notes"
   },
   "tabs": {

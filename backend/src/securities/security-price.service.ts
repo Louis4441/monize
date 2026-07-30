@@ -20,6 +20,7 @@ import {
   QuoteProviderRegistry,
 } from "./providers/quote-provider.registry";
 import { getTradingDateFromQuote } from "./providers/trading-date.util";
+import { getMarketSessionFromQuote } from "./providers/market-session.util";
 import { CreateSecurityPriceDto } from "./dto/create-security-price.dto";
 import { UpdateSecurityPriceDto } from "./dto/update-security-price.dto";
 import { formatDateYMD } from "../common/date-utils";
@@ -273,6 +274,44 @@ export class SecurityPriceService {
   }
 
   /**
+   * Cache the instrument's trading session on the Security row, so the UI can
+   * say whether its market is open right now without a provider round trip.
+   *
+   * Only written when it changes, which is almost never -- an exchange moves
+   * its hours rarely, and the daylight-saving shift is already handled by
+   * storing local times against a zone rather than fixed offsets.
+   */
+  private async persistMarketSession(
+    security: Security,
+    quote: QuoteResult,
+  ): Promise<void> {
+    const session = getMarketSessionFromQuote(quote);
+    if (!session) return;
+    if (
+      session.timezone === security.marketTimezone &&
+      session.openTime === security.marketOpenTime &&
+      session.closeTime === security.marketCloseTime
+    ) {
+      return;
+    }
+    try {
+      security.marketTimezone = session.timezone;
+      security.marketOpenTime = session.openTime;
+      security.marketCloseTime = session.closeTime;
+      await this.securitiesRepository.update(security.id, {
+        marketTimezone: session.timezone,
+        marketOpenTime: session.openTime,
+        marketCloseTime: session.closeTime,
+      });
+    } catch (err) {
+      // A price refresh that worked must not fail over its metadata.
+      this.logger.warn(
+        `Failed to persist market session for ${security.symbol}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
    * After MSN resolves a SecId on behalf of a security, cache it on the
    * Security row so subsequent refreshes skip the autosuggest hop.
    */
@@ -434,6 +473,7 @@ export class SecurityPriceService {
       for (const security of group) {
         try {
           await this.savePriceData(security.id, tradingDate, quote);
+          await this.persistMarketSession(security, quote);
           results.push({
             symbol: security.symbol,
             success: true,
@@ -552,6 +592,7 @@ export class SecurityPriceService {
       try {
         const tradingDate = formatDateYMD(getTradingDateFromQuote(quote));
         await this.savePriceData(security.id, tradingDate, quote);
+        await this.persistMarketSession(security, quote);
         results.push({
           symbol: security.symbol,
           success: true,
@@ -589,6 +630,12 @@ export class SecurityPriceService {
     quote: QuoteResult,
   ): Promise<SecurityPrice> {
     const source = sourceFor(quote.provider);
+    // The instant the quote was struck, which `priceDate` cannot carry and
+    // `createdAt` does not track: a same-day refresh updates the row in place,
+    // leaving createdAt at whatever time the row was first written today.
+    const quotedAt = quote.regularMarketTime
+      ? new Date(quote.regularMarketTime * 1000)
+      : null;
 
     const existing = await this.securityPriceRepository.findOne({
       where: { securityId, priceDate },
@@ -601,6 +648,7 @@ export class SecurityPriceService {
       existing.closePrice = quote.regularMarketPrice!;
       existing.volume = quote.regularMarketVolume ?? existing.volume;
       existing.source = source;
+      existing.quotedAt = quotedAt ?? existing.quotedAt;
       return this.securityPriceRepository.save(existing);
     }
 
@@ -613,6 +661,7 @@ export class SecurityPriceService {
       closePrice: quote.regularMarketPrice!,
       volume: quote.regularMarketVolume,
       source,
+      quotedAt,
     });
 
     return this.securityPriceRepository.save(priceEntry);

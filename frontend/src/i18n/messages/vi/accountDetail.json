@@ -3,7 +3,10 @@
     "viewTransactions": "Xem giao dịch",
     "reconcile": "Đối soát",
     "edit": "Chỉnh sửa tài khoản",
-    "back": "Quay lại danh sách tài khoản"
+    "back": "Quay lại danh sách tài khoản",
+    "switchAccount": "Chuyển sang tài khoản khác",
+    "switchPlaceholder": "Lọc tài khoản...",
+    "switchNoMatches": "Không có tài khoản nào khớp"
   },
   "loading": "Đang tải chi tiết tài khoản...",
   "error": {

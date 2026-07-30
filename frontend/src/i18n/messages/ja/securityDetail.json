@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "{date} の価格",
+    "priceAtTime": "{datetime} {zone} 時点の価格",
+    "marketOpen": "取引時間中",
+    "marketClosed": "取引時間外",
+    "marketHours": "取引時間は {open} から {close}（{zone}）。祝日は考慮されません。",
     "noPrice": "価格はまだ記録されていません",
     "changeToday": "本日 {change}（{percent}）",
     "changeLast": "直近の変動 {change}（{percent}）",
@@ -33,10 +37,7 @@
     "openAccount": "{name} を「投資」ページで表示",
     "unitsShare": "{units}（{share}）",
     "valueUnknown": "評価不可",
-    "approx": "約 {amount}",
-    "asOf": "{date} の終値時点",
-    "asOfStale": "{date} の終値時点。記録されている最新価格です",
-    "asOfStaleTitle": "これより新しい価格が保存されていないため、これは本日ではなくその日のポジション評価額です。提供元から価格を更新するか、手入力で追加してください。"
+    "approx": "約 {amount}"
   },
   "chart": {
     "title": "{symbol} の価格",

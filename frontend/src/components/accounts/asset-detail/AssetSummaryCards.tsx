@@ -4,7 +4,11 @@ import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { computeAppreciation } from '@/lib/asset-equity';
-import { SummaryCardGrid, SummaryCardItem } from '@/components/accounts/shared/SummaryCardGrid';
+import {
+  SummaryCardGrid,
+  SummaryCardItem,
+  summaryGridClass,
+} from '@/components/accounts/shared/SummaryCardGrid';
 import type { Account } from '@/types/account';
 
 interface AssetSummaryCardsProps {
@@ -77,6 +81,6 @@ export function AssetSummaryCards({ account, categoryName }: AssetSummaryCardsPr
   ];
 
   return (
-    <SummaryCardGrid cards={cards} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4" />
+    <SummaryCardGrid cards={cards} className={summaryGridClass(cards.length)} />
   );
 }

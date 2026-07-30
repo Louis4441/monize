@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "Cena z {date}",
+    "priceAtTime": "Kurs z {datetime} {zone}",
+    "marketOpen": "Rynek otwarty",
+    "marketClosed": "Rynek zamknięty",
+    "marketHours": "Notowania od {open} do {close}, {zone}. Dni wolne nie są uwzględniane.",
     "noPrice": "Nie zapisano jeszcze żadnej ceny",
     "changeToday": "{change} ({percent}) dziś",
     "changeLast": "{change} ({percent}) ostatnia zmiana",
@@ -33,10 +37,7 @@
     "openAccount": "Pokaż {name} na stronie Inwestycje",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Brak wyceny",
-    "approx": "~ {amount}",
-    "asOf": "Na zamknięciu {date}",
-    "asOfStale": "Na zamknięciu {date}, najnowsza zapisana cena",
-    "asOfStaleTitle": "Nie ma nowszej ceny, więc to wartość pozycji z tego dnia, a nie z dziś. Zaktualizuj ceny od dostawcy albo dodaj cenę ręcznie."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "Cena {symbol}",

@@ -58,6 +58,49 @@ describe('PayeeForm', () => {
     expect(screen.getByText('Notes (optional)')).toBeInTheDocument();
   });
 
+  describe('website', () => {
+    it('offers a website field, hinting that a bare domain is enough', () => {
+      render(<PayeeForm categories={categories} onSubmit={onSubmit} onCancel={onCancel} />);
+      expect(screen.getByText('Website')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('starbucks.com')).toBeInTheDocument();
+    });
+
+    it('pre-fills the stored address when editing', async () => {
+      const payee = {
+        id: 'p1',
+        name: 'Walmart',
+        defaultCategoryId: 'c1',
+        notes: '',
+        website: 'https://www.walmart.com',
+      } as any;
+      await act(async () => {
+        render(<PayeeForm payee={payee} categories={categories} onSubmit={onSubmit} onCancel={onCancel} />);
+      });
+      expect(screen.getByPlaceholderText('starbucks.com')).toHaveValue(
+        'https://www.walmart.com',
+      );
+    });
+
+    it('submits what was typed, leaving the scheme to the backend', async () => {
+      const submit = vi.fn().mockResolvedValue(undefined);
+      render(<PayeeForm categories={categories} onSubmit={submit} onCancel={onCancel} />);
+
+      fireEvent.change(screen.getByLabelText('Payee Name'), {
+        target: { value: 'Starbucks' },
+      });
+      fireEvent.change(screen.getByPlaceholderText('starbucks.com'), {
+        target: { value: 'starbucks.com' },
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByText('Create Payee'));
+      });
+
+      expect(submit).toHaveBeenCalledWith(
+        expect.objectContaining({ website: 'starbucks.com' }),
+      );
+    });
+  });
+
   it('renders alias manager when creating a new payee', () => {
     render(<PayeeForm categories={categories} onSubmit={onSubmit} onCancel={onCancel} />);
     expect(screen.getByText('Aliases')).toBeInTheDocument();

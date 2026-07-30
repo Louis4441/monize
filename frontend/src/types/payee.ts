@@ -7,6 +7,11 @@ export interface Payee {
   defaultCategoryId: string | null;
   defaultCategory: Category | null;
   notes: string | null;
+  /**
+   * The payee's site, stored absolute (https unless an explicit http:// was
+   * given), so it can go straight into an anchor.
+   */
+  website: string | null;
   isActive: boolean;
   createdAt: string;
   transactionCount?: number;
@@ -71,6 +76,8 @@ export interface CreatePayeeData {
   name: string;
   defaultCategoryId?: string;
   notes?: string;
+  /** Accepts a bare domain; the backend stores it absolute. */
+  website?: string | null;
 }
 
 export type ApplyCategoryToTransactions = 'none' | 'uncategorized' | 'all';

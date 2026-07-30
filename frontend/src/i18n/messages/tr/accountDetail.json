@@ -3,7 +3,10 @@
     "viewTransactions": "İşlemleri Görüntüle",
     "reconcile": "Mutabakat",
     "edit": "Hesabı Düzenle",
-    "back": "Hesaplara Dön"
+    "back": "Hesaplara Dön",
+    "switchAccount": "Başka bir hesaba geç",
+    "switchPlaceholder": "Hesapları filtrele...",
+    "switchNoMatches": "Eşleşen hesap yok"
   },
   "loading": "Hesap ayrıntıları yükleniyor...",
   "error": {

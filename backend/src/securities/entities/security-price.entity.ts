@@ -96,6 +96,17 @@ export class SecurityPrice {
   @Column({ type: "varchar", length: 50, nullable: true })
   source: string;
 
+  /**
+   * The instant the provider says the quote was struck, as opposed to
+   * `priceDate` (the calendar day it belongs to) or `createdAt` (when this row
+   * was first written, which does not advance when a same-day refresh updates
+   * it in place). Null for manual entries, rows derived from transactions, and
+   * everything written before the column existed.
+   */
+  @ApiProperty({ required: false, nullable: true })
+  @Column({ type: "timestamptz", name: "quoted_at", nullable: true })
+  quotedAt: Date | null;
+
   @ManyToOne(() => Security)
   @JoinColumn({ name: "security_id" })
   security: Security;

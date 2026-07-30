@@ -21,6 +21,7 @@ import { YahooFinanceService } from "./yahoo-finance.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
 import { SecurityLookupResult } from "./providers/quote-provider.interface";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { normalizeWebsite } from "../common/normalize-website";
 import {
   normalizeCountryName,
   normalizeAssetName,
@@ -381,21 +382,11 @@ export class SecuritiesService {
     return { name, removedFrom };
   }
 
-  /**
-   * Normalise a user-entered address to an absolute https URL, the way
-   * `InstitutionsService` does for its own website field. The DTO accepts
-   * "apple.com" so nobody has to type a scheme; a stored link needs one.
-   *
-   * Empty string means "clear it", which is how the edit form removes an address.
-   */
+  /** Shared with institutions and payees; see `common/normalize-website`. */
   private normalizeWebsite(
     value: string | null | undefined,
   ): string | null | undefined {
-    if (value === undefined) return undefined;
-    if (value === null) return null;
-    const trimmed = value.trim();
-    if (trimmed === "") return null;
-    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    return normalizeWebsite(value);
   }
 
   async create(

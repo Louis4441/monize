@@ -417,6 +417,17 @@ export class YahooFinanceService implements QuoteProvider {
           regularMarketDayLow: convert(meta.regularMarketDayLow),
           regularMarketVolume: meta.regularMarketVolume,
           regularMarketTime: meta.regularMarketTime,
+          exchangeTimezone: meta.exchangeTimezoneName ?? null,
+          // The window for the day this quote came from, so a half day or a
+          // holiday is the provider's answer rather than our assumption.
+          regularSession:
+            typeof meta.currentTradingPeriod?.regular?.start === "number" &&
+            typeof meta.currentTradingPeriod?.regular?.end === "number"
+              ? {
+                  start: meta.currentTradingPeriod.regular.start,
+                  end: meta.currentTradingPeriod.regular.end,
+                }
+              : null,
           // Authoritative currency from the instrument itself. GBX/GBp (pence,
           // the LSE quote unit) maps to GBP since prices above are converted to
           // pounds; otherwise pass the reported currency (e.g. USD for a

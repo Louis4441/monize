@@ -41,6 +41,40 @@ interface SummaryCardGridProps {
 export const DEFAULT_SUMMARY_GRID = 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4';
 
 /**
+ * Written out rather than interpolated: Tailwind scans source text for class
+ * names, so `lg:grid-cols-${n}` would compile to nothing.
+ */
+const LG_COLUMNS = [
+  '',
+  'lg:grid-cols-1',
+  'lg:grid-cols-2',
+  'lg:grid-cols-3',
+  'lg:grid-cols-4',
+  'lg:grid-cols-5',
+  'lg:grid-cols-6',
+  'lg:grid-cols-7',
+  'lg:grid-cols-8',
+] as const;
+
+/** Past this the cards are too narrow to read, so the row is allowed to wrap. */
+const MAX_SINGLE_ROW_CARDS = LG_COLUMNS.length - 1;
+
+/**
+ * A grid sized to the cards it holds, so a summary row lands on one line
+ * instead of leaving a short second row hanging beneath it. Several of these
+ * rows vary in length with the account -- a chequing account shows five cards,
+ * six once it has an interest rate, seven once that rate has earned something
+ * -- and a fixed column count cannot fit all three.
+ *
+ * Below `lg` the row still wraps: two columns on a phone and three on a tablet
+ * are as many cards as fit before the amounts start truncating.
+ */
+export function summaryGridClass(cardCount: number): string {
+  const count = Math.max(1, Math.min(cardCount, MAX_SINGLE_ROW_CARDS));
+  return `grid grid-cols-2 md:grid-cols-3 ${LG_COLUMNS[count]} gap-4`;
+}
+
+/**
  * A responsive row of key-figure cards (label / value / optional note),
  * generalised from `LoanSummaryCards` so every account detail view shares the
  * same card styling. Purely presentational -- callers format the values.

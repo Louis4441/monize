@@ -62,6 +62,13 @@ describe("Support backup (integration)", () => {
 
   it("classifies every exported column (golden allowlist)", async () => {
     const exported = backupService.getBackedUpTableNames();
+    // Collected across every table and asserted once at the end, rather than
+    // expect()-ing inside the loop. A throw on the first offender hides the
+    // rest, and one migration usually adds columns to several tables -- so a
+    // per-table assertion turns one fix into one red CI run per table.
+    const unclassifiedByTable: Record<string, string[]> = {};
+    const staleByTable: Record<string, string[]> = {};
+
     for (const table of exported) {
       if (ALWAYS_EXCLUDED_TABLES.has(table)) {
         expect(RULES[table]).toBeUndefined();
@@ -80,9 +87,14 @@ describe("Support backup (integration)", () => {
       );
       const stale = ruleColumns.filter((c) => !schemaColumns.includes(c));
 
-      expect({ table, unclassified }).toEqual({ table, unclassified: [] });
-      expect({ table, stale }).toEqual({ table, stale: [] });
+      if (unclassified.length > 0) unclassifiedByTable[table] = unclassified;
+      if (stale.length > 0) staleByTable[table] = stale;
     }
+
+    expect({
+      unclassified: unclassifiedByTable,
+      stale: staleByTable,
+    }).toEqual({ unclassified: {}, stale: {} });
   });
 
   it("covers every foreign key between exported tables (REFS allowlist)", async () => {

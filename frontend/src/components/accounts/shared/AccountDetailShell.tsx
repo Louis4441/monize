@@ -3,11 +3,12 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
+import { ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/Button';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { InstitutionLogo, InstitutionLogoData } from '@/components/institutions/InstitutionLogo';
 import { formatAccountType } from '@/lib/account-utils';
 import type { Account } from '@/types/account';
+import { AccountSwitcher } from './AccountSwitcher';
 
 export interface AccountDetailShellProps {
   account: Account;
@@ -18,7 +19,11 @@ export interface AccountDetailShellProps {
   onReconcile?: () => void;
   onEdit?: () => void;
   onExport?: () => void;
+  /** Renders the "Back to Accounts" link above the name. */
   onBack?: () => void;
+  /** Accounts the caret beside the name can jump to. Empty hides the caret. */
+  accounts?: readonly Account[];
+  onSelectAccount?: (id: string) => void;
   /** Type-specific action buttons rendered before the standard set. */
   headerActions?: ReactNode;
   /** Render a loading placeholder in place of the body. */
@@ -47,6 +52,8 @@ export function AccountDetailShell({
   onEdit,
   onExport,
   onBack,
+  accounts,
+  onSelectAccount,
   headerActions,
   isLoading,
   error,
@@ -77,60 +84,84 @@ export function AccountDetailShell({
 
   // Export PDF leads the action row, set off from the navigation actions by a
   // minimalist vertical divider. Every action is the same outline Button so the
-  // row reads as one consistent set.
+  // row reads as one consistent set. Going back is no longer among them: it is
+  // the link above the name, matching the securities and payees detail pages.
   const hasNavActions = !!(
-    onBack ||
     onViewTransactions ||
     onReconcile ||
     onEdit ||
     headerActions
   );
 
-  const actions = (
-    <>
-      {onExport && (
-        <Button variant="outline" onClick={handleExport} isLoading={isExporting}>
-          {tc('exportDropdown.exportPdf')}
-        </Button>
-      )}
-      {onExport && hasNavActions && (
-        <span
-          aria-hidden="true"
-          className="hidden sm:block h-6 border-l border-gray-300 dark:border-gray-600"
-        />
-      )}
-      {onBack && (
-        <Button variant="outline" onClick={onBack}>
-          {t('header.back')}
-        </Button>
-      )}
-      {onViewTransactions && (
-        <Button variant="outline" onClick={onViewTransactions}>
-          {t('header.viewTransactions')}
-        </Button>
-      )}
-      {onReconcile && (
-        <Button variant="outline" onClick={onReconcile}>
-          {t('header.reconcile')}
-        </Button>
-      )}
-      {onEdit && (
-        <Button variant="outline" onClick={onEdit}>
-          {t('header.edit')}
-        </Button>
-      )}
-      {headerActions}
-    </>
-  );
-
   return (
     <div>
-      <PageHeader
-        title={account.name}
-        subtitle={`${formatAccountType(account.accountType, tc)} - ${account.currencyCode}`}
-        icon={institution ? <InstitutionLogo institution={institution} size={28} /> : undefined}
-        actions={actions}
-      />
+      <div className="mb-6">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-2 -ml-1 inline-flex items-center gap-1 rounded text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            <ChevronLeftIcon className="h-4 w-4" aria-hidden="true" />
+            {t('header.back')}
+          </button>
+        )}
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            {institution && <InstitutionLogo institution={institution} size={28} />}
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-1">
+                <h1 className="truncate text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {account.name}
+                </h1>
+                {/* Jump straight to another account instead of going back to
+                    the list and clicking again. */}
+                {accounts && onSelectAccount && (
+                  <AccountSwitcher
+                    currentId={account.id}
+                    accounts={accounts}
+                    onSelect={onSelectAccount}
+                  />
+                )}
+              </div>
+              <p className="text-gray-500 dark:text-gray-400">
+                {`${formatAccountType(account.accountType, tc)} - ${account.currencyCode}`}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {onExport && (
+              <Button variant="outline" onClick={handleExport} isLoading={isExporting}>
+                {tc('exportDropdown.exportPdf')}
+              </Button>
+            )}
+            {onExport && hasNavActions && (
+              <span
+                aria-hidden="true"
+                className="hidden sm:block h-6 border-l border-gray-300 dark:border-gray-600"
+              />
+            )}
+            {onViewTransactions && (
+              <Button variant="outline" onClick={onViewTransactions}>
+                {t('header.viewTransactions')}
+              </Button>
+            )}
+            {onReconcile && (
+              <Button variant="outline" onClick={onReconcile}>
+                {t('header.reconcile')}
+              </Button>
+            )}
+            {onEdit && (
+              <Button variant="outline" onClick={onEdit}>
+                {t('header.edit')}
+              </Button>
+            )}
+            {headerActions}
+          </div>
+        </div>
+      </div>
       {error ? (
         <div
           role="alert"

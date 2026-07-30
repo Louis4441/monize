@@ -8,6 +8,10 @@
   },
   "header": {
     "priceAt": "Цена на {date}",
+    "priceAtTime": "Цена на {datetime} {zone}",
+    "marketOpen": "Рынок открыт",
+    "marketClosed": "Рынок закрыт",
+    "marketHours": "Торги с {open} до {close}, {zone}. Праздничные дни не учитываются.",
     "noPrice": "Цена ещё не записана",
     "changeToday": "{change} ({percent}) сегодня",
     "changeLast": "{change} ({percent}) последнее изменение",
@@ -33,10 +37,7 @@
     "openAccount": "Показать {name} на странице «Инвестиции»",
     "unitsShare": "{units} ({share})",
     "valueUnknown": "Нет оценки",
-    "approx": "~ {amount}",
-    "asOf": "По закрытию {date}",
-    "asOfStale": "По закрытию {date} — самой свежей записанной цене",
-    "asOfStaleTitle": "Более свежей цены нет, поэтому это стоимость позиции на тот день, а не на сегодня. Обновите цены у поставщика или добавьте цену вручную."
+    "approx": "~ {amount}"
   },
   "chart": {
     "title": "Цена {symbol}",

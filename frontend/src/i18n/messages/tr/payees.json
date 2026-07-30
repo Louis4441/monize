@@ -87,6 +87,7 @@
     "nameLabel": "Alacaklı Adı",
     "categoryLabel": "Varsayılan Kategori",
     "notesLabel": "Notlar (isteğe bağlı)",
+    "websiteLabel": "Web sitesi",
     "submitCreate": "Alacaklı Oluştur",
     "submitUpdate": "Alacaklıyı Güncelle",
     "applyCategoryLabel": "Bu kategoriyi mevcut işlemlere uygula",
