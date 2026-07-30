@@ -498,9 +498,6 @@ describe("mapInvestments", () => {
       expect(incoming?.linkedInvestmentId).toBe(outgoing?.id);
       expect(outgoing?.linkedInvestmentId).toBe(incoming?.id);
       expect(result.transfersPaired).toBe(1);
-      expect(
-        result.warnings.filter((w) => w.code === "unpairedShareTransfer"),
-      ).toHaveLength(0);
     });
 
     it("does not pair two rows in the same account", () => {
@@ -537,7 +534,10 @@ describe("mapInvestments", () => {
       expect(result.transfersPaired).toBe(0);
     });
 
-    it("leaves an unpaired row as ADD_SHARES and says so", () => {
+    // Shares transferred in from a broker are the ordinary way a portfolio
+    // starts, so an unpaired row is not an anomaly and must not warn --
+    // money2002.mny alone has 60 of them.
+    it("leaves an unpaired row as ADD_SHARES, without a warning", () => {
       const result = mapInvestments(
         input({
           transactions: transactionData({
@@ -554,11 +554,7 @@ describe("mapInvestments", () => {
       );
 
       expect(result.transactions[0].action).toBe(InvestmentAction.ADD_SHARES);
-      expect(result.warnings).toContainEqual({
-        code: "unpairedShareTransfer",
-        subject: "htrn=1",
-        detail: InvestmentAction.ADD_SHARES,
-      });
+      expect(result.warnings).toEqual([]);
     });
 
     it("pairs each removal only once", () => {

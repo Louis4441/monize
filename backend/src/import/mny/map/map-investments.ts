@@ -252,12 +252,16 @@ function mapOne(
  * Money records a security moving between accounts as two independent rows: an
  * ADD_SHARES in the destination and a REMOVE_SHARES in the source, with nothing
  * connecting them. They are the same event, so they are matched on date,
- * security and quantity across two different accounts. An unpaired row stays
- * ADD/REMOVE_SHARES, which is exactly what Money recorded, and says so.
+ * security and quantity across two different accounts.
+ *
+ * An unpaired row stays ADD/REMOVE_SHARES and produces **no warning**: that is
+ * exactly what Money recorded and the position it produces is identical either
+ * way. Opening a portfolio with shares transferred in from a broker is the
+ * ordinary case, not an anomaly -- `money2002.mny` alone has 60 of them, which
+ * is 60 lines of noise burying the warnings that do mean something.
  */
 function pairShareTransfers(
   transactions: readonly MappedInvestmentTransaction[],
-  warnings: MnyWarning[],
 ): { transactions: MappedInvestmentTransaction[]; paired: number } {
   const key = (transaction: MappedInvestmentTransaction): string =>
     `${transaction.transactionDate}|${transaction.securityHandle}|${transaction.quantity ?? 0}`;
@@ -310,24 +314,13 @@ function pairShareTransfers(
 
   const rewritten = transactions.map((transaction) => {
     const rewrite = rewrites.get(transaction.id);
-    if (!rewrite) {
-      if (
-        transaction.action === InvestmentAction.ADD_SHARES ||
-        transaction.action === InvestmentAction.REMOVE_SHARES
-      ) {
-        warnings.push({
-          code: "unpairedShareTransfer",
-          subject: `htrn=${transaction.handle}`,
-          detail: transaction.action,
-        });
-      }
-      return transaction;
-    }
-    return {
-      ...transaction,
-      action: rewrite.action,
-      linkedInvestmentId: rewrite.linkedInvestmentId,
-    };
+    return rewrite
+      ? {
+          ...transaction,
+          action: rewrite.action,
+          linkedInvestmentId: rewrite.linkedInvestmentId,
+        }
+      : transaction;
   });
 
   return { transactions: rewritten, paired };
@@ -528,7 +521,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
     mapped.push(mapOne(row, accountKey, action, context));
   }
 
-  const paired = pairShareTransfers(mapped, warnings);
+  const paired = pairShareTransfers(mapped);
   const splits = synthesizeSplits(paired.transactions, context);
   const transactions = orderForReplay([...paired.transactions, ...splits]);
 

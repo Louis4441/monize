@@ -50,6 +50,7 @@ describe("MnyImportJobService (integration)", () => {
     skipped: { accounts: 0, payees: 0, categories: 0, transactions: 0 },
     existingDataRemoved: false,
     verification: [],
+    holdings: [],
     warnings: [],
   };
 

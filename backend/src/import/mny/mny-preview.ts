@@ -27,6 +27,8 @@ export interface MnyPreviewAccount {
   readonly accountSubType: AccountSubType | null;
   readonly currencyCode: string;
   readonly transactionCount: number;
+  /** Investment rows this account will receive; 0 outside a brokerage side. */
+  readonly investmentCount: number;
   readonly openingBalance: number;
   /** Final balance computed from the file -- the verification baseline. */
   readonly finalBalance: number;
@@ -44,8 +46,19 @@ export interface MnyPreviewCounts {
   readonly transactionsToCreate: number;
   readonly transfersToLink: number;
   readonly transactionsSkipped: number;
-  /** Investment rows Phase 1 leaves alone; Phase 2 imports them. */
-  readonly investmentsDeferred: number;
+  readonly securitiesToCreate: number;
+  /** Real securities in the file, currency pseudo-securities excluded. */
+  readonly securitiesInFile: number;
+  readonly investmentsToCreate: number;
+  readonly investmentsSkipped: number;
+  /** `act` 15/16 rows matched into linked TRANSFER_IN / TRANSFER_OUT pairs. */
+  readonly shareTransfersPaired: number;
+  /** SPLIT rows synthesized from `SEC_SPLIT`. */
+  readonly stockSplitsApplied: number;
+  /** Price rows after the `(security, date)` dedupe; 0 when the toggle is off. */
+  readonly pricesToImport: number;
+  /** Exchange-rate rows; 0 when the toggle is off. */
+  readonly exchangeRatesToImport: number;
 }
 
 export interface MnyPreview {
@@ -89,6 +102,7 @@ export function buildPreview(input: BuildPreviewInput): MnyPreview {
       accountSubType: account.accountSubType,
       currencyCode: account.currencyCode,
       transactionCount: parsed.transactionCounts.get(account.key) ?? 0,
+      investmentCount: parsed.investmentCounts.get(account.key) ?? 0,
       openingBalance: account.openingBalance,
       finalBalance: parsed.expectedBalances.get(account.key) ?? 0,
       closed: account.closed,
@@ -114,7 +128,18 @@ export function buildPreview(input: BuildPreviewInput): MnyPreview {
       transactionsToCreate: parsed.transactions.transactions.length,
       transfersToLink: parsed.transactions.transfersLinked,
       transactionsSkipped: parsed.transactions.skipped,
-      investmentsDeferred: parsed.transactions.deferredInvestments,
+      securitiesToCreate: parsed.securities.securities.length,
+      securitiesInFile: parsed.fileCounts.securities,
+      investmentsToCreate: parsed.investments.transactions.length,
+      investmentsSkipped: parsed.investments.skipped,
+      shareTransfersPaired: parsed.investments.transfersPaired,
+      stockSplitsApplied: parsed.investments.splitsApplied,
+      pricesToImport: parsed.options.importPrices
+        ? parsed.fileCounts.securityPrices
+        : 0,
+      exchangeRatesToImport: parsed.options.importExchangeRates
+        ? parsed.fileCounts.exchangeRates
+        : 0,
     },
     fileCounts: parsed.fileCounts,
     missingTables: parsed.missingTables,

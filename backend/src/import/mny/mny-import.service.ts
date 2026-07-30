@@ -6,14 +6,16 @@ import {
   NotFoundException,
   forwardRef,
 } from "@nestjs/common";
-import { DataSource } from "typeorm";
+import { DataSource, In, QueryRunner } from "typeorm";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { withUserContext } from "../../common/db/with-context";
 import { Account } from "../../accounts/entities/account.entity";
+import { Holding } from "../../securities/entities/holding.entity";
+import { HoldingsService } from "../../securities/holdings.service";
 import { UserPreference } from "../../users/entities/user-preference.entity";
 import { UsersService } from "../../users/users.service";
 import { CurrenciesService } from "../../currencies/currencies.service";
-import { roundMoney } from "../../common/round.util";
+import { roundMoney, roundToDecimals } from "../../common/round.util";
 import { tr } from "../../i18n/translate";
 import { ImportPostProcessingService } from "../import-post-processing.service";
 import { ImportJob } from "./entities/import-job.entity";
@@ -23,8 +25,10 @@ import { MnyParsedFile, MnyParserService } from "./mny-parser.service";
 import { MnyStagingService } from "./mny-staging.service";
 import {
   MnyAccountVerification,
+  MnyHoldingVerification,
   MnyImportResult,
   balanceMatches,
+  quantityMatches,
 } from "./model/mny-import-job";
 import {
   MnyImportOptions,
@@ -41,6 +45,11 @@ import {
   writeAccountBalances,
   writeTransactions,
 } from "./writers/write-transactions";
+import { writeInvestments, writeSecurities } from "./writers/write-investments";
+import {
+  writeExchangeRates,
+  writeSecurityPrices,
+} from "./writers/write-prices";
 
 /**
  * Runs a `.mny` import: staged bytes in, Monize rows and a verification report
@@ -56,6 +65,9 @@ import {
  * re-authenticates, and its credentials must never be written into
  * `import_jobs.options`.
  */
+
+/** `holdings.quantity` is `decimal(20,8)`. */
+const HOLDING_DECIMALS = 8;
 
 /** Credentials the existing delete-my-data operation requires. */
 export interface WipeCredentials {
@@ -83,6 +95,8 @@ export class MnyImportService {
     private usersService: UsersService,
     @Inject(forwardRef(() => CurrenciesService))
     private currencies: CurrenciesService,
+    @Inject(forwardRef(() => HoldingsService))
+    private holdings: HoldingsService,
   ) {}
 
   /**
@@ -172,8 +186,10 @@ export class MnyImportService {
     });
 
     // Currencies are global reference data with their own idempotent creation
-    // path, so they are ensured before the import transaction opens.
-    for (const code of parsed.accounts.currencyCodes) {
+    // path, so they are ensured before the import transaction opens. Securities
+    // and exchange rates reference currencies no account need touch, which is
+    // why this list is not just the accounts'.
+    for (const code of parsed.currencyCodes) {
       await this.currencies.ensureSystemCurrency(code);
     }
 
@@ -186,7 +202,7 @@ export class MnyImportService {
     });
     await this.postProcessing.run(
       userId,
-      false,
+      parsed.investments.transactions.length > 0,
       new Set(written.affectedAccountIds),
     );
 
@@ -199,6 +215,12 @@ export class MnyImportService {
       userId,
       parsed,
       written.accountIdByKey,
+    );
+    const holdings = await this.verifyHoldings(
+      userId,
+      parsed,
+      written.accountIdByKey,
+      written.securityIdByHandle,
     );
 
     // Delete-on-complete: the bytes have done their job, and they are the
@@ -214,6 +236,16 @@ export class MnyImportService {
           subject: account.accountName,
           detail: `delta ${account.delta}`,
         })),
+      // The mapper's own LOT check compares against its replay; this one
+      // compares against what Monize actually ended up holding, which is the
+      // number the user sees in their portfolio.
+      ...holdings
+        .filter((holding) => !holding.matches)
+        .map((holding) => ({
+          code: "holdingsMismatch" as const,
+          subject: `${holding.accountName}: ${holding.symbol}`,
+          detail: `imported ${holding.importedQuantity} vs lots ${holding.lotQuantity}`,
+        })),
     ];
 
     return {
@@ -223,21 +255,22 @@ export class MnyImportService {
       transactionsCreated: written.transactionsCreated,
       splitsCreated: written.splitsCreated,
       transfersLinked: parsed.transactions.transfersLinked,
-      // Phase 2 fills these in; they are reported as zero rather than omitted so
-      // the report's shape does not change when investments land.
-      securitiesCreated: 0,
-      investmentTransactionsCreated: 0,
-      pricesImported: 0,
-      exchangeRatesImported: 0,
+      securitiesCreated: written.securitiesCreated,
+      investmentTransactionsCreated: written.investmentTransactionsCreated,
+      pricesImported: written.pricesImported,
+      exchangeRatesImported: written.exchangeRatesImported,
+      // Phase 3 fills this in; reported as zero rather than omitted so the
+      // report's shape does not change when bills land.
       billsCreated: 0,
       skipped: {
         accounts: parsed.accounts.skipped,
         payees: parsed.payees.skipped,
         categories: parsed.categories.skipped,
-        transactions: parsed.transactions.skipped,
+        transactions: parsed.transactions.skipped + parsed.investments.skipped,
       },
       existingDataRemoved: options.wipeExistingData,
       verification,
+      holdings,
       warnings: summarizeWarnings(warnings),
     };
   }
@@ -249,11 +282,16 @@ export class MnyImportService {
     context: JobRunContext,
   ): Promise<{
     accountIdByKey: ReadonlyMap<string, string>;
+    securityIdByHandle: ReadonlyMap<number, string>;
     accountsCreated: number;
     categoriesCreated: number;
     payeesCreated: number;
     transactionsCreated: number;
     splitsCreated: number;
+    securitiesCreated: number;
+    investmentTransactionsCreated: number;
+    pricesImported: number;
+    exchangeRatesImported: number;
     affectedAccountIds: ReadonlySet<string>;
   }> {
     return withScopedDb(this.dataSource, async (manager) => {
@@ -281,18 +319,88 @@ export class MnyImportService {
         total: parsed.transactions.transactions.length,
       });
 
+      const categoryIdByHandle = this.categoryIdsByHandle(
+        parsed,
+        categories.idByFullName,
+      );
+      const payeeIdByHandle = this.payeeIdsByHandle(parsed, payees.idByName);
+
       const transactions = await writeTransactions(manager, userId, {
         transactions: parsed.transactions.transactions,
         accountIdByKey: accounts.idByKey,
-        categoryIdByHandle: this.categoryIdsByHandle(
-          parsed,
-          categories.idByFullName,
-        ),
-        payeeIdByHandle: this.payeeIdsByHandle(parsed, payees.idByName),
+        categoryIdByHandle,
+        payeeIdByHandle,
         payeeNameByHandle: parsed.payees.nameByHandle,
         onProgress: (processed, total) =>
           context.reportProgress({ phase: "transactions", processed, total }),
       });
+
+      await context.reportProgress({
+        phase: "investments",
+        processed: 0,
+        total: parsed.investments.transactions.length,
+      });
+
+      const securities = await writeSecurities(
+        manager,
+        userId,
+        parsed.securities.securities,
+      );
+      const investments = await writeInvestments(manager, userId, {
+        transactions: parsed.investments.transactions,
+        accountIdByKey: accounts.idByKey,
+        securityIdByHandle: securities.idByHandle,
+        categoryIdByHandle,
+        payeeIdByHandle,
+        payeeNameByHandle: parsed.payees.nameByHandle,
+        symbolByHandle: new Map(
+          parsed.securities.securities.map((security) => [
+            security.handle,
+            security.symbol,
+          ]),
+        ),
+        onProgress: (processed, total) =>
+          context.reportProgress({ phase: "investments", processed, total }),
+      });
+
+      // Holdings come only from the canonical rebuild, never from an importer's
+      // private fold -- that second opinion is what left PR #192 with negative
+      // positions. The service takes a QueryRunner but only ever touches its
+      // `.manager`, so the transaction's own manager is passed through a shim
+      // rather than opening a second connection (which would deadlock).
+      const brokerageIds = [...investments.brokerageAccountIds];
+      if (brokerageIds.length > 0) {
+        await this.holdings.rebuildAccountsFromTransactions(
+          userId,
+          brokerageIds,
+          { manager } as unknown as QueryRunner,
+        );
+      }
+
+      await context.reportProgress({
+        phase: "prices",
+        processed: 0,
+        total: parsed.options.importPrices
+          ? parsed.fileCounts.securityPrices
+          : 0,
+      });
+
+      const pricesImported = parsed.options.importPrices
+        ? await writeSecurityPrices(
+            manager,
+            parsed.rawPrices,
+            securities.idByHandle,
+            (processed, total) =>
+              context.reportProgress({ phase: "prices", processed, total }),
+          )
+        : 0;
+      const exchangeRatesImported = parsed.options.importExchangeRates
+        ? await writeExchangeRates(
+            manager,
+            parsed.rawExchangeRates,
+            parsed.currencyByHandle,
+          )
+        : 0;
 
       // One balance write from the file-computed totals; post-processing then
       // recomputes the same numbers from the rows as a cross-check.
@@ -320,12 +428,21 @@ export class MnyImportService {
 
       return {
         accountIdByKey: accounts.idByKey,
+        securityIdByHandle: securities.idByHandle,
         accountsCreated: accounts.created,
         categoriesCreated: categories.created,
         payeesCreated: payees.created,
         transactionsCreated: transactions.transactionsCreated,
         splitsCreated: transactions.splitsCreated,
-        affectedAccountIds: transactions.affectedAccountIds,
+        securitiesCreated: securities.created,
+        investmentTransactionsCreated:
+          investments.investmentTransactionsCreated,
+        pricesImported,
+        exchangeRatesImported,
+        affectedAccountIds: new Set([
+          ...transactions.affectedAccountIds,
+          ...investments.affectedAccountIds,
+        ]),
       };
     });
   }
@@ -400,6 +517,66 @@ export class MnyImportService {
         delta,
         transactionCount: parsed.transactionCounts.get(account.key) ?? 0,
         matches: balanceMatches(delta),
+      };
+    });
+  }
+
+  /**
+   * Compares what Monize now holds against Money's open tax lots.
+   *
+   * The mapper already cross-checked its own replay against the lots; this is
+   * the reading that matters to the user, because it is what their portfolio
+   * page will show. Both are reported so a disagreement points at the layer that
+   * caused it: replay-versus-lots is a mapping problem, imported-versus-replay
+   * is a write or holdings-fold problem.
+   */
+  private async verifyHoldings(
+    userId: string,
+    parsed: MnyParsedFile,
+    accountIdByKey: ReadonlyMap<string, string>,
+    securityIdByHandle: ReadonlyMap<number, string>,
+  ): Promise<MnyHoldingVerification[]> {
+    if (parsed.holdingChecks.length === 0) {
+      return [];
+    }
+
+    const accountIds = [...accountIdByKey.values()];
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(Holding).find({
+        where: { accountId: In(accountIds) },
+        select: ["accountId", "securityId", "quantity"],
+      }),
+    );
+    const quantityByKey = new Map(
+      rows.map((row) => [
+        `${row.accountId}|${row.securityId}`,
+        Number(row.quantity),
+      ]),
+    );
+    const nameByKey = new Map(
+      parsed.accounts.accounts.map((account) => [account.key, account.name]),
+    );
+
+    return parsed.holdingChecks.map((check) => {
+      const accountId = accountIdByKey.get(check.accountKey);
+      const securityId = securityIdByHandle.get(check.securityHandle);
+      const importedQuantity =
+        accountId === undefined || securityId === undefined
+          ? 0
+          : (quantityByKey.get(`${accountId}|${securityId}`) ?? 0);
+      const delta = roundToDecimals(
+        importedQuantity - check.lotQuantity,
+        HOLDING_DECIMALS,
+      );
+
+      return {
+        accountName: nameByKey.get(check.accountKey) ?? check.accountKey,
+        symbol: check.symbol,
+        lotQuantity: check.lotQuantity,
+        replayQuantity: check.replayQuantity,
+        importedQuantity: roundToDecimals(importedQuantity, HOLDING_DECIMALS),
+        delta,
+        matches: quantityMatches(delta),
       };
     });
   }

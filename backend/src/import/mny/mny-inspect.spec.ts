@@ -93,15 +93,51 @@ describe("mappingSummary", () => {
     ).toBe(true);
   });
 
-  it("reports investment rows as deferred rather than as failures", () => {
+  it("reports the securities and investment rows the file maps to", () => {
     const lines = mappingSummary(
       readMnyTables(openMnyFile(readMnyFixture("money2002"))),
     );
 
+    // Every transaction in this fixture carries a security, and the currency
+    // pseudo-securities are excluded from the 86 real ones.
     expect(
-      lines.some((line) => line.includes("60 investment rows deferred")),
+      lines.some((line) => line.trimStart().startsWith("securities:")),
     ).toBe(true);
-    expect(lines.some((line) => line.includes("0 skipped,"))).toBe(true);
+    expect(lines.some((line) => line.includes("investments:     60"))).toBe(
+      true,
+    );
+  });
+
+  // money2002.mny has 60 open LOT rows and 60 act=15 transactions, which is the
+  // whole point of the cross-check: two independent readings of the same
+  // positions, agreeing.
+  it("reconciles the open lots against the action replay on a real file", () => {
+    const lines = mappingSummary(
+      readMnyTables(openMnyFile(readMnyFixture("money2002"))),
+    );
+
+    const start =
+      lines.findIndex((line) =>
+        line.includes("holdings (open lots vs action replay)"),
+      ) + 2;
+    const rows = lines.slice(start).slice(
+      0,
+      lines.slice(start).findIndex((line) => line.trim() === ""),
+    );
+
+    // 60 lots and 60 act=15 rows across 30 securities, every position agreeing.
+    expect(rows).toHaveLength(30);
+    expect(rows.every((line) => line.endsWith("  ok"))).toBe(true);
+  });
+
+  it("omits the holdings block for a file with no LOT rows", () => {
+    const lines = mappingSummary(
+      readMnyTables(openMnyFile(readMnyFixture("money2001"))),
+    );
+
+    expect(lines.some((line) => line.includes("holdings (open lots"))).toBe(
+      false,
+    );
   });
 
   it("survives a file with no accounts at all", () => {

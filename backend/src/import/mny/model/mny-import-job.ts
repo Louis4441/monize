@@ -56,6 +56,28 @@ export interface MnyAccountVerification {
   readonly matches: boolean;
 }
 
+/**
+ * One holding's line in the verification report.
+ *
+ * Three independent readings of the same position: what Money's open tax lots
+ * say, what replaying the mapped actions produces, and what Monize actually
+ * holds once `HoldingsService` has rebuilt from the imported rows. The lots are
+ * the authority -- they are the record Money itself reconciles against.
+ */
+export interface MnyHoldingVerification {
+  readonly accountName: string;
+  readonly symbol: string;
+  /** Shares Money's open lots claim. */
+  readonly lotQuantity: number;
+  /** Shares the mapper's own action replay produces. */
+  readonly replayQuantity: number;
+  /** Shares Monize holds after the import. */
+  readonly importedQuantity: number;
+  /** `importedQuantity - lotQuantity`. */
+  readonly delta: number;
+  readonly matches: boolean;
+}
+
 /** What the import created, and whether the result reconciles. */
 export interface MnyImportResult {
   readonly accountsCreated: number;
@@ -79,6 +101,8 @@ export interface MnyImportResult {
   /** True when the wizard's wipe option ran the delete-my-data pre-step. */
   readonly existingDataRemoved: boolean;
   readonly verification: readonly MnyAccountVerification[];
+  /** Empty when the file has no `LOT` table or the import created no holdings. */
+  readonly holdings: readonly MnyHoldingVerification[];
   readonly warnings: readonly MnyWarningSummary[];
 }
 
@@ -92,4 +116,14 @@ export const BALANCE_TOLERANCE = 0.005;
 
 export function balanceMatches(delta: number): boolean {
   return Math.abs(delta) <= BALANCE_TOLERANCE;
+}
+
+/**
+ * Share counts are `decimal(20,8)`, so anything smaller than the last stored
+ * place is rounding rather than a real discrepancy.
+ */
+export const QUANTITY_TOLERANCE = 0.00000001;
+
+export function quantityMatches(delta: number): boolean {
+  return Math.abs(delta) <= QUANTITY_TOLERANCE;
 }
