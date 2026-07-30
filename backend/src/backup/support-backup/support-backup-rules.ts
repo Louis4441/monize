@@ -113,6 +113,7 @@ export const RULES: Record<string, TableRules> = {
     name: mask,
     default_category_id: keep,
     notes: drop,
+    website: drop, // a public URL names the payee the masked name hides
     is_active: keep,
     created_at: keep,
   },

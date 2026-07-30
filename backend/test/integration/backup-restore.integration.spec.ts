@@ -175,8 +175,8 @@ describe("Backup export/restore round-trip (integration)", () => {
     );
 
     await dataSource.query(
-      `INSERT INTO payees (id, user_id, name, default_category_id)
-       VALUES ($1, $2, 'Corner Store', $3)`,
+      `INSERT INTO payees (id, user_id, name, default_category_id, website)
+       VALUES ($1, $2, 'Corner Store', $3, 'https://corner.example')`,
       [ids.payeeId, userId, ids.childCategoryId],
     );
 
@@ -397,7 +397,7 @@ describe("Backup export/restore round-trip (integration)", () => {
     // Deferred FK: payee.default_category_id resolves to B's Groceries category.
     const payee = (
       await dataSource.query(
-        `SELECT cat.user_id AS cat_user_id, cat.name AS cat_name
+        `SELECT cat.user_id AS cat_user_id, cat.name AS cat_name, pay.website
          FROM payees pay JOIN categories cat ON pay.default_category_id = cat.id
          WHERE pay.user_id = $1`,
         [userB.id],
@@ -405,6 +405,12 @@ describe("Backup export/restore round-trip (integration)", () => {
     )[0];
     expect(payee.cat_user_id).toBe(userB.id);
     expect(payee.cat_name).toBe("Groceries");
+    // The regular backup is a full fidelity copy, so a scalar added to the
+    // table has to survive the round trip. It does so only because the export
+    // is SELECT * and the restore validates columns against the live schema --
+    // neither enumerates payee columns, and a test that never sets the column
+    // would not notice if one day one of them did.
+    expect(payee.website).toBe("https://corner.example");
 
     // Deferred FK: account.institution_id resolves to B's institution.
     const account = (
