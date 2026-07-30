@@ -9,6 +9,7 @@
   },
   "mnyWarnings": {
     "unknownAccountType": "{count, plural, one {# account} other {# accounts}} had an account type Monize does not recognise and were skipped.",
-    "unknownInvestmentAction": "{count, plural, one {# investment transaction} other {# investment transactions}} used an action Monize does not recognise and were skipped."
+    "unknownInvestmentAction": "{count, plural, one {# investment transaction} other {# investment transactions}} used an action Monize does not recognise and were skipped.",
+    "unusableBill": "{count, plural, one {# scheduled bill} other {# scheduled bills}} had no account, no usable date or an unrecognised recurrence, and were skipped."
   }
 }

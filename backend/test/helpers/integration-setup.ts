@@ -21,6 +21,14 @@ import * as bcrypt from "bcryptjs";
  * Shared PostgreSQL connection options for integration suites. Specs that need
  * a real database with a schema synchronized from the entities use this instead
  * of copying the env-var defaults, so a config change lives in one place.
+ *
+ * **`dropSchema` means suites using this cannot run concurrently.** Every suite
+ * drops and rebuilds the schema of the one shared `monize_test` database, so a
+ * second worker starting up pulls the tables out from under a running suite --
+ * which surfaces as "connection terminated" from an unrelated spec rather than
+ * as anything resembling its cause. `test/jest-e2e.json` therefore pins
+ * `maxWorkers: 1`; keep it there rather than relying on a `--runInBand` flag at
+ * a call site, since the config is what every entry point shares.
  */
 export const INTEGRATION_TYPEORM_OPTIONS: TypeOrmModuleOptions = {
   type: "postgres",

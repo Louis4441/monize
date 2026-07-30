@@ -33,6 +33,7 @@ function preview(overrides: Partial<MnyPreview> = {}): MnyPreview {
     passwordProtected: false,
     baseCurrency: 'USD',
     accounts: [account()],
+    bills: [],
     counts: {
       accountsIncluded: 1,
       accountsInFile: 3,
@@ -51,6 +52,8 @@ function preview(overrides: Partial<MnyPreview> = {}): MnyPreview {
       stockSplitsApplied: 0,
       pricesToImport: 0,
       exchangeRatesToImport: 0,
+      billsDetected: 0,
+      billsSkipped: 0,
     },
     fileCounts: {
       accounts: 3,
@@ -84,6 +87,7 @@ describe('MnyReviewStep', () => {
     preview: preview(),
     excludedHandles: new Set<number>(),
     currencyOverrides: new Map<number, string>(),
+    selectedBillHandles: new Set<number>(),
     options: preview().options,
     currencyOptions: [
       { value: 'USD', label: 'USD - US Dollar' },
@@ -93,6 +97,8 @@ describe('MnyReviewStep', () => {
     onToggleAccount: vi.fn(),
     onSetAllAccounts: vi.fn(),
     onSetAccountCurrency: vi.fn(),
+    onToggleBill: vi.fn(),
+    onSetAllBills: vi.fn(),
     onSetOption: vi.fn(),
     onBack: vi.fn(),
     onImport: vi.fn(),
@@ -202,19 +208,22 @@ describe('MnyReviewStep', () => {
     expect(screen.getByText(/no BILL table/)).toBeInTheDocument();
   });
 
-  it('says plainly that scheduled bills are not imported yet', () => {
+  it('shows how few of a file\'s bill rows are live series -- the 1,844-rows scenario', () => {
+    // PR #192 imported all 1,844 rows. The review step has to make the gap
+    // between the file's row count and the real bill count visible before the
+    // user commits, not after.
     render(
       <MnyReviewStep
         {...defaultProps}
         preview={preview({
-          fileCounts: { ...preview().fileCounts, securities: 98, bills: 1844 },
+          counts: { ...preview().counts, billsDetected: 21 },
+          fileCounts: { ...preview().fileCounts, bills: 1844 },
         })}
       />,
     );
 
-    expect(
-      screen.getByText(/Scheduled bills are not imported yet/),
-    ).toBeInTheDocument();
+    expect(screen.getByText('21')).toBeInTheDocument();
+    expect(screen.getByText(/active of 1844 bill rows/)).toBeInTheDocument();
   });
 
   describe('investments', () => {

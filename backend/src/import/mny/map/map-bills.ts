@@ -1,0 +1,557 @@
+import { SplitKind } from "../../../transactions/entities/split-kind.enum";
+import {
+  MappedAccounts,
+  MappedBill,
+  MappedBillInvestment,
+  MappedBillSplit,
+  MappedBills,
+  MappedSecurities,
+} from "../model/mny-import-model";
+import { mapFrequency, mapInvestmentAction } from "../model/mny-model";
+import { MnyBill, MnyPayee, MnyTransaction } from "../model/mny-rows";
+import { MnyWarning } from "../model/mny-warnings";
+import { isDegeneratePayeeName } from "./map-reference";
+import { MnyBillData } from "../tables/read-bills";
+import { MnyInvestmentData } from "../tables/read-investments";
+import { MnyTransactionData } from "../tables/read-transactions";
+
+/**
+ * `BILL` rows mapped onto Monize scheduled transactions.
+ *
+ * The table is an accumulation, not a list of bills: Money keeps an instance row
+ * per occurrence, and decades of them add up -- PR #192 imported all 1,844 rows
+ * of the maintainer's file where ~20 bills were real, then bulk-deactivated the
+ * rest (design section 3, issue 2). Here rows are grouped into series
+ * (`hbillHead`), each series is reduced to one representative instance, and only
+ * series whose next due date falls inside a sanity horizon become candidates.
+ * The wizard shows the candidates as a checkbox list, which is the safety net
+ * for the detection erring in either direction.
+ *
+ * `BILL.st` has never been observed with a non-default value in any fixture
+ * (open question 12.3), so nothing filters on it. The raw value is carried on
+ * every candidate instead, so a real file's harness run can pin its semantics.
+ */
+
+/**
+ * How long past its next due date a series stays an active candidate. A bill
+ * the user is a few weeks behind on is still a bill; one silent for a quarter
+ * is a dead series left in the table.
+ */
+export const BILL_PAST_HORIZON_DAYS = 92;
+
+/**
+ * How far into the future a next due date may plausibly sit. A yearly bill's
+ * next instance is at most ~366 days out; anything further is Money's own
+ * far-future filler, not a schedule.
+ */
+export const BILL_FUTURE_HORIZON_DAYS = 400;
+
+export interface MapBillsInput {
+  readonly bills: MnyBillData;
+  readonly transactions: MnyTransactionData;
+  readonly investments: MnyInvestmentData;
+  readonly accounts: MappedAccounts;
+  readonly securities: MappedSecurities;
+  readonly payees: readonly MnyPayee[];
+  /** Balance cut-off date, `YYYY-MM-DD` -- the horizon is measured from it. */
+  readonly asOf: string;
+}
+
+/** `date` shifted by `days`, in the repository's `YYYY-MM-DD` convention. */
+export function shiftIsoDate(date: string, days: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  const y = shifted.getUTCFullYear();
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(shifted.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+interface Context {
+  readonly input: MapBillsInput;
+  readonly transactionByHandle: ReadonlyMap<number, MnyTransaction>;
+  readonly childrenByParent: ReadonlyMap<number, MnyTransaction[]>;
+  readonly partnerByHandle: ReadonlyMap<number, number>;
+  readonly detailByHandle: ReadonlyMap<
+    number,
+    { price: number; quantity: number; commission: number }
+  >;
+  readonly payeeNameByHandle: ReadonlyMap<number, string>;
+  readonly warnings: MnyWarning[];
+}
+
+function buildContext(input: MapBillsInput): Context {
+  const transactionByHandle = new Map(
+    input.transactions.transactions
+      .filter((row) => row.handle !== null)
+      .map((row) => [row.handle as number, row]),
+  );
+
+  const childrenByParent = new Map<number, MnyTransaction[]>();
+  for (const split of [...input.transactions.splits].sort(
+    (a, b) => a.position - b.position,
+  )) {
+    if (split.parent === null || split.child === null) {
+      continue;
+    }
+    const child = transactionByHandle.get(split.child);
+    if (!child) {
+      continue;
+    }
+    childrenByParent.set(split.parent, [
+      ...(childrenByParent.get(split.parent) ?? []),
+      child,
+    ]);
+  }
+
+  // Unlike the posting mapper, template transfer pairs need no existence
+  // checks beyond the row lookup: a dangling partner simply resolves to
+  // nothing and the leg stays a category leg.
+  const partnerByHandle = new Map<number, number>();
+  for (const transfer of input.transactions.transfers) {
+    if (transfer.from === null || transfer.to === null) {
+      continue;
+    }
+    if (
+      !partnerByHandle.has(transfer.from) &&
+      !partnerByHandle.has(transfer.to)
+    ) {
+      partnerByHandle.set(transfer.from, transfer.to);
+      partnerByHandle.set(transfer.to, transfer.from);
+    }
+  }
+
+  const detailByHandle = new Map(
+    input.investments.investmentDetails
+      .filter((detail) => detail.transaction !== null)
+      .map((detail) => [
+        detail.transaction as number,
+        {
+          price: detail.price,
+          quantity: detail.quantity,
+          commission: detail.commission,
+        },
+      ]),
+  );
+
+  const payeeNameByHandle = new Map(
+    input.payees
+      .filter(
+        (payee) => payee.handle !== null && !isDegeneratePayeeName(payee.name),
+      )
+      .map((payee) => [payee.handle as number, payee.name.trim()]),
+  );
+
+  return {
+    input,
+    transactionByHandle,
+    childrenByParent,
+    partnerByHandle,
+    detailByHandle,
+    payeeNameByHandle,
+    warnings: [],
+  };
+}
+
+/** Groups instance rows into series; a row with no `hbillHead` is its own. */
+function groupBySeries(bills: readonly MnyBill[]): Map<number, MnyBill[]> {
+  const bySeries = new Map<number, MnyBill[]>();
+  for (const bill of bills) {
+    if (bill.handle === null) {
+      continue;
+    }
+    const key = bill.series ?? bill.handle;
+    bySeries.set(key, [...(bySeries.get(key) ?? []), bill]);
+  }
+  return bySeries;
+}
+
+/**
+ * The instance that carries the series' schedule: the earliest one still due on
+ * or after the cut-off, else the most recently due. A series whose instances
+ * all lack a date has no schedule to import.
+ */
+function representativeOf(
+  instances: readonly MnyBill[],
+  asOf: string,
+): MnyBill | null {
+  const dated = instances
+    .filter((bill) => bill.nextDue !== null)
+    .sort((a, b) =>
+      (a.nextDue as string) < (b.nextDue as string)
+        ? -1
+        : a.nextDue === b.nextDue
+          ? 0
+          : 1,
+    );
+  if (dated.length === 0) {
+    return null;
+  }
+  return (
+    dated.find((bill) => (bill.nextDue as string) >= asOf) ??
+    dated[dated.length - 1]
+  );
+}
+
+/** Whether a series' schedule falls inside the active horizon. */
+function isActive(representative: MnyBill, asOf: string): boolean {
+  const nextDue = representative.nextDue as string;
+  if (nextDue < shiftIsoDate(asOf, -BILL_PAST_HORIZON_DAYS)) {
+    return false;
+  }
+  if (nextDue > shiftIsoDate(asOf, BILL_FUTURE_HORIZON_DAYS)) {
+    return false;
+  }
+  return representative.endsOn === null || representative.endsOn >= asOf;
+}
+
+/** The account key a template row's schedule belongs to, or null. */
+function accountKeyOf(
+  template: MnyTransaction,
+  context: Context,
+): string | null {
+  return template.account === null
+    ? null
+    : (context.input.accounts.keyByHandle.get(template.account) ?? null);
+}
+
+function mapSplitLegs(
+  template: MnyTransaction,
+  context: Context,
+): MappedBillSplit[] {
+  const children =
+    template.handle === null
+      ? []
+      : (context.childrenByParent.get(template.handle) ?? []);
+
+  return children.map((child) => {
+    const partner =
+      child.handle === null
+        ? null
+        : (context.partnerByHandle.get(child.handle) ?? null);
+    const partnerRow =
+      partner === null
+        ? null
+        : (context.transactionByHandle.get(partner) ?? null);
+    const partnerKey =
+      partnerRow === null ? null : accountKeyOf(partnerRow, context);
+
+    if (partnerKey !== null) {
+      return {
+        kind: SplitKind.TRANSFER,
+        categoryHandle: null,
+        transferAccountKey: partnerKey,
+        amount: child.amount,
+        memo: child.memo,
+      };
+    }
+
+    return {
+      kind: SplitKind.CATEGORY,
+      categoryHandle: child.category,
+      transferAccountKey: null,
+      amount: child.amount,
+      memo: child.memo,
+    };
+  });
+}
+
+function mapInvestmentTemplate(
+  template: MnyTransaction,
+  context: Context,
+): MappedBillInvestment | null {
+  const securityHandle = template.security as number;
+  if (!context.input.securities.byHandle.has(securityHandle)) {
+    return null;
+  }
+  const action = mapInvestmentAction(template.action);
+  if (action === null) {
+    return null;
+  }
+  const detail =
+    template.handle === null
+      ? undefined
+      : context.detailByHandle.get(template.handle);
+
+  return {
+    action,
+    securityHandle,
+    quantity: detail && detail.quantity !== 0 ? detail.quantity : null,
+    price: detail && detail.price !== 0 ? detail.price : null,
+    commission: detail?.commission ?? 0,
+  };
+}
+
+function billName(
+  template: MnyTransaction,
+  handle: number,
+  context: Context,
+): string {
+  const payeeName =
+    template.payee === null
+      ? undefined
+      : context.payeeNameByHandle.get(template.payee);
+  if (payeeName) {
+    return payeeName;
+  }
+  const memo = template.memo?.split("\n")[0].trim();
+  return memo || `Bill ${handle}`;
+}
+
+/** A series the user's account selection left out, as opposed to a bad row. */
+const EXCLUDED = "excluded";
+
+function mapOne(
+  representative: MnyBill,
+  context: Context,
+): MappedBill | typeof EXCLUDED | null {
+  const handle = representative.handle as number;
+  const templateHandle = representative.templateTransaction;
+  const template =
+    templateHandle === null
+      ? undefined
+      : context.transactionByHandle.get(templateHandle);
+  if (!template) {
+    context.warnings.push({
+      code: "billTemplateMissing",
+      subject: `hbill=${handle}`,
+    });
+    return null;
+  }
+
+  const accountKey = accountKeyOf(template, context);
+  if (accountKey === null) {
+    if (template.account === null) {
+      context.warnings.push({
+        code: "unusableBill",
+        subject: `hbill=${handle}`,
+        detail: "no account",
+      });
+      return null;
+    }
+    // The account exists but is not being imported -- a choice, not a defect.
+    return EXCLUDED;
+  }
+
+  const mapping = mapFrequency(
+    representative.frequency,
+    representative.interval,
+  );
+  if (mapping === null) {
+    context.warnings.push({
+      code: "unusableBill",
+      subject: `hbill=${handle}`,
+      detail: `frq=${representative.frequency}`,
+    });
+    return null;
+  }
+
+  const name = billName(template, handle, context);
+  if (mapping.approximate) {
+    context.warnings.push({
+      code: "billFrequencyApproximated",
+      subject: name,
+      detail: `frq=${representative.frequency} x${representative.interval}`,
+    });
+  }
+
+  const splits = mapSplitLegs(template, context);
+  const investment =
+    template.security !== null
+      ? mapInvestmentTemplate(template, context)
+      : null;
+  if (template.security !== null && investment === null) {
+    context.warnings.push({
+      code: "unusableBill",
+      subject: name,
+      detail: `act=${template.action}`,
+    });
+    return null;
+  }
+
+  // A top-level transfer template: the counterpart row names the account the
+  // money goes to. Split templates carry their transfer legs as splits instead.
+  const partner =
+    splits.length > 0 || template.handle === null
+      ? null
+      : (context.partnerByHandle.get(template.handle) ?? null);
+  const partnerRow =
+    partner === null
+      ? null
+      : (context.transactionByHandle.get(partner) ?? null);
+  const transferAccountKey =
+    partnerRow === null || investment !== null
+      ? null
+      : accountKeyOf(partnerRow, context);
+
+  return {
+    handle,
+    seriesKey: representative.series ?? handle,
+    status: representative.status,
+    name,
+    accountKey,
+    payeeHandle: template.payee,
+    categoryHandle:
+      splits.length > 0 || transferAccountKey !== null || investment !== null
+        ? null
+        : template.category,
+    amount: template.amount,
+    currencyCode:
+      template.account === null
+        ? ""
+        : (context.input.accounts.currencyByHandle.get(template.account) ?? ""),
+    frequency: mapping.frequency,
+    approximate: mapping.approximate,
+    nextDueDate: representative.nextDue as string,
+    endDate: representative.endsOn,
+    description: template.memo,
+    isTransfer: transferAccountKey !== null,
+    transferAccountKey,
+    investment,
+    splits,
+  };
+}
+
+/**
+ * Drops the receiving side of a transfer bill that appears as two candidates.
+ *
+ * Money records a transfer bill once, but a file can carry a `BILL` row for
+ * each side of the template pair. Importing both would post the transfer
+ * twice; the paying side (the more negative amount) is the bill.
+ */
+function dedupeTransferPairs(
+  bills: readonly MappedBill[],
+  templateByBillHandle: ReadonlyMap<number, number>,
+  context: Context,
+): MappedBill[] {
+  const billByTemplate = new Map(
+    bills
+      .map((bill): [number | undefined, MappedBill] => [
+        templateByBillHandle.get(bill.handle),
+        bill,
+      ])
+      .filter((entry): entry is [number, MappedBill] => entry[0] !== undefined),
+  );
+
+  const dropped = new Set<number>();
+  for (const bill of bills) {
+    if (dropped.has(bill.handle) || !bill.isTransfer) {
+      continue;
+    }
+    const template = templateByBillHandle.get(bill.handle);
+    const partner =
+      template === undefined
+        ? undefined
+        : context.partnerByHandle.get(template);
+    const other =
+      partner === undefined ? undefined : billByTemplate.get(partner);
+    if (!other || other.handle === bill.handle) {
+      continue;
+    }
+    // Keep the paying side; on a tie the lower handle is stable.
+    const keep =
+      bill.amount < other.amount ||
+      (bill.amount === other.amount && bill.handle < other.handle)
+        ? bill
+        : other;
+    dropped.add(keep.handle === bill.handle ? other.handle : bill.handle);
+  }
+
+  return bills.filter((bill) => !dropped.has(bill.handle));
+}
+
+/**
+ * Maps `BILL` onto scheduled-transaction candidates, one per detected-active
+ * series. Inactive series are counted, never warned -- 1,824 dead rows worth of
+ * warnings is exactly the noise issue 2 complained about.
+ */
+export function mapBills(input: MapBillsInput): MappedBills {
+  const context = buildContext(input);
+
+  if (!input.bills.supported) {
+    return {
+      bills: [],
+      seriesInFile: 0,
+      skipped: 0,
+      supported: false,
+      warnings: [],
+    };
+  }
+
+  const bySeries = groupBySeries(input.bills.bills);
+  let skipped = 0;
+  const mapped: MappedBill[] = [];
+  const templateByBillHandle = new Map<number, number>();
+
+  for (const instances of bySeries.values()) {
+    const representative = representativeOf(instances, input.asOf);
+    if (representative === null || !isActive(representative, input.asOf)) {
+      continue;
+    }
+    const bill = mapOne(representative, context);
+    if (bill === null) {
+      skipped += 1;
+      continue;
+    }
+    if (bill === EXCLUDED) {
+      continue;
+    }
+    mapped.push(bill);
+    if (representative.templateTransaction !== null) {
+      templateByBillHandle.set(bill.handle, representative.templateTransaction);
+    }
+  }
+
+  const bills = dedupeTransferPairs(mapped, templateByBillHandle, context).sort(
+    (a, b) =>
+      a.nextDueDate < b.nextDueDate
+        ? -1
+        : a.nextDueDate > b.nextDueDate
+          ? 1
+          : a.handle - b.handle,
+  );
+
+  return {
+    bills,
+    seriesInFile: bySeries.size,
+    skipped,
+    supported: true,
+    warnings: context.warnings,
+  };
+}
+
+/**
+ * Payee and category handles a set of bills references. Computed over the
+ * *selected* bills, not all candidates: a payee only an unticked bill uses is
+ * not referenced (design section 3, issue 3 -- referenced-only import counts
+ * "a transaction, split, or selected bill").
+ */
+export function billReferences(bills: readonly MappedBill[]): {
+  payees: ReadonlySet<number>;
+  categories: ReadonlySet<number>;
+} {
+  return {
+    payees: new Set(
+      bills
+        .map((bill) => bill.payeeHandle)
+        .filter((handle): handle is number => handle !== null),
+    ),
+    categories: new Set(
+      bills
+        .flatMap((bill) => [
+          bill.categoryHandle,
+          ...bill.splits.map((split) => split.categoryHandle),
+        ])
+        .filter((handle): handle is number => handle !== null),
+    ),
+  };
+}
+
+/** The candidates the wizard's selection kept. */
+export function selectedBills(
+  bills: MappedBills,
+  selection: readonly number[],
+): MappedBill[] {
+  const wanted = new Set(selection);
+  return bills.bills.filter((bill) => wanted.has(bill.handle));
+}

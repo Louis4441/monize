@@ -46,6 +46,9 @@ import {
   writeTransactions,
 } from "./writers/write-transactions";
 import { writeInvestments, writeSecurities } from "./writers/write-investments";
+import { writeBills } from "./writers/write-bills";
+import { writeLoans } from "./writers/write-loans";
+import { selectedBills } from "./map/map-bills";
 import {
   writeExchangeRates,
   writeSecurityPrices,
@@ -259,14 +262,13 @@ export class MnyImportService {
       investmentTransactionsCreated: written.investmentTransactionsCreated,
       pricesImported: written.pricesImported,
       exchangeRatesImported: written.exchangeRatesImported,
-      // Phase 3 fills this in; reported as zero rather than omitted so the
-      // report's shape does not change when bills land.
-      billsCreated: 0,
+      billsCreated: written.billsCreated,
       skipped: {
         accounts: parsed.accounts.skipped,
         payees: parsed.payees.skipped,
         categories: parsed.categories.skipped,
         transactions: parsed.transactions.skipped + parsed.investments.skipped,
+        bills: parsed.bills.skipped,
       },
       existingDataRemoved: options.wipeExistingData,
       verification,
@@ -290,6 +292,7 @@ export class MnyImportService {
     splitsCreated: number;
     securitiesCreated: number;
     investmentTransactionsCreated: number;
+    billsCreated: number;
     pricesImported: number;
     exchangeRatesImported: number;
     affectedAccountIds: ReadonlySet<string>;
@@ -377,6 +380,31 @@ export class MnyImportService {
         );
       }
 
+      // Only the wizard's selection is written: an unchecked bill must be
+      // absent from the database, never created inactive.
+      const billsToWrite = selectedBills(parsed.bills, parsed.options.bills);
+      await context.reportProgress({
+        phase: "bills",
+        processed: 0,
+        total: billsToWrite.length,
+      });
+      // Loan terms come from the payments and bills that just landed, so this
+      // runs after both. Nothing it writes is required for the import to be
+      // correct -- it configures the loan schedule and rate detection.
+      const bills = await writeBills(manager, userId, {
+        bills: billsToWrite,
+        accountIdByKey: accounts.idByKey,
+        payeeIdByHandle,
+        payeeNameByHandle: parsed.payees.nameByHandle,
+        categoryIdByHandle,
+        securityIdByHandle: securities.idByHandle,
+        linkedKeyByKey: new Map(
+          parsed.accounts.accounts
+            .filter((account) => account.linkedKey !== null)
+            .map((account) => [account.key, account.linkedKey as string]),
+        ),
+      });
+
       await context.reportProgress({
         phase: "prices",
         processed: 0,
@@ -401,6 +429,12 @@ export class MnyImportService {
             parsed.currencyByHandle,
           )
         : 0;
+
+      await writeLoans(manager, userId, {
+        loans: parsed.loans.loans,
+        accountIdByKey: accounts.idByKey,
+        categoryIdByHandle,
+      });
 
       // One balance write from the file-computed totals; post-processing then
       // recomputes the same numbers from the rows as a cross-check.
@@ -437,6 +471,7 @@ export class MnyImportService {
         securitiesCreated: securities.created,
         investmentTransactionsCreated:
           investments.investmentTransactionsCreated,
+        billsCreated: bills.created,
         pricesImported,
         exchangeRatesImported,
         affectedAccountIds: new Set([
@@ -511,6 +546,7 @@ export class MnyImportService {
 
       return {
         accountName: account.name,
+        accountType: account.accountType,
         accountId,
         expectedBalance,
         importedBalance,

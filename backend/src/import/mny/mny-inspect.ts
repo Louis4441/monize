@@ -21,6 +21,8 @@ import { currencyCodesByHandle, mapAccounts } from "./map/map-reference";
 import { mapTransactions } from "./map/map-transactions";
 import { mapSecurities } from "./map/map-securities";
 import { mapInvestments } from "./map/map-investments";
+import { mapBills } from "./map/map-bills";
+import { mapLoans } from "./map/map-loans";
 import { crossCheckHoldings } from "./map/check-holdings";
 import { computeExpectedBalances, todayIsoDate } from "./mny-parser.service";
 import { DEFAULT_MNY_IMPORT_OPTIONS } from "./model/mny-import-options";
@@ -139,12 +141,29 @@ export function mappingSummary(tables: MnyTables): string[] {
     accounts,
     securities,
   });
+  const bills = mapBills({
+    bills: tables.bills,
+    transactions: tables.transactions,
+    investments: tables.investments,
+    accounts,
+    securities,
+    payees: tables.reference.payees,
+    asOf: todayIsoDate(),
+  });
+  const loans = mapLoans({ accounts, transactions, bills: bills.bills });
   const balances = computeExpectedBalances(
     accounts,
     transactions,
     todayIsoDate(),
     investments,
   );
+
+  // `BILL.st` has never been observed in a fixture (open question 12.3): the
+  // distribution over a real file is the evidence that pins its semantics.
+  const statusCounts = new Map<number, number>();
+  for (const row of tables.bills.bills) {
+    statusCounts.set(row.status, (statusCounts.get(row.status) ?? 0) + 1);
+  }
 
   const counts = new Map<string, number>();
   for (const transaction of transactions.transactions) {
@@ -191,6 +210,52 @@ export function mappingSummary(tables: MnyTables): string[] {
           ),
         ]
       : []),
+    ...(loans.loans.length > 0
+      ? [
+          "",
+          "  loans and mortgages (inferred terms):",
+          "  account                        interest booking   payment      next due     source",
+          ...loans.loans.map((loan) =>
+            [
+              `  ${(nameByKey.get(loan.accountKey) ?? loan.accountKey).slice(0, 28).padEnd(28)}`,
+              (loan.interestBookingMode ?? "-").padEnd(18),
+              (loan.paymentAmount === null
+                ? "-"
+                : loan.paymentAmount.toFixed(2)
+              ).padStart(10),
+              (loan.paymentStartDate ?? "-").padEnd(12),
+              loan.sourceAccountKey === null
+                ? "-"
+                : (nameByKey.get(loan.sourceAccountKey) ??
+                  loan.sourceAccountKey),
+            ].join(" "),
+          ),
+        ]
+      : []),
+    ...(tables.bills.supported
+      ? [
+          "",
+          `  bills: ${bills.bills.length} active candidates of ${bills.seriesInFile} series (${tables.bills.bills.length} rows, ${bills.skipped} unusable)`,
+          `  BILL.st values seen: ${
+            [...statusCounts]
+              .sort((a, b) => a[0] - b[0])
+              .map(([status, count]) => `${status} x${count}`)
+              .join(", ") || "none"
+          }`,
+          ...bills.bills.map((bill) =>
+            [
+              `  ${bill.name.slice(0, 32).padEnd(32)}`,
+              (nameByKey.get(bill.accountKey) ?? bill.accountKey)
+                .slice(0, 24)
+                .padEnd(24),
+              bill.frequency.padEnd(12),
+              bill.nextDueDate,
+              bill.amount.toFixed(2).padStart(12),
+              `st=${bill.status}`,
+            ].join(" "),
+          ),
+        ]
+      : []),
     "",
     "  warnings:",
     ...summarizeWarnings([
@@ -199,6 +264,8 @@ export function mappingSummary(tables: MnyTables): string[] {
       ...securities.warnings,
       ...investments.warnings,
       ...holdings.warnings,
+      ...bills.warnings,
+      ...loans.warnings,
     ]).map(
       (warning) =>
         `    ${warning.code.padEnd(32)} ${String(warning.count).padStart(6)}  ${warning.samples.join(", ")}`,

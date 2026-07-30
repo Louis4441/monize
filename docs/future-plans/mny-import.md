@@ -740,12 +740,73 @@ still want a real file (open questions 12.3 and 12.4 remain open).
 
 ### Phase 3 — Bills, loans polish, wipe UX (shippable increment)
 
-| ID | Task | Depends | Size |
-|----|------|---------|------|
-| M3.1 | Bills mapper (`map/map-bills.ts`): active-series detection (`st` + due-date horizon + series dedupe per M0.6), `lHtrn` template resolution (splits/transfer/investment templates), frequency map via `mapFrequency` (B3 landed: every code exact, downgrade + warn only for unrepresentable intervals). Acceptance: the kenlasko scenario yields ~20 active candidates from 1,844 rows; Money 2001 absence degrades with a notice | M0.6, M1.4 | L |
-| M3.2 | Bills writer + wizard selection panel (`MnyBillsPanel`): only selected bills imported, `is_active=true`, `auto_post=false`. Acceptance: unchecked bills are absent from the DB, not inactive | M3.1, M1.9 | M |
-| M3.3 | Wipe-first UX: typed-confirmation dialog naming the delete-my-data operation, wiring to `deleteData` as a pre-step, report line "existing data removed". Default import never deletes | M1.8 | S |
-| M3.4 | Loan verification on real files: loan/mortgage balances in the report, mortgage subtype mapping, escrow split refinement. Acceptance: maintainer's loan accounts reconcile in the harness | M1.4, M0.5 | M |
+Exit gate: cleared. Scheduled bills go through the wizard as a checkbox list,
+the optional wipe is behind a typed confirmation, and loan accounts come out
+configured rather than merely populated. The localization pass that section 9
+defers to M4.3 was done with it, so Phase 3 is fully translated.
+
+See 6.6 for what the implementation settled differently from this plan.
+
+| ID | Task | Depends | Size | Status |
+|----|------|---------|------|--------|
+| M3.1 | Bills mapper (`map/map-bills.ts`): active-series detection (`st` + due-date horizon + series dedupe per M0.6), `lHtrn` template resolution (splits/transfer/investment templates), frequency map via `mapFrequency` (B3 landed: every code exact, downgrade + warn only for unrepresentable intervals). Acceptance: the kenlasko scenario yields ~20 active candidates from 1,844 rows; Money 2001 absence degrades with a notice | M0.6, M1.4 | L | **done** (detection is date-horizon + series dedupe only -- `st` is carried, never filtered on; see 6.6) |
+| M3.2 | Bills writer + wizard selection panel (`MnyBillsPanel`): only selected bills imported, `is_active=true`, `auto_post=false`. Acceptance: unchecked bills are absent from the DB, not inactive | M3.1, M1.9 | M | **done** |
+| M3.3 | Wipe-first UX: typed-confirmation dialog naming the delete-my-data operation, wiring to `deleteData` as a pre-step, report line "existing data removed". Default import never deletes | M1.8 | S | **done** |
+| M3.4 | Loan verification on real files: loan/mortgage balances in the report, mortgage subtype mapping, escrow split refinement. Acceptance: maintainer's loan accounts reconcile in the harness | M1.4, M0.5 | M | **done** for what the corpus can prove: loan terms are inferred and written (`map/map-loans.ts`), loans are badged in the report and printed by the harness. The real-file reconciliation is the maintainer's acceptance run |
+
+#### 6.6 Phase 3 findings
+
+Five things this plan specified turned out differently once code existed.
+
+**`BILL.st` is still unobserved, so nothing filters on it.** M3.1 was written
+to use "`st` in the spike-confirmed active set", but M0.6 could not confirm one
+-- `BILL` is empty in all five fixtures (open question 12.3) -- and a
+plausible-looking constant would have been a guess wearing a filter's clothes.
+Active-series detection is therefore **date and series shape only**: rows are
+grouped by `hbillHead`, each series is reduced to the earliest instance still
+due on or after the cut-off, and a series survives if that date sits within
+`BILL_PAST_HORIZON_DAYS` (92) and `BILL_FUTURE_HORIZON_DAYS` (400) and its
+`dtMax` has not passed. The raw `st` value rides along on every candidate and
+`npm run mny:inspect` prints its distribution, so one run against a real file
+both closes question 12.3 and says whether the horizon rule already produces
+the "~20 of 1,844" ground truth on its own.
+
+**The wizard's selection has to be distinguishable from its absence.** ADR-5
+made `bills` an option list defaulting to empty, which cannot express "the user
+unticked everything" -- empty would equally mean "the client said nothing".
+The parser now resolves it: an absent `bills` field means every detected-active
+candidate (the default the preview echoes), and an explicit list, empty
+included, is the user's choice narrowed to real candidates. The wizard always
+sends the field.
+
+**Referenced-only filtering counts selected bills, not candidates.** Section 3
+issue 3 says payees and categories are created when "referenced by an imported
+transaction, split, or selected bill". Computing that from the candidates would
+create a payee for a bill the user unticked, so `billReferences` runs over the
+selection and the parser unions it into the referenced sets before mapping
+categories and payees.
+
+**A loan's interest category cannot be inferred when escrow is present, and
+must not be.** M3.4's "escrow split refinement" turned out to be a refusal
+rather than a heuristic. Interest and escrow are both ordinary category legs of
+the payment split and nothing in the file distinguishes them, so `mapLoans`
+adopts a category as the loan's interest category only when the payments name
+exactly **one** non-principal category. Two or more leaves it null with a
+`loanInterestCategoryUnclear` warning. Guessing would put escrow into
+`interest_category_id`, and `RateChangeInferenceService` would then infer every
+rate from the wrong leg.
+
+**Loan payment shape is worth reading even though Money has no loan-terms
+table.** What it does have is the payment: a transfer leg into the loan plus a
+category leg for interest is exactly Monize's `SPLIT` interest booking mode,
+the account the payment came from is the funding account, and an imported bill
+supplies the scheduled installment and cadence. `writeLoans` fills those in
+without ever overwriting a value the account already carries, so a second
+import into a live profile cannot clobber a loan the user configured by hand.
+`SPLIT` is claimed only when *every* observed payment was split-booked: a loan
+that also receives plain transfers has its interest booked elsewhere, and
+claiming SPLIT there would suppress the separate-interest pairing that recovers
+those rate observations.
 
 ### Phase 4 — Hardening, i18n, docs, e2e
 

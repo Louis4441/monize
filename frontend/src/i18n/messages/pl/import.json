@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} transferów papierów, {splits} podziałów akcji",
       "prices": "Historia cen",
       "exchangeRates": "Kursy walut",
-      "ofTotal": "z {total} w pliku"
+      "ofTotal": "z {total} w pliku",
+      "bills": "Zaplanowane rachunki",
+      "billsOfRows": "aktywnych z {rows} wierszy rachunków"
     },
-    "notYetImported": "Zaplanowane rachunki nie są jeszcze importowane: {bills} wierszy rachunków zostaje na późniejszą wersję. Cała reszta tego pliku jest importowana w całości.",
     "accountsHeading": "Konta ({count})",
     "selectAll": "Zaznacz wszystkie",
     "selectNone": "Odznacz wszystkie",
@@ -349,10 +350,47 @@
       "importPrices": "Importuj historię cen",
       "importPricesHint": "Zapis Money o tym, ile każdy papier był wart dzień po dniu. Wyłącz, jeśli wolisz zacząć od bieżących notowań.",
       "importExchangeRates": "Importuj kursy walut",
-      "importExchangeRatesHint": "Historyczne kursy między walutami z Twojego pliku, aby dawne operacje walutowe przeliczały się tak, jak przeliczał je Money."
+      "importExchangeRatesHint": "Historyczne kursy między walutami z Twojego pliku, aby dawne operacje walutowe przeliczały się tak, jak przeliczał je Money.",
+      "wipeExistingData": "Zacznij od nowa: najpierw usuń moje istniejące dane Monize",
+      "wipeExistingDataHint": "Przed importem wykonuje tę samą operację Usuń moje dane co w Ustawieniach. Zostaniesz poproszony o potwierdzenie. Zostaw wyłączone, aby dodać plik Money do tego, co już masz."
     },
     "warningsHeading": "Uwagi dotyczące tego pliku",
     "startImport": "Rozpocznij import"
+  },
+  "mnyBills": {
+    "heading": "Zaplanowane rachunki do utworzenia ({count})",
+    "explainer": "Money przechowuje wiersz dla każdego wystąpienia rachunku, więc długa historia zawiera ich tysiące. To są serie, które nadal wyglądają na aktywne. Odznacz te, których nie chcesz -- odznaczone rachunki nie są w ogóle tworzone.",
+    "unsupported": "Ta wersja Money jest starsza niż zaplanowane rachunki, więc nie ma czego importować.",
+    "skipped": "{count, plural, one {# seria rachunków nie miała} few {# serie rachunków nie miały} many {# serii rachunków nie miało} other {# serii rachunków nie miało}} szablonu ani użytecznej daty i nie mogą zostać zaimportowane.",
+    "table": {
+      "include": "Importuj",
+      "includeBill": "Importuj {name}",
+      "bill": "Rachunek",
+      "account": "Konto",
+      "frequency": "Częstotliwość",
+      "nextDue": "Następny termin",
+      "amount": "Kwota",
+      "transfer": "Przelew",
+      "investment": "Inwestycja",
+      "splits": "{count, plural, one {# podział} few {# podziały} many {# podziałów} other {# podziałów}}",
+      "approximate": "Najbliższa częstotliwość Monize"
+    }
+  },
+  "mnyWipe": {
+    "heading": "Najpierw usunąć istniejące dane?",
+    "body": "To wykonuje tę samą operację Usuń moje dane co w Ustawienia -> Strefa zagrożenia, zanim rozpocznie się import. Usuwa:",
+    "removes": {
+      "transactions": "Każdą transakcję i podział",
+      "scheduled": "Każdą zaplanowaną i cykliczną transakcję",
+      "investments": "Każdy papier wartościowy, cenę, pozycję i transakcję inwestycyjną",
+      "accounts": "Każde konto, kategorię i odbiorcę",
+      "budgets": "Każdy budżet, raport niestandardowy, tag i mapowanie importu"
+    },
+    "irreversible": "Tej operacji nie można cofnąć. Jeśli import się później nie powiedzie, usunięte dane nie wrócą.",
+    "typeToConfirm": "Wpisz {word}, aby potwierdzić:",
+    "passwordLabel": "Wprowadź swoje hasło:",
+    "oidcNote": "Twój dostawca tożsamości już potwierdził tę sesję, więc hasło nie jest potrzebne.",
+    "confirm": "Usuń moje dane i importuj"
   },
   "mnyImporting": {
     "heading": "Importowanie pliku Money",
@@ -387,7 +425,8 @@
       "securities": "Papiery wartościowe",
       "investments": "Transakcje inwestycyjne",
       "prices": "Ceny",
-      "exchangeRates": "Kursy walut"
+      "exchangeRates": "Kursy walut",
+      "bills": "Zaplanowane rachunki"
     },
     "existingDataRemoved": "Twoje dotychczasowe dane zostały usunięte przed tym importem, zgodnie z prośbą.",
     "verificationHeading": "Weryfikacja sald",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, one {# transakcja inwestycyjna nie miała} few {# transakcje inwestycyjne nie miały} many {# transakcji inwestycyjnych nie miało} other {# transakcji inwestycyjnych nie miało}} w pliku szczegółów udziałów i zaimportowano je tylko z kwotą gotówkową.",
     "investmentAccountMismatch": "{count, plural, one {# transakcja inwestycyjna była} few {# transakcje inwestycyjne były} many {# transakcji inwestycyjnych było} other {# transakcji inwestycyjnych było}} na koncie, które nie jest kontem inwestycyjnym, i zostały pominięte.",
     "unusableSecuritySplit": "{count, plural, one {# podziału akcji nie udało się} few {# podziałów akcji nie udało się} many {# podziałów akcji nie udało się} other {# podziałów akcji nie udało się}} powiązać z papierem wartościowym lub miał nieużyteczny współczynnik i nie został zastosowany.",
-    "holdingsMismatch": "{count, plural, one {# pozycja nie zgadza się} few {# pozycje nie zgadzają się} many {# pozycji nie zgadza się} other {# pozycji nie zgadza się}} z udziałami zapisanymi w pliku Money."
+    "holdingsMismatch": "{count, plural, one {# pozycja nie zgadza się} few {# pozycje nie zgadzają się} many {# pozycji nie zgadza się} other {# pozycji nie zgadza się}} z udziałami zapisanymi w pliku Money.",
+    "billTemplateMissing": "{count, plural, one {# zaplanowany rachunek nie miał} few {# zaplanowane rachunki nie miały} many {# zaplanowanych rachunków nie miało} other {# zaplanowanych rachunków nie miało}} transakcji szablonowej w pliku i zostały pominięte.",
+    "unusableBill": "{count, plural, one {# zaplanowany rachunek nie miał} few {# zaplanowane rachunki nie miały} many {# zaplanowanych rachunków nie miało} other {# zaplanowanych rachunków nie miało}} konta, użytecznej daty ani rozpoznanej cykliczności i zostały pominięte.",
+    "billFrequencyApproximated": "{count, plural, one {# zaplanowany rachunek używa} few {# zaplanowane rachunki używają} many {# zaplanowanych rachunków używa} other {# zaplanowanych rachunków używa}} interwału powtarzania, którego Monize nie potrafi wyrazić dokładnie, więc użyto najbliższego krótszego."
   },
   "mnyErrors": {
     "mnyImportFailed": "Coś poszło nie tak podczas importu. Nic nie zostało zapisane -- możesz spróbować ponownie.",

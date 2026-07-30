@@ -9,8 +9,9 @@ Native TypeScript pipeline for importing complete Microsoft Money files. Design 
   -> writer (withScopedDb) -> verification report
 ```
 
-Implemented so far: the decrypt, reader, table and coded-value layers (Phase 0, tasks M0.1–M0.4
-and M0.6).
+Implemented so far: the whole pipeline through Phase 3 -- decrypt, readers, mappers, writers, the
+background job and the wizard. Banking data, investments, scheduled bills and inferred loan terms
+all import; what remains is Phase 4 hardening (see the design's task list).
 
 ## Coded values
 
@@ -91,3 +92,19 @@ than aborting the report.
   shape.
 - **`CAT.lType` says income or expense directly** -- `{2, 3}` income, `{0, 1}` expense, `-1` the
   two roots. Use `isIncomeCategoryType` and fall back to the root ancestor only for the roots.
+- **`BILL` is an accumulation of instances, not a list of bills.** One row per occurrence, so a
+  long history holds thousands (1,844 in the maintainer's file for ~20 real bills). Group by
+  `hbillHead` and reduce each series to one representative before doing anything else.
+- **Nothing filters on `BILL.st`.** No fixture has ever contained a `BILL` row, so no value of it
+  has been observed. `mapBills` carries the raw value on every candidate and `mny:inspect` prints
+  its distribution; adding an `st` filter needs a real file first, not a plausible constant.
+- **An absent `options.bills` means "every candidate"; an empty list means "none".** They are
+  different requests, and the wizard always sends the field explicitly so unticking every bill
+  does not read as saying nothing.
+- **An unticked bill is never written, not written inactive.** PR #192 created all 1,844 and
+  bulk-deactivated the rest, which left the user a list to clean by hand.
+- **A loan's interest category is only inferred when the payments name exactly one non-principal
+  category.** Interest and escrow are both category legs and the file does not distinguish them,
+  so two or more legs means the field stays null with a warning. Putting escrow into
+  `interest_category_id` would make `RateChangeInferenceService` infer every rate from the wrong
+  leg.

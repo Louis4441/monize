@@ -25,6 +25,8 @@ import {
   writeExchangeRates,
   writeSecurityPrices,
 } from "./writers/write-prices";
+import { writeBills } from "./writers/write-bills";
+import { writeLoans } from "./writers/write-loans";
 import { HoldingsService } from "../../securities/holdings.service";
 
 jest.mock("../../common/db/scoped-db", () => ({
@@ -59,6 +61,14 @@ jest.mock("./writers/write-prices", () => ({
   writeExchangeRates: jest.fn(),
 }));
 
+jest.mock("./writers/write-bills", () => ({
+  writeBills: jest.fn(),
+}));
+
+jest.mock("./writers/write-loans", () => ({
+  writeLoans: jest.fn(),
+}));
+
 const mockedScopedDb = withScopedDb as jest.MockedFunction<typeof withScopedDb>;
 const mockedWriteAccounts = writeAccounts as jest.MockedFunction<
   typeof writeAccounts
@@ -90,6 +100,8 @@ const mockedWritePrices = writeSecurityPrices as jest.MockedFunction<
 const mockedWriteRates = writeExchangeRates as jest.MockedFunction<
   typeof writeExchangeRates
 >;
+const mockedWriteBills = writeBills as jest.MockedFunction<typeof writeBills>;
+const mockedWriteLoans = writeLoans as jest.MockedFunction<typeof writeLoans>;
 
 /**
  * The orchestration around the writers: what runs before the job row exists,
@@ -194,6 +206,14 @@ function parsedFile(overrides: Partial<MnyParsedFile> = {}): MnyParsedFile {
       skipped: 0,
       warnings: [],
     },
+    bills: {
+      bills: [],
+      seriesInFile: 0,
+      skipped: 0,
+      supported: true,
+      warnings: [],
+    },
+    loans: { loans: [], warnings: [] },
     rawPrices: [],
     rawExchangeRates: [],
     currencyByHandle: new Map([[1, "CAD"]]),
@@ -306,6 +326,8 @@ describe("MnyImportService", () => {
     });
     mockedWritePrices.mockResolvedValue(11);
     mockedWriteRates.mockResolvedValue(5);
+    mockedWriteBills.mockResolvedValue({ created: 0, reused: 0 });
+    mockedWriteLoans.mockResolvedValue({ updated: 0 });
 
     holdingsService = {
       rebuildAccountsFromTransactions: jest.fn().mockResolvedValue(undefined),
@@ -581,6 +603,7 @@ describe("MnyImportService", () => {
       expect(result.verification).toEqual([
         {
           accountName: "Chequing",
+          accountType: "CHEQUING",
           accountId: "account-1",
           expectedBalance: 120.5,
           importedBalance: 120.5,
@@ -878,6 +901,96 @@ describe("MnyImportService", () => {
       const result = await run();
 
       expect(result.holdings).toEqual([]);
+    });
+  });
+
+  describe("bills", () => {
+    /**
+     * Two detected-active candidates the wizard can tick independently.
+     *
+     * `parsed.options.bills` is what the service obeys, not the options handed
+     * to `runImport`: the parser resolves the request's selection against the
+     * candidates it actually found, so the fixture mirrors that.
+     */
+    function withBills(selection: number[]) {
+      const bill = (handle: number) => ({
+        handle,
+        seriesKey: handle,
+        status: 0,
+        name: `Bill ${handle}`,
+        accountKey: "acct-1",
+        payeeHandle: null,
+        categoryHandle: null,
+        amount: -50,
+        currencyCode: "CAD",
+        frequency: "MONTHLY" as never,
+        approximate: false,
+        nextDueDate: "2026-08-02",
+        endDate: null,
+        description: null,
+        isTransfer: false,
+        transferAccountKey: null,
+        investment: null,
+        splits: [],
+      });
+
+      parser.parse.mockReturnValue(
+        parsedFile({
+          options: { ...DEFAULT_MNY_IMPORT_OPTIONS, bills: selection },
+          bills: {
+            bills: [bill(7), bill(8)],
+            seriesInFile: 2,
+            skipped: 3,
+            supported: true,
+            warnings: [],
+          },
+        }),
+      );
+    }
+
+    it("writes only the bills the wizard selected", async () => {
+      withBills([7]);
+      mockedWriteBills.mockResolvedValue({ created: 1, reused: 0 });
+
+      const result = await service.runImport(
+        "user-1",
+        "staged-1",
+        { ...DEFAULT_MNY_IMPORT_OPTIONS, bills: [7] },
+        context,
+      );
+
+      // The unticked bill never reaches the writer, so it is absent from the
+      // database rather than created inactive (PR #192 issue 2).
+      expect(
+        mockedWriteBills.mock.calls[0][2].bills.map((b) => b.handle),
+      ).toEqual([7]);
+      expect(result.billsCreated).toBe(1);
+    });
+
+    it("writes nothing when the user unticked every bill", async () => {
+      withBills([]);
+
+      await service.runImport(
+        "user-1",
+        "staged-1",
+        { ...DEFAULT_MNY_IMPORT_OPTIONS, bills: [] },
+        context,
+      );
+
+      expect(mockedWriteBills.mock.calls[0][2].bills).toEqual([]);
+    });
+
+    it("reports bill series the mapper could not use as skipped", async () => {
+      withBills([7, 8]);
+
+      const result = await service.runImport(
+        "user-1",
+        "staged-1",
+        { ...DEFAULT_MNY_IMPORT_OPTIONS, bills: [7, 8] },
+        context,
+      );
+
+      expect(result.skipped.bills).toBe(3);
     });
   });
 });

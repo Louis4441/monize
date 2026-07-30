@@ -30,7 +30,10 @@ import { MnyParserService } from "@/import/mny/mny-parser.service";
 import { MnyStagingService } from "@/import/mny/mny-staging.service";
 import { readMnyFixture } from "@/import/mny/__fixtures__/mny-fixtures";
 import {
+  billData,
+  investmentData,
   mnyAccount,
+  mnyBill,
   mnyCategory,
   mnyCurrency,
   mnyDefaults,
@@ -47,6 +50,9 @@ import {
   mapPayees,
 } from "@/import/mny/map/map-reference";
 import { mapTransactions } from "@/import/mny/map/map-transactions";
+import { mapBills } from "@/import/mny/map/map-bills";
+import { mapLoans } from "@/import/mny/map/map-loans";
+import { mapSecurities } from "@/import/mny/map/map-securities";
 import { DEFAULT_MNY_IMPORT_OPTIONS } from "@/import/mny/model/mny-import-options";
 import {
   applyDeferredClosures,
@@ -58,6 +64,10 @@ import {
   writeAccountBalances,
   writeTransactions,
 } from "@/import/mny/writers/write-transactions";
+import { writeBills } from "@/import/mny/writers/write-bills";
+import { writeLoans } from "@/import/mny/writers/write-loans";
+import { ScheduledTransaction } from "@/scheduled-transactions/entities/scheduled-transaction.entity";
+import { ScheduledTransactionSplit } from "@/scheduled-transactions/entities/scheduled-transaction-split.entity";
 import { withScopedDb } from "@/common/db/scoped-db";
 import { withUserContext } from "@/common/db/with-context";
 
@@ -89,6 +99,8 @@ describe("mny writers (integration)", () => {
     "investment_transactions",
     "transaction_splits",
     "transactions",
+    "scheduled_transaction_splits",
+    "scheduled_transactions",
     "security_prices",
     "securities",
     "import_jobs",
@@ -739,6 +751,279 @@ describe("mny writers (integration)", () => {
       await expect(
         inTransaction((manager) => writeAccountBalances(manager, new Map())),
       ).resolves.toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Bills and loan terms
+  // -------------------------------------------------------------------------
+
+  describe("writeBills and writeLoans", () => {
+    /**
+     * A mortgage payment as Money records it: a split in the chequing account
+     * with a transfer leg for principal and a category leg for interest, plus
+     * an active `BILL` series whose template is that same shape.
+     */
+    async function setup(nextDue: string) {
+      const reference = referenceData({
+        currencies: [mnyCurrency({ handle: 1, isoCode: "USD" })],
+        defaults: mnyDefaults({ defaultCurrency: 1 }),
+        accounts: [
+          mnyAccount({ handle: 1, name: "Chequing" }),
+          mnyAccount({ handle: 9, type: 6, name: "Mortgage" }),
+        ],
+        payees: [mnyPayee({ handle: 30, name: "Bank" })],
+        categories: [
+          mnyCategory({
+            handle: 131,
+            name: "EXPENSE",
+            level: 0,
+            categoryType: -1,
+          }),
+          mnyCategory({ handle: 60, name: "Interest", level: 1, parent: 131 }),
+        ],
+      });
+
+      // htrn 1..3: a posted payment. htrn 10..12: the bill's template.
+      const data = transactionData({
+        transactions: [
+          mnyTransaction({ handle: 1, account: 1, amount: -1500, payee: 30 }),
+          mnyTransaction({ handle: 2, account: 1, amount: -1000 }),
+          mnyTransaction({
+            handle: 3,
+            account: 1,
+            amount: -500,
+            category: 60,
+            memo: "interest",
+          }),
+          mnyTransaction({ handle: 4, account: 9, amount: 1000 }),
+          mnyTransaction({
+            handle: 10,
+            account: 1,
+            amount: -1500,
+            payee: 30,
+            frequency: 3,
+            date: null,
+          }),
+          mnyTransaction({
+            handle: 11,
+            account: 1,
+            amount: -1000,
+            frequency: 3,
+            date: null,
+          }),
+          mnyTransaction({
+            handle: 12,
+            account: 1,
+            amount: -500,
+            category: 60,
+            frequency: 3,
+            date: null,
+          }),
+          mnyTransaction({
+            handle: 13,
+            account: 9,
+            amount: 1000,
+            frequency: 3,
+            date: null,
+          }),
+        ],
+        splits: [
+          mnySplit({ parent: 1, child: 2, position: 0 }),
+          mnySplit({ parent: 1, child: 3, position: 1 }),
+          mnySplit({ parent: 10, child: 11, position: 0 }),
+          mnySplit({ parent: 10, child: 12, position: 1 }),
+        ],
+        transfers: [
+          mnyTransfer({ from: 2, to: 4 }),
+          mnyTransfer({ from: 11, to: 13 }),
+        ],
+      });
+
+      const bills = billData({
+        bills: [
+          mnyBill({
+            handle: 7,
+            series: 7,
+            frequency: 3,
+            nextDue,
+            templateTransaction: 10,
+          }),
+        ],
+      });
+
+      const accounts = mapAccounts(
+        reference,
+        DEFAULT_MNY_IMPORT_OPTIONS,
+        "USD",
+      );
+      const transactions = mapTransactions({
+        transactions: data,
+        accountKeyByHandle: accounts.keyByHandle,
+        currencyByHandle: accounts.currencyByHandle,
+        bills: bills.bills,
+      });
+      const securities = mapSecurities({
+        securities: [],
+        currencyByHandle: new Map(),
+        baseCurrency: "USD",
+      });
+      const mappedBills = mapBills({
+        bills,
+        transactions: data,
+        investments: investmentData(),
+        accounts,
+        securities,
+        payees: reference.payees,
+        asOf: nextDue,
+      });
+      const loans = mapLoans({
+        accounts,
+        transactions,
+        bills: mappedBills.bills,
+      });
+      const categories = mapCategories(reference, null);
+      const payees = mapPayees(reference.payees, null);
+
+      const written = await inTransaction(async (manager) => {
+        const writtenAccounts = await writeAccounts(
+          manager,
+          userId,
+          accounts.accounts,
+        );
+        const writtenCategories = await writeCategories(
+          manager,
+          userId,
+          categories.categories,
+        );
+        const writtenPayees = await writePayees(manager, userId, payees.payees);
+        return { writtenAccounts, writtenCategories, writtenPayees };
+      });
+
+      const categoryIdByHandle = new Map(
+        [...categories.byHandle].map(([handle, category]) => [
+          handle,
+          written.writtenCategories.idByFullName.get(category.fullName)!,
+        ]),
+      );
+
+      return {
+        mappedBills,
+        loans,
+        accountIdByKey: written.writtenAccounts.idByKey,
+        categoryIdByHandle,
+        billInput: {
+          accountIdByKey: written.writtenAccounts.idByKey,
+          payeeIdByHandle: new Map(
+            [...payees.nameByHandle].map(([handle, name]) => [
+              handle,
+              written.writtenPayees.idByName.get(name)!,
+            ]),
+          ),
+          payeeNameByHandle: payees.nameByHandle,
+          categoryIdByHandle,
+          securityIdByHandle: new Map<number, string>(),
+          linkedKeyByKey: new Map<string, string>(),
+        },
+      };
+    }
+
+    it("writes a selected bill as an active, non-auto-posting schedule with its splits", async () => {
+      const { mappedBills, billInput } = await setup("2026-08-01");
+      expect(mappedBills.bills.map((bill) => bill.handle)).toEqual([7]);
+
+      const written = await inTransaction((manager) =>
+        writeBills(manager, userId, {
+          ...billInput,
+          bills: mappedBills.bills,
+        }),
+      );
+
+      expect(written.created).toBe(1);
+      const schedules = await dataSource
+        .getRepository(ScheduledTransaction)
+        .find({ where: { userId } });
+      expect(schedules).toHaveLength(1);
+      expect(schedules[0]).toMatchObject({
+        name: "Bank",
+        isActive: true,
+        autoPost: false,
+        isSplit: true,
+        frequency: "MONTHLY",
+        nextDueDate: "2026-08-01",
+      });
+
+      const splits = await dataSource
+        .getRepository(ScheduledTransactionSplit)
+        .find({ where: { scheduledTransactionId: schedules[0].id } });
+      expect(splits).toHaveLength(2);
+      // The principal leg keeps its transfer nature all the way to the row.
+      expect(
+        splits.some(
+          (split) =>
+            split.kind === SplitKind.TRANSFER &&
+            split.transferAccountId !== null,
+        ),
+      ).toBe(true);
+    });
+
+    it("leaves an unticked bill out of the database entirely", async () => {
+      // Not inactive -- absent. PR #192 created all 1,844 and deactivated them.
+      const { billInput } = await setup("2026-08-01");
+
+      const written = await inTransaction((manager) =>
+        writeBills(manager, userId, { ...billInput, bills: [] }),
+      );
+
+      expect(written.created).toBe(0);
+      await expect(
+        dataSource
+          .getRepository(ScheduledTransaction)
+          .count({ where: { userId } }),
+      ).resolves.toBe(0);
+    });
+
+    it("configures the mortgage from its payments and its bill", async () => {
+      const { loans, accountIdByKey, categoryIdByHandle } =
+        await setup("2026-08-01");
+
+      const written = await inTransaction((manager) =>
+        writeLoans(manager, userId, {
+          loans: loans.loans,
+          accountIdByKey,
+          categoryIdByHandle,
+        }),
+      );
+
+      expect(written.updated).toBe(1);
+      const mortgage = await dataSource.getRepository(Account).findOne({
+        where: { id: accountIdByKey.get("acct-9")!, userId },
+      });
+      expect(mortgage).toMatchObject({
+        interestBookingMode: "SPLIT",
+        interestCategoryId: categoryIdByHandle.get(60),
+        sourceAccountId: accountIdByKey.get("acct-1"),
+        paymentFrequency: "MONTHLY",
+      });
+      expect(Number(mortgage!.paymentAmount)).toBe(1500);
+    });
+
+    it("does not re-create the schedule on a second import of the same file", async () => {
+      const { mappedBills, billInput } = await setup("2026-08-01");
+
+      await inTransaction((manager) =>
+        writeBills(manager, userId, { ...billInput, bills: mappedBills.bills }),
+      );
+      const second = await inTransaction((manager) =>
+        writeBills(manager, userId, { ...billInput, bills: mappedBills.bills }),
+      );
+
+      expect(second).toEqual({ created: 0, reused: 1 });
+      await expect(
+        dataSource
+          .getRepository(ScheduledTransaction)
+          .count({ where: { userId } }),
+      ).resolves.toBe(1);
     });
   });
 

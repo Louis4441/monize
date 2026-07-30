@@ -317,9 +317,10 @@
       "investmentDetail": "증권 이전 {transfers}건, 주식 분할 {splits}건",
       "prices": "가격 이력",
       "exchangeRates": "환율",
-      "ofTotal": "파일의 {total}개 중"
+      "ofTotal": "파일의 {total}개 중",
+      "bills": "예약된 청구",
+      "billsOfRows": "{rows}개 청구 항목 중 활성"
     },
-    "notYetImported": "예약 청구는 아직 가져오지 않습니다. 청구 행 {bills}개는 이후 릴리스로 남겨둡니다. 이 파일의 나머지는 모두 가져옵니다.",
     "accountsHeading": "계정 ({count})",
     "selectAll": "모두 선택",
     "selectNone": "선택 해제",
@@ -349,10 +350,47 @@
       "importPrices": "가격 이력 가져오기",
       "importPricesHint": "각 증권이 날마다 얼마였는지에 대한 Money 자체의 기록입니다. 현재 시세부터 시작하려면 끄세요.",
       "importExchangeRates": "환율 가져오기",
-      "importExchangeRatesHint": "파일에 있는 통화 간의 과거 환율입니다. 과거 외화 거래가 Money가 환산하던 대로 환산됩니다."
+      "importExchangeRatesHint": "파일에 있는 통화 간의 과거 환율입니다. 과거 외화 거래가 Money가 환산하던 대로 환산됩니다.",
+      "wipeExistingData": "새로 시작: 기존 Monize 데이터를 먼저 삭제",
+      "wipeExistingDataHint": "가져오기 전에 설정의 내 데이터 삭제와 동일한 작업을 실행합니다. 확인을 요청합니다. 기존 데이터에 Money 파일을 추가하려면 꺼 두세요."
     },
     "warningsHeading": "이 파일에 대한 참고 사항",
     "startImport": "가져오기 시작"
+  },
+  "mnyBills": {
+    "heading": "생성할 예약된 청구 ({count})",
+    "explainer": "Money는 청구가 발생할 때마다 한 행씩 저장하므로 오래된 기록에는 수천 개가 쌓입니다. 여기 있는 것은 아직 활성으로 보이는 시리즈입니다. 원하지 않는 항목은 선택을 해제하세요. 선택 해제된 청구는 아예 생성되지 않습니다.",
+    "unsupported": "이 Money 버전은 예약된 청구 기능 이전이라 가져올 청구가 없습니다.",
+    "skipped": "{count, plural, other {#개 청구 시리즈}}에 템플릿이나 사용 가능한 날짜가 없어 가져올 수 없습니다.",
+    "table": {
+      "include": "가져오기",
+      "includeBill": "{name} 가져오기",
+      "bill": "청구",
+      "account": "계정",
+      "frequency": "빈도",
+      "nextDue": "다음 예정일",
+      "amount": "금액",
+      "transfer": "이체",
+      "investment": "투자",
+      "splits": "{count, plural, other {#개 분할}}",
+      "approximate": "가장 가까운 Monize 빈도"
+    }
+  },
+  "mnyWipe": {
+    "heading": "기존 데이터를 먼저 삭제할까요?",
+    "body": "가져오기가 시작되기 전에 설정 -> 위험 구역과 동일한 내 데이터 삭제 작업을 실행합니다. 삭제되는 항목:",
+    "removes": {
+      "transactions": "모든 거래 및 분할",
+      "scheduled": "모든 예약 및 반복 거래",
+      "investments": "모든 증권, 가격, 보유 종목 및 투자 거래",
+      "accounts": "모든 계정, 카테고리 및 거래처",
+      "budgets": "모든 예산, 사용자 지정 보고서, 태그 및 가져오기 매핑"
+    },
+    "irreversible": "이 작업은 되돌릴 수 없습니다. 이후 가져오기가 실패해도 삭제된 데이터는 복구되지 않습니다.",
+    "typeToConfirm": "확인하려면 {word}를 입력하세요:",
+    "passwordLabel": "비밀번호를 입력하세요:",
+    "oidcNote": "ID 공급자가 이미 이 세션을 확인했으므로 비밀번호가 필요하지 않습니다.",
+    "confirm": "내 데이터 삭제 후 가져오기"
   },
   "mnyImporting": {
     "heading": "Money 파일을 가져오는 중",
@@ -387,7 +425,8 @@
       "securities": "증권",
       "investments": "투자 거래",
       "prices": "가격",
-      "exchangeRates": "환율"
+      "exchangeRates": "환율",
+      "bills": "예약된 청구"
     },
     "existingDataRemoved": "요청하신 대로 이번 가져오기 전에 기존 데이터를 삭제했습니다.",
     "verificationHeading": "잔액 검증",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, other {투자 거래 #건}}에 파일상 주식 명세가 없어 현금 금액으로만 가져왔습니다.",
     "investmentAccountMismatch": "{count, plural, other {투자 거래 #건}}이 투자 계정이 아닌 계정에 있어 건너뛰었습니다.",
     "unusableSecuritySplit": "{count, plural, other {주식 분할 #건}}을 증권과 연결할 수 없거나 비율을 쓸 수 없어 적용하지 않았습니다.",
-    "holdingsMismatch": "{count, plural, other {보유 자산 #개}}가 Money 파일에 기록된 주식수와 일치하지 않습니다."
+    "holdingsMismatch": "{count, plural, other {보유 자산 #개}}가 Money 파일에 기록된 주식수와 일치하지 않습니다.",
+    "billTemplateMissing": "{count, plural, other {#개 예약된 청구}}에 파일 내 템플릿 거래가 없어 건너뛰었습니다.",
+    "unusableBill": "{count, plural, other {#개 예약된 청구}}에 계정, 사용 가능한 날짜 또는 인식된 반복 주기가 없어 건너뛰었습니다.",
+    "billFrequencyApproximated": "{count, plural, other {#개 예약된 청구}}가 Monize에서 정확히 표현할 수 없는 반복 주기를 사용하여 가장 가까운 더 짧은 주기를 사용했습니다."
   },
   "mnyErrors": {
     "mnyImportFailed": "가져오는 중 문제가 발생했습니다. 저장된 것은 없으므로 다시 시도할 수 있습니다.",

@@ -97,8 +97,10 @@ export function useImportWizard() {
     retryWithPassword: retryMnyWithPassword,
     start: startMny,
     reset: resetMny,
+    options: mnyOptions,
   } = mny;
   const [mnyFileName, setMnyFileName] = useState('');
+  const [showMnyWipeConfirm, setShowMnyWipeConfirm] = useState(false);
   const [importFiles, setImportFiles] = useState<ImportFileData[]>([]);
   const fileContent = importFiles[0]?.fileContent || '';
   const fileName = importFiles[0]?.fileName || '';
@@ -1109,9 +1111,32 @@ export function useImportWizard() {
     [startMny],
   );
 
+  /**
+   * The review step's Import button. Ticking "start fresh" only arms the
+   * confirmation: the wipe runs the same delete-my-data operation as Settings
+   * and needs the typed keyword plus the account password, so an import that
+   * would delete existing data can never begin from one click.
+   */
+  const handleMnyImportClick = useCallback(() => {
+    if (mnyOptions.wipeExistingData) {
+      setShowMnyWipeConfirm(true);
+      return;
+    }
+    void handleMnyStart();
+  }, [mnyOptions.wipeExistingData, handleMnyStart]);
+
+  const handleMnyWipeConfirm = useCallback(
+    async (password: string) => {
+      setShowMnyWipeConfirm(false);
+      await handleMnyStart(password || undefined);
+    },
+    [handleMnyStart],
+  );
+
   const handleMnyDone = useCallback(() => {
     resetMny();
     setMnyFileName('');
+    setShowMnyWipeConfirm(false);
     setImportFiles([]);
     setStep('upload');
   }, [resetMny]);
@@ -1148,5 +1173,7 @@ export function useImportWizard() {
     handleDeleteColumnMapping,
     // Microsoft Money (.mny)
     mny, mnyFileName, handleMnyPasswordSubmit, handleMnyStart, handleMnyDone,
+    showMnyWipeConfirm, handleMnyImportClick, handleMnyWipeConfirm,
+    cancelMnyWipeConfirm: () => setShowMnyWipeConfirm(false),
   };
 }

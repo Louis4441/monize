@@ -15,9 +15,13 @@ import {
 import { mapTransactions } from "./map/map-transactions";
 import { mapSecurities } from "./map/map-securities";
 import { mapInvestments } from "./map/map-investments";
+import { billReferences, mapBills, selectedBills } from "./map/map-bills";
+import { mapLoans } from "./map/map-loans";
 import { crossCheckHoldings } from "./map/check-holdings";
 import {
   MappedAccounts,
+  MappedBills,
+  MappedLoans,
   MappedCategories,
   MappedInvestments,
   MappedPayees,
@@ -84,6 +88,17 @@ export interface MnyParsedFile {
   readonly payees: MappedPayees;
   readonly securities: MappedSecurities;
   readonly investments: MappedInvestments;
+  /**
+   * Detected-active bill candidates. `options.bills` holds the selected
+   * handles: the server default is every candidate, an explicit list (possibly
+   * empty) is the wizard's choice, and only selected bills are written.
+   */
+  readonly bills: MappedBills;
+  /**
+   * Loan and mortgage terms inferred from the payments and bills that were
+   * imported. Empty when the file has no loan accounts.
+   */
+  readonly loans: MappedLoans;
   /**
    * `SP` and `CRNC_EXCHG` rows, and the currency handle map, passed straight
    * through to the price and rate writers. These two tables are the largest
@@ -360,21 +375,56 @@ export class MnyParserService {
       securities,
     });
 
-    // Referenced-only filtering has to see both pipelines: a payee or category
-    // only a dividend uses is still referenced.
+    const asOf = input.asOf ?? todayIsoDate();
+    const bills = mapBills({
+      bills: tables.bills,
+      transactions: tables.transactions,
+      investments: tables.investments,
+      accounts,
+      securities,
+      payees: tables.reference.payees,
+      asOf,
+    });
+    // An absent `bills` option means "every detected-active candidate" -- the
+    // server default the preview echoes. An explicit list, including an empty
+    // one, is the wizard's selection and is only narrowed to real candidates.
+    const candidateHandles = new Set(bills.bills.map((bill) => bill.handle));
+    const selectedBillHandles =
+      input.options?.bills === undefined
+        ? [...candidateHandles]
+        : options.bills.filter((handle) => candidateHandles.has(handle));
+    const resolvedOptions: MnyImportOptions = {
+      ...options,
+      bills: selectedBillHandles,
+    };
+    const billRefs = billReferences(selectedBills(bills, selectedBillHandles));
+    const loans = mapLoans({
+      accounts,
+      transactions,
+      bills: selectedBills(bills, selectedBillHandles),
+    });
+
+    // Referenced-only filtering has to see every pipeline: a payee or category
+    // only a dividend or a selected bill uses is still referenced.
     const categories = mapCategories(
       tables.reference,
       options.referencedOnlyCategories
         ? union(
-            transactions.referencedCategories,
-            investments.referencedCategories,
+            union(
+              transactions.referencedCategories,
+              investments.referencedCategories,
+            ),
+            billRefs.categories,
           )
         : null,
     );
     const payees = mapPayees(
       tables.reference.payees,
       options.referencedOnlyPayees
-        ? union(transactions.referencedPayees, investments.referencedPayees)
+        ? union(
+            union(transactions.referencedPayees, investments.referencedPayees),
+            billRefs.payees,
+          )
         : null,
     );
 
@@ -391,7 +441,7 @@ export class MnyParserService {
     return {
       era,
       passwordProtected: db.passwordProtected,
-      options,
+      options: resolvedOptions,
       baseCurrency: accounts.baseCurrency,
       currencyCodes: importedCurrencyCodes(
         accounts,
@@ -406,6 +456,8 @@ export class MnyParserService {
       payees,
       securities,
       investments,
+      bills,
+      loans,
       rawPrices: tables.investments.prices,
       rawExchangeRates: tables.reference.exchangeRates,
       currencyByHandle,
@@ -413,7 +465,7 @@ export class MnyParserService {
       expectedBalances: computeExpectedBalances(
         accounts,
         transactions,
-        input.asOf ?? todayIsoDate(),
+        asOf,
         investments,
       ),
       transactionCounts: countTransactionsByAccount(transactions, investments),
@@ -435,6 +487,8 @@ export class MnyParserService {
         ...securities.warnings,
         ...investments.warnings,
         ...holdings.warnings,
+        ...bills.warnings,
+        ...loans.warnings,
         ...categories.warnings,
         ...payees.warnings,
       ],

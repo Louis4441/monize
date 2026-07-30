@@ -47,7 +47,7 @@ describe("MnyImportJobService (integration)", () => {
     pricesImported: 0,
     exchangeRatesImported: 0,
     billsCreated: 0,
-    skipped: { accounts: 0, payees: 0, categories: 0, transactions: 0 },
+    skipped: { accounts: 0, payees: 0, categories: 0, transactions: 0, bills: 0 },
     existingDataRemoved: false,
     verification: [],
     holdings: [],

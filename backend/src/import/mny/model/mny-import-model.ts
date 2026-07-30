@@ -1,10 +1,12 @@
 import {
   AccountSubType,
   AccountType,
+  InterestBookingMode,
 } from "../../../accounts/entities/account.entity";
 import { TransactionStatus } from "../../../transactions/entities/transaction.entity";
 import { SplitKind } from "../../../transactions/entities/split-kind.enum";
 import { InvestmentAction } from "../../../securities/entities/investment-transaction.entity";
+import { FrequencyType } from "../../../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { MnyWarning } from "./mny-warnings";
 
 /**
@@ -251,6 +253,117 @@ export interface MappedInvestments {
   readonly splitsApplied: number;
   /** Security-carrying rows that could not be imported. */
   readonly skipped: number;
+  readonly warnings: readonly MnyWarning[];
+}
+
+// ---------------------------------------------------------------------------
+// Bills
+// ---------------------------------------------------------------------------
+
+/** One leg of a scheduled transaction built from a bill template's splits. */
+export interface MappedBillSplit {
+  readonly kind: SplitKind;
+  /** Money `hcat` for a category leg; null for a transfer leg. */
+  readonly categoryHandle: number | null;
+  /** Account key a transfer leg pays into -- typically the loan account. */
+  readonly transferAccountKey: string | null;
+  readonly amount: number;
+  readonly memo: string | null;
+}
+
+/** The investment template of a bill that schedules a recurring trade. */
+export interface MappedBillInvestment {
+  readonly action: InvestmentAction;
+  readonly securityHandle: number;
+  readonly quantity: number | null;
+  readonly price: number | null;
+  readonly commission: number;
+}
+
+/**
+ * One detected-active bill series, ready to become a scheduled transaction.
+ *
+ * `handle` is the representative `BILL.hbill` and doubles as the wizard's
+ * selection key (`options.bills`). Only detected-active series are mapped; the
+ * checkbox list is the safety net for the detection being wrong in either
+ * direction (design section 3, issue 2 -- 1,844 rows, ~20 real bills).
+ */
+export interface MappedBill {
+  /** Representative `BILL.hbill`; the wizard's selection key. */
+  readonly handle: number;
+  /** `BILL.hbillHead`, or the row's own handle when the file has no series. */
+  readonly seriesKey: number;
+  /** Raw `BILL.st`, surfaced so real files can pin its semantics (question 12.3). */
+  readonly status: number;
+  /** Payee name, else the template's memo, else a generated fallback. */
+  readonly name: string;
+  readonly accountKey: string;
+  readonly payeeHandle: number | null;
+  /** Null when the bill is a transfer, an investment, or split. */
+  readonly categoryHandle: number | null;
+  readonly amount: number;
+  readonly currencyCode: string;
+  readonly frequency: FrequencyType;
+  /** True when Monize cannot express the exact Money recurrence interval. */
+  readonly approximate: boolean;
+  readonly nextDueDate: string;
+  readonly endDate: string | null;
+  readonly description: string | null;
+  readonly isTransfer: boolean;
+  readonly transferAccountKey: string | null;
+  readonly investment: MappedBillInvestment | null;
+  readonly splits: readonly MappedBillSplit[];
+}
+
+export interface MappedBills {
+  /** Detected-active candidates, one per series. */
+  readonly bills: readonly MappedBill[];
+  /** Distinct series seen in the file, active or not. */
+  readonly seriesInFile: number;
+  /** Series that could not be mapped at all (no template, no usable date). */
+  readonly skipped: number;
+  /** False for Money 2001 files, which predate the `BILL` table. */
+  readonly supported: boolean;
+  readonly warnings: readonly MnyWarning[];
+}
+
+// ---------------------------------------------------------------------------
+// Loans
+// ---------------------------------------------------------------------------
+
+/**
+ * What a loan or mortgage account's imported payments say about its terms.
+ *
+ * Money has no loan-terms table, so every field here is inferred from payment
+ * shape and from the bill that pays the loan. A field the evidence does not
+ * settle stays null and the writer leaves the account's own value alone.
+ */
+export interface MappedLoanTerms {
+  readonly accountKey: string;
+  /**
+   * The category the payments book interest to, or null when the payments name
+   * more than one non-principal category (a loan with an escrow leg does), in
+   * which case escrow and interest cannot be told apart.
+   */
+  readonly interestCategoryHandle: number | null;
+  /**
+   * `SPLIT` when every observed payment booked interest as a split leg, which
+   * is what `RateChangeInferenceService` needs so it does not also pair
+   * standalone interest expenses and double-count. Null leaves the default.
+   */
+  readonly interestBookingMode: InterestBookingMode | null;
+  /** Account key the payments came from -- the loan's funding account. */
+  readonly sourceAccountKey: string | null;
+  /** Scheduled installment, from the bill when there is one. */
+  readonly paymentAmount: number | null;
+  readonly paymentFrequency: FrequencyType | null;
+  readonly paymentStartDate: string | null;
+  /** Split-booked payments seen; 0 when the terms came only from a bill. */
+  readonly paymentsObserved: number;
+}
+
+export interface MappedLoans {
+  readonly loans: readonly MappedLoanTerms[];
   readonly warnings: readonly MnyWarning[];
 }
 

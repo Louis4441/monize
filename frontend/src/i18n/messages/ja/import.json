@@ -317,9 +317,10 @@
       "investmentDetail": "証券振替 {transfers} 件、株式分割 {splits} 件",
       "prices": "価格履歴",
       "exchangeRates": "為替レート",
-      "ofTotal": "ファイル内 {total} 件のうち"
+      "ofTotal": "ファイル内 {total} 件のうち",
+      "bills": "予定された支払い",
+      "billsOfRows": "{rows} 件の支払い行のうち有効"
     },
-    "notYetImported": "予定された請求はまだ取り込まれません。請求行 {bills} 件は今後のリリースに残されます。このファイルのそれ以外はすべて取り込まれます。",
     "accountsHeading": "口座 ({count})",
     "selectAll": "すべて選択",
     "selectNone": "選択を解除",
@@ -349,10 +350,47 @@
       "importPrices": "価格履歴を取り込む",
       "importPricesHint": "各銘柄が日々いくらだったかという Money 自身の記録です。現在の相場から始めたい場合はオフにしてください。",
       "importExchangeRates": "為替レートを取り込む",
-      "importExchangeRatesHint": "ファイル内の通貨間の過去レートです。これにより過去の外貨取引が Money と同じように換算されます。"
+      "importExchangeRatesHint": "ファイル内の通貨間の過去レートです。これにより過去の外貨取引が Money と同じように換算されます。",
+      "wipeExistingData": "最初からやり直す: 既存の Monize データを先に削除する",
+      "wipeExistingDataHint": "インポート前に、設定と同じ「データを削除」操作を実行します。確認を求められます。Money ファイルを既存のデータに追加する場合はオフのままにしてください。"
     },
     "warningsHeading": "このファイルに関する注意",
     "startImport": "インポートを開始"
+  },
+  "mnyBills": {
+    "heading": "作成する予定の支払い ({count})",
+    "explainer": "Money は支払いの発生ごとに 1 行を保存するため、長い履歴には数千行が含まれます。ここに表示されているのは、まだ有効と思われるシリーズです。不要なものはチェックを外してください。チェックを外した支払いはまったく作成されません。",
+    "unsupported": "この Money バージョンは予定された支払い機能より前のもので、インポートできる支払いはありません。",
+    "skipped": "{count, plural, other {# 件の支払いシリーズ}} にテンプレートまたは利用可能な日付がなく、インポートできません。",
+    "table": {
+      "include": "インポート",
+      "includeBill": "{name} をインポート",
+      "bill": "支払い",
+      "account": "口座",
+      "frequency": "頻度",
+      "nextDue": "次回期日",
+      "amount": "金額",
+      "transfer": "振替",
+      "investment": "投資",
+      "splits": "{count, plural, other {# 件の分割}}",
+      "approximate": "最も近い Monize の頻度"
+    }
+  },
+  "mnyWipe": {
+    "heading": "既存のデータを先に削除しますか？",
+    "body": "インポート開始前に、設定 -> 危険ゾーンと同じ「データを削除」操作を実行します。削除される対象:",
+    "removes": {
+      "transactions": "すべての取引と分割",
+      "scheduled": "すべての予定取引と定期取引",
+      "investments": "すべての銘柄、価格、保有、投資取引",
+      "accounts": "すべての口座、カテゴリ、支払先",
+      "budgets": "すべての予算、カスタムレポート、タグ、インポートマッピング"
+    },
+    "irreversible": "この操作は取り消せません。その後インポートが失敗しても、削除されたデータは戻りません。",
+    "typeToConfirm": "確認のため {word} と入力してください:",
+    "passwordLabel": "パスワードを入力してください:",
+    "oidcNote": "ID プロバイダーがこのセッションを既に確認済みのため、パスワードは不要です。",
+    "confirm": "データを削除してインポート"
   },
   "mnyImporting": {
     "heading": "Money ファイルをインポート中",
@@ -387,7 +425,8 @@
       "securities": "有価証券",
       "investments": "投資取引",
       "prices": "価格",
-      "exchangeRates": "為替レート"
+      "exchangeRates": "為替レート",
+      "bills": "予定された支払い"
     },
     "existingDataRemoved": "ご指定どおり、このインポートの前に既存データを削除しました。",
     "verificationHeading": "残高の検証",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, other {# 件の投資取引}} にはファイル内に株数の明細がなかったため、現金額のみで取り込みました。",
     "investmentAccountMismatch": "{count, plural, other {# 件の投資取引}} が投資口座ではない口座にあったため、スキップしました。",
     "unusableSecuritySplit": "{count, plural, other {# 件の株式分割}} は証券と対応付けられないか比率が使用できなかったため、適用しませんでした。",
-    "holdingsMismatch": "{count, plural, other {# 件の保有銘柄}} が Money ファイルに記録された株数と一致しません。"
+    "holdingsMismatch": "{count, plural, other {# 件の保有銘柄}} が Money ファイルに記録された株数と一致しません。",
+    "billTemplateMissing": "{count, plural, other {# 件の予定された支払い}} にファイル内のテンプレート取引がなく、スキップしました。",
+    "unusableBill": "{count, plural, other {# 件の予定された支払い}} に口座、利用可能な日付、または認識できる繰り返し設定がなく、スキップしました。",
+    "billFrequencyApproximated": "{count, plural, other {# 件の予定された支払い}} は Monize が正確に表現できない繰り返し間隔を使用しているため、最も近い短い間隔を使用しました。"
   },
   "mnyErrors": {
     "mnyImportFailed": "インポート中に問題が発生しました。何も保存されていないため、やり直せます。",

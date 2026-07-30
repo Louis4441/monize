@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} trasferimenti di titoli, {splits} suddivisioni azionarie",
       "prices": "Storico prezzi",
       "exchangeRates": "Tassi di cambio",
-      "ofTotal": "su {total} nel file"
+      "ofTotal": "su {total} nel file",
+      "bills": "Bollette pianificate",
+      "billsOfRows": "attive su {rows} righe di bollette"
     },
-    "notYetImported": "Le scadenze pianificate non vengono ancora importate: {bills} righe di scadenze sono rimandate a una versione successiva. Tutto il resto di questo file viene importato per intero.",
     "accountsHeading": "Conti ({count})",
     "selectAll": "Seleziona tutto",
     "selectNone": "Deseleziona tutto",
@@ -349,10 +350,47 @@
       "importPrices": "Importa lo storico prezzi",
       "importPricesHint": "Il registro che Money tiene del valore di ogni titolo, giorno per giorno. Disattivalo se preferisci partire dalle quotazioni attuali.",
       "importExchangeRates": "Importa i tassi di cambio",
-      "importExchangeRatesHint": "Tassi storici fra le valute presenti nel file, così le vecchie operazioni in valuta estera vengono convertite come le convertiva Money."
+      "importExchangeRatesHint": "Tassi storici fra le valute presenti nel file, così le vecchie operazioni in valuta estera vengono convertite come le convertiva Money.",
+      "wipeExistingData": "Ricomincia da zero: rimuovi prima i miei dati Monize esistenti",
+      "wipeExistingDataHint": "Esegue la stessa operazione Elimina i miei dati delle Impostazioni prima dell'importazione. Ti verrà chiesta conferma. Lascialo disattivato per aggiungere il file Money a quello che hai già."
     },
     "warningsHeading": "Note su questo file",
     "startImport": "Avvia importazione"
+  },
+  "mnyBills": {
+    "heading": "Bollette pianificate da creare ({count})",
+    "explainer": "Money conserva una riga per ogni ricorrenza di una bolletta, quindi uno storico lungo ne contiene migliaia. Queste sono le serie che sembrano ancora attive. Deseleziona quelle che non vuoi: le bollette deselezionate non vengono create affatto.",
+    "unsupported": "Questa versione di Money è precedente alle bollette pianificate, quindi non ce ne sono da importare.",
+    "skipped": "{count, plural, one {# serie di bollette non aveva} other {# serie di bollette non avevano}} un modello o una data utilizzabile e non possono essere importate.",
+    "table": {
+      "include": "Importa",
+      "includeBill": "Importa {name}",
+      "bill": "Bolletta",
+      "account": "Conto",
+      "frequency": "Frequenza",
+      "nextDue": "Prossima scadenza",
+      "amount": "Importo",
+      "transfer": "Trasferimento",
+      "investment": "Investimento",
+      "splits": "{count, plural, one {# suddivisione} other {# suddivisioni}}",
+      "approximate": "Frequenza Monize più vicina"
+    }
+  },
+  "mnyWipe": {
+    "heading": "Rimuovere prima i tuoi dati esistenti?",
+    "body": "Esegue la stessa operazione Elimina i miei dati di Impostazioni -> Zona pericolosa, prima che l'importazione inizi. Rimuove:",
+    "removes": {
+      "transactions": "Ogni transazione e suddivisione",
+      "scheduled": "Ogni transazione pianificata e ricorrente",
+      "investments": "Ogni titolo, quotazione, posizione e transazione di investimento",
+      "accounts": "Ogni conto, categoria e beneficiario",
+      "budgets": "Ogni budget, report personalizzato, tag e mappatura di importazione"
+    },
+    "irreversible": "Questa operazione non può essere annullata. Se l'importazione poi fallisce, i dati rimossi non tornano.",
+    "typeToConfirm": "Digita {word} per confermare:",
+    "passwordLabel": "Inserisci la tua password:",
+    "oidcNote": "Il tuo provider di identità ha già confermato questa sessione, quindi non serve alcuna password.",
+    "confirm": "Elimina i miei dati e importa"
   },
   "mnyImporting": {
     "heading": "Importazione del file Money in corso",
@@ -387,7 +425,8 @@
       "securities": "Titoli",
       "investments": "Transazioni di investimento",
       "prices": "Prezzi",
-      "exchangeRates": "Tassi di cambio"
+      "exchangeRates": "Tassi di cambio",
+      "bills": "Bollette pianificate"
     },
     "existingDataRemoved": "I dati esistenti sono stati rimossi prima di questa importazione, come richiesto.",
     "verificationHeading": "Verifica dei saldi",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, one {# transazione di investimento non aveva} other {# transazioni di investimento non avevano}} il dettaglio delle azioni nel file e sono state importate solo per l'importo in contanti.",
     "investmentAccountMismatch": "{count, plural, one {# transazione di investimento si trovava} other {# transazioni di investimento si trovavano}} in un conto che non è di investimento e sono state ignorate.",
     "unusableSecuritySplit": "{count, plural, one {# suddivisione azionaria non è} other {# suddivisioni azionarie non sono}} stata associata a un titolo o aveva un rapporto inutilizzabile, e non è stata applicata.",
-    "holdingsMismatch": "{count, plural, one {# posizione non corrisponde} other {# posizioni non corrispondono}} alle azioni registrate nel file Money."
+    "holdingsMismatch": "{count, plural, one {# posizione non corrisponde} other {# posizioni non corrispondono}} alle azioni registrate nel file Money.",
+    "billTemplateMissing": "{count, plural, one {# bolletta pianificata non aveva} other {# bollette pianificate non avevano}} una transazione modello nel file e sono state saltate.",
+    "unusableBill": "{count, plural, one {# bolletta pianificata non aveva} other {# bollette pianificate non avevano}} un conto, una data utilizzabile o una ricorrenza riconosciuta e sono state saltate.",
+    "billFrequencyApproximated": "{count, plural, one {# bolletta pianificata usa} other {# bollette pianificate usano}} un intervallo di ripetizione che Monize non può esprimere esattamente, quindi è stato usato il più breve più vicino."
   },
   "mnyErrors": {
     "mnyImportFailed": "Qualcosa è andato storto durante l'importazione. Non è stato salvato nulla: puoi riprovare.",

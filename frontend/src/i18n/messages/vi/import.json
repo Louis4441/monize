@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} lần chuyển chứng khoán, {splits} lần tách cổ phiếu",
       "prices": "Lịch sử giá",
       "exchangeRates": "Tỷ giá hối đoái",
-      "ofTotal": "trong {total} có trong tệp"
+      "ofTotal": "trong {total} có trong tệp",
+      "bills": "Hóa đơn đã lên lịch",
+      "billsOfRows": "đang hoạt động trong {rows} dòng hóa đơn"
     },
-    "notYetImported": "Hóa đơn định kỳ chưa được nhập: {bills} dòng hóa đơn để dành cho bản phát hành sau. Mọi thứ còn lại trong tệp này đều được nhập đầy đủ.",
     "accountsHeading": "Tài khoản ({count})",
     "selectAll": "Chọn tất cả",
     "selectNone": "Bỏ chọn tất cả",
@@ -349,10 +350,47 @@
       "importPrices": "Nhập lịch sử giá",
       "importPricesHint": "Bản ghi của chính Money về giá trị từng chứng khoán theo từng ngày. Tắt tùy chọn này nếu bạn muốn bắt đầu từ giá hiện tại.",
       "importExchangeRates": "Nhập tỷ giá hối đoái",
-      "importExchangeRatesHint": "Tỷ giá lịch sử giữa các loại tiền trong tệp của bạn, để các giao dịch ngoại tệ cũ được quy đổi đúng như Money đã quy đổi."
+      "importExchangeRatesHint": "Tỷ giá lịch sử giữa các loại tiền trong tệp của bạn, để các giao dịch ngoại tệ cũ được quy đổi đúng như Money đã quy đổi.",
+      "wipeExistingData": "Bắt đầu lại: xóa dữ liệu Monize hiện có của tôi trước",
+      "wipeExistingDataHint": "Chạy cùng thao tác Xóa dữ liệu của tôi như trong Cài đặt trước khi nhập. Bạn sẽ được yêu cầu xác nhận. Để tắt nếu muốn thêm tệp Money vào dữ liệu hiện có."
     },
     "warningsHeading": "Ghi chú về tệp này",
     "startImport": "Bắt đầu nhập"
+  },
+  "mnyBills": {
+    "heading": "Hóa đơn đã lên lịch sẽ tạo ({count})",
+    "explainer": "Money lưu một dòng cho mỗi lần hóa đơn xuất hiện, nên lịch sử dài chứa hàng nghìn dòng. Đây là các chuỗi vẫn còn có vẻ đang hoạt động. Bỏ chọn những mục bạn không muốn -- hóa đơn bỏ chọn sẽ không được tạo.",
+    "unsupported": "Phiên bản Money này có trước tính năng hóa đơn theo lịch, nên không có gì để nhập.",
+    "skipped": "{count, plural, other {# chuỗi hóa đơn}} không có mẫu hoặc ngày dùng được và không thể nhập.",
+    "table": {
+      "include": "Nhập",
+      "includeBill": "Nhập {name}",
+      "bill": "Hóa đơn",
+      "account": "Tài khoản",
+      "frequency": "Tần suất",
+      "nextDue": "Đến hạn kế tiếp",
+      "amount": "Số tiền",
+      "transfer": "Chuyển khoản",
+      "investment": "Đầu tư",
+      "splits": "{count, plural, other {# phân tách}}",
+      "approximate": "Tần suất Monize gần nhất"
+    }
+  },
+  "mnyWipe": {
+    "heading": "Xóa dữ liệu hiện có trước?",
+    "body": "Thao tác này chạy cùng tác vụ Xóa dữ liệu của tôi như trong Cài đặt -> Vùng nguy hiểm, trước khi bắt đầu nhập. Nó xóa:",
+    "removes": {
+      "transactions": "Mọi giao dịch và phân tách",
+      "scheduled": "Mọi giao dịch theo lịch và định kỳ",
+      "investments": "Mọi chứng khoán, giá, khoản nắm giữ và giao dịch đầu tư",
+      "accounts": "Mọi tài khoản, danh mục và người nhận",
+      "budgets": "Mọi ngân sách, báo cáo tùy chỉnh, thẻ và ánh xạ nhập"
+    },
+    "irreversible": "Không thể hoàn tác. Nếu việc nhập sau đó thất bại, dữ liệu đã xóa sẽ không quay lại.",
+    "typeToConfirm": "Nhập {word} để xác nhận:",
+    "passwordLabel": "Nhập mật khẩu của bạn:",
+    "oidcNote": "Nhà cung cấp danh tính đã xác nhận phiên này, nên không cần mật khẩu.",
+    "confirm": "Xóa dữ liệu của tôi và nhập"
   },
   "mnyImporting": {
     "heading": "Đang nhập tệp Money của bạn",
@@ -387,7 +425,8 @@
       "securities": "Chứng khoán",
       "investments": "Giao dịch đầu tư",
       "prices": "Giá",
-      "exchangeRates": "Tỷ giá hối đoái"
+      "exchangeRates": "Tỷ giá hối đoái",
+      "bills": "Hóa đơn đã lên lịch"
     },
     "existingDataRemoved": "Dữ liệu hiện có của bạn đã được xoá trước lần nhập này, theo yêu cầu.",
     "verificationHeading": "Kiểm tra số dư",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, other {# giao dịch đầu tư}} không có chi tiết cổ phiếu trong tệp và chỉ được nhập theo số tiền mặt.",
     "investmentAccountMismatch": "{count, plural, other {# giao dịch đầu tư}} nằm trong tài khoản không phải tài khoản đầu tư và đã bị bỏ qua.",
     "unusableSecuritySplit": "{count, plural, other {# lần tách cổ phiếu}} không khớp được với chứng khoán nào hoặc có tỷ lệ không dùng được, nên không được áp dụng.",
-    "holdingsMismatch": "{count, plural, other {# khoản nắm giữ}} không khớp với số cổ phiếu ghi trong tệp Money của bạn."
+    "holdingsMismatch": "{count, plural, other {# khoản nắm giữ}} không khớp với số cổ phiếu ghi trong tệp Money của bạn.",
+    "billTemplateMissing": "{count, plural, other {# hóa đơn theo lịch}} không có giao dịch mẫu trong tệp và đã bị bỏ qua.",
+    "unusableBill": "{count, plural, other {# hóa đơn theo lịch}} không có tài khoản, ngày dùng được hoặc chu kỳ nhận diện được, nên đã bị bỏ qua.",
+    "billFrequencyApproximated": "{count, plural, other {# hóa đơn theo lịch}} dùng khoảng lặp mà Monize không thể diễn đạt chính xác, nên đã dùng khoảng ngắn hơn gần nhất."
   },
   "mnyErrors": {
     "mnyImportFailed": "Đã xảy ra lỗi khi nhập. Không có gì được lưu -- bạn có thể thử lại.",

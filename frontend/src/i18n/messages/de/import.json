@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} Wertpapierübertragungen, {splits} Aktienteilungen",
       "prices": "Kursverlauf",
       "exchangeRates": "Wechselkurse",
-      "ofTotal": "von {total} in der Datei"
+      "ofTotal": "von {total} in der Datei",
+      "bills": "Geplante Rechnungen",
+      "billsOfRows": "aktiv von {rows} Rechnungszeilen"
     },
-    "notYetImported": "Geplante Rechnungen werden noch nicht importiert: {bills} Rechnungszeilen bleiben einer späteren Version vorbehalten. Alles andere in dieser Datei wird vollständig importiert.",
     "accountsHeading": "Konten ({count})",
     "selectAll": "Alle auswählen",
     "selectNone": "Keine auswählen",
@@ -349,10 +350,47 @@
       "importPrices": "Kursverlauf importieren",
       "importPricesHint": "Moneys eigene Aufzeichnung, was jedes Wertpapier Tag für Tag wert war. Deaktivieren Sie dies, wenn Sie lieber mit aktuellen Kursen beginnen möchten.",
       "importExchangeRates": "Wechselkurse importieren",
-      "importExchangeRatesHint": "Historische Kurse zwischen den Währungen in Ihrer Datei, damit frühere Fremdwährungsbuchungen so umgerechnet werden wie in Money."
+      "importExchangeRatesHint": "Historische Kurse zwischen den Währungen in Ihrer Datei, damit frühere Fremdwährungsbuchungen so umgerechnet werden wie in Money.",
+      "wipeExistingData": "Neu beginnen: meine vorhandenen Monize-Daten zuerst entfernen",
+      "wipeExistingDataHint": "Führt vor dem Import denselben Vorgang \"Meine Daten löschen\" aus wie in den Einstellungen. Sie werden um Bestätigung gebeten. Lassen Sie dies aus, um die Money-Datei zu Ihren vorhandenen Daten hinzuzufügen."
     },
     "warningsHeading": "Hinweise zu dieser Datei",
     "startImport": "Import starten"
+  },
+  "mnyBills": {
+    "heading": "Zu erstellende geplante Rechnungen ({count})",
+    "explainer": "Money speichert für jedes Auftreten einer Rechnung eine Zeile, sodass eine lange Historie Tausende davon enthält. Dies sind die Serien, die noch aktiv wirken. Deaktivieren Sie alle, die Sie nicht möchten -- abgewählte Rechnungen werden überhaupt nicht angelegt.",
+    "unsupported": "Diese Money-Version kennt noch keine geplanten Rechnungen, es gibt also keine zu importieren.",
+    "skipped": "{count, plural, one {# Rechnungsserie hatte} other {# Rechnungsserien hatten}} keine Vorlage oder kein brauchbares Datum und können nicht importiert werden.",
+    "table": {
+      "include": "Importieren",
+      "includeBill": "{name} importieren",
+      "bill": "Rechnung",
+      "account": "Konto",
+      "frequency": "Häufigkeit",
+      "nextDue": "Nächste Fälligkeit",
+      "amount": "Betrag",
+      "transfer": "Umbuchung",
+      "investment": "Anlage",
+      "splits": "{count, plural, one {# Aufteilung} other {# Aufteilungen}}",
+      "approximate": "Nächstliegende Monize-Häufigkeit"
+    }
+  },
+  "mnyWipe": {
+    "heading": "Zuerst Ihre vorhandenen Daten entfernen?",
+    "body": "Dies führt vor dem Import denselben Vorgang \"Meine Daten löschen\" aus wie unter Einstellungen -> Gefahrenzone. Entfernt wird:",
+    "removes": {
+      "transactions": "Jede Transaktion und Aufteilung",
+      "scheduled": "Jede geplante und wiederkehrende Transaktion",
+      "investments": "Jedes Wertpapier, jeden Kurs, jeden Bestand und jede Anlagetransaktion",
+      "accounts": "Jedes Konto, jede Kategorie und jeden Zahlungsempfänger",
+      "budgets": "Jedes Budget, jeden benutzerdefinierten Bericht, jedes Tag und jede Importzuordnung"
+    },
+    "irreversible": "Dies kann nicht rückgängig gemacht werden. Wenn der Import anschließend fehlschlägt, kommen die entfernten Daten nicht zurück.",
+    "typeToConfirm": "Geben Sie zur Bestätigung {word} ein:",
+    "passwordLabel": "Geben Sie Ihr Passwort ein:",
+    "oidcNote": "Ihr Identitätsanbieter hat diese Sitzung bereits bestätigt, daher ist kein Passwort erforderlich.",
+    "confirm": "Meine Daten löschen und importieren"
   },
   "mnyImporting": {
     "heading": "Money-Datei wird importiert",
@@ -387,7 +425,8 @@
       "securities": "Wertpapiere",
       "investments": "Investitionstransaktionen",
       "prices": "Kurse",
-      "exchangeRates": "Wechselkurse"
+      "exchangeRates": "Wechselkurse",
+      "bills": "Geplante Rechnungen"
     },
     "existingDataRemoved": "Ihre bestehenden Daten wurden wie gewünscht vor diesem Import entfernt.",
     "verificationHeading": "Saldenprüfung",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, one {# Investitionstransaktion hatte} other {# Investitionstransaktionen hatten}} keine Anteilsangaben in der Datei und wurden nur mit ihrem Geldbetrag importiert.",
     "investmentAccountMismatch": "{count, plural, one {# Investitionstransaktion lag} other {# Investitionstransaktionen lagen}} in einem Konto, das kein Depotkonto ist, und wurden übersprungen.",
     "unusableSecuritySplit": "{count, plural, one {# Aktienteilung konnte} other {# Aktienteilungen konnten}} keinem Wertpapier zugeordnet werden oder hatte ein unbrauchbares Verhältnis und wurde nicht angewendet.",
-    "holdingsMismatch": "{count, plural, one {# Position stimmt} other {# Positionen stimmen}} nicht mit den in Ihrer Money-Datei erfassten Anteilen überein."
+    "holdingsMismatch": "{count, plural, one {# Position stimmt} other {# Positionen stimmen}} nicht mit den in Ihrer Money-Datei erfassten Anteilen überein.",
+    "billTemplateMissing": "{count, plural, one {# geplante Rechnung hatte} other {# geplante Rechnungen hatten}} keine Vorlagentransaktion in der Datei und wurden übersprungen.",
+    "unusableBill": "{count, plural, one {# geplante Rechnung hatte} other {# geplante Rechnungen hatten}} kein Konto, kein brauchbares Datum oder eine unbekannte Wiederholung und wurden übersprungen.",
+    "billFrequencyApproximated": "{count, plural, one {# geplante Rechnung verwendet} other {# geplante Rechnungen verwenden}} ein Wiederholungsintervall, das Monize nicht exakt abbilden kann; das nächstkürzere wurde verwendet."
   },
   "mnyErrors": {
     "mnyImportFailed": "Beim Import ist etwas schiefgegangen. Es wurde nichts gespeichert -- Sie können es erneut versuchen.",

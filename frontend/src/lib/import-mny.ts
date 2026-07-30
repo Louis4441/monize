@@ -50,6 +50,38 @@ export interface MnyPreviewAccount {
   favourite: boolean;
 }
 
+export type MnyFrequency =
+  | 'ONCE'
+  | 'DAILY'
+  | 'WEEKLY'
+  | 'BIWEEKLY'
+  | 'EVERY4WEEKS'
+  | 'SEMIMONTHLY'
+  | 'MONTHLY'
+  | 'EVERY2MONTHS'
+  | 'QUARTERLY'
+  | 'SEMIANNUAL'
+  | 'YEARLY';
+
+/** One detected-active bill in the review step's checkbox list. */
+export interface MnyPreviewBill {
+  /** Representative `BILL.hbill` -- what `options.bills` carries. */
+  handle: number;
+  name: string;
+  accountName: string;
+  amount: number;
+  currencyCode: string;
+  frequency: MnyFrequency;
+  /** True when the Money interval had no exact Monize frequency. */
+  approximate: boolean;
+  nextDueDate: string;
+  isTransfer: boolean;
+  isInvestment: boolean;
+  splitCount: number;
+  /** Raw `BILL.st`, surfaced for diagnosing real files. */
+  status: number;
+}
+
 export interface MnyPreviewCounts {
   accountsIncluded: number;
   accountsInFile: number;
@@ -68,6 +100,10 @@ export interface MnyPreviewCounts {
   stockSplitsApplied: number;
   pricesToImport: number;
   exchangeRatesToImport: number;
+  /** Detected-active bill series offered in the checkbox list. */
+  billsDetected: number;
+  /** Bill series the mapper could not use -- not unticked ones. */
+  billsSkipped: number;
 }
 
 export interface MnyFileCounts {
@@ -110,6 +146,8 @@ export interface MnyPreview {
   passwordProtected: boolean;
   baseCurrency: string;
   accounts: MnyPreviewAccount[];
+  /** Detected-active bills; empty when the file has none or has no BILL table. */
+  bills: MnyPreviewBill[];
   counts: MnyPreviewCounts;
   fileCounts: MnyFileCounts;
   missingTables: string[];
@@ -120,6 +158,8 @@ export interface MnyPreview {
 
 export interface MnyAccountVerification {
   accountName: string;
+  /** So a delta on a loan or mortgage can be called out as such. */
+  accountType: string;
   accountId: string | null;
   expectedBalance: number;
   importedBalance: number;
@@ -159,6 +199,8 @@ export interface MnyImportResult {
     payees: number;
     categories: number;
     transactions: number;
+    /** Bill series with no usable template or date -- not unticked ones. */
+    bills: number;
   };
   existingDataRemoved: boolean;
   verification: MnyAccountVerification[];

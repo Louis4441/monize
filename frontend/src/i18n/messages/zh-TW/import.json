@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} 筆證券移轉、{splits} 次股票分割",
       "prices": "價格歷史",
       "exchangeRates": "匯率",
-      "ofTotal": "共 {total} 項"
+      "ofTotal": "共 {total} 項",
+      "bills": "定期帳單",
+      "billsOfRows": "有效，共 {rows} 筆帳單記錄"
     },
-    "notYetImported": "排定帳單尚未匯入：{bills} 列帳單留待後續版本。此檔案中的其他內容都會完整匯入。",
     "accountsHeading": "帳戶（{count}）",
     "selectAll": "全選",
     "selectNone": "全不選",
@@ -349,10 +350,47 @@
       "importPrices": "匯入價格歷史",
       "importPricesHint": "Money 自己記錄的每檔證券逐日價值。若您想從目前報價開始，請關閉此項。",
       "importExchangeRates": "匯入匯率",
-      "importExchangeRatesHint": "檔案中各幣別之間的歷史匯率，讓過去的外幣交易依 Money 當時的方式換算。"
+      "importExchangeRatesHint": "檔案中各幣別之間的歷史匯率，讓過去的外幣交易依 Money 當時的方式換算。",
+      "wipeExistingData": "從零開始：先刪除我現有的 Monize 資料",
+      "wipeExistingDataHint": "匯入前執行與設定中相同的「刪除我的資料」操作。系統會要求確認。保持關閉可將 Money 檔案加入現有資料中。"
     },
     "warningsHeading": "關於此檔案的說明",
     "startImport": "開始匯入"
+  },
+  "mnyBills": {
+    "heading": "將建立的定期帳單（{count}）",
+    "explainer": "Money 會為帳單的每一次發生保存一列記錄，因此較長的歷史會包含數千列。這裡列出的是仍然看起來有效的帳單序列。取消勾選你不需要的帳單——未勾選的帳單根本不會被建立。",
+    "unsupported": "此 Money 版本早於定期帳單功能，因此沒有可匯入的帳單。",
+    "skipped": "{count, plural, other {# 個帳單序列}}缺少範本或可用日期，無法匯入。",
+    "table": {
+      "include": "匯入",
+      "includeBill": "匯入 {name}",
+      "bill": "帳單",
+      "account": "帳戶",
+      "frequency": "頻率",
+      "nextDue": "下次到期",
+      "amount": "金額",
+      "transfer": "轉帳",
+      "investment": "投資",
+      "splits": "{count, plural, other {# 筆拆分}}",
+      "approximate": "最接近的 Monize 頻率"
+    }
+  },
+  "mnyWipe": {
+    "heading": "先刪除你現有的資料嗎？",
+    "body": "這會在匯入開始前執行與設定 -> 危險區域中相同的「刪除我的資料」操作。它會刪除：",
+    "removes": {
+      "transactions": "所有交易及其拆分",
+      "scheduled": "所有排程交易和定期交易",
+      "investments": "所有證券、價格、持股和投資交易",
+      "accounts": "所有帳戶、分類和收款人",
+      "budgets": "所有預算、自訂報表、標籤和匯入對應"
+    },
+    "irreversible": "此操作無法復原。如果隨後匯入失敗，已刪除的資料不會恢復。",
+    "typeToConfirm": "輸入 {word} 以確認：",
+    "passwordLabel": "輸入你的密碼：",
+    "oidcNote": "你的身分提供者已確認此工作階段，因此無需輸入密碼。",
+    "confirm": "刪除我的資料並匯入"
   },
   "mnyImporting": {
     "heading": "正在匯入您的 Money 檔案",
@@ -387,7 +425,8 @@
       "securities": "證券",
       "investments": "投資交易",
       "prices": "價格",
-      "exchangeRates": "匯率"
+      "exchangeRates": "匯率",
+      "bills": "定期帳單"
     },
     "existingDataRemoved": "已依您的要求，在本次匯入前刪除原有資料。",
     "verificationHeading": "餘額驗證",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, other {# 筆投資交易}}在檔案中沒有股數明細，僅依其現金金額匯入。",
     "investmentAccountMismatch": "{count, plural, other {# 筆投資交易}}位於非投資帳戶中，已略過。",
     "unusableSecuritySplit": "{count, plural, other {# 次股票分割}}無法對應到證券，或比例無法使用，因此未套用。",
-    "holdingsMismatch": "{count, plural, other {# 項持倉}}與 Money 檔案記錄的股數不符。"
+    "holdingsMismatch": "{count, plural, other {# 項持倉}}與 Money 檔案記錄的股數不符。",
+    "billTemplateMissing": "{count, plural, other {# 個定期帳單}}在檔案中沒有範本交易，已略過。",
+    "unusableBill": "{count, plural, other {# 個定期帳單}}沒有帳戶、可用日期或可辨識的重複週期，已略過。",
+    "billFrequencyApproximated": "{count, plural, other {# 個定期帳單}}使用了 Monize 無法精確表達的重複間隔，因此採用了最接近的較短間隔。"
   },
   "mnyErrors": {
     "mnyImportFailed": "匯入過程中發生問題。沒有儲存任何內容 -- 您可以重試。",

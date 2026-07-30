@@ -317,9 +317,10 @@
       "investmentDetail": "{transfers} transferts de titres, {splits} divisions d'actions",
       "prices": "Historique du cours",
       "exchangeRates": "Taux de change",
-      "ofTotal": "sur {total} dans le fichier"
+      "ofTotal": "sur {total} dans le fichier",
+      "bills": "Factures planifiées",
+      "billsOfRows": "actives sur {rows} lignes de facture"
     },
-    "notYetImported": "Les factures planifiées ne sont pas encore importées : {bills} lignes de facture sont réservées à une version ultérieure. Tout le reste de ce fichier est importé intégralement.",
     "accountsHeading": "Comptes ({count})",
     "selectAll": "Tout sélectionner",
     "selectNone": "Ne rien sélectionner",
@@ -349,10 +350,47 @@
       "importPrices": "Importer l'historique du cours",
       "importPricesHint": "Le relevé que Money conserve de la valeur de chaque titre, jour par jour. Désactivez cette option si vous préférez partir des cours actuels.",
       "importExchangeRates": "Importer les taux de change",
-      "importExchangeRatesHint": "Taux historiques entre les devises de votre fichier, pour que les anciennes opérations en devise étrangère soient converties comme Money les convertissait."
+      "importExchangeRatesHint": "Taux historiques entre les devises de votre fichier, pour que les anciennes opérations en devise étrangère soient converties comme Money les convertissait.",
+      "wipeExistingData": "Repartir de zéro : supprimer d'abord mes données Monize existantes",
+      "wipeExistingDataHint": "Exécute la même opération Supprimer mes données que dans les Paramètres avant l'import. Une confirmation vous sera demandée. Laissez cette option désactivée pour ajouter le fichier Money à vos données existantes."
     },
     "warningsHeading": "Remarques sur ce fichier",
     "startImport": "Démarrer l'import"
+  },
+  "mnyBills": {
+    "heading": "Factures planifiées à créer ({count})",
+    "explainer": "Money enregistre une ligne pour chaque occurrence d'une facture, si bien qu'un long historique en contient des milliers. Voici les séries qui semblent encore actives. Décochez celles dont vous ne voulez pas : les factures décochées ne sont pas créées du tout.",
+    "unsupported": "Cette version de Money est antérieure aux factures planifiées : il n'y en a donc aucune à importer.",
+    "skipped": "{count, plural, one {# série de factures n'avait} other {# séries de factures n'avaient}} ni modèle ni date exploitable et ne peuvent pas être importées.",
+    "table": {
+      "include": "Importer",
+      "includeBill": "Importer {name}",
+      "bill": "Facture",
+      "account": "Compte",
+      "frequency": "Fréquence",
+      "nextDue": "Prochaine échéance",
+      "amount": "Montant",
+      "transfer": "Virement",
+      "investment": "Investissement",
+      "splits": "{count, plural, one {# ventilation} other {# ventilations}}",
+      "approximate": "Fréquence Monize la plus proche"
+    }
+  },
+  "mnyWipe": {
+    "heading": "Supprimer d'abord vos données existantes ?",
+    "body": "Cette action exécute la même opération Supprimer mes données que dans Paramètres -> Zone dangereuse, avant le début de l'import. Elle supprime :",
+    "removes": {
+      "transactions": "Toutes les transactions et leurs ventilations",
+      "scheduled": "Toutes les transactions planifiées et récurrentes",
+      "investments": "Tous les titres, cours, positions et transactions d'investissement",
+      "accounts": "Tous les comptes, catégories et bénéficiaires",
+      "budgets": "Tous les budgets, rapports personnalisés, étiquettes et mappages d'import"
+    },
+    "irreversible": "Cette action est irréversible. Si l'import échoue ensuite, les données supprimées ne reviennent pas.",
+    "typeToConfirm": "Saisissez {word} pour confirmer :",
+    "passwordLabel": "Saisissez votre mot de passe :",
+    "oidcNote": "Votre fournisseur d'identité a déjà confirmé cette session : aucun mot de passe n'est nécessaire.",
+    "confirm": "Supprimer mes données et importer"
   },
   "mnyImporting": {
     "heading": "Import de votre fichier Money",
@@ -387,7 +425,8 @@
       "securities": "Titres",
       "investments": "Transactions de placement",
       "prices": "Cours",
-      "exchangeRates": "Taux de change"
+      "exchangeRates": "Taux de change",
+      "bills": "Factures planifiées"
     },
     "existingDataRemoved": "Vos données existantes ont été supprimées avant cet import, comme demandé.",
     "verificationHeading": "Vérification des soldes",
@@ -430,7 +469,10 @@
     "missingInvestmentDetail": "{count, plural, one {# transaction de placement n'avait} other {# transactions de placement n'avaient}} aucun détail de parts dans le fichier et ont été importées uniquement pour leur montant en espèces.",
     "investmentAccountMismatch": "{count, plural, one {# transaction de placement se trouvait} other {# transactions de placement se trouvaient}} dans un compte qui n'est pas un compte de placement et ont été ignorées.",
     "unusableSecuritySplit": "{count, plural, one {# division d'actions n'a} other {# divisions d'actions n'ont}} pas pu être rattachée à un titre ou présentait un ratio inutilisable, et n'ont pas été appliquées.",
-    "holdingsMismatch": "{count, plural, one {# position ne correspond} other {# positions ne correspondent}} pas aux parts consignées dans votre fichier Money."
+    "holdingsMismatch": "{count, plural, one {# position ne correspond} other {# positions ne correspondent}} pas aux parts consignées dans votre fichier Money.",
+    "billTemplateMissing": "{count, plural, one {# facture planifiée n'avait} other {# factures planifiées n'avaient}} pas de transaction modèle dans le fichier et ont été ignorées.",
+    "unusableBill": "{count, plural, one {# facture planifiée n'avait} other {# factures planifiées n'avaient}} pas de compte, pas de date exploitable ou une périodicité inconnue, et ont été ignorées.",
+    "billFrequencyApproximated": "{count, plural, one {# facture planifiée utilise} other {# factures planifiées utilisent}} un intervalle de répétition que Monize ne peut pas exprimer exactement ; le plus court le plus proche a été retenu."
   },
   "mnyErrors": {
     "mnyImportFailed": "Une erreur est survenue pendant l'import. Rien n'a été enregistré -- vous pouvez réessayer.",
