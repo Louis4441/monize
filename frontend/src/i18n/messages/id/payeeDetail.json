@@ -16,6 +16,7 @@
     "switchPayee": "Pindah ke penerima lain",
     "switchPlaceholder": "Saring penerima...",
     "switchNoMatches": "Tidak ada penerima yang cocok",
+    "visitWebsite": "Buka situs web {name} di tab baru",
     "since": "Penerima sejak {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Transaksi Terbesar",
     "largestValue": "{amount} pada {date}",
     "overpaymentFor": "Penerima Pembayaran Ekstra untuk",
+    "website": "Situs web",
     "notes": "Catatan"
   },
   "tabs": {

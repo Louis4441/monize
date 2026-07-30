@@ -87,6 +87,7 @@
     "nameLabel": "Naam begunstigde",
     "categoryLabel": "Standaardcategorie",
     "notesLabel": "Notities (optioneel)",
+    "websiteLabel": "Website",
     "submitCreate": "Begunstigde aanmaken",
     "submitUpdate": "Begunstigde bijwerken",
     "applyCategoryLabel": "Deze categorie toepassen op bestaande transacties",

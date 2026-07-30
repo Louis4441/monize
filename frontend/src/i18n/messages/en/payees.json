@@ -87,6 +87,7 @@
     "nameLabel": "Payee Name",
     "categoryLabel": "Default Category",
     "notesLabel": "Notes (optional)",
+    "websiteLabel": "Website",
     "submitCreate": "Create Payee",
     "submitUpdate": "Update Payee",
     "applyCategoryLabel": "Apply this category to existing transactions",

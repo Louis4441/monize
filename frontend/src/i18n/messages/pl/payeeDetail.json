@@ -16,6 +16,7 @@
     "switchPayee": "Przejdź do innego odbiorcy",
     "switchPlaceholder": "Filtruj odbiorców...",
     "switchNoMatches": "Brak dopasowanych odbiorców",
+    "visitWebsite": "Otwórz stronę {name} w nowej karcie",
     "since": "Odbiorca od {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Największa transakcja",
     "largestValue": "{amount} dnia {date}",
     "overpaymentFor": "Odbiorca nadpłat dla",
+    "website": "Strona internetowa",
     "notes": "Notatki"
   },
   "tabs": {

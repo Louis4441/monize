@@ -87,6 +87,7 @@
     "nameLabel": "Nazwa odbiorcy",
     "categoryLabel": "Domyślna kategoria",
     "notesLabel": "Notatki (opcjonalnie)",
+    "websiteLabel": "Strona internetowa",
     "submitCreate": "Utwórz odbiorcę",
     "submitUpdate": "Zapisz odbiorcę",
     "applyCategoryLabel": "Zastosuj tę kategorię do istniejących transakcji",

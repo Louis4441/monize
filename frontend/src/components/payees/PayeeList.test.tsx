@@ -41,6 +41,7 @@ function makePayee(overrides: Partial<Payee> & { id: string; name: string }): Pa
     defaultCategoryId: null,
     defaultCategory: null,
     notes: null,
+    website: null,
     isActive: true,
     createdAt: '2026-01-01T00:00:00Z',
     transactionCount: 0,

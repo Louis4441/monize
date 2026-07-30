@@ -16,6 +16,7 @@
     "switchPayee": "Chuyển sang người nhận khác",
     "switchPlaceholder": "Lọc người nhận...",
     "switchNoMatches": "Không có người nhận nào khớp",
+    "visitWebsite": "Mở trang web của {name} trong tab mới",
     "since": "Người nhận từ {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Giao tác lớn nhất",
     "largestValue": "{amount} vào {date}",
     "overpaymentFor": "Người nhận khoản trả thêm cho",
+    "website": "Trang web",
     "notes": "Ghi chú"
   },
   "tabs": {

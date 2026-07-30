@@ -21,6 +21,7 @@ const buildPayeeSchema = (t: (key: string) => string) => z.object({
   name: z.string().min(1, t('validation.nameRequired')).max(255),
   defaultCategoryId: z.string().optional(),
   notes: z.string().optional(),
+  website: z.string().max(2048).optional(),
 });
 
 type PayeeFormData = z.infer<ReturnType<typeof buildPayeeSchema>>;
@@ -57,6 +58,7 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
           name: payee.name,
           defaultCategoryId: payee.defaultCategoryId || '',
           notes: payee.notes || '',
+          website: payee.website || '',
         }
       : {
           defaultCategoryId: '',
@@ -170,6 +172,15 @@ export function PayeeForm({ payee, categories, onSubmit, onCancel, onDirtyChange
         label={t('form.notesLabel')}
         error={errors.notes?.message}
         {...register('notes')}
+      />
+
+      {/* Rendered as a link on the detail page, so the backend stores only an
+          http(s) address and adds https to a bare domain. */}
+      <Input
+        label={t('form.websiteLabel')}
+        placeholder="starbucks.com"
+        error={errors.website?.message}
+        {...register('website')}
       />
 
       {payee ? (

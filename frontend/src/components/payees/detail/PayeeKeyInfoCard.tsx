@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { KeyValueList, type KeyValueRow } from '@/components/ui/KeyValueList';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
+import { externalUrlLabel, toSafeExternalUrl } from '@/lib/external-url';
 import type { PayeeDetail } from '@/types/payee';
 
 interface PayeeKeyInfoCardProps {
@@ -36,6 +37,7 @@ export function PayeeKeyInfoCard({
   const { formatCurrency } = useNumberFormat();
 
   const { payee, stats, largestTransaction, overpaymentForAccounts } = detail;
+  const websiteUrl = toSafeExternalUrl(payee.website);
 
   const rows: KeyValueRow[] = [
     {
@@ -111,6 +113,21 @@ export function PayeeKeyInfoCard({
             ))}
           </span>
         ) : null,
+    },
+    {
+      key: 'website',
+      label: t('keyInfo.website'),
+      value: websiteUrl ? (
+        <a
+          href={websiteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={websiteUrl}
+          className="text-blue-600 hover:underline dark:text-blue-400"
+        >
+          {externalUrlLabel(websiteUrl)}
+        </a>
+      ) : null,
     },
     {
       key: 'notes',

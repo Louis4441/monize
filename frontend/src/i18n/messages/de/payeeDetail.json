@@ -16,6 +16,7 @@
     "switchPayee": "Zu einem anderen Zahlungsempfänger wechseln",
     "switchPlaceholder": "Zahlungsempfänger filtern...",
     "switchNoMatches": "Keine Zahlungsempfänger gefunden",
+    "visitWebsite": "{name}s Website in einem neuen Tab öffnen",
     "since": "Zahlungsempfänger seit {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Größte Buchung",
     "largestValue": "{amount} am {date}",
     "overpaymentFor": "Sondertilgungs-Empfänger für",
+    "website": "Website",
     "notes": "Notizen"
   },
   "tabs": {

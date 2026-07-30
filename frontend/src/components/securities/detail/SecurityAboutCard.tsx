@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { KeyValueList, type KeyValueRow } from '@/components/ui/KeyValueList';
+import { externalUrlLabel, toSafeExternalUrl } from '@/lib/external-url';
 import type { Security } from '@/types/investment';
 
 interface SecurityAboutCardProps {
@@ -30,14 +31,10 @@ export function SecurityAboutCard({ security }: SecurityAboutCardProps) {
    * does not have to guess a scheme, and it still checks: the row is data, and a
    * link built from an unchecked string is a link that can run something.
    */
-  const link = (url: string | null) => {
-    if (!url || !/^https?:\/\//i.test(url)) return null;
-    let label = url;
-    try {
-      label = new URL(url).hostname.replace(/^www\./i, '');
-    } catch {
-      // Keep the raw value; it is still shown, just not prettified.
-    }
+  const link = (raw: string | null) => {
+    const url = toSafeExternalUrl(raw);
+    if (!url) return null;
+    const label = externalUrlLabel(url);
     return (
       <a
         href={url}

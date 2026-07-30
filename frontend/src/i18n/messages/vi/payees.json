@@ -87,6 +87,7 @@
     "nameLabel": "Tên người nhận",
     "categoryLabel": "Danh mục mặc định",
     "notesLabel": "Ghi chú (tùy chọn)",
+    "websiteLabel": "Trang web",
     "submitCreate": "Tạo người nhận",
     "submitUpdate": "Cập nhật người nhận",
     "applyCategoryLabel": "Áp dụng danh mục này cho các giao dịch hiện có",

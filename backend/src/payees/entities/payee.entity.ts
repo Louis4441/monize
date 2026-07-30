@@ -42,6 +42,14 @@ export class Payee {
   @Column({ type: "text", nullable: true })
   notes: string;
 
+  /**
+   * The payee's site. Stored absolute so it can go straight into an anchor:
+   * a schemeless address would be resolved relative to the current page.
+   */
+  @ApiProperty({ example: "https://www.starbucks.com", required: false })
+  @Column({ type: "varchar", length: 2048, nullable: true })
+  website: string | null;
+
   @ApiProperty({ example: true, description: "Whether the payee is active" })
   @Column({ type: "boolean", name: "is_active", default: true })
   isActive: boolean;

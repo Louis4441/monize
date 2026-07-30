@@ -16,6 +16,7 @@
     "switchPayee": "Перейти к другому получателю",
     "switchPlaceholder": "Фильтр получателей...",
     "switchNoMatches": "Нет подходящих получателей",
+    "visitWebsite": "Открыть сайт {name} в новой вкладке",
     "since": "Получатель с {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Крупнейшая проводка",
     "largestValue": "{amount} — {date}",
     "overpaymentFor": "Получатель досрочных платежей для",
+    "website": "Сайт",
     "notes": "Примечания"
   },
   "tabs": {

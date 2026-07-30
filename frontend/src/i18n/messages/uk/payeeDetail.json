@@ -16,6 +16,7 @@
     "switchPayee": "Перейти до іншого одержувача",
     "switchPlaceholder": "Фільтр одержувачів...",
     "switchNoMatches": "Немає відповідних одержувачів",
+    "visitWebsite": "Відкрити сайт {name} у новій вкладці",
     "since": "Одержувач з {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Найбільша транзакція",
     "largestValue": "{amount} — {date}",
     "overpaymentFor": "Одержувач додаткових платежів для",
+    "website": "Сайт",
     "notes": "Примітки"
   },
   "tabs": {

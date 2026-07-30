@@ -87,6 +87,7 @@
     "nameLabel": "Nama Penerima",
     "categoryLabel": "Kategori Default",
     "notesLabel": "Catatan (opsional)",
+    "websiteLabel": "Situs web",
     "submitCreate": "Buat Penerima",
     "submitUpdate": "Perbarui Penerima",
     "applyCategoryLabel": "Terapkan kategori ini ke transaksi yang sudah ada",

@@ -87,6 +87,7 @@
     "nameLabel": "收款人名稱",
     "categoryLabel": "預設類別",
     "notesLabel": "備註（選填）",
+    "websiteLabel": "網站",
     "submitCreate": "建立收款人",
     "submitUpdate": "更新收款人",
     "applyCategoryLabel": "將此類別套用至現有交易",

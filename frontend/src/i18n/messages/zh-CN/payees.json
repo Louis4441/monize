@@ -87,6 +87,7 @@
     "nameLabel": "收款人名称",
     "categoryLabel": "默认分类",
     "notesLabel": "备注（可选）",
+    "websiteLabel": "网站",
     "submitCreate": "创建收款人",
     "submitUpdate": "更新收款人",
     "applyCategoryLabel": "将此分类应用于现有交易",

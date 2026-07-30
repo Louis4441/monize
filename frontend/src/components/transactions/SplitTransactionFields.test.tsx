@@ -112,6 +112,7 @@ function createPayee(overrides: Partial<Payee> = {}): Payee {
     defaultCategoryId: null,
     defaultCategory: null,
     notes: null,
+    website: null,
     isActive: true,
     createdAt: '2024-01-01T00:00:00Z',
     ...overrides,

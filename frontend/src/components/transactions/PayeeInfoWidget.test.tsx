@@ -51,6 +51,7 @@ const makePayee = (overrides: Partial<Payee> = {}): Payee =>
     defaultCategoryId: 'c-1',
     defaultCategory: null,
     notes: null,
+    website: null,
     isActive: true,
     createdAt: '2024-01-01',
     ...overrides,

@@ -24,6 +24,7 @@ const sourcePayee: Payee = {
   defaultCategoryId: null,
   defaultCategory: null,
   notes: null,
+  website: null,
   isActive: true,
   createdAt: '2025-01-01',
   transactionCount: 5,
@@ -36,6 +37,7 @@ const targetPayee: Payee = {
   defaultCategoryId: 'c1',
   defaultCategory: { id: 'c1', name: 'Food & Drink' } as any,
   notes: null,
+  website: null,
   isActive: true,
   createdAt: '2025-01-01',
 };

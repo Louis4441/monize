@@ -16,6 +16,7 @@
     "switchPayee": "別の支払先に切り替える",
     "switchPlaceholder": "支払先を絞り込む...",
     "switchNoMatches": "一致する支払先はありません",
+    "visitWebsite": "{name} のウェブサイトを新しいタブで開く",
     "since": "{date} からの支払先"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "最大の取引",
     "largestValue": "{date} に {amount}",
     "overpaymentFor": "繰上返済の支払先となる口座",
+    "website": "ウェブサイト",
     "notes": "メモ"
   },
   "tabs": {

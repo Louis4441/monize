@@ -87,6 +87,7 @@
     "nameLabel": "Имя получателя",
     "categoryLabel": "Категория по умолчанию",
     "notesLabel": "Примечания (необязательно)",
+    "websiteLabel": "Сайт",
     "submitCreate": "Создать получателя",
     "submitUpdate": "Обновить получателя",
     "applyCategoryLabel": "Применить эту категорию к существующим проводкам",

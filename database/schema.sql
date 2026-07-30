@@ -209,6 +209,7 @@ CREATE TABLE payees (
     name VARCHAR(255) NOT NULL,
     default_category_id UUID REFERENCES categories(id),
     notes TEXT,
+    website VARCHAR(2048), -- the payee's site; stored absolute (https unless an explicit http:// was given)
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, name)

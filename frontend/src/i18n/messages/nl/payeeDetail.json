@@ -16,6 +16,7 @@
     "switchPayee": "Naar een andere begunstigde gaan",
     "switchPlaceholder": "Begunstigden filteren...",
     "switchNoMatches": "Geen begunstigden gevonden",
+    "visitWebsite": "Website van {name} openen in een nieuw tabblad",
     "since": "Begunstigde sinds {date}"
   },
   "toasts": {
@@ -92,6 +93,7 @@
     "largestTransaction": "Grootste transactie",
     "largestValue": "{amount} op {date}",
     "overpaymentFor": "Begunstigde voor extra aflossing van",
+    "website": "Website",
     "notes": "Notities"
   },
   "tabs": {
