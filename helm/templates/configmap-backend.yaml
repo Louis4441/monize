@@ -27,6 +27,9 @@ data:
   OIDC_CALLBACK_URL: {{ .Values.backend.oidc.OIDC_CALLBACK_URL | quote }}
   {{- end }}
   {{- end }}
+  # Microsoft Money (.mny) import
+  {{- $mnyImport := .Values.backend.mnyImport | default dict }}
+  MNY_IMPORT_LIMIT_MB: {{ $mnyImport.MNY_IMPORT_LIMIT_MB | default "300" | quote }}
   # SMTP
   SMTP_HOST: {{ .Values.backend.smtp.SMTP_HOST | quote }}
   SMTP_PORT: {{ .Values.backend.smtp.SMTP_PORT | quote }}

@@ -201,4 +201,28 @@ describe("inspect", () => {
 
     expect(lines).toContain("  (table not present in this Money version)");
   });
+
+  it("reports the stage timings and peak memory task M4.1 records", () => {
+    // The acceptance numbers can only come from a real Money Plus file, which
+    // never enters the repository -- so the harness has to measure itself.
+    const lines = inspect(readMnyFixture("money2002"), { rows: 5 });
+    const start = lines.indexOf("performance:");
+
+    expect(start).toBeGreaterThan(-1);
+    const block = lines.slice(start, start + 6).join("\n");
+    expect(block).toMatch(/file size\s+2\.6 MiB/);
+    expect(block).toMatch(/decrypt \+ open\s+\d+ ms/);
+    expect(block).toMatch(/read tables\s+\d+ ms/);
+    expect(block).toMatch(/map\s+\d+ ms/);
+    expect(block).toMatch(/peak rss\s+[\d.]+ MiB \([\d.]+x file size\)/);
+  });
+
+  it("still reports performance after a damaged table stops the summary", () => {
+    const file = readMnyFixture("money2002");
+    file.fill(0xff, 15 * 4096, 16 * 4096);
+
+    const lines = inspect(file, { rows: 5 });
+
+    expect(lines).toContain("performance:");
+  });
 });

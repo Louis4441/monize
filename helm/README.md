@@ -105,6 +105,27 @@ ingress:
 | `backend.livenessProbe` | Liveness probe config | `/api/v1/health/live` |
 | `backend.readinessProbe` | Readiness probe config | `/api/v1/health/ready` |
 | `backend.env.*` | Backend environment variables | See values.yaml |
+| `backend.mnyImport.MNY_IMPORT_LIMIT_MB` | Largest Microsoft Money (.mny) file the import wizard accepts | `300` |
+
+#### Memory for Microsoft Money imports
+
+The default `backend.resources.limits.memory` of `150Mi` is sized for ordinary
+use and **cannot import a real `.mny` file**. A Money upload is buffered in
+memory and decrypted in place, so peak usage is roughly twice the file size on
+top of the baseline. A pod that hits its limit mid-import is OOM-killed, and the
+wizard reports the job as stalled rather than as out of memory.
+
+Set the limit to at least `2 x MNY_IMPORT_LIMIT_MB + 200Mi`:
+
+| `MNY_IMPORT_LIMIT_MB` | Suggested `backend.resources.limits.memory` |
+|---|---|
+| `50` | `300Mi` |
+| `100` | `400Mi` |
+| `300` (default) | `1Gi` |
+
+Lowering `MNY_IMPORT_LIMIT_MB` is the cheaper option when the files being
+imported are small: the wizard then rejects an oversized file with a clear
+message before any memory is committed to it.
 
 ### Frontend
 

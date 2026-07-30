@@ -279,7 +279,20 @@ export function inspect(
   options: Omit<InspectOptions, "file">,
 ): string[] {
   const started = Date.now();
+  const sizeBytes = buffer.length;
+  // Peak RSS against file size is the number task M4.1 wants recorded, and the
+  // number the pod memory limit has to be set from. Sampling at each stage
+  // boundary is enough: the allocations that matter here are whole tables, and
+  // each one is materialised inside a stage rather than across them.
+  const rssSamples = [process.memoryUsage().rss];
+  const sample = (): void => {
+    rssSamples.push(process.memoryUsage().rss);
+  };
+
   const db = openMnyFile(buffer, options.password);
+  const decryptedAt = Date.now();
+  sample();
+
   const lines = [
     `encryption:        ${db.scheme}`,
     `password required: ${db.passwordProtected ? "yes" : "no"}`,
@@ -304,9 +317,15 @@ export function inspect(
     }
   }
 
+  let readAt = decryptedAt;
+  let mappedAt = decryptedAt;
   try {
     const tables = readMnyTables(db);
+    readAt = Date.now();
+    sample();
     lines.push("", ...summarise(tables), "", ...mappingSummary(tables));
+    mappedAt = Date.now();
+    sample();
   } catch (error) {
     // A damaged table stops the readers but not the report: the table list
     // above is what tells you which one to look at.
@@ -325,7 +344,19 @@ export function inspect(
     }
   }
 
-  lines.push("", `read in ${Date.now() - started} ms`);
+  const peakRss = Math.max(...rssSamples);
+  const mib = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(1);
+  lines.push(
+    "",
+    "performance:",
+    `  file size          ${mib(sizeBytes)} MiB`,
+    `  decrypt + open     ${decryptedAt - started} ms`,
+    `  read tables        ${readAt - decryptedAt} ms`,
+    `  map                ${mappedAt - readAt} ms`,
+    `  peak rss           ${mib(peakRss)} MiB (${(peakRss / Math.max(sizeBytes, 1)).toFixed(1)}x file size)`,
+    "",
+    `read in ${Date.now() - started} ms`,
+  );
   return lines;
 }
 

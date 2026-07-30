@@ -494,6 +494,21 @@ describe("MnyImportService", () => {
         context,
       );
 
+    it("logs where the time and the memory went", async () => {
+      // Task M4.1's acceptance numbers can only be measured on a real Money
+      // Plus file, which cannot be committed -- so the import measures itself
+      // and the maintainer's run is what gets recorded.
+      const log = jest.spyOn(service["logger"], "log");
+
+      await run();
+
+      expect(log).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /\.mny import timing: [\d.]+ MiB file, .*total \d+ ms; peak rss [\d.]+ MiB \([\d.]+x file size\)/,
+        ),
+      );
+    });
+
     it("fails cleanly when the staged bytes are gone", async () => {
       staging.loadBytes.mockResolvedValue(null);
 

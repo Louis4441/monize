@@ -47,6 +47,19 @@ any table or field this Money version could not supply. Run it against a real Mo
 file before trusting anything downstream; a table that fails to read is reported inline rather
 than aborting the report.
 
+It also ends with a `performance:` block -- stage timings and peak RSS as a multiple of file
+size. That, and the `.mny import timing:` line a real import logs, are where the design's
+acceptance numbers come from: they can only be measured on a 200 MB file that will never be
+committed here, so the pipeline measures itself and the run is what gets recorded.
+
+## Memory
+
+An upload is buffered whole and decrypted in place, so peak usage is roughly **twice the file
+size** above baseline. `MNY_IMPORT_LIMIT_MB` (default 300) bounds it; the pod needs at least
+`2x` that plus headroom, which the default Helm limit of `150Mi` is nowhere near. A pod that hits
+its limit mid-import is OOM-killed and the wizard reports a *stalled job*, naming the symptom and
+not the cause -- see `helm/README.md` for the sizing table.
+
 ## Layering rules
 
 - **Mappers never touch the database; the writer never parses.** Only the layers in `msisam/`
@@ -58,7 +71,13 @@ than aborting the report.
   throwing.
 - **Every failure is an `MnyImportError` with a stable `code`** (`mny-errors.ts`). The controller
   maps the code to an i18n key; nothing below the controller formats user-facing text, and no
-  message ever contains the file password.
+  message ever contains the file password. An untyped error escaping this layer is a defect
+  twice over: the wizard gets a 500 with nothing to branch on, and a running job records the
+  failure as *retryable*, offering Try again on a file that can never import.
+- **Progress goes through `throttleProgress`, never straight from a chunk loop.** Each report
+  escapes the import transaction by design, so it costs a second pool connection while the long
+  transaction is open -- and the wizard only polls every 1500 ms, so a report per 500-row chunk
+  writes a hundred-odd updates nobody reads.
 
 ## Traps
 
