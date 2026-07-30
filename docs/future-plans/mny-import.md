@@ -69,7 +69,7 @@ Credit to marksimpson: the PoC's real contribution is the reverse-engineered sch
 `migration/ms-money-data-model.md` — table relationships, the `act` action-code semantics
 (including the misleading act=16), the phantom-transaction taxonomy, and the LOT table as the
 authoritative holdings source. Task M4.5 adopts that document into `docs/` (with attribution)
-as the living format reference. Also correct and carried forward:
+as the living format reference (now `docs/ms-money-data-model.md`, with the corrections below called out inline against the original). Also correct and carried forward:
 
 - Money account type map (`at` 0..6) and the `hacctRel` investment/cash account pairing, which
   matches Monize's linked INVESTMENT_CASH + INVESTMENT_BROKERAGE pair exactly.
@@ -817,9 +817,9 @@ See 6.7 for what the implementation settled differently from this plan.
 | M4.1 | Performance/memory pass with the real Sunset file via the harness: batch sizes, progress cadence, peak RSS; document `MNY_IMPORT_LIMIT_MB` + helm memory guidance. Acceptance: 37k transactions + 68k prices < 3 min end-to-end; peak RSS < 3x file size; numbers recorded in docs | M2.4 | M | **done** for what this repository can settle: the progress cadence is fixed, the sizing guidance is written, and both the harness and the import now measure themselves. The acceptance numbers are the maintainer's run against the real Sunset file — see 6.7 |
 | M4.2 | Failure-path hardening: corrupt file, truncated upload, pod kill mid-import (reaper + retry), staged-file expiry mid-wizard, double-start guard. Every failure has a localized message and a next action | M1.7 | M | **done** (four defects found and fixed; see 6.7) |
 | M4.3 | Full localization pass: all new frontend `import` keys in all 23 locales, backend error keys in all 13; parity suites green; pseudo-locale regenerated. (Single pass at acceptance, per the project i18n workflow) | M1–M3 UI final | M | |
-| M4.4 | Playwright e2e: upload `money2001.mny` through the full wizard, plus the passworded variant; accept-string assertions finalized | M1.9 | M | |
-| M4.5 | Docs: `docs/import-ms-money.md` user guide (incl. v1 limitations: no merge/dedupe, FX cost-basis caveat); adopt PR #192's `ms-money-data-model.md` into `docs/` with attribution and the corrections from this design (act table, phantom rule, SEC_SPLIT); README feature bullet; release notes; close/supersede PR #192 and issue #173 with pointers and credit | all | S | |
-| M4.6 | Optional stretch: one-time offline generation (jackcess-encrypt, never in the build) of a tiny purpose-built fixture exercising transfer splits, act 4/15/16 pairing, SEC_SPLIT, bills; commit as `synthetic-edge.mny` with a driving integration spec. Skip if impractical | M0.1 | M | |
+| M4.4 | Playwright e2e: upload `money2001.mny` through the full wizard, plus the passworded variant; accept-string assertions finalized | M1.9 | M | **done** (`e2e/tests/import-mny.spec.ts`; the passworded variant is `money2008-pwd.mny`, not `money2001-pwd.mny` — see 6.7) |
+| M4.5 | Docs: `docs/import-ms-money.md` user guide (incl. v1 limitations: no merge/dedupe, FX cost-basis caveat); adopt PR #192's `ms-money-data-model.md` into `docs/` with attribution and the corrections from this design (act table, phantom rule, SEC_SPLIT); README feature bullet; release notes; close/supersede PR #192 and issue #173 with pointers and credit | all | S | **done** except the last clause: the guide, the adopted format reference, the README bullet and `docs/release-notes/1.14.0.md` are committed. Closing PR #192 and issue #173 is the maintainer's to do — it is an outward-facing action on someone else's contribution, and the credit belongs in a comment written by the person merging |
+| M4.6 | Optional stretch: one-time offline generation (jackcess-encrypt, never in the build) of a tiny purpose-built fixture exercising transfer splits, act 4/15/16 pairing, SEC_SPLIT, bills; commit as `synthetic-edge.mny` with a driving integration spec. Skip if impractical | M0.1 | M | **not done** — explicitly optional, and it needs a Java toolchain to author the fixture. The paths it would cover are exercised by plain-object fixtures today; a real file from the maintainer closes open questions 12.3 and 12.4 more cheaply |
 
 #### 6.7 Phase 4 findings
 
@@ -874,6 +874,20 @@ names the symptom and not the cause. `helm/README.md` now carries the sizing rul
 (`2 x MNY_IMPORT_LIMIT_MB` plus headroom, so 1Gi at the default 300) and
 `MNY_IMPORT_LIMIT_MB` is a first-class chart value rather than something to pass
 through `extraEnv`.
+
+**The passworded fixture the task list names is the wrong one.** M4.4 asks for
+`money2001.mny` plus "the passworded variant", which reads as
+`money2001-pwd.mny`. That file opens with no prompt at all: Money's pre-2002
+"old" key derivation takes no password, so a `-pwd` file of that vintage is
+indistinguishable from an unprotected one to anything downstream. The only
+fixture that can drive the password prompt is `money2008-pwd.mny`.
+
+**The upload step had the same hole the review step did, in the place most
+likely to be hit.** A `.mny` that would not open — wrong file, Money 97, damaged
+— left the user on the upload step with nothing shown at all, while every other
+parse failure in this wizard toasts. It is a panel rather than a toast because
+the useful messages are instructions ("open and save it once in Money Plus
+Sunset, then import the result") and a toast takes those away mid-sentence.
 
 **The acceptance numbers can only come from a file that cannot be committed**, so
 both ends of the pipeline now measure themselves. `npm run mny:inspect` prints

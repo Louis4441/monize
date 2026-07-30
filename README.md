@@ -80,6 +80,7 @@ Monize is running in my [Kubernetes cluster](https://github.com/kenlasko/k8s).
 - Payees with auto-categorization rules, aliases with wildcard patterns, and merge capability
 - Multi-currency transactions with automatic exchange rate tracking
 - Import from CSV, OFX/QFX, and QIF (Quicken and Microsoft Money) with smart column auto-matching
+- Microsoft Money full-file import: read a `.mny` file directly -- accounts, transfers, splits, investments, price history, exchange rates and scheduled bills -- and reconcile every balance against the file afterwards ([guide](docs/import-ms-money.md))
 - Quicken full-file import: import all accounts, categories, and tags from a single QIF export
 - Data reset: wipe financial data and re-import without losing your user account or settings
 
@@ -212,7 +213,7 @@ monize/
 │   │   ├── ai/                # AI assistant (providers, query engine, usage tracking)
 │   │   ├── mcp/               # Model Context Protocol server
 │   │   ├── tags/               # Transaction tags
-│   │   ├── import/            # QIF, CSV, OFX/QFX file import
+│   │   ├── import/            # QIF, CSV, OFX/QFX and Microsoft Money (.mny) file import
 │   │   ├── health/            # Health check endpoints
 │   │   └── main.ts            # Application entry point
 │   └── Dockerfile
