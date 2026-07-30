@@ -25,6 +25,8 @@ import {
 import { AuthGuard } from "@nestjs/passport";
 import { assertStringParam } from "../common/query-param-utils";
 import { PayeesService } from "./payees.service";
+import { PayeeDetailService } from "./payee-detail.service";
+import { PayeeDetailDto } from "./dto/payee-detail.dto";
 import {
   PayeeAutoMergeService,
   CategoryMatchMode,
@@ -50,6 +52,7 @@ import {
 export class PayeesController {
   constructor(
     private readonly payeesService: PayeesService,
+    private readonly payeeDetailService: PayeeDetailService,
     private readonly payeeAutoMergeService: PayeeAutoMergeService,
   ) {}
 
@@ -453,6 +456,21 @@ export class PayeesController {
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<PayeeAlias[]> {
     return this.payeesService.getAliases(req.user.id, id);
+  }
+
+  @Get(":id/detail")
+  @AllowDelegate()
+  @ApiOperation({ summary: "Get the payee detail page aggregate" })
+  @ApiResponse({
+    status: 200,
+    description: "Payee detail for the payee detail page",
+  })
+  @ApiResponse({ status: 404, description: "Payee not found" })
+  getDetail(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<PayeeDetailDto> {
+    return this.payeeDetailService.getDetail(req.user.id, id);
   }
 
   @Get("inactive/match")

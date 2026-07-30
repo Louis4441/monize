@@ -46,6 +46,22 @@ export async function countUncategorizedTransactionsByPayee(
 }
 
 /**
+ * Count how many transactions a default-category backfill would touch for ONE
+ * payee -- the single-payee form of `countUncategorizedTransactionsByPayee`,
+ * for callers (the detail page) that would otherwise pay for a scan across
+ * every payee to read one entry.
+ */
+export async function countUncategorizedTransactionsForPayee(
+  manager: EntityManager,
+  userId: string,
+  payeeId: string,
+): Promise<number> {
+  return manager.count(Transaction, {
+    where: backfillableWhere(userId, payeeId),
+  });
+}
+
+/**
  * Assign `categoryId` to a single payee's backfillable transactions (see
  * `backfillableWhere`). Returns the number of transactions updated. Pass the
  * EntityManager from an active QueryRunner so the backfill joins the caller's
