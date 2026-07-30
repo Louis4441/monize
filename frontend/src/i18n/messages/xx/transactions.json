@@ -24,6 +24,7 @@
     "inactive": "[XX-Inactive-XX]",
     "noTransactions": "[XX-No transactions in this period-XX]",
     "editAria": "[XX-Edit payee-XX]",
+    "detailsAria": "[XX-View payee details-XX]",
     "collapseAria": "[XX-Hide payee info-XX]",
     "show": "[XX-Show payee info-XX]"
   },

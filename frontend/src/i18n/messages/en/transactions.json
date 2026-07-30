@@ -24,6 +24,7 @@
     "inactive": "Inactive",
     "noTransactions": "No transactions in this period",
     "editAria": "Edit payee",
+    "detailsAria": "View payee details",
     "collapseAria": "Hide payee info",
     "show": "Show payee info"
   },

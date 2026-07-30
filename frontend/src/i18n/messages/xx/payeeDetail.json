@@ -1,0 +1,120 @@
+{
+  "loading": "[XX-Loading payee details...-XX]",
+  "notFound": "[XX-Payee not found-XX]",
+  "loadFailed": "[XX-Failed to load payee details-XX]",
+  "backToPayees": "[XX-Back to Payees-XX]",
+  "error": {
+    "retry": "[XX-Retry-XX]"
+  },
+  "header": {
+    "inactiveBadge": "[XX-Inactive-XX]",
+    "edit": "[XX-Edit-XX]",
+    "merge": "[XX-Merge-XX]",
+    "deactivate": "[XX-Deactivate-XX]",
+    "reactivate": "[XX-Reactivate-XX]",
+    "viewTransactions": "[XX-View Transactions-XX]",
+    "switchPayee": "[XX-Switch payee-XX]",
+    "switchPlaceholder": "[XX-Filter payees...-XX]",
+    "switchNoMatches": "[XX-No payees match-XX]",
+    "since": "[XX-Payee since {date}-XX]"
+  },
+  "toasts": {
+    "deactivated": "[XX-{name} deactivated-XX]",
+    "deactivateFailed": "[XX-Failed to deactivate payee-XX]",
+    "reactivated": "[XX-{name} reactivated-XX]",
+    "reactivateFailed": "[XX-Failed to reactivate payee-XX]"
+  },
+  "deactivate": {
+    "confirmTitle": "[XX-Deactivate Payee-XX]",
+    "confirmMessage": "[XX-Deactivate {name}? It keeps its history but stops appearing in payee suggestions. You can reactivate it at any time.-XX]",
+    "confirmButton": "[XX-Deactivate-XX]"
+  },
+  "summary": {
+    "spentThisYear": "[XX-Spent This Year-XX]",
+    "receivedThisYear": "[XX-Received This Year-XX]",
+    "vsLastYear": "[XX-{percent} vs same period last year-XX]",
+    "vsLastYearNew": "[XX-Nothing in this period last year-XX]",
+    "averageTransaction": "[XX-Average Transaction-XX]",
+    "transactions": "[XX-Transactions-XX]",
+    "sinceYear": "[XX-Since {year}-XX]",
+    "lastTransaction": "[XX-Last Transaction-XX]",
+    "recurring": "[XX-Recurring-XX]",
+    "recurringValue": "[XX-{cadence} · ~{amount}-XX]",
+    "priceUp": "[XX-Up from {amount}-XX]",
+    "priceDown": "[XX-Down from {amount}-XX]",
+    "uncategorized": "[XX-Uncategorized-XX]",
+    "uncategorizedApply": "[XX-Click to apply the default category-XX]",
+    "uncategorizedSetDefault": "[XX-Click to set a default category-XX]",
+    "convertedNote": "[XX-Converted to {currency}-XX]"
+  },
+  "cadence": {
+    "weekly": "[XX-Weekly-XX]",
+    "biweekly": "[XX-Every 2 Weeks-XX]",
+    "monthly": "[XX-Monthly-XX]",
+    "quarterly": "[XX-Quarterly-XX]",
+    "yearly": "[XX-Yearly-XX]"
+  },
+  "topCategories": {
+    "title": "[XX-Top Categories-XX]",
+    "subtitle": "[XX-Trailing 12 months-XX]",
+    "empty": "[XX-No spending in the last 12 months-XX]",
+    "uncategorized": "[XX-Uncategorized-XX]"
+  },
+  "accountsPanel": {
+    "title": "[XX-Paid From Accounts-XX]",
+    "subtitle": "[XX-All time-XX]",
+    "empty": "[XX-No transactions yet-XX]"
+  },
+  "recurringPanel": {
+    "title": "[XX-Bills & Recurring-XX]",
+    "empty": "[XX-No recurring pattern detected in the last 12 months-XX]",
+    "detectedTooltip": "[XX-Detected from repeated charges over the last 12 months.-XX]",
+    "frequencyValue": "[XX-{cadence} · {amount}-XX]",
+    "wasAmount": "[XX-was {amount}-XX]",
+    "usualDay": "[XX-Usually around day {day} of the month-XX]",
+    "nextBill": "[XX-Next Bill-XX]",
+    "viewBills": "[XX-View in Bills & Deposits-XX]"
+  },
+  "keyInfo": {
+    "title": "[XX-Key Information-XX]",
+    "defaultCategory": "[XX-Default Category-XX]",
+    "status": "[XX-Status-XX]",
+    "active": "[XX-Active-XX]",
+    "inactive": "[XX-Inactive-XX]",
+    "created": "[XX-Added-XX]",
+    "firstTransaction": "[XX-First Transaction-XX]",
+    "lastTransaction": "[XX-Last Transaction-XX]",
+    "aliases": "[XX-Aliases-XX]",
+    "largestTransaction": "[XX-Largest Transaction-XX]",
+    "largestValue": "[XX-{amount} on {date}-XX]",
+    "overpaymentFor": "[XX-Overpayment Payee For-XX]",
+    "notes": "[XX-Notes-XX]"
+  },
+  "tabs": {
+    "ariaLabel": "[XX-Payee detail sections-XX]",
+    "overview": "[XX-Overview-XX]",
+    "transactions": "[XX-Transactions-XX]",
+    "aliases": "[XX-Aliases-XX]"
+  },
+  "transactionsTab": {
+    "title": "[XX-Recent Transactions-XX]",
+    "empty": "[XX-No transactions for this payee yet-XX]",
+    "viewAll": "[XX-View all in the register-XX]",
+    "date": "[XX-Date-XX]",
+    "account": "[XX-Account-XX]",
+    "category": "[XX-Category-XX]",
+    "amount": "[XX-Amount-XX]",
+    "uncategorized": "[XX-Uncategorized-XX]",
+    "loadFailed": "[XX-Failed to load transactions-XX]"
+  },
+  "aliasesTab": {
+    "description": "[XX-Aliases map imported transaction names onto this payee. Wildcards are allowed, e.g. STARBUCKS*.-XX]"
+  },
+  "applyDefault": {
+    "confirmTitle": "[XX-Apply Default Category-XX]",
+    "confirmMessage": "[XX-Assign {category} to {count, plural, one {# uncategorized transaction} other {# uncategorized transactions}} from {name}? Manually categorized transactions are left unchanged.-XX]",
+    "confirmButton": "[XX-Apply-XX]",
+    "applied": "[XX-{count, plural, one {# transaction categorized} other {# transactions categorized}}-XX]",
+    "failed": "[XX-Failed to apply the default category-XX]"
+  }
+}

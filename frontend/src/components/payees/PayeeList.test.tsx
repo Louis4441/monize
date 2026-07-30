@@ -285,6 +285,19 @@ describe('PayeeList', () => {
     expect(mockPush).toHaveBeenCalledWith('/transactions?payeeId=p1');
   });
 
+  // Row click opens the payee detail page (the name keeps its register link,
+  // and Edit stays available as a row action).
+  it('navigates to the payee detail page when the row is clicked', () => {
+    const payees = [
+      makePayee({ id: 'p1', name: 'Walmart' }),
+    ];
+
+    render(<PayeeList payees={payees} onEdit={onEdit} onRefresh={onRefresh} />);
+    fireEvent.click(screen.getByText('Walmart').closest('tr')!);
+    expect(mockPush).toHaveBeenCalledWith('/payees/p1');
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
   // Delete flow
   it('shows delete button for each payee', () => {
     const payees = [

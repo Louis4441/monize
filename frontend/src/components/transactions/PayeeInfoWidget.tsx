@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { PencilSquareIcon, ChevronDoubleLeftIcon } from '@heroicons/react/24/outline';
+import {
+  PencilSquareIcon,
+  ChevronDoubleLeftIcon,
+  ArrowTopRightOnSquareIcon,
+} from '@heroicons/react/24/outline';
 import { Payee, PayeeAlias } from '@/types/payee';
 import { Category } from '@/types/category';
 import { ScheduledTransaction } from '@/types/scheduled-transaction';
@@ -178,6 +182,15 @@ export function PayeeInfoWidget({
           )}
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => router.push(`/payees/${payee.id}`)}
+            aria-label={t('payeeWidget.detailsAria')}
+            title={t('payeeWidget.detailsAria')}
+            className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1"
+          >
+            <ArrowTopRightOnSquareIcon className="h-5 w-5" />
+          </button>
           <button
             type="button"
             onClick={onEdit}

@@ -9,6 +9,7 @@ import {
   CategoryAssignment,
   DeactivationPreviewParams,
   DeactivationCandidate,
+  PayeeDetail,
   PayeeStatusFilter,
   PayeeAlias,
   CreatePayeeAliasData,
@@ -49,6 +50,12 @@ export const payeesApi = {
   // Get payee by ID
   getById: async (id: string): Promise<Payee> => {
     const response = await apiClient.get<Payee>(`/payees/${id}`);
+    return response.data;
+  },
+
+  // Get the detail-page aggregate (stats, account breakdown, largest transaction)
+  getDetail: async (id: string): Promise<PayeeDetail> => {
+    const response = await apiClient.get<PayeeDetail>(`/payees/${id}/detail`);
     return response.data;
   },
 
