@@ -18,7 +18,11 @@ import {
   CountryWeightingResult,
   AssetClassWeightingResult,
   SecurityPrice,
+  SecurityDocument,
+  CreateSecurityDocumentData,
+  SecurityNewsResult,
   SecurityTransactionHistory,
+  SecurityDetail,
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
 import { getCached, setCache, invalidateCache } from './apiCache';
@@ -103,16 +107,25 @@ export const investmentsApi = {
     return response.data;
   },
 
-  // Suggest a description for a security from the Yahoo provider profile
-  // (advisory pre-fill for the "Fetch from Yahoo" button). Not cached.
+  // Suggest a description and website for a security from the Yahoo provider
+  // profile (advisory pre-fill for the "Fetch from Yahoo" button). Not cached.
+  // `website` is null for funds, where Yahoo publishes no URL, and there is no
+  // investor-relations address to suggest: no provider carries one.
   getSuggestedDescription: async (
     symbol: string,
     exchange?: string,
-  ): Promise<{ symbol: string; description: string | null }> => {
-    const response = await apiClient.get<{ symbol: string; description: string | null }>(
-      '/securities/profile-description',
-      { params: { symbol, ...(exchange ? { exchange } : {}) } },
-    );
+  ): Promise<{
+    symbol: string;
+    description: string | null;
+    website: string | null;
+  }> => {
+    const response = await apiClient.get<{
+      symbol: string;
+      description: string | null;
+      website: string | null;
+    }>('/securities/profile-description', {
+      params: { symbol, ...(exchange ? { exchange } : {}) },
+    });
     return response.data;
   },
 
@@ -367,6 +380,14 @@ export const investmentsApi = {
     return response.data;
   },
 
+  // The security plus its position, per-account breakdown and lifetime totals,
+  // for the security detail page. Deliberately uncached: it is the page's
+  // primary data, and a stale position after a trade would be misleading.
+  getSecurityDetail: async (id: string): Promise<SecurityDetail> => {
+    const response = await apiClient.get<SecurityDetail>(`/securities/${id}/detail`);
+    return response.data;
+  },
+
   // Country names for the manual ETF/fund allocation picker: canonical list
   // plus any custom countries the user has saved, base-currency country first.
   getCountryOptions: async (): Promise<string[]> => {
@@ -580,6 +601,50 @@ export const investmentsApi = {
   },
 
   // Get price history for a security
+  getSecurityNews: async (securityId: string): Promise<SecurityNewsResult> => {
+    const response = await apiClient.get<SecurityNewsResult>(
+      `/securities/${securityId}/news`,
+    );
+    return response.data;
+  },
+
+  getSecurityDocuments: async (securityId: string): Promise<SecurityDocument[]> => {
+    const response = await apiClient.get<SecurityDocument[]>(
+      `/securities/${securityId}/documents`,
+    );
+    return response.data;
+  },
+
+  createSecurityDocument: async (
+    securityId: string,
+    data: CreateSecurityDocumentData,
+  ): Promise<SecurityDocument> => {
+    const response = await apiClient.post<SecurityDocument>(
+      `/securities/${securityId}/documents`,
+      data,
+    );
+    return response.data;
+  },
+
+  updateSecurityDocument: async (
+    securityId: string,
+    documentId: string,
+    data: Partial<CreateSecurityDocumentData>,
+  ): Promise<SecurityDocument> => {
+    const response = await apiClient.patch<SecurityDocument>(
+      `/securities/${securityId}/documents/${documentId}`,
+      data,
+    );
+    return response.data;
+  },
+
+  deleteSecurityDocument: async (
+    securityId: string,
+    documentId: string,
+  ): Promise<void> => {
+    await apiClient.delete(`/securities/${securityId}/documents/${documentId}`);
+  },
+
   getSecurityPrices: async (securityId: string, limit = 365): Promise<SecurityPrice[]> => {
     const cacheKey = `investments:prices:${securityId}:${limit}`;
     const cached = getCached<SecurityPrice[]>(cacheKey);

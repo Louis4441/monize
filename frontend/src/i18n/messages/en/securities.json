@@ -78,8 +78,6 @@
       "source": "Source of the most recent price"
     },
     "actions": {
-      "history": "History",
-      "prices": "Prices",
       "edit": "Edit",
       "deactivate": "Deactivate",
       "activate": "Activate",
@@ -94,8 +92,6 @@
       "subtitle": "Get started by adding your first security."
     },
     "contextMenu": {
-      "transactionHistory": "Transaction History",
-      "viewPrices": "View Prices",
       "editSecurity": "Edit Security",
       "deactivate": "Deactivate",
       "activate": "Activate",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Auto-resolved from ticker; override only if wrong",
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "Notes about this security.",
+    "websiteLabel": "Website",
+    "irWebsiteLabel": "Investor relations website",
+    "irWebsiteHint": "No price provider publishes this one, so it has to be typed in.",
     "tagsLabel": "Tags",
     "tagsPlaceholder": "Select tags",
     "createNewTag": "Create new tag",
@@ -222,10 +221,11 @@
       "sold": "Sold {quantity} · {account}"
     },
     "empty": "No price history available",
-    "showingCount": "Showing {shown} of {total} prices",
     "columns": {
       "date": "Date",
       "close": "Close",
+      "adjustedClose": "Adj. close",
+      "adjustedCloseTitle": "Split- and dividend-adjusted close (total return). Empty when the price provider does not supply it.",
       "open": "Open",
       "high": "High",
       "low": "Low",
@@ -251,7 +251,10 @@
       "title": "Delete Price",
       "message": "Delete price entry for {date}?",
       "confirmLabel": "Delete"
-    }
+    },
+    "groupCount": "{count} price(s)",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all"
   },
   "transactionHistory": {
     "inactiveBadge": "Inactive",

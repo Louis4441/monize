@@ -78,8 +78,6 @@
       "source": "Nguồn của giá gần nhất"
     },
     "actions": {
-      "history": "Lịch sử",
-      "prices": "Giá",
       "edit": "Chỉnh sửa",
       "deactivate": "Vô hiệu hóa",
       "activate": "Kích hoạt",
@@ -94,8 +92,6 @@
       "subtitle": "Bắt đầu bằng cách thêm giấy chứng khoán đầu tiên của bạn."
     },
     "contextMenu": {
-      "transactionHistory": "Lịch sử giao tác",
-      "viewPrices": "Xem giá",
       "editSecurity": "Chỉnh sửa giấy chứng khoán",
       "deactivate": "Vô hiệu hóa",
       "activate": "Kích hoạt",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Tự động xác định từ mã chứng khoán; chỉ ghi đè nếu sai",
     "descriptionLabel": "Mô tả",
     "descriptionPlaceholder": "Ghi chú về chứng khoán này.",
+    "websiteLabel": "Trang web",
+    "irWebsiteLabel": "Trang quan hệ nhà đầu tư",
+    "irWebsiteHint": "Không nhà cung cấp giá nào công bố địa chỉ này, nên phải tự nhập.",
     "tagsLabel": "Thẻ",
     "tagsPlaceholder": "Chọn thẻ...",
     "createNewTag": "Tạo thẻ mới...",
@@ -222,7 +221,6 @@
       "sold": "Bán {quantity} · {account}"
     },
     "empty": "Không có lịch sử giá",
-    "showingCount": "Đang hiển thị {shown} trong {total} giá",
     "columns": {
       "date": "Ngày",
       "close": "Đóng cửa",
@@ -231,7 +229,9 @@
       "low": "Thấp nhất",
       "volume": "Khối lượng",
       "source": "Nguồn",
-      "actions": "Hành động"
+      "actions": "Hành động",
+      "adjustedClose": "Giá đóng cửa điều chỉnh",
+      "adjustedCloseTitle": "Giá đóng cửa đã điều chỉnh theo chia tách và cổ tức (lợi nhuận tổng). Để trống khi nhà cung cấp giá không cung cấp."
     },
     "toasts": {
       "added": "Đã thêm giá",
@@ -251,7 +251,10 @@
       "title": "Xóa giá",
       "message": "Xóa bản ghi giá cho {date}?",
       "confirmLabel": "Xóa"
-    }
+    },
+    "collapseAll": "Thu gọn tất cả",
+    "expandAll": "Mở rộng tất cả",
+    "groupCount": "{count} giá"
   },
   "transactionHistory": {
     "inactiveBadge": "Không hoạt động",

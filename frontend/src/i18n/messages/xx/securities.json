@@ -78,8 +78,6 @@
       "source": "[XX-Source of the most recent price-XX]"
     },
     "actions": {
-      "history": "[XX-History-XX]",
-      "prices": "[XX-Prices-XX]",
       "edit": "[XX-Edit-XX]",
       "deactivate": "[XX-Deactivate-XX]",
       "activate": "[XX-Activate-XX]",
@@ -94,8 +92,6 @@
       "subtitle": "[XX-Get started by adding your first security.-XX]"
     },
     "contextMenu": {
-      "transactionHistory": "[XX-Transaction History-XX]",
-      "viewPrices": "[XX-View Prices-XX]",
       "editSecurity": "[XX-Edit Security-XX]",
       "deactivate": "[XX-Deactivate-XX]",
       "activate": "[XX-Activate-XX]",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "[XX-Auto-resolved from ticker; override only if wrong-XX]",
     "descriptionLabel": "[XX-Description-XX]",
     "descriptionPlaceholder": "[XX-Notes about this security.-XX]",
+    "websiteLabel": "[XX-Website-XX]",
+    "irWebsiteLabel": "[XX-Investor relations website-XX]",
+    "irWebsiteHint": "[XX-No price provider publishes this one, so it has to be typed in.-XX]",
     "tagsLabel": "[XX-Tags-XX]",
     "tagsPlaceholder": "[XX-Select tags-XX]",
     "createNewTag": "[XX-Create new tag-XX]",
@@ -222,10 +221,11 @@
       "sold": "[XX-Sold {quantity} · {account}-XX]"
     },
     "empty": "[XX-No price history available-XX]",
-    "showingCount": "[XX-Showing {shown} of {total} prices-XX]",
     "columns": {
       "date": "[XX-Date-XX]",
       "close": "[XX-Close-XX]",
+      "adjustedClose": "[XX-Adj. close-XX]",
+      "adjustedCloseTitle": "[XX-Split- and dividend-adjusted close (total return). Empty when the price provider does not supply it.-XX]",
       "open": "[XX-Open-XX]",
       "high": "[XX-High-XX]",
       "low": "[XX-Low-XX]",
@@ -251,7 +251,10 @@
       "title": "[XX-Delete Price-XX]",
       "message": "[XX-Delete price entry for {date}?-XX]",
       "confirmLabel": "[XX-Delete-XX]"
-    }
+    },
+    "groupCount": "[XX-{count} price(s)-XX]",
+    "expandAll": "[XX-Expand all-XX]",
+    "collapseAll": "[XX-Collapse all-XX]"
   },
   "transactionHistory": {
     "inactiveBadge": "[XX-Inactive-XX]",

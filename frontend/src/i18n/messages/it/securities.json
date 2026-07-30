@@ -78,8 +78,6 @@
       "source": "Fonte del prezzo più recente"
     },
     "actions": {
-      "history": "Storico",
-      "prices": "Prezzi",
       "edit": "Modifica",
       "deactivate": "Disattiva",
       "activate": "Attiva",
@@ -94,8 +92,6 @@
       "subtitle": "Inizia aggiungendo il tuo primo titolo."
     },
     "contextMenu": {
-      "transactionHistory": "Storico transazioni",
-      "viewPrices": "Visualizza prezzi",
       "editSecurity": "Modifica titolo",
       "deactivate": "Disattiva",
       "activate": "Attiva",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Risolto automaticamente dal ticker; modifica solo se errato",
     "descriptionLabel": "Descrizione",
     "descriptionPlaceholder": "Note su questo titolo.",
+    "websiteLabel": "Sito web",
+    "irWebsiteLabel": "Sito investor relations",
+    "irWebsiteHint": "Nessun fornitore di quotazioni pubblica questo indirizzo, quindi va inserito a mano.",
     "tagsLabel": "Etichette",
     "tagsPlaceholder": "Seleziona etichette...",
     "createNewTag": "Crea nuova etichetta...",
@@ -222,7 +221,6 @@
       "sold": "Vendita {quantity} · {account}"
     },
     "empty": "Nessuno storico delle quotazioni disponibile",
-    "showingCount": "Visualizzazione di {shown} prezzi su {total}",
     "columns": {
       "date": "Data",
       "close": "Chiusura",
@@ -231,7 +229,9 @@
       "low": "Minimo",
       "volume": "Volume",
       "source": "Fonte",
-      "actions": "Azioni"
+      "actions": "Azioni",
+      "adjustedClose": "Chiusura agg.",
+      "adjustedCloseTitle": "Chiusura aggiustata per frazionamenti e dividendi (rendimento totale). Vuota quando il fornitore di prezzi non la fornisce."
     },
     "toasts": {
       "added": "Prezzo aggiunto",
@@ -251,7 +251,10 @@
       "title": "Elimina prezzo",
       "message": "Eliminare la voce di prezzo del {date}?",
       "confirmLabel": "Elimina"
-    }
+    },
+    "collapseAll": "Comprimi tutto",
+    "expandAll": "Espandi tutto",
+    "groupCount": "{count} prezzo/i"
   },
   "transactionHistory": {
     "inactiveBadge": "Inattivo",

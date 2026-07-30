@@ -70,6 +70,7 @@ export const RESTORABLE_TABLES: ReadonlySet<string> = new Set([
   "scheduled_transaction_split_tags",
   "securities",
   "security_prices",
+  "security_documents",
   "holdings",
   "security_tags",
   "investment_transactions",
@@ -143,6 +144,7 @@ interface BackupData {
   scheduled_transaction_overrides: Record<string, unknown>[];
   securities: Record<string, unknown>[];
   security_prices: Record<string, unknown>[];
+  security_documents: Record<string, unknown>[];
   holdings: Record<string, unknown>[];
   investment_transactions: Record<string, unknown>[];
   loan_rate_changes: Record<string, unknown>[];
@@ -416,6 +418,10 @@ export class BackupService {
               WHERE s.user_id = $1`,
       },
       {
+        key: "security_documents",
+        sql: "SELECT * FROM security_documents WHERE user_id = $1",
+      },
+      {
         key: "holdings",
         sql: `SELECT h.* FROM holdings h
               JOIN accounts a ON h.account_id = a.id
@@ -659,6 +665,12 @@ export class BackupService {
         "security_prices",
         data.security_prices,
         null,
+      );
+      restored.securityDocuments = await this.insertRows(
+        queryRunner,
+        "security_documents",
+        data.security_documents,
+        userId,
       );
       restored.holdings = await this.insertRows(
         queryRunner,
@@ -1064,6 +1076,10 @@ export class BackupService {
     await queryRunner.query(
       `DELETE FROM security_prices WHERE security_id IN
        (SELECT id FROM securities WHERE user_id = $1)`,
+      [userId],
+    );
+    await queryRunner.query(
+      "DELETE FROM security_documents WHERE user_id = $1",
       [userId],
     );
     // Scheduled transactions and their splits reference securities via

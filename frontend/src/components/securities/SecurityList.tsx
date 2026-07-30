@@ -14,8 +14,6 @@ import { RowActionSheet } from '@/components/ui/row-actions/RowActionSheet';
 import type { RowAction } from '@/components/ui/row-actions/rowAction';
 
 interface SecurityActionLabels {
-  history: string;
-  prices: string;
   edit: string;
   activate: string;
   deactivate: string;
@@ -23,8 +21,6 @@ interface SecurityActionLabels {
 }
 
 interface SecurityActionHandlers {
-  onViewHistory?: (security: Security) => void;
-  onViewPrices?: (security: Security) => void;
   onEdit: (security: Security) => void;
   onToggleActive: (security: Security) => void;
   onDelete?: (security: Security) => void;
@@ -43,22 +39,6 @@ function buildSecurityActions(
 ): RowAction[] {
   const canDelete = !hasHoldings && !hasTransactions;
   return [
-    {
-      key: 'history',
-      label: labels.history,
-      icon: 'history',
-      tone: 'neutral',
-      onClick: () => handlers.onViewHistory?.(security),
-      hidden: !handlers.onViewHistory,
-    },
-    {
-      key: 'prices',
-      label: labels.prices,
-      icon: 'prices',
-      tone: 'neutral',
-      onClick: () => handlers.onViewPrices?.(security),
-      hidden: !handlers.onViewPrices,
-    },
     {
       key: 'edit',
       label: labels.edit,
@@ -147,8 +127,8 @@ interface SecurityListProps {
   onToggleActive: (security: Security) => void;
   onToggleFavourite?: (security: Security) => void;
   onDelete?: (security: Security) => void;
-  onViewPrices?: (security: Security) => void;
-  onViewHistory?: (security: Security) => void;
+  /** Opens the security's detail page; a click anywhere on the row calls it. */
+  onOpen: (security: Security) => void;
   density?: DensityLevel;
   onDensityChange?: (density: DensityLevel) => void;
   sortField?: SecuritySortField;
@@ -169,8 +149,6 @@ interface SecurityRowProps {
   onToggleActive: (security: Security) => void;
   onToggleFavourite?: (security: Security) => void;
   onDelete?: (security: Security) => void;
-  onViewPrices?: (security: Security) => void;
-  onViewHistory?: (security: Security) => void;
   getRowHandlers: (security: Security) => LongPressRowHandlers;
   index: number;
   defaultQuoteProvider: 'yahoo' | 'msn';
@@ -188,8 +166,6 @@ const SecurityRow = memo(function SecurityRow({
   onToggleActive,
   onToggleFavourite,
   onDelete,
-  onViewPrices,
-  onViewHistory,
   getRowHandlers,
   index,
   defaultQuoteProvider,
@@ -218,20 +194,18 @@ const SecurityRow = memo(function SecurityRow({
     hasHoldings,
     hasTransactions,
     {
-      history: t('list.actions.history'),
-      prices: t('list.actions.prices'),
       edit: tc('actions.edit'),
       activate: t('list.actions.activate'),
       deactivate: t('list.actions.deactivate'),
       delete: tc('actions.delete'),
     },
-    { onViewHistory, onViewPrices, onEdit, onToggleActive, onDelete },
+    { onEdit, onToggleActive, onDelete },
   );
 
   return (
     <tr
       ref={rowRef}
-      className={`group hover:bg-gray-100 dark:hover:bg-gray-800 select-none ${
+      className={`group hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer select-none ${
         !security.isActive ? 'opacity-60' : ''
       } ${density !== 'normal' && index % 2 === 1 ? 'bg-gray-50 dark:bg-table-stripe-dark' : 'bg-white dark:bg-gray-900'} ${isHighlighted ? HIGHLIGHT_FLASH : ''}`}
       {...getRowHandlers(security)}
@@ -383,8 +357,7 @@ export function SecurityList({
   onToggleActive,
   onToggleFavourite,
   onDelete,
-  onViewPrices,
-  onViewHistory,
+  onOpen,
   density: propDensity,
   onDensityChange,
   sortField: propSortField,
@@ -425,6 +398,10 @@ export function SecurityList({
 
   const { getRowHandlers } = useLongPress<Security>({
     onLongPress: setContextSecurity,
+    // A plain click anywhere on the row opens the security, matching the
+    // accounts list. The favourite star and the row actions stop propagation, so
+    // they act on themselves rather than opening the page underneath.
+    onClick: onOpen,
   });
 
   // Memoize padding classes based on density
@@ -577,8 +554,6 @@ export function SecurityList({
                 onToggleActive={onToggleActive}
                 onToggleFavourite={onToggleFavourite}
                 onDelete={onDelete}
-                onViewPrices={onViewPrices}
-                onViewHistory={onViewHistory}
                 getRowHandlers={getRowHandlers}
                 index={index}
                 defaultQuoteProvider={defaultQuoteProvider}
@@ -600,14 +575,12 @@ export function SecurityList({
               (holdings[contextSecurity.id] || 0) > 0,
               transactionSecurityIds.has(contextSecurity.id),
               {
-                history: t('list.contextMenu.transactionHistory'),
-                prices: t('list.contextMenu.viewPrices'),
                 edit: t('list.contextMenu.editSecurity'),
                 activate: t('list.contextMenu.activate'),
                 deactivate: t('list.contextMenu.deactivate'),
                 delete: t('list.contextMenu.delete'),
               },
-              { onViewHistory, onViewPrices, onEdit, onToggleActive, onDelete },
+              { onEdit, onToggleActive, onDelete },
             )
           : []}
         onClose={() => setContextSecurity(null)}

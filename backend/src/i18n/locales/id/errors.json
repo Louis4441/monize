@@ -404,7 +404,8 @@
     "noUpdateFields": "Berikan setidaknya satu kolom untuk diubah.",
     "allocationExceedsTotal": "Persentase alokasi berjumlah lebih dari 100%.",
     "invalidTagKey": "Kunci tag (1-100 karakter) diperlukan",
-    "assetOptionNameRequired": "Nama kelas aset wajib diisi."
+    "assetOptionNameRequired": "Nama kelas aset wajib diisi.",
+    "documentNotFound": "Dokumen tidak ditemukan"
   },
   "tags": {
     "notFound": "Tag dengan ID {{ id }} tidak ditemukan",

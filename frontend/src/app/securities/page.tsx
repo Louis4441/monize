@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
@@ -16,8 +17,6 @@ import dynamic from 'next/dynamic';
 import { investmentsApi } from '@/lib/investments';
 import { Security, CreateSecurityData, Holding } from '@/types/investment';
 const SecurityForm = dynamic(() => import('@/components/securities/SecurityForm').then(m => m.SecurityForm), { ssr: false });
-const SecurityPriceHistory = dynamic(() => import('@/components/securities/SecurityPriceHistory').then(m => m.SecurityPriceHistory), { ssr: false });
-const SecurityTransactionHistory = dynamic(() => import('@/components/securities/SecurityTransactionHistory').then(m => m.SecurityTransactionHistory), { ssr: false });
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { SecurityList, type SecurityHoldings, type SecurityTransactions, type SecuritySortField, type SortDirection } from '@/components/securities/SecurityList';
 import { type DensityLevel } from '@/hooks/useTableDensity';
@@ -43,6 +42,7 @@ export default function SecuritiesPage() {
 
 function SecuritiesContent() {
   const t = useTranslations('securities');
+  const router = useRouter();
   const [allSecurities, setAllSecurities] = useState<Security[]>([]);
   const [holdings, setHoldings] = useState<SecurityHoldings>({});
   const [transactionSecurityIds, setTransactionSecurityIds] = useState<SecurityTransactions>(new Set());
@@ -52,15 +52,11 @@ function SecuritiesContent() {
     security: null,
   });
   const { showForm, editingItem: editingSecurity, openCreate, openEdit, close, isEditing, modalProps, setFormDirty, unsavedChangesDialog, formSubmitRef } = useFormModal<Security>();
-  const [priceSecurity, setPriceSecurity] = useState<Security | undefined>();
-  // Deep link: `?price=<securityId>` opens this page's price history for that
-  // security, so other screens (the dashboard's Top Movers) can send the user
-  // straight to it instead of growing their own copy of the view. Captured once
-  // on mount, then resolved against the loaded list by plain derivation -- no
-  // effect, so nothing re-opens after the user closes it.
+  // Legacy deep link: `?price=<securityId>` used to open a price-history modal
+  // on this page. The detail page owns that view now, so the link is honoured by
+  // redirecting rather than broken -- old bookmarks and any link already sent out
+  // keep working.
   const priceParamId = useSearchParams().get('price');
-  const [priceParamConsumed, setPriceParamConsumed] = useState(false);
-  const [historySecurity, setHistorySecurity] = useState<Security | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
   const [currentPage, setCurrentPage] = useState(1);
@@ -104,6 +100,11 @@ function SecuritiesContent() {
     }
   }, [t]);
 
+  // Legacy `?price=<id>` links land on the detail page's Price history tab.
+  useEffect(() => {
+    if (priceParamId) router.replace(`/securities/${priceParamId}?tab=prices`);
+  }, [priceParamId, router]);
+
   useOnUndoRedo(loadData);
   // Refresh after the AI assistant creates or edits a security from the chat.
   useOnAiAction(loadData);
@@ -125,6 +126,15 @@ function SecuritiesContent() {
   const handleEdit = (security: Security) => {
     openEdit(security);
   };
+
+  // The list's modals stay for a quick look; the detail page is the whole
+  // picture, and the linkable place other screens point at.
+  const handleOpen = useCallback(
+    (security: Security) => {
+      router.push(`/securities/${security.id}`);
+    },
+    [router],
+  );
 
   const handleFormSubmit = async (data: CreateSecurityData) => {
     try {
@@ -276,19 +286,6 @@ function SecuritiesContent() {
     }
   }, [highlightId, sortedSecurities]);
 
-  // The deep-linked security, until the user closes the modal. Derived rather
-  // than pushed into state by an effect, so it needs no setState-in-effect and
-  // survives the list arriving after mount.
-  const deepLinkedPriceSecurity =
-    priceParamId && !priceParamConsumed
-      ? allSecurities.find((security) => security.id === priceParamId)
-      : undefined;
-  const shownPriceSecurity = priceSecurity ?? deepLinkedPriceSecurity;
-  const closePriceHistory = () => {
-    setPriceSecurity(undefined);
-    setPriceParamConsumed(true);
-  };
-
   const activeCount = allSecurities.filter((s) => s.isActive).length;
   const inactiveCount = allSecurities.filter((s) => !s.isActive).length;
 
@@ -362,27 +359,6 @@ function SecuritiesContent() {
         </Modal>
         <UnsavedChangesDialog {...unsavedChangesDialog} />
 
-        {/* Price History Modal */}
-        <Modal isOpen={!!shownPriceSecurity} onClose={closePriceHistory} maxWidth="5xl" className="p-3 sm:p-6" pushHistory tightMobileInset>
-          {shownPriceSecurity && (
-            <SecurityPriceHistory
-              security={shownPriceSecurity}
-              onClose={closePriceHistory}
-            />
-          )}
-        </Modal>
-
-        {/* Transaction History Modal */}
-        <Modal isOpen={!!historySecurity} onClose={() => setHistorySecurity(undefined)} maxWidth="5xl" className="p-6" pushHistory>
-          {historySecurity && (
-            <SecurityTransactionHistory
-              security={historySecurity}
-              onClose={() => setHistorySecurity(undefined)}
-              onChanged={loadData}
-            />
-          )}
-        </Modal>
-
         {/* Securities List */}
         <div className="bg-white dark:bg-gray-800 shadow dark:shadow-gray-700/50 rounded-lg overflow-hidden">
           {isLoading ? (
@@ -396,8 +372,7 @@ function SecuritiesContent() {
               onToggleActive={handleToggleActive}
               onToggleFavourite={handleToggleFavourite}
               onDelete={handleDeleteClick}
-              onViewPrices={setPriceSecurity}
-              onViewHistory={setHistorySecurity}
+              onOpen={handleOpen}
               density={listDensity}
               onDensityChange={setListDensity}
               sortField={sortField}

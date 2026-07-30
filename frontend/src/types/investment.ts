@@ -34,6 +34,10 @@ export interface Security {
   countryWeightings: { name: string; weight: number }[] | null;
   /** Manual ETF/fund asset-class breakdown (free-text names); weight is a decimal 0-1. */
   assetWeightings: { name: string; weight: number }[] | null;
+  /** The issuer's or product's page; auto-filled from Yahoo for shares. */
+  website: string | null;
+  /** The investor-relations page; manual, no provider supplies one. */
+  irWebsite: string | null;
   quoteProvider: QuoteProviderName | null;
   msnInstrumentId: string | null;
   /** Source of the most recent price row for this security (e.g. "yahoo_finance", "msn_finance", "manual"), or null if no prices exist. */
@@ -230,6 +234,150 @@ export interface SecurityTransactionHistory {
   currentQuantityAll: number;
 }
 
+/**
+ * The position in one account holding a security.
+ *
+ * Every amount is in the **security's own currency** -- what its price and
+ * average cost are quoted in -- except `costBasisAccountCurrency`, which is the
+ * portfolio's historical-rate conversion and is named for it. Nullable
+ * throughout: a position held in a closed account, or a dust residual, is known
+ * to exist from the transaction history but has no figures in the portfolio
+ * calculation, and a zero there would be a claim rather than an absence.
+ */
+export interface SecurityDetailAccountPosition {
+  accountId: string;
+  accountName: string;
+  accountCurrencyCode: string | null;
+  isClosed: boolean;
+  quantity: number;
+  /** Average cost per unit, in the security's currency. */
+  averageCost: number | null;
+  costBasis: number | null;
+  costBasisAccountCurrency: number | null;
+  marketValue: number | null;
+  gainLoss: number | null;
+  gainLossPercent: number | null;
+}
+
+/**
+ * The aggregate position across every account, for the summary cards. All
+ * amounts are in the security's currency.
+ */
+export interface SecurityDetailPosition {
+  quantity: number;
+  averageCost: number | null;
+  currentPrice: number | null;
+  costBasis: number | null;
+  marketValue: number | null;
+  gainLoss: number | null;
+  gainLossPercent: number | null;
+}
+
+/** Lifetime totals for the Position info card, in the security's currency. */
+export interface SecurityDetailActivity {
+  firstTransactionDate: string | null;
+  lastTransactionDate: string | null;
+  totalInvested: number;
+  totalSold: number;
+  dividends: number;
+  fees: number;
+  /**
+   * Realized gain in `realizedGainCurrency` -- the holding account's currency,
+   * which is how the canonical replay denominates it. Null when the security was
+   * sold from accounts of more than one currency, because those gains cannot be
+   * added into a single figure.
+   */
+  realizedGain: number | null;
+  realizedGainCurrency: string | null;
+  /** Currencies the security was sold from, for naming them when they differ. */
+  realizedGainCurrencies: string[];
+  /**
+   * Sales the replay found. Distinguishes "never sold" (zero) from "sold across
+   * currencies, so the gains cannot be added" -- both of which leave
+   * `realizedGain` null.
+   */
+  realizedSaleCount: number;
+  transactionCount: number;
+}
+
+/** One headline filed against a security. */
+export interface SecurityNewsItem {
+  id: string;
+  title: string;
+  publisher: string | null;
+  link: string;
+  /** ISO timestamp, or null when the provider gave none. */
+  publishedAt: string | null;
+  /** `STORY` or `VIDEO`. */
+  type: string | null;
+  /**
+   * Path on our own API, never the publisher's CDN: the backend fetches the
+   * image so the reader's browser does not have to contact a third party.
+   */
+  thumbnailUrl: string | null;
+  /** Every symbol the item was filed under, which is more than just this one. */
+  relatedTickers: string[];
+}
+
+export interface SecurityNewsResult {
+  /**
+   * Which provider supplied the headlines, or null when the security's quote
+   * provider supplies none. Distinguishes "nothing published" from "cannot ask".
+   */
+  provider: 'yahoo' | 'msn' | null;
+  items: SecurityNewsItem[];
+}
+
+/** The kinds of document a security can carry. Mirrors the backend enum. */
+export const SECURITY_DOCUMENT_TYPES = [
+  'FACTSHEET',
+  'KIID',
+  'PROSPECTUS',
+  'ANNUAL_REPORT',
+  'SEMI_ANNUAL_REPORT',
+  'TAX',
+  'RESEARCH',
+  'OTHER',
+] as const;
+
+export type SecurityDocumentType = (typeof SECURITY_DOCUMENT_TYPES)[number];
+
+/** A document recorded against a security. */
+export interface SecurityDocument {
+  id: string;
+  securityId: string;
+  documentType: SecurityDocumentType;
+  name: string;
+  /** The date on the document, not when it was recorded. Null where it has none. */
+  documentDate: string | null;
+  url: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSecurityDocumentData {
+  documentType?: SecurityDocumentType;
+  name: string;
+  /**
+   * Explicit `null` clears the stored date on an edit. `undefined` omits the
+   * field, which on a PATCH means "leave it alone" -- the difference is what
+   * makes clearing possible at all.
+   */
+  documentDate?: string | null;
+  url: string;
+  notes?: string | null;
+}
+
+export interface SecurityDetail {
+  security: Security;
+  position: SecurityDetailPosition;
+  accounts: SecurityDetailAccountPosition[];
+  activity: SecurityDetailActivity;
+  hasTransactions: boolean;
+  isPositionClosed: boolean;
+}
+
 export interface CreateInvestmentTransactionData {
   accountId: string;
   securityId?: string;
@@ -263,6 +411,16 @@ export interface SecurityPrice {
   highPrice: number | null;
   lowPrice: number | null;
   closePrice: number;
+  /**
+   * Split- and dividend-adjusted close, i.e. the total-return series. Stored by
+   * the backend from provider data and returned by the prices endpoint; null for
+   * a security whose provider does not supply it (MSN today).
+   *
+   * Use it, falling back to `closePrice`, wherever a *return* is computed --
+   * `COALESCE(adjusted_close, close_price)` is what the backend's own
+   * calculations do. Keep `closePrice` for anything that shows the quote itself.
+   */
+  adjustedClose: number | null;
   volume: number | null;
   source: string | null;
   createdAt: string;
@@ -284,6 +442,9 @@ export interface CreateSecurityData {
   exchange?: string;
   currencyCode: string;
   description?: string;
+  /** Empty string clears the stored address; the backend normalises the rest. */
+  website?: string | null;
+  irWebsite?: string | null;
   tagIds?: string[];
   quoteProvider?: QuoteProviderName | null;
   msnInstrumentId?: string;

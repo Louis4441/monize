@@ -1,0 +1,244 @@
+{
+  "loading": "銘柄を読み込んでいます...",
+  "loadFailed": "この銘柄を読み込めませんでした",
+  "notFound": "銘柄が見つかりません",
+  "backToSecurities": "銘柄",
+  "error": {
+    "retry": "再試行"
+  },
+  "header": {
+    "priceAt": "{date} の価格",
+    "noPrice": "価格はまだ記録されていません",
+    "changeToday": "本日 {change}（{percent}）",
+    "changeLast": "直近の変動 {change}（{percent}）",
+    "inactiveBadge": "無効",
+    "edit": "編集",
+    "favourites": "お気に入り",
+    "switchSecurity": "別の銘柄に切り替える",
+    "switchPlaceholder": "シンボルまたは名称で絞り込む...",
+    "switchNoMatches": "一致する銘柄はありません"
+  },
+  "toasts": {
+    "favouriteAdded": "お気に入りに追加しました",
+    "favouriteRemoved": "お気に入りから削除しました",
+    "favouriteFailed": "お気に入りを更新できませんでした"
+  },
+  "cards": {
+    "marketValue": "時価評価額",
+    "costBasis": "取得原価",
+    "unrealizedPl": "未実現損益",
+    "units": "口数",
+    "avgCostPerUnit": "平均取得単価",
+    "heldInAccounts": "保有口座",
+    "openAccount": "{name} を「投資」ページで表示",
+    "unitsShare": "{units}（{share}）",
+    "valueUnknown": "評価不可",
+    "approx": "約 {amount}",
+    "asOf": "{date} の終値時点",
+    "asOfStale": "{date} の終値時点。記録されている最新価格です",
+    "asOfStaleTitle": "これより新しい価格が保存されていないため、これは本日ではなくその日のポジション評価額です。提供元から価格を更新するか、手入力で追加してください。"
+  },
+  "chart": {
+    "title": "{symbol} の価格",
+    "seriesAriaLabel": "グラフの系列",
+    "modes": {
+      "price": "価格",
+      "value": "投資評価額",
+      "return": "リターン"
+    },
+    "titles": {
+      "price": "価格",
+      "value": "投資評価額",
+      "return": "リターン"
+    },
+    "summary": {
+      "first": "期初",
+      "latest": "最新",
+      "ending": "期末",
+      "lowest": "最低"
+    },
+    "panEarlier": "履歴の前の区間を表示",
+    "panLater": "履歴の次の区間を表示"
+  },
+  "keyInfo": {
+    "title": "基本情報",
+    "symbol": "シンボル",
+    "securityType": "銘柄種別",
+    "distributions": "分配",
+    "distributing": "実施あり（データから判定）",
+    "accumulating": "なし（再投資型）",
+    "distributionsTitle": "価格履歴から読み取っています。分配が行われるたびに調整後終値が呼値の終値から離れます。発行者の表明ではなく、データからの推定です。",
+    "exchange": "取引所",
+    "currency": "通貨",
+    "sector": "セクター",
+    "industry": "業種",
+    "provider": "提供元",
+    "lastPrice": "最終価格"
+  },
+  "tabs": {
+    "ariaLabel": "銘柄のセクション",
+    "overview": "概要",
+    "transactions": "取引",
+    "prices": "価格履歴",
+    "documents": "資料",
+    "news": "ニュース"
+  },
+  "about": {
+    "title": "概要説明",
+    "noDescription": "この銘柄の説明は保存されていません。",
+    "sector": "セクター",
+    "industry": "業種",
+    "country": "国",
+    "website": "ウェブサイト",
+    "irWebsite": "IR サイト",
+    "tags": "タグ",
+    "notStored": "未保存"
+  },
+  "performance": {
+    "title": "銘柄のパフォーマンス",
+    "subject": "保有していたかどうかに関わらず、この商品そのものの値動きです。ご自身のポジションの成績は「トータルリターン」にあります。",
+    "empty": "リターンを測るには価格履歴がまだ足りません。",
+    "unavailable": "該当なし",
+    "periods": {
+      "1m": "1か月",
+      "3m": "3か月",
+      "ytd": "年初来",
+      "1y": "1年",
+      "3y": "3年",
+      "5y": "5年"
+    },
+    "includesDividends": "配当込み",
+    "excludesDividends": "配当を含まない",
+    "excludesDividendsTitle": "この提供元は調整後終値の系列を出さないため、これらのリターンは価格のみで算出しています。分配を行うファンドでは、その分配率のぶんだけリターンを低く見せます。"
+  },
+  "positionInfo": {
+    "title": "ポジション情報",
+    "firstTransaction": "最初の取引",
+    "lastTransaction": "最後の取引",
+    "totalInvested": "投資額合計",
+    "totalSold": "売却額合計",
+    "dividends": "配当",
+    "fees": "手数料",
+    "realizedPl": "実現損益",
+    "realizedMixed": "{currencies} で実現したため合算していません",
+    "totalReturn": "トータルリターン",
+    "totalReturnValue": "{amount}（{percent}）",
+    "totalReturnTitle": "未実現の利益に、売却で実現した額と受け取った収益を加え、手数料を差し引いたものを、投じた資本に対して示した値です。その資本に対する単純なリターンで、年率換算しておらず、各購入分を保有期間で重み付けしていません。",
+    "status": "状態",
+    "statusOpen": "保有中",
+    "statusClosed": "決済済み",
+    "statusNone": "保有したことがありません"
+  },
+  "accounts": {
+    "title": "口座",
+    "closedSuffix": "{name}（解約済み）",
+    "total": "合計",
+    "columns": {
+      "account": "口座",
+      "currency": "通貨",
+      "units": "口数",
+      "avgCost": "平均取得単価",
+      "marketValue": "時価評価額",
+      "costBasis": "取得原価",
+      "unrealizedPl": "未実現損益"
+    }
+  },
+  "closed": {
+    "title": "ポジション決済済み",
+    "description": "この銘柄はもう保有していません。履歴は下に残っています。",
+    "realizedPl": "実現損益",
+    "heldFrom": "保有開始",
+    "heldRange": "{start} 〜 {end}"
+  },
+  "empty": {
+    "noPosition": "ポジションのデータがありません",
+    "noPositionHint": "この銘柄の取引はまだ記録されていません。",
+    "noPrices": "価格履歴がありません",
+    "noPricesHint": "価格を手入力で追加するか、提供元から価格を更新してください。",
+    "noTransactions": "取引はまだありません",
+    "noAccounts": "この銘柄はどの口座でも保有されていません。"
+  },
+  "weightings": {
+    "title": "構成",
+    "ariaLabel": "構成の切り口",
+    "sectorTab": "セクター",
+    "countryTab": "国",
+    "assetClassTab": "資産クラス",
+    "sectorEmpty": "セクター構成は保存されていません。Monize はファンドと ETF について提供元から取り込みます。",
+    "countryEmpty": "国別構成は保存されていません。銘柄を編集するときに入力できます。",
+    "assetClassEmpty": "資産クラス構成はまだ保存されていません。",
+    "remainder": "{percent} は未分類"
+  },
+  "documents": {
+    "title": "資料",
+    "add": "資料を追加",
+    "loadFailed": "この銘柄の資料を読み込めませんでした",
+    "noDate": "日付なし",
+    "columns": {
+      "type": "種類",
+      "name": "名称",
+      "date": "日付",
+      "address": "アドレス",
+      "actions": "操作"
+    },
+    "types": {
+      "FACTSHEET": "ファクトシート",
+      "KIID": "KIID",
+      "PROSPECTUS": "目論見書",
+      "ANNUAL_REPORT": "年次報告書",
+      "SEMI_ANNUAL_REPORT": "半期報告書",
+      "TAX": "税務書類",
+      "RESEARCH": "調査レポート",
+      "OTHER": "その他"
+    },
+    "actions": {
+      "open": "開く",
+      "openNamed": "{name} を新しいタブで開く",
+      "edit": "編集",
+      "delete": "削除"
+    },
+    "empty": {
+      "title": "資料はまだありません",
+      "description": "この銘柄の書類を一か所にまとめておけます。ファクトシート、KIID、目論見書、年次報告書、税務書類など。どれもここから直接開けるリンクです。",
+      "action": "最初の資料を追加"
+    },
+    "form": {
+      "addTitle": "資料を追加",
+      "editTitle": "資料を編集",
+      "date": "資料の日付",
+      "dateHint": "本日ではなく、資料自体に記載された日付です。なければ空のままにしてください。",
+      "url": "アドレス",
+      "notes": "メモ",
+      "create": "資料を追加",
+      "save": "資料を保存"
+    },
+    "validation": {
+      "nameRequired": "資料に名称を付けてください",
+      "urlRequired": "アドレスは必須です",
+      "urlScheme": "アドレスは http:// または https:// で始まる必要があります"
+    },
+    "delete": {
+      "title": "資料を削除しますか？",
+      "message": "「{name}」へのリンクを削除します。資料そのものには手を付けません。"
+    },
+    "toasts": {
+      "created": "資料を追加しました",
+      "updated": "資料を更新しました",
+      "deleted": "資料を削除しました",
+      "saveFailed": "資料を保存できませんでした",
+      "deleteFailed": "資料を削除できませんでした"
+    }
+  },
+  "news": {
+    "title": "{symbol} に言及したニュース",
+    "subject": "提供元は記事に登場するすべてのティッカーへ記事を紐付けるため、一部はこの銘柄に言及した別の会社に関する記事です。",
+    "loadFailed": "この銘柄のニュースを読み込めませんでした",
+    "video": "動画",
+    "alsoMentions": "{tickers} にも言及",
+    "unsupportedProvider": "この銘柄の価格提供元はニュースを提供していません。銘柄の編集で Yahoo に切り替えると、ここに見出しが表示されます。",
+    "empty": {
+      "title": "現在、見出しはありません",
+      "description": "このシンボルについて最近公開されたものはありません。ここに戻ると一覧が更新されます。"
+    }
+  }
+}

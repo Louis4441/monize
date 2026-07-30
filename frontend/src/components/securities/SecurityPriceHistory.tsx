@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
+import { ChevronRightIcon } from '@heroicons/react/20/solid';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -17,6 +18,12 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useLongPress } from '@/hooks/useLongPress';
 import { RowActionSheet, type RowAction } from '@/components/ui/row-actions';
 import { getErrorMessage } from '@/lib/errors';
+import {
+  groupPricesByPeriod,
+  allPriceGroupKeys,
+  defaultOpenPriceGroups,
+  priceDecimals,
+} from '@/lib/security-detail';
 import { SecurityPriceForm } from './SecurityPriceForm';
 import {
   BalanceHistoryChart,
@@ -26,7 +33,15 @@ import { useNumberFormat } from '@/hooks/useNumberFormat';
 
 interface SecurityPriceHistoryProps {
   security: Security;
-  onClose: () => void;
+  /** Omitted when embedded, where there is no modal to close. */
+  onClose?: () => void;
+  /**
+   * Rendered inside the security detail page rather than in its own modal. Drops
+   * the modal-only chrome -- the heading that repeats the page title, the Close
+   * button, and the chart the page already shows full width above the tabs --
+   * and keeps the price table and its actions.
+   */
+  embedded?: boolean;
 }
 
 function getSourceLabel(source: string | null): string {
@@ -58,24 +73,26 @@ function getSourceColor(source: string | null): string {
   }
 }
 
-/** Rows rendered before the user scrolls. */
-const INITIAL_PAGE_SIZE = 10;
-/** Rows appended each time the end of the list scrolls into view. */
-const SCROLL_PAGE_SIZE = 50;
-/** Start fetching the next batch this far before the list actually ends. */
-const PREFETCH_MARGIN = '200px';
-
-function formatPrice(value: number | null): string {
+/**
+ * One price cell, at the column's shared decimal count so the figures line up.
+ * See `priceDecimals`: providers mix `93.239998` and `93.18` in one series, and
+ * formatting each to its own precision leaves the column ragged.
+ */
+function formatPrice(value: number | null, decimals: number): string {
   if (value === null || value === undefined) return '-';
   return Number(value).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 6,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   });
 }
 
-export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistoryProps) {
+export function SecurityPriceHistory({
+  security,
+  onClose,
+  embedded = false,
+}: SecurityPriceHistoryProps) {
   const t = useTranslations('securities');
-  const { formatDate } = useDateFormat();
+  const { formatDate, formatMonth } = useDateFormat();
   const [prices, setPrices] = useState<SecurityPrice[]>([]);
   // Trades, only for the chart's markers. A failed lookup costs the markers,
   // never the price list the modal is actually for.
@@ -91,18 +108,20 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
 
   const { formatQuantity } = useNumberFormat();
 
-  // The full series is still fetched -- the chart plots every point -- but the
-  // table renders a page at a time so a security with years of history does not
-  // mount thousands of rows.
-  const [visibleCount, setVisibleCount] = useState(INITIAL_PAGE_SIZE);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  // Which year and month sections are open, keyed as `yyyy` and `yyyy-MM`. Only
+  // an open month mounts its rows, so a decade of daily closes costs nothing
+  // until it is asked for.
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(new Set());
 
   const loadPrices = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await investmentsApi.getSecurityPrices(security.id, 9999);
       setPrices(data);
-      setVisibleCount(INITIAL_PAGE_SIZE);
+      // Open the newest year and month so recent prices need no click.
+      setOpenGroups(
+        new Set(defaultOpenPriceGroups(groupPricesByPeriod(data))),
+      );
     } catch (error) {
       toast.error(getErrorMessage(error, t('priceHistory.toasts.loadFailed')));
     } finally {
@@ -115,6 +134,9 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   }, [loadPrices]);
 
   useEffect(() => {
+    // The trades exist only to mark up the chart, so an embedded instance --
+    // which renders no chart -- should not fetch them at all.
+    if (embedded) return;
     let cancelled = false;
     investmentsApi
       .getSecurityTransactionHistory(security.id)
@@ -129,7 +151,7 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
     return () => {
       cancelled = true;
     };
-  }, [security.id]);
+  }, [security.id, embedded]);
 
   const handleAdd = useCallback(async (data: CreateSecurityPriceData) => {
     try {
@@ -266,37 +288,46 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
   }, [security.id, loadPrices, t]);
 
   const isFormOpen = showAddForm || !!editingPrice;
-  const visiblePrices = prices.slice(0, visibleCount);
-  const remainingCount = prices.length - visiblePrices.length;
+  // One decimal count across every price column and every row, so the figures
+  // form a column instead of a ragged edge. Taken over the whole series rather
+  // than per visible month: expanding a month must not reformat the rest.
+  const decimals = useMemo(
+    () =>
+      priceDecimals(
+        prices.flatMap((price) => [
+          price.closePrice,
+          price.adjustedClose,
+          price.openPrice,
+          price.highPrice,
+          price.lowPrice,
+        ]),
+      ),
+    [prices],
+  );
 
-  // Reveal the next batch as the end of the list comes into view. Re-observed
-  // on every visibleCount change: a batch that still does not reach past the
-  // sentinel leaves it intersecting, and an observer already reporting
-  // "intersecting" will not fire again on its own.
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+  const yearGroups = useMemo(() => groupPricesByPeriod(prices), [prices]);
+  const allKeys = useMemo(() => allPriceGroupKeys(yearGroups), [yearGroups]);
+  const allOpen = allKeys.length > 0 && allKeys.every((k) => openGroups.has(k));
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        setVisibleCount((count) =>
-          Math.min(count + SCROLL_PAGE_SIZE, prices.length),
-        );
-      },
-      { rootMargin: PREFETCH_MARGIN },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [prices.length, visibleCount]);
+  const toggleGroup = useCallback((key: string) => {
+    setOpenGroups((open) => {
+      const next = new Set(open);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-          {t('priceHistory.title', { symbol: security.symbol })}
-        </h2>
-        <div className="flex gap-2">
+        {!embedded && (
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            {t('priceHistory.title', { symbol: security.symbol })}
+          </h2>
+        )}
+        <div className={`flex gap-2 ${embedded ? 'ml-auto' : ''}`}>
           {!isFormOpen && (
             <>
               <Button
@@ -311,11 +342,26 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
               <Button onClick={() => setShowAddForm(true)} size="sm" disabled={isUpdating}>
                 {t('priceHistory.addPriceButton')}
               </Button>
+              {yearGroups.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setOpenGroups(allOpen ? new Set() : new Set(allKeys))
+                  }
+                >
+                  {allOpen
+                    ? t('priceHistory.collapseAll')
+                    : t('priceHistory.expandAll')}
+                </Button>
+              )}
             </>
           )}
-          <Button variant="outline" onClick={onClose} size="sm">
-{t('priceHistory.closeButton')}
-          </Button>
+          {onClose && (
+            <Button variant="outline" onClick={onClose} size="sm">
+              {t('priceHistory.closeButton')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -345,7 +391,7 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
           shape of data, so the two screens read the same way -- title and
           neutral colouring are the only differences (a price has no good or
           bad sign). */}
-      {!isLoading && chartData.length > 1 && (
+      {!embedded && !isLoading && chartData.length > 1 && (
         <BalanceHistoryChart
           data={chartData}
           isLoading={false}
@@ -366,91 +412,150 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
           {t('priceHistory.empty')}
         </p>
       ) : (
-        // Only the modal panel scrolls vertically. A capped inner scroller here
-        // put a second scrollbar inside the first, whose track ran past the
-        // panel's edge; paging the rows keeps this block short enough not to
-        // need one.
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
-              <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.date')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.close')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.open')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.high')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.low')}</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">{t('priceHistory.columns.volume')}</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.source')}</th>
-                {/* Actions - hidden on mobile, where long-press opens the sheet */}
-                <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.actions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {visiblePrices.map((price) => (
-                <tr
-                  key={price.id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-700 select-none"
-                  {...getRowHandlers(price)}
+        <div className="space-y-2">
+          {yearGroups.map((year) => {
+            const yearOpen = openGroups.has(year.key);
+            return (
+              <div
+                key={year.key}
+                className="rounded-lg border border-gray-200 dark:border-gray-700"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(year.key)}
+                  aria-expanded={yearOpen}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700/50"
                 >
-                  <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                    {formatDate(price.priceDate)}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100 text-right">
-                    {formatPrice(price.closePrice)}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
-                    {formatPrice(price.openPrice)}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
-                    {formatPrice(price.highPrice)}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
-                    {formatPrice(price.lowPrice)}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden md:table-cell">
-                    {price.volume !== null ? Number(price.volume).toLocaleString() : '-'}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getSourceColor(price.source)}`}>
-                      {getSourceLabel(price.source)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap hidden sm:table-cell">
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => startEdit(price)}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs"
-                      >
-                        {t('list.actions.edit')}
-                      </button>
-                      <button
-                        onClick={() => setDeletingPrice(price)}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs"
-                      >
-                        {t('list.actions.delete')}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {/* Both the "more is coming" caption and the trigger that fetches it:
-              scrolling this into view reveals the next batch. */}
-          {remainingCount > 0 && (
-            <div
-              ref={sentinelRef}
-              data-testid="price-history-sentinel"
-              className="flex items-center justify-center pt-3 text-xs text-gray-500 dark:text-gray-400"
-            >
-              {t('priceHistory.showingCount', {
-                shown: visiblePrices.length,
-                total: prices.length,
-              })}
-            </div>
-          )}
+                  <ChevronRightIcon
+                    className={`h-4 w-4 flex-shrink-0 text-gray-400 transition-transform ${yearOpen ? 'rotate-90' : ''}`}
+                    aria-hidden="true"
+                  />
+                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {year.key}
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('priceHistory.groupCount', { count: year.count })}
+                  </span>
+                </button>
+
+                {yearOpen && (
+                  <div className="space-y-1 border-t border-gray-200 px-2 pb-2 pt-1 dark:border-gray-700">
+                    {year.months.map((month) => {
+                      const monthOpen = openGroups.has(month.key);
+                      return (
+                        <div key={month.key}>
+                          <button
+                            type="button"
+                            onClick={() => toggleGroup(month.key)}
+                            aria-expanded={monthOpen}
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-gray-700/50"
+                          >
+                            <ChevronRightIcon
+                              className={`h-3.5 w-3.5 flex-shrink-0 text-gray-400 transition-transform ${monthOpen ? 'rotate-90' : ''}`}
+                              aria-hidden="true"
+                            />
+                            <span className="text-sm text-gray-800 dark:text-gray-200">
+                              {formatMonth(month.key)}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {t('priceHistory.groupCount', {
+                                count: month.prices.length,
+                              })}
+                            </span>
+                          </button>
+
+                          {monthOpen && (
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                <thead className="bg-gray-50 dark:bg-gray-900">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.date')}</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.close')}</th>
+                                    {/* The total-return close. Shown so it is visible whether the
+                                        provider supplies it at all -- MSN does not, and a column of
+                                        dashes here is the only way to notice before a return
+                                        calculation quietly uses price instead. */}
+                                    <th
+                                      className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden lg:table-cell"
+                                      title={t('priceHistory.columns.adjustedCloseTitle')}
+                                    >
+                                      {t('priceHistory.columns.adjustedClose')}
+                                    </th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.open')}</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.high')}</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.low')}</th>
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden md:table-cell">{t('priceHistory.columns.volume')}</th>
+                                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{t('priceHistory.columns.source')}</th>
+                                    {/* Actions - hidden on mobile, where long-press opens the sheet */}
+                                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase hidden sm:table-cell">{t('priceHistory.columns.actions')}</th>
+                                  </tr>
+                                </thead>
+                              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                              {month.prices.map((price) => (
+                              <tr
+                              key={price.id}
+                              className="hover:bg-gray-50 dark:hover:bg-gray-700 select-none"
+                              {...getRowHandlers(price)}
+                              >
+                              <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                              {formatDate(price.priceDate)}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-900 dark:text-gray-100 text-right">
+                              {formatPrice(price.closePrice, decimals)}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden lg:table-cell">
+                              {formatPrice(price.adjustedClose, decimals)}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
+                              {formatPrice(price.openPrice, decimals)}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
+                              {formatPrice(price.highPrice, decimals)}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden sm:table-cell">
+                              {formatPrice(price.lowPrice, decimals)}
+                              </td>
+                              <td className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 text-right hidden md:table-cell">
+                              {price.volume !== null ? Number(price.volume).toLocaleString() : '-'}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getSourceColor(price.source)}`}>
+                              {getSourceLabel(price.source)}
+                              </span>
+                              </td>
+                              <td className="px-3 py-2 text-right whitespace-nowrap hidden sm:table-cell">
+                              <div className="flex gap-2 justify-end">
+                              <button
+                              onClick={() => startEdit(price)}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs"
+                              >
+                              {t('list.actions.edit')}
+                              </button>
+                              <button
+                              onClick={() => setDeletingPrice(price)}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs"
+                              >
+                              {t('list.actions.delete')}
+                              </button>
+                              </div>
+                              </td>
+                              </tr>
+                              ))}
+
+                              </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -458,7 +563,7 @@ export function SecurityPriceHistory({ security, onClose }: SecurityPriceHistory
       <RowActionSheet
         isOpen={!!contextPrice}
         title={contextPrice ? formatDate(contextPrice.priceDate) : ''}
-        subtitle={contextPrice ? formatPrice(contextPrice.closePrice) : undefined}
+        subtitle={contextPrice ? formatPrice(contextPrice.closePrice, decimals) : undefined}
         actions={contextActions}
         onClose={() => setContextPrice(undefined)}
       />

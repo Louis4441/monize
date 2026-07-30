@@ -78,8 +78,6 @@
       "source": "En güncel fiyatın kaynağı"
     },
     "actions": {
-      "history": "Geçmiş",
-      "prices": "Fiyatlar",
       "edit": "Düzenle",
       "deactivate": "Devre Dışı Bırak",
       "activate": "Etkinleştir",
@@ -94,8 +92,6 @@
       "subtitle": "İlk menkul kıymetinizi ekleyerek başlayın."
     },
     "contextMenu": {
-      "transactionHistory": "İşlem Geçmişi",
-      "viewPrices": "Fiyatları Görüntüle",
       "editSecurity": "Menkul Kıymeti Düzenle",
       "deactivate": "Devre Dışı Bırak",
       "activate": "Etkinleştir",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Hisse kodundan otomatik çözümlenir; yanlışsa geçersiz kılın",
     "descriptionLabel": "Açıklama",
     "descriptionPlaceholder": "Bu menkul kıymet hakkında notlar.",
+    "websiteLabel": "Web sitesi",
+    "irWebsiteLabel": "Yatırımcı ilişkileri sitesi",
+    "irWebsiteHint": "Hiçbir fiyat sağlayıcısı bu adresi yayımlamıyor, bu yüzden elle yazılması gerekiyor.",
     "tagsLabel": "Etiketler",
     "tagsPlaceholder": "Etiket seçin...",
     "createNewTag": "Yeni etiket oluştur...",
@@ -222,7 +221,6 @@
       "sold": "Satım {quantity} · {account}"
     },
     "empty": "Fiyat geçmişi mevcut değil",
-    "showingCount": "{total} fiyatın {shown} tanesi gösteriliyor",
     "columns": {
       "date": "Tarih",
       "close": "Kapanış",
@@ -231,7 +229,9 @@
       "low": "En Düşük",
       "volume": "Hacim",
       "source": "Kaynak",
-      "actions": "İşlemler"
+      "actions": "İşlemler",
+      "adjustedClose": "Düzelt. kapanış",
+      "adjustedCloseTitle": "Bölünme ve temettüye göre düzeltilmiş kapanış (toplam getiri). Fiyat sağlayıcısı vermediğinde boş kalır."
     },
     "toasts": {
       "added": "Fiyat eklendi",
@@ -251,7 +251,10 @@
       "title": "Fiyatı Sil",
       "message": "{date} tarihli fiyat kaydı silinsin mi?",
       "confirmLabel": "Sil"
-    }
+    },
+    "collapseAll": "Tümünü daralt",
+    "expandAll": "Tümünü genişlet",
+    "groupCount": "{count} fiyat"
   },
   "transactionHistory": {
     "inactiveBadge": "Pasif",

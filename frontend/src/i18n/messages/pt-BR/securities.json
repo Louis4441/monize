@@ -78,8 +78,6 @@
       "source": "Fonte da cotação mais recente"
     },
     "actions": {
-      "history": "Histórico",
-      "prices": "Cotações",
       "edit": "Editar",
       "deactivate": "Desativar",
       "activate": "Ativar",
@@ -94,8 +92,6 @@
       "subtitle": "Comece adicionando o seu primeiro título."
     },
     "contextMenu": {
-      "transactionHistory": "Histórico de Transações",
-      "viewPrices": "Ver Cotações",
       "editSecurity": "Editar Título",
       "deactivate": "Desativar",
       "activate": "Ativar",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Resolvido automaticamente pelo ticker; substituir apenas se incorreto",
     "descriptionLabel": "Descrição",
     "descriptionPlaceholder": "Notas sobre este ativo.",
+    "websiteLabel": "Site",
+    "irWebsiteLabel": "Site de relações com investidores",
+    "irWebsiteHint": "Nenhum fornecedor de cotações publica este endereço, então ele precisa ser digitado.",
     "tagsLabel": "Etiquetas",
     "tagsPlaceholder": "Selecionar etiquetas...",
     "createNewTag": "Criar nova etiqueta...",
@@ -222,7 +221,6 @@
       "sold": "Venda {quantity} · {account}"
     },
     "empty": "Sem histórico de cotações disponível",
-    "showingCount": "Mostrando {shown} de {total} cotações",
     "columns": {
       "date": "Data",
       "close": "Fechamento",
@@ -231,7 +229,9 @@
       "low": "Mínimo",
       "volume": "Volume",
       "source": "Fonte",
-      "actions": "Ações"
+      "actions": "Ações",
+      "adjustedClose": "Fech. ajust.",
+      "adjustedCloseTitle": "Fechamento ajustado por desdobramentos e dividendos (retorno total). Vazio quando o fornecedor de preços não o informa."
     },
     "toasts": {
       "added": "Cotação adicionada",
@@ -251,7 +251,10 @@
       "title": "Excluir Cotação",
       "message": "Excluir a cotação de {date}?",
       "confirmLabel": "Excluir"
-    }
+    },
+    "collapseAll": "Recolher tudo",
+    "expandAll": "Expandir tudo",
+    "groupCount": "{count} preço(s)"
   },
   "transactionHistory": {
     "inactiveBadge": "Inativo",

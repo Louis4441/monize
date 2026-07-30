@@ -404,7 +404,8 @@
     "noUpdateFields": "Hãy cung cấp ít nhất một trường để thay đổi.",
     "allocationExceedsTotal": "Tổng tỷ lệ phân bổ vượt quá 100%.",
     "invalidTagKey": "Cần có khóa thẻ (1-100 ký tự)",
-    "assetOptionNameRequired": "Cần có tên loại tài sản."
+    "assetOptionNameRequired": "Cần có tên loại tài sản.",
+    "documentNotFound": "Không tìm thấy tài liệu"
   },
   "tags": {
     "notFound": "Không tìm thấy thẻ với ID {{ id }}",

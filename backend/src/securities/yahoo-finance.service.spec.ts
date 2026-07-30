@@ -1915,4 +1915,134 @@ describe("YahooFinanceService", () => {
       expect(result).toBeNull();
     });
   });
+
+  describe("fetchNews", () => {
+    /** One item shaped the way the search endpoint's `news[]` carries them. */
+    const newsItem = (overrides: any = {}) => ({
+      uuid: "uuid-1",
+      title: "Apple says UK App Store proposal amounts to price regulation",
+      publisher: "Reuters",
+      link: "https://finance.yahoo.com/news/apple-uk-app-store.html",
+      providerPublishTime: 1785350000,
+      type: "STORY",
+      thumbnail: {
+        resolutions: [
+          { url: "https://s.yimg.com/big.jpg", width: 1200, height: 800 },
+          { url: "https://s.yimg.com/small.jpg", width: 140, height: 140 },
+        ],
+      },
+      relatedTickers: ["AAPL"],
+      ...overrides,
+    });
+
+    it("asks the same search endpoint the symbol lookup uses, with news turned on", async () => {
+      mockFetchResponse({ news: [] });
+      await service.fetchNews("AAPL", 15);
+
+      const url = (global.fetch as jest.Mock).mock.calls[0][0] as string;
+      expect(url).toContain("/v1/finance/search");
+      expect(url).toContain("q=AAPL");
+      // Quotes off, news on: the opposite of what lookupSecurityMany asks for.
+      expect(url).toContain("quotesCount=0");
+      expect(url).toContain("newsCount=15");
+    });
+
+    it("narrows an item to what the page renders", async () => {
+      mockFetchResponse({ news: [newsItem()] });
+      const [item] = await service.fetchNews("AAPL");
+
+      expect(item).toEqual({
+        id: "uuid-1",
+        title: "Apple says UK App Store proposal amounts to price regulation",
+        publisher: "Reuters",
+        link: "https://finance.yahoo.com/news/apple-uk-app-store.html",
+        publishedAt: new Date(1785350000 * 1000).toISOString(),
+        type: "STORY",
+        thumbnailUrl: "https://s.yimg.com/small.jpg",
+        relatedTickers: ["AAPL"],
+      });
+    });
+
+    it("reads the timestamp as seconds, not milliseconds", async () => {
+      // Upstream sends Unix seconds; a millisecond reading dates every story
+      // to 1970 and the list sorts and reads as nonsense.
+      mockFetchResponse({
+        news: [newsItem({ providerPublishTime: 1785350000 })],
+      });
+      const [item] = await service.fetchNews("AAPL");
+      expect(item.publishedAt!.startsWith("2026-")).toBe(true);
+    });
+
+    it("keeps the smallest thumbnail that still covers the list's size", async () => {
+      // The list draws these tiny; a 1200px hero is wasted bytes.
+      mockFetchResponse({ news: [newsItem()] });
+      const [item] = await service.fetchNews("AAPL");
+      expect(item.thumbnailUrl).toBe("https://s.yimg.com/small.jpg");
+    });
+
+    it("has no thumbnail when none is offered over https", async () => {
+      mockFetchResponse({
+        news: [
+          newsItem({
+            thumbnail: {
+              resolutions: [{ url: "http://s.yimg.com/x.jpg", width: 140 }],
+            },
+          }),
+        ],
+      });
+      const [item] = await service.fetchNews("AAPL");
+      expect(item.thumbnailUrl).toBeNull();
+    });
+
+    describe("items it refuses to return", () => {
+      // The link becomes an anchor, so its scheme is a security control -- the
+      // value comes from a third party and is no more trusted than a typed one.
+      it.each([
+        ["a javascript link", { link: "javascript:alert(1)" }],
+        ["a data link", { link: "data:text/html,<script>alert(1)</script>" }],
+        ["no link at all", { link: undefined }],
+        ["no title", { title: "   " }],
+      ])("drops %s", async (_name, overrides) => {
+        mockFetchResponse({ news: [newsItem(overrides)] });
+        expect(await service.fetchNews("AAPL")).toEqual([]);
+      });
+    });
+
+    it("carries every ticker the item was filed under", async () => {
+      // Filed by mention, not by subject: a Berkshire story listing AAPL fifth
+      // comes back for AAPL, and the UI has to be able to say so.
+      mockFetchResponse({
+        news: [
+          newsItem({
+            title: "Berkshire slips despite UBS raising target",
+            relatedTickers: ["BRK-B", "AAPL", "^GSPC", "UBS", "KO"],
+          }),
+        ],
+      });
+      const [item] = await service.fetchNews("AAPL");
+      expect(item.relatedTickers).toEqual([
+        "BRK-B",
+        "AAPL",
+        "^GSPC",
+        "UBS",
+        "KO",
+      ]);
+    });
+
+    it("returns nothing rather than failing the page when upstream errors", async () => {
+      // News is decoration on a page that works without it.
+      mockFetchResponse({}, false, 503);
+      expect(await service.fetchNews("AAPL")).toEqual([]);
+    });
+
+    it("returns nothing when the request throws", async () => {
+      mockFetchError(new Error("network down"));
+      expect(await service.fetchNews("AAPL")).toEqual([]);
+    });
+
+    it("tolerates a response with no news key", async () => {
+      mockFetchResponse({ quotes: [] });
+      expect(await service.fetchNews("AAPL")).toEqual([]);
+    });
+  });
 });

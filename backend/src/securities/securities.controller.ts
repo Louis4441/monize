@@ -14,6 +14,7 @@ import {
   ParseBoolPipe,
   DefaultValuePipe,
   Logger,
+  Res,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -22,6 +23,7 @@ import {
   ApiResponse,
   ApiQuery,
 } from "@nestjs/swagger";
+import { Response } from "express";
 import { AuthGuard } from "@nestjs/passport";
 import { Throttle } from "@nestjs/throttler";
 import { ParseSymbolPipe } from "../common/pipes/parse-symbol.pipe";
@@ -38,6 +40,18 @@ import {
 } from "./security-price.service";
 import { MsnFinanceService } from "./msn-finance.service";
 import { NetWorthService } from "../net-worth/net-worth.service";
+import {
+  SecurityDetailService,
+  SecurityDetail,
+} from "./security-detail.service";
+import { SecurityDocumentsService } from "./security-documents.service";
+import {
+  SecurityNewsService,
+  SecurityNewsResult,
+} from "./security-news.service";
+import { SecurityDocument } from "./entities/security-document.entity";
+import { CreateSecurityDocumentDto } from "./dto/create-security-document.dto";
+import { UpdateSecurityDocumentDto } from "./dto/update-security-document.dto";
 import { SectorWeightingService } from "./sector-weighting.service";
 import { CreateSecurityDto } from "./dto/create-security.dto";
 import { UpdateSecurityDto } from "./dto/update-security.dto";
@@ -56,6 +70,9 @@ export class SecuritiesController {
   constructor(
     private readonly securitiesService: SecuritiesService,
     private readonly securityPriceService: SecurityPriceService,
+    private readonly securityDetailService: SecurityDetailService,
+    private readonly securityDocumentsService: SecurityDocumentsService,
+    private readonly securityNewsService: SecurityNewsService,
     private readonly netWorthService: NetWorthService,
     private readonly sectorWeightingService: SectorWeightingService,
     private readonly msnFinanceService: MsnFinanceService,
@@ -247,7 +264,8 @@ export class SecuritiesController {
   @Get("profile-description")
   @Throttle({ default: { ttl: 60000, limit: 30 } })
   @ApiOperation({
-    summary: "Suggest a description for a security from Yahoo Finance",
+    summary:
+      "Suggest a description and website for a security from Yahoo Finance",
     description:
       "Best-effort pre-fill: stock prose or a synthesized fund one-liner. Advisory only; persists nothing.",
   })
@@ -261,13 +279,18 @@ export class SecuritiesController {
       properties: {
         symbol: { type: "string" },
         description: { type: "string", nullable: true },
+        website: { type: "string", nullable: true },
       },
     },
   })
   suggestDescription(
     @Query("symbol") symbol: string,
     @Query("exchange") exchange?: string,
-  ): Promise<{ symbol: string; description: string | null }> {
+  ): Promise<{
+    symbol: string;
+    description: string | null;
+    website: string | null;
+  }> {
     const sym = assertStringParam(symbol, "symbol");
     const exch = assertStringParam(exchange, "exchange");
     const safeSymbol = (sym ?? "").slice(0, 20);
@@ -346,6 +369,136 @@ export class SecuritiesController {
     @Param("id", ParseUUIDPipe) id: string,
   ): Promise<Security> {
     return this.securitiesService.findOne(req.user.id, id);
+  }
+
+  @Get(":id/detail")
+  @ApiOperation({
+    summary:
+      "Get a security with its position, per-account breakdown and activity totals",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Security detail for the security detail page",
+  })
+  @ApiResponse({ status: 404, description: "Security not found" })
+  getDetail(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<SecurityDetail> {
+    return this.securityDetailService.getDetail(req.user.id, id);
+  }
+
+  @Get(":id/news")
+  // Reaches a provider, like every other throttled route in this controller.
+  @Throttle({ default: { ttl: 60000, limit: 60 } })
+  @ApiOperation({ summary: "Recent headlines filed against a security" })
+  @ApiResponse({
+    status: 200,
+    description:
+      "Headlines, newest first. `provider` is null when the security's quote provider supplies no news.",
+  })
+  @ApiResponse({ status: 404, description: "Security not found" })
+  getNews(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<SecurityNewsResult> {
+    return this.securityNewsService.getNews(req.user.id, id);
+  }
+
+  @Get(":id/news/:itemId/thumbnail")
+  // Each call makes an outbound fetch of up to 2 MB with no response cache, so
+  // an unthrottled loop here would hammer the publisher's CDN at request rate
+  // and hold that much heap per concurrent call. A page shows at most fifteen
+  // thumbnails, so this is generous.
+  @Throttle({ default: { ttl: 60000, limit: 120 } })
+  @ApiOperation({
+    summary: "A headline's image, fetched server-side and served from here",
+  })
+  @ApiResponse({ status: 200, description: "Image bytes" })
+  @ApiResponse({ status: 404, description: "No image for this headline" })
+  async getNewsThumbnail(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("itemId") itemId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const image = await this.securityNewsService.getThumbnail(
+      req.user.id,
+      id,
+      itemId,
+    );
+    // A picture nobody can fetch is not an error worth a body: the row just
+    // renders without one.
+    if (!image) {
+      res.status(404).end();
+      return;
+    }
+
+    res.set({
+      "Content-Type": image.contentType,
+      "Content-Length": String(image.data.length),
+      // Same hardening the attachment download uses: never let the browser
+      // reinterpret these bytes, and neutralise anything active if a
+      // non-image somehow passed the content-type check.
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'",
+      // Private: the URL is behind the caller's own session.
+      "Cache-Control": "private, max-age=3600",
+    });
+    res.end(image.data);
+  }
+
+  @Get(":id/documents")
+  @ApiOperation({ summary: "List the documents recorded against a security" })
+  @ApiResponse({ status: 200, description: "Documents, newest first" })
+  @ApiResponse({ status: 404, description: "Security not found" })
+  listDocuments(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+  ): Promise<SecurityDocument[]> {
+    return this.securityDocumentsService.findAll(req.user.id, id);
+  }
+
+  @Post(":id/documents")
+  @ApiOperation({ summary: "Record a document against a security" })
+  @ApiResponse({ status: 201, description: "Document created" })
+  @ApiResponse({ status: 404, description: "Security not found" })
+  createDocument(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: CreateSecurityDocumentDto,
+  ): Promise<SecurityDocument> {
+    return this.securityDocumentsService.create(req.user.id, id, dto);
+  }
+
+  @Patch(":id/documents/:documentId")
+  @ApiOperation({ summary: "Update a document" })
+  @ApiResponse({ status: 200, description: "Document updated" })
+  @ApiResponse({ status: 404, description: "Security or document not found" })
+  updateDocument(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+    @Body() dto: UpdateSecurityDocumentDto,
+  ): Promise<SecurityDocument> {
+    return this.securityDocumentsService.update(
+      req.user.id,
+      id,
+      documentId,
+      dto,
+    );
+  }
+
+  @Delete(":id/documents/:documentId")
+  @ApiOperation({ summary: "Delete a document" })
+  @ApiResponse({ status: 200, description: "Document deleted" })
+  @ApiResponse({ status: 404, description: "Security or document not found" })
+  removeDocument(
+    @Request() req,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Param("documentId", ParseUUIDPipe) documentId: string,
+  ): Promise<void> {
+    return this.securityDocumentsService.remove(req.user.id, id, documentId);
   }
 
   @Get("symbol/:symbol")

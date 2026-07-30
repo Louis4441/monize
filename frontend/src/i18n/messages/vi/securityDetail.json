@@ -1,0 +1,244 @@
+{
+  "loading": "Đang tải chứng khoán...",
+  "loadFailed": "Không thể tải chứng khoán này",
+  "notFound": "Không tìm thấy chứng khoán",
+  "backToSecurities": "Chứng khoán",
+  "error": {
+    "retry": "Thử lại"
+  },
+  "header": {
+    "priceAt": "Giá ngày {date}",
+    "noPrice": "Chưa ghi nhận giá nào",
+    "changeToday": "{change} ({percent}) hôm nay",
+    "changeLast": "{change} ({percent}) lần biến động gần nhất",
+    "inactiveBadge": "Không hoạt động",
+    "edit": "Sửa",
+    "favourites": "Yêu thích",
+    "switchSecurity": "Chuyển sang chứng khoán khác",
+    "switchPlaceholder": "Lọc theo mã hoặc tên...",
+    "switchNoMatches": "Không có chứng khoán nào khớp"
+  },
+  "toasts": {
+    "favouriteAdded": "Đã thêm vào danh sách yêu thích",
+    "favouriteRemoved": "Đã xoá khỏi danh sách yêu thích",
+    "favouriteFailed": "Không thể cập nhật danh sách yêu thích"
+  },
+  "cards": {
+    "marketValue": "Giá trị thị trường",
+    "costBasis": "Giá vốn",
+    "unrealizedPl": "Lãi/lỗ chưa thực hiện",
+    "units": "Đơn vị",
+    "avgCostPerUnit": "Giá vốn TB / đơn vị",
+    "heldInAccounts": "Nắm giữ trong các tài khoản",
+    "openAccount": "Xem {name} trên trang Đầu tư",
+    "unitsShare": "{units} ({share})",
+    "valueUnknown": "Chưa có giá",
+    "approx": "~ {amount}",
+    "asOf": "Tại giá đóng cửa ngày {date}",
+    "asOfStale": "Tại giá đóng cửa ngày {date}, giá mới nhất được ghi nhận",
+    "asOfStaleTitle": "Không có giá nào mới hơn được lưu, nên đây là giá trị của vị thế vào ngày đó chứ không phải hôm nay. Hãy cập nhật giá từ nhà cung cấp, hoặc thêm một giá bằng tay."
+  },
+  "chart": {
+    "title": "Giá {symbol}",
+    "seriesAriaLabel": "Chuỗi dữ liệu của biểu đồ",
+    "modes": {
+      "price": "Giá",
+      "value": "Giá trị khoản đầu tư",
+      "return": "Lợi nhuận"
+    },
+    "titles": {
+      "price": "Giá",
+      "value": "Giá trị khoản đầu tư",
+      "return": "Lợi nhuận"
+    },
+    "summary": {
+      "first": "Đầu kỳ",
+      "latest": "Mới nhất",
+      "ending": "Cuối kỳ",
+      "lowest": "Thấp nhất"
+    },
+    "panEarlier": "Xem đoạn lịch sử trước đó",
+    "panLater": "Xem đoạn lịch sử tiếp theo"
+  },
+  "keyInfo": {
+    "title": "Thông tin chính",
+    "symbol": "Mã",
+    "securityType": "Loại chứng khoán",
+    "distributions": "Phân phối",
+    "distributing": "Có chi trả (theo dữ liệu)",
+    "accumulating": "Không (tích lũy)",
+    "distributionsTitle": "Đọc từ lịch sử giá: giá đóng cửa điều chỉnh tách khỏi giá đóng cửa niêm yết mỗi khi có một lần phân phối. Suy ra từ dữ liệu, không phải do tổ chức phát hành công bố.",
+    "exchange": "Sàn giao dịch",
+    "currency": "Tiền tệ",
+    "sector": "Ngành",
+    "industry": "Phân ngành",
+    "provider": "Nhà cung cấp",
+    "lastPrice": "Giá gần nhất"
+  },
+  "tabs": {
+    "ariaLabel": "Các phần của chứng khoán",
+    "overview": "Tổng quan",
+    "transactions": "Giao dịch",
+    "prices": "Lịch sử giá",
+    "documents": "Tài liệu",
+    "news": "Tin tức"
+  },
+  "about": {
+    "title": "Giới thiệu",
+    "noDescription": "Chưa lưu mô tả nào cho chứng khoán này.",
+    "sector": "Ngành",
+    "industry": "Phân ngành",
+    "country": "Quốc gia",
+    "website": "Trang web",
+    "irWebsite": "Trang quan hệ nhà đầu tư",
+    "tags": "Thẻ",
+    "notStored": "Chưa được lưu"
+  },
+  "performance": {
+    "title": "Hiệu suất của chứng khoán",
+    "subject": "Bản thân công cụ này đã biến động thế nào, dù bạn có nắm giữ hay không. Kết quả của vị thế của bạn nằm ở Tổng lợi nhuận.",
+    "empty": "Lịch sử giá còn quá ít để đo lợi nhuận.",
+    "unavailable": "k/c",
+    "periods": {
+      "1m": "1T",
+      "3m": "3T",
+      "ytd": "Từ đầu năm",
+      "1y": "1N",
+      "3y": "3N",
+      "5y": "5N"
+    },
+    "includesDividends": "Đã gồm cổ tức",
+    "excludesDividends": "Chưa gồm cổ tức",
+    "excludesDividendsTitle": "Nhà cung cấp này không đưa ra chuỗi giá đóng cửa điều chỉnh, nên các con số lợi nhuận này chỉ tính theo giá. Với quỹ có chi trả, chúng thấp hơn thực tế đúng bằng toàn bộ tỷ lệ chi trả của quỹ."
+  },
+  "positionInfo": {
+    "title": "Thông tin vị thế",
+    "firstTransaction": "Giao dịch đầu tiên",
+    "lastTransaction": "Giao dịch gần nhất",
+    "totalInvested": "Tổng đã đầu tư",
+    "totalSold": "Tổng đã bán",
+    "dividends": "Cổ tức",
+    "fees": "Phí",
+    "realizedPl": "Lãi/lỗ đã thực hiện",
+    "realizedMixed": "Thực hiện bằng {currencies}, nên không cộng gộp",
+    "totalReturn": "Tổng lợi nhuận",
+    "totalReturnValue": "{amount} ({percent})",
+    "totalReturnTitle": "Lãi chưa thực hiện, cộng phần bạn đã thực hiện khi bán và nhận được từ thu nhập, trừ phí, so với số vốn bạn đã bỏ ra. Đây là lợi nhuận đơn giản trên số vốn đó: không quy về năm và không tính theo thời gian nắm giữ của từng lần mua.",
+    "status": "Trạng thái",
+    "statusOpen": "Đang mở",
+    "statusClosed": "Đã đóng",
+    "statusNone": "Chưa từng nắm giữ"
+  },
+  "accounts": {
+    "title": "Tài khoản",
+    "closedSuffix": "{name} (đã đóng)",
+    "total": "Tổng",
+    "columns": {
+      "account": "Tài khoản",
+      "currency": "Tiền tệ",
+      "units": "Đơn vị",
+      "avgCost": "Giá vốn TB / đơn vị",
+      "marketValue": "Giá trị thị trường",
+      "costBasis": "Giá vốn",
+      "unrealizedPl": "Lãi/lỗ chưa thực hiện"
+    }
+  },
+  "closed": {
+    "title": "Vị thế đã đóng",
+    "description": "Bạn không còn nắm giữ chứng khoán này. Lịch sử của nó vẫn còn ở bên dưới.",
+    "realizedPl": "Lãi/lỗ đã thực hiện",
+    "heldFrom": "Nắm giữ từ",
+    "heldRange": "{start} đến {end}"
+  },
+  "empty": {
+    "noPosition": "Không có dữ liệu vị thế",
+    "noPositionHint": "Bạn chưa ghi nhận giao dịch nào cho chứng khoán này.",
+    "noPrices": "Không có lịch sử giá",
+    "noPricesHint": "Hãy thêm một giá bằng tay, hoặc cập nhật giá từ nhà cung cấp.",
+    "noTransactions": "Chưa có giao dịch",
+    "noAccounts": "Chứng khoán này không được nắm giữ trong tài khoản nào."
+  },
+  "weightings": {
+    "title": "Cơ cấu",
+    "ariaLabel": "Chiều của cơ cấu",
+    "sectorTab": "Ngành",
+    "countryTab": "Quốc gia",
+    "assetClassTab": "Loại tài sản",
+    "sectorEmpty": "Chưa lưu cơ cấu theo ngành. Monize lấy phần này từ nhà cung cấp cho quỹ và ETF.",
+    "countryEmpty": "Chưa lưu cơ cấu theo quốc gia. Bạn có thể nhập khi sửa chứng khoán.",
+    "assetClassEmpty": "Chưa lưu cơ cấu theo loại tài sản.",
+    "remainder": "{percent} chưa phân loại"
+  },
+  "documents": {
+    "title": "Tài liệu",
+    "add": "Thêm tài liệu",
+    "loadFailed": "Không thể tải tài liệu của chứng khoán này",
+    "noDate": "Không có ngày",
+    "columns": {
+      "type": "Loại",
+      "name": "Tên",
+      "date": "Ngày",
+      "address": "Địa chỉ",
+      "actions": "Hành động"
+    },
+    "types": {
+      "FACTSHEET": "Bản thông tin nhanh",
+      "KIID": "KIID",
+      "PROSPECTUS": "Bản cáo bạch",
+      "ANNUAL_REPORT": "Báo cáo thường niên",
+      "SEMI_ANNUAL_REPORT": "Báo cáo bán niên",
+      "TAX": "Tài liệu thuế",
+      "RESEARCH": "Nghiên cứu",
+      "OTHER": "Khác"
+    },
+    "actions": {
+      "open": "Mở",
+      "openNamed": "Mở {name} trong tab mới",
+      "edit": "Sửa",
+      "delete": "Xoá"
+    },
+    "empty": {
+      "title": "Chưa có tài liệu",
+      "description": "Giữ giấy tờ của chứng khoán này ở một nơi: bản thông tin nhanh, KIID, bản cáo bạch, báo cáo thường niên, chứng từ thuế. Mỗi thứ là một liên kết bạn mở ngay từ đây.",
+      "action": "Thêm tài liệu đầu tiên"
+    },
+    "form": {
+      "addTitle": "Thêm tài liệu",
+      "editTitle": "Sửa tài liệu",
+      "date": "Ngày của tài liệu",
+      "dateHint": "Ngày ghi trên chính tài liệu, không phải hôm nay. Để trống nếu không có.",
+      "url": "Địa chỉ",
+      "notes": "Ghi chú",
+      "create": "Thêm tài liệu",
+      "save": "Lưu tài liệu"
+    },
+    "validation": {
+      "nameRequired": "Hãy đặt tên cho tài liệu",
+      "urlRequired": "Cần có địa chỉ",
+      "urlScheme": "Địa chỉ phải bắt đầu bằng http:// hoặc https://"
+    },
+    "delete": {
+      "title": "Xoá tài liệu?",
+      "message": "Việc này xoá liên kết tới „{name}”. Bản thân tài liệu không bị ảnh hưởng."
+    },
+    "toasts": {
+      "created": "Đã thêm tài liệu",
+      "updated": "Đã cập nhật tài liệu",
+      "deleted": "Đã xoá tài liệu",
+      "saveFailed": "Không thể lưu tài liệu",
+      "deleteFailed": "Không thể xoá tài liệu"
+    }
+  },
+  "news": {
+    "title": "Tin tức có nhắc tới {symbol}",
+    "subject": "Nhà cung cấp gắn mỗi bản tin với mọi mã mà nó nêu tên, nên một số tin thực ra nói về công ty khác có nhắc tới công ty này.",
+    "loadFailed": "Không thể tải tin tức cho chứng khoán này",
+    "video": "Video",
+    "alsoMentions": "Còn nhắc tới {tickers}",
+    "unsupportedProvider": "Nhà cung cấp giá cho chứng khoán này không cung cấp tin tức. Nếu bạn đổi sang Yahoo khi sửa chứng khoán, các tiêu đề sẽ xuất hiện ở đây.",
+    "empty": {
+      "title": "Hiện chưa có tiêu đề nào",
+      "description": "Gần đây chưa có gì được công bố cho mã này. Danh sách sẽ được làm mới khi bạn quay lại."
+    }
+  }
+}

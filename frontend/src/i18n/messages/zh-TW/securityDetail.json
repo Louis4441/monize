@@ -1,0 +1,244 @@
+{
+  "loading": "正在載入證券...",
+  "loadFailed": "無法載入該證券",
+  "notFound": "找不到該證券",
+  "backToSecurities": "证券",
+  "error": {
+    "retry": "重試"
+  },
+  "header": {
+    "priceAt": "{date} 的价格",
+    "noPrice": "尚未記錄任何價格",
+    "changeToday": "今日 {change}（{percent}）",
+    "changeLast": "最近變動 {change}（{percent}）",
+    "inactiveBadge": "已停用",
+    "edit": "编辑",
+    "favourites": "收藏",
+    "switchSecurity": "切換到其他證券",
+    "switchPlaceholder": "依代碼或名稱篩選...",
+    "switchNoMatches": "沒有符合的證券"
+  },
+  "toasts": {
+    "favouriteAdded": "已加入收藏",
+    "favouriteRemoved": "已從收藏中移除",
+    "favouriteFailed": "無法更新你的收藏"
+  },
+  "cards": {
+    "marketValue": "市值",
+    "costBasis": "成本",
+    "unrealizedPl": "未實現損益",
+    "units": "單位數",
+    "avgCostPerUnit": "平均成本 / 單位",
+    "heldInAccounts": "持有帳戶",
+    "openAccount": "在「投資」頁面中查看 {name}",
+    "unitsShare": "{units}（{share}）",
+    "valueUnknown": "無法估值",
+    "approx": "约 {amount}",
+    "asOf": "按 {date} 收盤價",
+    "asOfStale": "按 {date} 收盤價，這是記錄中最新的價格",
+    "asOfStaleTitle": "沒有更新的價格，所以這是該部位在那一天的價值，而不是今天的。請從資料來源更新價格，或手動新增一筆。"
+  },
+  "chart": {
+    "title": "{symbol} 价格",
+    "seriesAriaLabel": "图表序列",
+    "modes": {
+      "price": "价格",
+      "value": "投資市值",
+      "return": "報酬"
+    },
+    "titles": {
+      "price": "价格",
+      "value": "投資市值",
+      "return": "報酬"
+    },
+    "summary": {
+      "first": "期初",
+      "latest": "最新",
+      "ending": "期末",
+      "lowest": "最低"
+    },
+    "panEarlier": "查看上一段歷史",
+    "panLater": "查看下一段歷史"
+  },
+  "keyInfo": {
+    "title": "關鍵資訊",
+    "symbol": "代码",
+    "securityType": "證券類型",
+    "distributions": "分配",
+    "distributing": "有配息（依資料判斷）",
+    "accumulating": "無（累積型）",
+    "distributionsTitle": "從價格歷史讀取：每次配息時，調整後收盤價都會與報價收盤價分離。這是由資料推斷的，不是發行機構的宣告。",
+    "exchange": "交易所",
+    "currency": "貨幣",
+    "sector": "類股",
+    "industry": "產業",
+    "provider": "資料來源",
+    "lastPrice": "最新價格"
+  },
+  "tabs": {
+    "ariaLabel": "證券各區塊",
+    "overview": "總覽",
+    "transactions": "交易",
+    "prices": "價格歷史",
+    "documents": "文件",
+    "news": "新闻"
+  },
+  "about": {
+    "title": "简介",
+    "noDescription": "尚未為該證券儲存說明。",
+    "sector": "類股",
+    "industry": "產業",
+    "country": "国家",
+    "website": "網站",
+    "irWebsite": "投資人關係網站",
+    "tags": "標籤",
+    "notStored": "尚未儲存"
+  },
+  "performance": {
+    "title": "證券表現",
+    "subject": "無論你是否持有，這裡顯示的是該標的本身的走勢。你自己部位的報酬在「總報酬」一列。",
+    "empty": "價格歷史還不足以計算報酬。",
+    "unavailable": "无",
+    "periods": {
+      "1m": "1个月",
+      "3m": "3个月",
+      "ytd": "年初至今",
+      "1y": "1年",
+      "3y": "3年",
+      "5y": "5年"
+    },
+    "includesDividends": "含股利",
+    "excludesDividends": "不含股利",
+    "excludesDividendsTitle": "該資料來源不提供調整後收盤價序列，因此這些報酬只依價格計算。對於會配息的基金，它們會把報酬低估掉整個配息率。"
+  },
+  "positionInfo": {
+    "title": "部位資訊",
+    "firstTransaction": "首筆交易",
+    "lastTransaction": "最近一筆交易",
+    "totalInvested": "累計投入",
+    "totalSold": "累計賣出",
+    "dividends": "股利",
+    "fees": "費用",
+    "realizedPl": "已實現損益",
+    "realizedMixed": "以 {currencies} 實現，因此不做合計",
+    "totalReturn": "總報酬",
+    "totalReturnValue": "{amount}（{percent}）",
+    "totalReturnTitle": "未實現收益，加上賣出時已實現的金額和收到的收益，減去費用，相對於你投入的資本。這是該資本上的簡單報酬：沒有換算成年化，也沒有按各筆買進的持有時間加權。",
+    "status": "状态",
+    "statusOpen": "持有中",
+    "statusClosed": "已了結",
+    "statusNone": "從未持有"
+  },
+  "accounts": {
+    "title": "帳戶",
+    "closedSuffix": "{name}（已關閉）",
+    "total": "合计",
+    "columns": {
+      "account": "帳戶",
+      "currency": "貨幣",
+      "units": "單位數",
+      "avgCost": "平均成本 / 單位",
+      "marketValue": "市值",
+      "costBasis": "成本",
+      "unrealizedPl": "未實現損益"
+    }
+  },
+  "closed": {
+    "title": "部位已了結",
+    "description": "你已不再持有該證券。它的歷史仍保留在下方。",
+    "realizedPl": "已實現損益",
+    "heldFrom": "持有起始",
+    "heldRange": "{start} 至 {end}"
+  },
+  "empty": {
+    "noPosition": "沒有部位資料",
+    "noPositionHint": "你還沒有為該證券記錄任何交易。",
+    "noPrices": "沒有價格歷史",
+    "noPricesHint": "手動新增一筆價格，或從資料來源更新價格。",
+    "noTransactions": "还没有交易",
+    "noAccounts": "該證券沒有在任何帳戶中持有。"
+  },
+  "weightings": {
+    "title": "組成",
+    "ariaLabel": "組成維度",
+    "sectorTab": "類股",
+    "countryTab": "国家",
+    "assetClassTab": "資產類別",
+    "sectorEmpty": "未儲存類股組成。對於基金與 ETF，Monize 會從資料來源補齊。",
+    "countryEmpty": "未儲存國家組成。你可以在編輯該證券時輸入。",
+    "assetClassEmpty": "尚未儲存資產類別組成。",
+    "remainder": "{percent} 未分类"
+  },
+  "documents": {
+    "title": "文件",
+    "add": "新增文件",
+    "loadFailed": "無法載入該證券的文件",
+    "noDate": "無日期",
+    "columns": {
+      "type": "類型",
+      "name": "名稱",
+      "date": "日期",
+      "address": "位址",
+      "actions": "操作"
+    },
+    "types": {
+      "FACTSHEET": "基金概覽",
+      "KIID": "KIID",
+      "PROSPECTUS": "公開說明書",
+      "ANNUAL_REPORT": "年度報告",
+      "SEMI_ANNUAL_REPORT": "半年度報告",
+      "TAX": "稅務文件",
+      "RESEARCH": "研究報告",
+      "OTHER": "其他"
+    },
+    "actions": {
+      "open": "開啟",
+      "openNamed": "在新分頁中開啟 {name}",
+      "edit": "编辑",
+      "delete": "刪除"
+    },
+    "empty": {
+      "title": "還沒有文件",
+      "description": "把該證券的資料集中放在一處：基金概覽、KIID、公開說明書、年度報告、稅務憑證。每一份都是可以直接從這裡開啟的連結。",
+      "action": "新增第一份文件"
+    },
+    "form": {
+      "addTitle": "新增文件",
+      "editTitle": "編輯文件",
+      "date": "文件日期",
+      "dateHint": "文件本身上標註的日期，而不是今天。如果沒有就留空。",
+      "url": "位址",
+      "notes": "備註",
+      "create": "新增文件",
+      "save": "儲存文件"
+    },
+    "validation": {
+      "nameRequired": "請給文件取個名稱",
+      "urlRequired": "位址為必填欄位",
+      "urlScheme": "位址必須以 http:// 或 https:// 開頭"
+    },
+    "delete": {
+      "title": "刪除該文件？",
+      "message": "這會移除指向「{name}」的連結。文件本身不受影響。"
+    },
+    "toasts": {
+      "created": "已新增文件",
+      "updated": "已更新文件",
+      "deleted": "已刪除文件",
+      "saveFailed": "無法儲存該文件",
+      "deleteFailed": "無法刪除該文件"
+    }
+  },
+  "news": {
+    "title": "提到 {symbol} 的新聞",
+    "subject": "資料來源會把一篇報導關聯到它提到的每一個代碼，因此其中有些其實是關於另一家提及本證券的公司。",
+    "loadFailed": "無法載入該證券的新聞",
+    "video": "影片",
+    "alsoMentions": "同時提到 {tickers}",
+    "unsupportedProvider": "該證券的報價來源不提供新聞。在編輯該證券時把它切換為 Yahoo，這裡就會出現標題。",
+    "empty": {
+      "title": "目前沒有標題",
+      "description": "最近沒有關於該代碼的內容發布。你再回到這裡時清單會重新整理。"
+    }
+  }
+}

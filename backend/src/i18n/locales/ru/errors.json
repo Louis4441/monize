@@ -404,7 +404,8 @@
     "noUpdateFields": "Укажите хотя бы одно поле для изменения.",
     "allocationExceedsTotal": "Сумма процентов распределения превышает 100%.",
     "invalidTagKey": "Требуется ключ тега (1–100 символов)",
-    "assetOptionNameRequired": "Требуется название класса активов."
+    "assetOptionNameRequired": "Требуется название класса активов.",
+    "documentNotFound": "Документ не найден"
   },
   "tags": {
     "notFound": "Тег с ID {{ id }} не найден",

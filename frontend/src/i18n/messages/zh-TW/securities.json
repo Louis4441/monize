@@ -78,8 +78,6 @@
       "source": "最近一次價格的來源"
     },
     "actions": {
-      "history": "歷史",
-      "prices": "價格",
       "edit": "編輯",
       "deactivate": "停用",
       "activate": "啟用",
@@ -94,8 +92,6 @@
       "subtitle": "請新增您的第一個證券以開始使用。"
     },
     "contextMenu": {
-      "transactionHistory": "交易記錄",
-      "viewPrices": "查看價格",
       "editSecurity": "編輯證券",
       "deactivate": "停用",
       "activate": "啟用",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "從股票代碼自動解析；如有誤才需覆寫",
     "descriptionLabel": "描述",
     "descriptionPlaceholder": "關於此證券的備註。",
+    "websiteLabel": "網站",
+    "irWebsiteLabel": "投資人關係網站",
+    "irWebsiteHint": "沒有報價來源公開這個位址，因此需要手動填寫。",
     "tagsLabel": "標籤",
     "tagsPlaceholder": "選擇標籤...",
     "createNewTag": "建立新標籤...",
@@ -222,7 +221,6 @@
       "sold": "賣出 {quantity} · {account}"
     },
     "empty": "無可用的價格歷史",
-    "showingCount": "顯示 {shown} 筆（共 {total} 筆）價格",
     "columns": {
       "date": "日期",
       "close": "收盤",
@@ -231,7 +229,9 @@
       "low": "最低",
       "volume": "成交量",
       "source": "來源",
-      "actions": "動作"
+      "actions": "動作",
+      "adjustedClose": "調整後收盤",
+      "adjustedCloseTitle": "經分割與股利調整的收盤價（總報酬）。價格來源不提供時為空。"
     },
     "toasts": {
       "added": "價格已新增",
@@ -251,7 +251,10 @@
       "title": "刪除價格",
       "message": "確定要刪除 {date} 的價格記錄嗎？",
       "confirmLabel": "刪除"
-    }
+    },
+    "collapseAll": "全部收合",
+    "expandAll": "全部展開",
+    "groupCount": "{count} 筆價格"
   },
   "transactionHistory": {
     "inactiveBadge": "非活躍",

@@ -43,8 +43,8 @@ export class Holding {
   @ApiProperty({ example: 150.25, description: "Average cost per share" })
   @Column({
     type: "decimal",
-    precision: 20,
-    scale: 6,
+    precision: 24,
+    scale: 10,
     name: "average_cost",
     nullable: true,
   })

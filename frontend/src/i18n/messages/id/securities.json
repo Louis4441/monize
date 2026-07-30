@@ -78,8 +78,6 @@
       "source": "Sumber harga terbaru"
     },
     "actions": {
-      "history": "Riwayat",
-      "prices": "Harga",
       "edit": "Edit",
       "deactivate": "Nonaktifkan",
       "activate": "Aktifkan",
@@ -94,8 +92,6 @@
       "subtitle": "Mulai dengan menambahkan sekuritas pertama Anda."
     },
     "contextMenu": {
-      "transactionHistory": "Riwayat Transaksi",
-      "viewPrices": "Lihat Harga",
       "editSecurity": "Edit Sekuritas",
       "deactivate": "Nonaktifkan",
       "activate": "Aktifkan",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Diselesaikan otomatis dari ticker; ganti hanya jika salah",
     "descriptionLabel": "Keterangan",
     "descriptionPlaceholder": "Catatan tentang sekuritas ini.",
+    "websiteLabel": "Situs web",
+    "irWebsiteLabel": "Situs hubungan investor",
+    "irWebsiteHint": "Tidak ada penyedia harga yang menerbitkan alamat ini, jadi harus diisi sendiri.",
     "tagsLabel": "Tag",
     "tagsPlaceholder": "Pilih tag...",
     "createNewTag": "Buat tag baru...",
@@ -222,7 +221,6 @@
       "sold": "Jual {quantity} · {account}"
     },
     "empty": "Tidak ada riwayat harga tersedia",
-    "showingCount": "Menampilkan {shown} dari {total} harga",
     "columns": {
       "date": "Tanggal",
       "close": "Penutupan",
@@ -231,7 +229,9 @@
       "low": "Terendah",
       "volume": "Volume",
       "source": "Sumber",
-      "actions": "Tindakan"
+      "actions": "Tindakan",
+      "adjustedClose": "Penutupan disesuaikan",
+      "adjustedCloseTitle": "Penutupan yang disesuaikan untuk pemecahan saham dan dividen (hasil total). Kosong bila penyedia harga tidak menyediakannya."
     },
     "toasts": {
       "added": "Harga ditambahkan",
@@ -251,7 +251,10 @@
       "title": "Hapus Harga",
       "message": "Hapus entri harga untuk {date}?",
       "confirmLabel": "Hapus"
-    }
+    },
+    "collapseAll": "Tutup semua",
+    "expandAll": "Buka semua",
+    "groupCount": "{count} harga"
   },
   "transactionHistory": {
     "inactiveBadge": "Tidak Aktif",

@@ -62,6 +62,8 @@ const buildSecuritySchema = (t: (key: string) => string) => z.object({
   exchange: z.string().optional(),
   currencyCode: z.string().min(1, t('validation.currencyRequired')),
   description: z.string().max(5000, t('validation.descriptionMax')).optional(),
+  website: z.string().max(2048).optional(),
+  irWebsite: z.string().max(2048).optional(),
   quoteProvider: z.enum(['', 'yahoo', 'msn']).optional(),
   msnInstrumentId: z.string().max(50).optional(),
   isFavourite: z.boolean().optional(),
@@ -227,6 +229,8 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
       exchange: security?.exchange || '',
       currencyCode: security?.currencyCode || defaultCurrency,
       description: security?.description || '',
+      website: security?.website || '',
+      irWebsite: security?.irWebsite || '',
       quoteProvider: security?.quoteProvider || '',
       msnInstrumentId: security?.msnInstrumentId || '',
       isFavourite: security?.isFavourite || false,
@@ -266,12 +270,18 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
       // the provider actually returns something so a manual edit isn't wiped.
       investmentsApi
         .getSuggestedDescription(result.symbol, result.exchange || undefined)
-        .then(({ description }) => {
+        .then(({ description, website }) => {
           if (description) {
             setValue('description', description, { shouldDirty: true });
           }
+          // Same request, no extra call. Null for a fund, where Yahoo gives a
+          // fund family and no URL -- and there is never an IR address to
+          // suggest, because no provider publishes one.
+          if (website) {
+            setValue('website', website, { shouldDirty: true });
+          }
         })
-        .catch((error) => logger.error('Description fetch failed:', error));
+        .catch((error) => logger.error('Profile fetch failed:', error));
 
       const details = [`Symbol: ${result.symbol}`, `Name: ${result.name}`];
       if (result.exchange) details.push(`Exchange: ${result.exchange}`);
@@ -416,6 +426,11 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
       // backend clears any existing override. Undefined would be stripped by
       // axios and treated as "no change", leaving the previous override in place.
       quoteProvider: data.quoteProvider === '' ? null : data.quoteProvider,
+      // Empty string rather than undefined, so clearing an address actually
+      // clears it: the backend normalises "" to null, where an omitted field
+      // would leave the previous value in place.
+      website: data.website?.trim() ?? '',
+      irWebsite: data.irWebsite?.trim() ?? '',
       msnInstrumentId: data.msnInstrumentId?.trim() || undefined,
       isFavourite: data.isFavourite ?? false,
       // Only ETFs/funds carry the manual breakdowns; send [] to clear them.
@@ -624,6 +639,28 @@ export function SecurityForm({ security, onSubmit, onCancel, onDirtyChange, subm
             {errors.description.message}
           </p>
         )}
+      </div>
+
+      {/* Both are rendered as links on the detail page, so the backend only
+          stores an http(s) address and normalises a bare domain to https. There
+          is no provider field for an IR page, hence the hint. */}
+      <Input
+        label={t('form.websiteLabel')}
+        placeholder="apple.com"
+        error={errors.website?.message}
+        {...register('website')}
+      />
+
+      <div>
+        <Input
+          label={t('form.irWebsiteLabel')}
+          placeholder="investor.apple.com"
+          error={errors.irWebsite?.message}
+          {...register('irWebsite')}
+        />
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {t('form.irWebsiteHint')}
+        </p>
       </div>
 
       {/* Tags */}

@@ -78,8 +78,6 @@
       "source": "Source du cours le plus récent"
     },
     "actions": {
-      "history": "Historique",
-      "prices": "Cours",
       "edit": "Modifier",
       "deactivate": "Désactiver",
       "activate": "Activer",
@@ -94,8 +92,6 @@
       "subtitle": "Commencez par ajouter votre premier titre."
     },
     "contextMenu": {
-      "transactionHistory": "Historique des transactions",
-      "viewPrices": "Voir les cours",
       "editSecurity": "Modifier le titre",
       "deactivate": "Désactiver",
       "activate": "Activer",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Résolu automatiquement depuis le symbole ; à corriger uniquement si incorrect",
     "descriptionLabel": "Description",
     "descriptionPlaceholder": "Notes sur ce titre.",
+    "websiteLabel": "Site web",
+    "irWebsiteLabel": "Site relations investisseurs",
+    "irWebsiteHint": "Aucun fournisseur de cours ne publie cette adresse : elle doit être saisie.",
     "tagsLabel": "Étiquettes",
     "tagsPlaceholder": "Sélectionner des étiquettes...",
     "createNewTag": "Créer une nouvelle étiquette...",
@@ -222,7 +221,6 @@
       "sold": "Vente {quantity} · {account}"
     },
     "empty": "Aucun historique des cours disponible",
-    "showingCount": "Affichage de {shown} cours sur {total}",
     "columns": {
       "date": "Date",
       "close": "Clôture",
@@ -231,7 +229,9 @@
       "low": "Bas",
       "volume": "Volume",
       "source": "Source",
-      "actions": "Actions"
+      "actions": "Actions",
+      "adjustedClose": "Clôture aj.",
+      "adjustedCloseTitle": "Cours de clôture ajusté des splits et des dividendes (rendement total). Vide lorsque le fournisseur de cours ne le donne pas."
     },
     "toasts": {
       "added": "Cours ajouté",
@@ -251,7 +251,10 @@
       "title": "Supprimer le cours",
       "message": "Supprimer le cours du {date} ?",
       "confirmLabel": "Supprimer"
-    }
+    },
+    "collapseAll": "Tout replier",
+    "expandAll": "Tout déplier",
+    "groupCount": "{count} cours"
   },
   "transactionHistory": {
     "inactiveBadge": "Inactif",

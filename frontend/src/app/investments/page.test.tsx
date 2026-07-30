@@ -272,9 +272,9 @@ vi.mock('@/components/investments/AssetAllocationChart', () => ({
 }));
 
 vi.mock('@/components/investments/GroupedHoldingsList', () => ({
-  GroupedHoldingsList: ({ onSymbolClick, onCashClick }: any) => (
+  GroupedHoldingsList: ({ onSecurityClick, onCashClick }: any) => (
     <div data-testid="grouped-holdings">
-      <button data-testid="symbol-click" onClick={() => onSymbolClick('AAPL')}>AAPL</button>
+      <button data-testid="symbol-click" onClick={() => onSecurityClick('sec-1')}>AAPL</button>
       <button data-testid="cash-click" onClick={() => onCashClick('cash-1')}>Cash</button>
     </div>
   ),
@@ -293,6 +293,7 @@ vi.mock('@/components/investments/InvestmentTransactionList', () => ({
       ))}
       <button data-testid="new-tx-btn" onClick={onNewTransaction}>New</button>
       <button data-testid="clear-filters" onClick={() => onFiltersChange({})}>Clear Filters</button>
+      <button data-testid="set-symbol-filter" onClick={() => onFiltersChange({ symbol: 'AAPL' })}>Filter AAPL</button>
       {filters?.symbol && <span data-testid="symbol-filter">{filters.symbol}</span>}
     </div>
   ),
@@ -598,7 +599,7 @@ describe('InvestmentsPage', () => {
   });
 
   describe('Symbol Click', () => {
-    it('filters transactions by symbol when clicked in holdings', async () => {
+    it('opens the security detail page when a holding is clicked', async () => {
       await renderPage();
       await waitFor(() => {
         expect(screen.getByTestId('symbol-click')).toBeInTheDocument();
@@ -606,9 +607,12 @@ describe('InvestmentsPage', () => {
 
       fireEvent.click(screen.getByTestId('symbol-click'));
 
+      // It used to filter the transaction list by symbol instead (review of
+      // discussion #964); the filters above that list still do that.
       await waitFor(() => {
-        expect(screen.getByTestId('symbol-filter')).toHaveTextContent('AAPL');
+        expect(mockRouterPush).toHaveBeenCalledWith('/securities/sec-1');
       });
+      expect(screen.queryByTestId('symbol-filter')).not.toBeInTheDocument();
     });
   });
 
@@ -706,7 +710,7 @@ describe('InvestmentsPage', () => {
       });
 
       // First set a symbol filter
-      fireEvent.click(screen.getByTestId('symbol-click'));
+      fireEvent.click(screen.getByTestId('set-symbol-filter'));
       await waitFor(() => {
         expect(screen.getByTestId('symbol-filter')).toBeInTheDocument();
       });

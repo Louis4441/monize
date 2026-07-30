@@ -78,8 +78,6 @@
       "source": "Quelle des zuletzt abgerufenen Kurses"
     },
     "actions": {
-      "history": "Verlauf",
-      "prices": "Kurse",
       "edit": "Bearbeiten",
       "deactivate": "Deaktivieren",
       "activate": "Aktivieren",
@@ -94,8 +92,6 @@
       "subtitle": "Fügen Sie Ihr erstes Wertpapier hinzu, um zu beginnen."
     },
     "contextMenu": {
-      "transactionHistory": "Buchungsverlauf",
-      "viewPrices": "Kurse anzeigen",
       "editSecurity": "Wertpapier bearbeiten",
       "deactivate": "Deaktivieren",
       "activate": "Aktivieren",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Automatisch aus Ticker ermittelt; nur bei Fehler überschreiben",
     "descriptionLabel": "Beschreibung",
     "descriptionPlaceholder": "Notizen zu diesem Wertpapier.",
+    "websiteLabel": "Website",
+    "irWebsiteLabel": "Website für Investoren",
+    "irWebsiteHint": "Kein Kursanbieter veröffentlicht diese Adresse, sie muss also eingetragen werden.",
     "tagsLabel": "Tags",
     "tagsPlaceholder": "Tags auswählen...",
     "createNewTag": "Neuen Tag erstellen...",
@@ -222,7 +221,6 @@
       "sold": "Verkauf {quantity} · {account}"
     },
     "empty": "Kein Kursverlauf verfügbar",
-    "showingCount": "{shown} von {total} Kursen angezeigt",
     "columns": {
       "date": "Datum",
       "close": "Schluss",
@@ -231,7 +229,9 @@
       "low": "Tief",
       "volume": "Volumen",
       "source": "Quelle",
-      "actions": "Aktionen"
+      "actions": "Aktionen",
+      "adjustedClose": "Ber. Schluss",
+      "adjustedCloseTitle": "Um Splits und Dividenden bereinigter Schlusskurs (Gesamtrendite). Leer, wenn der Kursanbieter ihn nicht liefert."
     },
     "toasts": {
       "added": "Kurs hinzugefügt",
@@ -251,7 +251,10 @@
       "title": "Kurs löschen",
       "message": "Kurseintrag für {date} löschen?",
       "confirmLabel": "Löschen"
-    }
+    },
+    "collapseAll": "Alle einklappen",
+    "expandAll": "Alle ausklappen",
+    "groupCount": "{count} Kurs(e)"
   },
   "transactionHistory": {
     "inactiveBadge": "Inaktiv",

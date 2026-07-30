@@ -13,6 +13,19 @@ export interface SummaryCardItem {
   ariaLabel?: string;
   /** When set, the card becomes a button (e.g. to drill into transactions). */
   onClick?: () => void;
+  /**
+   * Small decorative glyph shown before the label. Purely visual -- the label
+   * already names the figure -- so it is hidden from assistive tech.
+   */
+  icon?: ReactNode;
+  /**
+   * Replaces the label/value/note body entirely, for a card that is a small
+   * list rather than a single figure (the detail page's "Held in accounts").
+   * The card keeps its shared chrome either way.
+   */
+  body?: ReactNode;
+  /** Extra classes for this card, e.g. a wider `col-span` on desktop. */
+  className?: string;
 }
 
 interface SummaryCardGridProps {
@@ -36,9 +49,24 @@ export function SummaryCardGrid({ cards, className = DEFAULT_SUMMARY_GRID }: Sum
   return (
     <div className={className}>
       {cards.map((card, index) => {
-        const body = (
+        const label = (
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            {card.icon && (
+              <span aria-hidden="true" className="shrink-0">
+                {card.icon}
+              </span>
+            )}
+            <span>{card.label}</span>
+          </div>
+        );
+        const body = card.body ? (
           <>
-            <div className="text-sm text-gray-500 dark:text-gray-400">{card.label}</div>
+            {label}
+            {card.body}
+          </>
+        ) : (
+          <>
+            {label}
             <div className={`text-lg font-bold ${card.valueClass ?? 'text-gray-900 dark:text-gray-100'}`}>
               {card.value}
             </div>
@@ -47,7 +75,7 @@ export function SummaryCardGrid({ cards, className = DEFAULT_SUMMARY_GRID }: Sum
             )}
           </>
         );
-        const base = 'bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4';
+        const base = `bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 ${card.className ?? ''}`;
         return card.onClick ? (
           <button
             key={`${card.label}-${index}`}

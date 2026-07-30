@@ -303,6 +303,62 @@ button {
   }
 }
 
+/* A slim, quiet scrollbar for a bounded region inside a card.
+ *
+ * The default native bar is the problem, not scrolling: on Linux and Windows it
+ * is a wide arrowed control drawn hard against the content, which inside a small
+ * card reads as a rendering fault rather than as an affordance. This keeps the
+ * bar -- a bounded list needs one, or the rest of it is invisible -- and makes it
+ * a thin rounded thumb on an empty track, in the theme's own greys, so it recedes
+ * until it is wanted. Firefox gets `scrollbar-width: thin`, which is as far as it
+ * can be styled.
+ *
+ * Use on any region that caps its height so the card around it keeps a stable
+ * size. Never `scrollbar-hide` for this: hiding a bar you need is worse than a
+ * plain one. */
+@utility scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-gray-300) transparent;
+
+  &::-webkit-scrollbar {
+    width: 0.5rem;
+    height: 0.5rem;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-gray-300);
+    border-radius: 9999px;
+    /* Inset so the thumb sits away from the content rather than against it. */
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-gray-400);
+  }
+  /* No stepper arrows: they are the bulkiest part of the native control and
+     nothing in this app is navigated a line at a time. */
+  &::-webkit-scrollbar-button {
+    display: none;
+  }
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+:where(.dark) .scrollbar-slim,
+.dark .scrollbar-slim {
+  scrollbar-color: var(--color-gray-600) transparent;
+
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--color-gray-600);
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-gray-500);
+  }
+}
+
 /* Hide native date picker indicator (calendar icon) so only
    the custom CalendarPopover icon is visible on desktop. */
 

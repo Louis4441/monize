@@ -78,8 +78,6 @@
       "source": "Bron van de meest recente koers"
     },
     "actions": {
-      "history": "Geschiedenis",
-      "prices": "Koersen",
       "edit": "Bewerken",
       "deactivate": "Deactiveren",
       "activate": "Activeren",
@@ -94,8 +92,6 @@
       "subtitle": "Begin met het toevoegen van je eerste waardepapier."
     },
     "contextMenu": {
-      "transactionHistory": "Transactiegeschiedenis",
-      "viewPrices": "Koersen bekijken",
       "editSecurity": "Waardepapier bewerken",
       "deactivate": "Deactiveren",
       "activate": "Activeren",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Automatisch bepaald via ticker; overschrijf alleen indien onjuist",
     "descriptionLabel": "Omschrijving",
     "descriptionPlaceholder": "Notities over dit effect.",
+    "websiteLabel": "Website",
+    "irWebsiteLabel": "Website investor relations",
+    "irWebsiteHint": "Geen koersaanbieder publiceert dit adres, dus het moet worden ingevuld.",
     "tagsLabel": "Labels",
     "tagsPlaceholder": "Selecteer labels...",
     "createNewTag": "Nieuw label aanmaken...",
@@ -222,7 +221,6 @@
       "sold": "Verkoop {quantity} · {account}"
     },
     "empty": "Geen koershistorie beschikbaar",
-    "showingCount": "{shown} van {total} koersen weergegeven",
     "columns": {
       "date": "Datum",
       "close": "Slotkoers",
@@ -231,7 +229,9 @@
       "low": "Laag",
       "volume": "Volume",
       "source": "Bron",
-      "actions": "Acties"
+      "actions": "Acties",
+      "adjustedClose": "Aangep. slot",
+      "adjustedCloseTitle": "Voor splitsingen en dividend aangepaste slotkoers (totaalrendement). Leeg wanneer de koersaanbieder die niet levert."
     },
     "toasts": {
       "added": "Koers toegevoegd",
@@ -251,7 +251,10 @@
       "title": "Koers verwijderen",
       "message": "Koersvermelding van {date} verwijderen?",
       "confirmLabel": "Verwijderen"
-    }
+    },
+    "collapseAll": "Alles inklappen",
+    "expandAll": "Alles uitklappen",
+    "groupCount": "{count} koers(en)"
   },
   "transactionHistory": {
     "inactiveBadge": "Inactief",

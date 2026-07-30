@@ -1,0 +1,244 @@
+{
+  "loading": "[XX-Loading security...-XX]",
+  "loadFailed": "[XX-Failed to load this security-XX]",
+  "notFound": "[XX-Security not found-XX]",
+  "backToSecurities": "[XX-Securities-XX]",
+  "error": {
+    "retry": "[XX-Retry-XX]"
+  },
+  "header": {
+    "priceAt": "[XX-Price at {date}-XX]",
+    "noPrice": "[XX-No price recorded yet-XX]",
+    "changeToday": "[XX-{change} ({percent}) today-XX]",
+    "changeLast": "[XX-{change} ({percent}) last move-XX]",
+    "inactiveBadge": "[XX-Inactive-XX]",
+    "edit": "[XX-Edit-XX]",
+    "favourites": "[XX-Favourites-XX]",
+    "switchSecurity": "[XX-Switch to another security-XX]",
+    "switchPlaceholder": "[XX-Filter by symbol or name...-XX]",
+    "switchNoMatches": "[XX-No securities match-XX]"
+  },
+  "toasts": {
+    "favouriteAdded": "[XX-Added to your favourites-XX]",
+    "favouriteRemoved": "[XX-Removed from your favourites-XX]",
+    "favouriteFailed": "[XX-Could not update your favourites-XX]"
+  },
+  "cards": {
+    "marketValue": "[XX-Market value-XX]",
+    "costBasis": "[XX-Cost basis-XX]",
+    "unrealizedPl": "[XX-Unrealized P/L-XX]",
+    "units": "[XX-Units-XX]",
+    "avgCostPerUnit": "[XX-Avg. cost / unit-XX]",
+    "heldInAccounts": "[XX-Held in accounts-XX]",
+    "openAccount": "[XX-Show {name} on the Investments page-XX]",
+    "unitsShare": "[XX-{units} ({share})-XX]",
+    "valueUnknown": "[XX-Not priced-XX]",
+    "approx": "[XX-~ {amount}-XX]",
+    "asOf": "[XX-At the close of {date}-XX]",
+    "asOfStale": "[XX-At the close of {date}, the newest price on record-XX]",
+    "asOfStaleTitle": "[XX-No newer price is stored, so this is what the position was worth on that day rather than today. Update prices from the provider, or add one by hand.-XX]"
+  },
+  "chart": {
+    "title": "[XX-{symbol} price-XX]",
+    "seriesAriaLabel": "[XX-Chart series-XX]",
+    "modes": {
+      "price": "[XX-Price-XX]",
+      "value": "[XX-Investment value-XX]",
+      "return": "[XX-Return-XX]"
+    },
+    "titles": {
+      "price": "[XX-Price-XX]",
+      "value": "[XX-Investment value-XX]",
+      "return": "[XX-Return-XX]"
+    },
+    "summary": {
+      "first": "[XX-First-XX]",
+      "latest": "[XX-Latest-XX]",
+      "ending": "[XX-Ending-XX]",
+      "lowest": "[XX-Lowest-XX]"
+    },
+    "panEarlier": "[XX-Show the previous stretch of history-XX]",
+    "panLater": "[XX-Show the next stretch of history-XX]"
+  },
+  "keyInfo": {
+    "title": "[XX-Key information-XX]",
+    "symbol": "[XX-Symbol-XX]",
+    "securityType": "[XX-Security type-XX]",
+    "distributions": "[XX-Distributions-XX]",
+    "distributing": "[XX-Paid (observed)-XX]",
+    "accumulating": "[XX-None (accumulating)-XX]",
+    "distributionsTitle": "[XX-Read from the price history: the adjusted close parts from the quoted close whenever a distribution is paid. Observed from data, not declared by the issuer.-XX]",
+    "exchange": "[XX-Exchange-XX]",
+    "currency": "[XX-Currency-XX]",
+    "sector": "[XX-Sector-XX]",
+    "industry": "[XX-Industry-XX]",
+    "provider": "[XX-Provider-XX]",
+    "lastPrice": "[XX-Last price-XX]"
+  },
+  "tabs": {
+    "ariaLabel": "[XX-Security sections-XX]",
+    "overview": "[XX-Overview-XX]",
+    "transactions": "[XX-Transactions-XX]",
+    "prices": "[XX-Price history-XX]",
+    "documents": "[XX-Documents-XX]",
+    "news": "[XX-News-XX]"
+  },
+  "about": {
+    "title": "[XX-About-XX]",
+    "noDescription": "[XX-No description has been saved for this security.-XX]",
+    "sector": "[XX-Sector-XX]",
+    "industry": "[XX-Industry-XX]",
+    "country": "[XX-Country-XX]",
+    "website": "[XX-Website-XX]",
+    "irWebsite": "[XX-IR Website-XX]",
+    "tags": "[XX-Tags-XX]",
+    "notStored": "[XX-Not stored yet-XX]"
+  },
+  "performance": {
+    "title": "[XX-Security performance-XX]",
+    "subject": "[XX-How the instrument itself has moved, whether or not you held it. What your own position made is under Total return.-XX]",
+    "empty": "[XX-Not enough price history to measure a return yet.-XX]",
+    "unavailable": "[XX-n/a-XX]",
+    "periods": {
+      "1m": "[XX-1M-XX]",
+      "3m": "[XX-3M-XX]",
+      "ytd": "[XX-YTD-XX]",
+      "1y": "[XX-1Y-XX]",
+      "3y": "[XX-3Y-XX]",
+      "5y": "[XX-5Y-XX]"
+    },
+    "includesDividends": "[XX-Includes dividends-XX]",
+    "excludesDividends": "[XX-Excludes dividends-XX]",
+    "excludesDividendsTitle": "[XX-This provider supplies no adjusted-close series, so these returns are measured on price alone. For a fund that pays out, they understate the return by its yield.-XX]"
+  },
+  "positionInfo": {
+    "title": "[XX-Position info-XX]",
+    "firstTransaction": "[XX-First transaction-XX]",
+    "lastTransaction": "[XX-Last transaction-XX]",
+    "totalInvested": "[XX-Total invested-XX]",
+    "totalSold": "[XX-Total sold-XX]",
+    "dividends": "[XX-Dividends-XX]",
+    "fees": "[XX-Fees-XX]",
+    "realizedPl": "[XX-Realized P/L-XX]",
+    "realizedMixed": "[XX-Realized in {currencies}, so not added up-XX]",
+    "totalReturn": "[XX-Total return-XX]",
+    "totalReturnValue": "[XX-{amount} ({percent})-XX]",
+    "totalReturnTitle": "[XX-Unrealized gain, plus what you realized on sales and received in income, less fees, over the capital you put in. A simple return on that capital: it is not annualized and does not weight tranches by how long you held them.-XX]",
+    "status": "[XX-Status-XX]",
+    "statusOpen": "[XX-Open-XX]",
+    "statusClosed": "[XX-Closed-XX]",
+    "statusNone": "[XX-Never held-XX]"
+  },
+  "accounts": {
+    "title": "[XX-Accounts-XX]",
+    "closedSuffix": "[XX-{name} (closed)-XX]",
+    "total": "[XX-Total-XX]",
+    "columns": {
+      "account": "[XX-Account-XX]",
+      "currency": "[XX-Currency-XX]",
+      "units": "[XX-Units-XX]",
+      "avgCost": "[XX-Avg. cost / unit-XX]",
+      "marketValue": "[XX-Market value-XX]",
+      "costBasis": "[XX-Cost basis-XX]",
+      "unrealizedPl": "[XX-Unrealized P/L-XX]"
+    }
+  },
+  "closed": {
+    "title": "[XX-Position closed-XX]",
+    "description": "[XX-You no longer hold this security. Its history stays available below.-XX]",
+    "realizedPl": "[XX-Realized P/L-XX]",
+    "heldFrom": "[XX-Held from-XX]",
+    "heldRange": "[XX-{start} to {end}-XX]"
+  },
+  "empty": {
+    "noPosition": "[XX-No position data-XX]",
+    "noPositionHint": "[XX-You have not recorded any transactions for this security yet.-XX]",
+    "noPrices": "[XX-No price history available-XX]",
+    "noPricesHint": "[XX-Add a price manually, or update prices from the provider.-XX]",
+    "noTransactions": "[XX-No transactions yet-XX]",
+    "noAccounts": "[XX-This security is not held in any account.-XX]"
+  },
+  "weightings": {
+    "title": "[XX-Breakdown-XX]",
+    "ariaLabel": "[XX-Breakdown dimension-XX]",
+    "sectorTab": "[XX-Sector-XX]",
+    "countryTab": "[XX-Country-XX]",
+    "assetClassTab": "[XX-Asset class-XX]",
+    "sectorEmpty": "[XX-No sector breakdown is stored. Monize fills this in from the provider for funds and ETFs.-XX]",
+    "countryEmpty": "[XX-No country breakdown is stored. You can enter one when editing the security.-XX]",
+    "assetClassEmpty": "[XX-No asset class breakdown is stored yet.-XX]",
+    "remainder": "[XX-{percent} unclassified-XX]"
+  },
+  "documents": {
+    "title": "[XX-Documents-XX]",
+    "add": "[XX-Add document-XX]",
+    "loadFailed": "[XX-Could not load the documents for this security-XX]",
+    "noDate": "[XX-No date-XX]",
+    "columns": {
+      "type": "[XX-Type-XX]",
+      "name": "[XX-Name-XX]",
+      "date": "[XX-Date-XX]",
+      "address": "[XX-Address-XX]",
+      "actions": "[XX-Actions-XX]"
+    },
+    "types": {
+      "FACTSHEET": "[XX-Factsheet-XX]",
+      "KIID": "[XX-KIID-XX]",
+      "PROSPECTUS": "[XX-Prospectus-XX]",
+      "ANNUAL_REPORT": "[XX-Annual report-XX]",
+      "SEMI_ANNUAL_REPORT": "[XX-Semi-annual report-XX]",
+      "TAX": "[XX-Tax document-XX]",
+      "RESEARCH": "[XX-Research-XX]",
+      "OTHER": "[XX-Other-XX]"
+    },
+    "actions": {
+      "open": "[XX-Open-XX]",
+      "openNamed": "[XX-Open {name} in a new tab-XX]",
+      "edit": "[XX-Edit-XX]",
+      "delete": "[XX-Delete-XX]"
+    },
+    "empty": {
+      "title": "[XX-No documents yet-XX]",
+      "description": "[XX-Keep the paperwork for this security in one place: its factsheet, its KIID, a prospectus, an annual report, a tax slip. Each one is a link you can open straight from here.-XX]",
+      "action": "[XX-Add the first document-XX]"
+    },
+    "form": {
+      "addTitle": "[XX-Add document-XX]",
+      "editTitle": "[XX-Edit document-XX]",
+      "date": "[XX-Document date-XX]",
+      "dateHint": "[XX-The date on the document itself, not today. Leave it empty if it has none.-XX]",
+      "url": "[XX-Address-XX]",
+      "notes": "[XX-Notes-XX]",
+      "create": "[XX-Add document-XX]",
+      "save": "[XX-Save document-XX]"
+    },
+    "validation": {
+      "nameRequired": "[XX-Give the document a name-XX]",
+      "urlRequired": "[XX-An address is required-XX]",
+      "urlScheme": "[XX-The address must start with http:// or https://-XX]"
+    },
+    "delete": {
+      "title": "[XX-Delete document?-XX]",
+      "message": "[XX-This removes the link to \"{name}\". The document itself is not touched.-XX]"
+    },
+    "toasts": {
+      "created": "[XX-Document added-XX]",
+      "updated": "[XX-Document updated-XX]",
+      "deleted": "[XX-Document deleted-XX]",
+      "saveFailed": "[XX-Could not save the document-XX]",
+      "deleteFailed": "[XX-Could not delete the document-XX]"
+    }
+  },
+  "news": {
+    "title": "[XX-News mentioning {symbol}-XX]",
+    "subject": "[XX-The provider files a story against every ticker it names, so some of these are about another company that mentions this one.-XX]",
+    "loadFailed": "[XX-Could not load the news for this security-XX]",
+    "video": "[XX-Video-XX]",
+    "alsoMentions": "[XX-Also mentions {tickers}-XX]",
+    "unsupportedProvider": "[XX-The quote provider for this security supplies no news. Switching it to Yahoo, when editing the security, brings headlines here.-XX]",
+    "empty": {
+      "title": "[XX-No headlines right now-XX]",
+      "description": "[XX-Nothing has been published against this symbol recently. The list refreshes when you come back to it.-XX]"
+    }
+  }
+}

@@ -191,7 +191,7 @@ export function TopMovers({ movers, isLoading, hasInvestmentAccounts, onRefresh,
             <button
               key={mover.securityId}
               type="button"
-              onClick={() => router.push(`/securities?price=${mover.securityId}`)}
+              onClick={() => router.push(`/securities/${mover.securityId}?tab=prices`)}
               title={t('topMovers.openPriceHistory', { symbol: mover.symbol })}
               className="flex w-full items-center justify-between p-2 sm:p-3 rounded-lg border border-gray-200 dark:border-gray-700 text-left transition-colors hover:border-blue-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:border-blue-500 dark:hover:bg-gray-700/50"
             >

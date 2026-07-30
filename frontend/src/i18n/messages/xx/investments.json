@@ -97,7 +97,7 @@
     "cashLabel": "[XX-Cash-XX]",
     "availableBalance": "[XX-Available Balance-XX]",
     "cashClickTitle": "[XX-Click to view cash account transactions-XX]",
-    "symbolClickTitle": "[XX-Click to filter transactions by this symbol-XX]",
+    "symbolClickTitle": "[XX-Click to open this security-XX]",
     "accountTotal": "[XX-Account Total-XX]",
     "symbolColumn": "[XX-Symbol-XX]",
     "sharesColumn": "[XX-Shares-XX]",

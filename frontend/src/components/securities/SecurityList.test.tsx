@@ -5,6 +5,7 @@ import { SecurityList } from './SecurityList';
 describe('SecurityList', () => {
   const onEdit = vi.fn();
   const onToggleActive = vi.fn();
+  const onOpen = vi.fn();
 
   const makeSecurity = (overrides: any = {}) => ({
     id: 's1',
@@ -26,7 +27,7 @@ describe('SecurityList', () => {
   });
 
   it('renders empty state', () => {
-    render(<SecurityList securities={[]} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={[]} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('No securities')).toBeInTheDocument();
   });
 
@@ -36,7 +37,7 @@ describe('SecurityList', () => {
       makeSecurity({ id: 's2', symbol: 'XEQT', name: 'iShares ETF', securityType: 'ETF', exchange: 'TSX', currencyCode: 'CAD', isActive: false }),
     ];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('AAPL')).toBeInTheDocument();
     expect(screen.getByText('XEQT')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
@@ -51,7 +52,7 @@ describe('SecurityList', () => {
       }),
     ];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('Bonds')).toBeInTheDocument();
     expect(screen.getByText('Global aggregate bond ETF.')).toBeInTheDocument();
   });
@@ -65,13 +66,13 @@ describe('SecurityList', () => {
     ];
 
     const { rerender } = render(
-      <SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="compact" />,
+      <SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="compact" />,
     );
     expect(screen.getByText('Bonds')).toBeInTheDocument();
     expect(screen.queryByText('Global aggregate bond ETF.')).not.toBeInTheDocument();
 
     rerender(
-      <SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />,
+      <SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="dense" />,
     );
     expect(screen.queryByText('Global aggregate bond ETF.')).not.toBeInTheDocument();
   });
@@ -81,14 +82,14 @@ describe('SecurityList', () => {
       makeSecurity({ securityType: 'MUTUAL_FUND' }),
     ];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('Mutual Fund')).toBeInTheDocument();
   });
 
   it('renders exchange and currency columns in normal density', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
     expect(screen.getByText('NASDAQ')).toBeInTheDocument();
     expect(screen.getByText('USD')).toBeInTheDocument();
   });
@@ -96,14 +97,14 @@ describe('SecurityList', () => {
   it('hides exchange and currency columns in compact density', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="compact" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="compact" />);
     expect(screen.queryByText('NASDAQ')).not.toBeInTheDocument();
   });
 
   it('calls onEdit when edit button is clicked', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     fireEvent.click(screen.getByText('Edit'));
     expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'AAPL' }));
   });
@@ -111,21 +112,21 @@ describe('SecurityList', () => {
   it('shows deactivate button for active securities without holdings', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('Deactivate')).toBeInTheDocument();
   });
 
   it('shows activate button for inactive securities without holdings', () => {
     const securities = [makeSecurity({ isActive: false })];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('Activate')).toBeInTheDocument();
   });
 
   it('calls onToggleActive when deactivate button is clicked', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     fireEvent.click(screen.getByText('Deactivate'));
     expect(onToggleActive).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'AAPL' }));
   });
@@ -134,7 +135,7 @@ describe('SecurityList', () => {
     const securities = [makeSecurity()];
     const holdings = { s1: 100 };
 
-    render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.queryByText('Deactivate')).not.toBeInTheDocument();
     // Edit should still be visible
     expect(screen.getByText('Edit')).toBeInTheDocument();
@@ -144,7 +145,7 @@ describe('SecurityList', () => {
     const securities = [makeSecurity()];
     const holdings = { s1: 0 };
 
-    render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('Deactivate')).toBeInTheDocument();
   });
 
@@ -152,7 +153,7 @@ describe('SecurityList', () => {
     const securities = [makeSecurity()];
     const holdings = { s1: 0.0003 };
 
-    render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('Shares')).toBeInTheDocument();
     // Residual quantity shown exactly, not rounded away.
     expect(screen.getByText('0.0003')).toBeInTheDocument();
@@ -161,58 +162,78 @@ describe('SecurityList', () => {
   it('shows 0 shares when a security has no holdings', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('0')).toBeInTheDocument();
   });
 
-  it('renders a History action and calls onViewHistory when clicked', () => {
+  it('opens the detail page from a click anywhere on the row', () => {
     const securities = [makeSecurity()];
-    const onViewHistory = vi.fn();
-
     render(
       <SecurityList
         securities={securities}
         onEdit={onEdit}
         onToggleActive={onToggleActive}
-        onViewHistory={onViewHistory}
+        onOpen={onOpen}
       />,
     );
-    fireEvent.click(screen.getByText('History'));
-    expect(onViewHistory).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'AAPL' }));
+
+    // The whole row is the target, as on the accounts list. Buttons on the text
+    // alone were a narrow hit area inside a wide row: clicking the cell's
+    // padding did nothing at all.
+    fireEvent.click(screen.getByText('Apple Inc.').closest('tr')!);
+    expect(onOpen).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: 'AAPL' }),
+    );
   });
 
-  it('omits the History action when onViewHistory is not provided', () => {
+  it('does not open the page when the favourite star is clicked', () => {
+    const onToggleFavourite = vi.fn();
     const securities = [makeSecurity()];
+    render(
+      <SecurityList
+        securities={securities}
+        onEdit={onEdit}
+        onToggleActive={onToggleActive}
+        onOpen={onOpen}
+        onToggleFavourite={onToggleFavourite}
+      />,
+    );
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
-    expect(screen.queryByText('History')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add to favourites' }));
+    expect(onToggleFavourite).toHaveBeenCalled();
+    // The risk of a clickable row: a control on it acting twice.
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it('toggles density when density button is clicked', () => {
+  it('does not open the page when a row action is clicked', () => {
     const securities = [makeSecurity()];
+    render(
+      <SecurityList
+        securities={securities}
+        onEdit={onEdit}
+        onToggleActive={onToggleActive}
+        onOpen={onOpen}
+      />,
+    );
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
-    const densityButton = screen.getByText('Normal');
-    fireEvent.click(densityButton);
-    expect(screen.getByText('Compact')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Compact'));
-    expect(screen.getByText('Dense')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Edit'));
+    expect(onEdit).toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it('calls onDensityChange when provided', () => {
-    const onDensityChange = vi.fn();
+  it('no longer offers History, Prices or Details actions', () => {
     const securities = [makeSecurity()];
-
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" onDensityChange={onDensityChange} />);
-    fireEvent.click(screen.getByText('Normal'));
-    expect(onDensityChange).toHaveBeenCalledWith('compact');
-  });
-
-  it('shows abbreviated type in dense mode', () => {
-    const securities = [makeSecurity({ securityType: 'MUTUAL_FUND' })];
-
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />);
-    expect(screen.getByText('MF')).toBeInTheDocument();
+    render(
+      <SecurityList
+        securities={securities}
+        onEdit={onEdit}
+        onToggleActive={onToggleActive}
+        onOpen={onOpen}
+      />,
+    );
+    for (const label of ['History', 'Prices', 'Details']) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
   });
 
   describe('long-press context menu', () => {
@@ -227,7 +248,7 @@ describe('SecurityList', () => {
     it('opens context menu on long press', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -241,7 +262,7 @@ describe('SecurityList', () => {
     it('shows security symbol and name in context menu', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -260,7 +281,7 @@ describe('SecurityList', () => {
     it('context menu Edit Security calls onEdit', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -275,7 +296,7 @@ describe('SecurityList', () => {
     it('context menu shows Deactivate for active security without holdings', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -291,7 +312,7 @@ describe('SecurityList', () => {
     it('context menu shows Activate for inactive security without holdings', async () => {
       const securities = [makeSecurity({ isActive: false })];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -307,7 +328,7 @@ describe('SecurityList', () => {
       const securities = [makeSecurity()];
       const holdings = { s1: 50 };
 
-      render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -325,7 +346,7 @@ describe('SecurityList', () => {
     it('context menu Deactivate calls onToggleActive', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -342,7 +363,7 @@ describe('SecurityList', () => {
     it('does not open context menu if mouse released before 750ms', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -359,7 +380,7 @@ describe('SecurityList', () => {
   // --- New tests for improved coverage ---
 
   it('renders empty state with descriptive text', () => {
-    render(<SecurityList securities={[]} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={[]} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     expect(screen.getByText('No securities')).toBeInTheDocument();
     expect(screen.getByText('Get started by adding your first security.')).toBeInTheDocument();
   });
@@ -367,7 +388,7 @@ describe('SecurityList', () => {
   it('shows dash for security without securityType', () => {
     const securities = [makeSecurity({ securityType: null })];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     // Type column shows "-" when null; the Provider column also renders "-",
     // so multiple dashes may be present.
     expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(1);
@@ -376,7 +397,7 @@ describe('SecurityList', () => {
   it('shows dash for security without exchange', () => {
     const securities = [makeSecurity({ exchange: null })];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
     // Exchange column shows "-" when null (provider column may also be "-").
     expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(1);
   });
@@ -384,7 +405,7 @@ describe('SecurityList', () => {
   it('renders all table headers in normal density', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
     expect(screen.getByText('Symbol')).toBeInTheDocument();
     expect(screen.getByText('Name')).toBeInTheDocument();
     expect(screen.getByText('Type')).toBeInTheDocument();
@@ -397,19 +418,19 @@ describe('SecurityList', () => {
 
   it('renders MSN badge in the Provider column when security has an MSN override', () => {
     const securities = [makeSecurity({ quoteProvider: 'msn' })];
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
     expect(screen.getByText('MSN')).toBeInTheDocument();
   });
 
   it('renders Yahoo badge in the Provider column when security has a Yahoo override', () => {
     const securities = [makeSecurity({ quoteProvider: 'yahoo' })];
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
     expect(screen.getByText('Yahoo')).toBeInTheDocument();
   });
 
   it('shows the default provider (inherited) when security has no override', () => {
     const securities = [makeSecurity({ quoteProvider: null })];
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
     // Default in tests is "yahoo" (preferences store mock returns undefined → '?? yahoo').
     const yahooBadge = screen.getByText('Yahoo');
     expect(yahooBadge).toBeInTheDocument();
@@ -421,7 +442,7 @@ describe('SecurityList', () => {
   it('hides exchange and currency headers in compact density', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="compact" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="compact" />);
     expect(screen.queryByText('Exchange')).not.toBeInTheDocument();
     expect(screen.queryByText('Currency')).not.toBeInTheDocument();
     // These should still be visible
@@ -432,7 +453,7 @@ describe('SecurityList', () => {
   it('hides exchange and currency headers in dense density', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="dense" />);
     expect(screen.queryByText('Exchange')).not.toBeInTheDocument();
     expect(screen.queryByText('Currency')).not.toBeInTheDocument();
   });
@@ -440,7 +461,7 @@ describe('SecurityList', () => {
   it('applies opacity to inactive securities', () => {
     const securities = [makeSecurity({ isActive: false })];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     const row = screen.getByText('AAPL').closest('tr')!;
     expect(row.className).toContain('opacity-60');
   });
@@ -448,7 +469,7 @@ describe('SecurityList', () => {
   it('does not apply opacity to active securities', () => {
     const securities = [makeSecurity({ isActive: true })];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     const row = screen.getByText('AAPL').closest('tr')!;
     expect(row.className).not.toContain('opacity-60');
   });
@@ -456,14 +477,14 @@ describe('SecurityList', () => {
   it('shows abbreviated status badge in dense mode for active security', () => {
     const securities = [makeSecurity({ isActive: true })];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="dense" />);
     expect(screen.getByText('Act')).toBeInTheDocument();
   });
 
   it('shows abbreviated status badge in dense mode for inactive security', () => {
     const securities = [makeSecurity({ isActive: false })];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="dense" />);
     expect(screen.getByText('Ina')).toBeInTheDocument();
   });
 
@@ -474,7 +495,7 @@ describe('SecurityList', () => {
       makeSecurity({ id: 's3', symbol: 'GOOG', name: 'Alphabet Inc.' }),
     ];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     const rows = screen.getAllByRole('row');
     // rows[0] = header, rows[1..3] = data rows
     expect(rows[1]).toHaveTextContent('AAPL');
@@ -485,7 +506,7 @@ describe('SecurityList', () => {
   it('cycles density from dense back to normal', () => {
     const securities = [makeSecurity()];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
 
     // Start at Normal
     fireEvent.click(screen.getByText('Normal'));
@@ -508,7 +529,7 @@ describe('SecurityList', () => {
       makeSecurity({ id: 's6', securityType: 'OTHER' }),
     ];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="dense" />);
 
     expect(screen.getByText('Stk')).toBeInTheDocument();
     expect(screen.getByText('ETF')).toBeInTheDocument();
@@ -521,7 +542,7 @@ describe('SecurityList', () => {
   it('calls onToggleActive when activate button clicked for inactive security', () => {
     const securities = [makeSecurity({ isActive: false })];
 
-    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+    render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
     fireEvent.click(screen.getByText('Activate'));
     expect(onToggleActive).toHaveBeenCalledWith(expect.objectContaining({ isActive: false }));
   });
@@ -530,7 +551,7 @@ describe('SecurityList', () => {
     it('renders sortable column headers', () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const symbolHeader = screen.getByText('Symbol');
       const nameHeader = screen.getByText('Name');
       const typeHeader = screen.getByText('Type');
@@ -543,7 +564,7 @@ describe('SecurityList', () => {
       const onSort = vi.fn();
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onSort={onSort} sortField="symbol" sortDirection="asc" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onSort={onSort} sortField="symbol" sortDirection="asc" />);
       fireEvent.click(screen.getByText('Name'));
       expect(onSort).toHaveBeenCalledWith('name');
     });
@@ -552,7 +573,7 @@ describe('SecurityList', () => {
       const onSort = vi.fn();
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onSort={onSort} sortField="symbol" sortDirection="asc" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onSort={onSort} sortField="symbol" sortDirection="asc" />);
       fireEvent.click(screen.getByText('Symbol'));
       expect(onSort).toHaveBeenCalledWith('symbol');
     });
@@ -563,7 +584,7 @@ describe('SecurityList', () => {
         makeSecurity({ id: 's2', symbol: 'MSFT', name: 'Microsoft Corp.' }),
       ];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       // Click Name header to sort - should not throw
       fireEvent.click(screen.getByText('Name'));
     });
@@ -572,7 +593,7 @@ describe('SecurityList', () => {
       const onSort = vi.fn();
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onSort={onSort} sortField="symbol" sortDirection="asc" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onSort={onSort} sortField="symbol" sortDirection="asc" />);
       fireEvent.click(screen.getByText('Shares'));
       expect(onSort).toHaveBeenCalledWith('shares');
     });
@@ -590,7 +611,7 @@ describe('SecurityList', () => {
     it('cancels long press when touch moves beyond threshold', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -608,7 +629,7 @@ describe('SecurityList', () => {
     it('cancels long press on mouse leave', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -624,7 +645,7 @@ describe('SecurityList', () => {
     it('cancels long press on touch cancel', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -640,7 +661,7 @@ describe('SecurityList', () => {
     it('does NOT cancel long press when touch movement is below threshold', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -658,7 +679,7 @@ describe('SecurityList', () => {
     it('handles touchStart without touches array gracefully', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -674,7 +695,7 @@ describe('SecurityList', () => {
     it('touch end cancels the long press timer', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -688,46 +709,12 @@ describe('SecurityList', () => {
     });
   });
 
-  describe('onViewPrices', () => {
-    it('shows Prices button in row when onViewPrices provided', () => {
-      const onViewPrices = vi.fn();
-      const securities = [makeSecurity()];
-
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onViewPrices={onViewPrices} />);
-      expect(screen.getByText('Prices')).toBeInTheDocument();
-    });
-
-    it('calls onViewPrices when Prices button clicked', () => {
-      const onViewPrices = vi.fn();
-      const securities = [makeSecurity()];
-
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onViewPrices={onViewPrices} />);
-      fireEvent.click(screen.getByText('Prices'));
-      expect(onViewPrices).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'AAPL' }));
-    });
-
-    it('shows the prices icon button in dense mode when onViewPrices provided', () => {
-      const onViewPrices = vi.fn();
-      const securities = [makeSecurity()];
-
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onViewPrices={onViewPrices} density="dense" />);
-      expect(screen.getByRole('button', { name: 'Prices' })).toBeInTheDocument();
-    });
-
-    it('does not show Prices button when onViewPrices not provided', () => {
-      const securities = [makeSecurity()];
-
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
-      expect(screen.queryByText('Prices')).not.toBeInTheDocument();
-    });
-  });
-
   describe('onDelete', () => {
     it('shows Delete button when security has no holdings and no transactions', () => {
       const onDelete = vi.fn();
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onDelete={onDelete} />);
       expect(screen.getByText('Delete')).toBeInTheDocument();
     });
 
@@ -735,7 +722,7 @@ describe('SecurityList', () => {
       const onDelete = vi.fn();
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onDelete={onDelete} />);
       fireEvent.click(screen.getByText('Delete'));
       expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'AAPL' }));
     });
@@ -745,7 +732,7 @@ describe('SecurityList', () => {
       const securities = [makeSecurity()];
       const holdings = { s1: 10 };
 
-      render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} />);
+      render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onDelete={onDelete} />);
       expect(screen.queryByText('Delete')).not.toBeInTheDocument();
     });
 
@@ -754,14 +741,14 @@ describe('SecurityList', () => {
       const securities = [makeSecurity()];
       const transactionSecurityIds = new Set(['s1']);
 
-      render(<SecurityList securities={securities} transactionSecurityIds={transactionSecurityIds} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} />);
+      render(<SecurityList securities={securities} transactionSecurityIds={transactionSecurityIds} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onDelete={onDelete} />);
       expect(screen.queryByText('Delete')).not.toBeInTheDocument();
     });
 
     it('does not show Delete button when onDelete not provided', () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       expect(screen.queryByText('Delete')).not.toBeInTheDocument();
     });
   });
@@ -769,7 +756,7 @@ describe('SecurityList', () => {
   describe('lastPriceSource badges in normal density', () => {
     it('renders Yahoo price source badge', () => {
       const securities = [makeSecurity({ lastPriceSource: 'yahoo_finance' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       // Yahoo appears as Provider badge (from quoteProvider=null→default yahoo) AND as lastPriceSource badge
       const yahooEls = screen.getAllByText('Yahoo');
       expect(yahooEls.length).toBeGreaterThanOrEqual(1);
@@ -777,55 +764,55 @@ describe('SecurityList', () => {
 
     it('renders MSN price source badge', () => {
       const securities = [makeSecurity({ lastPriceSource: 'msn_finance', quoteProvider: 'yahoo' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('MSN')).toBeInTheDocument();
     });
 
     it('renders Manual price source badge', () => {
       const securities = [makeSecurity({ lastPriceSource: 'manual', quoteProvider: 'yahoo' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Manual')).toBeInTheDocument();
     });
 
     it('renders Txn badge for buy source', () => {
       const securities = [makeSecurity({ lastPriceSource: 'buy', quoteProvider: 'yahoo' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Txn')).toBeInTheDocument();
     });
 
     it('renders Txn badge for sell source', () => {
       const securities = [makeSecurity({ lastPriceSource: 'sell', quoteProvider: 'yahoo' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Txn')).toBeInTheDocument();
     });
 
     it('renders Txn badge for reinvest source', () => {
       const securities = [makeSecurity({ lastPriceSource: 'reinvest', quoteProvider: 'yahoo' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Txn')).toBeInTheDocument();
     });
 
     it('renders Txn badge for transfer_in source', () => {
       const securities = [makeSecurity({ lastPriceSource: 'transfer_in', quoteProvider: 'yahoo' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Txn')).toBeInTheDocument();
     });
 
     it('renders Txn badge for transfer_out source', () => {
       const securities = [makeSecurity({ lastPriceSource: 'transfer_out', quoteProvider: 'yahoo' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Txn')).toBeInTheDocument();
     });
 
     it('renders raw source string for unknown source', () => {
       const securities = [makeSecurity({ lastPriceSource: 'some_other_feed', quoteProvider: 'yahoo' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('some_other_feed')).toBeInTheDocument();
     });
 
     it('renders dash when lastPriceSource is null', () => {
       const securities = [makeSecurity({ lastPriceSource: null, quoteProvider: 'yahoo' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       // Source column shows "-" when null
       expect(screen.getAllByText('-').length).toBeGreaterThanOrEqual(1);
     });
@@ -834,13 +821,13 @@ describe('SecurityList', () => {
   describe('density button label and row striping', () => {
     it('shows Compact label on density button in compact mode', () => {
       const securities = [makeSecurity()];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="compact" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="compact" />);
       expect(screen.getByText('Compact')).toBeInTheDocument();
     });
 
     it('shows Dense label on density button in dense mode', () => {
       const securities = [makeSecurity()];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="dense" />);
       expect(screen.getByText('Dense')).toBeInTheDocument();
     });
 
@@ -849,7 +836,7 @@ describe('SecurityList', () => {
         makeSecurity({ id: 's1', symbol: 'AAPL' }),
         makeSecurity({ id: 's2', symbol: 'MSFT' }),
       ];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="compact" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="compact" />);
       const rows = screen.getAllByRole('row');
       // rows[0] = header, rows[1] = index 0 (no stripe), rows[2] = index 1 (stripe)
       expect(rows[2].className).toContain('bg-gray-50');
@@ -859,7 +846,7 @@ describe('SecurityList', () => {
   describe('sorting with local state', () => {
     it('toggles sort direction when same field clicked twice', () => {
       const securities = [makeSecurity()];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
 
       // Click Symbol once to sort asc (already default), click again to toggle desc
       const symbolHeader = screen.getByText('Symbol').closest('th')!;
@@ -870,34 +857,34 @@ describe('SecurityList', () => {
 
     it('clicks Exchange header in normal density', () => {
       const securities = [makeSecurity()];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       const exchangeHeader = screen.getByText('Exchange').closest('th')!;
       fireEvent.click(exchangeHeader);
     });
 
     it('clicks Currency header in normal density', () => {
       const securities = [makeSecurity()];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       const currencyHeader = screen.getByText('Currency').closest('th')!;
       fireEvent.click(currencyHeader);
     });
 
     it('clicks Provider header in normal density', () => {
       const securities = [makeSecurity()];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       const providerHeader = screen.getByText('Provider').closest('th')!;
       fireEvent.click(providerHeader);
     });
 
     it('clicks Source header in normal density', () => {
       const securities = [makeSecurity()];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       const sourceHeader = screen.getByText('Source').closest('th')!;
       fireEvent.click(sourceHeader);
     });
   });
 
-  describe('context menu with onViewPrices and onDelete', () => {
+  describe('context menu with onDelete', () => {
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -906,42 +893,11 @@ describe('SecurityList', () => {
       vi.useRealTimers();
     });
 
-    it('shows View Prices in context menu when onViewPrices provided', async () => {
-      const onViewPrices = vi.fn();
-      const securities = [makeSecurity()];
-
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onViewPrices={onViewPrices} />);
-      const row = screen.getByText('AAPL').closest('tr')!;
-
-      await act(async () => {
-        fireEvent.mouseDown(row);
-        vi.advanceTimersByTime(750);
-      });
-
-      expect(screen.getByText('View Prices')).toBeInTheDocument();
-    });
-
-    it('calls onViewPrices from context menu', async () => {
-      const onViewPrices = vi.fn();
-      const securities = [makeSecurity()];
-
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onViewPrices={onViewPrices} />);
-      const row = screen.getByText('AAPL').closest('tr')!;
-
-      await act(async () => {
-        fireEvent.mouseDown(row);
-        vi.advanceTimersByTime(750);
-      });
-
-      fireEvent.click(screen.getByText('View Prices'));
-      expect(onViewPrices).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'AAPL' }));
-    });
-
     it('shows Delete in context menu when security can be deleted', async () => {
       const onDelete = vi.fn();
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onDelete={onDelete} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -956,7 +912,7 @@ describe('SecurityList', () => {
       const onDelete = vi.fn();
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onDelete={onDelete} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -975,7 +931,7 @@ describe('SecurityList', () => {
       const securities = [makeSecurity()];
       const holdings = { s1: 5 };
 
-      render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} />);
+      render(<SecurityList securities={securities} holdings={holdings} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onDelete={onDelete} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -993,7 +949,7 @@ describe('SecurityList', () => {
       const securities = [makeSecurity()];
       const transactionSecurityIds = new Set(['s1']);
 
-      render(<SecurityList securities={securities} transactionSecurityIds={transactionSecurityIds} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} />);
+      render(<SecurityList securities={securities} transactionSecurityIds={transactionSecurityIds} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onDelete={onDelete} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -1008,7 +964,7 @@ describe('SecurityList', () => {
     it('shows Activate in context menu for inactive security without holdings', async () => {
       const securities = [makeSecurity({ isActive: false })];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -1024,7 +980,7 @@ describe('SecurityList', () => {
     it('calls onToggleActive from context menu for inactive security', async () => {
       const securities = [makeSecurity({ isActive: false })];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -1040,7 +996,7 @@ describe('SecurityList', () => {
     it('context menu closes when modal onClose is triggered', async () => {
       const securities = [makeSecurity()];
 
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const row = screen.getByText('AAPL').closest('tr')!;
 
       await act(async () => {
@@ -1062,37 +1018,37 @@ describe('SecurityList', () => {
   describe('security type full labels in normal density', () => {
     it('renders STOCK full label', () => {
       const securities = [makeSecurity({ securityType: 'STOCK' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Stock')).toBeInTheDocument();
     });
 
     it('renders BOND full label', () => {
       const securities = [makeSecurity({ securityType: 'BOND' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Bond')).toBeInTheDocument();
     });
 
     it('renders OPTION full label', () => {
       const securities = [makeSecurity({ securityType: 'OPTION' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Option')).toBeInTheDocument();
     });
 
     it('renders CRYPTO full label', () => {
       const securities = [makeSecurity({ securityType: 'CRYPTO' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Crypto')).toBeInTheDocument();
     });
 
     it('renders OTHER full label', () => {
       const securities = [makeSecurity({ securityType: 'OTHER' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('Other')).toBeInTheDocument();
     });
 
     it('renders unknown security type as-is', () => {
       const securities = [makeSecurity({ securityType: 'CUSTOM_TYPE' })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="normal" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="normal" />);
       expect(screen.getByText('CUSTOM_TYPE')).toBeInTheDocument();
     });
   });
@@ -1100,39 +1056,39 @@ describe('SecurityList', () => {
   describe('dense mode action labels', () => {
     it('shows pencil icon in Edit button in dense mode', () => {
       const securities = [makeSecurity()];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="dense" />);
       // Dense mode renders '✎' instead of 'Edit'
       expect(screen.queryByText('Edit')).not.toBeInTheDocument();
     });
 
     it('shows deactivate icon in dense mode for active security', () => {
       const securities = [makeSecurity({ isActive: true })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="dense" />);
       expect(screen.queryByText('Deactivate')).not.toBeInTheDocument();
     });
 
     it('shows activate icon in dense mode for inactive security', () => {
       const securities = [makeSecurity({ isActive: false })];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} density="dense" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} density="dense" />);
       expect(screen.queryByText('Activate')).not.toBeInTheDocument();
     });
 
     it('shows delete icon in dense mode when security can be deleted', () => {
       const onDelete = vi.fn();
       const securities = [makeSecurity()];
-      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onDelete={onDelete} density="dense" />);
+      render(<SecurityList securities={securities} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} onDelete={onDelete} density="dense" />);
       expect(screen.queryByText('Delete')).not.toBeInTheDocument();
     });
   });
 
   describe('favourite column', () => {
     it('renders an "Add to favourites" star for a non-favourite security', () => {
-      render(<SecurityList securities={[makeSecurity()]} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={[makeSecurity()]} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       expect(screen.getByTitle('Add to favourites')).toBeInTheDocument();
     });
 
     it('renders a filled star (Remove from favourites) for a favourite security', () => {
-      render(<SecurityList securities={[makeSecurity({ isFavourite: true })]} onEdit={onEdit} onToggleActive={onToggleActive} />);
+      render(<SecurityList securities={[makeSecurity({ isFavourite: true })]} onEdit={onEdit} onToggleActive={onToggleActive} onOpen={onOpen} />);
       const btn = screen.getByTitle('Remove from favourites');
       expect(btn).toBeInTheDocument();
       expect(btn.getAttribute('aria-pressed')).toBe('true');
@@ -1144,7 +1100,7 @@ describe('SecurityList', () => {
         <SecurityList
           securities={[makeSecurity()]}
           onEdit={onEdit}
-          onToggleActive={onToggleActive}
+          onToggleActive={onToggleActive} onOpen={onOpen}
           onToggleFavourite={onToggleFavourite}
         />,
       );
@@ -1158,7 +1114,7 @@ describe('SecurityList', () => {
         <SecurityList
           securities={[makeSecurity()]}
           onEdit={onEdit}
-          onToggleActive={onToggleActive}
+          onToggleActive={onToggleActive} onOpen={onOpen}
           onToggleFavourite={onToggleFavourite}
         />,
       );

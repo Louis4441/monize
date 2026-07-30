@@ -1,0 +1,244 @@
+{
+  "loading": "Effect wordt geladen...",
+  "loadFailed": "Dit effect kon niet worden geladen",
+  "notFound": "Effect niet gevonden",
+  "backToSecurities": "Effecten",
+  "error": {
+    "retry": "Opnieuw proberen"
+  },
+  "header": {
+    "priceAt": "Koers van {date}",
+    "noPrice": "Nog geen koers vastgelegd",
+    "changeToday": "{change} ({percent}) vandaag",
+    "changeLast": "{change} ({percent}) laatste beweging",
+    "inactiveBadge": "Inactief",
+    "edit": "Bewerken",
+    "favourites": "Favorieten",
+    "switchSecurity": "Naar een ander effect gaan",
+    "switchPlaceholder": "Filter op symbool of naam...",
+    "switchNoMatches": "Geen effecten gevonden"
+  },
+  "toasts": {
+    "favouriteAdded": "Toegevoegd aan je favorieten",
+    "favouriteRemoved": "Verwijderd uit je favorieten",
+    "favouriteFailed": "Je favorieten konden niet worden bijgewerkt"
+  },
+  "cards": {
+    "marketValue": "Marktwaarde",
+    "costBasis": "Kostprijs",
+    "unrealizedPl": "Ongerealiseerde W/V",
+    "units": "Stukken",
+    "avgCostPerUnit": "Gem. kostprijs / stuk",
+    "heldInAccounts": "Aangehouden in rekeningen",
+    "openAccount": "{name} op de pagina Beleggingen laten zien",
+    "unitsShare": "{units} ({share})",
+    "valueUnknown": "Geen koers",
+    "approx": "~ {amount}",
+    "asOf": "Op de slotkoers van {date}",
+    "asOfStale": "Op de slotkoers van {date}, de meest recente vastgelegde koers",
+    "asOfStaleTitle": "Er is geen nieuwere koers opgeslagen, dus dit is wat de positie op die dag waard was en niet vandaag. Werk de koersen bij via de aanbieder of voeg er met de hand een toe."
+  },
+  "chart": {
+    "title": "Koers van {symbol}",
+    "seriesAriaLabel": "Reeks van de grafiek",
+    "modes": {
+      "price": "Koers",
+      "value": "Waarde van de belegging",
+      "return": "Rendement"
+    },
+    "titles": {
+      "price": "Koers",
+      "value": "Waarde van de belegging",
+      "return": "Rendement"
+    },
+    "summary": {
+      "first": "Eerste",
+      "latest": "Laatste",
+      "ending": "Slot",
+      "lowest": "Laagste"
+    },
+    "panEarlier": "Het vorige stuk van de historie laten zien",
+    "panLater": "Het volgende stuk van de historie laten zien"
+  },
+  "keyInfo": {
+    "title": "Kerngegevens",
+    "symbol": "Symbool",
+    "securityType": "Soort effect",
+    "distributions": "Uitkeringen",
+    "distributing": "Uitgekeerd (waargenomen)",
+    "accumulating": "Geen (accumulerend)",
+    "distributionsTitle": "Uit de koershistorie gelezen: de aangepaste slotkoers wijkt af van de genoteerde slotkoers zodra er een uitkering wordt gedaan. Afgeleid uit de gegevens, niet opgegeven door de uitgevende instelling.",
+    "exchange": "Beurs",
+    "currency": "Valuta",
+    "sector": "Sector",
+    "industry": "Bedrijfstak",
+    "provider": "Aanbieder",
+    "lastPrice": "Laatste koers"
+  },
+  "tabs": {
+    "ariaLabel": "Onderdelen van het effect",
+    "overview": "Overzicht",
+    "transactions": "Transacties",
+    "prices": "Koershistorie",
+    "documents": "Documenten",
+    "news": "Nieuws"
+  },
+  "about": {
+    "title": "Over",
+    "noDescription": "Voor dit effect is geen omschrijving opgeslagen.",
+    "sector": "Sector",
+    "industry": "Bedrijfstak",
+    "country": "Land",
+    "website": "Website",
+    "irWebsite": "Website investor relations",
+    "tags": "Labels",
+    "notStored": "Nog niet opgeslagen"
+  },
+  "performance": {
+    "title": "Rendement van het effect",
+    "subject": "Hoe het instrument zelf bewoog, of je het aanhield of niet. Wat je eigen positie opbracht staat onder Totaalrendement.",
+    "empty": "Nog te weinig koershistorie om een rendement te meten.",
+    "unavailable": "n.v.t.",
+    "periods": {
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Dit jaar",
+      "1y": "1J",
+      "3y": "3J",
+      "5y": "5J"
+    },
+    "includesDividends": "Inclusief dividend",
+    "excludesDividends": "Zonder dividend",
+    "excludesDividendsTitle": "Deze aanbieder levert geen reeks aangepaste slotkoersen, dus deze rendementen zijn alleen op de koers gemeten. Bij een uitkerend fonds geven ze het rendement te laag weer, met het hele uitkeringspercentage."
+  },
+  "positionInfo": {
+    "title": "Gegevens van de positie",
+    "firstTransaction": "Eerste transactie",
+    "lastTransaction": "Laatste transactie",
+    "totalInvested": "Totaal ingelegd",
+    "totalSold": "Totaal verkocht",
+    "dividends": "Dividend",
+    "fees": "Kosten",
+    "realizedPl": "Gerealiseerde W/V",
+    "realizedMixed": "Gerealiseerd in {currencies}, dus niet opgeteld",
+    "totalReturn": "Totaalrendement",
+    "totalReturnValue": "{amount} ({percent})",
+    "totalReturnTitle": "De ongerealiseerde winst, plus wat je bij verkopen realiseerde en aan inkomsten ontving, minus kosten, ten opzichte van het ingelegde kapitaal. Een eenvoudig rendement op dat kapitaal: het is niet op jaarbasis gezet en weegt tranches niet naar hoe lang je ze aanhield.",
+    "status": "Status",
+    "statusOpen": "Open",
+    "statusClosed": "Gesloten",
+    "statusNone": "Nooit aangehouden"
+  },
+  "accounts": {
+    "title": "Rekeningen",
+    "closedSuffix": "{name} (gesloten)",
+    "total": "Totaal",
+    "columns": {
+      "account": "Rekening",
+      "currency": "Valuta",
+      "units": "Stukken",
+      "avgCost": "Gem. kostprijs / stuk",
+      "marketValue": "Marktwaarde",
+      "costBasis": "Kostprijs",
+      "unrealizedPl": "Ongerealiseerde W/V"
+    }
+  },
+  "closed": {
+    "title": "Positie gesloten",
+    "description": "Je houdt dit effect niet meer aan. De historie blijft hieronder beschikbaar.",
+    "realizedPl": "Gerealiseerde W/V",
+    "heldFrom": "Aangehouden vanaf",
+    "heldRange": "{start} tot {end}"
+  },
+  "empty": {
+    "noPosition": "Geen positiegegevens",
+    "noPositionHint": "Je hebt voor dit effect nog geen transacties vastgelegd.",
+    "noPrices": "Geen koershistorie beschikbaar",
+    "noPricesHint": "Voeg met de hand een koers toe of werk de koersen bij via de aanbieder.",
+    "noTransactions": "Nog geen transacties",
+    "noAccounts": "Dit effect wordt in geen enkele rekening aangehouden."
+  },
+  "weightings": {
+    "title": "Opbouw",
+    "ariaLabel": "Dimensie van de opbouw",
+    "sectorTab": "Sector",
+    "countryTab": "Land",
+    "assetClassTab": "Beleggingscategorie",
+    "sectorEmpty": "Er is geen sectoropbouw opgeslagen. Monize vult die voor fondsen en ETF's aan via de aanbieder.",
+    "countryEmpty": "Er is geen landenopbouw opgeslagen. Je kunt die invoeren bij het bewerken van het effect.",
+    "assetClassEmpty": "Er is nog geen opbouw naar beleggingscategorie opgeslagen.",
+    "remainder": "{percent} niet ingedeeld"
+  },
+  "documents": {
+    "title": "Documenten",
+    "add": "Document toevoegen",
+    "loadFailed": "De documenten van dit effect konden niet worden geladen",
+    "noDate": "Geen datum",
+    "columns": {
+      "type": "Soort",
+      "name": "Naam",
+      "date": "Datum",
+      "address": "Adres",
+      "actions": "Acties"
+    },
+    "types": {
+      "FACTSHEET": "Factsheet",
+      "KIID": "EBI",
+      "PROSPECTUS": "Prospectus",
+      "ANNUAL_REPORT": "Jaarverslag",
+      "SEMI_ANNUAL_REPORT": "Halfjaarverslag",
+      "TAX": "Belastingdocument",
+      "RESEARCH": "Analyse",
+      "OTHER": "Overig"
+    },
+    "actions": {
+      "open": "Openen",
+      "openNamed": "{name} in een nieuw tabblad openen",
+      "edit": "Bewerken",
+      "delete": "Verwijderen"
+    },
+    "empty": {
+      "title": "Nog geen documenten",
+      "description": "Houd de papieren van dit effect op één plek: de factsheet, de EBI, een prospectus, een jaarverslag, een belastingopgave. Elk daarvan is een link die je hiervandaan direct opent.",
+      "action": "Het eerste document toevoegen"
+    },
+    "form": {
+      "addTitle": "Document toevoegen",
+      "editTitle": "Document bewerken",
+      "date": "Datum van het document",
+      "dateHint": "De datum op het document zelf, niet die van vandaag. Laat leeg als het er geen heeft.",
+      "url": "Adres",
+      "notes": "Notities",
+      "create": "Document toevoegen",
+      "save": "Document opslaan"
+    },
+    "validation": {
+      "nameRequired": "Geef het document een naam",
+      "urlRequired": "Een adres is verplicht",
+      "urlScheme": "Het adres moet met http:// of https:// beginnen"
+    },
+    "delete": {
+      "title": "Document verwijderen?",
+      "message": "Hiermee verdwijnt de link naar „{name}”. Het document zelf blijft ongemoeid."
+    },
+    "toasts": {
+      "created": "Document toegevoegd",
+      "updated": "Document bijgewerkt",
+      "deleted": "Document verwijderd",
+      "saveFailed": "Het document kon niet worden opgeslagen",
+      "deleteFailed": "Het document kon niet worden verwijderd"
+    }
+  },
+  "news": {
+    "title": "Nieuws waarin {symbol} wordt genoemd",
+    "subject": "De aanbieder hangt een bericht aan elk symbool dat erin voorkomt, dus sommige gaan over een ander bedrijf dat dit noemt.",
+    "loadFailed": "Het nieuws voor dit effect kon niet worden geladen",
+    "video": "Video",
+    "alsoMentions": "Noemt ook {tickers}",
+    "unsupportedProvider": "De koersaanbieder van dit effect levert geen nieuws. Zet je hem bij het bewerken op Yahoo, dan verschijnen hier koppen.",
+    "empty": {
+      "title": "Op dit moment geen koppen",
+      "description": "Er is recent niets over dit symbool gepubliceerd. De lijst wordt verversd als je terugkomt."
+    }
+  }
+}

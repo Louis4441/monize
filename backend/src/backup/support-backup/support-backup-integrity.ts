@@ -189,6 +189,9 @@ const REFS: Record<string, RefRule[]> = {
   security_prices: [
     { column: "security_id", refTable: "securities", onMissing: "dropRow" },
   ],
+  security_documents: [
+    { column: "security_id", refTable: "securities", onMissing: "dropRow" },
+  ],
   security_tags: [
     { column: "security_id", refTable: "securities", onMissing: "dropRow" },
     { column: "tag_id", refTable: "tags", onMissing: "dropRow" },

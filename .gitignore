@@ -4,7 +4,12 @@
 !.env.example
 
 # Dependencies
+# Both forms on purpose: `node_modules/` matches the real directory, and the
+# bare name also matches a *symlink* called node_modules -- which is how a git
+# worktree shares one install with the main checkout, and how two of them got
+# committed by an `add` with an explicit pathspec.
 node_modules/
+node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

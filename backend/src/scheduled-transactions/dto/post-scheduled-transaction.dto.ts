@@ -123,7 +123,7 @@ export class PostScheduledTransactionDto {
     description: "Override price for this posting only (investment kind)",
   })
   @IsOptional()
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0)
   @Max(999999999999)
   investmentPrice?: number;

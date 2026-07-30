@@ -119,8 +119,8 @@ export class InvestmentTransaction {
   @ApiProperty({ example: 150.25, description: "Price per share" })
   @Column({
     type: "decimal",
-    precision: 20,
-    scale: 6,
+    precision: 24,
+    scale: 10,
     nullable: true,
     transformer: numericTransformer,
   })

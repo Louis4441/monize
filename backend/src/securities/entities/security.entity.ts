@@ -126,6 +126,24 @@ export class Security {
   sectorDataUpdatedAt: Date | null;
 
   @ApiProperty({
+    example: "https://www.apple.com",
+    description:
+      "The issuer's or product's own page. Auto-filled from Yahoo's summaryProfile where the provider has one, which in practice means shares; for ETFs and funds it stays empty unless the user types it.",
+    nullable: true,
+  })
+  @Column({ type: "varchar", length: 2048, nullable: true })
+  website: string | null;
+
+  @ApiProperty({
+    example: "https://investor.apple.com",
+    description:
+      "The investor-relations page. Manual by nature: no quote provider publishes one, and deriving it from the domain would produce a link that mostly 404s.",
+    nullable: true,
+  })
+  @Column({ type: "varchar", length: 2048, name: "ir_website", nullable: true })
+  irWebsite: string | null;
+
+  @ApiProperty({
     example: "yahoo",
     description:
       "Per-security quote provider override ('yahoo' | 'msn'); NULL = use user default",

@@ -1,0 +1,244 @@
+{
+  "loading": "Loading security...",
+  "loadFailed": "Failed to load this security",
+  "notFound": "Security not found",
+  "backToSecurities": "Securities",
+  "error": {
+    "retry": "Retry"
+  },
+  "header": {
+    "priceAt": "Price at {date}",
+    "noPrice": "No price recorded yet",
+    "changeToday": "{change} ({percent}) today",
+    "changeLast": "{change} ({percent}) last move",
+    "inactiveBadge": "Inactive",
+    "edit": "Edit",
+    "favourites": "Favourites",
+    "switchSecurity": "Switch to another security",
+    "switchPlaceholder": "Filter by symbol or name...",
+    "switchNoMatches": "No securities match"
+  },
+  "toasts": {
+    "favouriteAdded": "Added to your favourites",
+    "favouriteRemoved": "Removed from your favourites",
+    "favouriteFailed": "Could not update your favourites"
+  },
+  "cards": {
+    "marketValue": "Market value",
+    "costBasis": "Cost basis",
+    "unrealizedPl": "Unrealized P/L",
+    "units": "Units",
+    "avgCostPerUnit": "Avg. cost / unit",
+    "heldInAccounts": "Held in accounts",
+    "openAccount": "Show {name} on the Investments page",
+    "unitsShare": "{units} ({share})",
+    "valueUnknown": "Not priced",
+    "approx": "~ {amount}",
+    "asOf": "At the close of {date}",
+    "asOfStale": "At the close of {date}, the newest price on record",
+    "asOfStaleTitle": "No newer price is stored, so this is what the position was worth on that day rather than today. Update prices from the provider, or add one by hand."
+  },
+  "chart": {
+    "title": "{symbol} price",
+    "seriesAriaLabel": "Chart series",
+    "modes": {
+      "price": "Price",
+      "value": "Investment value",
+      "return": "Return"
+    },
+    "titles": {
+      "price": "Price",
+      "value": "Investment value",
+      "return": "Return"
+    },
+    "summary": {
+      "first": "First",
+      "latest": "Latest",
+      "ending": "Ending",
+      "lowest": "Lowest"
+    },
+    "panEarlier": "Show the previous stretch of history",
+    "panLater": "Show the next stretch of history"
+  },
+  "keyInfo": {
+    "title": "Key information",
+    "symbol": "Symbol",
+    "securityType": "Security type",
+    "distributions": "Distributions",
+    "distributing": "Paid (observed)",
+    "accumulating": "None (accumulating)",
+    "distributionsTitle": "Read from the price history: the adjusted close parts from the quoted close whenever a distribution is paid. Observed from data, not declared by the issuer.",
+    "exchange": "Exchange",
+    "currency": "Currency",
+    "sector": "Sector",
+    "industry": "Industry",
+    "provider": "Provider",
+    "lastPrice": "Last price"
+  },
+  "tabs": {
+    "ariaLabel": "Security sections",
+    "overview": "Overview",
+    "transactions": "Transactions",
+    "prices": "Price history",
+    "documents": "Documents",
+    "news": "News"
+  },
+  "about": {
+    "title": "About",
+    "noDescription": "No description has been saved for this security.",
+    "sector": "Sector",
+    "industry": "Industry",
+    "country": "Country",
+    "website": "Website",
+    "irWebsite": "IR Website",
+    "tags": "Tags",
+    "notStored": "Not stored yet"
+  },
+  "performance": {
+    "title": "Security performance",
+    "subject": "How the instrument itself has moved, whether or not you held it. What your own position made is under Total return.",
+    "empty": "Not enough price history to measure a return yet.",
+    "unavailable": "n/a",
+    "periods": {
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "YTD",
+      "1y": "1Y",
+      "3y": "3Y",
+      "5y": "5Y"
+    },
+    "includesDividends": "Includes dividends",
+    "excludesDividends": "Excludes dividends",
+    "excludesDividendsTitle": "This provider supplies no adjusted-close series, so these returns are measured on price alone. For a fund that pays out, they understate the return by its yield."
+  },
+  "positionInfo": {
+    "title": "Position info",
+    "firstTransaction": "First transaction",
+    "lastTransaction": "Last transaction",
+    "totalInvested": "Total invested",
+    "totalSold": "Total sold",
+    "dividends": "Dividends",
+    "fees": "Fees",
+    "realizedPl": "Realized P/L",
+    "realizedMixed": "Realized in {currencies}, so not added up",
+    "totalReturn": "Total return",
+    "totalReturnValue": "{amount} ({percent})",
+    "totalReturnTitle": "Unrealized gain, plus what you realized on sales and received in income, less fees, over the capital you put in. A simple return on that capital: it is not annualized and does not weight tranches by how long you held them.",
+    "status": "Status",
+    "statusOpen": "Open",
+    "statusClosed": "Closed",
+    "statusNone": "Never held"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "closedSuffix": "{name} (closed)",
+    "total": "Total",
+    "columns": {
+      "account": "Account",
+      "currency": "Currency",
+      "units": "Units",
+      "avgCost": "Avg. cost / unit",
+      "marketValue": "Market value",
+      "costBasis": "Cost basis",
+      "unrealizedPl": "Unrealized P/L"
+    }
+  },
+  "closed": {
+    "title": "Position closed",
+    "description": "You no longer hold this security. Its history stays available below.",
+    "realizedPl": "Realized P/L",
+    "heldFrom": "Held from",
+    "heldRange": "{start} to {end}"
+  },
+  "empty": {
+    "noPosition": "No position data",
+    "noPositionHint": "You have not recorded any transactions for this security yet.",
+    "noPrices": "No price history available",
+    "noPricesHint": "Add a price manually, or update prices from the provider.",
+    "noTransactions": "No transactions yet",
+    "noAccounts": "This security is not held in any account."
+  },
+  "weightings": {
+    "title": "Breakdown",
+    "ariaLabel": "Breakdown dimension",
+    "sectorTab": "Sector",
+    "countryTab": "Country",
+    "assetClassTab": "Asset class",
+    "sectorEmpty": "No sector breakdown is stored. Monize fills this in from the provider for funds and ETFs.",
+    "countryEmpty": "No country breakdown is stored. You can enter one when editing the security.",
+    "assetClassEmpty": "No asset class breakdown is stored yet.",
+    "remainder": "{percent} unclassified"
+  },
+  "documents": {
+    "title": "Documents",
+    "add": "Add document",
+    "loadFailed": "Could not load the documents for this security",
+    "noDate": "No date",
+    "columns": {
+      "type": "Type",
+      "name": "Name",
+      "date": "Date",
+      "address": "Address",
+      "actions": "Actions"
+    },
+    "types": {
+      "FACTSHEET": "Factsheet",
+      "KIID": "KIID",
+      "PROSPECTUS": "Prospectus",
+      "ANNUAL_REPORT": "Annual report",
+      "SEMI_ANNUAL_REPORT": "Semi-annual report",
+      "TAX": "Tax document",
+      "RESEARCH": "Research",
+      "OTHER": "Other"
+    },
+    "actions": {
+      "open": "Open",
+      "openNamed": "Open {name} in a new tab",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "empty": {
+      "title": "No documents yet",
+      "description": "Keep the paperwork for this security in one place: its factsheet, its KIID, a prospectus, an annual report, a tax slip. Each one is a link you can open straight from here.",
+      "action": "Add the first document"
+    },
+    "form": {
+      "addTitle": "Add document",
+      "editTitle": "Edit document",
+      "date": "Document date",
+      "dateHint": "The date on the document itself, not today. Leave it empty if it has none.",
+      "url": "Address",
+      "notes": "Notes",
+      "create": "Add document",
+      "save": "Save document"
+    },
+    "validation": {
+      "nameRequired": "Give the document a name",
+      "urlRequired": "An address is required",
+      "urlScheme": "The address must start with http:// or https://"
+    },
+    "delete": {
+      "title": "Delete document?",
+      "message": "This removes the link to \"{name}\". The document itself is not touched."
+    },
+    "toasts": {
+      "created": "Document added",
+      "updated": "Document updated",
+      "deleted": "Document deleted",
+      "saveFailed": "Could not save the document",
+      "deleteFailed": "Could not delete the document"
+    }
+  },
+  "news": {
+    "title": "News mentioning {symbol}",
+    "subject": "The provider files a story against every ticker it names, so some of these are about another company that mentions this one.",
+    "loadFailed": "Could not load the news for this security",
+    "video": "Video",
+    "alsoMentions": "Also mentions {tickers}",
+    "unsupportedProvider": "The quote provider for this security supplies no news. Switching it to Yahoo, when editing the security, brings headlines here.",
+    "empty": {
+      "title": "No headlines right now",
+      "description": "Nothing has been published against this symbol recently. The list refreshes when you come back to it."
+    }
+  }
+}

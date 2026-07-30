@@ -42,8 +42,8 @@ export class SecurityPrice {
   @ApiProperty({ required: false })
   @Column({
     type: "decimal",
-    precision: 20,
-    scale: 6,
+    precision: 24,
+    scale: 10,
     name: "open_price",
     nullable: true,
   })
@@ -52,8 +52,8 @@ export class SecurityPrice {
   @ApiProperty({ required: false })
   @Column({
     type: "decimal",
-    precision: 20,
-    scale: 6,
+    precision: 24,
+    scale: 10,
     name: "high_price",
     nullable: true,
   })
@@ -62,15 +62,15 @@ export class SecurityPrice {
   @ApiProperty({ required: false })
   @Column({
     type: "decimal",
-    precision: 20,
-    scale: 6,
+    precision: 24,
+    scale: 10,
     name: "low_price",
     nullable: true,
   })
   lowPrice: number;
 
   @ApiProperty()
-  @Column({ type: "decimal", precision: 20, scale: 6, name: "close_price" })
+  @Column({ type: "decimal", precision: 24, scale: 10, name: "close_price" })
   closePrice: number;
 
   /**
@@ -81,8 +81,8 @@ export class SecurityPrice {
   @ApiProperty({ required: false })
   @Column({
     type: "decimal",
-    precision: 20,
-    scale: 6,
+    precision: 24,
+    scale: 10,
     name: "adjusted_close",
     nullable: true,
   })

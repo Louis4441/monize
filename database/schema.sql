@@ -396,6 +396,8 @@ CREATE TABLE securities (
     country_weightings JSONB,        -- manual ETF/fund country breakdown [{name, weight}] (weight is a decimal 0-1)
     asset_weightings JSONB,          -- manual ETF/fund asset-class breakdown [{name, weight}] (free-text names, weight is a decimal 0-1)
     sector_data_updated_at TIMESTAMP, -- cache staleness check
+    website VARCHAR(2048),           -- issuer/product page; auto-filled from Yahoo for shares
+    ir_website VARCHAR(2048),        -- investor-relations page; manual, no provider supplies it
     quote_provider VARCHAR(20),      -- per-security provider override: 'yahoo' | 'msn' | NULL = user default
     msn_instrument_id VARCHAR(50),   -- cached MSN Financial Instrument ID (SecId)
     historical_backfill_attempted_at TIMESTAMP, -- last time we asked the provider for a multi-year backfill
@@ -454,7 +456,7 @@ CREATE TABLE scheduled_transactions (
     investment_security_id UUID REFERENCES securities(id),
     investment_funding_account_id UUID REFERENCES accounts(id), -- alternate cash source (e.g., bank for contribution+buy)
     investment_quantity NUMERIC(20, 8),
-    investment_price NUMERIC(20, 6),
+    investment_price NUMERIC(24, 10),
     investment_commission NUMERIC(20, 4) DEFAULT 0,
     investment_total_amount NUMERIC(20, 4), -- for amount-only actions (DIVIDEND, INTEREST, CAPITAL_GAIN)
     investment_exchange_rate NUMERIC(20, 10),
@@ -485,7 +487,7 @@ CREATE TABLE scheduled_transaction_splits (
     investment_action VARCHAR(50),
     investment_security_id UUID REFERENCES securities(id),
     investment_quantity NUMERIC(20, 8),
-    investment_price NUMERIC(20, 6),
+    investment_price NUMERIC(24, 10),
     investment_commission NUMERIC(20, 4),
     investment_exchange_rate NUMERIC(20, 10),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -542,7 +544,7 @@ CREATE TABLE scheduled_transaction_overrides (
     splits JSONB, -- JSON array of split overrides: [{categoryId, amount, memo}]
     -- Per-occurrence investment overrides (BUY/SELL/REINVEST etc.); NULL means "use base value"
     investment_quantity NUMERIC(20, 8),
-    investment_price NUMERIC(20, 6),
+    investment_price NUMERIC(24, 10),
     investment_total_amount NUMERIC(20, 4),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -553,16 +555,42 @@ CREATE INDEX idx_sched_txn_overrides_sched_txn_id ON scheduled_transaction_overr
 CREATE INDEX idx_sched_txn_overrides_date ON scheduled_transaction_overrides(override_date);
 CREATE INDEX idx_sched_txn_overrides_orig ON scheduled_transaction_overrides(scheduled_transaction_id, original_date);
 
+-- Security documents: factsheet, KIID, prospectus, annual report, tax slip,
+-- research. Real columns rather than a JSONB blob so the type, name, date and
+-- address are all sortable (discussion #964). Linked documents only for now;
+-- uploads need the attachments table generalised beyond transactions first.
+CREATE TABLE security_documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    security_id UUID NOT NULL REFERENCES securities(id) ON DELETE CASCADE,
+    document_type VARCHAR(30) NOT NULL DEFAULT 'OTHER',
+    name VARCHAR(255) NOT NULL,
+    document_date DATE,             -- the date on the document, not when it was added
+    url VARCHAR(2048) NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT security_documents_type_check
+      CHECK (document_type IN (
+        'FACTSHEET','KIID','PROSPECTUS','ANNUAL_REPORT',
+        'SEMI_ANNUAL_REPORT','TAX','RESEARCH','OTHER'
+      ))
+);
+
+CREATE INDEX idx_security_documents_security
+  ON security_documents(security_id, document_date DESC NULLS LAST);
+CREATE INDEX idx_security_documents_user ON security_documents(user_id);
+
 -- Security Prices (historical)
 CREATE TABLE security_prices (
     id BIGSERIAL PRIMARY KEY,
     security_id UUID NOT NULL REFERENCES securities(id) ON DELETE CASCADE,
     price_date DATE NOT NULL,
-    open_price NUMERIC(20, 6),
-    high_price NUMERIC(20, 6),
-    low_price NUMERIC(20, 6),
-    close_price NUMERIC(20, 6) NOT NULL,
-    adjusted_close NUMERIC(20, 6),
+    open_price NUMERIC(24, 10),
+    high_price NUMERIC(24, 10),
+    low_price NUMERIC(24, 10),
+    close_price NUMERIC(24, 10) NOT NULL,
+    adjusted_close NUMERIC(24, 10),
     volume BIGINT,
     source VARCHAR(50), -- yahoo_finance, msn_finance, manual, or transaction action (buy, sell, reinvest, transfer_in, transfer_out)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -578,7 +606,7 @@ CREATE TABLE holdings (
     account_id UUID NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     security_id UUID NOT NULL REFERENCES securities(id),
     quantity NUMERIC(20, 8) NOT NULL DEFAULT 0,
-    average_cost NUMERIC(20, 6), -- average cost per unit
+    average_cost NUMERIC(24, 10), -- average cost per unit
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(account_id, security_id)
@@ -614,7 +642,7 @@ CREATE TABLE investment_transactions (
     action investment_action NOT NULL,
     transaction_date DATE NOT NULL,
     quantity NUMERIC(20, 8),
-    price NUMERIC(20, 6),
+    price NUMERIC(24, 10),
     commission NUMERIC(20, 4) DEFAULT 0,
     total_amount NUMERIC(20, 4) NOT NULL,
     exchange_rate NUMERIC(20, 10) NOT NULL DEFAULT 1,
@@ -956,6 +984,7 @@ CREATE TRIGGER update_transactions_updated_at BEFORE UPDATE ON transactions FOR 
 CREATE TRIGGER update_scheduled_transactions_updated_at BEFORE UPDATE ON scheduled_transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_scheduled_transaction_overrides_updated_at BEFORE UPDATE ON scheduled_transaction_overrides FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_securities_updated_at BEFORE UPDATE ON securities FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER update_security_documents_updated_at BEFORE UPDATE ON security_documents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_holdings_updated_at BEFORE UPDATE ON holdings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_investment_transactions_updated_at BEFORE UPDATE ON investment_transactions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_user_preferences_updated_at BEFORE UPDATE ON user_preferences FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -1694,6 +1723,16 @@ CREATE POLICY scheduled_transaction_overrides_isolation ON scheduled_transaction
 -- history and tags belong to exactly one user despite looking like reference
 -- data. holdings hang off the account, not the security.
 -- ---------------------------------------------------------------------------
+
+-- security_documents carries its own user_id (migration 118)
+DROP POLICY IF EXISTS security_documents_isolation ON security_documents;
+CREATE POLICY security_documents_isolation ON security_documents
+  USING (
+    user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls())
+  )
+  WITH CHECK (
+    user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls())
+  );
 
 -- security_prices -> securities.user_id
 DROP POLICY IF EXISTS security_prices_isolation ON security_prices;

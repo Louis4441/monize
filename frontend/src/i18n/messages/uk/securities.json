@@ -78,8 +78,6 @@
       "source": "Джерело останньої ціни"
     },
     "actions": {
-      "history": "Історія",
-      "prices": "Ціни",
       "edit": "Редагувати",
       "deactivate": "Деактивувати",
       "activate": "Активувати",
@@ -94,8 +92,6 @@
       "subtitle": "Розпочніть, додавши перший цінний папір."
     },
     "contextMenu": {
-      "transactionHistory": "Історія транзакцій",
-      "viewPrices": "Переглянути ціни",
       "editSecurity": "Редагувати цінний папір",
       "deactivate": "Деактивувати",
       "activate": "Активувати",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "Визначається автоматично з тикера; змінюйте лише якщо неправильно",
     "descriptionLabel": "Опис",
     "descriptionPlaceholder": "Нотатки про цей цінний папір.",
+    "websiteLabel": "Сайт",
+    "irWebsiteLabel": "Сайт для інвесторів",
+    "irWebsiteHint": "Жоден постачальник котирувань не подає цю адресу, тож її потрібно ввести.",
     "tagsLabel": "Теги",
     "tagsPlaceholder": "Оберіть теги...",
     "createNewTag": "Створити новий тег...",
@@ -222,7 +221,6 @@
       "sold": "Продаж {quantity} · {account}"
     },
     "empty": "Історія цін відсутня",
-    "showingCount": "Відображається {shown} із {total} цін",
     "columns": {
       "date": "Дата",
       "close": "Закриття",
@@ -231,7 +229,9 @@
       "low": "Мінімум",
       "volume": "Обсяг",
       "source": "Джерело",
-      "actions": "Дії"
+      "actions": "Дії",
+      "adjustedClose": "Скориг. закриття",
+      "adjustedCloseTitle": "Закриття, скориговане на спліти та дивіденди (повна дохідність). Порожньо, коли постачальник цін його не дає."
     },
     "toasts": {
       "added": "Ціну додано",
@@ -251,7 +251,10 @@
       "title": "Видалити ціну",
       "message": "Видалити запис ціни за {date}?",
       "confirmLabel": "Видалити"
-    }
+    },
+    "collapseAll": "Згорнути все",
+    "expandAll": "Розгорнути все",
+    "groupCount": "цін: {count}"
   },
   "transactionHistory": {
     "inactiveBadge": "Неактивний",

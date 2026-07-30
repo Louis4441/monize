@@ -38,7 +38,7 @@ export class TransferSecurityDto {
     description:
       "Per-share cost basis carried to the destination account. Defaults (client-side) to the source holding's average cost so gain/profit reporting is preserved.",
   })
-  @IsNumber({ maxDecimalPlaces: 6 })
+  @IsNumber({ maxDecimalPlaces: 10 })
   @Min(0)
   costPerShare: number;
 

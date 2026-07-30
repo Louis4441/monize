@@ -1,0 +1,244 @@
+{
+  "loading": "Wczytywanie papieru wartościowego...",
+  "loadFailed": "Nie udało się wczytać tego papieru wartościowego",
+  "notFound": "Nie znaleziono papieru wartościowego",
+  "backToSecurities": "Papiery wartościowe",
+  "error": {
+    "retry": "Ponów"
+  },
+  "header": {
+    "priceAt": "Cena z {date}",
+    "noPrice": "Nie zapisano jeszcze żadnej ceny",
+    "changeToday": "{change} ({percent}) dziś",
+    "changeLast": "{change} ({percent}) ostatnia zmiana",
+    "inactiveBadge": "Nieaktywny",
+    "edit": "Edytuj",
+    "favourites": "Ulubione",
+    "switchSecurity": "Przejdź do innego papieru wartościowego",
+    "switchPlaceholder": "Filtruj po symbolu lub nazwie...",
+    "switchNoMatches": "Brak dopasowanych papierów"
+  },
+  "toasts": {
+    "favouriteAdded": "Dodano do ulubionych",
+    "favouriteRemoved": "Usunięto z ulubionych",
+    "favouriteFailed": "Nie udało się zaktualizować ulubionych"
+  },
+  "cards": {
+    "marketValue": "Wartość rynkowa",
+    "costBasis": "Koszt nabycia",
+    "unrealizedPl": "Niezrealizowany zysk/strata",
+    "units": "Jednostki",
+    "avgCostPerUnit": "Śr. koszt / jednostkę",
+    "heldInAccounts": "Trzymane na kontach",
+    "openAccount": "Pokaż {name} na stronie Inwestycje",
+    "unitsShare": "{units} ({share})",
+    "valueUnknown": "Brak wyceny",
+    "approx": "~ {amount}",
+    "asOf": "Na zamknięciu {date}",
+    "asOfStale": "Na zamknięciu {date}, najnowsza zapisana cena",
+    "asOfStaleTitle": "Nie ma nowszej ceny, więc to wartość pozycji z tego dnia, a nie z dziś. Zaktualizuj ceny od dostawcy albo dodaj cenę ręcznie."
+  },
+  "chart": {
+    "title": "Cena {symbol}",
+    "seriesAriaLabel": "Seria wykresu",
+    "modes": {
+      "price": "Cena",
+      "value": "Wartość inwestycji",
+      "return": "Zwrot"
+    },
+    "titles": {
+      "price": "Cena",
+      "value": "Wartość inwestycji",
+      "return": "Zwrot"
+    },
+    "summary": {
+      "first": "Pierwsza",
+      "latest": "Ostatnia",
+      "ending": "Końcowa",
+      "lowest": "Najniższa"
+    },
+    "panEarlier": "Pokaż wcześniejszy odcinek historii",
+    "panLater": "Pokaż późniejszy odcinek historii"
+  },
+  "keyInfo": {
+    "title": "Kluczowe informacje",
+    "symbol": "Symbol",
+    "securityType": "Typ papieru",
+    "distributions": "Wypłaty",
+    "distributing": "Wypłacane (zaobserwowane)",
+    "accumulating": "Brak (akumulacyjny)",
+    "distributionsTitle": "Odczytane z historii cen: kurs skorygowany odchodzi od kursu zamknięcia przy każdej wypłacie. Wnioskowane z danych, nie zadeklarowane przez emitenta.",
+    "exchange": "Giełda",
+    "currency": "Waluta",
+    "sector": "Sektor",
+    "industry": "Branża",
+    "provider": "Dostawca",
+    "lastPrice": "Ostatnia cena"
+  },
+  "tabs": {
+    "ariaLabel": "Sekcje papieru wartościowego",
+    "overview": "Przegląd",
+    "transactions": "Transakcje",
+    "prices": "Historia cen",
+    "documents": "Dokumenty",
+    "news": "Wiadomości"
+  },
+  "about": {
+    "title": "O papierze",
+    "noDescription": "Nie zapisano opisu tego papieru wartościowego.",
+    "sector": "Sektor",
+    "industry": "Branża",
+    "country": "Kraj",
+    "website": "Strona internetowa",
+    "irWebsite": "Strona relacji inwestorskich",
+    "tags": "Tagi",
+    "notStored": "Jeszcze nieprzechowywane"
+  },
+  "performance": {
+    "title": "Wyniki papieru",
+    "subject": "Jak zachowywał się sam instrument, niezależnie od tego, czy go trzymałeś. Wynik Twojej pozycji jest pod Zwrot całkowity.",
+    "empty": "Za mało historii cen, żeby zmierzyć zwrot.",
+    "unavailable": "n/d",
+    "periods": {
+      "1m": "1M",
+      "3m": "3M",
+      "ytd": "Od pocz. roku",
+      "1y": "1R",
+      "3y": "3L",
+      "5y": "5L"
+    },
+    "includesDividends": "Zawiera dywidendy",
+    "excludesDividends": "Bez dywidend",
+    "excludesDividendsTitle": "Ten dostawca nie podaje serii kursów skorygowanych, więc te zwroty liczone są wyłącznie z ceny. Dla funduszu wypłacającego zaniżają zwrot o całą jego stopę wypłaty."
+  },
+  "positionInfo": {
+    "title": "Informacje o pozycji",
+    "firstTransaction": "Pierwsza transakcja",
+    "lastTransaction": "Ostatnia transakcja",
+    "totalInvested": "Łącznie zainwestowane",
+    "totalSold": "Łącznie sprzedane",
+    "dividends": "Dywidendy",
+    "fees": "Opłaty",
+    "realizedPl": "Zrealizowany zysk/strata",
+    "realizedMixed": "Zrealizowane w {currencies}, więc nie zsumowano",
+    "totalReturn": "Zwrot całkowity",
+    "totalReturnValue": "{amount} ({percent})",
+    "totalReturnTitle": "Niezrealizowany zysk plus to, co zrealizowałeś na sprzedażach i otrzymałeś w przychodach, minus opłaty, w stosunku do wpłaconego kapitału. Prosty zwrot z tego kapitału: nie jest annualizowany i nie waży transz czasem ich trzymania.",
+    "status": "Status",
+    "statusOpen": "Otwarta",
+    "statusClosed": "Zamknięta",
+    "statusNone": "Nigdy nietrzymane"
+  },
+  "accounts": {
+    "title": "Konta",
+    "closedSuffix": "{name} (zamknięte)",
+    "total": "Razem",
+    "columns": {
+      "account": "Konto",
+      "currency": "Waluta",
+      "units": "Jednostki",
+      "avgCost": "Śr. koszt / jednostkę",
+      "marketValue": "Wartość rynkowa",
+      "costBasis": "Koszt nabycia",
+      "unrealizedPl": "Niezrealizowany zysk/strata"
+    }
+  },
+  "closed": {
+    "title": "Pozycja zamknięta",
+    "description": "Nie trzymasz już tego papieru wartościowego. Jego historia pozostaje dostępna poniżej.",
+    "realizedPl": "Zrealizowany zysk/strata",
+    "heldFrom": "Trzymane od",
+    "heldRange": "{start} do {end}"
+  },
+  "empty": {
+    "noPosition": "Brak danych o pozycji",
+    "noPositionHint": "Nie zapisałeś jeszcze żadnej transakcji dla tego papieru wartościowego.",
+    "noPrices": "Brak historii cen",
+    "noPricesHint": "Dodaj cenę ręcznie albo zaktualizuj ceny od dostawcy.",
+    "noTransactions": "Brak transakcji",
+    "noAccounts": "Ten papier wartościowy nie jest trzymany na żadnym koncie."
+  },
+  "weightings": {
+    "title": "Struktura",
+    "ariaLabel": "Wymiar struktury",
+    "sectorTab": "Sektor",
+    "countryTab": "Kraj",
+    "assetClassTab": "Klasa aktywów",
+    "sectorEmpty": "Nie zapisano podziału na sektory. Monize uzupełnia go od dostawcy dla funduszy i ETF-ów.",
+    "countryEmpty": "Nie zapisano podziału na kraje. Możesz go wpisać przy edycji papieru wartościowego.",
+    "assetClassEmpty": "Nie zapisano jeszcze podziału na klasy aktywów.",
+    "remainder": "{percent} niesklasyfikowane"
+  },
+  "documents": {
+    "title": "Dokumenty",
+    "add": "Dodaj dokument",
+    "loadFailed": "Nie udało się wczytać dokumentów tego papieru wartościowego",
+    "noDate": "Brak daty",
+    "columns": {
+      "type": "Typ",
+      "name": "Nazwa",
+      "date": "Data",
+      "address": "Adres",
+      "actions": "Akcje"
+    },
+    "types": {
+      "FACTSHEET": "Karta funduszu",
+      "KIID": "KIID",
+      "PROSPECTUS": "Prospekt",
+      "ANNUAL_REPORT": "Raport roczny",
+      "SEMI_ANNUAL_REPORT": "Raport półroczny",
+      "TAX": "Dokument podatkowy",
+      "RESEARCH": "Analiza",
+      "OTHER": "Inne"
+    },
+    "actions": {
+      "open": "Otwórz",
+      "openNamed": "Otwórz {name} w nowej karcie",
+      "edit": "Edytuj",
+      "delete": "Usuń"
+    },
+    "empty": {
+      "title": "Brak dokumentów",
+      "description": "Trzymaj dokumentację tego papieru w jednym miejscu: kartę funduszu, KIID, prospekt, raport roczny, dokument podatkowy. Każdy z nich to link, który otworzysz stąd.",
+      "action": "Dodaj pierwszy dokument"
+    },
+    "form": {
+      "addTitle": "Dodaj dokument",
+      "editTitle": "Edytuj dokument",
+      "date": "Data dokumentu",
+      "dateHint": "Data na samym dokumencie, nie dzisiejsza. Zostaw puste, jeśli jej nie ma.",
+      "url": "Adres",
+      "notes": "Notatki",
+      "create": "Dodaj dokument",
+      "save": "Zapisz dokument"
+    },
+    "validation": {
+      "nameRequired": "Nadaj dokumentowi nazwę",
+      "urlRequired": "Adres jest wymagany",
+      "urlScheme": "Adres musi zaczynać się od http:// lub https://"
+    },
+    "delete": {
+      "title": "Usunąć dokument?",
+      "message": "To usuwa link do „{name}”. Sam dokument pozostaje nietknięty."
+    },
+    "toasts": {
+      "created": "Dokument dodany",
+      "updated": "Dokument zaktualizowany",
+      "deleted": "Dokument usunięty",
+      "saveFailed": "Nie udało się zapisać dokumentu",
+      "deleteFailed": "Nie udało się usunąć dokumentu"
+    }
+  },
+  "news": {
+    "title": "Wiadomości wspominające {symbol}",
+    "subject": "Dostawca przypisuje wiadomość do każdego wymienionego tickera, więc część z nich dotyczy innej spółki, która wspomina tę.",
+    "loadFailed": "Nie udało się wczytać wiadomości dla tego papieru wartościowego",
+    "video": "Wideo",
+    "alsoMentions": "Wspomina też {tickers}",
+    "unsupportedProvider": "Dostawca notowań tego papieru nie podaje wiadomości. Zmiana go na Yahoo przy edycji papieru sprowadzi tu nagłówki.",
+    "empty": {
+      "title": "Brak nagłówków w tej chwili",
+      "description": "Nic nie opublikowano ostatnio pod tym symbolem. Lista odświeży się, gdy tu wrócisz."
+    }
+  }
+}

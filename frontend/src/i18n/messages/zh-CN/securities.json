@@ -78,8 +78,6 @@
       "source": "最新价格的来源"
     },
     "actions": {
-      "history": "历史",
-      "prices": "价格",
       "edit": "编辑",
       "deactivate": "停用",
       "activate": "激活",
@@ -94,8 +92,6 @@
       "subtitle": "添加您的第一个证券以开始使用。"
     },
     "contextMenu": {
-      "transactionHistory": "交易历史",
-      "viewPrices": "查看价格",
       "editSecurity": "编辑证券",
       "deactivate": "停用",
       "activate": "激活",
@@ -167,6 +163,9 @@
     "exchangePlaceholder": "从交易代码自动解析；仅在错误时覆盖",
     "descriptionLabel": "描述",
     "descriptionPlaceholder": "关于该证券的备注。",
+    "websiteLabel": "网站",
+    "irWebsiteLabel": "投资者关系网站",
+    "irWebsiteHint": "没有行情数据源公开这个地址，因此需要手动填写。",
     "tagsLabel": "标签",
     "tagsPlaceholder": "选择标签...",
     "createNewTag": "创建新标签...",
@@ -222,7 +221,6 @@
       "sold": "卖出 {quantity} · {account}"
     },
     "empty": "暂无价格历史",
-    "showingCount": "显示 {shown} 条，共 {total} 条价格",
     "columns": {
       "date": "日期",
       "close": "收盘价",
@@ -231,7 +229,9 @@
       "low": "最低价",
       "volume": "成交量",
       "source": "来源",
-      "actions": "操作"
+      "actions": "操作",
+      "adjustedClose": "调整后收盘",
+      "adjustedCloseTitle": "经拆股和分红调整的收盘价（总回报）。价格数据源不提供时为空。"
     },
     "toasts": {
       "added": "价格已添加",
@@ -251,7 +251,10 @@
       "title": "删除价格",
       "message": "确定要删除 {date} 的价格记录吗？",
       "confirmLabel": "删除"
-    }
+    },
+    "collapseAll": "全部折叠",
+    "expandAll": "全部展开",
+    "groupCount": "{count} 条价格"
   },
   "transactionHistory": {
     "inactiveBadge": "非活跃",

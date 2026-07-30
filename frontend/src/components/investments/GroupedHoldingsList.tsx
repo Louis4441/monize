@@ -13,7 +13,7 @@ interface GroupedHoldingsListProps {
   holdingsByAccount: AccountHoldings[];
   isLoading: boolean;
   totalPortfolioValue: number;
-  onSymbolClick?: (symbol: string) => void;
+  onSecurityClick?: (securityId: string) => void;
   onCashClick?: (cashAccountId: string) => void;
 }
 
@@ -21,7 +21,7 @@ export function GroupedHoldingsList({
   holdingsByAccount,
   isLoading,
   totalPortfolioValue,
-  onSymbolClick,
+  onSecurityClick,
   onCashClick,
 }: GroupedHoldingsListProps) {
   const t = useTranslations('investments');
@@ -229,7 +229,7 @@ export function GroupedHoldingsList({
                           formatPercent={formatPercent}
                           getGainLossColor={getGainLossColor}
                           getPortfolioPercent={getPortfolioPercent}
-                          onSymbolClick={onSymbolClick}
+                          onSecurityClick={onSecurityClick}
                         />
                       ))}
 
@@ -327,7 +327,7 @@ interface HoldingRowProps {
   formatPercent: (value: number | null, showSign?: boolean) => string;
   getGainLossColor: (value: number | null) => string;
   getPortfolioPercent: (value: number | null, currencyCode?: string) => string;
-  onSymbolClick?: (symbol: string) => void;
+  onSecurityClick?: (securityId: string) => void;
 }
 
 const HoldingRow = memo(function HoldingRow({
@@ -342,7 +342,7 @@ const HoldingRow = memo(function HoldingRow({
   formatPercent,
   getGainLossColor,
   getPortfolioPercent,
-  onSymbolClick,
+  onSecurityClick,
 }: HoldingRowProps) {
   const t = useTranslations('investments');
   const isForeign = holding.currencyCode && holding.currencyCode !== defaultCurrency;
@@ -384,7 +384,7 @@ const HoldingRow = memo(function HoldingRow({
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/20">
       <td className="px-2 sm:px-6 py-3 whitespace-nowrap">
         <button
-          onClick={() => onSymbolClick?.(holding.symbol)}
+          onClick={() => onSecurityClick?.(holding.securityId)}
           className="text-left hover:underline focus:outline-none focus:underline"
           title={t('groupedHoldings.symbolClickTitle')}
         >
