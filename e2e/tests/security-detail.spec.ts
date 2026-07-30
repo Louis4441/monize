@@ -70,7 +70,7 @@ test.describe('Security detail', () => {
     await expect(page.getByText('+30.00%').first()).toBeVisible();
   });
 
-  test('dates the market value at the close it was struck at', async ({
+  test('dates the price in the header, not on the market value card', async ({
     authedPage: page,
     api,
   }) => {
@@ -78,10 +78,13 @@ test.describe('Security detail', () => {
 
     await page.goto(`/securities/${security.id}`);
 
-    // Market value is quantity times the newest close on record, whatever day
-    // that is; the card has to say which day, or a stale valuation reads as
-    // today's worth.
-    await expect(page.getByText(/At the close of/).first()).toBeVisible();
+    // The valuation still has to be dated, or a stale one reads as today's
+    // worth -- but the header is the one place that says so. The card used to
+    // carry "At the close of {date}", which intraday is a claim the price
+    // cannot support: the newest row is that day's latest quote, not its
+    // close. Asserting the old wording is gone keeps it from coming back.
+    await expect(page.getByText(/Price at/).first()).toBeVisible();
+    await expect(page.getByText(/At the close of/)).toHaveCount(0);
   });
 
   test('separates the security s return from the position s', async ({
