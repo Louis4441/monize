@@ -45,6 +45,15 @@ export function SecurityPositionInfoCard({
       ? { label: t('positionInfo.statusClosed'), tone: 'neutral' as const }
       : { label: t('positionInfo.statusOpen'), tone: 'open' as const };
 
+  // A security in the catalogue that was never traded has no lifetime totals,
+  // and `formatCurrency(0)` is not the same statement as "there is nothing
+  // here": four rows of $0.00 read as a position that lost everything. The card
+  // already drops a row whose value is null (KeyValueList), so use that -- the
+  // Status row saying "Never held" is the whole answer.
+  const untraded = !detail.hasTransactions;
+  const lifetimeTotal = (amount: number): string | null =>
+    untraded ? null : formatCurrency(amount, currency);
+
   const rows: KeyValueRow[] = [
     {
       key: 'firstTransaction',
@@ -63,22 +72,22 @@ export function SecurityPositionInfoCard({
     {
       key: 'totalInvested',
       label: t('positionInfo.totalInvested'),
-      value: formatCurrency(activity.totalInvested, currency),
+      value: lifetimeTotal(activity.totalInvested),
     },
     {
       key: 'totalSold',
       label: t('positionInfo.totalSold'),
-      value: formatCurrency(activity.totalSold, currency),
+      value: lifetimeTotal(activity.totalSold),
     },
     {
       key: 'dividends',
       label: t('positionInfo.dividends'),
-      value: formatCurrency(activity.dividends, currency),
+      value: lifetimeTotal(activity.dividends),
     },
     {
       key: 'fees',
       label: t('positionInfo.fees'),
-      value: formatCurrency(activity.fees, currency),
+      value: lifetimeTotal(activity.fees),
     },
     {
       key: 'realizedPl',

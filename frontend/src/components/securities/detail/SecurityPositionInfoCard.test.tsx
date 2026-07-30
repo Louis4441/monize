@@ -92,6 +92,70 @@ describe('SecurityPositionInfoCard', () => {
     expect(screen.getByText('€50.00')).toBeInTheDocument();
   });
 
+  describe('a security in the catalogue that was never traded', () => {
+    // Found in the E2E suite: the card filled every lifetime total with a
+    // formatted zero, so a security nobody bought read as a position that had
+    // lost the lot. "Never held" is the whole answer; the totals are not facts
+    // about it.
+    function untraded() {
+      return detail({
+        hasTransactions: false,
+        position: position({
+          quantity: 0,
+          averageCost: null,
+          currentPrice: null,
+          costBasis: null,
+          marketValue: null,
+          gainLoss: null,
+          gainLossPercent: null,
+        }),
+        activity: activity({
+          totalInvested: 0,
+          totalSold: 0,
+          dividends: 0,
+          fees: 0,
+          firstTransactionDate: null,
+          lastTransactionDate: null,
+          realizedGain: null,
+          realizedGainCurrency: null,
+          realizedGainCurrencies: [],
+          realizedSaleCount: 0,
+        }),
+      });
+    }
+
+    it('leaves the lifetime totals out rather than showing zeros', () => {
+      render(<SecurityPositionInfoCard detail={untraded()} />);
+      expect(screen.queryByText('€0.00')).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ['Total invested'],
+      ['Total sold'],
+      ['Dividends'],
+      ['Fees'],
+    ])('drops the %s row', (label) => {
+      render(<SecurityPositionInfoCard detail={untraded()} />);
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    });
+
+    it('still says the position was never held', () => {
+      render(<SecurityPositionInfoCard detail={untraded()} />);
+      expect(screen.getByText('Never held')).toBeInTheDocument();
+    });
+
+    it('keeps showing the totals for a security that was traded', () => {
+      // The other half of the rule: a real zero on a real position is a fact.
+      render(
+        <SecurityPositionInfoCard
+          detail={detail({ activity: activity({ dividends: 0 }) })}
+        />,
+      );
+      expect(screen.getByText('Dividends')).toBeInTheDocument();
+      expect(screen.getAllByText('€0.00').length).toBeGreaterThan(0);
+    });
+  });
+
   describe('status', () => {
     it('calls a never-traded security never held', () => {
       render(
