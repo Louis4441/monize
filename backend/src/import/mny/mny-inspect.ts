@@ -228,9 +228,26 @@ export function mappingSummary(tables: MnyTables): string[] {
     accounts.accounts.map((account) => [account.key, account.name]),
   );
 
+  // The signs the *writer* would insert, which is not the same population as
+  // the raw `TRN.amt` block above: that counts every row in the table, this
+  // counts only the rows this import would create. A file whose raw amounts are
+  // signed but whose mapped amounts are not localises the fault to the mapper.
+  const signs = (values: readonly number[]): string =>
+    `${values.filter((v) => v > 0).length} positive, ` +
+    `${values.filter((v) => v < 0).length} negative, ` +
+    `${values.filter((v) => v === 0).length} zero`;
+  const mappedAmounts = transactions.transactions.map((t) => t.amount);
+  const splitAmounts = transactions.transactions.flatMap((t) =>
+    t.splits.map((split) => split.amount),
+  );
+  const investmentCash = investments.transactions.map((t) => t.cashAmount);
+
   return [
     "mapped import:",
     `  base currency:   ${accounts.baseCurrency}`,
+    `  txn amounts:     ${signs(mappedAmounts)}`,
+    `  split legs:      ${signs(splitAmounts)}`,
+    `  investment cash: ${signs(investmentCash)}`,
     `  accounts:        ${accounts.accounts.length} (${accounts.skipped} skipped)`,
     `  transactions:    ${transactions.transactions.length} (${transactions.transfersLinked} transfers linked, ${transactions.skipped} skipped)`,
     `  securities:      ${securities.securities.length} (${securities.skipped} skipped as currencies or unusable)`,

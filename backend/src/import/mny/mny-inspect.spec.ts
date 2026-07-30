@@ -131,6 +131,25 @@ describe("mappingSummary", () => {
     expect(rows.every((line) => line.endsWith("  ok"))).toBe(true);
   });
 
+  it("reports the signs the writer would actually insert", () => {
+    // Distinct from the raw `TRN.amt` block, which counts every row in the
+    // table. This counts only what this import would create, so a file whose
+    // raw amounts are signed but whose mapped amounts are not localises the
+    // fault to the mapper rather than to the reader or the writer.
+    const lines = mappingSummary(
+      readMnyTables(openMnyFile(readMnyFixture("money2002"))),
+    );
+
+    const block = lines.join("\n");
+    expect(block).toMatch(
+      /txn amounts:\s+\d+ positive, \d+ negative, \d+ zero/,
+    );
+    expect(block).toMatch(/split legs:\s+\d+ positive, \d+ negative, \d+ zero/);
+    expect(block).toMatch(
+      /investment cash:\s+\d+ positive, \d+ negative, \d+ zero/,
+    );
+  });
+
   it("omits the holdings block for a file with no LOT rows", () => {
     const lines = mappingSummary(
       readMnyTables(openMnyFile(readMnyFixture("money2001"))),
