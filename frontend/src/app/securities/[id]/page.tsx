@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -26,6 +26,7 @@ import { useOnAiAction } from '@/hooks/useOnAiAction';
 import { usePriceRefresh } from '@/hooks/usePriceRefresh';
 import { investmentsApi } from '@/lib/investments';
 import { getErrorMessage } from '@/lib/errors';
+import { SECURITY_PRICE_HISTORY_LIMIT } from '@/lib/constants';
 import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { roundToDecimals } from '@/lib/format';
 import {
@@ -147,27 +148,48 @@ function SecurityDetailContent() {
   // Only for the caret beside the name; a failure costs the switcher, not the page.
   const [securities, setSecurities] = useState<Security[]>([]);
 
+  // The security on screen right now, readable from inside an in-flight load.
+  // The switcher moves between securities on the same route (`router.push`
+  // below), so this component stays mounted and a load started for the previous
+  // one can still be running. Assigned during render so it is never a render
+  // behind the id the page is currently showing.
+  const shownIdRef = useRef(securityId);
+  shownIdRef.current = securityId;
+
   const loadData = useCallback(async () => {
+    const requestedId = securityId;
+    // Every write below is guarded on the page still showing the security this
+    // load was started for. Without it a slow response for the previous
+    // security lands after the new one's and paints its figures under the new
+    // URL -- the reader sees another instrument's position, and nothing looks
+    // wrong until they reload.
+    const isStale = () => shownIdRef.current !== requestedId;
+
     setIsLoading(true);
     setError(null);
     try {
       // The detail is the page; prices and trades feed the chart and its
       // markers, so a failure in either costs the chart, never the page.
-      const detailData = await investmentsApi.getSecurityDetail(securityId);
+      const detailData = await investmentsApi.getSecurityDetail(requestedId);
       const [priceData, historyData] = await Promise.all([
-        investmentsApi.getSecurityPrices(securityId, 9999).catch(() => []),
         investmentsApi
-          .getSecurityTransactionHistory(securityId)
+          .getSecurityPrices(requestedId, SECURITY_PRICE_HISTORY_LIMIT)
+          .catch(() => []),
+        investmentsApi
+          .getSecurityTransactionHistory(requestedId)
           .catch(() => null),
       ]);
+      if (isStale()) return;
       setDetail(detailData);
       setPrices(priceData);
       setTrades(historyData?.transactions ?? []);
     } catch (err) {
+      if (isStale()) return;
       const message = getErrorMessage(err, t('loadFailed'));
       setError(message);
     } finally {
-      setIsLoading(false);
+      // A stale load must not clear the spinner the current one put up.
+      if (!isStale()) setIsLoading(false);
     }
   }, [securityId, t]);
 
@@ -175,11 +197,17 @@ function SecurityDetailContent() {
   // the page is already on screen -- reload in place rather than through
   // loadData, whose spinner would blank everything the user was reading.
   const reloadAfterPriceRefresh = useCallback(async () => {
+    const requestedId = securityId;
     try {
       const [detailData, priceData] = await Promise.all([
-        investmentsApi.getSecurityDetail(securityId),
-        investmentsApi.getSecurityPrices(securityId, 9999).catch(() => null),
+        investmentsApi.getSecurityDetail(requestedId),
+        investmentsApi
+          .getSecurityPrices(requestedId, SECURITY_PRICE_HISTORY_LIMIT)
+          .catch(() => null),
       ]);
+      // Same guard as loadData: a refresh that resolves after the reader moved
+      // on must not write the old security's quote onto the new page.
+      if (shownIdRef.current !== requestedId) return;
       setDetail(detailData);
       if (priceData) setPrices(priceData);
     } catch {

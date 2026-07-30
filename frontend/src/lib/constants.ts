@@ -2,6 +2,19 @@ import { formatDate } from './utils';
 
 export const PAGE_SIZE = 50;
 
+/**
+ * Rows to ask for when a screen wants a security's whole price history: the
+ * detail page's chart, its Performance card and the price table all reason over
+ * the complete series, so a page of prices would give them a partial answer that
+ * still looks like a total.
+ *
+ * It is a cap rather than "everything" because the endpoint requires a limit.
+ * ~40 years of daily closes fits, which is beyond any history a provider
+ * backfills -- but a series longer than this is silently truncated, so a screen
+ * that starts reporting a suspiciously short "all" range should look here first.
+ */
+export const SECURITY_PRICE_HISTORY_LIMIT = 9999;
+
 type DateFormatOption = { value: string; label: string };
 
 /**

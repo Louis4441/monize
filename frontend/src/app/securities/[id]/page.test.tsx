@@ -6,10 +6,16 @@ import type { Security, SecurityDetail } from '@/types/investment';
 const mockPush = vi.fn();
 /** Mutable so a test can arrive with `?tab=` the way a deep link does. */
 const searchParams = { current: new URLSearchParams() };
+/**
+ * Mutable too: the switcher moves between securities with `router.push` on the
+ * same route, so a test has to be able to change the id under a mounted page the
+ * way the App Router does.
+ */
+const routeParams = { current: { id: 'sec-1' } as { id: string } };
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, replace: vi.fn() }),
-  usePathname: () => '/securities/sec-1',
-  useParams: () => ({ id: 'sec-1' }),
+  usePathname: () => `/securities/${routeParams.current.id}`,
+  useParams: () => routeParams.current,
   useSearchParams: () => searchParams.current,
 }));
 
@@ -180,6 +186,7 @@ describe('SecurityDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     searchParams.current = new URLSearchParams();
+    routeParams.current = { id: 'sec-1' };
     mockGetSecurityDetail.mockResolvedValue(detailFixture());
     mockGetSecurityPrices.mockResolvedValue([
       {
@@ -237,6 +244,48 @@ describe('SecurityDetailPage', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Apple Inc.' }),
     ).toBeInTheDocument();
+  });
+
+  it('discards a load that resolves after the reader moved to another security', async () => {
+    // The switcher moves between securities on the same route, so this component
+    // stays mounted and a load started for the previous one keeps running. With
+    // nothing discarding the late response, it wrote its own figures over the new
+    // page: another instrument's position under this instrument's URL, with
+    // nothing on screen to say so.
+    let resolveSlowRead: ((detail: SecurityDetail) => void) | undefined;
+    const slowRead = new Promise<SecurityDetail>((resolve) => {
+      resolveSlowRead = resolve;
+    });
+    const microsoft = detailFixture({
+      security: { ...security, id: 'sec-2', symbol: 'MSFT', name: 'Microsoft' },
+    });
+    mockGetSecurityDetail.mockImplementation((id: string) =>
+      id === 'sec-1' ? slowRead : Promise.resolve(microsoft),
+    );
+
+    // Apple's read is still in flight when the reader picks Microsoft.
+    const { rerender } = await renderPage();
+    routeParams.current = { id: 'sec-2' };
+    await act(async () => {
+      rerender(<SecurityDetailPage />);
+    });
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Microsoft' }),
+      ).toBeInTheDocument();
+    });
+
+    // Only now does Apple's response arrive.
+    await act(async () => {
+      resolveSlowRead?.(detailFixture());
+    });
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Microsoft' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 1, name: 'Apple Inc.' }),
+    ).not.toBeInTheDocument();
   });
 
   it('names the currency on the header quote when it is not the reader\'s', async () => {
