@@ -425,6 +425,14 @@ function PayeeDetailContent() {
     [router, payeeId],
   );
 
+  // Stable, so the memoized chart is not re-rendered by unrelated page state
+  // (the Top Categories range, say). A re-render replays the bars' entry
+  // animation, and Recharts hides their value labels until it finishes.
+  const handleMonthClick = useCallback(
+    (startDate: string, endDate: string) => goToRegister({ startDate, endDate }),
+    [goToRegister],
+  );
+
   const handleEditSubmit = useCallback(
     async (data: PayeeFormSubmitData) => {
       try {
@@ -607,9 +615,7 @@ function PayeeDetailContent() {
                     <CategoryPayeeBarChart
                       data={analytics?.monthlyTotals ?? []}
                       isLoading={false}
-                      onMonthClick={(startDate, endDate) =>
-                        goToRegister({ startDate, endDate })
-                      }
+                      onMonthClick={handleMonthClick}
                       filterLabel={payee.name}
                     />
                   </div>

@@ -6,10 +6,16 @@ import type { PayeeDetail } from '@/types/payee';
 import type { TransactionSummary } from '@/types/transaction';
 
 const mockPush = vi.fn();
+/**
+ * One router object for the whole file, as real Next returns. A fresh object
+ * per call would churn every `useCallback` that depends on it, which would hide
+ * exactly the prop-stability this file asserts below.
+ */
+const stableRouter = { push: mockPush, replace: vi.fn() };
 /** Mutable so a test can arrive with `?tab=` the way a deep link does. */
 const searchParams = { current: new URLSearchParams() };
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush, replace: vi.fn() }),
+  useRouter: () => stableRouter,
   usePathname: () => '/payees/payee-1',
   useParams: () => ({ id: 'payee-1' }),
   useSearchParams: () => searchParams.current,
@@ -43,11 +49,20 @@ vi.mock('@/lib/errors', () => ({
 }));
 
 // The chart has its own tests; stub it so this page test does not depend on
-// Recharts measuring a zero-size container.
+// Recharts measuring a zero-size container. The props of each render are
+// recorded so the prop-stability guard below can compare them.
+const chartProps: Array<{ data: unknown; onMonthClick: unknown }> = [];
 vi.mock('@/components/transactions/CategoryPayeeBarChart', () => ({
-  CategoryPayeeBarChart: ({ data }: { data: unknown[] }) => (
-    <div data-testid="chart">{data.length}</div>
-  ),
+  CategoryPayeeBarChart: ({
+    data,
+    onMonthClick,
+  }: {
+    data: unknown[];
+    onMonthClick?: unknown;
+  }) => {
+    chartProps.push({ data, onMonthClick });
+    return <div data-testid="chart">{data.length}</div>;
+  },
 }));
 
 const mockGetDetail = vi.fn();
@@ -168,6 +183,7 @@ async function renderPage() {
 describe('PayeeDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    chartProps.length = 0;
     searchParams.current = new URLSearchParams();
     mockGetDetail.mockResolvedValue(detailFixture());
     mockGetAllPayees.mockResolvedValue([]);
@@ -347,6 +363,24 @@ describe('PayeeDetailPage', () => {
       expect(mockPush).toHaveBeenCalledWith(
         '/transactions?payeeId=payee-1&accountStatus=all&categoryId=cat-2',
       );
+    });
+
+    // The chart is memoized because Recharts hides a bar's value labels while
+    // its entry animation runs: an unrelated re-render blanks every label and
+    // fades it back, which reads as the chart reloading. Memo only bails out
+    // when the props are referentially equal, so the page has to keep them so.
+    it('hands the chart unchanged props when the range toggles', async () => {
+      await renderPage();
+      const before = chartProps.at(-1)!;
+
+      const panel = screen.getByText('Top Categories').closest('section')!;
+      await act(async () => {
+        fireEvent.click(within(panel).getByRole('button', { name: 'All time' }));
+      });
+
+      const after = chartProps.at(-1)!;
+      expect(after.data).toBe(before.data);
+      expect(after.onMonthClick).toBe(before.onMonthClick);
     });
 
     it('carries the 12-month window into a category link', async () => {
