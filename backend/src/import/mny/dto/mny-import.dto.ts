@@ -1,0 +1,173 @@
+import { Type } from "class-transformer";
+import {
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  ImportJobStatus,
+  MnyImportProgress,
+  MnyImportResult,
+} from "../model/mny-import-job";
+
+/**
+ * Request and response shapes for the `.mny` import endpoints.
+ *
+ * The Money file password appears in exactly one place -- a multipart text field
+ * on the parse call -- and in no response, no log line and no stored row (design
+ * ADR-7). Same for the credentials the optional wipe re-authentication needs:
+ * they travel on the start request and are spent immediately.
+ */
+
+/** Multipart text fields accompanying the uploaded file on `POST .../parse`. */
+export class ParseMnyDto {
+  @ApiPropertyOptional({
+    description:
+      "Money file password. Required only when the file is protected; never stored or echoed.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  password?: string;
+}
+
+export class MnyAccountOptionDto {
+  @ApiProperty({ description: "Money ACCT.hacct of the account" })
+  @IsInt()
+  handle: number;
+
+  @ApiProperty({ description: "False leaves the account out of the import" })
+  @IsBoolean()
+  include: boolean;
+
+  @ApiPropertyOptional({
+    description: "ISO code overriding the currency Money recorded",
+  })
+  @IsOptional()
+  @IsString()
+  @Length(3, 3)
+  currencyOverride?: string | null;
+}
+
+export class MnyImportOptionsDto {
+  @ApiPropertyOptional({
+    description:
+      "Run the existing delete-my-data operation before importing. Requires the account password (or OIDC token) on this request.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  wipeExistingData?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  referencedOnlyPayees?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  referencedOnlyCategories?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  importClosedAccounts?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  importPrices?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  importExchangeRates?: boolean;
+
+  @ApiPropertyOptional({ type: [MnyAccountOptionDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MnyAccountOptionDto)
+  accounts?: MnyAccountOptionDto[];
+
+  @ApiPropertyOptional({
+    type: [Number],
+    description: "BILL.hbill handles the user selected",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(0, { each: true })
+  bills?: number[];
+}
+
+export class StartMnyImportDto {
+  @ApiProperty({ description: "Staged file returned by the parse call" })
+  @IsUUID()
+  stagedFileId: string;
+
+  @ApiPropertyOptional({ type: MnyImportOptionsDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MnyImportOptionsDto)
+  options?: MnyImportOptionsDto;
+
+  @ApiPropertyOptional({
+    description:
+      "Account password, required only to confirm wipeExistingData. Spent on this request; never stored.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  wipePassword?: string;
+
+  @ApiPropertyOptional({
+    description: "OIDC id token, the wipe confirmation for OIDC accounts.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  wipeOidcIdToken?: string;
+}
+
+/**
+ * The job as the wizard polls it. Deliberately not the entity: the row also
+ * carries the staged file id and internal timestamps the client has no use for.
+ */
+export class MnyImportJobDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ enum: ["pending", "running", "completed", "failed"] })
+  status: ImportJobStatus;
+
+  @ApiPropertyOptional({ description: "Phase and row counts while running" })
+  progress: MnyImportProgress | null;
+
+  @ApiPropertyOptional({ description: "Counts and verification report" })
+  result: MnyImportResult | null;
+
+  @ApiPropertyOptional({
+    description: "i18n key for a failed job (import.mnyErrors.<key>)",
+  })
+  errorKey: string | null;
+
+  @ApiProperty({
+    description: "Whether Retry over the same file is worth offering",
+  })
+  retryable: boolean;
+
+  @ApiPropertyOptional()
+  startedAt: Date | null;
+
+  @ApiPropertyOptional()
+  completedAt: Date | null;
+}

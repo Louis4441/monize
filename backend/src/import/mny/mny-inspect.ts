@@ -4,15 +4,23 @@
  *   npm run mny:inspect -- path/to/file.mny [--password secret] [--table TRN]
  *
  * Prints what the reader can see: encryption scheme, table list with row and
- * column counts, a summary of what the table readers made of the file, and
- * optionally the first rows of one table. Its job is to prove that a
- * real-world file -- a 200 MB Money Plus Sunset file, a Money 2001 file --
- * decrypts and reads before any mapping work depends on it.
+ * column counts, a summary of what the table readers made of the file, what the
+ * mappers make of it (accounts, transaction counts, per-account final balances,
+ * warnings), and optionally the first rows of one table. Its job is to prove
+ * that a real-world file -- a 200 MB Money Plus Sunset file, a Money 2001 file
+ * -- decrypts, reads and maps to sane numbers before an import is attempted.
  *
- * This is not the full validation CLI from task M0.5: per-account balances and
- * holdings need the mappers, which do not exist yet.
+ * Per-account balances are the Phase 1 mappers' own output, so they are the same
+ * numbers the verification report reconciles against. Holdings still need the
+ * investment mappers (task M2.3), so the validation harness from M0.5 is not
+ * complete until Phase 2.
  */
 import { MnyImportError } from "./mny-errors";
+import { mapAccounts } from "./map/map-reference";
+import { mapTransactions } from "./map/map-transactions";
+import { computeExpectedBalances, todayIsoDate } from "./mny-parser.service";
+import { DEFAULT_MNY_IMPORT_OPTIONS } from "./model/mny-import-options";
+import { summarizeWarnings } from "./model/mny-warnings";
 import { openMnyFile } from "./msisam/open-mny";
 import {
   MnyTables,
@@ -85,6 +93,66 @@ export function summarise(tables: MnyTables): string[] {
   ];
 }
 
+/**
+ * What the mappers make of the file: which Monize accounts it produces, how many
+ * transactions land in each, and each account's final balance computed from the
+ * file. These are the numbers the verification report reconciles against, so
+ * running this against a real file is how a per-account discrepancy gets traced
+ * before an import is ever attempted (task M0.5).
+ *
+ * Investment transactions are reported as deferred: Phase 1 imports banking data.
+ */
+export function mappingSummary(tables: MnyTables): string[] {
+  const accounts = mapAccounts(
+    tables.reference,
+    DEFAULT_MNY_IMPORT_OPTIONS,
+    "USD",
+  );
+  const transactions = mapTransactions({
+    transactions: tables.transactions,
+    accountKeyByHandle: accounts.keyByHandle,
+    currencyByHandle: accounts.currencyByHandle,
+    bills: tables.bills.bills,
+  });
+  const balances = computeExpectedBalances(
+    accounts,
+    transactions,
+    todayIsoDate(),
+  );
+
+  const counts = new Map<string, number>();
+  for (const transaction of transactions.transactions) {
+    counts.set(
+      transaction.accountKey,
+      (counts.get(transaction.accountKey) ?? 0) + 1,
+    );
+  }
+
+  return [
+    "mapped import:",
+    `  base currency:   ${accounts.baseCurrency}`,
+    `  accounts:        ${accounts.accounts.length} (${accounts.skipped} skipped)`,
+    `  transactions:    ${transactions.transactions.length} (${transactions.transfersLinked} transfers linked, ${transactions.skipped} skipped, ${transactions.deferredInvestments} investment rows deferred)`,
+    "",
+    "  account                                    ccy   txns        opening          final",
+    ...accounts.accounts.map((account) =>
+      [
+        `  ${account.name.slice(0, 40).padEnd(40)}`,
+        account.currencyCode.padEnd(5),
+        String(counts.get(account.key) ?? 0).padStart(5),
+        account.openingBalance.toFixed(2).padStart(15),
+        (balances.get(account.key) ?? 0).toFixed(2).padStart(15),
+      ].join(" "),
+    ),
+    "",
+    "  warnings:",
+    ...(summarizeWarnings([...accounts.warnings, ...transactions.warnings]).map(
+      (warning) =>
+        `    ${warning.code.padEnd(32)} ${String(warning.count).padStart(6)}  ${warning.samples.join(", ")}`,
+    ) || []),
+  ];
+}
+
 /** Formats the report as lines so the shape is testable without stdout capture. */
 export function inspect(
   buffer: Buffer,
@@ -117,7 +185,8 @@ export function inspect(
   }
 
   try {
-    lines.push("", ...summarise(readMnyTables(db)));
+    const tables = readMnyTables(db);
+    lines.push("", ...summarise(tables), "", ...mappingSummary(tables));
   } catch (error) {
     // A damaged table stops the readers but not the report: the table list
     // above is what tells you which one to look at.

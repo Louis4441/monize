@@ -1,0 +1,378 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
+import { formatCurrency } from '@/lib/format';
+import { formatAccountType } from '@/lib/account-utils';
+import { MnyImportOptionsInput, MnyPreview } from '@/lib/import-mny';
+
+interface MnyReviewStepProps {
+  preview: MnyPreview;
+  excludedHandles: ReadonlySet<number>;
+  currencyOverrides: ReadonlyMap<number, string>;
+  options: MnyImportOptionsInput;
+  currencyOptions: Array<{ value: string; label: string }>;
+  isLoading: boolean;
+  onToggleAccount: (handle: number) => void;
+  onSetAllAccounts: (include: boolean) => void;
+  onSetAccountCurrency: (handle: number, currencyCode: string | null) => void;
+  onSetOption: <K extends keyof MnyImportOptionsInput>(
+    key: K,
+    value: MnyImportOptionsInput[K],
+  ) => void;
+  onBack: () => void;
+  onImport: () => void;
+}
+
+/**
+ * What the file contains, and what will be done with it.
+ *
+ * Modelled on `MultiAccountReviewStep`, with one addition that matters: each
+ * account shows the **final balance computed from the Money file**. That number
+ * is what the verification report reconciles against after the import, so a user
+ * can sanity-check it against Money before committing -- the trust-builder both
+ * PR #192 testers asked for.
+ */
+export function MnyReviewStep({
+  preview,
+  excludedHandles,
+  currencyOverrides,
+  options,
+  currencyOptions,
+  isLoading,
+  onToggleAccount,
+  onSetAllAccounts,
+  onSetAccountCurrency,
+  onSetOption,
+  onBack,
+  onImport,
+}: MnyReviewStepProps) {
+  const t = useTranslations('import');
+  const tc = useTranslations('common');
+
+  const { counts, fileCounts } = preview;
+  const includedCount = preview.accounts.filter(
+    (account) => account.handle === null || !excludedHandles.has(account.handle),
+  ).length;
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <h2 className="text-lg font-semibold text-foreground mb-1">
+        {t('mnyReview.heading')}
+      </h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        {t('mnyReview.fileSummary', {
+          filename: preview.filename,
+          era: t(`mnyReview.era.${preview.era}`),
+          currency: preview.baseCurrency,
+        })}
+      </p>
+
+      {/* What this Money version could not supply */}
+      {preview.missingTables.length > 0 && (
+        <div className="mb-6 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            {t('mnyReview.missingTables', {
+              tables: preview.missingTables.join(', '),
+            })}
+          </p>
+        </div>
+      )}
+
+      {/* Counts */}
+      <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryTile
+          label={t('mnyReview.counts.transactions')}
+          value={String(counts.transactionsToCreate)}
+          detail={t('mnyReview.counts.transfersLinked', {
+            count: counts.transfersToLink,
+          })}
+        />
+        <SummaryTile
+          label={t('mnyReview.counts.payees')}
+          value={String(counts.payeesToCreate)}
+          detail={t('mnyReview.counts.ofTotal', { total: counts.payeesInFile })}
+        />
+        <SummaryTile
+          label={t('mnyReview.counts.categories')}
+          value={String(counts.categoriesToCreate)}
+          detail={t('mnyReview.counts.ofTotal', {
+            total: counts.categoriesInFile,
+          })}
+        />
+        <SummaryTile
+          label={t('mnyReview.counts.accounts')}
+          value={String(includedCount)}
+          detail={t('mnyReview.counts.ofTotal', {
+            total: preview.accounts.length,
+          })}
+        />
+      </div>
+
+      {/* Things Phase 1 does not import yet */}
+      {(counts.investmentsDeferred > 0 || fileCounts.bills > 0) && (
+        <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            {t('mnyReview.notYetImported', {
+              investments: counts.investmentsDeferred,
+              securities: fileCounts.securities,
+              bills: fileCounts.bills,
+            })}
+          </p>
+        </div>
+      )}
+
+      {/* Accounts */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-foreground">
+            {t('mnyReview.accountsHeading', { count: preview.accounts.length })}
+          </h3>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onSetAllAccounts(true)}
+              className="text-xs text-primary hover:underline"
+            >
+              {t('mnyReview.selectAll')}
+            </button>
+            <button
+              type="button"
+              onClick={() => onSetAllAccounts(false)}
+              className="text-xs text-primary hover:underline"
+            >
+              {t('mnyReview.selectNone')}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-lg overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium">
+                  {t('mnyReview.table.include')}
+                </th>
+                <th className="px-3 py-2 text-left font-medium">
+                  {t('mnyReview.table.account')}
+                </th>
+                <th className="px-3 py-2 text-left font-medium">
+                  {t('mnyReview.table.type')}
+                </th>
+                <th className="px-3 py-2 text-left font-medium">
+                  {t('mnyReview.table.currency')}
+                </th>
+                <th className="px-3 py-2 text-right font-medium">
+                  {t('mnyReview.table.transactions')}
+                </th>
+                <th className="px-3 py-2 text-right font-medium">
+                  {t('mnyReview.table.openingBalance')}
+                </th>
+                <th className="px-3 py-2 text-right font-medium">
+                  {t('mnyReview.table.finalBalance')}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {preview.accounts.map((account) => {
+                const handle = account.handle;
+                const included =
+                  handle === null || !excludedHandles.has(handle);
+                const currency =
+                  (handle !== null ? currencyOverrides.get(handle) : null) ??
+                  account.currencyCode;
+
+                return (
+                  <tr
+                    key={account.key}
+                    className={included ? '' : 'opacity-50'}
+                  >
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={included}
+                        disabled={handle === null}
+                        onChange={() => handle !== null && onToggleAccount(handle)}
+                        aria-label={t('mnyReview.table.includeAccount', {
+                          name: account.name,
+                        })}
+                        className="rounded border-border"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="font-medium text-foreground">
+                        {account.name}
+                      </span>
+                      {account.closed && (
+                        <span className="ml-2 inline-block px-1.5 py-0.5 text-xs bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 rounded">
+                          {t('mnyReview.table.closed')}
+                        </span>
+                      )}
+                      {account.favourite && (
+                        <span className="ml-2 inline-block px-1.5 py-0.5 text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 rounded">
+                          {t('mnyReview.table.favourite')}
+                        </span>
+                      )}
+                      {account.name !== account.moneyName && (
+                        <span className="block text-xs text-muted-foreground">
+                          {t('mnyReview.table.renamedFrom', {
+                            name: account.moneyName,
+                          })}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground">
+                      {formatAccountType(account.accountType, tc)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <Select
+                        value={currency}
+                        onChange={(e) =>
+                          handle !== null &&
+                          onSetAccountCurrency(
+                            handle,
+                            e.target.value === account.currencyCode
+                              ? null
+                              : e.target.value,
+                          )
+                        }
+                        options={currencyOptions}
+                        disabled={handle === null || !included}
+                        aria-label={t('mnyReview.table.currencyForAccount', {
+                          name: account.name,
+                        })}
+                        className="text-xs"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">
+                      {account.transactionCount}
+                    </td>
+                    <td className="px-3 py-2 text-right text-muted-foreground">
+                      {formatCurrency(account.openingBalance, currency)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium text-foreground">
+                      {formatCurrency(account.finalBalance, currency)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Options */}
+      <div className="mb-6 bg-card border border-border rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-foreground mb-3">
+          {t('mnyReview.optionsHeading')}
+        </h3>
+        <div className="space-y-2">
+          <OptionCheckbox
+            label={t('mnyReview.options.referencedOnlyPayees')}
+            hint={t('mnyReview.options.referencedOnlyPayeesHint')}
+            checked={options.referencedOnlyPayees ?? true}
+            onChange={(value) => onSetOption('referencedOnlyPayees', value)}
+          />
+          <OptionCheckbox
+            label={t('mnyReview.options.referencedOnlyCategories')}
+            hint={t('mnyReview.options.referencedOnlyCategoriesHint')}
+            checked={options.referencedOnlyCategories ?? true}
+            onChange={(value) => onSetOption('referencedOnlyCategories', value)}
+          />
+          <OptionCheckbox
+            label={t('mnyReview.options.importClosedAccounts')}
+            hint={t('mnyReview.options.importClosedAccountsHint')}
+            checked={options.importClosedAccounts ?? true}
+            onChange={(value) => onSetOption('importClosedAccounts', value)}
+          />
+        </div>
+      </div>
+
+      {/* Mapper warnings */}
+      {preview.warnings.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-foreground mb-2">
+            {t('mnyReview.warningsHeading')}
+          </h3>
+          <ul className="bg-card border border-border rounded-lg divide-y divide-border text-sm">
+            {preview.warnings.map((warning) => (
+              <li key={warning.code} className="px-4 py-2">
+                <span className="text-foreground">
+                  {t(`mnyWarnings.${warning.code}`, {
+                    count: warning.count,
+                  })}
+                </span>
+                {warning.samples.length > 0 && (
+                  <span className="block text-xs text-muted-foreground">
+                    {warning.samples.join(', ')}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex justify-between pt-4">
+        <Button variant="outline" onClick={onBack} disabled={isLoading}>
+          {t('navigation.back')}
+        </Button>
+        <Button
+          onClick={onImport}
+          isLoading={isLoading}
+          disabled={includedCount === 0}
+        >
+          {t('mnyReview.startImport')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SummaryTile({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-lg px-3 py-2">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      <div className="text-lg font-semibold text-foreground">{value}</div>
+      <div className="text-xs text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+function OptionCheckbox({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="flex items-start gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 rounded border-border"
+      />
+      <span>
+        <span className="text-sm text-foreground">{label}</span>
+        <span className="block text-xs text-muted-foreground">{hint}</span>
+      </span>
+    </label>
+  );
+}

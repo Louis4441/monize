@@ -276,7 +276,18 @@
     "invalidSecurityMapping": "El mapeo de valor hace referencia a un valor no válido: {{ secId }}",
     "columnMappingNotFound": "Mapeo de columna no encontrado",
     "columnMappingDuplicate": "Ya existe un mapeo de columna llamado \"{{ name }}\"",
-    "accountNotFound": "Cuenta no encontrada"
+    "accountNotFound": "Cuenta no encontrada",
+    "mnyNoFile": "No se ha subido ningún archivo de Money",
+    "mnyFileTruncated": "Este archivo de Money parece incompleto. Puede que la subida se haya interrumpido: vuelva a intentarlo.",
+    "mnyNotAMoneyFile": "Ese archivo no es un archivo de Microsoft Money (.mny)",
+    "mnyUnsupportedVersion": "Ese archivo se creó con Money 97 o 98, que Monize no puede leer. Ábralo y guárdelo una vez en la edición gratuita Money Plus Sunset y después importe el resultado.",
+    "mnyPasswordRequired": "Ese archivo de Money está protegido con contraseña. Introdúzcala para continuar.",
+    "mnyPasswordIncorrect": "Esa contraseña no abre el archivo de Money. Compruébela y vuelva a intentarlo.",
+    "mnyUnreadableDatabase": "Ese archivo de Money se descifró, pero no se pudo leer su contenido. Puede estar dañado.",
+    "mnyStagedFileMissing": "El archivo de Money subido ya no está disponible. Vuelva a subirlo.",
+    "mnyImportAlreadyRunning": "Ya hay una importación en curso. Espere a que termine antes de iniciar otra.",
+    "mnyJobNotFound": "Tarea de importación no encontrada",
+    "mnyFileTooLarge": "Ese archivo de Money supera el límite de importación de {{ limit }} MB."
   },
   "monteCarlo": {
     "scenarioNotFound": "Escenario {{ id }} no encontrado",

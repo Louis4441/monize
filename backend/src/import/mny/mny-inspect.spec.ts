@@ -1,6 +1,11 @@
 import { fakeMnyDatabase } from "./__fixtures__/fake-mny-database";
 import { readMnyFixture } from "./__fixtures__/mny-fixtures";
-import { inspect, parseInspectArgs, summarise } from "./mny-inspect";
+import {
+  inspect,
+  mappingSummary,
+  parseInspectArgs,
+  summarise,
+} from "./mny-inspect";
 import { openMnyFile } from "./msisam/open-mny";
 import { readMnyTables } from "./tables/read-mny-tables";
 
@@ -68,6 +73,41 @@ describe("summarise", () => {
 
     expect(lines).toContain("  base currency:   unknown");
     expect(lines).toContain("  defaulted fields: none");
+  });
+});
+
+describe("mappingSummary", () => {
+  it("reports the Monize accounts a real file maps to, with balances", () => {
+    const lines = mappingSummary(
+      readMnyTables(openMnyFile(readMnyFixture("money2002"))),
+    );
+
+    expect(lines).toContain("  base currency:   GBP");
+    // Two Money investment accounts become two Monize pairs.
+    expect(lines).toContain("  accounts:        4 (0 skipped)");
+    expect(
+      lines.some((line) => line.includes("None Investment - Brokerage")),
+    ).toBe(true);
+    expect(
+      lines.some((line) => line.trimStart().startsWith("transactions:")),
+    ).toBe(true);
+  });
+
+  it("reports investment rows as deferred rather than as failures", () => {
+    const lines = mappingSummary(
+      readMnyTables(openMnyFile(readMnyFixture("money2002"))),
+    );
+
+    expect(
+      lines.some((line) => line.includes("60 investment rows deferred")),
+    ).toBe(true);
+    expect(lines.some((line) => line.includes("0 skipped,"))).toBe(true);
+  });
+
+  it("survives a file with no accounts at all", () => {
+    const lines = mappingSummary(readMnyTables(fakeMnyDatabase({})));
+
+    expect(lines).toContain("  accounts:        0 (0 skipped)");
   });
 });
 

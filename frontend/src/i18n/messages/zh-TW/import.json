@@ -29,7 +29,8 @@
     "selectAccountForAllFiles": "請為所有檔案選擇科目",
     "importFailed": "匯入失敗",
     "importedFromFiles": "成功從 {files} 個檔案匯入 {imported} 筆交易",
-    "imported": "成功匯入 {imported} 筆交易"
+    "imported": "成功匯入 {imported} 筆交易",
+    "mnySingleFileOnly": "請一次匯入一個 Microsoft Money 檔案 -- 一個 .mny 檔案包含完整的帳務資料。"
   },
   "page": {
     "title": "匯入交易",
@@ -287,5 +288,131 @@
   "navigation": {
     "back": "上一步",
     "next": "下一步"
+  },
+  "mnyPassword": {
+    "heading": "此 Money 檔案需要密碼",
+    "body": "Microsoft Money 以密碼加密了這個檔案。請輸入密碼以繼續；密碼只用於讀取檔案一次，不會被儲存。",
+    "retryBody": "該密碼無法開啟檔案。請檢查後重試 -- Money 密碼區分大小寫。",
+    "label": "Money 檔案密碼",
+    "submit": "開啟檔案"
+  },
+  "mnyReview": {
+    "heading": "檢查您的 Microsoft Money 檔案",
+    "fileSummary": "{filename} -- {era}，基準貨幣 {currency}。下面的餘額是依檔案本身計算的，因此您可以在匯入前與 Money 核對。",
+    "era": {
+      "money2001": "Money 2001 格式",
+      "money2002": "Money 2002 格式",
+      "moneyPlus": "Money Plus / Sunset 格式",
+      "unknown": "無法識別的 Money 版本"
+    },
+    "missingTables": "此 Money 版本沒有 {tables} 表格，因此其中的內容會被略過。",
+    "counts": {
+      "transactions": "交易",
+      "transfersLinked": "已連結 {count} 筆轉帳",
+      "payees": "收款人",
+      "categories": "類別",
+      "accounts": "帳戶",
+      "ofTotal": "共 {total} 項"
+    },
+    "notYetImported": "投資與排定帳單尚未匯入：{investments} 筆投資交易、{securities} 檔證券與 {bills} 列帳單留待後續版本。您的銀行紀錄會完整匯入。",
+    "accountsHeading": "帳戶（{count}）",
+    "selectAll": "全選",
+    "selectNone": "全不選",
+    "table": {
+      "include": "匯入",
+      "includeAccount": "匯入 {name}",
+      "account": "帳戶",
+      "type": "類型",
+      "currency": "貨幣",
+      "currencyForAccount": "{name} 的貨幣",
+      "transactions": "交易",
+      "openingBalance": "期初餘額",
+      "finalBalance": "最終餘額",
+      "closed": "已結清",
+      "favourite": "收藏",
+      "renamedFrom": "在 Money 中名為「{name}」"
+    },
+    "optionsHeading": "匯入選項",
+    "options": {
+      "referencedOnlyPayees": "僅匯入使用過的收款人",
+      "referencedOnlyPayeesHint": "Money 會在最後一筆交易之後長期保留收款人。保持開啟可略過未使用的收款人。",
+      "referencedOnlyCategories": "僅匯入使用過的類別",
+      "referencedOnlyCategoriesHint": "無論您是否使用，Money 都會建立完整的類別樹。保持開啟可略過從未用過的類別。",
+      "importClosedAccounts": "匯入已結清的帳戶",
+      "importClosedAccountsHint": "已結清的帳戶仍保有值得留存的紀錄，匯入後維持結清狀態。"
+    },
+    "warningsHeading": "關於此檔案的說明",
+    "startImport": "開始匯入"
+  },
+  "mnyImporting": {
+    "heading": "正在匯入您的 Money 檔案",
+    "doNotClose": "此程序在伺服器上執行，您可以離開此頁面稍後再回來。較大的檔案需要幾分鐘。",
+    "rowProgress": "{total} 中的 {processed}",
+    "phases": {
+      "preparing": "準備中",
+      "reference": "帳戶、類別與收款人",
+      "transactions": "交易",
+      "investments": "投資",
+      "bills": "排定帳單",
+      "prices": "價格與匯率",
+      "finalizing": "重新計算餘額",
+      "verifying": "驗證中"
+    },
+    "failedHeading": "匯入未完成",
+    "retry": "重試",
+    "startOver": "重新開始"
+  },
+  "mnyComplete": {
+    "heading": "匯入完成",
+    "allMatch": "全部 {count} 個帳戶均核對一致：每個餘額都與依 Money 檔案計算的結果相同。",
+    "someDiffer": "{count} 個帳戶與依 Money 檔案計算的餘額不一致。下面標記的列顯示差額。",
+    "counts": {
+      "accounts": "帳戶",
+      "transactions": "交易",
+      "transfers": "轉帳",
+      "splits": "拆分明細",
+      "payees": "收款人",
+      "categories": "類別"
+    },
+    "existingDataRemoved": "已依您的要求，在本次匯入前刪除原有資料。",
+    "verificationHeading": "餘額驗證",
+    "table": {
+      "account": "帳戶",
+      "transactions": "交易",
+      "expected": "來自 Money 檔案",
+      "imported": "Monize 中",
+      "delta": "差額",
+      "check": "待核對"
+    },
+    "warningsHeading": "關於本次匯入的說明",
+    "downloadReport": "下載報告",
+    "done": "完成"
+  },
+  "mnyWarnings": {
+    "missingTable": "此 Money 版本缺少匯入所需的 {count, plural, other {# 個表格}}。",
+    "missingField": "此 Money 版本中缺少 {count, plural, other {# 個欄位}}，已使用預設值。",
+    "unknownAccountType": "{count, plural, other {# 個帳戶}}的帳戶類型 Monize 無法識別，已略過。",
+    "duplicateAccountName": "{count, plural, other {# 個帳戶}}與其他帳戶同名，已重新命名。",
+    "unknownCurrency": "{count, plural, other {# 個帳戶}}參照了檔案中未定義的貨幣，將使用基準貨幣。",
+    "categoryFlattened": "{count, plural, other {# 個類別}}層級超過兩層，已併入其上層類別。",
+    "categoryTypeInferred": "{count, plural, other {# 個類別}}缺少 Money 的收入標記，收入或支出依類別樹推斷。",
+    "degeneratePayeeSkipped": "已略過 Money 內部保留的 {count, plural, other {# 個佔位收款人}}。",
+    "unusableTransaction": "{count, plural, other {# 筆交易}}沒有帳戶或可用日期，已略過。",
+    "orphanedTransferSide": "{count, plural, other {# 筆轉帳}}在檔案中缺少對應的另一方，已略過。",
+    "orphanedSplit": "{count, plural, other {# 列拆分明細}}沒有對應的上層交易，已略過。",
+    "splitSumMismatch": "{count, plural, other {# 筆拆分}}的明細金額與交易總額不符，已保留 Money 自身的金額。",
+    "transferAcrossExcludedAccount": "{count, plural, other {# 筆轉帳}}指向您排除的帳戶，已作為一般交易匯入。",
+    "balanceMismatch": "{count, plural, other {# 個帳戶}}的最終餘額與 Money 檔案不一致。"
+  },
+  "mnyErrors": {
+    "mnyImportFailed": "匯入過程中發生問題。沒有儲存任何內容 -- 您可以重試。",
+    "mnyJobStalled": "匯入已停止回應，很可能是伺服器重新啟動所致。您上傳的檔案仍在，重試是安全的。",
+    "mnyStagedFileMissing": "上傳的 Money 檔案已無法使用，請重新上傳。",
+    "mnyFileTruncated": "這個 Money 檔案似乎不完整，上傳可能被中斷。",
+    "mnyNotAMoneyFile": "這個檔案不是 Microsoft Money (.mny) 檔案。",
+    "mnyUnsupportedVersion": "這個檔案由 Money 97 或 98 建立。請先以免費的 Money Plus Sunset 版本開啟並儲存一次，然後匯入結果。",
+    "mnyPasswordRequired": "這個 Money 檔案受密碼保護。",
+    "mnyPasswordIncorrect": "這個密碼無法開啟 Money 檔案。",
+    "mnyUnreadableDatabase": "這個 Money 檔案已解密，但無法讀取其內容，檔案可能已損壞。"
   }
 }

@@ -1,0 +1,516 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { AxiosError } from 'axios';
+import { useMnyImport } from './useMnyImport';
+import { mnyImportApi } from '@/lib/import-mny';
+import type { MnyImportJob, MnyPreview } from '@/lib/import-mny';
+
+vi.mock('@/lib/import-mny', () => ({
+  mnyImportApi: {
+    parse: vi.fn(),
+    start: vi.fn(),
+    getJob: vi.fn(),
+    discardStagedFile: vi.fn(),
+  },
+}));
+
+const mockedApi = vi.mocked(mnyImportApi);
+
+function preview(overrides: Partial<MnyPreview> = {}): MnyPreview {
+  return {
+    stagedFileId: 'staged-1',
+    filename: 'finances.mny',
+    sizeBytes: 1024,
+    era: 'moneyPlus',
+    passwordProtected: false,
+    baseCurrency: 'USD',
+    accounts: [
+      {
+        key: 'acct-1',
+        handle: 1,
+        name: 'Chequing',
+        moneyName: 'Chequing',
+        accountType: 'CHEQUING',
+        accountSubType: null,
+        currencyCode: 'USD',
+        transactionCount: 10,
+        openingBalance: 0,
+        finalBalance: 100,
+        closed: false,
+        favourite: false,
+      },
+      {
+        key: 'acct-2',
+        handle: 2,
+        name: 'Savings',
+        moneyName: 'Savings',
+        accountType: 'SAVINGS',
+        accountSubType: null,
+        currencyCode: 'USD',
+        transactionCount: 5,
+        openingBalance: 0,
+        finalBalance: 50,
+        closed: false,
+        favourite: false,
+      },
+    ],
+    counts: {
+      accountsIncluded: 2,
+      accountsInFile: 2,
+      payeesToCreate: 1,
+      payeesInFile: 2,
+      categoriesToCreate: 1,
+      categoriesInFile: 2,
+      transactionsToCreate: 15,
+      transfersToLink: 0,
+      transactionsSkipped: 0,
+      investmentsDeferred: 0,
+    },
+    fileCounts: {
+      accounts: 2,
+      payees: 2,
+      categories: 2,
+      securities: 0,
+      securityPrices: 0,
+      exchangeRates: 0,
+      bills: 0,
+      transactions: 15,
+    },
+    missingTables: [],
+    missingFields: [],
+    warnings: [],
+    options: {
+      wipeExistingData: false,
+      referencedOnlyPayees: true,
+      referencedOnlyCategories: true,
+      importClosedAccounts: true,
+      importPrices: true,
+      importExchangeRates: true,
+      accounts: [],
+      bills: [],
+    },
+    ...overrides,
+  };
+}
+
+function job(overrides: Partial<MnyImportJob> = {}): MnyImportJob {
+  return {
+    id: 'job-1',
+    status: 'running',
+    progress: null,
+    result: null,
+    errorKey: null,
+    retryable: false,
+    startedAt: null,
+    completedAt: null,
+    ...overrides,
+  };
+}
+
+/** An axios error shaped the way the backend's error taxonomy arrives. */
+function apiError(errorCode: string, message = 'boom'): AxiosError {
+  const error = new AxiosError(message);
+  error.response = {
+    data: { message, errorCode },
+    status: 400,
+    statusText: 'Bad Request',
+    headers: {},
+    config: {} as never,
+  };
+  return error;
+}
+
+const file = new File(['bytes'], 'finances.mny');
+
+describe('useMnyImport', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedApi.parse.mockResolvedValue(preview());
+    mockedApi.start.mockResolvedValue(job());
+    mockedApi.getJob.mockResolvedValue(job());
+  });
+
+  afterEach(() => vi.useRealTimers());
+
+  describe('upload', () => {
+    it('keeps the preview and the server-computed option defaults', async () => {
+      const { result } = renderHook(() => useMnyImport());
+
+      await act(async () => {
+        expect(await result.current.upload(file)).toBe(true);
+      });
+
+      expect(result.current.preview?.stagedFileId).toBe('staged-1');
+      expect(result.current.options.referencedOnlyPayees).toBe(true);
+    });
+
+    it('prompts for a password when the file is protected', async () => {
+      mockedApi.parse.mockRejectedValue(apiError('mnyPasswordRequired'));
+      const { result } = renderHook(() => useMnyImport());
+
+      await act(async () => {
+        expect(await result.current.upload(file)).toBe(false);
+      });
+
+      expect(result.current.passwordPrompt).toEqual({ retry: false });
+      // Nothing to show yet: the file needing a password is not an error.
+      expect(result.current.uploadError).toBeNull();
+    });
+
+    it('distinguishes a wrong password from a missing one', async () => {
+      mockedApi.parse.mockRejectedValue(apiError('mnyPasswordIncorrect'));
+      const { result } = renderHook(() => useMnyImport());
+
+      await act(async () => {
+        await result.current.upload(file, 'wrong');
+      });
+
+      expect(result.current.passwordPrompt).toEqual({ retry: true });
+      expect(result.current.uploadError?.code).toBe('mnyPasswordIncorrect');
+    });
+
+    it('reports any other failure without prompting for a password', async () => {
+      mockedApi.parse.mockRejectedValue(
+        apiError('mnyUnsupportedVersion', 'Money 97 file'),
+      );
+      const { result } = renderHook(() => useMnyImport());
+
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      expect(result.current.passwordPrompt).toBeNull();
+      expect(result.current.uploadError).toEqual({
+        code: 'mnyUnsupportedVersion',
+        message: 'Money 97 file',
+      });
+    });
+
+    it('retries with a password without asking for the file again', async () => {
+      mockedApi.parse.mockRejectedValueOnce(apiError('mnyPasswordRequired'));
+      const { result } = renderHook(() => useMnyImport());
+
+      await act(async () => {
+        await result.current.upload(file);
+      });
+      await act(async () => {
+        expect(await result.current.retryWithPassword('hunter2')).toBe(true);
+      });
+
+      expect(mockedApi.parse).toHaveBeenLastCalledWith(file, 'hunter2');
+      expect(result.current.passwordPrompt).toBeNull();
+    });
+
+    it('cannot retry before a file has been chosen', async () => {
+      const { result } = renderHook(() => useMnyImport());
+
+      await act(async () => {
+        expect(await result.current.retryWithPassword('x')).toBe(false);
+      });
+
+      expect(mockedApi.parse).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('account selection', () => {
+    it('sends only the accounts the user actually changed', async () => {
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.toggleAccount(2));
+      await act(async () => {
+        await result.current.start();
+      });
+
+      // A 56-account file with one edit must not send 56 entries.
+      expect(mockedApi.start).toHaveBeenCalledWith(
+        'staged-1',
+        expect.objectContaining({
+          accounts: [{ handle: 2, include: false, currencyOverride: null }],
+        }),
+        undefined,
+      );
+    });
+
+    it('toggles an account back on', async () => {
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.toggleAccount(2));
+      act(() => result.current.toggleAccount(2));
+
+      expect(result.current.excludedHandles.size).toBe(0);
+    });
+
+    it('excludes or includes every account at once', async () => {
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.setAllAccounts(false));
+      expect([...result.current.excludedHandles].sort()).toEqual([1, 2]);
+
+      act(() => result.current.setAllAccounts(true));
+      expect(result.current.excludedHandles.size).toBe(0);
+    });
+
+    it('records and clears a currency override', async () => {
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.setAccountCurrency(1, 'CAD'));
+      expect(result.current.currencyOverrides.get(1)).toBe('CAD');
+
+      act(() => result.current.setAccountCurrency(1, null));
+      expect(result.current.currencyOverrides.has(1)).toBe(false);
+    });
+
+    it('sends a currency override for an account that is still included', async () => {
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.setAccountCurrency(1, 'CAD'));
+      await act(async () => {
+        await result.current.start();
+      });
+
+      expect(mockedApi.start).toHaveBeenCalledWith(
+        'staged-1',
+        expect.objectContaining({
+          accounts: [{ handle: 1, include: true, currencyOverride: 'CAD' }],
+        }),
+        undefined,
+      );
+    });
+  });
+
+  describe('options', () => {
+    it('overrides a single option and leaves the rest', async () => {
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.setOption('referencedOnlyPayees', false));
+
+      expect(result.current.options.referencedOnlyPayees).toBe(false);
+      expect(result.current.options.referencedOnlyCategories).toBe(true);
+    });
+  });
+
+  describe('start and polling', () => {
+    it('does nothing without a preview', async () => {
+      const { result } = renderHook(() => useMnyImport());
+
+      await act(async () => {
+        expect(await result.current.start()).toBe(false);
+      });
+      expect(mockedApi.start).not.toHaveBeenCalled();
+    });
+
+    it('forwards a wipe password on the start request only', async () => {
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      await act(async () => {
+        await result.current.start('hunter2');
+      });
+
+      expect(mockedApi.start).toHaveBeenCalledWith(
+        'staged-1',
+        expect.anything(),
+        { password: 'hunter2' },
+      );
+    });
+
+    it('reports a failure to start, e.g. a wrong wipe password', async () => {
+      mockedApi.start.mockRejectedValue(
+        apiError('UNAUTHORIZED', 'Invalid password'),
+      );
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      await act(async () => {
+        expect(await result.current.start('wrong')).toBe(false);
+      });
+
+      expect(result.current.uploadError?.message).toBe('Invalid password');
+    });
+
+    it('polls until the job finishes, then stops', async () => {
+      vi.useFakeTimers();
+      mockedApi.getJob
+        .mockResolvedValueOnce(
+          job({ progress: { phase: 'transactions', processed: 5, total: 15 } }),
+        )
+        .mockResolvedValueOnce(job({ status: 'completed' }));
+
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+      await act(async () => {
+        await result.current.start();
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      expect(result.current.job?.progress?.processed).toBe(5);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      expect(result.current.job?.status).toBe('completed');
+
+      const callsAtFinish = mockedApi.getJob.mock.calls.length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000);
+      });
+      expect(mockedApi.getJob.mock.calls.length).toBe(callsAtFinish);
+    });
+
+    it('keeps polling after a dropped poll rather than giving up', async () => {
+      vi.useFakeTimers();
+      mockedApi.getJob
+        .mockRejectedValueOnce(new Error('network blip'))
+        .mockResolvedValueOnce(job({ status: 'completed' }));
+
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+      await act(async () => {
+        await result.current.start();
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+
+      expect(result.current.job?.status).toBe('completed');
+    });
+
+    it('stops polling a failed job', async () => {
+      vi.useFakeTimers();
+      mockedApi.getJob.mockResolvedValue(
+        job({ status: 'failed', errorKey: 'mnyImportFailed', retryable: true }),
+      );
+
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+      await act(async () => {
+        await result.current.start();
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+
+      const calls = mockedApi.getJob.mock.calls.length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000);
+      });
+      expect(mockedApi.getJob.mock.calls.length).toBe(calls);
+    });
+
+    it('stops polling when the component unmounts', async () => {
+      vi.useFakeTimers();
+      const { result, unmount } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+      await act(async () => {
+        await result.current.start();
+      });
+
+      unmount();
+      const calls = mockedApi.getJob.mock.calls.length;
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000);
+      });
+
+      expect(mockedApi.getJob.mock.calls.length).toBe(calls);
+    });
+  });
+
+  describe('retry', () => {
+    it('starts a new job over the same staged file, with no re-upload', async () => {
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+      await act(async () => {
+        await result.current.start();
+      });
+
+      mockedApi.parse.mockClear();
+      await act(async () => {
+        expect(await result.current.retry()).toBe(true);
+      });
+
+      expect(mockedApi.parse).not.toHaveBeenCalled();
+      expect(mockedApi.start).toHaveBeenLastCalledWith(
+        'staged-1',
+        expect.anything(),
+        undefined,
+      );
+    });
+
+    it('cannot retry without a staged file', async () => {
+      const { result } = renderHook(() => useMnyImport());
+
+      await act(async () => {
+        expect(await result.current.retry()).toBe(false);
+      });
+    });
+  });
+
+  describe('reset', () => {
+    it('clears everything so the wizard can start again', async () => {
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+      act(() => result.current.toggleAccount(1));
+
+      act(() => result.current.reset());
+
+      await waitFor(() => {
+        expect(result.current.preview).toBeNull();
+        expect(result.current.job).toBeNull();
+        expect(result.current.excludedHandles.size).toBe(0);
+        expect(result.current.options).toEqual({});
+      });
+    });
+
+    it('cancels the password prompt without keeping the file', async () => {
+      mockedApi.parse.mockRejectedValue(apiError('mnyPasswordRequired'));
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+
+      act(() => result.current.cancelPasswordPrompt());
+      expect(result.current.passwordPrompt).toBeNull();
+
+      await act(async () => {
+        expect(await result.current.retryWithPassword('x')).toBe(false);
+      });
+    });
+  });
+});

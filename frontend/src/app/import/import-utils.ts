@@ -1,8 +1,14 @@
 import { ParsedQifResponse } from '@/lib/import';
 export { formatAccountType, isInvestmentBrokerageAccount } from '@/lib/account-utils';
 
-export type ImportFileType = 'qif' | 'ofx' | 'csv';
-export type ImportStep = 'upload' | 'csvColumnMapping' | 'selectAccount' | 'mapCategories' | 'mapSecurities' | 'mapAccounts' | 'review' | 'multiAccountReview' | 'complete';
+/**
+ * `mny` is a binary Microsoft Money database, not text: it is uploaded as
+ * multipart and never read with `File.text()`, and it skips the mapping steps
+ * entirely because the file already carries exact accounts, categories and
+ * transfer links.
+ */
+export type ImportFileType = 'qif' | 'ofx' | 'csv' | 'mny';
+export type ImportStep = 'upload' | 'csvColumnMapping' | 'selectAccount' | 'mapCategories' | 'mapSecurities' | 'mapAccounts' | 'review' | 'multiAccountReview' | 'mnyReview' | 'mnyImporting' | 'complete';
 export type MatchConfidence = 'exact' | 'partial' | 'type' | 'none';
 
 export interface ImportFileData {

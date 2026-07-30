@@ -276,7 +276,18 @@
     "invalidSecurityMapping": "Сопоставление ценной бумаги ссылается на недопустимую ценную бумагу: {{ secId }}",
     "columnMappingNotFound": "Сопоставление столбцов не найдено",
     "columnMappingDuplicate": "Сопоставление столбцов с именем \"{{ name }}\" уже существует",
-    "accountNotFound": "Счёт не найден"
+    "accountNotFound": "Счёт не найден",
+    "mnyNoFile": "Файл Money не был загружен",
+    "mnyFileTruncated": "Этот файл Money выглядит неполным. Возможно, загрузка была прервана -- попробуйте снова.",
+    "mnyNotAMoneyFile": "Этот файл не является файлом Microsoft Money (.mny)",
+    "mnyUnsupportedVersion": "Этот файл создан в Money 97 или 98, который Monize не может прочитать. Откройте и сохраните его один раз в бесплатной версии Money Plus Sunset, а затем импортируйте результат.",
+    "mnyPasswordRequired": "Этот файл Money защищён паролем. Введите пароль, чтобы продолжить.",
+    "mnyPasswordIncorrect": "Этот пароль не открывает файл Money. Проверьте его и попробуйте снова.",
+    "mnyUnreadableDatabase": "Этот файл Money удалось расшифровать, но прочитать его содержимое не получилось. Возможно, он повреждён.",
+    "mnyStagedFileMissing": "Загруженный файл Money больше недоступен. Загрузите его снова.",
+    "mnyImportAlreadyRunning": "Импорт уже выполняется. Дождитесь его завершения, прежде чем запускать новый.",
+    "mnyJobNotFound": "Задача импорта не найдена",
+    "mnyFileTooLarge": "Этот файл Money превышает лимит импорта в {{ limit }} МБ."
   },
   "monteCarlo": {
     "scenarioNotFound": "Сценарий {{ id }} не найден",

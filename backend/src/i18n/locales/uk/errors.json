@@ -276,7 +276,18 @@
     "invalidSecurityMapping": "Відображення цінного паперу посилається на недійсний цінний папір: {{ secId }}",
     "columnMappingNotFound": "Відображення стовпця не знайдено",
     "columnMappingDuplicate": "Відображення стовпця з назвою «{{ name }}» вже існує",
-    "accountNotFound": "Рахунок не знайдено"
+    "accountNotFound": "Рахунок не знайдено",
+    "mnyNoFile": "Файл Money не завантажено",
+    "mnyFileTruncated": "Цей файл Money виглядає неповним. Можливо, завантаження було перервано -- спробуйте ще раз.",
+    "mnyNotAMoneyFile": "Цей файл не є файлом Microsoft Money (.mny)",
+    "mnyUnsupportedVersion": "Цей файл створено в Money 97 або 98, який Monize не може прочитати. Відкрийте та збережіть його один раз у безкоштовній версії Money Plus Sunset, а потім імпортуйте результат.",
+    "mnyPasswordRequired": "Цей файл Money захищено паролем. Введіть пароль, щоб продовжити.",
+    "mnyPasswordIncorrect": "Цей пароль не відкриває файл Money. Перевірте його та спробуйте ще раз.",
+    "mnyUnreadableDatabase": "Цей файл Money було розшифровано, але прочитати його вміст не вдалося. Можливо, він пошкоджений.",
+    "mnyStagedFileMissing": "Завантажений файл Money більше недоступний. Завантажте його знову.",
+    "mnyImportAlreadyRunning": "Імпорт уже виконується. Дочекайтеся його завершення, перш ніж починати новий.",
+    "mnyJobNotFound": "Завдання імпорту не знайдено",
+    "mnyFileTooLarge": "Цей файл Money перевищує ліміт імпорту в {{ limit }} МБ."
   },
   "monteCarlo": {
     "scenarioNotFound": "Сценарій {{ id }} не знайдено",

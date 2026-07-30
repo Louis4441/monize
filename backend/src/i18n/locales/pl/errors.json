@@ -276,7 +276,18 @@
     "invalidSecurityMapping": "Mapowanie papieru wartościowego odwołuje się do nieprawidłowego papieru: {{ secId }}",
     "columnMappingNotFound": "Nie znaleziono mapowania kolumn",
     "columnMappingDuplicate": "Mapowanie kolumn o nazwie \"{{ name }}\" już istnieje",
-    "accountNotFound": "Nie znaleziono konta"
+    "accountNotFound": "Nie znaleziono konta",
+    "mnyNoFile": "Nie przesłano żadnego pliku Money",
+    "mnyFileTruncated": "Ten plik Money wygląda na niekompletny. Przesyłanie mogło zostać przerwane -- spróbuj ponownie.",
+    "mnyNotAMoneyFile": "Ten plik nie jest plikiem Microsoft Money (.mny)",
+    "mnyUnsupportedVersion": "Ten plik został utworzony w programie Money 97 lub 98, którego Monize nie potrafi odczytać. Otwórz go i zapisz raz w darmowej edycji Money Plus Sunset, a następnie zaimportuj wynik.",
+    "mnyPasswordRequired": "Ten plik Money jest chroniony hasłem. Podaj hasło, aby kontynuować.",
+    "mnyPasswordIncorrect": "To hasło nie otwiera pliku Money. Sprawdź je i spróbuj ponownie.",
+    "mnyUnreadableDatabase": "Ten plik Money został odszyfrowany, ale nie udało się odczytać jego zawartości. Może być uszkodzony.",
+    "mnyStagedFileMissing": "Przesłany plik Money nie jest już dostępny. Prześlij go ponownie.",
+    "mnyImportAlreadyRunning": "Import już trwa. Poczekaj na jego zakończenie, zanim rozpoczniesz następny.",
+    "mnyJobNotFound": "Nie znaleziono zadania importu",
+    "mnyFileTooLarge": "Ten plik Money jest większy niż limit importu wynoszący {{ limit }} MB."
   },
   "monteCarlo": {
     "scenarioNotFound": "Nie znaleziono scenariusza {{ id }}",

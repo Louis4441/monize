@@ -3,6 +3,7 @@ import { requestContextStorage, RequestContext } from "../request-context";
 import {
   MISSING_CONTEXT_MESSAGE,
   getActiveScopedManager,
+  runOutsideActiveScopedManager,
   withScopedDb,
 } from "./scoped-db";
 
@@ -205,5 +206,51 @@ describe("withScopedDb -- re-entrancy", () => {
       withScopedDb(dataSource, async () => undefined),
     );
     expect(getActiveScopedManager()).toBeUndefined();
+  });
+});
+
+describe("runOutsideActiveScopedManager", () => {
+  it("opens a second transaction instead of joining the ambient one", async () => {
+    // The progress-publishing shape: a long write needs a concurrent reader to
+    // see a row before the outer transaction commits.
+    process.env.RLS_MODE = "enforce";
+    const { dataSource, transaction } = makeDataSource();
+
+    await run({ userId: "user-a" }, () =>
+      withScopedDb(dataSource, async () => {
+        expect(transaction).toHaveBeenCalledTimes(1);
+
+        await runOutsideActiveScopedManager(() =>
+          withScopedDb(dataSource, async () => undefined),
+        );
+
+        expect(transaction).toHaveBeenCalledTimes(2);
+      }),
+    );
+  });
+
+  it("hides the ambient manager only for the duration of the call", async () => {
+    process.env.RLS_MODE = "enforce";
+    const { dataSource, manager } = makeDataSource();
+
+    await run({ userId: "user-a" }, () =>
+      withScopedDb(dataSource, async () => {
+        runOutsideActiveScopedManager(() => {
+          expect(getActiveScopedManager()).toBeUndefined();
+        });
+        expect(getActiveScopedManager()).toBe(manager);
+      }),
+    );
+  });
+
+  it("still requires an identity context", async () => {
+    process.env.RLS_MODE = "enforce";
+    const { dataSource } = makeDataSource();
+
+    await expect(
+      runOutsideActiveScopedManager(() =>
+        withScopedDb(dataSource, async () => undefined),
+      ),
+    ).rejects.toThrow(MISSING_CONTEXT_MESSAGE);
   });
 });

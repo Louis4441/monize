@@ -276,7 +276,18 @@
     "invalidSecurityMapping": "Waardepapierentoewijzing verwijst naar een ongeldig waardepapier: {{ secId }}",
     "columnMappingNotFound": "Kolomtoewijzing niet gevonden",
     "columnMappingDuplicate": "Er bestaat al een kolomtoewijzing met de naam \"{{ name }}\"",
-    "accountNotFound": "Rekening niet gevonden"
+    "accountNotFound": "Rekening niet gevonden",
+    "mnyNoFile": "Er is geen Money-bestand geüpload",
+    "mnyFileTruncated": "Dit Money-bestand lijkt onvolledig. De upload is mogelijk onderbroken -- probeer het opnieuw.",
+    "mnyNotAMoneyFile": "Dit bestand is geen Microsoft Money-bestand (.mny)",
+    "mnyUnsupportedVersion": "Dit bestand is gemaakt met Money 97 of 98, dat Monize niet kan lezen. Open en bewaar het één keer in de gratis Money Plus Sunset-editie en importeer daarna het resultaat.",
+    "mnyPasswordRequired": "Dit Money-bestand is met een wachtwoord beveiligd. Voer het wachtwoord in om door te gaan.",
+    "mnyPasswordIncorrect": "Met dit wachtwoord kan het Money-bestand niet worden geopend. Controleer het en probeer het opnieuw.",
+    "mnyUnreadableDatabase": "Dit Money-bestand is ontsleuteld, maar de inhoud kon niet worden gelezen. Het is mogelijk beschadigd.",
+    "mnyStagedFileMissing": "Het geüploade Money-bestand is niet langer beschikbaar. Upload het opnieuw.",
+    "mnyImportAlreadyRunning": "Er loopt al een import. Wacht tot deze klaar is voordat u een nieuwe start.",
+    "mnyJobNotFound": "Importtaak niet gevonden",
+    "mnyFileTooLarge": "Dit Money-bestand is groter dan de importlimiet van {{ limit }} MB."
   },
   "monteCarlo": {
     "scenarioNotFound": "Scenario {{ id }} niet gevonden",

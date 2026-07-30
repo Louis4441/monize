@@ -16,3 +16,5 @@ Cron jobs use the `@Cron()` decorator from `@nestjs/schedule`. They run in a sep
 | `budget-period-cron.service` | 1st of month midnight | Create new budget periods |
 | `budget-alert.service` | Daily 7 AM, Mon 7 AM, Daily 3 AM | Budget threshold alerts |
 | `security-price.service` | 5 PM ET weekdays | Fetch security prices |
+| `mny-staging.service` | Hourly | Delete expired staged import files (24 h TTL) |
+| `mny-import-job.service` | Every 5 min | Fail import jobs whose worker stopped heartbeating |

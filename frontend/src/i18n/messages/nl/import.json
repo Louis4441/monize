@@ -29,7 +29,8 @@
     "selectAccountForAllFiles": "Selecteer een rekening voor alle bestanden",
     "importFailed": "Import mislukt",
     "importedFromFiles": "Succesvol {imported} transacties geïmporteerd uit {files} bestanden",
-    "imported": "Succesvol {imported} transacties geïmporteerd"
+    "imported": "Succesvol {imported} transacties geïmporteerd",
+    "mnySingleFileOnly": "Importeer Microsoft Money-bestanden één voor één -- een .mny-bestand bevat een volledig profiel."
   },
   "page": {
     "title": "Transacties importeren",
@@ -287,5 +288,131 @@
   "navigation": {
     "back": "Terug",
     "next": "Volgende"
+  },
+  "mnyPassword": {
+    "heading": "Dit Money-bestand vraagt een wachtwoord",
+    "body": "Microsoft Money heeft dit bestand met een wachtwoord versleuteld. Voer het in om door te gaan; het wordt één keer gebruikt om het bestand te lezen en nooit opgeslagen.",
+    "retryBody": "Dat wachtwoord opende het bestand niet. Controleer het en probeer het opnieuw -- Money-wachtwoorden zijn hoofdlettergevoelig.",
+    "label": "Wachtwoord van het Money-bestand",
+    "submit": "Bestand openen"
+  },
+  "mnyReview": {
+    "heading": "Controleer uw Microsoft Money-bestand",
+    "fileSummary": "{filename} -- {era}, basisvaluta {currency}. De saldi hieronder zijn uit het bestand zelf berekend, zodat u ze vóór het importeren met Money kunt vergelijken.",
+    "era": {
+      "money2001": "Money 2001-indeling",
+      "money2002": "Money 2002-indeling",
+      "moneyPlus": "Money Plus-/Sunset-indeling",
+      "unknown": "onbekende Money-versie"
+    },
+    "missingTables": "Deze Money-versie heeft geen {tables}-tabel, dus alles wat daarin zou staan wordt overgeslagen.",
+    "counts": {
+      "transactions": "Transacties",
+      "transfersLinked": "{count} overboekingen gekoppeld",
+      "payees": "Begunstigden",
+      "categories": "Categorieën",
+      "accounts": "Rekeningen",
+      "ofTotal": "van {total} in het bestand"
+    },
+    "notYetImported": "Beleggingen en geplande rekeningen worden nog niet geïmporteerd: {investments} beleggingstransacties, {securities} effecten en {bills} rekeningregels blijven voor een latere versie. Uw bankgeschiedenis wordt volledig geïmporteerd.",
+    "accountsHeading": "Rekeningen ({count})",
+    "selectAll": "Alles selecteren",
+    "selectNone": "Niets selecteren",
+    "table": {
+      "include": "Importeren",
+      "includeAccount": "{name} importeren",
+      "account": "Rekening",
+      "type": "Type",
+      "currency": "Valuta",
+      "currencyForAccount": "Valuta voor {name}",
+      "transactions": "Transacties",
+      "openingBalance": "Beginsaldo",
+      "finalBalance": "Eindsaldo",
+      "closed": "Gesloten",
+      "favourite": "Favoriet",
+      "renamedFrom": "in Money \"{name}\" genoemd"
+    },
+    "optionsHeading": "Importopties",
+    "options": {
+      "referencedOnlyPayees": "Alleen gebruikte begunstigden importeren",
+      "referencedOnlyPayeesHint": "Money bewaart begunstigden lang na hun laatste transactie. Laat dit aan staan om de ongebruikte over te slaan.",
+      "referencedOnlyCategories": "Alleen gebruikte categorieën importeren",
+      "referencedOnlyCategoriesHint": "Money maakt een volledige categoriestructuur aan, of u die gebruikt of niet. Laat dit aan staan om nooit gebruikte categorieën over te slaan.",
+      "importClosedAccounts": "Gesloten rekeningen importeren",
+      "importClosedAccountsHint": "Gesloten rekeningen bevatten nog geschiedenis die het bewaren waard is. Ze worden als gesloten geïmporteerd."
+    },
+    "warningsHeading": "Opmerkingen over dit bestand",
+    "startImport": "Import starten"
+  },
+  "mnyImporting": {
+    "heading": "Uw Money-bestand wordt geïmporteerd",
+    "doNotClose": "Dit loopt op de server, dus u kunt deze pagina verlaten en later terugkomen. Een groot bestand duurt een paar minuten.",
+    "rowProgress": "{processed} van {total}",
+    "phases": {
+      "preparing": "Voorbereiden",
+      "reference": "Rekeningen, categorieën en begunstigden",
+      "transactions": "Transacties",
+      "investments": "Beleggingen",
+      "bills": "Geplande rekeningen",
+      "prices": "Koersen en wisselkoersen",
+      "finalizing": "Saldi herberekenen",
+      "verifying": "Verifiëren"
+    },
+    "failedHeading": "De import is niet voltooid",
+    "retry": "Opnieuw proberen",
+    "startOver": "Opnieuw beginnen"
+  },
+  "mnyComplete": {
+    "heading": "Import voltooid",
+    "allMatch": "Alle {count} rekeningen kloppen: elk saldo komt overeen met het saldo dat uit uw Money-bestand is berekend.",
+    "someDiffer": "{count} rekeningen komen niet overeen met het saldo dat uit uw Money-bestand is berekend. De gemarkeerde regels hieronder tonen het verschil.",
+    "counts": {
+      "accounts": "Rekeningen",
+      "transactions": "Transacties",
+      "transfers": "Overboekingen",
+      "splits": "Splitsingsregels",
+      "payees": "Begunstigden",
+      "categories": "Categorieën"
+    },
+    "existingDataRemoved": "Uw bestaande gegevens zijn vóór deze import verwijderd, zoals gevraagd.",
+    "verificationHeading": "Saldoverificatie",
+    "table": {
+      "account": "Rekening",
+      "transactions": "Transacties",
+      "expected": "Uit Money-bestand",
+      "imported": "In Monize",
+      "delta": "Verschil",
+      "check": "Nakijken"
+    },
+    "warningsHeading": "Opmerkingen over deze import",
+    "downloadReport": "Rapport downloaden",
+    "done": "Klaar"
+  },
+  "mnyWarnings": {
+    "missingTable": "Deze Money-versie heeft {count, plural, one {# tabel} other {# tabellen}} niet die de import gebruikt.",
+    "missingField": "{count, plural, one {# veld zat} other {# velden zaten}} niet in deze Money-versie en kregen een standaardwaarde.",
+    "unknownAccountType": "{count, plural, one {# rekening had} other {# rekeningen hadden}} een rekeningtype dat Monize niet kent en zijn overgeslagen.",
+    "duplicateAccountName": "{count, plural, one {# rekening had} other {# rekeningen hadden}} dezelfde naam als een andere en zijn hernoemd.",
+    "unknownCurrency": "{count, plural, one {# rekening verwijst} other {# rekeningen verwijzen}} naar een valuta die het bestand niet definieert en gebruiken de basisvaluta.",
+    "categoryFlattened": "{count, plural, one {# categorie was} other {# categorieën waren}} dieper dan twee niveaus en zijn samengevoegd in hun hoofdcategorie.",
+    "categoryTypeInferred": "De inkomstenmarkering van Money ontbrak bij {count, plural, one {# categorie} other {# categorieën}}; inkomsten of uitgaven is uit de categoriestructuur afgeleid.",
+    "degeneratePayeeSkipped": "{count, plural, one {# tijdelijke begunstigde} other {# tijdelijke begunstigden}} die Money intern bewaart zijn overgeslagen.",
+    "unusableTransaction": "{count, plural, one {# transactie had} other {# transacties hadden}} geen rekening of geen bruikbare datum en zijn overgeslagen.",
+    "orphanedTransferSide": "{count, plural, one {# overboeking miste} other {# overboekingen misten}} hun tegenkant in het bestand en zijn overgeslagen.",
+    "orphanedSplit": "{count, plural, one {# splitsingsregel had} other {# splitsingsregels hadden}} geen bovenliggende transactie en zijn overgeslagen.",
+    "splitSumMismatch": "Bij {count, plural, one {# splitsing} other {# splitsingen}} tellen de regels niet op tot het transactietotaal; de totalen van Money zijn behouden.",
+    "transferAcrossExcludedAccount": "{count, plural, one {# overboeking wees} other {# overboekingen wezen}} naar een rekening die u hebt uitgesloten en zijn als gewone transacties geïmporteerd.",
+    "balanceMismatch": "{count, plural, one {# rekening eindigde} other {# rekeningen eindigden}} met een saldo dat afwijkt van het Money-bestand."
+  },
+  "mnyErrors": {
+    "mnyImportFailed": "Er is iets misgegaan tijdens de import. Er is niets opgeslagen -- u kunt het opnieuw proberen.",
+    "mnyJobStalled": "De import reageert niet meer, waarschijnlijk omdat de server opnieuw is opgestart. Uw geüploade bestand is er nog, dus opnieuw proberen is veilig.",
+    "mnyStagedFileMissing": "Het geüploade Money-bestand is niet langer beschikbaar. Upload het opnieuw.",
+    "mnyFileTruncated": "Dit Money-bestand lijkt onvolledig. De upload is mogelijk onderbroken.",
+    "mnyNotAMoneyFile": "Dit bestand is geen Microsoft Money-bestand (.mny).",
+    "mnyUnsupportedVersion": "Dit bestand is gemaakt met Money 97 of 98. Open en bewaar het één keer in de gratis Money Plus Sunset-editie en importeer daarna het resultaat.",
+    "mnyPasswordRequired": "Dit Money-bestand is met een wachtwoord beveiligd.",
+    "mnyPasswordIncorrect": "Met dit wachtwoord kan het Money-bestand niet worden geopend.",
+    "mnyUnreadableDatabase": "Dit Money-bestand is ontsleuteld, maar de inhoud kon niet worden gelezen. Het is mogelijk beschadigd."
   }
 }

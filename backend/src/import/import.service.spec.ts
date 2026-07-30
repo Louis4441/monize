@@ -25,6 +25,7 @@ import { NetWorthService } from "../net-worth/net-worth.service";
 import { SecurityPriceService } from "../securities/security-price.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { ImportEntityCreatorService } from "./import-entity-creator.service";
+import { ImportPostProcessingService } from "./import-post-processing.service";
 import { ImportInvestmentProcessorService } from "./import-investment-processor.service";
 import { ImportRegularProcessorService } from "./import-regular-processor.service";
 
@@ -328,6 +329,7 @@ describe("ImportService", () => {
         { provide: NetWorthService, useValue: mockNetWorthService },
         { provide: SecurityPriceService, useValue: mockSecurityPriceService },
         { provide: ExchangeRateService, useValue: mockExchangeRateService },
+        ImportPostProcessingService,
         ImportEntityCreatorService,
         ImportInvestmentProcessorService,
         ImportRegularProcessorService,

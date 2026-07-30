@@ -1224,6 +1224,52 @@ CREATE INDEX idx_import_column_mappings_user ON import_column_mappings(user_id);
 
 CREATE TRIGGER update_import_column_mappings_updated_at BEFORE UPDATE ON import_column_mappings FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Staged import files: the decrypted bytes of a binary upload (.mny today),
+-- held between the wizard's parse/preview call and the background import so any
+-- backend replica can run the job. The user's Money password is request-scoped
+-- and never stored here. See migration 117.
+CREATE TABLE import_staged_files (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    filename VARCHAR(255) NOT NULL,
+    source_format VARCHAR(20) NOT NULL DEFAULT 'mny',
+    size_bytes BIGINT NOT NULL,
+    sha256 CHAR(64) NOT NULL,
+    data BYTEA NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
+);
+
+CREATE INDEX idx_import_staged_files_user ON import_staged_files(user_id);
+CREATE INDEX idx_import_staged_files_expires ON import_staged_files(expires_at);
+
+-- One row per background import attempt. A failed job keeps its staged file so
+-- Retry is a new job over the same bytes.
+CREATE TABLE import_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    staged_file_id UUID REFERENCES import_staged_files(id) ON DELETE SET NULL,
+    source_format VARCHAR(20) NOT NULL DEFAULT 'mny',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending' | 'running' | 'completed' | 'failed'
+    options JSONB NOT NULL DEFAULT '{}'::jsonb,
+    progress JSONB,
+    result JSONB,
+    error_key VARCHAR(100),
+    error_detail TEXT,
+    retryable BOOLEAN NOT NULL DEFAULT false,
+    heartbeat_at TIMESTAMP,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_import_jobs_user ON import_jobs(user_id);
+CREATE INDEX idx_import_jobs_staged_file ON import_jobs(staged_file_id);
+CREATE INDEX idx_import_jobs_running_heartbeat ON import_jobs(heartbeat_at) WHERE status = 'running';
+
+CREATE TRIGGER update_import_jobs_updated_at BEFORE UPDATE ON import_jobs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Trigger for tags updated_at
 CREATE TRIGGER update_tags_updated_at BEFORE UPDATE ON tags FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -1435,6 +1481,8 @@ DECLARE
         'categories',
         'custom_reports',
         'import_column_mappings',
+        'import_jobs',
+        'import_staged_files',
         'institutions',
         'investment_reports',
         'investment_transactions',
@@ -1872,5 +1920,6 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- Verification helper (run manually; not part of the migration's effect):
 --   SELECT tablename, policyname FROM pg_policies
 --    WHERE schemaname = 'public' ORDER BY tablename;
--- Expected: 50 policies -- 26 direct + 4 real-user-keyed (112),
---           15 indirect (113), 5 special (114).
+-- Expected: 52 policies -- 26 direct + 4 real-user-keyed (112),
+--           15 indirect (113), 5 special (114),
+--           2 direct for the .mny import's staging + job tables (117).

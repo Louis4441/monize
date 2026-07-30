@@ -29,7 +29,8 @@
     "selectAccountForAllFiles": "कृपया सभी फ़ाइलों के लिए एक खाता चुनें",
     "importFailed": "आयात विफल हुआ",
     "importedFromFiles": "{files} फ़ाइलों से {imported} लेनदेन सफलतापूर्वक आयात किए गए",
-    "imported": "{imported} लेनदेन सफलतापूर्वक आयात किए गए"
+    "imported": "{imported} लेनदेन सफलतापूर्वक आयात किए गए",
+    "mnySingleFileOnly": "Microsoft Money फ़ाइलें एक-एक करके आयात करें -- एक .mny फ़ाइल में पूरी प्रोफ़ाइल होती है।"
   },
   "page": {
     "title": "लेनदेन आयात करें",
@@ -287,5 +288,131 @@
   "navigation": {
     "back": "वापस",
     "next": "अगला"
+  },
+  "mnyPassword": {
+    "heading": "इस Money फ़ाइल के लिए पासवर्ड आवश्यक है",
+    "body": "Microsoft Money ने इस फ़ाइल को पासवर्ड से एन्क्रिप्ट किया है। जारी रखने के लिए पासवर्ड दर्ज करें; यह फ़ाइल पढ़ने के लिए एक बार उपयोग होता है और कभी संग्रहीत नहीं किया जाता।",
+    "retryBody": "उस पासवर्ड से फ़ाइल नहीं खुली। इसे जाँचें और फिर से प्रयास करें -- Money पासवर्ड में बड़े-छोटे अक्षरों का अंतर मायने रखता है।",
+    "label": "Money फ़ाइल का पासवर्ड",
+    "submit": "फ़ाइल खोलें"
+  },
+  "mnyReview": {
+    "heading": "अपनी Microsoft Money फ़ाइल की समीक्षा करें",
+    "fileSummary": "{filename} -- {era}, आधार मुद्रा {currency}। नीचे दिए शेष फ़ाइल से ही गणना किए गए हैं, इसलिए आयात करने से पहले आप उन्हें Money से मिला सकते हैं।",
+    "era": {
+      "money2001": "Money 2001 प्रारूप",
+      "money2002": "Money 2002 प्रारूप",
+      "moneyPlus": "Money Plus / Sunset प्रारूप",
+      "unknown": "अज्ञात Money संस्करण"
+    },
+    "missingTables": "इस Money संस्करण में {tables} तालिका नहीं है, इसलिए उसमें आने वाली हर चीज़ छोड़ दी जाती है।",
+    "counts": {
+      "transactions": "लेन-देन",
+      "transfersLinked": "{count} स्थानांतरण जोड़े गए",
+      "payees": "प्राप्तकर्ता",
+      "categories": "श्रेणियाँ",
+      "accounts": "खाते",
+      "ofTotal": "फ़ाइल में {total} में से"
+    },
+    "notYetImported": "निवेश और निर्धारित बिल अभी आयात नहीं होते: {investments} निवेश लेन-देन, {securities} प्रतिभूतियाँ और {bills} बिल पंक्तियाँ किसी बाद के रिलीज़ के लिए रखी गई हैं। आपका बैंकिंग इतिहास पूरा आयात होता है।",
+    "accountsHeading": "खाते ({count})",
+    "selectAll": "सभी चुनें",
+    "selectNone": "कोई नहीं चुनें",
+    "table": {
+      "include": "आयात करें",
+      "includeAccount": "{name} आयात करें",
+      "account": "खाता",
+      "type": "प्रकार",
+      "currency": "मुद्रा",
+      "currencyForAccount": "{name} के लिए मुद्रा",
+      "transactions": "लेन-देन",
+      "openingBalance": "प्रारंभिक शेष",
+      "finalBalance": "अंतिम शेष",
+      "closed": "बंद",
+      "favourite": "पसंदीदा",
+      "renamedFrom": "Money में \"{name}\" नाम था"
+    },
+    "optionsHeading": "आयात विकल्प",
+    "options": {
+      "referencedOnlyPayees": "केवल उपयोग में आए प्राप्तकर्ता आयात करें",
+      "referencedOnlyPayeesHint": "Money प्राप्तकर्ताओं को उनके अंतिम लेन-देन के बहुत बाद तक रखता है। अनुपयोगी प्राप्तकर्ताओं को छोड़ने के लिए इसे चालू रखें।",
+      "referencedOnlyCategories": "केवल उपयोग में आई श्रेणियाँ आयात करें",
+      "referencedOnlyCategoriesHint": "Money पूरी श्रेणी संरचना बनाता है, चाहे आप उसका उपयोग करें या नहीं। कभी उपयोग न की गई श्रेणियाँ छोड़ने के लिए इसे चालू रखें।",
+      "importClosedAccounts": "बंद खाते आयात करें",
+      "importClosedAccountsHint": "बंद खातों में भी सहेजने योग्य इतिहास होता है। वे बंद स्थिति में ही आयात होते हैं।"
+    },
+    "warningsHeading": "इस फ़ाइल के बारे में टिप्पणियाँ",
+    "startImport": "आयात शुरू करें"
+  },
+  "mnyImporting": {
+    "heading": "आपकी Money फ़ाइल आयात हो रही है",
+    "doNotClose": "यह सर्वर पर चलता है, इसलिए आप इस पृष्ठ को छोड़कर बाद में वापस आ सकते हैं। बड़ी फ़ाइल में कुछ मिनट लगते हैं।",
+    "rowProgress": "{total} में से {processed}",
+    "phases": {
+      "preparing": "तैयारी",
+      "reference": "खाते, श्रेणियाँ और प्राप्तकर्ता",
+      "transactions": "लेन-देन",
+      "investments": "निवेश",
+      "bills": "निर्धारित बिल",
+      "prices": "भाव और विनिमय दरें",
+      "finalizing": "शेष की पुनर्गणना",
+      "verifying": "सत्यापन"
+    },
+    "failedHeading": "आयात पूरा नहीं हुआ",
+    "retry": "फिर से प्रयास करें",
+    "startOver": "नए सिरे से शुरू करें"
+  },
+  "mnyComplete": {
+    "heading": "आयात पूरा हुआ",
+    "allMatch": "सभी {count} खाते मिलान करते हैं: प्रत्येक शेष आपकी Money फ़ाइल से गणना किए गए शेष के बराबर है।",
+    "someDiffer": "{count} खाते आपकी Money फ़ाइल से गणना किए गए शेष से मेल नहीं खाते। नीचे चिह्नित पंक्तियाँ अंतर दिखाती हैं।",
+    "counts": {
+      "accounts": "खाते",
+      "transactions": "लेन-देन",
+      "transfers": "स्थानांतरण",
+      "splits": "विभाजन पंक्तियाँ",
+      "payees": "प्राप्तकर्ता",
+      "categories": "श्रेणियाँ"
+    },
+    "existingDataRemoved": "आपके अनुरोध के अनुसार, इस आयात से पहले आपका मौजूदा डेटा हटा दिया गया।",
+    "verificationHeading": "शेष सत्यापन",
+    "table": {
+      "account": "खाता",
+      "transactions": "लेन-देन",
+      "expected": "Money फ़ाइल से",
+      "imported": "Monize में",
+      "delta": "अंतर",
+      "check": "जाँचें"
+    },
+    "warningsHeading": "इस आयात के बारे में टिप्पणियाँ",
+    "downloadReport": "रिपोर्ट डाउनलोड करें",
+    "done": "पूर्ण"
+  },
+  "mnyWarnings": {
+    "missingTable": "इस Money संस्करण में आयात द्वारा उपयोग की जाने वाली {count, plural, one {# तालिका} other {# तालिकाएँ}} नहीं है।",
+    "missingField": "इस Money संस्करण में {count, plural, one {# फ़ील्ड} other {# फ़ील्ड}} मौजूद नहीं थे और उन्होंने डिफ़ॉल्ट मान लिया।",
+    "unknownAccountType": "{count, plural, one {# खाते} other {# खातों}} का खाता प्रकार Monize नहीं पहचानता, इसलिए उन्हें छोड़ दिया गया।",
+    "duplicateAccountName": "{count, plural, one {# खाते} other {# खातों}} का नाम किसी अन्य खाते से समान था, इसलिए उनका नाम बदल दिया गया।",
+    "unknownCurrency": "{count, plural, one {# खाता} other {# खाते}} ऐसी मुद्रा का संदर्भ देते हैं जो फ़ाइल में परिभाषित नहीं है; वे आधार मुद्रा का उपयोग करते हैं।",
+    "categoryFlattened": "{count, plural, one {# श्रेणी} other {# श्रेणियाँ}} दो स्तरों से अधिक गहरी थीं और उन्हें उनकी मूल श्रेणी में समाहित कर दिया गया।",
+    "categoryTypeInferred": "{count, plural, one {# श्रेणी} other {# श्रेणियों}} के लिए Money का आय चिह्न अनुपलब्ध था; आय या व्यय श्रेणी संरचना से निर्धारित किया गया।",
+    "degeneratePayeeSkipped": "Money द्वारा आंतरिक रूप से रखे गए {count, plural, one {# स्थानधारक प्राप्तकर्ता} other {# स्थानधारक प्राप्तकर्ता}} छोड़ दिए गए।",
+    "unusableTransaction": "{count, plural, one {# लेन-देन} other {# लेन-देन}} में कोई खाता या उपयोग योग्य तिथि नहीं थी, इसलिए उन्हें छोड़ दिया गया।",
+    "orphanedTransferSide": "{count, plural, one {# स्थानांतरण} other {# स्थानांतरणों}} का दूसरा पक्ष फ़ाइल में नहीं था, इसलिए उन्हें छोड़ दिया गया।",
+    "orphanedSplit": "{count, plural, one {# विभाजन पंक्ति} other {# विभाजन पंक्तियों}} का कोई मूल लेन-देन नहीं था, इसलिए उन्हें छोड़ दिया गया।",
+    "splitSumMismatch": "{count, plural, one {# विभाजन} other {# विभाजनों}} में पंक्तियों का योग लेन-देन की कुल राशि से मेल नहीं खाता; Money के कुल मान बनाए रखे गए।",
+    "transferAcrossExcludedAccount": "{count, plural, one {# स्थानांतरण} other {# स्थानांतरण}} आपके छोड़े गए खाते की ओर संकेत करते थे और सामान्य लेन-देन के रूप में आयात किए गए।",
+    "balanceMismatch": "{count, plural, one {# खाते} other {# खातों}} का अंतिम शेष Money फ़ाइल से भिन्न है।"
+  },
+  "mnyErrors": {
+    "mnyImportFailed": "आयात के दौरान कुछ गड़बड़ हुई। कुछ भी सहेजा नहीं गया -- आप फिर से प्रयास कर सकते हैं।",
+    "mnyJobStalled": "आयात ने प्रतिक्रिया देना बंद कर दिया, संभवतः सर्वर पुनः आरंभ होने के कारण। आपकी अपलोड की गई फ़ाइल अभी भी यहाँ है, इसलिए फिर से प्रयास करना सुरक्षित है।",
+    "mnyStagedFileMissing": "अपलोड की गई Money फ़ाइल अब उपलब्ध नहीं है। कृपया इसे फिर से अपलोड करें।",
+    "mnyFileTruncated": "यह Money फ़ाइल अपूर्ण लगती है। अपलोड बाधित हो सकता है।",
+    "mnyNotAMoneyFile": "यह फ़ाइल Microsoft Money (.mny) फ़ाइल नहीं है।",
+    "mnyUnsupportedVersion": "यह फ़ाइल Money 97 या 98 से बनी है। इसे निःशुल्क Money Plus Sunset संस्करण में एक बार खोलकर सहेजें, फिर परिणाम आयात करें।",
+    "mnyPasswordRequired": "यह Money फ़ाइल पासवर्ड से सुरक्षित है।",
+    "mnyPasswordIncorrect": "यह पासवर्ड Money फ़ाइल को नहीं खोलता।",
+    "mnyUnreadableDatabase": "यह Money फ़ाइल डिक्रिप्ट हो गई, लेकिन इसकी सामग्री पढ़ी नहीं जा सकी। यह क्षतिग्रस्त हो सकती है।"
   }
 }

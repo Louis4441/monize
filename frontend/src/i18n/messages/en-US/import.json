@@ -1,5 +1,10 @@
 {
   "selectAccount": {
     "accountNamePlaceholder": "e.g. My Checking"
+  },
+  "mnyReview": {
+    "table": {
+      "favourite": "Favorite"
+    }
   }
 }

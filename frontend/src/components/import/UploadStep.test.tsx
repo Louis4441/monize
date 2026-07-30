@@ -133,7 +133,7 @@ describe('UploadStep', () => {
     render(<UploadStep preselectedAccount={undefined} isLoading={false} onFileSelect={onFileSelect} />);
 
     const input = document.getElementById('import-file') as HTMLInputElement;
-    expect(input.accept).toBe('.qif,.ofx,.qfx,.csv');
+    expect(input.accept).toBe('.qif,.ofx,.qfx,.csv,.mny');
     expect(input.multiple).toBe(true);
   });
 });

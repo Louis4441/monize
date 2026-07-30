@@ -4,14 +4,9 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
-  Inject,
-  forwardRef,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource, In, IsNull } from "typeorm";
-import { NetWorthService } from "../net-worth/net-worth.service";
-import { SecurityPriceService } from "../securities/security-price.service";
-import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import {
   Account,
   AccountType,
@@ -56,12 +51,12 @@ import {
 } from "./dto/import.dto";
 import { ImportContext, updateAccountBalance } from "./import-context";
 import { ImportEntityCreatorService } from "./import-entity-creator.service";
+import { ImportPostProcessingService } from "./import-post-processing.service";
 import { ImportInvestmentProcessorService } from "./import-investment-processor.service";
 import { ImportRegularProcessorService } from "./import-regular-processor.service";
 import { Tag } from "../tags/entities/tag.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
-import { roundMoney } from "../common/round.util";
 import { tr } from "../i18n/translate";
 
 @Injectable()
@@ -78,12 +73,7 @@ export class ImportService {
     private payeesRepository: Repository<Payee>,
     @InjectRepository(ImportColumnMapping)
     private columnMappingRepository: Repository<ImportColumnMapping>,
-    @Inject(forwardRef(() => NetWorthService))
-    private netWorthService: NetWorthService,
-    @Inject(forwardRef(() => SecurityPriceService))
-    private securityPriceService: SecurityPriceService,
-    @Inject(forwardRef(() => ExchangeRateService))
-    private exchangeRateService: ExchangeRateService,
+    private postProcessing: ImportPostProcessingService,
     private entityCreator: ImportEntityCreatorService,
     private investmentProcessor: ImportInvestmentProcessorService,
     private regularProcessor: ImportRegularProcessorService,
@@ -1683,100 +1673,17 @@ export class ImportService {
     }
   }
 
+  /**
+   * Shared with the `.mny` pipeline: balance recalculation, price/FX backfill
+   * and net-worth recalc live in `ImportPostProcessingService` so both importers
+   * run one implementation. See that file for why the balance query matters.
+   */
   private async postImportProcessing(
     userId: string,
     isInvestment: boolean,
     affectedAccountIds: Set<string>,
   ): Promise<void> {
-    // Recalculate current_balance for all affected accounts so that
-    // future-dated transactions are excluded. During import,
-    // updateAccountBalance() adds every transaction amount regardless
-    // of date, which inflates the balance when future transactions exist.
-    // Compute every affected account's balance in one grouped query and write
-    // them back in one bulk UPDATE rather than 3 queries per account.
-    const affectedIds = [...affectedAccountIds];
-    if (affectedIds.length > 0) {
-      try {
-        const balances: { account_id: string; balance: string }[] =
-          await this.dataSource.query(
-            `SELECT a.id as account_id,
-                    COALESCE(a.opening_balance, 0) + COALESCE(SUM(t.amount), 0) as balance
-               FROM accounts a
-               LEFT JOIN transactions t ON t.account_id = a.id
-                 AND (t.status IS NULL OR t.status != 'VOID')
-                 AND t.parent_transaction_id IS NULL
-                 AND t.transaction_date <= CURRENT_DATE
-              WHERE a.id = ANY($1)
-              GROUP BY a.id, a.opening_balance`,
-            [affectedIds],
-          );
-
-        if (balances.length > 0) {
-          const valuesClause = balances
-            .map((_, i) => `($${i * 2 + 1}::uuid, $${i * 2 + 2}::numeric)`)
-            .join(", ");
-          const params = balances.flatMap((row) => [
-            row.account_id,
-            roundMoney(Number(row.balance)),
-          ]);
-          await this.dataSource.query(
-            `UPDATE accounts SET current_balance = v.balance
-               FROM (VALUES ${valuesClause}) AS v(id, balance)
-               WHERE accounts.id = v.id`,
-            params,
-          );
-        }
-      } catch (err) {
-        this.logger.warn(
-          `Post-import balance recalculation failed: ${err.message}`,
-        );
-      }
-    }
-
-    if (isInvestment) {
-      try {
-        this.logger.log("Post-import: backfilling historical security prices");
-        await this.securityPriceService.backfillHistoricalPrices();
-        this.logger.log("Post-import: historical price backfill complete");
-      } catch (err) {
-        this.logger.warn(
-          `Post-import historical price backfill failed: ${err.message}`,
-        );
-      }
-
-      try {
-        this.logger.log("Post-import: backfilling transaction-derived prices");
-        await this.securityPriceService.backfillTransactionPrices();
-        this.logger.log("Post-import: transaction price backfill complete");
-      } catch (err) {
-        this.logger.warn(
-          `Post-import transaction price backfill failed: ${err.message}`,
-        );
-      }
-    }
-
-    try {
-      this.logger.log("Post-import: backfilling historical exchange rates");
-      await this.exchangeRateService.backfillHistoricalRates(
-        userId,
-        Array.from(affectedAccountIds),
-      );
-      this.logger.log("Post-import: historical rate backfill complete");
-    } catch (err) {
-      this.logger.warn(
-        `Post-import historical rate backfill failed: ${err.message}`,
-      );
-    }
-
-    for (const accountId of affectedAccountIds) {
-      this.netWorthService
-        .recalculateAccount(userId, accountId)
-        .catch((err) =>
-          this.logger.warn(
-            `Post-import net worth recalc failed for account ${accountId}: ${err.message}`,
-          ),
-        );
-    }
+    await this.postProcessing.run(userId, isInvestment, affectedAccountIds);
   }
 
   /**

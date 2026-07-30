@@ -276,7 +276,18 @@
     "invalidSecurityMapping": "Pemetaan sekuritas merujuk sekuritas yang tidak valid: {{ secId }}",
     "columnMappingNotFound": "Pemetaan kolom tidak ditemukan",
     "columnMappingDuplicate": "Pemetaan kolom bernama \"{{ name }}\" sudah ada",
-    "accountNotFound": "Akun tidak ditemukan"
+    "accountNotFound": "Akun tidak ditemukan",
+    "mnyNoFile": "Tidak ada berkas Money yang diunggah",
+    "mnyFileTruncated": "Berkas Money ini tampak tidak lengkap. Unggahan mungkin terputus -- coba lagi.",
+    "mnyNotAMoneyFile": "Berkas itu bukan berkas Microsoft Money (.mny)",
+    "mnyUnsupportedVersion": "Berkas itu dibuat oleh Money 97 atau 98, yang tidak dapat dibaca Monize. Buka dan simpan sekali di edisi gratis Money Plus Sunset, lalu impor hasilnya.",
+    "mnyPasswordRequired": "Berkas Money itu dilindungi kata sandi. Masukkan kata sandinya untuk melanjutkan.",
+    "mnyPasswordIncorrect": "Kata sandi itu tidak membuka berkas Money. Periksa dan coba lagi.",
+    "mnyUnreadableDatabase": "Berkas Money itu berhasil didekripsi, tetapi isinya tidak dapat dibaca. Mungkin rusak.",
+    "mnyStagedFileMissing": "Berkas Money yang diunggah sudah tidak tersedia. Silakan unggah kembali.",
+    "mnyImportAlreadyRunning": "Impor sedang berjalan. Tunggu hingga selesai sebelum memulai yang lain.",
+    "mnyJobNotFound": "Tugas impor tidak ditemukan",
+    "mnyFileTooLarge": "Berkas Money itu lebih besar dari batas impor {{ limit }} MB."
   },
   "monteCarlo": {
     "scenarioNotFound": "Skenario {{ id }} tidak ditemukan",

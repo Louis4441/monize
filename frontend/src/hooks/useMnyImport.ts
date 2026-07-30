@@ -1,0 +1,319 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getErrorCode, getErrorMessage } from '@/lib/errors';
+import {
+  MnyImportJob,
+  MnyImportOptionsInput,
+  MnyPreview,
+  mnyImportApi,
+} from '@/lib/import-mny';
+
+/**
+ * State machine for a Microsoft Money import: upload, review, run, verify.
+ *
+ * Kept out of `useImportWizard` because almost none of that hook applies -- a
+ * `.mny` file needs no account selection, no category mapping and no date-format
+ * guessing (Money stores real dates and exact transfer links). What it does need
+ * is a password prompt and job polling, neither of which the text-file importers
+ * have.
+ */
+
+/** How often the wizard asks the job how it is doing (design ADR-3). */
+export const MNY_POLL_INTERVAL_MS = 1500;
+
+/** Parse failures the wizard reacts to rather than merely displaying. */
+const PASSWORD_REQUIRED = 'mnyPasswordRequired';
+const PASSWORD_INCORRECT = 'mnyPasswordIncorrect';
+
+export interface MnyUploadError {
+  /** Stable backend code, or undefined for an unexpected failure. */
+  code?: string;
+  /** Localized message from the backend. */
+  message: string;
+}
+
+export interface UseMnyImportResult {
+  preview: MnyPreview | null;
+  job: MnyImportJob | null;
+  isUploading: boolean;
+  isStarting: boolean;
+  /** Set when the file needs a password, or the one supplied was wrong. */
+  passwordPrompt: { retry: boolean } | null;
+  uploadError: MnyUploadError | null;
+  /** Money account handles the user has unticked. */
+  excludedHandles: ReadonlySet<number>;
+  /** Per-account currency overrides, keyed by Money handle. */
+  currencyOverrides: ReadonlyMap<number, string>;
+  options: MnyImportOptionsInput;
+  upload: (file: File, password?: string) => Promise<boolean>;
+  /** Re-uploads the file already chosen, with the password just entered. */
+  retryWithPassword: (password: string) => Promise<boolean>;
+  toggleAccount: (handle: number) => void;
+  setAllAccounts: (include: boolean) => void;
+  setAccountCurrency: (handle: number, currencyCode: string | null) => void;
+  setOption: <K extends keyof MnyImportOptionsInput>(
+    key: K,
+    value: MnyImportOptionsInput[K],
+  ) => void;
+  start: (wipePassword?: string) => Promise<boolean>;
+  retry: () => Promise<boolean>;
+  cancelPasswordPrompt: () => void;
+  reset: () => void;
+}
+
+export function useMnyImport(): UseMnyImportResult {
+  const [preview, setPreview] = useState<MnyPreview | null>(null);
+  const [job, setJob] = useState<MnyImportJob | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [passwordPrompt, setPasswordPrompt] = useState<{
+    retry: boolean;
+  } | null>(null);
+  const [uploadError, setUploadError] = useState<MnyUploadError | null>(null);
+  const [excludedHandles, setExcludedHandles] = useState<Set<number>>(
+    new Set(),
+  );
+  const [currencyOverrides, setCurrencyOverrides] = useState<
+    Map<number, string>
+  >(new Map());
+  const [options, setOptions] = useState<MnyImportOptionsInput>({});
+
+  // The file is kept so a password retry can re-upload it without asking the
+  // user to pick it again.
+  const pendingFile = useRef<File | null>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimer.current !== null) {
+      clearInterval(pollTimer.current);
+      pollTimer.current = null;
+    }
+  }, []);
+
+  // Polling must not outlive the page: a wizard left mid-import would otherwise
+  // keep hitting the endpoint from a detached component.
+  useEffect(() => stopPolling, [stopPolling]);
+
+  const beginPolling = useCallback(
+    (jobId: string) => {
+      stopPolling();
+      pollTimer.current = setInterval(() => {
+        void mnyImportApi
+          .getJob(jobId)
+          .then((latest) => {
+            setJob(latest);
+            if (latest.status === 'completed' || latest.status === 'failed') {
+              stopPolling();
+            }
+          })
+          // A dropped poll is not a failed import: the next tick tries again,
+          // and the reaper is what decides a job is really dead.
+          .catch(() => undefined);
+      }, MNY_POLL_INTERVAL_MS);
+    },
+    [stopPolling],
+  );
+
+  const upload = useCallback(
+    async (file: File, password?: string): Promise<boolean> => {
+      pendingFile.current = file;
+      setIsUploading(true);
+      setUploadError(null);
+
+      try {
+        const parsed = await mnyImportApi.parse(file, password);
+        setPreview(parsed);
+        setOptions(parsed.options);
+        setExcludedHandles(new Set());
+        setCurrencyOverrides(new Map());
+        setPasswordPrompt(null);
+        return true;
+      } catch (error) {
+        const code = getErrorCode(error);
+        if (code === PASSWORD_REQUIRED || code === PASSWORD_INCORRECT) {
+          // The distinction is the whole point of the taxonomy: one asks for a
+          // password, the other says the password was wrong.
+          setPasswordPrompt({ retry: code === PASSWORD_INCORRECT });
+          setUploadError(
+            code === PASSWORD_INCORRECT
+              ? { code, message: getErrorMessage(error, '') }
+              : null,
+          );
+          return false;
+        }
+        setPasswordPrompt(null);
+        setUploadError({ code, message: getErrorMessage(error, '') });
+        return false;
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [],
+  );
+
+  /**
+   * The password prompt's submit path. The file is held from the first attempt
+   * so a user who typed the wrong password does not have to pick it again.
+   */
+  const retryWithPassword = useCallback(
+    (password: string): Promise<boolean> => {
+      const file = pendingFile.current;
+      return file ? upload(file, password) : Promise.resolve(false);
+    },
+    [upload],
+  );
+
+  const toggleAccount = useCallback((handle: number) => {
+    setExcludedHandles((current) => {
+      const next = new Set(current);
+      if (next.has(handle)) {
+        next.delete(handle);
+      } else {
+        next.add(handle);
+      }
+      return next;
+    });
+  }, []);
+
+  const setAllAccounts = useCallback(
+    (include: boolean) => {
+      setExcludedHandles(
+        include
+          ? new Set<number>()
+          : new Set(
+              (preview?.accounts ?? [])
+                .map((account) => account.handle)
+                .filter((handle): handle is number => handle !== null),
+            ),
+      );
+    },
+    [preview],
+  );
+
+  const setAccountCurrency = useCallback(
+    (handle: number, currencyCode: string | null) => {
+      setCurrencyOverrides((current) => {
+        const next = new Map(current);
+        if (currencyCode === null) {
+          next.delete(handle);
+        } else {
+          next.set(handle, currencyCode);
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const setOption = useCallback(
+    <K extends keyof MnyImportOptionsInput>(
+      key: K,
+      value: MnyImportOptionsInput[K],
+    ) => {
+      setOptions((current) => ({ ...current, [key]: value }));
+    },
+    [],
+  );
+
+  /**
+   * Sends only the accounts the user actually changed. An account absent from
+   * the list takes the server's defaults, so a 56-account file with no edits
+   * sends an empty array rather than 56 redundant entries.
+   */
+  const buildOptions = useCallback((): MnyImportOptionsInput => {
+    const touched = new Set<number>([
+      ...excludedHandles,
+      ...currencyOverrides.keys(),
+    ]);
+
+    return {
+      ...options,
+      accounts: [...touched].map((handle) => ({
+        handle,
+        include: !excludedHandles.has(handle),
+        currencyOverride: currencyOverrides.get(handle) ?? null,
+      })),
+    };
+  }, [options, excludedHandles, currencyOverrides]);
+
+  const startWith = useCallback(
+    async (stagedFileId: string, wipePassword?: string): Promise<boolean> => {
+      setIsStarting(true);
+      setUploadError(null);
+      try {
+        const started = await mnyImportApi.start(
+          stagedFileId,
+          buildOptions(),
+          wipePassword ? { password: wipePassword } : undefined,
+        );
+        setJob(started);
+        beginPolling(started.id);
+        return true;
+      } catch (error) {
+        setUploadError({
+          code: getErrorCode(error),
+          message: getErrorMessage(error, ''),
+        });
+        return false;
+      } finally {
+        setIsStarting(false);
+      }
+    },
+    [beginPolling, buildOptions],
+  );
+
+  const start = useCallback(
+    (wipePassword?: string) =>
+      preview
+        ? startWith(preview.stagedFileId, wipePassword)
+        : Promise.resolve(false),
+    [preview, startWith],
+  );
+
+  /** A retry is a new job over the same staged file -- no re-upload. */
+  const retry = useCallback(() => {
+    setJob(null);
+    return preview ? startWith(preview.stagedFileId) : Promise.resolve(false);
+  }, [preview, startWith]);
+
+  const cancelPasswordPrompt = useCallback(() => {
+    setPasswordPrompt(null);
+    setUploadError(null);
+    pendingFile.current = null;
+  }, []);
+
+  const reset = useCallback(() => {
+    stopPolling();
+    setPreview(null);
+    setJob(null);
+    setPasswordPrompt(null);
+    setUploadError(null);
+    setExcludedHandles(new Set());
+    setCurrencyOverrides(new Map());
+    setOptions({});
+    pendingFile.current = null;
+  }, [stopPolling]);
+
+  return {
+    preview,
+    job,
+    isUploading,
+    isStarting,
+    passwordPrompt,
+    uploadError,
+    excludedHandles,
+    currencyOverrides,
+    options,
+    upload,
+    retryWithPassword,
+    toggleAccount,
+    setAllAccounts,
+    setAccountCurrency,
+    setOption,
+    start,
+    retry,
+    cancelPasswordPrompt,
+    reset,
+  };
+}
