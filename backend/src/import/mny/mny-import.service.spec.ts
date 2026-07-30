@@ -268,6 +268,7 @@ describe("MnyImportService", () => {
       hasActiveJob: jest.fn().mockResolvedValue(false),
       create: jest.fn().mockResolvedValue({ id: "job-1" }),
       runClaimed: jest.fn().mockResolvedValue(true),
+      fail: jest.fn().mockResolvedValue(undefined),
     };
     postProcessing = { run: jest.fn().mockResolvedValue(undefined) };
     usersService = { deleteData: jest.fn().mockResolvedValue(undefined) };
@@ -436,6 +437,35 @@ describe("MnyImportService", () => {
       expect(error).toHaveBeenCalledWith(
         expect.stringContaining("pool exhausted"),
       );
+    });
+
+    it("fails the job when the background start never got going", async () => {
+      // Otherwise the row sits pending until the reaper's five-minute sweep,
+      // and `hasActiveJob` counts pending -- so the user could start nothing at
+      // all in the meantime, with no error to explain why.
+      jobs.runClaimed.mockRejectedValue(new Error("pool exhausted"));
+
+      await service.start("user-1", { stagedFileId: "staged-1" });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(jobs.fail).toHaveBeenCalledWith(
+        "job-1",
+        "mnyImportFailed",
+        "pool exhausted",
+        true,
+      );
+    });
+
+    it("swallows a failure to record the failure, rather than rejecting unhandled", async () => {
+      jobs.runClaimed.mockRejectedValue(new Error("pool exhausted"));
+      jobs.fail.mockRejectedValue(new Error("still down"));
+
+      await expect(
+        service.start("user-1", { stagedFileId: "staged-1" }),
+      ).resolves.toBeDefined();
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
     it("runs the import as the job body", async () => {

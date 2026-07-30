@@ -203,6 +203,7 @@ function ImportContent() {
             options={wizard.mny.options}
             currencyOptions={wizard.currencyOptions}
             isLoading={wizard.mny.isStarting}
+            startError={wizard.mny.uploadError}
             onToggleAccount={wizard.mny.toggleAccount}
             onSetAllAccounts={wizard.mny.setAllAccounts}
             onSetAccountCurrency={wizard.mny.setAccountCurrency}

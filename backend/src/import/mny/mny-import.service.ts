@@ -20,7 +20,11 @@ import { tr } from "../../i18n/translate";
 import { ImportPostProcessingService } from "../import-post-processing.service";
 import { ImportJob } from "./entities/import-job.entity";
 import { MnyStagedFileMissingError } from "./mny-errors";
-import { JobRunContext, MnyImportJobService } from "./mny-import-job.service";
+import {
+  JOB_FAILED_ERROR_KEY,
+  JobRunContext,
+  MnyImportJobService,
+} from "./mny-import-job.service";
 import { MnyParsedFile, MnyParserService } from "./mny-parser.service";
 import { MnyStagingService } from "./mny-staging.service";
 import {
@@ -152,11 +156,18 @@ export class MnyImportService {
       this.jobs.runClaimed(userId, job.id, (context) =>
         this.runImport(userId, staged.id, options, context),
       ),
-    ).catch((error) =>
-      this.logger.error(
-        `Import job ${job.id} could not be started: ${error instanceof Error ? error.message : String(error)}`,
-      ),
-    );
+    ).catch(async (error) => {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Import job ${job.id} could not be started: ${detail}`);
+      // `runClaimed` reports its own body's failures; reaching here means the
+      // claim or the status write itself failed, which would otherwise leave the
+      // row pending until the reaper's five-minute sweep -- and `hasActiveJob`
+      // counts pending, so the user could start nothing in the meantime. Failing
+      // it now turns that into an immediate, retryable error in the wizard.
+      await withUserContext(userId, () =>
+        this.jobs.fail(job.id, JOB_FAILED_ERROR_KEY, detail, true),
+      ).catch(() => undefined);
+    });
 
     return job;
   }

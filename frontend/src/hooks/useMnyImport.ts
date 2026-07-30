@@ -94,6 +94,10 @@ export function useMnyImport(): UseMnyImportResult {
   // user to pick it again.
   const pendingFile = useRef<File | null>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Set once a start request carrying the wipe has been accepted. The wipe runs
+  // server-side before the job row exists, so it has already happened by then --
+  // see `wipeExistingData` in `buildOptions`.
+  const wipePerformed = useRef(false);
 
   const stopPolling = useCallback(() => {
     if (pollTimer.current !== null) {
@@ -268,6 +272,13 @@ export function useMnyImport(): UseMnyImportResult {
 
     return {
       ...options,
+      // The wipe happens in `start`, before the job row exists, so a Retry after
+      // a failed import must not ask for it again: the data is already gone, and
+      // repeating it would fail re-authentication -- Retry collects no password,
+      // by design, because it is one click on a failure screen.
+      wipeExistingData: wipePerformed.current
+        ? false
+        : (options.wipeExistingData ?? false),
       accounts: [...touched].map((handle) => ({
         handle,
         include: !excludedHandles.has(handle),
@@ -283,12 +294,16 @@ export function useMnyImport(): UseMnyImportResult {
     async (stagedFileId: string, wipePassword?: string): Promise<boolean> => {
       setIsStarting(true);
       setUploadError(null);
+      const requestOptions = buildOptions();
       try {
         const started = await mnyImportApi.start(
           stagedFileId,
-          buildOptions(),
+          requestOptions,
           wipePassword ? { password: wipePassword } : undefined,
         );
+        if (requestOptions.wipeExistingData) {
+          wipePerformed.current = true;
+        }
         setJob(started);
         beginPolling(started.id);
         return true;
@@ -336,6 +351,7 @@ export function useMnyImport(): UseMnyImportResult {
     setSelectedBillHandles(new Set());
     setOptions({});
     pendingFile.current = null;
+    wipePerformed.current = false;
   }, [stopPolling]);
 
   return {

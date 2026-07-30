@@ -375,16 +375,27 @@ describe("MnyImportJobService", () => {
   });
 
   describe("reapStaleJobs", () => {
-    it("fails only running jobs whose heartbeat went stale, and marks them retryable", async () => {
+    it("fails running jobs whose heartbeat went stale, and marks them retryable", async () => {
       await service.reapStaleJobs();
 
       const statement = sql(query.mock.calls[0]);
-      expect(statement).toContain("WHERE status = 'running'");
+      expect(statement).toContain("status = 'running'");
+      expect(statement).toContain("heartbeat_at < CURRENT_TIMESTAMP");
       expect(statement).toContain("retryable = true");
       expect(query.mock.calls[0][1]).toEqual([
         String(JOB_STALE_AFTER_MS),
         JOB_STALLED_ERROR_KEY,
       ]);
+    });
+
+    it("fails pending jobs no worker ever claimed, measured from creation", async () => {
+      // A row stuck pending is worse than a stuck running one: `hasActiveJob`
+      // counts it, so it refuses every future import for that user, forever.
+      await service.reapStaleJobs();
+
+      const statement = sql(query.mock.calls[0]);
+      expect(statement).toContain("status = 'pending'");
+      expect(statement).toContain("created_at < CURRENT_TIMESTAMP");
     });
 
     it("logs the jobs it reaped", async () => {

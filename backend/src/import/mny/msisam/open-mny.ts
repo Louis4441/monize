@@ -71,9 +71,20 @@ function wrapTable(reader: MDBReader, name: string): MnyTable {
         // returning one per row keeps row counts meaningful for callers.
         return Array.from({ length: table.rowCount }, () => ({}) as MnyRow);
       }
-      return table.getData<MnyRow>(
-        requested === undefined ? undefined : { columns: requested },
-      );
+      try {
+        return table.getData<MnyRow>(
+          requested === undefined ? undefined : { columns: requested },
+        );
+      } catch (error) {
+        // Row data is read lazily, page by page, long after the table
+        // definition was resolved -- so a file whose upload was cut short, or
+        // whose data pages are damaged, fails here rather than in `wrapTable`.
+        // Without this the raw "Wrong page type" escapes as an untyped error:
+        // the parse call 500s with no code for the wizard to act on, and a
+        // running job records it as retryable, offering Try again on a file
+        // that will fail the same way forever.
+        throw new MnyUnreadableDatabaseError(error);
+      }
     },
   };
 }

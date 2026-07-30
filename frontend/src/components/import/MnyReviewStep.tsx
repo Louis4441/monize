@@ -17,6 +17,8 @@ interface MnyReviewStepProps {
   options: MnyImportOptionsInput;
   currencyOptions: Array<{ value: string; label: string }>;
   isLoading: boolean;
+  /** Why the last Start import attempt did not begin, if it did not. */
+  startError: { code?: string; message: string } | null;
   onToggleAccount: (handle: number) => void;
   onSetAllAccounts: (include: boolean) => void;
   onSetAccountCurrency: (handle: number, currencyCode: string | null) => void;
@@ -47,6 +49,7 @@ export function MnyReviewStep({
   options,
   currencyOptions,
   isLoading,
+  startError,
   onToggleAccount,
   onSetAllAccounts,
   onSetAccountCurrency,
@@ -407,6 +410,35 @@ export function MnyReviewStep({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/*
+        A start that never began. Without this the button simply does nothing --
+        the staged file expired under an abandoned wizard, or another import is
+        already running, and the user has no way to tell which.
+      */}
+      {startError && (
+        <div
+          role="alert"
+          className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+        >
+          <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">
+            {t('mnyReview.startFailedHeading')}
+          </h3>
+          <p className="mt-1 text-sm text-red-700 dark:text-red-300">
+            {startError.message || t('mnyErrors.mnyImportFailed')}
+          </p>
+          {startError.code === 'mnyStagedFileMissing' && (
+            <Button
+              variant="outline"
+              className="mt-3"
+              onClick={onBack}
+              disabled={isLoading}
+            >
+              {t('mnyReview.uploadAgain')}
+            </Button>
+          )}
         </div>
       )}
 

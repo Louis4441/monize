@@ -66,6 +66,23 @@ describe("openMnyFile", () => {
     expect(() => db.getTableOrNull("ACCT")).toThrow(MnyUnreadableDatabaseError);
   });
 
+  it("reports an unreadable data page distinctly, not as a raw reader error", () => {
+    const file = readMnyFixture("money2002");
+    // Page 34 holds ACCT row data, not its definition: the catalogue and the
+    // table definition both still read, and the failure only appears when rows
+    // are pulled -- which is where a truncated upload of a large file lands.
+    file.fill(0xab, 34 * JET_PAGE_SIZE, 35 * JET_PAGE_SIZE);
+    const db = openMnyFile(file);
+    const table = db.getTableOrNull("ACCT");
+
+    // The regression this guards: `rows()` used to let mdb-reader's own
+    // "Wrong page type" escape untyped, so `/import/mny/parse` 500'd with no
+    // code for the wizard to act on, and a running job recorded the failure as
+    // retryable -- offering Try again on a file that can never import.
+    expect(() => table!.rows()).toThrow(MnyUnreadableDatabaseError);
+    expect(() => table!.rows(["hacct"])).toThrow(MnyUnreadableDatabaseError);
+  });
+
   it("returns null for a table the Money version does not have", () => {
     // Money 2001 predates scheduled bills; this absence crash-looped the
     // PR #192 proof of concept.
