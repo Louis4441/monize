@@ -312,9 +312,14 @@
       "payees": "Begunstigden",
       "categories": "Categorieën",
       "accounts": "Rekeningen",
+      "securities": "Effecten",
+      "investments": "Beleggingstransacties",
+      "investmentDetail": "{transfers} effectenoverboekingen, {splits} aandelensplitsingen",
+      "prices": "Koersgeschiedenis",
+      "exchangeRates": "Wisselkoersen",
       "ofTotal": "van {total} in het bestand"
     },
-    "notYetImported": "Beleggingen en geplande rekeningen worden nog niet geïmporteerd: {investments} beleggingstransacties, {securities} effecten en {bills} rekeningregels blijven voor een latere versie. Uw bankgeschiedenis wordt volledig geïmporteerd.",
+    "notYetImported": "Geplande rekeningen worden nog niet geïmporteerd: {bills} rekeningregels blijven voor een latere versie. Al het overige in dit bestand wordt volledig geïmporteerd.",
     "accountsHeading": "Rekeningen ({count})",
     "selectAll": "Alles selecteren",
     "selectNone": "Niets selecteren",
@@ -326,6 +331,7 @@
       "currency": "Valuta",
       "currencyForAccount": "Valuta voor {name}",
       "transactions": "Transacties",
+      "investmentRows": "+ {count, plural, one {# belegging} other {# beleggingen}}",
       "openingBalance": "Beginsaldo",
       "finalBalance": "Eindsaldo",
       "closed": "Gesloten",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "Alleen gebruikte categorieën importeren",
       "referencedOnlyCategoriesHint": "Money maakt een volledige categoriestructuur aan, of u die gebruikt of niet. Laat dit aan staan om nooit gebruikte categorieën over te slaan.",
       "importClosedAccounts": "Gesloten rekeningen importeren",
-      "importClosedAccountsHint": "Gesloten rekeningen bevatten nog geschiedenis die het bewaren waard is. Ze worden als gesloten geïmporteerd."
+      "importClosedAccountsHint": "Gesloten rekeningen bevatten nog geschiedenis die het bewaren waard is. Ze worden als gesloten geïmporteerd.",
+      "importPrices": "Koersgeschiedenis importeren",
+      "importPricesHint": "De eigen registratie van Money van wat elk effect dag na dag waard was. Zet dit uit als u liever met actuele koersen begint.",
+      "importExchangeRates": "Wisselkoersen importeren",
+      "importExchangeRatesHint": "Historische koersen tussen de valuta's in uw bestand, zodat oude transacties in vreemde valuta net zo worden omgerekend als Money ze omrekende."
     },
     "warningsHeading": "Opmerkingen over dit bestand",
     "startImport": "Import starten"
@@ -366,21 +376,31 @@
     "heading": "Import voltooid",
     "allMatch": "Alle {count} rekeningen kloppen: elk saldo komt overeen met het saldo dat uit uw Money-bestand is berekend.",
     "someDiffer": "{count} rekeningen komen niet overeen met het saldo dat uit uw Money-bestand is berekend. De gemarkeerde regels hieronder tonen het verschil.",
+    "someHoldingsDiffer": "Alle saldi kloppen, maar {count, plural, one {# positie komt} other {# posities komen}} niet overeen met de aandelen die in uw Money-bestand staan. De gemarkeerde regels hieronder tonen het verschil.",
     "counts": {
       "accounts": "Rekeningen",
       "transactions": "Transacties",
       "transfers": "Overboekingen",
       "splits": "Splitsingsregels",
       "payees": "Begunstigden",
-      "categories": "Categorieën"
+      "categories": "Categorieën",
+      "securities": "Effecten",
+      "investments": "Beleggingstransacties",
+      "prices": "Koersen",
+      "exchangeRates": "Wisselkoersen"
     },
     "existingDataRemoved": "Uw bestaande gegevens zijn vóór deze import verwijderd, zoals gevraagd.",
     "verificationHeading": "Saldoverificatie",
+    "holdingsHeading": "Positiecontrole",
+    "holdingsExplainer": "De aandelen die Monize nu aanhoudt, tegenover de open fiscale lots in uw Money-bestand. Money stemt zelf af op die lots, dus dat is het getal om op te vertrouwen.",
     "table": {
       "account": "Rekening",
+      "security": "Waardepapier",
       "transactions": "Transacties",
       "expected": "Uit Money-bestand",
       "imported": "In Monize",
+      "lotShares": "Aandelen in Money",
+      "importedShares": "Aandelen in Monize",
       "delta": "Verschil",
       "check": "Nakijken"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "{count, plural, one {# splitsingsregel had} other {# splitsingsregels hadden}} geen bovenliggende transactie en zijn overgeslagen.",
     "splitSumMismatch": "Bij {count, plural, one {# splitsing} other {# splitsingen}} tellen de regels niet op tot het transactietotaal; de totalen van Money zijn behouden.",
     "transferAcrossExcludedAccount": "{count, plural, one {# overboeking wees} other {# overboekingen wezen}} naar een rekening die u hebt uitgesloten en zijn als gewone transacties geïmporteerd.",
-    "balanceMismatch": "{count, plural, one {# rekening eindigde} other {# rekeningen eindigden}} met een saldo dat afwijkt van het Money-bestand."
+    "balanceMismatch": "{count, plural, one {# rekening eindigde} other {# rekeningen eindigden}} met een saldo dat afwijkt van het Money-bestand.",
+    "duplicateSecuritySymbol": "{count, plural, one {# effect deelt} other {# effecten delen}} een symbool met een ander; de latere zijn hernoemd zodat ze gescheiden blijven.",
+    "generatedSecuritySymbol": "{count, plural, one {# effect heeft} other {# effecten hebben}} geen symbool in Money, dus is er een tijdelijk symbool gemaakt en zijn koersupdates uit gelaten.",
+    "unknownInvestmentAction": "{count, plural, one {# beleggingstransactie gebruikte} other {# beleggingstransacties gebruikten}} een actie die Monize niet herkent en zijn overgeslagen.",
+    "unconfirmedInvestmentAction": "{count, plural, one {# beleggingstransactie gebruikte} other {# beleggingstransacties gebruikten}} een Money-actie waarvan de betekenis is afgeleid en niet gedocumenteerd; controleer ze tegen Money.",
+    "missingInvestmentDetail": "{count, plural, one {# beleggingstransactie had} other {# beleggingstransacties hadden}} geen aandelengegevens in het bestand en zijn alleen op hun geldbedrag geïmporteerd.",
+    "investmentAccountMismatch": "{count, plural, one {# beleggingstransactie stond} other {# beleggingstransacties stonden}} op een rekening die geen beleggingsrekening is en zijn overgeslagen.",
+    "unusableSecuritySplit": "{count, plural, one {# aandelensplitsing kon} other {# aandelensplitsingen konden}} niet aan een effect worden gekoppeld of had een onbruikbare verhouding, en is niet toegepast.",
+    "holdingsMismatch": "{count, plural, one {# positie komt} other {# posities komen}} niet overeen met de aandelen in uw Money-bestand."
   },
   "mnyErrors": {
     "mnyImportFailed": "Er is iets misgegaan tijdens de import. Er is niets opgeslagen -- u kunt het opnieuw proberen.",

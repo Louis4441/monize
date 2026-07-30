@@ -312,9 +312,14 @@
       "payees": "Beneficiari",
       "categories": "Categorie",
       "accounts": "Conti",
+      "securities": "Titoli",
+      "investments": "Transazioni di investimento",
+      "investmentDetail": "{transfers} trasferimenti di titoli, {splits} suddivisioni azionarie",
+      "prices": "Storico prezzi",
+      "exchangeRates": "Tassi di cambio",
       "ofTotal": "su {total} nel file"
     },
-    "notYetImported": "Investimenti e scadenze pianificate non vengono ancora importati: {investments} transazioni di investimento, {securities} titoli e {bills} righe di scadenze sono rimandati a una versione successiva. Lo storico bancario viene importato per intero.",
+    "notYetImported": "Le scadenze pianificate non vengono ancora importate: {bills} righe di scadenze sono rimandate a una versione successiva. Tutto il resto di questo file viene importato per intero.",
     "accountsHeading": "Conti ({count})",
     "selectAll": "Seleziona tutto",
     "selectNone": "Deseleziona tutto",
@@ -326,6 +331,7 @@
       "currency": "Valuta",
       "currencyForAccount": "Valuta per {name}",
       "transactions": "Transazioni",
+      "investmentRows": "+ {count, plural, one {# investimento} other {# investimenti}}",
       "openingBalance": "Saldo iniziale",
       "finalBalance": "Saldo finale",
       "closed": "Chiuso",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "Importa solo le categorie utilizzate",
       "referencedOnlyCategoriesHint": "Money crea un albero di categorie completo, che tu lo usi o meno. Lascia attiva questa opzione per saltare le categorie mai usate.",
       "importClosedAccounts": "Importa i conti chiusi",
-      "importClosedAccountsHint": "I conti chiusi conservano uno storico che vale la pena mantenere. Vengono importati come chiusi."
+      "importClosedAccountsHint": "I conti chiusi conservano uno storico che vale la pena mantenere. Vengono importati come chiusi.",
+      "importPrices": "Importa lo storico prezzi",
+      "importPricesHint": "Il registro che Money tiene del valore di ogni titolo, giorno per giorno. Disattivalo se preferisci partire dalle quotazioni attuali.",
+      "importExchangeRates": "Importa i tassi di cambio",
+      "importExchangeRatesHint": "Tassi storici fra le valute presenti nel file, così le vecchie operazioni in valuta estera vengono convertite come le convertiva Money."
     },
     "warningsHeading": "Note su questo file",
     "startImport": "Avvia importazione"
@@ -366,21 +376,31 @@
     "heading": "Importazione completata",
     "allMatch": "Tutti i {count} conti tornano: ogni saldo corrisponde a quello calcolato dal file Money.",
     "someDiffer": "{count} conti non corrispondono al saldo calcolato dal file Money. Le righe segnalate qui sotto mostrano la differenza.",
+    "someHoldingsDiffer": "Tutti i saldi tornano, ma {count, plural, one {# posizione non corrisponde} other {# posizioni non corrispondono}} alle azioni registrate nel file Money. Le righe segnalate qui sotto mostrano la differenza.",
     "counts": {
       "accounts": "Conti",
       "transactions": "Transazioni",
       "transfers": "Trasferimenti",
       "splits": "Righe suddivise",
       "payees": "Beneficiari",
-      "categories": "Categorie"
+      "categories": "Categorie",
+      "securities": "Titoli",
+      "investments": "Transazioni di investimento",
+      "prices": "Prezzi",
+      "exchangeRates": "Tassi di cambio"
     },
     "existingDataRemoved": "I dati esistenti sono stati rimossi prima di questa importazione, come richiesto.",
     "verificationHeading": "Verifica dei saldi",
+    "holdingsHeading": "Verifica delle posizioni",
+    "holdingsExplainer": "Le azioni che Monize detiene ora, a confronto con i lotti fiscali aperti registrati nel file Money. Money stesso si riconcilia su quei lotti, quindi sono il numero di riferimento.",
     "table": {
       "account": "Conto",
+      "security": "Titolo",
       "transactions": "Transazioni",
       "expected": "Dal file Money",
       "imported": "In Monize",
+      "lotShares": "Azioni in Money",
+      "importedShares": "Azioni in Monize",
       "delta": "Differenza",
       "check": "Da controllare"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "{count, plural, one {# riga suddivisa non aveva} other {# righe suddivise non avevano}} una transazione principale e sono state saltate.",
     "splitSumMismatch": "{count, plural, one {# suddivisione aveva} other {# suddivisioni avevano}} righe la cui somma non corrisponde al totale; sono stati mantenuti i totali di Money.",
     "transferAcrossExcludedAccount": "{count, plural, one {# trasferimento puntava} other {# trasferimenti puntavano}} a un conto che hai escluso e sono stati importati come transazioni normali.",
-    "balanceMismatch": "{count, plural, one {# conto ha} other {# conti hanno}} un saldo finale diverso da quello del file Money."
+    "balanceMismatch": "{count, plural, one {# conto ha} other {# conti hanno}} un saldo finale diverso da quello del file Money.",
+    "duplicateSecuritySymbol": "{count, plural, one {# titolo condivide} other {# titoli condividono}} il simbolo con un altro; quelli successivi sono stati rinominati per restare distinti.",
+    "generatedSecuritySymbol": "{count, plural, one {# titolo non ha} other {# titoli non hanno}} un simbolo in Money, quindi è stato generato un segnaposto e gli aggiornamenti dei prezzi restano disattivati.",
+    "unknownInvestmentAction": "{count, plural, one {# transazione di investimento usava} other {# transazioni di investimento usavano}} un'operazione che Monize non riconosce e sono state ignorate.",
+    "unconfirmedInvestmentAction": "{count, plural, one {# transazione di investimento usava} other {# transazioni di investimento usavano}} un'operazione di Money il cui significato è dedotto e non documentato; verificale con Money.",
+    "missingInvestmentDetail": "{count, plural, one {# transazione di investimento non aveva} other {# transazioni di investimento non avevano}} il dettaglio delle azioni nel file e sono state importate solo per l'importo in contanti.",
+    "investmentAccountMismatch": "{count, plural, one {# transazione di investimento si trovava} other {# transazioni di investimento si trovavano}} in un conto che non è di investimento e sono state ignorate.",
+    "unusableSecuritySplit": "{count, plural, one {# suddivisione azionaria non è} other {# suddivisioni azionarie non sono}} stata associata a un titolo o aveva un rapporto inutilizzabile, e non è stata applicata.",
+    "holdingsMismatch": "{count, plural, one {# posizione non corrisponde} other {# posizioni non corrispondono}} alle azioni registrate nel file Money."
   },
   "mnyErrors": {
     "mnyImportFailed": "Qualcosa è andato storto durante l'importazione. Non è stato salvato nulla: puoi riprovare.",

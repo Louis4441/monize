@@ -665,14 +665,12 @@ See 6.4 for what the implementation settled differently from this plan.
 
 ### Phase 2 — Investments (shippable increment)
 
-Exit gate: cleared for the code. A `.mny` file's securities, investment
-transactions, stock splits, price history and exchange rates go through the same
-wizard, and the verification report gained a per-holding section reconciling what
-Monize holds against Money's own open tax lots. `money2002.mny` imports end to
-end with all 30 positions matching and no negative holdings. The 22-locale
-translation pass is deliberately **not** done yet (project i18n workflow: English
-first, one localization pass at acceptance) -- the `en` catalogs and the
-pseudo-locale are current and the parity suites fail until that pass runs.
+Exit gate: cleared. A `.mny` file's securities, investment transactions, stock
+splits, price history and exchange rates go through the same wizard, and the
+verification report gained a per-holding section reconciling what Monize holds
+against Money's own open tax lots. `money2002.mny` imports end to end with all 30
+positions matching and no negative holdings. The localization pass that section 9
+defers to M4.3 was done with it, so Phase 2 is fully translated.
 
 See 6.5 for what the implementation settled differently from this plan.
 

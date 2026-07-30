@@ -312,9 +312,14 @@
       "payees": "Alıcılar",
       "categories": "Kategoriler",
       "accounts": "Hesaplar",
+      "securities": "Menkul kıymetler",
+      "investments": "Yatırım işlemleri",
+      "investmentDetail": "{transfers} kıymet transferi, {splits} hisse bölünmesi",
+      "prices": "Fiyat geçmişi",
+      "exchangeRates": "Döviz kurları",
       "ofTotal": "dosyadaki {total} içinden"
     },
-    "notYetImported": "Yatırımlar ve planlanmış faturalar henüz içe aktarılmıyor: {investments} yatırım işlemi, {securities} menkul kıymet ve {bills} fatura satırı sonraki bir sürüme bırakıldı. Banka geçmişiniz eksiksiz içe aktarılır.",
+    "notYetImported": "Planlanmış faturalar henüz içe aktarılmıyor: {bills} fatura satırı sonraki bir sürüme bırakıldı. Bu dosyadaki diğer her şey eksiksiz içe aktarılır.",
     "accountsHeading": "Hesaplar ({count})",
     "selectAll": "Tümünü seç",
     "selectNone": "Hiçbirini seçme",
@@ -326,6 +331,7 @@
       "currency": "Para birimi",
       "currencyForAccount": "{name} için para birimi",
       "transactions": "İşlemler",
+      "investmentRows": "+ {count, plural, other {# yatırım}}",
       "openingBalance": "Açılış bakiyesi",
       "finalBalance": "Son bakiye",
       "closed": "Kapalı",
@@ -339,7 +345,11 @@
       "referencedOnlyCategories": "Yalnızca kullanılan kategorileri içe aktar",
       "referencedOnlyCategoriesHint": "Money, kullanıp kullanmadığınıza bakmaksızın eksiksiz bir kategori ağacı oluşturur. Hiç kullanmadığınız kategorileri atlamak için bunu açık bırakın.",
       "importClosedAccounts": "Kapalı hesapları içe aktar",
-      "importClosedAccountsHint": "Kapalı hesaplar hâlâ saklanmaya değer geçmiş barındırır. Kapalı olarak içe aktarılırlar."
+      "importClosedAccountsHint": "Kapalı hesaplar hâlâ saklanmaya değer geçmiş barındırır. Kapalı olarak içe aktarılırlar.",
+      "importPrices": "Fiyat geçmişini içe aktar",
+      "importPricesHint": "Money'nin her menkul kıymetin gün gün ne ettiğine dair kendi kaydı. Güncel kotasyonlarla başlamayı tercih ediyorsanız bunu kapatın.",
+      "importExchangeRates": "Döviz kurlarını içe aktar",
+      "importExchangeRatesHint": "Dosyanızdaki para birimleri arasındaki geçmiş kurlar; böylece eski yabancı para işlemleri Money'nin çevirdiği gibi çevrilir."
     },
     "warningsHeading": "Bu dosyayla ilgili notlar",
     "startImport": "İçe aktarmayı başlat"
@@ -366,21 +376,31 @@
     "heading": "İçe aktarma tamamlandı",
     "allMatch": "{count} hesabın tamamı tutuyor: her bakiye Money dosyanızdan hesaplanan değerle aynı.",
     "someDiffer": "{count} hesap, Money dosyanızdan hesaplanan bakiyeyle uyuşmuyor. Aşağıda işaretlenen satırlar farkı gösterir.",
+    "someHoldingsDiffer": "Tüm bakiyeler tutuyor, ancak {count, plural, other {# pozisyon}} Money dosyanızda kayıtlı hisse adediyle uyuşmuyor. Aşağıda işaretlenen satırlar farkı gösterir.",
     "counts": {
       "accounts": "Hesaplar",
       "transactions": "İşlemler",
       "transfers": "Transferler",
       "splits": "Bölme satırları",
       "payees": "Alıcılar",
-      "categories": "Kategoriler"
+      "categories": "Kategoriler",
+      "securities": "Menkul kıymetler",
+      "investments": "Yatırım işlemleri",
+      "prices": "Fiyatlar",
+      "exchangeRates": "Döviz kurları"
     },
     "existingDataRemoved": "Mevcut verileriniz, istediğiniz gibi bu içe aktarmadan önce kaldırıldı.",
     "verificationHeading": "Bakiye doğrulaması",
+    "holdingsHeading": "Pozisyon doğrulaması",
+    "holdingsExplainer": "Monize'nin şu anda tuttuğu hisseler ile Money dosyanızdaki açık vergi lotları. Money'nin kendisi de bu lotlarla mutabakat yapar, dolayısıyla güvenilecek sayı onlardır.",
     "table": {
       "account": "Hesap",
+      "security": "Menkul kıymet",
       "transactions": "İşlemler",
       "expected": "Money dosyasından",
       "imported": "Monize'da",
+      "lotShares": "Money'deki hisse",
+      "importedShares": "Monize'deki hisse",
       "delta": "Fark",
       "check": "Kontrol et"
     },
@@ -402,7 +422,15 @@
     "orphanedSplit": "{count, plural, other {# bölme satırının}} üst işlemi yoktu ve atlandı.",
     "splitSumMismatch": "{count, plural, other {# bölmede}} satırlar işlem toplamını vermiyor; Money'nin kendi toplamları korundu.",
     "transferAcrossExcludedAccount": "{count, plural, other {# transfer}} dışarıda bıraktığınız bir hesabı gösteriyordu ve sıradan işlem olarak içe aktarıldı.",
-    "balanceMismatch": "{count, plural, other {# hesap}} Money dosyasından farklı bir bakiyeyle sonuçlandı."
+    "balanceMismatch": "{count, plural, other {# hesap}} Money dosyasından farklı bir bakiyeyle sonuçlandı.",
+    "duplicateSecuritySymbol": "{count, plural, other {# menkul kıymet}} sembolünü bir başkasıyla paylaşıyordu; ayrı kalsınlar diye sonrakiler yeniden adlandırıldı.",
+    "generatedSecuritySymbol": "{count, plural, other {# menkul kıymetin}} Money'de sembolü yok; bu yüzden bir yer tutucu üretildi ve fiyat güncellemeleri kapalı bırakıldı.",
+    "unknownInvestmentAction": "{count, plural, other {# yatırım işlemi}} Monize'nin tanımadığı bir eylem kullandı ve atlandı.",
+    "unconfirmedInvestmentAction": "{count, plural, other {# yatırım işlemi}} anlamı belgelenmiş değil çıkarsanmış bir Money eylemi kullandı; bunları Money ile karşılaştırın.",
+    "missingInvestmentDetail": "{count, plural, other {# yatırım işleminin}} dosyada hisse ayrıntısı yoktu ve yalnızca nakit tutarıyla içe aktarıldı.",
+    "investmentAccountMismatch": "{count, plural, other {# yatırım işlemi}} yatırım hesabı olmayan bir hesaptaydı ve atlandı.",
+    "unusableSecuritySplit": "{count, plural, other {# hisse bölünmesi}} bir menkul kıymetle eşleştirilemedi ya da kullanılamaz bir orana sahipti; uygulanmadı.",
+    "holdingsMismatch": "{count, plural, other {# pozisyon}} Money dosyanızda kayıtlı hisse adediyle uyuşmuyor."
   },
   "mnyErrors": {
     "mnyImportFailed": "İçe aktarma sırasında bir şeyler ters gitti. Hiçbir şey kaydedilmedi -- yeniden denebilirsiniz.",
