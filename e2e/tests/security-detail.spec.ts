@@ -96,7 +96,11 @@ test.describe('Security detail', () => {
     await expect(
       page.getByRole('heading', { name: 'Security performance' }),
     ).toBeVisible();
-    await expect(page.getByText('Total return')).toBeVisible();
+    // Exact: the performance card's own text points the reader at "Total
+    // return", so a loose match finds that sentence as well as the row label.
+    await expect(
+      page.getByText('Total return', { exact: true }),
+    ).toBeVisible();
   });
 
   test('keeps a sub-cent price intact end to end', async ({
@@ -112,7 +116,15 @@ test.describe('Security detail', () => {
 
     await page.goto(`/securities/${security.id}`);
 
-    await expect(page.getByText(/0\.0001234568/).first()).toBeVisible();
+    // The card shows three significant figures for a sub-penny value, which is
+    // what `adaptiveFractionDigits` does everywhere in the app -- so the check
+    // here is that the price survived the round trip as a small non-zero number
+    // rather than collapsing to $0.00, which is how it failed before the column
+    // was widened. The stored precision itself is guarded in the backend by
+    // `entity-decimal-precision.spec.ts`.
+    await expect(page.getByText('$0.000123').first()).toBeVisible();
+    // 15,000 units at that price: a cost basis of 1.85, not 1.84 or 1.86.
+    await expect(page.getByText('$1.85').first()).toBeVisible();
   });
 
   test('offers the three chart series and the tabs beneath', async ({
