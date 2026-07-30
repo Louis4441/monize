@@ -29,7 +29,8 @@
     "selectAccountForAllFiles": "Harap pilih akun untuk semua file",
     "importFailed": "Impor gagal",
     "importedFromFiles": "Berhasil mengimpor {imported} transaksi dari {files} file",
-    "imported": "Berhasil mengimpor {imported} transaksi"
+    "imported": "Berhasil mengimpor {imported} transaksi",
+    "mnySingleFileOnly": "Impor berkas Microsoft Money satu per satu -- berkas .mny memuat satu profil utuh."
   },
   "page": {
     "title": "Impor Transaksi",
@@ -287,5 +288,131 @@
   "navigation": {
     "back": "Kembali",
     "next": "Berikutnya"
+  },
+  "mnyPassword": {
+    "heading": "Berkas Money ini memerlukan kata sandi",
+    "body": "Microsoft Money mengenkripsi berkas ini dengan kata sandi. Masukkan untuk melanjutkan; kata sandi dipakai sekali untuk membaca berkas dan tidak pernah disimpan.",
+    "retryBody": "Kata sandi itu tidak membuka berkas. Periksa dan coba lagi -- kata sandi Money membedakan huruf besar dan kecil.",
+    "label": "Kata sandi berkas Money",
+    "submit": "Buka berkas"
+  },
+  "mnyReview": {
+    "heading": "Periksa berkas Microsoft Money Anda",
+    "fileSummary": "{filename} -- {era}, mata uang dasar {currency}. Saldo di bawah dihitung dari berkas itu sendiri, jadi Anda dapat membandingkannya dengan Money sebelum mengimpor.",
+    "era": {
+      "money2001": "format Money 2001",
+      "money2002": "format Money 2002",
+      "moneyPlus": "format Money Plus / Sunset",
+      "unknown": "versi Money tidak dikenal"
+    },
+    "missingTables": "Versi Money ini tidak memiliki tabel {tables}, sehingga semua yang ada di dalamnya dilewati.",
+    "counts": {
+      "transactions": "Transaksi",
+      "transfersLinked": "{count} transfer tertaut",
+      "payees": "Penerima",
+      "categories": "Kategori",
+      "accounts": "Akun",
+      "ofTotal": "dari {total} di berkas"
+    },
+    "notYetImported": "Investasi dan tagihan terjadwal belum diimpor: {investments} transaksi investasi, {securities} efek, dan {bills} baris tagihan ditinggalkan untuk rilis berikutnya. Riwayat bank Anda diimpor sepenuhnya.",
+    "accountsHeading": "Akun ({count})",
+    "selectAll": "Pilih semua",
+    "selectNone": "Jangan pilih apa pun",
+    "table": {
+      "include": "Impor",
+      "includeAccount": "Impor {name}",
+      "account": "Akun",
+      "type": "Jenis",
+      "currency": "Mata uang",
+      "currencyForAccount": "Mata uang untuk {name}",
+      "transactions": "Transaksi",
+      "openingBalance": "Saldo awal",
+      "finalBalance": "Saldo akhir",
+      "closed": "Ditutup",
+      "favourite": "Favorit",
+      "renamedFrom": "diberi nama \"{name}\" di Money"
+    },
+    "optionsHeading": "Opsi impor",
+    "options": {
+      "referencedOnlyPayees": "Hanya impor penerima yang dipakai",
+      "referencedOnlyPayeesHint": "Money menyimpan penerima lama setelah transaksi terakhirnya. Biarkan aktif untuk melewati yang tidak dipakai.",
+      "referencedOnlyCategories": "Hanya impor kategori yang dipakai",
+      "referencedOnlyCategoriesHint": "Money membuat pohon kategori lengkap, dipakai atau tidak. Biarkan aktif untuk melewati kategori yang tidak pernah Anda gunakan.",
+      "importClosedAccounts": "Impor akun yang ditutup",
+      "importClosedAccountsHint": "Akun yang ditutup masih menyimpan riwayat yang layak disimpan. Akun tersebut diimpor dalam keadaan tertutup."
+    },
+    "warningsHeading": "Catatan tentang berkas ini",
+    "startImport": "Mulai impor"
+  },
+  "mnyImporting": {
+    "heading": "Mengimpor berkas Money Anda",
+    "doNotClose": "Proses ini berjalan di server, jadi Anda boleh meninggalkan halaman ini dan kembali nanti. Berkas besar memerlukan beberapa menit.",
+    "rowProgress": "{processed} dari {total}",
+    "phases": {
+      "preparing": "Menyiapkan",
+      "reference": "Akun, kategori, dan penerima",
+      "transactions": "Transaksi",
+      "investments": "Investasi",
+      "bills": "Tagihan terjadwal",
+      "prices": "Harga dan nilai tukar",
+      "finalizing": "Menghitung ulang saldo",
+      "verifying": "Memverifikasi"
+    },
+    "failedHeading": "Impor tidak selesai",
+    "retry": "Coba lagi",
+    "startOver": "Mulai dari awal"
+  },
+  "mnyComplete": {
+    "heading": "Impor selesai",
+    "allMatch": "Semua {count} akun cocok: setiap saldo sama dengan yang dihitung dari berkas Money Anda.",
+    "someDiffer": "{count} akun tidak cocok dengan saldo yang dihitung dari berkas Money Anda. Baris yang ditandai di bawah menunjukkan selisihnya.",
+    "counts": {
+      "accounts": "Akun",
+      "transactions": "Transaksi",
+      "transfers": "Transfer",
+      "splits": "Baris pemecahan",
+      "payees": "Penerima",
+      "categories": "Kategori"
+    },
+    "existingDataRemoved": "Data Anda yang ada dihapus sebelum impor ini, sesuai permintaan.",
+    "verificationHeading": "Verifikasi saldo",
+    "table": {
+      "account": "Akun",
+      "transactions": "Transaksi",
+      "expected": "Dari berkas Money",
+      "imported": "Di Monize",
+      "delta": "Selisih",
+      "check": "Periksa"
+    },
+    "warningsHeading": "Catatan tentang impor ini",
+    "downloadReport": "Unduh laporan",
+    "done": "Selesai"
+  },
+  "mnyWarnings": {
+    "missingTable": "Versi Money ini tidak memiliki {count, plural, other {# tabel}} yang dipakai impor.",
+    "missingField": "{count, plural, other {# bidang}} tidak ada di versi Money ini dan memakai nilai bawaan.",
+    "unknownAccountType": "{count, plural, other {# akun}} memiliki jenis akun yang tidak dikenali Monize dan dilewati.",
+    "duplicateAccountName": "{count, plural, other {# akun}} bernama sama dengan akun lain dan diganti namanya.",
+    "unknownCurrency": "{count, plural, other {# akun}} merujuk mata uang yang tidak didefinisikan berkas dan memakai mata uang dasar.",
+    "categoryFlattened": "{count, plural, other {# kategori}} lebih dalam dari dua tingkat dan diratakan ke kategori induknya.",
+    "categoryTypeInferred": "Penanda pemasukan dari Money tidak ada pada {count, plural, other {# kategori}}; pemasukan atau pengeluaran disimpulkan dari pohon kategori.",
+    "degeneratePayeeSkipped": "{count, plural, other {# penerima pengganti}} yang disimpan Money secara internal dilewati.",
+    "unusableTransaction": "{count, plural, other {# transaksi}} tidak memiliki akun atau tanggal yang dapat dipakai dan dilewati.",
+    "orphanedTransferSide": "{count, plural, other {# transfer}} kehilangan sisi lainnya di berkas dan dilewati.",
+    "orphanedSplit": "{count, plural, other {# baris pemecahan}} tidak memiliki transaksi induk dan dilewati.",
+    "splitSumMismatch": "{count, plural, other {# pemecahan}} memiliki baris yang jumlahnya tidak sama dengan total transaksi; total dari Money dipertahankan.",
+    "transferAcrossExcludedAccount": "{count, plural, other {# transfer}} menunjuk ke akun yang Anda kecualikan dan diimpor sebagai transaksi biasa.",
+    "balanceMismatch": "{count, plural, other {# akun}} berakhir dengan saldo yang berbeda dari berkas Money."
+  },
+  "mnyErrors": {
+    "mnyImportFailed": "Terjadi kesalahan saat mengimpor. Tidak ada yang disimpan -- Anda dapat mencoba lagi.",
+    "mnyJobStalled": "Impor berhenti merespons, kemungkinan besar karena server dimulai ulang. Berkas yang Anda unggah masih ada, jadi mencoba lagi aman.",
+    "mnyStagedFileMissing": "Berkas Money yang diunggah sudah tidak tersedia. Silakan unggah kembali.",
+    "mnyFileTruncated": "Berkas Money ini tampak tidak lengkap. Unggahan mungkin terputus.",
+    "mnyNotAMoneyFile": "Berkas itu bukan berkas Microsoft Money (.mny).",
+    "mnyUnsupportedVersion": "Berkas itu dibuat oleh Money 97 atau 98. Buka dan simpan sekali di edisi gratis Money Plus Sunset, lalu impor hasilnya.",
+    "mnyPasswordRequired": "Berkas Money itu dilindungi kata sandi.",
+    "mnyPasswordIncorrect": "Kata sandi itu tidak membuka berkas Money.",
+    "mnyUnreadableDatabase": "Berkas Money itu berhasil didekripsi, tetapi isinya tidak dapat dibaca. Mungkin rusak."
   }
 }

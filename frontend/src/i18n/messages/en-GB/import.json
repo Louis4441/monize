@@ -1,5 +1,13 @@
 {
   "selectAccount": {
     "accountNamePlaceholder": "e.g. My Current Account"
+  },
+  "mnyReview": {
+    "era": {
+      "unknown": "unrecognised Money version"
+    }
+  },
+  "mnyWarnings": {
+    "unknownAccountType": "{count, plural, one {# account} other {# accounts}} had an account type Monize does not recognise and were skipped."
   }
 }

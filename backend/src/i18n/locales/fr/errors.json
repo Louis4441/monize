@@ -276,7 +276,18 @@
     "invalidSecurityMapping": "La correspondance de titre fait référence à un titre invalide : {{ secId }}",
     "columnMappingNotFound": "Correspondance de colonne introuvable",
     "columnMappingDuplicate": "Une correspondance de colonne nommée « {{ name }} » existe déjà",
-    "accountNotFound": "Compte introuvable"
+    "accountNotFound": "Compte introuvable",
+    "mnyNoFile": "Aucun fichier Money n'a été envoyé",
+    "mnyFileTruncated": "Ce fichier Money semble incomplet. L'envoi a peut-être été interrompu -- réessayez.",
+    "mnyNotAMoneyFile": "Ce fichier n'est pas un fichier Microsoft Money (.mny)",
+    "mnyUnsupportedVersion": "Ce fichier a été créé avec Money 97 ou 98, que Monize ne peut pas lire. Ouvrez-le et enregistrez-le une fois dans l'édition gratuite Money Plus Sunset, puis importez le résultat.",
+    "mnyPasswordRequired": "Ce fichier Money est protégé par un mot de passe. Saisissez-le pour continuer.",
+    "mnyPasswordIncorrect": "Ce mot de passe n'ouvre pas le fichier Money. Vérifiez-le et réessayez.",
+    "mnyUnreadableDatabase": "Ce fichier Money a été déchiffré mais son contenu n'a pas pu être lu. Il est peut-être endommagé.",
+    "mnyStagedFileMissing": "Le fichier Money envoyé n'est plus disponible. Veuillez l'envoyer à nouveau.",
+    "mnyImportAlreadyRunning": "Un import est déjà en cours. Attendez qu'il se termine avant d'en lancer un autre.",
+    "mnyJobNotFound": "Tâche d'import introuvable",
+    "mnyFileTooLarge": "Ce fichier Money dépasse la limite d'import de {{ limit }} Mo."
   },
   "monteCarlo": {
     "scenarioNotFound": "Scénario {{ id }} introuvable",

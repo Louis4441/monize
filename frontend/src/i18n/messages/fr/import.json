@@ -29,7 +29,8 @@
     "selectAccountForAllFiles": "Veuillez sélectionner un compte pour chaque fichier",
     "importFailed": "Échec de l'importation",
     "importedFromFiles": "{imported} transactions importées avec succès depuis {files} fichiers",
-    "imported": "{imported} transactions importées avec succès"
+    "imported": "{imported} transactions importées avec succès",
+    "mnySingleFileOnly": "Importez les fichiers Microsoft Money un par un -- un fichier .mny contient un profil complet."
   },
   "page": {
     "title": "Importer des transactions",
@@ -287,5 +288,131 @@
   "navigation": {
     "back": "Retour",
     "next": "Suivant"
+  },
+  "mnyPassword": {
+    "heading": "Ce fichier Money nécessite un mot de passe",
+    "body": "Microsoft Money a chiffré ce fichier avec un mot de passe. Saisissez-le pour continuer ; il sert une seule fois à lire le fichier et n'est jamais conservé.",
+    "retryBody": "Ce mot de passe n'a pas ouvert le fichier. Vérifiez-le et réessayez -- les mots de passe Money sont sensibles à la casse.",
+    "label": "Mot de passe du fichier Money",
+    "submit": "Ouvrir le fichier"
+  },
+  "mnyReview": {
+    "heading": "Vérifiez votre fichier Microsoft Money",
+    "fileSummary": "{filename} -- {era}, devise de base {currency}. Les soldes ci-dessous sont calculés depuis le fichier lui-même, vous pouvez donc les comparer à Money avant d'importer.",
+    "era": {
+      "money2001": "format Money 2001",
+      "money2002": "format Money 2002",
+      "moneyPlus": "format Money Plus / Sunset",
+      "unknown": "version de Money inconnue"
+    },
+    "missingTables": "Cette version de Money n'a pas de table {tables} ; tout ce qu'elle contiendrait est donc ignoré.",
+    "counts": {
+      "transactions": "Transactions",
+      "transfersLinked": "{count} virements liés",
+      "payees": "Bénéficiaires",
+      "categories": "Catégories",
+      "accounts": "Comptes",
+      "ofTotal": "sur {total} dans le fichier"
+    },
+    "notYetImported": "Les placements et les factures planifiées ne sont pas encore importés : {investments} transactions de placement, {securities} titres et {bills} lignes de facture sont réservés à une version ultérieure. Votre historique bancaire est importé intégralement.",
+    "accountsHeading": "Comptes ({count})",
+    "selectAll": "Tout sélectionner",
+    "selectNone": "Ne rien sélectionner",
+    "table": {
+      "include": "Importer",
+      "includeAccount": "Importer {name}",
+      "account": "Compte",
+      "type": "Type",
+      "currency": "Devise",
+      "currencyForAccount": "Devise pour {name}",
+      "transactions": "Transactions",
+      "openingBalance": "Solde initial",
+      "finalBalance": "Solde final",
+      "closed": "Fermé",
+      "favourite": "Favori",
+      "renamedFrom": "nommé « {name} » dans Money"
+    },
+    "optionsHeading": "Options d'import",
+    "options": {
+      "referencedOnlyPayees": "N'importer que les bénéficiaires utilisés",
+      "referencedOnlyPayeesHint": "Money conserve les bénéficiaires longtemps après leur dernière transaction. Laissez cette option activée pour ignorer ceux qui ne servent plus.",
+      "referencedOnlyCategories": "N'importer que les catégories utilisées",
+      "referencedOnlyCategoriesHint": "Money crée une arborescence de catégories complète, que vous l'utilisiez ou non. Laissez cette option activée pour ignorer les catégories jamais utilisées.",
+      "importClosedAccounts": "Importer les comptes fermés",
+      "importClosedAccountsHint": "Les comptes fermés contiennent un historique qui mérite d'être conservé. Ils sont importés comme fermés."
+    },
+    "warningsHeading": "Remarques sur ce fichier",
+    "startImport": "Démarrer l'import"
+  },
+  "mnyImporting": {
+    "heading": "Import de votre fichier Money",
+    "doNotClose": "L'import s'exécute sur le serveur : vous pouvez quitter cette page et y revenir. Un gros fichier prend quelques minutes.",
+    "rowProgress": "{processed} sur {total}",
+    "phases": {
+      "preparing": "Préparation",
+      "reference": "Comptes, catégories et bénéficiaires",
+      "transactions": "Transactions",
+      "investments": "Placements",
+      "bills": "Factures planifiées",
+      "prices": "Cours et taux de change",
+      "finalizing": "Recalcul des soldes",
+      "verifying": "Vérification"
+    },
+    "failedHeading": "L'import ne s'est pas terminé",
+    "retry": "Réessayer",
+    "startOver": "Recommencer"
+  },
+  "mnyComplete": {
+    "heading": "Import terminé",
+    "allMatch": "Les {count} comptes concordent : chaque solde correspond à celui calculé depuis votre fichier Money.",
+    "someDiffer": "{count} comptes ne correspondent pas au solde calculé depuis votre fichier Money. Les lignes signalées ci-dessous indiquent l'écart.",
+    "counts": {
+      "accounts": "Comptes",
+      "transactions": "Transactions",
+      "transfers": "Virements",
+      "splits": "Lignes ventilées",
+      "payees": "Bénéficiaires",
+      "categories": "Catégories"
+    },
+    "existingDataRemoved": "Vos données existantes ont été supprimées avant cet import, comme demandé.",
+    "verificationHeading": "Vérification des soldes",
+    "table": {
+      "account": "Compte",
+      "transactions": "Transactions",
+      "expected": "D'après le fichier Money",
+      "imported": "Dans Monize",
+      "delta": "Écart",
+      "check": "À vérifier"
+    },
+    "warningsHeading": "Remarques sur cet import",
+    "downloadReport": "Télécharger le rapport",
+    "done": "Terminé"
+  },
+  "mnyWarnings": {
+    "missingTable": "Cette version de Money n'a pas {count, plural, one {# table} other {# tables}} utilisée(s) par l'import.",
+    "missingField": "{count, plural, one {# champ était absent} other {# champs étaient absents}} de cette version de Money et ont pris une valeur par défaut.",
+    "unknownAccountType": "{count, plural, one {# compte avait} other {# comptes avaient}} un type de compte inconnu de Monize et ont été ignorés.",
+    "duplicateAccountName": "{count, plural, one {# compte portait} other {# comptes portaient}} le même nom qu'un autre et ont été renommés.",
+    "unknownCurrency": "{count, plural, one {# compte référence} other {# comptes référencent}} une devise que le fichier ne définit pas et utilisent la devise de base.",
+    "categoryFlattened": "{count, plural, one {# catégorie dépassait} other {# catégories dépassaient}} deux niveaux et ont été regroupées dans leur catégorie parente.",
+    "categoryTypeInferred": "L'indicateur de revenu de Money manquait pour {count, plural, one {# catégorie} other {# catégories}} ; revenu ou dépense a été déduit de l'arborescence.",
+    "degeneratePayeeSkipped": "{count, plural, one {# bénéficiaire fictif} other {# bénéficiaires fictifs}} que Money conserve en interne ont été ignorés.",
+    "unusableTransaction": "{count, plural, one {# transaction n'avait} other {# transactions n'avaient}} ni compte ni date exploitable et ont été ignorées.",
+    "orphanedTransferSide": "{count, plural, one {# virement n'avait pas} other {# virements n'avaient pas}} leur contrepartie dans le fichier et ont été ignorés.",
+    "orphanedSplit": "{count, plural, one {# ligne ventilée n'avait} other {# lignes ventilées n'avaient}} pas de transaction parente et ont été ignorées.",
+    "splitSumMismatch": "{count, plural, one {# ventilation avait} other {# ventilations avaient}} des lignes dont la somme ne correspond pas au total ; les totaux de Money ont été conservés.",
+    "transferAcrossExcludedAccount": "{count, plural, one {# virement pointait} other {# virements pointaient}} vers un compte que vous avez exclu et ont été importés comme transactions ordinaires.",
+    "balanceMismatch": "{count, plural, one {# compte présente} other {# comptes présentent}} un solde différent de celui du fichier Money."
+  },
+  "mnyErrors": {
+    "mnyImportFailed": "Une erreur est survenue pendant l'import. Rien n'a été enregistré -- vous pouvez réessayer.",
+    "mnyJobStalled": "L'import ne répond plus, très probablement parce que le serveur a redémarré. Votre fichier est toujours là : réessayer ne présente aucun risque.",
+    "mnyStagedFileMissing": "Le fichier Money envoyé n'est plus disponible. Veuillez l'envoyer à nouveau.",
+    "mnyFileTruncated": "Ce fichier Money semble incomplet. L'envoi a peut-être été interrompu.",
+    "mnyNotAMoneyFile": "Ce fichier n'est pas un fichier Microsoft Money (.mny).",
+    "mnyUnsupportedVersion": "Ce fichier a été créé avec Money 97 ou 98. Ouvrez-le et enregistrez-le une fois dans l'édition gratuite Money Plus Sunset, puis importez le résultat.",
+    "mnyPasswordRequired": "Ce fichier Money est protégé par un mot de passe.",
+    "mnyPasswordIncorrect": "Ce mot de passe n'ouvre pas le fichier Money.",
+    "mnyUnreadableDatabase": "Ce fichier Money a été déchiffré mais son contenu n'a pas pu être lu. Il est peut-être endommagé."
   }
 }

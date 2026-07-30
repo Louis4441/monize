@@ -276,7 +276,18 @@
     "invalidSecurityMapping": "證券對應參照了無效的證券：{{ secId }}",
     "columnMappingNotFound": "找不到欄位對應",
     "columnMappingDuplicate": "已有名為「{{ name }}」的欄位對應",
-    "accountNotFound": "找不到科目"
+    "accountNotFound": "找不到科目",
+    "mnyNoFile": "未上傳 Money 檔案",
+    "mnyFileTruncated": "這個 Money 檔案似乎不完整。上傳可能被中斷，請重試。",
+    "mnyNotAMoneyFile": "這個檔案不是 Microsoft Money (.mny) 檔案",
+    "mnyUnsupportedVersion": "這個檔案由 Money 97 或 98 建立，Monize 無法讀取。請先以免費的 Money Plus Sunset 版本開啟並儲存一次，然後匯入結果。",
+    "mnyPasswordRequired": "這個 Money 檔案受密碼保護。請輸入密碼以繼續。",
+    "mnyPasswordIncorrect": "這個密碼無法開啟 Money 檔案。請檢查後重試。",
+    "mnyUnreadableDatabase": "這個 Money 檔案已解密，但無法讀取其內容。檔案可能已損壞。",
+    "mnyStagedFileMissing": "上傳的 Money 檔案已無法使用，請重新上傳。",
+    "mnyImportAlreadyRunning": "已有匯入正在進行。請等待完成後再開始新的匯入。",
+    "mnyJobNotFound": "找不到匯入工作",
+    "mnyFileTooLarge": "這個 Money 檔案超過 {{ limit }} MB 的匯入上限。"
   },
   "monteCarlo": {
     "scenarioNotFound": "找不到情境 {{ id }}",

@@ -29,7 +29,8 @@
     "selectAccountForAllFiles": "Lütfen tüm dosyalar için bir hesap seçin",
     "importFailed": "İçe aktarma başarısız",
     "importedFromFiles": "{files} dosyadan {imported} işlem başarıyla içe aktarıldı",
-    "imported": "{imported} işlem başarıyla içe aktarıldı"
+    "imported": "{imported} işlem başarıyla içe aktarıldı",
+    "mnySingleFileOnly": "Microsoft Money dosyalarını tek tek içe aktarın -- bir .mny dosyası bütün bir profili içerir."
   },
   "page": {
     "title": "İşlem İçe Aktar",
@@ -287,5 +288,131 @@
   "navigation": {
     "back": "Geri",
     "next": "İleri"
+  },
+  "mnyPassword": {
+    "heading": "Bu Money dosyası bir parola gerektiriyor",
+    "body": "Microsoft Money bu dosyayı bir parolayla şifreledi. Devam etmek için parolayı girin; dosyayı okumak için bir kez kullanılır ve hiçbir zaman saklanmaz.",
+    "retryBody": "Bu parola dosyayı açmadı. Kontrol edip yeniden deneyin -- Money parolaları büyük/küçük harfe duyarlıdır.",
+    "label": "Money dosyası parolası",
+    "submit": "Dosyayı aç"
+  },
+  "mnyReview": {
+    "heading": "Microsoft Money dosyanızı gözden geçirin",
+    "fileSummary": "{filename} -- {era}, temel para birimi {currency}. Aşağıdaki bakiyeler dosyanın kendisinden hesaplanır; böylece içe aktarmadan önce Money ile karşılaştırabilirsiniz.",
+    "era": {
+      "money2001": "Money 2001 biçimi",
+      "money2002": "Money 2002 biçimi",
+      "moneyPlus": "Money Plus / Sunset biçimi",
+      "unknown": "bilinmeyen Money sürümü"
+    },
+    "missingTables": "Bu Money sürümünde {tables} tablosu yok, dolayısıyla içinde yer alacak her şey atlanır.",
+    "counts": {
+      "transactions": "İşlemler",
+      "transfersLinked": "{count} transfer bağlandı",
+      "payees": "Alıcılar",
+      "categories": "Kategoriler",
+      "accounts": "Hesaplar",
+      "ofTotal": "dosyadaki {total} içinden"
+    },
+    "notYetImported": "Yatırımlar ve planlanmış faturalar henüz içe aktarılmıyor: {investments} yatırım işlemi, {securities} menkul kıymet ve {bills} fatura satırı sonraki bir sürüme bırakıldı. Banka geçmişiniz eksiksiz içe aktarılır.",
+    "accountsHeading": "Hesaplar ({count})",
+    "selectAll": "Tümünü seç",
+    "selectNone": "Hiçbirini seçme",
+    "table": {
+      "include": "İçe aktar",
+      "includeAccount": "{name} hesabını içe aktar",
+      "account": "Hesap",
+      "type": "Tür",
+      "currency": "Para birimi",
+      "currencyForAccount": "{name} için para birimi",
+      "transactions": "İşlemler",
+      "openingBalance": "Açılış bakiyesi",
+      "finalBalance": "Son bakiye",
+      "closed": "Kapalı",
+      "favourite": "Favori",
+      "renamedFrom": "Money'de \"{name}\" olarak adlandırılmış"
+    },
+    "optionsHeading": "İçe aktarma seçenekleri",
+    "options": {
+      "referencedOnlyPayees": "Yalnızca kullanılan alıcıları içe aktar",
+      "referencedOnlyPayeesHint": "Money alıcıları son işlemlerinden çok sonra da tutar. Kullanılmayanları atlamak için bunu açık bırakın.",
+      "referencedOnlyCategories": "Yalnızca kullanılan kategorileri içe aktar",
+      "referencedOnlyCategoriesHint": "Money, kullanıp kullanmadığınıza bakmaksızın eksiksiz bir kategori ağacı oluşturur. Hiç kullanmadığınız kategorileri atlamak için bunu açık bırakın.",
+      "importClosedAccounts": "Kapalı hesapları içe aktar",
+      "importClosedAccountsHint": "Kapalı hesaplar hâlâ saklanmaya değer geçmiş barındırır. Kapalı olarak içe aktarılırlar."
+    },
+    "warningsHeading": "Bu dosyayla ilgili notlar",
+    "startImport": "İçe aktarmayı başlat"
+  },
+  "mnyImporting": {
+    "heading": "Money dosyanız içe aktarılıyor",
+    "doNotClose": "İşlem sunucuda çalışır, bu yüzden bu sayfadan ayrılıp sonra geri dönebilirsiniz. Büyük bir dosya birkaç dakika sürer.",
+    "rowProgress": "{total} içinden {processed}",
+    "phases": {
+      "preparing": "Hazırlanıyor",
+      "reference": "Hesaplar, kategoriler ve alıcılar",
+      "transactions": "İşlemler",
+      "investments": "Yatırımlar",
+      "bills": "Planlanmış faturalar",
+      "prices": "Fiyatlar ve döviz kurları",
+      "finalizing": "Bakiyeler yeniden hesaplanıyor",
+      "verifying": "Doğrulanıyor"
+    },
+    "failedHeading": "İçe aktarma tamamlanmadı",
+    "retry": "Yeniden dene",
+    "startOver": "Baştan başla"
+  },
+  "mnyComplete": {
+    "heading": "İçe aktarma tamamlandı",
+    "allMatch": "{count} hesabın tamamı tutuyor: her bakiye Money dosyanızdan hesaplanan değerle aynı.",
+    "someDiffer": "{count} hesap, Money dosyanızdan hesaplanan bakiyeyle uyuşmuyor. Aşağıda işaretlenen satırlar farkı gösterir.",
+    "counts": {
+      "accounts": "Hesaplar",
+      "transactions": "İşlemler",
+      "transfers": "Transferler",
+      "splits": "Bölme satırları",
+      "payees": "Alıcılar",
+      "categories": "Kategoriler"
+    },
+    "existingDataRemoved": "Mevcut verileriniz, istediğiniz gibi bu içe aktarmadan önce kaldırıldı.",
+    "verificationHeading": "Bakiye doğrulaması",
+    "table": {
+      "account": "Hesap",
+      "transactions": "İşlemler",
+      "expected": "Money dosyasından",
+      "imported": "Monize'da",
+      "delta": "Fark",
+      "check": "Kontrol et"
+    },
+    "warningsHeading": "Bu içe aktarmayla ilgili notlar",
+    "downloadReport": "Raporu indir",
+    "done": "Bitti"
+  },
+  "mnyWarnings": {
+    "missingTable": "Bu Money sürümünde, içe aktarmanın kullandığı {count, plural, other {# tablo}} yok.",
+    "missingField": "Bu Money sürümünde {count, plural, other {# alan}} bulunmadığı için varsayılan değer aldı.",
+    "unknownAccountType": "{count, plural, other {# hesap}} Monize'ın tanımadığı bir hesap türüne sahipti ve atlandı.",
+    "duplicateAccountName": "{count, plural, other {# hesap}} başka bir hesapla aynı adı taşıdığı için yeniden adlandırıldı.",
+    "unknownCurrency": "{count, plural, other {# hesap}} dosyada tanımlı olmayan bir para birimine başvuruyor ve temel para birimini kullanıyor.",
+    "categoryFlattened": "{count, plural, other {# kategori}} iki düzeyden daha derindi ve üst kategorisine düzleştirildi.",
+    "categoryTypeInferred": "{count, plural, other {# kategoride}} Money'nin gelir işareti eksikti; gelir mi gider mi olduğu kategori ağacından çıkarıldı.",
+    "degeneratePayeeSkipped": "Money'nin içeride tuttuğu {count, plural, other {# yer tutucu alıcı}} atlandı.",
+    "unusableTransaction": "{count, plural, other {# işlemin}} hesabı ya da kullanılabilir tarihi yoktu ve atlandı.",
+    "orphanedTransferSide": "{count, plural, other {# transferin}} dosyada karşı tarafı yoktu ve atlandı.",
+    "orphanedSplit": "{count, plural, other {# bölme satırının}} üst işlemi yoktu ve atlandı.",
+    "splitSumMismatch": "{count, plural, other {# bölmede}} satırlar işlem toplamını vermiyor; Money'nin kendi toplamları korundu.",
+    "transferAcrossExcludedAccount": "{count, plural, other {# transfer}} dışarıda bıraktığınız bir hesabı gösteriyordu ve sıradan işlem olarak içe aktarıldı.",
+    "balanceMismatch": "{count, plural, other {# hesap}} Money dosyasından farklı bir bakiyeyle sonuçlandı."
+  },
+  "mnyErrors": {
+    "mnyImportFailed": "İçe aktarma sırasında bir şeyler ters gitti. Hiçbir şey kaydedilmedi -- yeniden denebilirsiniz.",
+    "mnyJobStalled": "İçe aktarma yanıt vermeyi bıraktı, büyük olasılıkla sunucu yeniden başladığı için. Yüklediğiniz dosya hâlâ burada, bu yüzden yeniden denemek güvenli.",
+    "mnyStagedFileMissing": "Yüklenen Money dosyası artık kullanılamıyor. Lütfen yeniden yükleyin.",
+    "mnyFileTruncated": "Bu Money dosyası eksik görünüyor. Yükleme kesilmiş olabilir.",
+    "mnyNotAMoneyFile": "Bu dosya bir Microsoft Money (.mny) dosyası değil.",
+    "mnyUnsupportedVersion": "Bu dosya Money 97 veya 98 ile oluşturulmuş. Ücretsiz Money Plus Sunset sürümünde bir kez açıp kaydedin, ardından sonucu içe aktarın.",
+    "mnyPasswordRequired": "Bu Money dosyası parola korumalı.",
+    "mnyPasswordIncorrect": "Bu parola Money dosyasını açmıyor.",
+    "mnyUnreadableDatabase": "Bu Money dosyasının şifresi çözüldü ancak içeriği okunamadı. Dosya bozuk olabilir."
   }
 }
