@@ -4,6 +4,7 @@ import {
 } from "../../../accounts/entities/account.entity";
 import { TransactionStatus } from "../../../transactions/entities/transaction.entity";
 import { SplitKind } from "../../../transactions/entities/split-kind.enum";
+import { InvestmentAction } from "../../../securities/entities/investment-transaction.entity";
 import { MnyWarning } from "./mny-warnings";
 
 /**
@@ -171,4 +172,98 @@ export interface MappedTransactions {
    */
   readonly deferredInvestments: number;
   readonly warnings: readonly MnyWarning[];
+}
+
+// ---------------------------------------------------------------------------
+// Securities and investments
+// ---------------------------------------------------------------------------
+
+export interface MappedSecurity {
+  /** `SEC.hsec`. */
+  readonly handle: number;
+  /**
+   * Symbol Monize will use: trimmed, unique within the import and within the
+   * `securities` column width. Never shared with another security -- PR #192
+   * upserted on `(user_id, symbol)` and collapsed distinct funds into one.
+   */
+  readonly symbol: string;
+  /** Symbol as Money recorded it; empty when Money had none. */
+  readonly moneySymbol: string;
+  readonly name: string;
+  readonly currencyCode: string;
+  /**
+   * True for a generated placeholder symbol, which no quote provider can
+   * resolve. Matches the QIF importer's convention for auto-created securities.
+   */
+  readonly skipPriceUpdates: boolean;
+}
+
+export interface MappedSecurities {
+  readonly securities: readonly MappedSecurity[];
+  readonly byHandle: ReadonlyMap<number, MappedSecurity>;
+  /** Currency pseudo-securities and rows with no usable identity. */
+  readonly skipped: number;
+  readonly warnings: readonly MnyWarning[];
+}
+
+export interface MappedInvestmentTransaction {
+  /** Pre-generated UUID, so a share-transfer pair is wired before insert. */
+  readonly id: string;
+  /** `TRN.htrn`, or null for a `SEC_SPLIT`-derived SPLIT row. */
+  readonly handle: number | null;
+  /** The brokerage account key the shares move in. */
+  readonly accountKey: string;
+  /** The cash sleeve the cash leg lands in; null when the action moves no cash. */
+  readonly cashAccountKey: string | null;
+  readonly securityHandle: number;
+  readonly action: InvestmentAction;
+  readonly transactionDate: string;
+  /**
+   * Always positive -- direction comes from `action`, never from a sign
+   * (`TRN_INV.qty` is stored positive). For a SPLIT this is the ratio the
+   * holdings fold multiplies by.
+   */
+  readonly quantity: number | null;
+  readonly price: number | null;
+  readonly commission: number;
+  /** Positive magnitude of the transaction, in the account's currency. */
+  readonly totalAmount: number;
+  readonly currencyCode: string;
+  /** Signed cash impact on the cash sleeve; 0 for the share-only actions. */
+  readonly cashAmount: number;
+  readonly status: TransactionStatus;
+  readonly payeeHandle: number | null;
+  readonly categoryHandle: number | null;
+  readonly description: string | null;
+  /** The other leg of an `act` 15/16 share transfer. */
+  readonly linkedInvestmentId: string | null;
+}
+
+export interface MappedInvestments {
+  readonly transactions: readonly MappedInvestmentTransaction[];
+  /** Security handles an imported investment row actually uses. */
+  readonly referencedSecurities: ReadonlySet<number>;
+  readonly referencedPayees: ReadonlySet<number>;
+  readonly referencedCategories: ReadonlySet<number>;
+  /** `act` 15/16 pairs turned into linked TRANSFER_IN / TRANSFER_OUT rows. */
+  readonly transfersPaired: number;
+  /** SPLIT rows synthesized from `SEC_SPLIT`. */
+  readonly splitsApplied: number;
+  /** Security-carrying rows that could not be imported. */
+  readonly skipped: number;
+  readonly warnings: readonly MnyWarning[];
+}
+
+/** One holding's line in the LOT cross-check (design task M2.3). */
+export interface MnyHoldingCheck {
+  readonly accountKey: string;
+  readonly securityHandle: number;
+  readonly symbol: string;
+  /** Shares open lots say the account holds (`LOT` rows with no `htrnSell`). */
+  readonly lotQuantity: number;
+  /** Shares replaying the mapped investment actions produces. */
+  readonly replayQuantity: number;
+  /** `replayQuantity - lotQuantity`. */
+  readonly delta: number;
+  readonly matches: boolean;
 }
