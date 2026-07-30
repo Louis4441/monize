@@ -8,7 +8,7 @@ import {
   MnyUnreadableDatabaseError,
 } from "../mny-errors";
 import { JET_PAGE_SIZE } from "./jet-header";
-import { openMnyFile } from "./open-mny";
+import { openDecryptedMnyFile, openMnyFile } from "./open-mny";
 
 function open(fixture: MnyFixtureName) {
   return openMnyFile(readMnyFixture(fixture), MNY_FIXTURES[fixture].password);
@@ -81,6 +81,57 @@ describe("openMnyFile", () => {
     // retryable -- offering Try again on a file that can never import.
     expect(() => table!.rows()).toThrow(MnyUnreadableDatabaseError);
     expect(() => table!.rows(["hacct"])).toThrow(MnyUnreadableDatabaseError);
+  });
+
+  describe("openDecryptedMnyFile", () => {
+    it.each(Object.keys(MNY_FIXTURES) as MnyFixtureName[])(
+      "re-opens %s after it has already been decrypted once",
+      (fixture) => {
+        // The wizard's real path: parse decrypts the upload in place, the same
+        // buffer is staged as plaintext, and the import job re-parses it.
+        const buffer = readMnyFixture(fixture);
+        openMnyFile(buffer, MNY_FIXTURES[fixture].password);
+
+        const reopened = openDecryptedMnyFile(buffer);
+
+        expect(reopened.tableNames).toHaveLength(
+          MNY_FIXTURES[fixture].tableCount,
+        );
+        expect(reopened.getTableOrNull("ACCT")!.rowCount).toBeGreaterThan(0);
+      },
+    );
+
+    it("still reports the scheme and password state from page 0", () => {
+      // Page 0 is never encrypted, so both survive the decrypt untouched.
+      const buffer = readMnyFixture("money2008Pwd");
+      openMnyFile(buffer, "Test12345");
+
+      const reopened = openDecryptedMnyFile(buffer);
+
+      expect(reopened.scheme).toBe("new-sha1");
+      expect(reopened.passwordProtected).toBe(true);
+    });
+
+    it("reports an unprotected file as unprotected", () => {
+      const buffer = readMnyFixture("money2001");
+      openMnyFile(buffer);
+
+      const reopened = openDecryptedMnyFile(buffer);
+
+      expect(reopened.scheme).toBe("old");
+      expect(reopened.passwordProtected).toBe(false);
+    });
+
+    it("guards the defect: decrypting a second time re-encrypts the file", () => {
+      // RC4 is symmetric, so `openMnyFile` on already-plaintext bytes runs the
+      // cipher back over pages 1..0xE. The only symptom is an unreadable page
+      // structure from a layer that looks unrelated, which is why this needs a
+      // test naming it rather than a comment.
+      const buffer = readMnyFixture("money2001");
+      openMnyFile(buffer);
+
+      expect(() => openMnyFile(buffer)).toThrow(MnyUnreadableDatabaseError);
+    });
   });
 
   it("returns null for a table the Money version does not have", () => {

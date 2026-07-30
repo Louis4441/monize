@@ -875,6 +875,25 @@ names the symptom and not the cause. `helm/README.md` now carries the sizing rul
 `MNY_IMPORT_LIMIT_MB` is a first-class chart value rather than something to pass
 through `extraEnv`.
 
+**The e2e found that no `.mny` import had ever worked through the wizard.** The
+first CI run of M4.4 failed on the money2001 end-to-end test: the preview
+parsed fine and the job then died with `mnyUnreadableDatabase`. The cause is
+ADR-2 meeting ADR-6. `POST /parse` decrypts the upload **in place** and stages
+*that* buffer, because staging plaintext is what lets the password be spent
+once and never persisted (ADR-7). The job then re-parses those staged bytes
+through `openMnyFile`, which decrypts again -- and RC4 is symmetric, so the
+second pass re-encrypts pages 1..0xE.
+
+What made it survive three phases is the test data, not the test coverage:
+every integration test staged **raw fixture bytes**, so the job's decrypt was
+the only decrypt and the path was green. The fix is a second, explicitly named
+entry point (`openDecryptedMnyFile`, reached from `parse({ alreadyDecrypted:
+true })`); page 0 is never encrypted, so the scheme and password state still
+read from it. The integration suite now stages what the controller stages, and
+one spec performs the controller's exact sequence -- parse the upload, stage
+that same buffer, import it. The rule is in the module README: a test that
+stages anything other than what `POST /parse` stages is not testing the import.
+
 **The passworded fixture the task list names is the wrong one.** M4.4 asks for
 `money2001.mny` plus "the passworded variant", which reads as
 `money2001-pwd.mny`. That file opens with no prompt at all: Money's pre-2002

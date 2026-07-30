@@ -288,6 +288,32 @@ describe("MnyParserService", () => {
       ).toThrow(expect.objectContaining({ code: "mnyPasswordRequired" }));
     });
 
+    it("re-parses staged bytes without asking for the password again", () => {
+      // Staging stores the decrypted file so the password is spent once
+      // (ADR-2, ADR-7). The import job re-parses those bytes, and must neither
+      // demand a password nor decrypt a second time -- the second pass would
+      // re-encrypt the file, which is how every real import failed until the
+      // wizard's own e2e ran it.
+      const buffer = readMnyFixture("money2008Pwd");
+      const first = service.parse({
+        buffer,
+        password: MNY_FIXTURES.money2008Pwd.password,
+        userDefaultCurrency: "CAD",
+      });
+
+      const reparsed = service.parse({
+        buffer,
+        alreadyDecrypted: true,
+        userDefaultCurrency: "CAD",
+      });
+
+      expect(reparsed.passwordProtected).toBe(true);
+      expect(reparsed.accounts.accounts).toHaveLength(
+        first.accounts.accounts.length,
+      );
+      expect(reparsed.expectedBalances).toEqual(first.expectedBalances);
+    });
+
     it("tells a wrong password apart from a missing one", () => {
       expect(() =>
         service.parse({

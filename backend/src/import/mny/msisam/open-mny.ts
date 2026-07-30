@@ -3,7 +3,13 @@ import type { Value } from "mdb-reader";
 
 import { MnyUnreadableDatabaseError } from "../mny-errors";
 import { MsisamEncryptionScheme } from "./jet-header";
-import { decryptMsisamInPlace } from "./msisam-decrypt";
+import { decryptMsisamInPlace, readMsisamMetadata } from "./msisam-decrypt";
+
+/** What page 0 says about a file, however its pages were obtained. */
+interface MsisamFileMetadata {
+  readonly scheme: MsisamEncryptionScheme;
+  readonly passwordProtected: boolean;
+}
 
 /**
  * Opens a decrypted `.mny` file with `mdb-reader` and exposes it through a
@@ -101,8 +107,29 @@ function wrapTable(reader: MDBReader, name: string): MnyTable {
  *   protected or unparseable files
  */
 export function openMnyFile(buffer: Buffer, password?: string): MnyDatabase {
-  const { scheme, passwordProtected } = decryptMsisamInPlace(buffer, password);
+  return openDatabase(buffer, decryptMsisamInPlace(buffer, password));
+}
 
+/**
+ * Opens a buffer that has **already** been through `decryptMsisamInPlace`.
+ *
+ * The staged copy of an upload is stored decrypted, on purpose: the password is
+ * spent on the parse request and never persisted (ADR-2, ADR-7). The import job
+ * then re-parses those bytes -- and must not decrypt them a second time. RC4 is
+ * symmetric, so a second pass re-encrypts pages 1..0xE, and the only symptom is
+ * `MnyUnreadableDatabaseError` from a layer that looks unrelated.
+ *
+ * The scheme and password state still come from page 0, which is never
+ * encrypted and so reads the same either way.
+ */
+export function openDecryptedMnyFile(buffer: Buffer): MnyDatabase {
+  return openDatabase(buffer, readMsisamMetadata(buffer));
+}
+
+function openDatabase(
+  buffer: Buffer,
+  { scheme, passwordProtected }: MsisamFileMetadata,
+): MnyDatabase {
   let reader: MDBReader;
   let tableNames: string[];
   try {

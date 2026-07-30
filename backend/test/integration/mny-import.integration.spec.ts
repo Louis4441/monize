@@ -28,7 +28,12 @@ import { MnyImportJobService } from "@/import/mny/mny-import-job.service";
 import { MnyImportService } from "@/import/mny/mny-import.service";
 import { MnyParserService } from "@/import/mny/mny-parser.service";
 import { MnyStagingService } from "@/import/mny/mny-staging.service";
-import { readMnyFixture } from "@/import/mny/__fixtures__/mny-fixtures";
+import {
+  MNY_FIXTURES,
+  MnyFixtureName,
+  readMnyFixture,
+} from "@/import/mny/__fixtures__/mny-fixtures";
+import { decryptMsisamInPlace } from "@/import/mny/msisam/msisam-decrypt";
 import {
   billData,
   investmentData,
@@ -1035,12 +1040,30 @@ describe("mny writers (integration)", () => {
     let importService: MnyImportService;
     let staging: MnyStagingService;
     let jobs: MnyImportJobService;
+    let parser: MnyParserService;
 
     beforeAll(() => {
       importService = module.get(MnyImportService);
       staging = module.get(MnyStagingService);
       jobs = module.get(MnyImportJobService);
+      parser = module.get(MnyParserService);
     });
+
+    /**
+     * The bytes the controller actually stages.
+     *
+     * `POST /parse` decrypts the upload in place and stages *that* buffer, so
+     * staging holds plaintext and the password is spent once (ADR-2, ADR-7).
+     * Staging a raw fixture instead -- which this suite did for three phases --
+     * makes the job's decrypt the only decrypt, and hides the fact that the
+     * real path decrypts twice and re-encrypts the file.
+     */
+    function stagedBytes(fixture: MnyFixtureName): Buffer {
+      return decryptMsisamInPlace(
+        readMnyFixture(fixture),
+        MNY_FIXTURES[fixture].password,
+      ).buffer;
+    }
 
     async function runImport(
       fixture: "money2002" | "money2008",
@@ -1049,7 +1072,7 @@ describe("mny writers (integration)", () => {
       const staged = await withUserContext(userId, () =>
         staging.stage(userId, {
           filename: `${fixture}.mny`,
-          data: readMnyFixture(fixture),
+          data: stagedBytes(fixture),
         }),
       );
       const job = await withUserContext(userId, () =>
@@ -1101,6 +1124,46 @@ describe("mny writers (integration)", () => {
       }
     });
 
+    it("imports the buffer the parse endpoint actually stages", async () => {
+      // The controller's exact sequence, and the one no test performed for
+      // three phases: parse the upload -- which decrypts it in place -- then
+      // stage that same buffer and import it. Because RC4 is symmetric, the
+      // job decrypting a second time re-encrypted the file, and every import
+      // through the real wizard died with "contents could not be read" while
+      // every fixture-staging test passed.
+      const uploaded = readMnyFixture("money2008");
+      const preview = parser.parse({
+        buffer: uploaded,
+        userDefaultCurrency: "USD",
+      });
+      expect(preview.accounts.accounts.length).toBeGreaterThan(0);
+
+      const staged = await withUserContext(userId, () =>
+        staging.stage(userId, { filename: "money2008.mny", data: uploaded }),
+      );
+      const started = await withUserContext(userId, () =>
+        importService.start(userId, { stagedFileId: staged.id }),
+      );
+
+      let job = await withUserContext(userId, () =>
+        jobs.findOne(userId, started.id),
+      );
+      for (let attempt = 0; attempt < 100 && job; attempt += 1) {
+        if (job.status !== "pending" && job.status !== "running") {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        job = await withUserContext(userId, () =>
+          jobs.findOne(userId, started.id),
+        );
+      }
+
+      expect(job).toMatchObject({ status: "completed", errorKey: null });
+      expect(job!.result!.accountsCreated).toBe(
+        preview.accounts.accounts.length,
+      );
+    });
+
     it("deletes the staged file once the import completes", async () => {
       const before = await dataSource
         .getRepository(ImportStagedFile)
@@ -1118,7 +1181,7 @@ describe("mny writers (integration)", () => {
       const staged = await withUserContext(userId, () =>
         staging.stage(userId, {
           filename: "money2008.mny",
-          data: readMnyFixture("money2008"),
+          data: stagedBytes("money2008"),
         }),
       );
       await withUserContext(userId, () =>

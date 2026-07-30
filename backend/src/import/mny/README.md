@@ -91,6 +91,14 @@ not the cause -- see `helm/README.md` for the sizing table.
 - **`decryptMsisamInPlace` takes ownership of its buffer.** It mutates and returns the same
   buffer, deliberately (ADR-6). Tests must read a fresh fixture per assertion --
   `readMnyFixture` does that.
+- **Decrypt each buffer exactly once; RC4 is symmetric.** A second pass re-encrypts pages
+  1..0xE, and the only symptom is `MnyUnreadableDatabaseError` from a layer that looks
+  unrelated. Staged bytes are stored *decrypted* so the password is spent on the parse request
+  and never persisted (ADR-2, ADR-7), so anything re-reading them uses `openDecryptedMnyFile`
+  (or `parse({ alreadyDecrypted: true })`), never `openMnyFile`. This shipped broken through
+  three phases because **every test staged raw fixture bytes** -- making the job's decrypt the
+  only decrypt -- while the wizard's real upload-then-import path decrypted twice. A test that
+  stages anything other than what `POST /parse` stages is not testing the import.
 - **Money 2001 files use a different key derivation** ("old" scheme, flags bit `0x6` clear) that
   uses no password at all. Both schemes must keep working; the fixtures cover each.
 - **`TRN` holds the payee in `lHpay` on Money Plus and `hpay` before it.** Reading one name only

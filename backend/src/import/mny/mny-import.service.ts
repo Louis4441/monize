@@ -209,6 +209,10 @@ export class MnyImportService {
     const parsed = this.parser.parse({
       buffer: bytes,
       options,
+      // Staged bytes are stored decrypted, so the password is spent on the
+      // parse request and never persisted. Decrypting them again would
+      // re-encrypt them -- see `openDecryptedMnyFile`.
+      alreadyDecrypted: true,
       userDefaultCurrency: await this.defaultCurrency(userId),
     });
     const parsedAt = Date.now();
