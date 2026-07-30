@@ -142,6 +142,21 @@ describe('inferDistributionPolicy', () => {
     ).toBe('distributing');
   });
 
+  it('ignores an adjusted close above the quoted one, which is bad data', () => {
+    // Back-adjustment only ever pushes the adjusted series *below* the quoted
+    // one, so a point above it says nothing about distributions -- it says the
+    // row is wrong. Reading the gap unsigned let a single such row relabel an
+    // accumulating fund as distributing, and the label then stuck for every
+    // reader of the page.
+    expect(
+      inferDistributionPolicy([
+        { date: '2024-01-01', close: 100, totalReturnClose: 100 },
+        { date: '2024-06-01', close: 101, totalReturnClose: 101 },
+        { date: '2025-01-01', close: 103, totalReturnClose: 103.5 },
+      ]),
+    ).toBe('accumulating');
+  });
+
   it('ignores a gap that is only provider rounding', () => {
     // Six decimal places of storage can leave a hair of difference; that is not
     // a dividend.
@@ -261,6 +276,43 @@ describe('buildChartSeries', () => {
       // The 15 Feb top-up doubles the position before the March point.
       { date: '2024-03-01', balance: 1800 },
     ]);
+  });
+
+  it('walks the steps once and still reads every date as quantityAt does', () => {
+    // Value mode advances a cursor through the steps instead of re-scanning them
+    // per price point. The cases that separate a correct walk from a plausible
+    // one: a price before any trade, several steps between two prices (the last
+    // one wins), and a step landing exactly on a price date (it counts that day).
+    const prices = [
+      { date: '2024-01-01', close: 10 },
+      { date: '2024-06-01', close: 10 },
+      { date: '2024-06-15', close: 10 },
+      { date: '2024-12-01', close: 10 },
+    ];
+    const manySteps = [
+      { date: '2024-03-01', quantity: 5 },
+      { date: '2024-04-01', quantity: 9 },
+      { date: '2024-05-01', quantity: 12 },
+      { date: '2024-06-15', quantity: 20 },
+    ];
+
+    expect(buildChartSeries(prices, manySteps, 'value')).toEqual([
+      // Before the first trade: nothing held, so the position is worth nothing.
+      { date: '2024-01-01', balance: 0 },
+      // Three steps passed between January and June; only the newest holds.
+      { date: '2024-06-01', balance: 120 },
+      // A step dated the same day as the price counts on that day.
+      { date: '2024-06-15', balance: 200 },
+      { date: '2024-12-01', balance: 200 },
+    ]);
+
+    // Same answer the per-point lookup gives, which is the contract the walk
+    // replaced.
+    for (const point of prices) {
+      const viaLookup = point.close * quantityAt(manySteps, point.date);
+      const viaWalk = buildChartSeries([point], manySteps, 'value')[0].balance;
+      expect(viaWalk).toBe(viaLookup);
+    }
   });
 
   it('uses the adjusted series in return mode, matching the Performance card', () => {
@@ -617,6 +669,15 @@ describe('priceDecimals', () => {
 
   it('caps at what the price columns can store', () => {
     expect(priceDecimals([1.23456789012345])).toBe(MAX_PRICE_DECIMALS);
+  });
+
+  it('is not widened by binary float noise in one value', () => {
+    // 0.1 + 0.2 is 0.30000000000000004, seventeen countable decimals. Counting
+    // them took the whole column to the cap, so a table of two-decimal prices
+    // rendered as 93.1800000000 because one value had been through arithmetic.
+    // Storage is NUMERIC(24,10); past the tenth place there is no information to
+    // preserve.
+    expect(priceDecimals([0.1 + 0.2, 93.18])).toBe(2);
   });
 
   it('goes to the cap for a price written in exponent form', () => {

@@ -161,9 +161,19 @@ export function inferDistributionPolicy(
   // because no distribution has happened since).
   if (comparable.length < 2) return 'unknown';
 
+  // Only a gap in the direction back-adjustment actually produces counts: the
+  // adjusted series runs *below* the quoted one, never above. An adjusted close
+  // above the quoted close is bad provider data, and reading it as a
+  // distribution would relabel an accumulating fund on the strength of the one
+  // thing this model says cannot happen.
+  //
+  // One diverging point is still enough. A distribution back-adjusts every close
+  // before it, so a long history diverges across a stretch -- but a series with
+  // only one point older than the payout has only that one to show it, and
+  // demanding two would read that fund as accumulating.
   const diverges = comparable.some(
     (point) =>
-      Math.abs((point.totalReturnClose as number) - point.close) / point.close >
+      (point.close - (point.totalReturnClose as number)) / point.close >
       DISTRIBUTION_EPSILON,
   );
   return diverges ? 'distributing' : 'accumulating';
@@ -204,10 +214,26 @@ export function buildChartSeries(
   }
 
   if (mode === 'value') {
-    return window.map((point) => ({
-      date: point.date,
-      balance: roundToDecimals(point.close * quantityAt(steps, point.date), 4),
-    }));
+    // Both series are date-ordered, so one walk over the steps serves the whole
+    // window. Calling `quantityAt` per point re-scans the steps from the
+    // beginning each time, which is O(points x steps) -- fine for a month of a
+    // lightly traded holding, wasteful for a decade of daily closes against
+    // years of trades, and this runs on every chart render.
+    let stepIndex = 0;
+    let quantity = 0;
+    return window.map((point) => {
+      while (
+        stepIndex < steps.length &&
+        steps[stepIndex].date <= point.date
+      ) {
+        quantity = steps[stepIndex].quantity;
+        stepIndex += 1;
+      }
+      return {
+        date: point.date,
+        balance: roundToDecimals(point.close * quantity, 4),
+      };
+    });
   }
 
   // Return mode reads the same adjusted series the Performance card does, so the
@@ -467,7 +493,12 @@ const MIN_PRICE_DECIMALS = 2;
 /** Decimal places a single number is written with, or null if not readable. */
 function decimalPlacesOf(value: number): number | null {
   if (!isFinite(value)) return null;
-  const text = Math.abs(value).toString();
+  // Round to the most a column will ever show before counting. Otherwise binary
+  // float noise decides the width of the whole column: a value that arrived as
+  // 0.30000000000000004 rather than 0.3 counts as seventeen decimals and takes
+  // every row to the maximum. Storage is NUMERIC(24,10), so nothing past the
+  // tenth place is information anyway.
+  const text = Math.abs(roundToDecimals(value, MAX_PRICE_DECIMALS)).toString();
   // Exponent form (a very small price): the digits are there but not countable
   // this way, so let the caller fall back to the maximum.
   if (text.includes('e')) return null;
