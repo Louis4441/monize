@@ -185,6 +185,8 @@ Never use synchronous `act(() => {...})` for calls that trigger async side-effec
 
 Colour themes are pure CSS variable overrides in `src/app/themes.css` (`html[data-theme="..."]` redefines the gray/blue ramps etc. -- Tailwind v4 utilities compile to `var(--color-*)` so no component changes are needed). Chart colours go through `src/lib/chart-colors.ts`, which exposes `var(--chart-*)` strings for Recharts props; never hardcode hex colours in charts, and never theme user-chosen entity colours (tags, categories, payees).
 
+**Sign colour is a chart colour, in CSS bars too.** `chartColors.income` / `chartColors.expense` are not only for Recharts props -- a hand-rolled `<div>` bar, and the amount printed beside it, take them through `style={{ backgroundColor }}` / `style={{ color }}`. Reaching for `bg-green-400 dark:bg-green-500` or `text-red-600 dark:text-red-400` instead looks right on the default palette and then stays Tailwind red/green on every other theme, which is exactly the thing that gets noticed. `TopGroupsPanel` and `PayeeSeasonalityPanel` are the worked examples; both carry a guard test asserting no `bg-`/`text-red|green-N` survives in their output. To emphasise one bar among many (a peak, a selection), vary `opacity` on the same token rather than picking a second shade -- opacity moves toward the card in both light and dark mode, so the emphasis reads the same way in each and the sign survives it.
+
 ## Security Notes
 
 - **Zod:** Configured with `jitless: true` (`zodConfig.ts`) for CSP compliance -- no `new Function()`

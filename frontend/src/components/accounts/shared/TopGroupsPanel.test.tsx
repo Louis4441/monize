@@ -32,6 +32,26 @@ describe('TopGroupsPanel', () => {
     expect(screen.getByText('Uncategorised')).toBeInTheDocument();
   });
 
+  it('colours amounts and bars with the theme chart tokens, not fixed red/green', () => {
+    const { container } = render(
+      <TopGroupsPanel
+        title="Top Categories"
+        emptyLabel="No activity"
+        fallbackLabel="Uncategorised"
+        totals={totals}
+        currencyCode="CAD"
+        isLoading={false}
+      />,
+    );
+    const items = screen.getAllByRole('listitem');
+    // Salary (+3000) ranks first and reads as income, Rent (-1200) as expense.
+    expect(items[0].innerHTML).toContain('var(--chart-income)');
+    expect(items[1].innerHTML).toContain('var(--chart-expense)');
+    // Guard against the original mistake: hardcoded Tailwind shades ignore the
+    // active colour theme, so no row may carry one.
+    expect(container.innerHTML).not.toMatch(/(text|bg)-(red|green)-\d/);
+  });
+
   it('calls onSelect with the group id for identified rows only', () => {
     const onSelect = vi.fn();
     render(

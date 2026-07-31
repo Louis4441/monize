@@ -23,7 +23,7 @@ function evenTwoYears(amount = -100): MonthlyTotal[] {
 }
 
 function renderPanel(monthly: MonthlyTotal[], isLoading = false) {
-  render(
+  return render(
     <PayeeSeasonalityPanel
       monthly={monthly}
       currencyStrategy={strategy}
@@ -63,6 +63,34 @@ describe('PayeeSeasonalityPanel', () => {
     for (const label of labels) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+  });
+
+  it('draws the bars with the theme chart tokens, not fixed red/green', () => {
+    const { container } = renderPanel([
+      ...evenTwoYears(),
+      month('2025-12', -900),
+      month('2026-12', -900),
+    ]);
+    const bars = container.querySelectorAll('li > div > div[style]');
+    expect(bars.length).toBe(12);
+    for (const bar of bars) {
+      expect(bar.getAttribute('style')).toContain('var(--chart-expense)');
+    }
+    // Guard against the original mistake: hardcoded Tailwind shades ignore the
+    // active colour theme, so no bar may carry one.
+    expect(container.innerHTML).not.toMatch(/bg-(red|green)-\d/);
+  });
+
+  it('lifts the peak month above the rest without changing its hue', () => {
+    const { container } = renderPanel([
+      ...evenTwoYears(),
+      month('2025-12', -900),
+      month('2026-12', -900),
+    ]);
+    const bars = Array.from(container.querySelectorAll('li > div > div[style]'));
+    // December is the peak: full strength, every other month washed back.
+    expect(bars[11].getAttribute('style')).toContain('opacity: 1');
+    expect(bars[0].getAttribute('style')).toContain('opacity: 0.6');
   });
 
   it('shows a skeleton while loading', () => {

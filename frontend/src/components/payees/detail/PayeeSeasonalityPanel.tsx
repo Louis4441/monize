@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { chartColors } from '@/lib/chart-colors';
 import { useChartDateFormat } from '@/hooks/useChartDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import {
@@ -120,23 +121,23 @@ export function PayeeSeasonalityPanel({
                             years: entry.years,
                           })}
                           // Colour carries the sign, matching the app's other
-                          // CSS bars (TopGroupsPanel, CashFlowMiniReport):
-                          // money out red, money in green. The peak is the same
-                          // hue a couple of steps darker rather than a colour of
-                          // its own, so highlighting it does not cost the sign.
-                          className={`w-full rounded-t ${
-                            average > 0
-                              ? isPeak
-                                ? 'bg-green-600 dark:bg-green-400'
-                                : 'bg-green-400 dark:bg-green-600'
-                              : isPeak
-                                ? 'bg-red-600 dark:bg-red-400'
-                                : 'bg-red-400 dark:bg-red-600'
-                          }`}
+                          // CSS bars (TopGroupsPanel): money out red, money in
+                          // green -- but through the theme's chart tokens, so
+                          // the row re-colours with the palette instead of
+                          // staying Tailwind red/green on every theme. The peak
+                          // is the same token at full strength and the rest are
+                          // washed back toward the card, so highlighting it does
+                          // not cost the sign or introduce a colour of its own.
+                          className="w-full rounded-t"
                           // A month with history but a zero average still shows
                           // a sliver, so it reads as "billed, netted out"
                           // rather than as a month with no history at all.
-                          style={{ height: `${Math.max(height, 2)}%` }}
+                          style={{
+                            height: `${Math.max(height, 2)}%`,
+                            backgroundColor:
+                              average > 0 ? chartColors.income : chartColors.expense,
+                            opacity: isPeak ? 1 : 0.6,
+                          }}
                         />
                       ) : (
                         <div className="h-px w-full bg-gray-200 dark:bg-gray-700" />
