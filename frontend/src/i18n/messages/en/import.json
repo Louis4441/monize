@@ -43,6 +43,7 @@
     "clickToSelect": "Click to select file(s)",
     "processing": "Processing...",
     "acceptedFormats": "QIF, OFX, QFX, CSV, or Microsoft Money (.mny)",
+    "mnyFailedHeading": "That Microsoft Money file could not be opened",
     "wikiNotice": {
       "title": "Before you import",
       "body": "Read the <money>Importing from Microsoft Money</money> or <quicken>Importing from Quicken</quicken> section of the wiki before importing anything."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "Runs the same Delete My Data operation as Settings before importing. You will be asked to confirm. Leave this off to add the Money file to what you already have."
     },
     "warningsHeading": "Notes about this file",
-    "startImport": "Start import"
+    "startImport": "Start import",
+    "startFailedHeading": "The import could not be started",
+    "uploadAgain": "Upload the file again"
   },
   "mnyBills": {
     "heading": "Scheduled bills to create ({count})",

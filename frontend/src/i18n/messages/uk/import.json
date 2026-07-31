@@ -43,6 +43,7 @@
     "clickToSelect": "Натисніть, щоб вибрати файл(и)",
     "processing": "Обробка...",
     "acceptedFormats": "QIF, OFX, QFX або CSV",
+    "mnyFailedHeading": "Не вдалося відкрити цей файл Microsoft Money",
     "wikiNotice": {
       "title": "Перед імпортом",
       "body": "Перш ніж щось імпортувати, прочитайте розділ вікі <money>Importing from Microsoft Money</money> або <quicken>Importing from Quicken</quicken>."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "Перед імпортом виконує ту саму операцію «Видалити мої дані», що й у налаштуваннях. Знадобиться підтвердження. Залиште вимкненим, щоб додати файл Money до наявних даних."
     },
     "warningsHeading": "Зауваження щодо цього файлу",
-    "startImport": "Почати імпорт"
+    "startImport": "Почати імпорт",
+    "startFailedHeading": "Не вдалося розпочати імпорт",
+    "uploadAgain": "Завантажити файл ще раз"
   },
   "mnyBills": {
     "heading": "Заплановані платежі для створення ({count})",

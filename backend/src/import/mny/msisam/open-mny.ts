@@ -3,7 +3,13 @@ import type { Value } from "mdb-reader";
 
 import { MnyUnreadableDatabaseError } from "../mny-errors";
 import { MsisamEncryptionScheme } from "./jet-header";
-import { decryptMsisamInPlace } from "./msisam-decrypt";
+import { decryptMsisamInPlace, readMsisamMetadata } from "./msisam-decrypt";
+
+/** What page 0 says about a file, however its pages were obtained. */
+interface MsisamFileMetadata {
+  readonly scheme: MsisamEncryptionScheme;
+  readonly passwordProtected: boolean;
+}
 
 /**
  * Opens a decrypted `.mny` file with `mdb-reader` and exposes it through a
@@ -71,9 +77,20 @@ function wrapTable(reader: MDBReader, name: string): MnyTable {
         // returning one per row keeps row counts meaningful for callers.
         return Array.from({ length: table.rowCount }, () => ({}) as MnyRow);
       }
-      return table.getData<MnyRow>(
-        requested === undefined ? undefined : { columns: requested },
-      );
+      try {
+        return table.getData<MnyRow>(
+          requested === undefined ? undefined : { columns: requested },
+        );
+      } catch (error) {
+        // Row data is read lazily, page by page, long after the table
+        // definition was resolved -- so a file whose upload was cut short, or
+        // whose data pages are damaged, fails here rather than in `wrapTable`.
+        // Without this the raw "Wrong page type" escapes as an untyped error:
+        // the parse call 500s with no code for the wizard to act on, and a
+        // running job records it as retryable, offering Try again on a file
+        // that will fail the same way forever.
+        throw new MnyUnreadableDatabaseError(error);
+      }
     },
   };
 }
@@ -90,8 +107,29 @@ function wrapTable(reader: MDBReader, name: string): MnyTable {
  *   protected or unparseable files
  */
 export function openMnyFile(buffer: Buffer, password?: string): MnyDatabase {
-  const { scheme, passwordProtected } = decryptMsisamInPlace(buffer, password);
+  return openDatabase(buffer, decryptMsisamInPlace(buffer, password));
+}
 
+/**
+ * Opens a buffer that has **already** been through `decryptMsisamInPlace`.
+ *
+ * The staged copy of an upload is stored decrypted, on purpose: the password is
+ * spent on the parse request and never persisted (ADR-2, ADR-7). The import job
+ * then re-parses those bytes -- and must not decrypt them a second time. RC4 is
+ * symmetric, so a second pass re-encrypts pages 1..0xE, and the only symptom is
+ * `MnyUnreadableDatabaseError` from a layer that looks unrelated.
+ *
+ * The scheme and password state still come from page 0, which is never
+ * encrypted and so reads the same either way.
+ */
+export function openDecryptedMnyFile(buffer: Buffer): MnyDatabase {
+  return openDatabase(buffer, readMsisamMetadata(buffer));
+}
+
+function openDatabase(
+  buffer: Buffer,
+  { scheme, passwordProtected }: MsisamFileMetadata,
+): MnyDatabase {
   let reader: MDBReader;
   let tableNames: string[];
   try {

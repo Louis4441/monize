@@ -594,6 +594,63 @@ describe('useMnyImport', () => {
         expect(await result.current.retry()).toBe(false);
       });
     });
+
+    it('does not ask for the wipe a second time when retrying', async () => {
+      // The wipe runs server-side in `start`, before the job row exists, so by
+      // the time a job can fail the data is already gone. Retry collects no
+      // password -- it is one click on a failure screen -- so repeating the
+      // request would fail re-authentication and the user would be stuck on a
+      // retryable failure they cannot retry.
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+      act(() => result.current.setOption('wipeExistingData', true));
+
+      await act(async () => {
+        await result.current.start('hunter2');
+      });
+      expect(mockedApi.start).toHaveBeenLastCalledWith(
+        'staged-1',
+        expect.objectContaining({ wipeExistingData: true }),
+        { password: 'hunter2' },
+      );
+
+      await act(async () => {
+        await result.current.retry();
+      });
+
+      expect(mockedApi.start).toHaveBeenLastCalledWith(
+        'staged-1',
+        expect.objectContaining({ wipeExistingData: false }),
+        undefined,
+      );
+    });
+
+    it('still wipes on a retry when the first start never reached the server', async () => {
+      // A start the backend refused wiped nothing, so the option has to survive.
+      mockedApi.start.mockRejectedValueOnce(
+        apiError('mnyImportAlreadyRunning', 'Already running'),
+      );
+      const { result } = renderHook(() => useMnyImport());
+      await act(async () => {
+        await result.current.upload(file);
+      });
+      act(() => result.current.setOption('wipeExistingData', true));
+
+      await act(async () => {
+        expect(await result.current.start('hunter2')).toBe(false);
+      });
+      await act(async () => {
+        await result.current.start('hunter2');
+      });
+
+      expect(mockedApi.start).toHaveBeenLastCalledWith(
+        'staged-1',
+        expect.objectContaining({ wipeExistingData: true }),
+        { password: 'hunter2' },
+      );
+    });
   });
 
   describe('reset', () => {

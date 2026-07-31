@@ -271,9 +271,17 @@ export class MnyImportJobService {
    * Fails jobs whose worker stopped heartbeating -- a killed pod, an OOM, a
    * rolling restart mid-import.
    *
+   * A `pending` job is reaped on the same rule, measured from creation. Nothing
+   * else would ever clear one: `start` inserts the row and then claims it from an
+   * unawaited task, so a pod that dies in between -- or a claim that throws --
+   * leaves the row pending forever. `hasActiveJob` counts pending, so that one
+   * row would refuse every future import this user ever starts, with no way back
+   * short of a DBA. Five minutes is far longer than the microseconds the real
+   * gap takes.
+   *
    * Marked retryable: the staged file is untouched, so the wizard can offer Retry
    * rather than making the user upload 200 MB again. Idempotent across replicas,
-   * because the predicate only matches rows still claimed as running.
+   * because the predicate only matches rows still in the state being reaped.
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async reapStaleJobs(): Promise<void> {
@@ -284,12 +292,22 @@ export class MnyImportJobService {
             `UPDATE import_jobs
                 SET status = 'failed',
                     error_key = $2,
-                    error_detail = 'Import worker stopped reporting progress',
+                    error_detail = CASE
+                      WHEN status = 'running'
+                        THEN 'Import worker stopped reporting progress'
+                      ELSE 'Import was never picked up by a worker'
+                    END,
                     retryable = true,
                     progress = NULL,
                     completed_at = CURRENT_TIMESTAMP
-              WHERE status = 'running'
-                AND heartbeat_at < CURRENT_TIMESTAMP - ($1::text || ' milliseconds')::interval
+              WHERE (
+                      status = 'running'
+                  AND heartbeat_at < CURRENT_TIMESTAMP - ($1::text || ' milliseconds')::interval
+                    )
+                 OR (
+                      status = 'pending'
+                  AND created_at < CURRENT_TIMESTAMP - ($1::text || ' milliseconds')::interval
+                    )
               RETURNING id`,
             [String(JOB_STALE_AFTER_MS), JOB_STALLED_ERROR_KEY],
           );

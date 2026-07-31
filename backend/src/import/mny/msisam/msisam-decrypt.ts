@@ -209,8 +209,41 @@ function resolveNewSchemeKey(
 }
 
 /**
+ * Reads a file's encryption scheme and password state **without touching a
+ * byte of it**.
+ *
+ * This is what a buffer that has already been decrypted needs: page 0 is never
+ * encrypted, so the scheme and the crypt-check verification are still readable
+ * from plaintext bytes, and the pages that would be ruined by a second RC4 pass
+ * are left alone.
+ */
+export function readMsisamMetadata(buffer: Buffer): {
+  scheme: MsisamEncryptionScheme;
+  passwordProtected: boolean;
+} {
+  const header = readMnyFileHeader(buffer);
+  if (header.scheme === "old") {
+    // The pre-2002 scheme derives its key from the header and uses no password
+    // at all, so no file written by it is ever password protected.
+    return { scheme: header.scheme, passwordProtected: false };
+  }
+
+  const hasCheckBytes = cryptCheckBytes(header.page).some((byte) => byte !== 0);
+  return {
+    scheme: header.scheme,
+    passwordProtected:
+      hasCheckBytes && !verifyPassword(header.page, header.scheme, ""),
+  };
+}
+
+/**
  * Decrypts the encrypted pages of a `.mny` file **in place** and returns the
  * same buffer, now readable as a plain Jet 4 database.
+ *
+ * Call this **once** per buffer. RC4 is symmetric, so a second pass over an
+ * already-decrypted buffer re-encrypts it, and the only symptom is an
+ * unreadable page structure several layers away. Use `readMsisamMetadata` and
+ * `openDecryptedMnyFile` for a buffer that has already been through here.
  *
  * The caller hands over ownership of `buffer`; nothing else may hold a
  * reference to it. Decrypting in place is deliberate (ADR-6): it keeps peak

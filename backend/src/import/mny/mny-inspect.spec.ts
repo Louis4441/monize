@@ -4,6 +4,7 @@ import {
   inspect,
   mappingSummary,
   parseInspectArgs,
+  signSummary,
   summarise,
 } from "./mny-inspect";
 import { openMnyFile } from "./msisam/open-mny";
@@ -130,6 +131,25 @@ describe("mappingSummary", () => {
     expect(rows.every((line) => line.endsWith("  ok"))).toBe(true);
   });
 
+  it("reports the signs the writer would actually insert", () => {
+    // Distinct from the raw `TRN.amt` block, which counts every row in the
+    // table. This counts only what this import would create, so a file whose
+    // raw amounts are signed but whose mapped amounts are not localises the
+    // fault to the mapper rather than to the reader or the writer.
+    const lines = mappingSummary(
+      readMnyTables(openMnyFile(readMnyFixture("money2002"))),
+    );
+
+    const block = lines.join("\n");
+    expect(block).toMatch(
+      /txn amounts:\s+\d+ positive, \d+ negative, \d+ zero/,
+    );
+    expect(block).toMatch(/split legs:\s+\d+ positive, \d+ negative, \d+ zero/);
+    expect(block).toMatch(
+      /investment cash:\s+\d+ positive, \d+ negative, \d+ zero/,
+    );
+  });
+
   it("omits the holdings block for a file with no LOT rows", () => {
     const lines = mappingSummary(
       readMnyTables(openMnyFile(readMnyFixture("money2001"))),
@@ -144,6 +164,38 @@ describe("mappingSummary", () => {
     const lines = mappingSummary(readMnyTables(fakeMnyDatabase({})));
 
     expect(lines).toContain("  accounts:        0 (0 skipped)");
+  });
+});
+
+describe("signSummary", () => {
+  it("counts how TRN.amt is signed and lists the columns TRN has", () => {
+    // Monize has no income/expense column: the sign of `amount` is the
+    // direction. No committed fixture has a banking transaction, so whether
+    // Money signs `amt` at all can only be read off a real file -- which is
+    // what this block exists to answer.
+    const db = openMnyFile(readMnyFixture("money2002"));
+    const lines = signSummary(readMnyTables(db), db);
+
+    expect(lines[0]).toBe("TRN.amt signs:");
+    const block = lines.join("\n");
+    expect(block).toMatch(/positive:\s+\d+/);
+    expect(block).toMatch(/negative:\s+\d+/);
+    expect(block).toMatch(/transfer sides:\s+\d+ \(\d+ positive\)/);
+    // The column list is the lead when the sign turns out not to be in `amt`.
+    expect(block).toContain("amt");
+    expect(block).toContain("hacct");
+  });
+
+  it("says so when the file has no TRN table at all", () => {
+    const db = openMnyFile(readMnyFixture("money2002"));
+    const tables = readMnyTables(db);
+
+    const lines = signSummary(tables, {
+      ...db,
+      getTableOrNull: () => null,
+    });
+
+    expect(lines.join("\n")).toContain("(no TRN table)");
   });
 });
 
@@ -200,5 +252,29 @@ describe("inspect", () => {
     });
 
     expect(lines).toContain("  (table not present in this Money version)");
+  });
+
+  it("reports the stage timings and peak memory task M4.1 records", () => {
+    // The acceptance numbers can only come from a real Money Plus file, which
+    // never enters the repository -- so the harness has to measure itself.
+    const lines = inspect(readMnyFixture("money2002"), { rows: 5 });
+    const start = lines.indexOf("performance:");
+
+    expect(start).toBeGreaterThan(-1);
+    const block = lines.slice(start, start + 6).join("\n");
+    expect(block).toMatch(/file size\s+2\.6 MiB/);
+    expect(block).toMatch(/decrypt \+ open\s+\d+ ms/);
+    expect(block).toMatch(/read tables\s+\d+ ms/);
+    expect(block).toMatch(/map\s+\d+ ms/);
+    expect(block).toMatch(/peak rss\s+[\d.]+ MiB \([\d.]+x file size\)/);
+  });
+
+  it("still reports performance after a damaged table stops the summary", () => {
+    const file = readMnyFixture("money2002");
+    file.fill(0xff, 15 * 4096, 16 * 4096);
+
+    const lines = inspect(file, { rows: 5 });
+
+    expect(lines).toContain("performance:");
   });
 });

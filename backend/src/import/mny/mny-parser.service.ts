@@ -1,5 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { MnyDatabase, openMnyFile } from "./msisam/open-mny";
+import {
+  MnyDatabase,
+  openDecryptedMnyFile,
+  openMnyFile,
+} from "./msisam/open-mny";
 import {
   MnyTables,
   missingFields,
@@ -55,10 +59,20 @@ import { roundMoney } from "../../common/round.util";
 export type MnyEra = "money2001" | "money2002" | "moneyPlus" | "unknown";
 
 export interface MnyParseInput {
-  /** Decrypted or still-encrypted file bytes. Ownership passes to the parser. */
+  /** Still-encrypted file bytes, unless `alreadyDecrypted`. Ownership passes to the parser. */
   readonly buffer: Buffer;
   /** Money file password, when the file needs one. Never logged, never stored. */
   readonly password?: string;
+  /**
+   * True when `buffer` came from staging, which stores the **decrypted** file
+   * so the password is spent once and never persisted (ADR-2, ADR-7).
+   *
+   * Decryption is in place and RC4 is symmetric, so running it again over those
+   * bytes re-encrypts them. That was live for three phases: every integration
+   * test staged raw fixture bytes, so the job's decrypt was the only decrypt,
+   * and only the wizard's real upload-then-import path ever hit it.
+   */
+  readonly alreadyDecrypted?: boolean;
   readonly options?: Partial<MnyImportOptions>;
   /** Used as the base currency only when the file names none. */
   readonly userDefaultCurrency: string;
@@ -339,7 +353,9 @@ export class MnyParserService {
    */
   parse(input: MnyParseInput): MnyParsedFile {
     const options = resolveImportOptions(input.options);
-    const db = openMnyFile(input.buffer, input.password);
+    const db = input.alreadyDecrypted
+      ? openDecryptedMnyFile(input.buffer)
+      : openMnyFile(input.buffer, input.password);
     const tables = readMnyTables(db);
     const era = detectEra(tables, db);
 

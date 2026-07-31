@@ -324,8 +324,10 @@ describe("MnyImportJobService (integration)", () => {
       expect(job!.status).toBe("running");
     });
 
-    it("leaves a pending job alone -- it has no worker to lose", async () => {
+    it("leaves a freshly pending job alone -- its worker is about to claim it", async () => {
       const jobId = await newJob();
+      // A pending row has never heartbeated, so the running rule must not read
+      // its null heartbeat as stale.
       await dataSource.query(
         "UPDATE import_jobs SET heartbeat_at = CURRENT_TIMESTAMP - INTERVAL '1 day' WHERE id = $1",
         [jobId],
@@ -335,6 +337,30 @@ describe("MnyImportJobService (integration)", () => {
 
       const job = await asUser(userA, () => jobs.findOne(userA, jobId));
       expect(job!.status).toBe("pending");
+    });
+
+    it("reaps a pending job no worker ever claimed", async () => {
+      // `start` inserts the row and claims it from an unawaited task, so a pod
+      // that dies in between leaves this. Nothing else clears it, and
+      // `hasActiveJob` counts pending -- so without the reaper this one row
+      // refuses every future import the user starts.
+      const jobId = await newJob();
+      await dataSource.query(
+        "UPDATE import_jobs SET created_at = CURRENT_TIMESTAMP - INTERVAL '10 minutes' WHERE id = $1",
+        [jobId],
+      );
+
+      await jobs.reapStaleJobs();
+
+      expect(await asUser(userA, () => jobs.hasActiveJob(userA))).toBe(false);
+      const job = await asUser(userA, () => jobs.findOne(userA, jobId));
+      expect(job).toMatchObject({
+        status: "failed",
+        errorKey: JOB_STALLED_ERROR_KEY,
+        retryable: true,
+      });
+      // Retryable is only honest if the bytes survived.
+      expect(job!.stagedFileId).not.toBeNull();
     });
 
     it("is idempotent: a second sweep changes nothing", async () => {

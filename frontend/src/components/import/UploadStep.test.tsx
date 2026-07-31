@@ -136,4 +136,58 @@ describe('UploadStep', () => {
     expect(input.accept).toBe('.qif,.ofx,.qfx,.csv,.mny');
     expect(input.multiple).toBe(true);
   });
+
+  describe('when a Microsoft Money file would not open', () => {
+    it('says nothing while there is nothing to say', () => {
+      render(
+        <UploadStep
+          preselectedAccount={undefined}
+          isLoading={false}
+          onFileSelect={onFileSelect}
+        />,
+      );
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('shows the reason, because the wizard goes nowhere else', () => {
+      // The regression: a .mny that failed to parse left the user on this step
+      // with no message at all, so the file simply appeared to do nothing.
+      render(
+        <UploadStep
+          preselectedAccount={undefined}
+          isLoading={false}
+          onFileSelect={onFileSelect}
+          mnyError={{
+            code: 'mnyUnsupportedVersion',
+            message:
+              'That file was written by Money 97 or 98. Open and save it once in the free Money Plus Sunset edition.',
+          }}
+        />,
+      );
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent(
+        'That Microsoft Money file could not be opened',
+      );
+      // The instruction is the useful half, which is why this is a panel and
+      // not a toast that takes it away mid-sentence.
+      expect(alert).toHaveTextContent(/Money Plus Sunset edition/);
+    });
+
+    it('falls back to generic copy when the backend sent no message', () => {
+      render(
+        <UploadStep
+          preselectedAccount={undefined}
+          isLoading={false}
+          onFileSelect={onFileSelect}
+          mnyError={{ message: '' }}
+        />,
+      );
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /could not be read/,
+      );
+    });
+  });
 });

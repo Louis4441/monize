@@ -16,6 +16,14 @@ import { AccountType } from '@/types/account';
 
 /** Upload + parse of a 200 MB-class file, including the round trip. */
 const PARSE_TIMEOUT_MS = 300_000;
+/**
+ * Starting is normally an insert and a return -- except with "start fresh",
+ * where the wipe runs **inside** this request on purpose, so its credentials
+ * never reach the job row. Deleting a populated profile does not fit in the
+ * shared 10 s, and timing out here is worse than slow: the server carries on
+ * wiping and importing while the wizard reports a failed start.
+ */
+const START_TIMEOUT_MS = 120_000;
 /** A poll is a single indexed row read; anything slower is a real problem. */
 const POLL_TIMEOUT_MS = 10_000;
 
@@ -259,16 +267,20 @@ export const mnyImportApi = {
     options?: MnyImportOptionsInput,
     wipeCredentials?: { password?: string; oidcIdToken?: string },
   ): Promise<MnyImportJob> => {
-    const response = await apiClient.post<MnyImportJob>('/import/mny/start', {
-      stagedFileId,
-      ...(options ? { options } : {}),
-      ...(wipeCredentials?.password
-        ? { wipePassword: wipeCredentials.password }
-        : {}),
-      ...(wipeCredentials?.oidcIdToken
-        ? { wipeOidcIdToken: wipeCredentials.oidcIdToken }
-        : {}),
-    });
+    const response = await apiClient.post<MnyImportJob>(
+      '/import/mny/start',
+      {
+        stagedFileId,
+        ...(options ? { options } : {}),
+        ...(wipeCredentials?.password
+          ? { wipePassword: wipeCredentials.password }
+          : {}),
+        ...(wipeCredentials?.oidcIdToken
+          ? { wipeOidcIdToken: wipeCredentials.oidcIdToken }
+          : {}),
+      },
+      { timeout: START_TIMEOUT_MS },
+    );
     return response.data;
   },
 

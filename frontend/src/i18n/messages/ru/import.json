@@ -43,6 +43,7 @@
     "clickToSelect": "Нажмите для выбора файла(ов)",
     "processing": "Обработка...",
     "acceptedFormats": "QIF, OFX, QFX или CSV",
+    "mnyFailedHeading": "Не удалось открыть этот файл Microsoft Money",
     "wikiNotice": {
       "title": "Перед импортом",
       "body": "Прежде чем что-либо импортировать, прочитайте раздел вики <money>Importing from Microsoft Money</money> или <quicken>Importing from Quicken</quicken>."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "Перед импортом выполняет ту же операцию «Удалить мои данные», что и в настройках. Потребуется подтверждение. Оставьте выключенным, чтобы добавить файл Money к тому, что у вас уже есть."
     },
     "warningsHeading": "Замечания по этому файлу",
-    "startImport": "Начать импорт"
+    "startImport": "Начать импорт",
+    "startFailedHeading": "Не удалось запустить импорт",
+    "uploadAgain": "Загрузить файл заново"
   },
   "mnyBills": {
     "heading": "Запланированные платежи для создания ({count})",

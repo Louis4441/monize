@@ -43,6 +43,7 @@
     "clickToSelect": "Dosya(ları) seçmek için tıklayın",
     "processing": "İşleniyor...",
     "acceptedFormats": "QIF, OFX, QFX veya CSV",
+    "mnyFailedHeading": "Bu Microsoft Money dosyası açılamadı",
     "wikiNotice": {
       "title": "İçe aktarmadan önce",
       "body": "Herhangi bir şeyi içe aktarmadan önce wiki'deki <money>Importing from Microsoft Money</money> veya <quicken>Importing from Quicken</quicken> bölümünü okuyun."
@@ -355,7 +356,9 @@
       "wipeExistingDataHint": "İçe aktarmadan önce Ayarlar'daki Verilerimi Sil işleminin aynısını çalıştırır. Onaylamanız istenir. Money dosyasını mevcut verilerinize eklemek için kapalı bırakın."
     },
     "warningsHeading": "Bu dosyayla ilgili notlar",
-    "startImport": "İçe aktarmayı başlat"
+    "startImport": "İçe aktarmayı başlat",
+    "startFailedHeading": "İçe aktarma başlatılamadı",
+    "uploadAgain": "Dosyayı yeniden yükle"
   },
   "mnyBills": {
     "heading": "Oluşturulacak planlanmış faturalar ({count})",

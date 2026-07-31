@@ -94,6 +94,7 @@ describe('MnyReviewStep', () => {
       { value: 'CAD', label: 'CAD - Canadian Dollar' },
     ],
     isLoading: false,
+    startError: null,
     onToggleAccount: vi.fn(),
     onSetAllAccounts: vi.fn(),
     onSetAccountCurrency: vi.fn(),
@@ -362,5 +363,62 @@ describe('MnyReviewStep', () => {
     );
 
     expect(screen.getByLabelText('Import TFSA - Cash')).toBeDisabled();
+  });
+
+  describe('when the import could not be started', () => {
+    it('says nothing while there is nothing to say', () => {
+      render(<MnyReviewStep {...defaultProps} />);
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('shows why, rather than leaving the button looking inert', () => {
+      // The regression: a start that failed left the review step unchanged, so
+      // pressing Start import appeared to do nothing at all.
+      render(
+        <MnyReviewStep
+          {...defaultProps}
+          startError={{
+            code: 'mnyImportAlreadyRunning',
+            message: 'An import is already running.',
+          }}
+        />,
+      );
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('The import could not be started');
+      expect(alert).toHaveTextContent('An import is already running.');
+      expect(
+        screen.queryByRole('button', { name: 'Upload the file again' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('offers a way back to the upload step when the staged file is gone', () => {
+      render(
+        <MnyReviewStep
+          {...defaultProps}
+          startError={{
+            code: 'mnyStagedFileMissing',
+            message: 'The uploaded Money file is no longer available.',
+          }}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Upload the file again' }),
+      );
+
+      expect(defaultProps.onBack).toHaveBeenCalled();
+    });
+
+    it('falls back to generic copy when the backend sent no message', () => {
+      render(
+        <MnyReviewStep {...defaultProps} startError={{ message: '' }} />,
+      );
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /Something went wrong while importing/,
+      );
+    });
   });
 });

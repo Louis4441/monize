@@ -75,6 +75,7 @@ secrets/
 credentials/
 *.docx
 *.pdf
+*.mny
 
 # Claude Code
 .claude/worktrees/

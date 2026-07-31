@@ -27,7 +27,7 @@ import { crossCheckHoldings } from "./map/check-holdings";
 import { computeExpectedBalances, todayIsoDate } from "./mny-parser.service";
 import { DEFAULT_MNY_IMPORT_OPTIONS } from "./model/mny-import-options";
 import { summarizeWarnings } from "./model/mny-warnings";
-import { openMnyFile } from "./msisam/open-mny";
+import { MnyDatabase, openMnyFile } from "./msisam/open-mny";
 import {
   MnyTables,
   missingFields,
@@ -97,6 +97,58 @@ export function summarise(tables: MnyTables): string[] {
     `  missing tables:  ${absentTables.length > 0 ? absentTables.join(", ") : "none"}`,
     `  defaulted fields:${defaulted.length > 0 ? ` ${defaulted.join(", ")}` : " none"}`,
   ];
+}
+
+/**
+ * How `TRN.amt` is signed in this file, and every column `TRN` actually has.
+ *
+ * Monize has no income/expense column -- the sign of `amount` *is* the
+ * direction -- so if Money does not sign `amt`, every row imports as income.
+ * No committed fixture contains a single banking transaction, so this cannot be
+ * answered from the corpus; it has to be read off a real file. The transfer
+ * split matters most: a transfer's two sides are one out and one in, so if both
+ * are positive the direction is not in `amt` at all and the column list below is
+ * where to look for whatever carries it.
+ */
+export function signSummary(tables: MnyTables, db: MnyDatabase): string[] {
+  const rows = tables.transactions.transactions;
+  const count = (predicate: (amount: number) => boolean): number =>
+    rows.filter((row) => predicate(row.amount)).length;
+
+  const transferHandles = new Set<number>();
+  for (const transfer of tables.transactions.transfers) {
+    if (transfer.from !== null) transferHandles.add(transfer.from);
+    if (transfer.to !== null) transferHandles.add(transfer.to);
+  }
+  const transferRows = rows.filter(
+    (row) => row.handle !== null && transferHandles.has(row.handle),
+  );
+  const transferPositive = transferRows.filter((row) => row.amount > 0).length;
+
+  const trn = db.getTableOrNull("TRN");
+
+  return [
+    "TRN.amt signs:",
+    `  positive:        ${count((amount) => amount > 0)}`,
+    `  negative:        ${count((amount) => amount < 0)}`,
+    `  zero:            ${count((amount) => amount === 0)}`,
+    `  transfer sides:  ${transferRows.length} (${transferPositive} positive)`,
+    "",
+    "  Monize reads the direction from this sign alone. All-positive means the",
+    "  direction is carried by some other column -- these are the ones TRN has:",
+    ...(trn
+      ? chunkColumns(trn.columnNames).map((line) => `    ${line}`)
+      : ["    (no TRN table)"]),
+  ];
+}
+
+/** Wraps a long column list so the report stays readable in a terminal. */
+function chunkColumns(names: readonly string[], perLine = 8): string[] {
+  const lines: string[] = [];
+  for (let index = 0; index < names.length; index += perLine) {
+    lines.push(names.slice(index, index + perLine).join(" "));
+  }
+  return lines;
 }
 
 /**
@@ -176,9 +228,26 @@ export function mappingSummary(tables: MnyTables): string[] {
     accounts.accounts.map((account) => [account.key, account.name]),
   );
 
+  // The signs the *writer* would insert, which is not the same population as
+  // the raw `TRN.amt` block above: that counts every row in the table, this
+  // counts only the rows this import would create. A file whose raw amounts are
+  // signed but whose mapped amounts are not localises the fault to the mapper.
+  const signs = (values: readonly number[]): string =>
+    `${values.filter((v) => v > 0).length} positive, ` +
+    `${values.filter((v) => v < 0).length} negative, ` +
+    `${values.filter((v) => v === 0).length} zero`;
+  const mappedAmounts = transactions.transactions.map((t) => t.amount);
+  const splitAmounts = transactions.transactions.flatMap((t) =>
+    t.splits.map((split) => split.amount),
+  );
+  const investmentCash = investments.transactions.map((t) => t.cashAmount);
+
   return [
     "mapped import:",
     `  base currency:   ${accounts.baseCurrency}`,
+    `  txn amounts:     ${signs(mappedAmounts)}`,
+    `  split legs:      ${signs(splitAmounts)}`,
+    `  investment cash: ${signs(investmentCash)}`,
     `  accounts:        ${accounts.accounts.length} (${accounts.skipped} skipped)`,
     `  transactions:    ${transactions.transactions.length} (${transactions.transfersLinked} transfers linked, ${transactions.skipped} skipped)`,
     `  securities:      ${securities.securities.length} (${securities.skipped} skipped as currencies or unusable)`,
@@ -279,7 +348,20 @@ export function inspect(
   options: Omit<InspectOptions, "file">,
 ): string[] {
   const started = Date.now();
+  const sizeBytes = buffer.length;
+  // Peak RSS against file size is the number task M4.1 wants recorded, and the
+  // number the pod memory limit has to be set from. Sampling at each stage
+  // boundary is enough: the allocations that matter here are whole tables, and
+  // each one is materialised inside a stage rather than across them.
+  const rssSamples = [process.memoryUsage().rss];
+  const sample = (): void => {
+    rssSamples.push(process.memoryUsage().rss);
+  };
+
   const db = openMnyFile(buffer, options.password);
+  const decryptedAt = Date.now();
+  sample();
+
   const lines = [
     `encryption:        ${db.scheme}`,
     `password required: ${db.passwordProtected ? "yes" : "no"}`,
@@ -304,9 +386,22 @@ export function inspect(
     }
   }
 
+  let readAt = decryptedAt;
+  let mappedAt = decryptedAt;
   try {
     const tables = readMnyTables(db);
-    lines.push("", ...summarise(tables), "", ...mappingSummary(tables));
+    readAt = Date.now();
+    sample();
+    lines.push(
+      "",
+      ...summarise(tables),
+      "",
+      ...signSummary(tables, db),
+      "",
+      ...mappingSummary(tables),
+    );
+    mappedAt = Date.now();
+    sample();
   } catch (error) {
     // A damaged table stops the readers but not the report: the table list
     // above is what tells you which one to look at.
@@ -325,7 +420,19 @@ export function inspect(
     }
   }
 
-  lines.push("", `read in ${Date.now() - started} ms`);
+  const peakRss = Math.max(...rssSamples);
+  const mib = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(1);
+  lines.push(
+    "",
+    "performance:",
+    `  file size          ${mib(sizeBytes)} MiB`,
+    `  decrypt + open     ${decryptedAt - started} ms`,
+    `  read tables        ${readAt - decryptedAt} ms`,
+    `  map                ${mappedAt - readAt} ms`,
+    `  peak rss           ${mib(peakRss)} MiB (${(peakRss / Math.max(sizeBytes, 1)).toFixed(1)}x file size)`,
+    "",
+    `read in ${Date.now() - started} ms`,
+  );
   return lines;
 }
 

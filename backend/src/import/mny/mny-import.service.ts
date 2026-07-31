@@ -20,7 +20,11 @@ import { tr } from "../../i18n/translate";
 import { ImportPostProcessingService } from "../import-post-processing.service";
 import { ImportJob } from "./entities/import-job.entity";
 import { MnyStagedFileMissingError } from "./mny-errors";
-import { JobRunContext, MnyImportJobService } from "./mny-import-job.service";
+import {
+  JOB_FAILED_ERROR_KEY,
+  JobRunContext,
+  MnyImportJobService,
+} from "./mny-import-job.service";
 import { MnyParsedFile, MnyParserService } from "./mny-parser.service";
 import { MnyStagingService } from "./mny-staging.service";
 import {
@@ -47,6 +51,7 @@ import {
 } from "./writers/write-transactions";
 import { writeInvestments, writeSecurities } from "./writers/write-investments";
 import { writeBills } from "./writers/write-bills";
+import { throttleProgress } from "./writers/progress-throttle";
 import { writeLoans } from "./writers/write-loans";
 import { selectedBills } from "./map/map-bills";
 import {
@@ -152,11 +157,18 @@ export class MnyImportService {
       this.jobs.runClaimed(userId, job.id, (context) =>
         this.runImport(userId, staged.id, options, context),
       ),
-    ).catch((error) =>
-      this.logger.error(
-        `Import job ${job.id} could not be started: ${error instanceof Error ? error.message : String(error)}`,
-      ),
-    );
+    ).catch(async (error) => {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Import job ${job.id} could not be started: ${detail}`);
+      // `runClaimed` reports its own body's failures; reaching here means the
+      // claim or the status write itself failed, which would otherwise leave the
+      // row pending until the reaper's five-minute sweep -- and `hasActiveJob`
+      // counts pending, so the user could start nothing in the meantime. Failing
+      // it now turns that into an immediate, retryable error in the wizard.
+      await withUserContext(userId, () =>
+        this.jobs.fail(job.id, JOB_FAILED_ERROR_KEY, detail, true),
+      ).catch(() => undefined);
+    });
 
     return job;
   }
@@ -177,16 +189,34 @@ export class MnyImportService {
       total: 0,
     });
 
+    // Stage timings and peak RSS, logged once at the end. Task M4.1's numbers
+    // can only come from a real 200 MB file, which by definition never enters
+    // the repository -- so the run that produces them has to report them itself.
+    const startedAt = Date.now();
+    let peakRss = process.memoryUsage().rss;
+    const sampleRss = (): void => {
+      peakRss = Math.max(peakRss, process.memoryUsage().rss);
+    };
+
     const bytes = await this.staging.loadBytes(userId, stagedFileId);
     if (!bytes) {
       throw new MnyStagedFileMissingError(stagedFileId);
     }
+    const sizeBytes = bytes.length;
+    const loadedAt = Date.now();
+    sampleRss();
 
     const parsed = this.parser.parse({
       buffer: bytes,
       options,
+      // Staged bytes are stored decrypted, so the password is spent on the
+      // parse request and never persisted. Decrypting them again would
+      // re-encrypt them -- see `openDecryptedMnyFile`.
+      alreadyDecrypted: true,
       userDefaultCurrency: await this.defaultCurrency(userId),
     });
+    const parsedAt = Date.now();
+    sampleRss();
 
     // Currencies are global reference data with their own idempotent creation
     // path, so they are ensured before the import transaction opens. Securities
@@ -197,6 +227,8 @@ export class MnyImportService {
     }
 
     const written = await this.writeAll(userId, parsed, context);
+    const writtenAt = Date.now();
+    sampleRss();
 
     await context.reportProgress({
       phase: "finalizing",
@@ -229,6 +261,20 @@ export class MnyImportService {
     // Delete-on-complete: the bytes have done their job, and they are the
     // largest thing this feature stores.
     await this.staging.remove(userId, stagedFileId);
+    sampleRss();
+
+    this.logTiming({
+      sizeBytes,
+      peakRss,
+      load: loadedAt - startedAt,
+      parse: parsedAt - loadedAt,
+      write: writtenAt - parsedAt,
+      finalize: Date.now() - writtenAt,
+      total: Date.now() - startedAt,
+      transactions: written.transactionsCreated,
+      investments: written.investmentTransactionsCreated,
+      prices: written.pricesImported,
+    });
 
     const warnings: MnyWarning[] = [
       ...parsed.warnings,
@@ -275,6 +321,41 @@ export class MnyImportService {
       holdings,
       warnings: summarizeWarnings(warnings),
     };
+  }
+
+  /**
+   * One line per import with where the time and the memory went.
+   *
+   * The acceptance numbers task M4.1 asks for -- 37,000 transactions and 68,000
+   * prices inside three minutes, peak RSS under three times the file size --
+   * can only be measured on a real Money Plus file, and such a file cannot be
+   * committed. So the import reports its own: run one, read the log, record the
+   * numbers. It is also the first thing to look at when a real import is slow,
+   * because it says which phase to blame.
+   */
+  private logTiming(timing: {
+    sizeBytes: number;
+    peakRss: number;
+    load: number;
+    parse: number;
+    write: number;
+    finalize: number;
+    total: number;
+    transactions: number;
+    investments: number;
+    prices: number;
+  }): void {
+    const mib = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(1);
+    const ratio = (timing.peakRss / Math.max(timing.sizeBytes, 1)).toFixed(1);
+
+    this.logger.log(
+      `.mny import timing: ${mib(timing.sizeBytes)} MiB file, ` +
+        `${timing.transactions} transactions, ${timing.investments} investment rows, ` +
+        `${timing.prices} prices -- ` +
+        `load ${timing.load} ms, parse ${timing.parse} ms, write ${timing.write} ms, ` +
+        `finalize ${timing.finalize} ms, total ${timing.total} ms; ` +
+        `peak rss ${mib(timing.peakRss)} MiB (${ratio}x file size)`,
+    );
   }
 
   /** Everything that has to be atomic, in one transaction. */
@@ -328,6 +409,9 @@ export class MnyImportService {
       );
       const payeeIdByHandle = this.payeeIdsByHandle(parsed, payees.idByName);
 
+      // Throttled, not per chunk: a chunk report is a whole extra transaction on
+      // a second pool connection, and the wizard only polls every 1500 ms.
+      const reportTransactions = throttleProgress(context.reportProgress);
       const transactions = await writeTransactions(manager, userId, {
         transactions: parsed.transactions.transactions,
         accountIdByKey: accounts.idByKey,
@@ -335,7 +419,7 @@ export class MnyImportService {
         payeeIdByHandle,
         payeeNameByHandle: parsed.payees.nameByHandle,
         onProgress: (processed, total) =>
-          context.reportProgress({ phase: "transactions", processed, total }),
+          reportTransactions({ phase: "transactions", processed, total }),
       });
 
       await context.reportProgress({
@@ -344,6 +428,7 @@ export class MnyImportService {
         total: parsed.investments.transactions.length,
       });
 
+      const reportInvestments = throttleProgress(context.reportProgress);
       const securities = await writeSecurities(
         manager,
         userId,
@@ -363,7 +448,7 @@ export class MnyImportService {
           ]),
         ),
         onProgress: (processed, total) =>
-          context.reportProgress({ phase: "investments", processed, total }),
+          reportInvestments({ phase: "investments", processed, total }),
       });
 
       // Holdings come only from the canonical rebuild, never from an importer's
@@ -413,13 +498,16 @@ export class MnyImportService {
           : 0,
       });
 
+      // The biggest phase in a real file -- 68,000 rows in the maintainer's --
+      // and so the one where an unthrottled report per chunk costs the most.
+      const reportPrices = throttleProgress(context.reportProgress);
       const pricesImported = parsed.options.importPrices
         ? await writeSecurityPrices(
             manager,
             parsed.rawPrices,
             securities.idByHandle,
             (processed, total) =>
-              context.reportProgress({ phase: "prices", processed, total }),
+              reportPrices({ phase: "prices", processed, total }),
           )
         : 0;
       const exchangeRatesImported = parsed.options.importExchangeRates

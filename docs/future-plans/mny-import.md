@@ -69,7 +69,7 @@ Credit to marksimpson: the PoC's real contribution is the reverse-engineered sch
 `migration/ms-money-data-model.md` — table relationships, the `act` action-code semantics
 (including the misleading act=16), the phantom-transaction taxonomy, and the LOT table as the
 authoritative holdings source. Task M4.5 adopts that document into `docs/` (with attribution)
-as the living format reference. Also correct and carried forward:
+as the living format reference (now `docs/ms-money-data-model.md`, with the corrections below called out inline against the original). Also correct and carried forward:
 
 - Money account type map (`at` 0..6) and the `hacctRel` investment/cash account pairing, which
   matches Monize's linked INVESTMENT_CASH + INVESTMENT_BROKERAGE pair exactly.
@@ -810,14 +810,112 @@ those rate observations.
 
 ### Phase 4 — Hardening, i18n, docs, e2e
 
-| ID | Task | Depends | Size |
-|----|------|---------|------|
-| M4.1 | Performance/memory pass with the real Sunset file via the harness: batch sizes, progress cadence, peak RSS; document `MNY_IMPORT_LIMIT_MB` + helm memory guidance. Acceptance: 37k transactions + 68k prices < 3 min end-to-end; peak RSS < 3x file size; numbers recorded in docs | M2.4 | M |
-| M4.2 | Failure-path hardening: corrupt file, truncated upload, pod kill mid-import (reaper + retry), staged-file expiry mid-wizard, double-start guard. Every failure has a localized message and a next action | M1.7 | M |
-| M4.3 | Full localization pass: all new frontend `import` keys in all 23 locales, backend error keys in all 13; parity suites green; pseudo-locale regenerated. (Single pass at acceptance, per the project i18n workflow) | M1–M3 UI final | M |
-| M4.4 | Playwright e2e: upload `money2001.mny` through the full wizard, plus the passworded variant; accept-string assertions finalized | M1.9 | M |
-| M4.5 | Docs: `docs/import-ms-money.md` user guide (incl. v1 limitations: no merge/dedupe, FX cost-basis caveat); adopt PR #192's `ms-money-data-model.md` into `docs/` with attribution and the corrections from this design (act table, phantom rule, SEC_SPLIT); README feature bullet; release notes; close/supersede PR #192 and issue #173 with pointers and credit | all | S |
-| M4.6 | Optional stretch: one-time offline generation (jackcess-encrypt, never in the build) of a tiny purpose-built fixture exercising transfer splits, act 4/15/16 pairing, SEC_SPLIT, bills; commit as `synthetic-edge.mny` with a driving integration spec. Skip if impractical | M0.1 | M |
+See 6.7 for what the implementation settled differently from this plan.
+
+| ID | Task | Depends | Size | Status |
+|----|------|---------|------|--------|
+| M4.1 | Performance/memory pass with the real Sunset file via the harness: batch sizes, progress cadence, peak RSS; document `MNY_IMPORT_LIMIT_MB` + helm memory guidance. Acceptance: 37k transactions + 68k prices < 3 min end-to-end; peak RSS < 3x file size; numbers recorded in docs | M2.4 | M | **done** for what this repository can settle: the progress cadence is fixed, the sizing guidance is written, and both the harness and the import now measure themselves. The acceptance numbers are the maintainer's run against the real Sunset file — see 6.7 |
+| M4.2 | Failure-path hardening: corrupt file, truncated upload, pod kill mid-import (reaper + retry), staged-file expiry mid-wizard, double-start guard. Every failure has a localized message and a next action | M1.7 | M | **done** (four defects found and fixed; see 6.7) |
+| M4.3 | Full localization pass: all new frontend `import` keys in all 23 locales, backend error keys in all 13; parity suites green; pseudo-locale regenerated. (Single pass at acceptance, per the project i18n workflow) | M1–M3 UI final | M | **done** — three keys, because each earlier phase was localized as it landed. No new backend keys: the error taxonomy already carried every message the new surfaces show |
+| M4.4 | Playwright e2e: upload `money2001.mny` through the full wizard, plus the passworded variant; accept-string assertions finalized | M1.9 | M | **done** (`e2e/tests/import-mny.spec.ts`; the passworded variant is `money2008-pwd.mny`, not `money2001-pwd.mny` — see 6.7) |
+| M4.5 | Docs: `docs/import-ms-money.md` user guide (incl. v1 limitations: no merge/dedupe, FX cost-basis caveat); adopt PR #192's `ms-money-data-model.md` into `docs/` with attribution and the corrections from this design (act table, phantom rule, SEC_SPLIT); README feature bullet; release notes; close/supersede PR #192 and issue #173 with pointers and credit | all | S | **done** except the last clause: the guide, the adopted format reference, the README bullet and `docs/release-notes/1.14.0.md` are committed. Closing PR #192 and issue #173 is the maintainer's to do — it is an outward-facing action on someone else's contribution, and the credit belongs in a comment written by the person merging |
+| M4.6 | Optional stretch: one-time offline generation (jackcess-encrypt, never in the build) of a tiny purpose-built fixture exercising transfer splits, act 4/15/16 pairing, SEC_SPLIT, bills; commit as `synthetic-edge.mny` with a driving integration spec. Skip if impractical | M0.1 | M | **not done** — explicitly optional, and it needs a Java toolchain to author the fixture. The paths it would cover are exercised by plain-object fixtures today; a real file from the maintainer closes open questions 12.3 and 12.4 more cheaply |
+
+#### 6.7 Phase 4 findings
+
+**Every failure path had a hole, and each one ended somewhere with no next
+step.** M4.2 was written as a checklist to confirm; it turned up four defects
+instead.
+
+- *A damaged or half-uploaded file threw an untyped error.* Table rows are read
+  lazily, page by page, long after the table definition resolved, so the guard
+  in `wrapTable` never saw it and mdb-reader's own `Wrong page type` escaped
+  from `MnyTable.rows()`. `/import/mny/parse` then 500'd with no code for the
+  wizard to branch on, and a running job recorded the failure as **retryable** —
+  offering Try again on a file that can never import. The fixture proves it:
+  page 34 of `money2002.mny` is `ACCT` row data, not its definition, so
+  corrupting it leaves the catalogue and the definition readable and fails only
+  on the read.
+- *A `pending` job was never reaped.* `start` inserts the row and claims it from
+  an unawaited task, so a pod dying in between left it pending forever — and
+  `hasActiveJob` counts pending, so that one row refused every future import
+  that user ever started, with no recovery short of a DBA. The reaper now takes
+  pending rows on the same staleness rule measured from `created_at`, and
+  `start` fails the job directly when the claim itself throws rather than
+  leaving the user wedged for five minutes.
+- *A failed start was invisible.* The staged file expiring under an abandoned
+  review step, or a second tab already importing, produced a perfectly good
+  localized error that nothing rendered: pressing Start import did nothing at
+  all. The review step shows it, and offers the way back to upload when the
+  staged bytes are what is gone.
+- *Retry after a "start fresh" import asked for the wipe again.* The wipe runs
+  in `start`, before the job row exists, so by the time a job can fail the data
+  is already gone — and Retry deliberately collects no password, being one click
+  on a failure screen. The repeat request therefore failed re-authentication and
+  left the user on a retryable failure they could not retry.
+
+**Progress was being written far faster than anything could read it.** Each
+writer reported after every chunk of 500 rows: 74 reports for the Sunset file's
+transactions and 136 for its prices. None of them is a cheap update —
+`reportProgress` deliberately escapes the import transaction, so each takes a
+*second pool connection* and opens its own transaction while the long one is
+still open — and the wizard polls every 1500 ms, so all but a handful are
+overwritten unread. `throttleProgress` rate-limits to one report per second,
+always letting the chunk that completes a phase through so the bar never stops
+short of the total it reached. Chunk sizes were left at 500: the parameter
+arithmetic has plenty of headroom, but raising them is a change no measurement
+in this repository can justify.
+
+**The default Helm memory limit cannot import a Money file.** `150Mi` suits
+ordinary use; a `.mny` upload is buffered in memory and decrypted in place, so
+peak usage is roughly twice the file size on top of the baseline. A pod that hits
+its limit mid-import is OOM-killed and the wizard reports a *stalled job*, which
+names the symptom and not the cause. `helm/README.md` now carries the sizing rule
+(`2 x MNY_IMPORT_LIMIT_MB` plus headroom, so 1Gi at the default 300) and
+`MNY_IMPORT_LIMIT_MB` is a first-class chart value rather than something to pass
+through `extraEnv`.
+
+**The e2e found that no `.mny` import had ever worked through the wizard.** The
+first CI run of M4.4 failed on the money2001 end-to-end test: the preview
+parsed fine and the job then died with `mnyUnreadableDatabase`. The cause is
+ADR-2 meeting ADR-6. `POST /parse` decrypts the upload **in place** and stages
+*that* buffer, because staging plaintext is what lets the password be spent
+once and never persisted (ADR-7). The job then re-parses those staged bytes
+through `openMnyFile`, which decrypts again -- and RC4 is symmetric, so the
+second pass re-encrypts pages 1..0xE.
+
+What made it survive three phases is the test data, not the test coverage:
+every integration test staged **raw fixture bytes**, so the job's decrypt was
+the only decrypt and the path was green. The fix is a second, explicitly named
+entry point (`openDecryptedMnyFile`, reached from `parse({ alreadyDecrypted:
+true })`); page 0 is never encrypted, so the scheme and password state still
+read from it. The integration suite now stages what the controller stages, and
+one spec performs the controller's exact sequence -- parse the upload, stage
+that same buffer, import it. The rule is in the module README: a test that
+stages anything other than what `POST /parse` stages is not testing the import.
+
+**The passworded fixture the task list names is the wrong one.** M4.4 asks for
+`money2001.mny` plus "the passworded variant", which reads as
+`money2001-pwd.mny`. That file opens with no prompt at all: Money's pre-2002
+"old" key derivation takes no password, so a `-pwd` file of that vintage is
+indistinguishable from an unprotected one to anything downstream. The only
+fixture that can drive the password prompt is `money2008-pwd.mny`.
+
+**The upload step had the same hole the review step did, in the place most
+likely to be hit.** A `.mny` that would not open — wrong file, Money 97, damaged
+— left the user on the upload step with nothing shown at all, while every other
+parse failure in this wizard toasts. It is a panel rather than a toast because
+the useful messages are instructions ("open and save it once in Money Plus
+Sunset, then import the result") and a toast takes those away mid-sentence.
+
+**The acceptance numbers can only come from a file that cannot be committed**, so
+both ends of the pipeline now measure themselves. `npm run mny:inspect` prints
+stage timings and peak RSS as a multiple of file size; a real import logs one
+`.mny import timing:` line with load/parse/write/finalize splits, row counts and
+the same RSS ratio. Running either against the real Sunset file is what closes
+M4.1's 3-minute and 3x-RSS acceptance, and the numbers belong in this section
+when it happens.
+
 
 Dependency spine: M0.2 -> M0.3 -> M0.4 -> {M0.5, M1.3}; M1.x converge on M1.8/M1.9; Phases 2 and
 3 parallelize after M1.8; Track B is fully parallel. Each phase leaves `main` shippable — the

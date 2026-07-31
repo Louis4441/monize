@@ -268,6 +268,7 @@ describe("MnyImportService", () => {
       hasActiveJob: jest.fn().mockResolvedValue(false),
       create: jest.fn().mockResolvedValue({ id: "job-1" }),
       runClaimed: jest.fn().mockResolvedValue(true),
+      fail: jest.fn().mockResolvedValue(undefined),
     };
     postProcessing = { run: jest.fn().mockResolvedValue(undefined) };
     usersService = { deleteData: jest.fn().mockResolvedValue(undefined) };
@@ -438,6 +439,35 @@ describe("MnyImportService", () => {
       );
     });
 
+    it("fails the job when the background start never got going", async () => {
+      // Otherwise the row sits pending until the reaper's five-minute sweep,
+      // and `hasActiveJob` counts pending -- so the user could start nothing at
+      // all in the meantime, with no error to explain why.
+      jobs.runClaimed.mockRejectedValue(new Error("pool exhausted"));
+
+      await service.start("user-1", { stagedFileId: "staged-1" });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(jobs.fail).toHaveBeenCalledWith(
+        "job-1",
+        "mnyImportFailed",
+        "pool exhausted",
+        true,
+      );
+    });
+
+    it("swallows a failure to record the failure, rather than rejecting unhandled", async () => {
+      jobs.runClaimed.mockRejectedValue(new Error("pool exhausted"));
+      jobs.fail.mockRejectedValue(new Error("still down"));
+
+      await expect(
+        service.start("user-1", { stagedFileId: "staged-1" }),
+      ).resolves.toBeDefined();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
     it("runs the import as the job body", async () => {
       const runImport = jest
         .spyOn(service, "runImport")
@@ -463,6 +493,21 @@ describe("MnyImportService", () => {
         DEFAULT_MNY_IMPORT_OPTIONS,
         context,
       );
+
+    it("logs where the time and the memory went", async () => {
+      // Task M4.1's acceptance numbers can only be measured on a real Money
+      // Plus file, which cannot be committed -- so the import measures itself
+      // and the maintainer's run is what gets recorded.
+      const log = jest.spyOn(service["logger"], "log");
+
+      await run();
+
+      expect(log).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /\.mny import timing: [\d.]+ MiB file, .*total \d+ ms; peak rss [\d.]+ MiB \([\d.]+x file size\)/,
+        ),
+      );
+    });
 
     it("fails cleanly when the staged bytes are gone", async () => {
       staging.loadBytes.mockResolvedValue(null);

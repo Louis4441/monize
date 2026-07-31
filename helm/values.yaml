@@ -39,12 +39,26 @@ backend:
     type: ClusterIP
 
   # -- Resource requests and limits
+  # NOTE: these suit ordinary use. Importing a Microsoft Money (.mny) file does
+  # not: the upload is buffered in memory and decrypted in place, so peak usage
+  # is roughly twice the file size on top of the baseline. A 150Mi limit will
+  # OOM-kill the pod partway through any real Money file, which the wizard then
+  # reports as a stalled job. See backend.mnyImport below for the sizing rule.
   resources:
     requests:
       cpu: 10m
       memory: 60Mi
     limits:
       memory: 150Mi
+
+  # -- Microsoft Money (.mny) import
+  mnyImport:
+    # -- Largest .mny file the wizard accepts, in megabytes. A Money Plus Sunset
+    # file with three decades of history runs to a couple of hundred MB.
+    # Set backend.resources.limits.memory to at least 2x this plus headroom --
+    # so 300 (the default) wants 1Gi, and lowering this is the cheaper way to
+    # bound memory if the files being imported are small. See helm/README.md.
+    MNY_IMPORT_LIMIT_MB: "300"
 
   # -- Security context for the backend container
   securityContext:
@@ -172,12 +186,24 @@ frontend:
     type: ClusterIP
 
   # -- Resource requests and limits
+  # NOTE: the Next.js proxy buffers each request body before forwarding it, so
+  # a Microsoft Money (.mny) upload is held here as well as in the backend. If
+  # that import is used, raise the limit to at least MNY_IMPORT_LIMIT_MB plus
+  # this baseline -- 400Mi at the default 300. See helm/README.md.
   resources:
     requests:
       cpu: 10m
       memory: 37Mi
     limits:
       memory: 100Mi
+
+  # -- Microsoft Money (.mny) import
+  mnyImport:
+    # -- Must match backend.mnyImport.MNY_IMPORT_LIMIT_MB. The frontend reads it
+    # to size the proxy's own request-body ceiling; Next caps proxied bodies at
+    # 10MB otherwise, and **truncates** rather than rejecting anything larger,
+    # which surfaces as an aborted upload with no error message anywhere.
+    MNY_IMPORT_LIMIT_MB: "300"
 
   # -- Security context for the frontend container
   securityContext:
