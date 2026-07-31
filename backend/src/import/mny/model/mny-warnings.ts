@@ -57,8 +57,12 @@ export const MNY_WARNING_CODES = [
   "missingInvestmentDetail",
   /** An investment row in an account that is not an investment account. */
   "investmentAccountMismatch",
-  /** A `SEC_SPLIT` row no price row resolves to a security, or with an unusable ratio. */
-  "unusableSecuritySplit",
+  /**
+   * The file records a stock split that changes a share count, and the import
+   * did not apply it -- because Money does not apply it either. See
+   * `reportUnappliedSplits`.
+   */
+  "securitySplitNotApplied",
   /** LOT-derived open shares and the action replay disagree for a holding. */
   "holdingsMismatch",
   /** A `BILL` series whose template transaction is missing from the file. */

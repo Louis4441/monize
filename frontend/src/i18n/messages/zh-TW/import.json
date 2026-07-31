@@ -471,7 +471,6 @@
     "unconfirmedInvestmentAction": "{count, plural, other {# 筆投資交易}}使用了語意靠推斷而非有文件佐證的 Money 動作，請與 Money 核對。",
     "missingInvestmentDetail": "{count, plural, other {# 筆投資交易}}在檔案中沒有股數明細，僅依其現金金額匯入。",
     "investmentAccountMismatch": "{count, plural, other {# 筆投資交易}}位於非投資帳戶中，已略過。",
-    "unusableSecuritySplit": "{count, plural, other {# 次股票分割}}無法對應到證券，或比例無法使用，因此未套用。",
     "holdingsMismatch": "{count, plural, other {# 項持倉}}與 Money 檔案記錄的股數不符。",
     "billTemplateMissing": "{count, plural, other {# 個定期帳單}}在檔案中沒有範本交易，已略過。",
     "unusableBill": "{count, plural, other {# 個定期帳單}}沒有帳戶、可用日期或可辨識的重複週期，已略過。",

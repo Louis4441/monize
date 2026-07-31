@@ -471,7 +471,6 @@
     "unconfirmedInvestmentAction": "{count, plural, one {# transacción de inversión usó} other {# transacciones de inversión usaron}} una acción de Money cuyo significado se deduce y no está documentado; compruébelas con Money.",
     "missingInvestmentDetail": "{count, plural, one {# transacción de inversión no tenía} other {# transacciones de inversión no tenían}} detalle de acciones en el archivo y se importaron solo por su importe en efectivo.",
     "investmentAccountMismatch": "{count, plural, one {# transacción de inversión estaba} other {# transacciones de inversión estaban}} en una cuenta que no es de inversión y se omitieron.",
-    "unusableSecuritySplit": "{count, plural, one {# división de acciones no pudo} other {# divisiones de acciones no pudieron}} asociarse a un valor o tenía una proporción inservible, y no se aplicaron.",
     "holdingsMismatch": "{count, plural, one {# posición no coincide} other {# posiciones no coinciden}} con las acciones que registra su archivo de Money.",
     "billTemplateMissing": "{count, plural, one {# factura programada no tenía} other {# facturas programadas no tenían}} transacción de plantilla en el archivo y se omitieron.",
     "unusableBill": "{count, plural, one {# factura programada no tenía} other {# facturas programadas no tenían}} cuenta, fecha utilizable o periodicidad reconocida, y se omitieron.",

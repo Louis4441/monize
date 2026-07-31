@@ -566,7 +566,8 @@ positive):
 | 16 | REMOVE_SHARES — never SELL | Closes lots despite the name |
 | 15+16 pair | TRANSFER_IN / TRANSFER_OUT | Paired across accounts by date + security + quantity; cross-linked via `linked_transaction_id`; unpaired rows stay ADD/REMOVE_SHARES |
 
-`SEC_SPLIT` -> SPLIT investment transactions (ratio applied by the existing holdings fold).
+`SEC_SPLIT` produces **no** transaction: Money does not apply those ratios to its own share
+counts, and applying them makes the import disagree with the file (see the note below).
 Cash legs use `TRN.amt` in the account currency. Holdings come only from
 `HoldingsService.rebuildAccountsFromTransactions` after the write; the mapper's independent
 LOT-derived open-lot positions (`htrnSell` empty, sum `qty`) and its action-replay positions are
@@ -580,6 +581,27 @@ file keeps the Dow, the NASDAQ, the DAX, the FTSE, the Hang Seng, the Nikkei, th
 Straits Times under the same code as two ETFs actually owned. Activity does separate them: a
 security referenced by no `TRN` row and no `LOT` is dropped, and its quote history goes with it
 (31 of 98 securities, 17,025 of 69,076 prices).
+
+**`SEC.sct` 4 is a money-market fund, not a currency.** The currency-pseudo-security test
+excluded that code on the format reference's word; the four rows it hides in the maintainer's
+file are TD Canadian Money Market, CIBC Canadian Money Market, CIBC Canadian T-Bill and McLean
+Budden Money Market, and Money Plus's own `sample.mny` files four more under it. In a brokerage
+account that fund *is* the sweep, so skipping the security took its cash movements with it: 829
+of 4,524 investment transactions dropped, and five cash sleeves ended thousands of dollars out
+(+11,571.95, -11,957.78, -941.58, -43.42, -11.17). Importing it lands every one of them within
+two cents of zero. A currency is now recognised by the `/GBPUS` symbol shape alone, which is
+where currencies actually live (`CRNC`); no `sct` code is read for meaning anywhere.
+
+**`SEC_SPLIT` ratios are not applied to positions, because Money does not apply them either.**
+Seven positions across two files prove it: the maintainer's brokerage bought 200 VTI before a 1:2
+split row and 100 after, then transferred the whole account away in a single 300-share row, and
+`LOT` shows both purchases fully consumed — applying the ratio leaves 200 shares in an account
+Money shows as empty, and XIU (1:4), XIC (1:4) and VWO (1:2) do the same. `sample.mny` agrees at
+MSFT (`LOT` 3 against 6 replayed), LEH (50 against 1,225) and ADM (110.25 against 115.7625).
+The rows are quote-feed metadata: the split's `SP` row is a `dPrice = 0`, `src = 0` marker with
+continuous prices either side, they exist for securities the user never held, and Canadian ETFs
+record a 1:1 one every December against a reinvested distribution. Ratios other than 1 raise
+`securitySplitNotApplied` so the user can check the share counts; nothing is adjusted.
 
 ## 9. Task list
 

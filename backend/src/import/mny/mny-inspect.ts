@@ -260,7 +260,7 @@ export function mappingSummary(tables: MnyTables): string[] {
     `  accounts:        ${accounts.accounts.length} (${accounts.skipped} skipped)`,
     `  transactions:    ${transactions.transactions.length} (${transactions.transfersLinked} transfers linked, ${transactions.skipped} skipped)`,
     `  securities:      ${securities.securities.length} (${securities.skipped} skipped as currencies or unusable)`,
-    `  investments:     ${investments.transactions.length} (${investments.transfersPaired} share transfers paired, ${investments.splitsApplied} stock splits, ${investments.skipped} skipped)`,
+    `  investments:     ${investments.transactions.length} (${investments.transfersPaired} share transfers paired, ${investments.skipped} skipped)`,
     "",
     "  account                                    ccy   txns        opening          final",
     ...accounts.accounts.map((account) =>

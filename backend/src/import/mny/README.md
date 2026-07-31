@@ -148,6 +148,14 @@ about 3,255 rows the user cannot act on is a sign the mapping is wrong, not that
   mapper.
 - **`SEC_SPLIT` has no security column.** Resolve it through `MnyInvestmentData.splitSecurities`,
   which is built from `SP.hss` -> `SP.hsec`.
+- **Never apply a `SEC_SPLIT` ratio to a position.** Money does not adjust its own share counts
+  for those rows, so an importer that does disagrees with the file it read: seven positions
+  across two files (the maintainer's VTI, VWO, XIC and XIU, `sample.mny`'s MSFT, LEH and ADM)
+  match `LOT` exactly when the split is ignored and are wrong by the ratio when it is applied.
+  The rows are quote-feed metadata -- the split's `SP` row is a `dPrice = 0`, `src = 0` marker
+  with continuous prices either side -- and they appear for securities the user never held and
+  for the annual 1:1 entries Canadian ETFs record against a reinvested distribution. Ratios
+  other than 1 are surfaced as `securitySplitNotApplied`, never acted on.
 - **"No date" is year 10000, not a two-digit-year pivot.** `toDate` returns null outside
   1900–2199; never parse Money dates by hand.
 - **`act` 16 removes shares; it is not a sale.** Mapping it to SELL closes lots against a

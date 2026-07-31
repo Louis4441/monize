@@ -459,12 +459,27 @@ for foreign ones (`GB:VOD`, `US:VT`), and empty for many funds.
 | `dtRecord` | Record date |
 | `dPriceSplit` | Price at the split |
 
-> **Addition, with a trap.** The original omits this table, and ignoring stock
-> splits makes every post-split position wrong.
+> **Addition, with a trap.** The original omits this table.
 >
 > **`SEC_SPLIT` carries no security handle.** The link runs the other way:
 > `SP.hss` points at `SEC_SPLIT.hss`, and the `SP` row's `hsec` is the security.
 > Looking for an `hsec` column here finds nothing, because there is not one.
+>
+> **Money does not apply these rows to share counts, and neither should you.**
+> The obvious reading -- ignoring a split leaves every later position wrong by
+> its ratio -- is wrong for this table, and two files say so at seven positions
+> with no counter-example. A brokerage holding 200 shares bought before a 1:2
+> `SEC_SPLIT` and 100 after transfers away in a single 300-share row, and `LOT`
+> shows both purchases fully consumed; applying the ratio leaves 200 shares in an
+> account Money shows as empty. `sample.mny` agrees: `LOT` holds 3 MSFT against 6
+> replayed with its 1:2 split, and 110.25 ADM against 115.7625.
+>
+> What the rows are is visible in the price history: the `SP` row a split points
+> at carries `dPrice = 0` and `src = 0` -- a marker, not a quote -- and the prices
+> either side of it are continuous and in the same units as the transactions.
+> They are quote-feed metadata, which is why they appear for securities the user
+> never held, and why Canadian ETFs record one every December with `cshrPre`
+> equal to `cshrPost`.
 
 ## SP (security prices)
 

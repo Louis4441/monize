@@ -105,7 +105,6 @@ export interface MnyPreviewCounts {
   investmentsToCreate: number;
   investmentsSkipped: number;
   shareTransfersPaired: number;
-  stockSplitsApplied: number;
   pricesToImport: number;
   exchangeRatesToImport: number;
   /** Detected-active bill series offered in the checkbox list. */

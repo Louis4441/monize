@@ -81,8 +81,6 @@ export interface MnyPreviewCounts {
   readonly investmentsSkipped: number;
   /** `act` 15/16 rows matched into linked TRANSFER_IN / TRANSFER_OUT pairs. */
   readonly shareTransfersPaired: number;
-  /** SPLIT rows synthesized from `SEC_SPLIT`. */
-  readonly stockSplitsApplied: number;
   /** Price rows after the `(security, date)` dedupe; 0 when the toggle is off. */
   readonly pricesToImport: number;
   /** Exchange-rate rows; 0 when the toggle is off. */
@@ -190,7 +188,6 @@ export function buildPreview(input: BuildPreviewInput): MnyPreview {
       investmentsToCreate: parsed.investments.transactions.length,
       investmentsSkipped: parsed.investments.skipped,
       shareTransfersPaired: parsed.investments.transfersPaired,
-      stockSplitsApplied: parsed.investments.splitsApplied,
       pricesToImport: parsed.options.importPrices
         ? parsed.fileCounts.securityPrices
         : 0,

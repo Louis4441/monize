@@ -249,8 +249,6 @@ export interface MappedInvestments {
   readonly referencedCategories: ReadonlySet<number>;
   /** `act` 15/16 pairs turned into linked TRANSFER_IN / TRANSFER_OUT rows. */
   readonly transfersPaired: number;
-  /** SPLIT rows synthesized from `SEC_SPLIT`. */
-  readonly splitsApplied: number;
   /** Security-carrying rows that could not be imported. */
   readonly skipped: number;
   readonly warnings: readonly MnyWarning[];

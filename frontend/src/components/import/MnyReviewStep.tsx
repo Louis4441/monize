@@ -137,7 +137,6 @@ export function MnyReviewStep({
             value={String(counts.investmentsToCreate)}
             detail={t('mnyReview.counts.investmentDetail', {
               transfers: counts.shareTransfersPaired,
-              splits: counts.stockSplitsApplied,
             })}
           />
           <SummaryTile

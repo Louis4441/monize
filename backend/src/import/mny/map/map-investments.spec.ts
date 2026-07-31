@@ -598,8 +598,13 @@ describe("mapInvestments", () => {
   });
 
   describe("SEC_SPLIT", () => {
-    // Ignoring stock splits leaves every post-split position wrong by the ratio.
-    it("creates a SPLIT row for each account holding the security", () => {
+    /**
+     * The importer used to synthesize a SPLIT row per holder. Money's own `LOT`
+     * rows are not split-adjusted, so that left shares in accounts Money shows
+     * as empty -- 200 VTI, 140 VWO, 960 XIC and 1,200 XIU in the maintainer's
+     * file, 3 MSFT and 1,175 LEH in Money Plus's `sample.mny`.
+     */
+    it("changes no position, and says which split it did not apply", () => {
       const result = mapInvestments(
         input({
           accounts: accountsFixture([10, 20]),
@@ -637,68 +642,40 @@ describe("mapInvestments", () => {
         }),
       );
 
-      const splits = result.transactions.filter(
-        (t) => t.action === InvestmentAction.SPLIT,
-      );
-      expect(splits).toHaveLength(2);
-      expect(splits.map((s) => s.accountKey).sort()).toEqual([
-        "acct-10",
-        "acct-20",
+      expect(
+        result.transactions.filter((t) => t.action === InvestmentAction.SPLIT),
+      ).toEqual([]);
+      expect(result.warnings).toEqual([
+        {
+          code: "securitySplitNotApplied",
+          subject: "SEC1",
+          detail: "2026-02-01: 1 -> 3",
+        },
       ]);
-      expect(splits[0]).toMatchObject({
-        handle: null,
-        quantity: 3,
-        totalAmount: 0,
-        cashAmount: 0,
-        transactionDate: "2026-02-01",
-      });
-      expect(result.splitsApplied).toBe(2);
     });
 
-    it("ignores accounts that only bought after the record date", () => {
+    // Canadian ETFs record their annual reinvested distribution this way: units
+    // before equal units after, so there is nothing to tell the user about.
+    it("says nothing about a split that changes no share count", () => {
       const result = mapInvestments(
         input({
-          transactions: transactionData({
-            transactions: [
-              invRow({ handle: 1, action: MNY_ACTION.BUY, date: "2026-06-01" }),
-            ],
-          }),
           investments: investmentData({
             securitySplits: [
-              mnySecuritySplit({ handle: 5, recordDate: "2026-02-01" }),
+              mnySecuritySplit({
+                handle: 5,
+                sharesBefore: 100,
+                sharesAfter: 100,
+              }),
             ],
             prices: [mnySecurityPrice({ security: 1, split: 5 })],
           }),
         }),
       );
 
-      expect(result.splitsApplied).toBe(0);
+      expect(result.warnings).toEqual([]);
     });
 
-    it("orders a split after the same day's trades", () => {
-      const result = mapInvestments(
-        input({
-          transactions: transactionData({
-            transactions: [
-              invRow({ handle: 1, action: MNY_ACTION.BUY, date: "2026-02-01" }),
-            ],
-          }),
-          investments: investmentData({
-            securitySplits: [
-              mnySecuritySplit({ handle: 5, recordDate: "2026-02-01" }),
-            ],
-            prices: [mnySecurityPrice({ security: 1, split: 5 })],
-          }),
-        }),
-      );
-
-      expect(result.transactions.map((t) => t.action)).toEqual([
-        InvestmentAction.BUY,
-        InvestmentAction.SPLIT,
-      ]);
-    });
-
-    it("warns when no price row resolves the split to a security", () => {
+    it("says nothing when no price row resolves the split to a security", () => {
       const result = mapInvestments(
         input({
           investments: investmentData({
@@ -707,17 +684,10 @@ describe("mapInvestments", () => {
         }),
       );
 
-      expect(result.splitsApplied).toBe(0);
-      expect(result.warnings).toEqual([
-        {
-          code: "unusableSecuritySplit",
-          subject: "hss=5",
-          detail: "no security",
-        },
-      ]);
+      expect(result.warnings).toEqual([]);
     });
 
-    it("warns on an unusable ratio instead of dividing by zero", () => {
+    it("says nothing about an unusable ratio instead of dividing by zero", () => {
       const result = mapInvestments(
         input({
           investments: investmentData({
@@ -729,11 +699,7 @@ describe("mapInvestments", () => {
         }),
       );
 
-      expect(result.splitsApplied).toBe(0);
-      expect(result.warnings[0]).toMatchObject({
-        code: "unusableSecuritySplit",
-        detail: "ratio 2/0",
-      });
+      expect(result.warnings).toEqual([]);
     });
   });
 

@@ -72,7 +72,6 @@ function preview(overrides: Partial<MnyPreview> = {}): MnyPreview {
       investmentsToCreate: 0,
       investmentsSkipped: 0,
       shareTransfersPaired: 0,
-      stockSplitsApplied: 0,
       pricesToImport: 0,
       exchangeRatesToImport: 0,
       billsDetected: 0,
