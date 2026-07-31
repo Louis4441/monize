@@ -1,10 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In } from "typeorm";
+import { DataSource, In } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Security } from "./entities/security.entity";
 import { Holding } from "./entities/holding.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
-import { SecurityPrice } from "./entities/security-price.entity";
 import { YahooFinanceService } from "./yahoo-finance.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { roundMoney, sumMoney } from "../common/round.util";
@@ -148,14 +147,7 @@ export class SectorWeightingService {
   private readonly logger = new Logger(SectorWeightingService.name);
 
   constructor(
-    @InjectRepository(Security)
-    private securityRepository: Repository<Security>,
-    @InjectRepository(Holding)
-    private holdingsRepository: Repository<Holding>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(SecurityPrice)
-    private securityPriceRepository: Repository<SecurityPrice>,
+    private dataSource: DataSource,
     private yahooFinanceService: YahooFinanceService,
     private portfolioCalculationService: PortfolioCalculationService,
   ) {}
@@ -234,7 +226,9 @@ export class SectorWeightingService {
     }
 
     if (toUpdate.length > 0) {
-      await this.securityRepository.save(toUpdate);
+      await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Security).save(toUpdate),
+      );
     }
   }
 
@@ -248,12 +242,14 @@ export class SectorWeightingService {
     if (securityIds.length === 0) return priceMap;
 
     const rows: { security_id: string; close_price: string }[] =
-      await this.securityPriceRepository.query(
-        `SELECT DISTINCT ON (security_id) security_id, close_price
+      await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `SELECT DISTINCT ON (security_id) security_id, close_price
          FROM security_prices
          WHERE security_id = ANY($1)
          ORDER BY security_id, price_date DESC`,
-        [securityIds],
+          [securityIds],
+        ),
       );
 
     for (const row of rows) {
@@ -268,9 +264,11 @@ export class SectorWeightingService {
    */
   async ensureSectorDataByIds(securityIds: string[]): Promise<void> {
     if (securityIds.length === 0) return;
-    const securities = await this.securityRepository.find({
-      where: { id: In(securityIds) },
-    });
+    const securities = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({
+        where: { id: In(securityIds) },
+      }),
+    );
     await this.ensureSectorData(securities);
   }
 
@@ -285,17 +283,21 @@ export class SectorWeightingService {
     // 1. Resolve investment accounts
     let investmentAccounts: Account[];
     if (accountIds && accountIds.length > 0) {
-      investmentAccounts = await this.accountsRepository.find({
-        where: {
-          userId,
-          id: In(accountIds),
-          accountType: AccountType.INVESTMENT,
-        },
-      });
+      investmentAccounts = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Account).find({
+          where: {
+            userId,
+            id: In(accountIds),
+            accountType: AccountType.INVESTMENT,
+          },
+        }),
+      );
     } else {
-      investmentAccounts = await this.accountsRepository.find({
-        where: { userId, accountType: AccountType.INVESTMENT },
-      });
+      investmentAccounts = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Account).find({
+          where: { userId, accountType: AccountType.INVESTMENT },
+        }),
+      );
     }
 
     const categorised =
@@ -304,10 +306,12 @@ export class SectorWeightingService {
     // 2. Get holdings for those accounts
     let holdings: Holding[];
     if (categorised.holdingsAccountIds.length > 0) {
-      holdings = await this.holdingsRepository.find({
-        where: { accountId: In(categorised.holdingsAccountIds) },
-        relations: ["security"],
-      });
+      holdings = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Holding).find({
+          where: { accountId: In(categorised.holdingsAccountIds) },
+          relations: ["security"],
+        }),
+      );
     } else {
       holdings = [];
     }
@@ -535,17 +539,21 @@ export class SectorWeightingService {
   ): Promise<LookThroughResult> {
     let investmentAccounts: Account[];
     if (accountIds && accountIds.length > 0) {
-      investmentAccounts = await this.accountsRepository.find({
-        where: {
-          userId,
-          id: In(accountIds),
-          accountType: AccountType.INVESTMENT,
-        },
-      });
+      investmentAccounts = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Account).find({
+          where: {
+            userId,
+            id: In(accountIds),
+            accountType: AccountType.INVESTMENT,
+          },
+        }),
+      );
     } else {
-      investmentAccounts = await this.accountsRepository.find({
-        where: { userId, accountType: AccountType.INVESTMENT },
-      });
+      investmentAccounts = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Account).find({
+          where: { userId, accountType: AccountType.INVESTMENT },
+        }),
+      );
     }
 
     const categorised =
@@ -553,10 +561,12 @@ export class SectorWeightingService {
 
     let holdings: Holding[];
     if (categorised.holdingsAccountIds.length > 0) {
-      holdings = await this.holdingsRepository.find({
-        where: { accountId: In(categorised.holdingsAccountIds) },
-        relations: ["security"],
-      });
+      holdings = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Holding).find({
+          where: { accountId: In(categorised.holdingsAccountIds) },
+          relations: ["security"],
+        }),
+      );
     } else {
       holdings = [];
     }

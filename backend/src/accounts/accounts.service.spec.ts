@@ -2668,22 +2668,21 @@ describe("AccountsService", () => {
     });
   });
 
-  describe("updateBalance with queryRunner", () => {
-    it("uses provided queryRunner instead of dataSource", async () => {
+  describe("updateBalance", () => {
+    it("applies the atomic UPDATE and re-reads the balance in one scoped transaction", async () => {
       accountsRepository.findOne.mockResolvedValue({
         ...mockAccount,
         currentBalance: 100,
       });
-      mockQueryRunner.manager.findOneOrFail.mockResolvedValue({
+      accountsRepository.findOneOrFail.mockResolvedValue({
         ...mockAccount,
         currentBalance: 200,
       });
-      const result = await service.updateBalance(
-        "account-1",
-        100,
-        mockQueryRunner as never,
+      const result = await service.updateBalance("account-1", 100);
+      expect(mockQueryRunner.manager.query).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE accounts SET current_balance"),
+        [100, "account-1"],
       );
-      expect(mockQueryRunner.query).toHaveBeenCalled();
       expect(result.currentBalance).toBe(200);
     });
   });
@@ -2696,22 +2695,15 @@ describe("AccountsService", () => {
       );
     });
 
-    it("computes new balance with provided queryRunner", async () => {
+    it("computes the new balance from the summed transactions", async () => {
       accountsRepository.findOne.mockResolvedValue({
         id: "account-1",
         openingBalance: 100,
       });
-      const qr = {
-        ...mockQueryRunner,
-        query: jest
-          .fn()
-          .mockResolvedValueOnce([{ balance: "150.5" }])
-          .mockResolvedValueOnce(undefined),
-      };
-      const result = await service.recalculateCurrentBalance(
-        "account-1",
-        qr as never,
-      );
+      accountsRepository.save.mockImplementation((d) => Promise.resolve(d));
+      const ds = mockQueryRunner.manager as unknown as { query: jest.Mock };
+      ds.query = jest.fn().mockResolvedValue([{ balance: "150.5" }]);
+      const result = await service.recalculateCurrentBalance("account-1");
       expect(result.currentBalance).toBe(150.5);
     });
 
@@ -2727,7 +2719,7 @@ describe("AccountsService", () => {
       expect(r.currentBalance).toBe(100);
     });
 
-    it("computes balance via dataSource when no queryRunner", async () => {
+    it("persists the recomputed balance", async () => {
       accountsRepository.findOne.mockResolvedValue({
         id: "account-1",
         openingBalance: 100,

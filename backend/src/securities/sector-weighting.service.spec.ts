@@ -1,19 +1,22 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { SectorWeightingService } from "./sector-weighting.service";
 import { Security } from "./entities/security.entity";
 import { Holding } from "./entities/holding.entity";
 import { Account } from "../accounts/entities/account.entity";
-import { SecurityPrice } from "./entities/security-price.entity";
-import { YahooFinanceService } from "./yahoo-finance.service";
-import { PortfolioCalculationService } from "./portfolio-calculation.service";
+import {
+  createScopedDbMocks,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("SectorWeightingService", () => {
   let service: SectorWeightingService;
   let securityRepo: Record<string, jest.Mock>;
   let holdingsRepo: Record<string, jest.Mock>;
   let accountsRepo: Record<string, jest.Mock>;
-  let priceRepo: Record<string, jest.Mock>;
+  let manager: ManagerMock;
   let yahooService: Record<string, jest.Mock>;
   let calcService: Record<string, jest.Mock>;
 
@@ -65,7 +68,7 @@ describe("SectorWeightingService", () => {
     sectorDataUpdatedAt: new Date(),
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     securityRepo = {
       save: jest.fn().mockResolvedValue(undefined),
     };
@@ -74,9 +77,6 @@ describe("SectorWeightingService", () => {
     };
     accountsRepo = {
       find: jest.fn().mockResolvedValue([]),
-    };
-    priceRepo = {
-      query: jest.fn().mockResolvedValue([]),
     };
     yahooService = {
       fetchStockSectorInfo: jest.fn().mockResolvedValue(null),
@@ -95,25 +95,19 @@ describe("SectorWeightingService", () => {
         .mockImplementation((amount) => Promise.resolve(amount)),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SectorWeightingService,
-        { provide: getRepositoryToken(Security), useValue: securityRepo },
-        { provide: getRepositoryToken(Holding), useValue: holdingsRepo },
-        { provide: getRepositoryToken(Account), useValue: accountsRepo },
-        {
-          provide: getRepositoryToken(SecurityPrice),
-          useValue: priceRepo,
-        },
-        { provide: YahooFinanceService, useValue: yahooService },
-        {
-          provide: PortfolioCalculationService,
-          useValue: calcService,
-        },
-      ],
-    }).compile();
+    const { manager: managerMock, dataSource } = createScopedDbMocks([
+      [Security, securityRepo],
+      [Holding, holdingsRepo],
+      [Account, accountsRepo],
+    ]);
+    manager = managerMock;
+    manager.query.mockResolvedValue([]);
 
-    service = module.get<SectorWeightingService>(SectorWeightingService);
+    service = new SectorWeightingService(
+      dataSource as never,
+      yahooService as never,
+      calcService as never,
+    );
   });
 
   describe("ensureSectorData", () => {
@@ -257,7 +251,7 @@ describe("SectorWeightingService", () => {
         },
       ]);
 
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-stock-1", close_price: "180" },
       ]);
 
@@ -296,7 +290,7 @@ describe("SectorWeightingService", () => {
         },
       ]);
 
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-etf-1", close_price: "250" },
       ]);
 
@@ -341,7 +335,7 @@ describe("SectorWeightingService", () => {
         },
       ]);
 
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-stock-1", close_price: "180" },
         { security_id: "sec-etf-1", close_price: "250" },
       ]);
@@ -380,7 +374,7 @@ describe("SectorWeightingService", () => {
         },
       ]);
 
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-stock-1", close_price: "180" },
       ]);
 
@@ -421,7 +415,7 @@ describe("SectorWeightingService", () => {
         },
       ]);
 
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-stock-1", close_price: "180" },
         { security_id: "sec-etf-1", close_price: "250" },
       ]);
@@ -461,7 +455,7 @@ describe("SectorWeightingService", () => {
         },
       ]);
 
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-none-1", close_price: "50" },
       ]);
 
@@ -523,7 +517,7 @@ describe("SectorWeightingService", () => {
         },
       ]);
 
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-stock-1", close_price: "180" },
       ]);
 
@@ -602,7 +596,7 @@ describe("SectorWeightingService", () => {
           },
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-etf-1", close_price: "100" },
       ]);
 
@@ -628,7 +622,7 @@ describe("SectorWeightingService", () => {
           security: mockStockSecurity, // NASDAQ -> United States
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-stock-1", close_price: "180" },
       ]);
 
@@ -656,7 +650,7 @@ describe("SectorWeightingService", () => {
           },
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-etf-1", close_price: "100" },
       ]);
 
@@ -681,7 +675,7 @@ describe("SectorWeightingService", () => {
           security: { ...mockEtfSecurity, countryWeightings: null },
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-etf-1", close_price: "100" },
       ]);
 
@@ -727,7 +721,7 @@ describe("SectorWeightingService", () => {
           },
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-etf-1", close_price: "100" },
       ]);
 
@@ -755,7 +749,7 @@ describe("SectorWeightingService", () => {
           security: mockStockSecurity,
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-stock-1", close_price: "180" },
       ]);
 
@@ -788,7 +782,7 @@ describe("SectorWeightingService", () => {
           security: mockStockSecurity, // security-type default is "Equity"
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-etf-1", close_price: "100" },
         { security_id: "sec-stock-1", close_price: "200" },
       ]);
@@ -824,7 +818,7 @@ describe("SectorWeightingService", () => {
           },
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-stock-1", close_price: "100" },
         { security_id: "sec-etf-1", close_price: "100" },
       ]);
@@ -860,7 +854,7 @@ describe("SectorWeightingService", () => {
           security: { ...mockEtfSecurity, assetWeightings: null },
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-etf-1", close_price: "100" },
       ]);
 
@@ -903,7 +897,7 @@ describe("SectorWeightingService", () => {
           },
         },
       ]);
-      priceRepo.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-etf-1", close_price: "100" },
       ]);
 

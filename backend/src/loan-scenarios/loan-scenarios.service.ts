@@ -81,34 +81,34 @@ export class LoanScenariosService {
     return withScopedDb(this.dataSource, (m) => {
       const repo = m.getRepository(LoanScenario);
       const updated = repo.merge(scenario, {
-      ...(dto.name !== undefined ? { name: dto.name } : {}),
-      ...(dto.recurringExtraAmount !== undefined
-        ? { recurringExtraAmount: dto.recurringExtraAmount }
-        : {}),
-      ...(dto.recurringExtraMode !== undefined
-        ? { recurringExtraMode: dto.recurringExtraMode }
-        : {}),
-      ...(dto.recurringExtraFrequency !== undefined
-        ? { recurringExtraFrequency: dto.recurringExtraFrequency }
-        : {}),
-      ...(dto.recurringExtraStartDate !== undefined
-        ? { recurringExtraStartDate: dto.recurringExtraStartDate }
-        : {}),
-      ...(dto.recurringExtraEndDate !== undefined
-        ? { recurringExtraEndDate: dto.recurringExtraEndDate }
-        : {}),
-      ...(dto.targetMonthlyPayment !== undefined
-        ? { targetMonthlyPayment: dto.targetMonthlyPayment }
-        : {}),
-      ...(dto.targetMonthlyPaymentMode !== undefined
-        ? { targetMonthlyPaymentMode: dto.targetMonthlyPaymentMode }
-        : {}),
-      ...(dto.targetMonthlyPaymentStartDate !== undefined
-        ? { targetMonthlyPaymentStartDate: dto.targetMonthlyPaymentStartDate }
-        : {}),
-      ...(dto.targetMonthlyPaymentEndDate !== undefined
-        ? { targetMonthlyPaymentEndDate: dto.targetMonthlyPaymentEndDate }
-        : {}),
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.recurringExtraAmount !== undefined
+          ? { recurringExtraAmount: dto.recurringExtraAmount }
+          : {}),
+        ...(dto.recurringExtraMode !== undefined
+          ? { recurringExtraMode: dto.recurringExtraMode }
+          : {}),
+        ...(dto.recurringExtraFrequency !== undefined
+          ? { recurringExtraFrequency: dto.recurringExtraFrequency }
+          : {}),
+        ...(dto.recurringExtraStartDate !== undefined
+          ? { recurringExtraStartDate: dto.recurringExtraStartDate }
+          : {}),
+        ...(dto.recurringExtraEndDate !== undefined
+          ? { recurringExtraEndDate: dto.recurringExtraEndDate }
+          : {}),
+        ...(dto.targetMonthlyPayment !== undefined
+          ? { targetMonthlyPayment: dto.targetMonthlyPayment }
+          : {}),
+        ...(dto.targetMonthlyPaymentMode !== undefined
+          ? { targetMonthlyPaymentMode: dto.targetMonthlyPaymentMode }
+          : {}),
+        ...(dto.targetMonthlyPaymentStartDate !== undefined
+          ? { targetMonthlyPaymentStartDate: dto.targetMonthlyPaymentStartDate }
+          : {}),
+        ...(dto.targetMonthlyPaymentEndDate !== undefined
+          ? { targetMonthlyPaymentEndDate: dto.targetMonthlyPaymentEndDate }
+          : {}),
         ...(dto.lumpSums !== undefined ? { lumpSums: dto.lumpSums } : {}),
       });
       // Validate the merged state, so a partial update cannot invert the window

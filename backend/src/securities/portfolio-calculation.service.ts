@@ -1,8 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In, LessThanOrEqual, FindOptionsWhere } from "typeorm";
+import { DataSource, FindOptionsWhere, In, LessThanOrEqual } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Holding } from "./entities/holding.entity";
-import { SecurityPrice } from "./entities/security-price.entity";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -228,14 +227,7 @@ function applyTxToState(
 @Injectable()
 export class PortfolioCalculationService {
   constructor(
-    @InjectRepository(Holding)
-    private holdingsRepository: Repository<Holding>,
-    @InjectRepository(SecurityPrice)
-    private securityPriceRepository: Repository<SecurityPrice>,
-    @InjectRepository(InvestmentTransaction)
-    private investmentTransactionRepository: Repository<InvestmentTransaction>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
+    private dataSource: DataSource,
     private exchangeRateService: ExchangeRateService,
   ) {}
 
@@ -300,13 +292,17 @@ export class PortfolioCalculationService {
     }
 
     if (holdingsAccountIds.length > 0) {
-      const rows: Array<{ currency: string | null }> =
-        await this.holdingsRepository
-          .createQueryBuilder("h")
-          .innerJoin("h.security", "s")
-          .where("h.account_id IN (:...ids)", { ids: holdingsAccountIds })
-          .select("DISTINCT s.currency_code", "currency")
-          .getRawMany();
+      const rows: Array<{ currency: string | null }> = await withScopedDb(
+        this.dataSource,
+        (m) =>
+          m
+            .getRepository(Holding)
+            .createQueryBuilder("h")
+            .innerJoin("h.security", "s")
+            .where("h.account_id IN (:...ids)", { ids: holdingsAccountIds })
+            .select("DISTINCT s.currency_code", "currency")
+            .getRawMany(),
+      );
       for (const row of rows) {
         if (row.currency) currencies.add(row.currency);
       }
@@ -467,10 +463,12 @@ export class PortfolioCalculationService {
     const effectiveBalances = new Map<string, number>();
     if (accountIds.length === 0) return effectiveBalances;
 
-    const accounts = await this.accountsRepository.find({
-      where: { id: In(accountIds) },
-      select: ["id", "currentBalance"],
-    });
+    const accounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { id: In(accountIds) },
+        select: ["id", "currentBalance"],
+      }),
+    );
     for (const account of accounts) {
       effectiveBalances.set(
         account.id,
@@ -532,8 +530,9 @@ export class PortfolioCalculationService {
       buys: string;
       sells: string;
       income: string;
-    }[] = await this.accountsRepository.query(
-      `SELECT account_id,
+    }[] = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT account_id,
                 COALESCE(SUM(CASE WHEN action = 'BUY' THEN total_amount * exchange_rate ELSE 0 END), 0) as buys,
                 COALESCE(SUM(CASE WHEN action = 'SELL' THEN total_amount * exchange_rate ELSE 0 END), 0) as sells,
                 COALESCE(SUM(CASE WHEN action IN ('DIVIDEND','INTEREST','CAPITAL_GAIN') THEN total_amount * exchange_rate ELSE 0 END), 0) as income
@@ -542,7 +541,8 @@ export class PortfolioCalculationService {
            AND account_id = ANY($2)
            AND transaction_date <= CURRENT_DATE
          GROUP BY account_id`,
-      [userId, accountIds],
+        [userId, accountIds],
+      ),
     );
     for (const row of flowRows) {
       investmentFlows.set(row.account_id, {
@@ -586,14 +586,16 @@ export class PortfolioCalculationService {
 
     const today = formatDateYMDLocal(new Date());
 
-    const transactions = await this.investmentTransactionRepository.find({
-      where: {
-        userId,
-        accountId: In(holdingsAccountIds),
-        transactionDate: LessThanOrEqual(today),
-      },
-      order: { transactionDate: "ASC", createdAt: "ASC" },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentTransaction).find({
+        where: {
+          userId,
+          accountId: In(holdingsAccountIds),
+          transactionDate: LessThanOrEqual(today),
+        },
+        order: { transactionDate: "ASC", createdAt: "ASC" },
+      }),
+    );
 
     const state = new Map<string, { quantity: number; costBasis: number }>();
 
@@ -693,11 +695,13 @@ export class PortfolioCalculationService {
       where.transactionDate = LessThanOrEqual(endDate);
     }
 
-    const transactions = await this.investmentTransactionRepository.find({
-      where,
-      relations: ["security", "account"],
-      order: { transactionDate: "ASC", createdAt: "ASC" },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentTransaction).find({
+        where,
+        relations: ["security", "account"],
+        order: { transactionDate: "ASC", createdAt: "ASC" },
+      }),
+    );
 
     const state = new Map<string, { quantity: number; costBasis: number }>();
     const results: RealizedGainEntry[] = [];
@@ -860,11 +864,13 @@ export class PortfolioCalculationService {
     }
     where.transactionDate = LessThanOrEqual(endDate);
 
-    const transactions = await this.investmentTransactionRepository.find({
-      where,
-      relations: ["security", "account"],
-      order: { transactionDate: "ASC", createdAt: "ASC" },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentTransaction).find({
+        where,
+        relations: ["security", "account"],
+        order: { transactionDate: "ASC", createdAt: "ASC" },
+      }),
+    );
 
     if (transactions.length === 0) return [];
 
@@ -1080,10 +1086,12 @@ export class PortfolioCalculationService {
   }> {
     let holdings: Holding[] = [];
     if (holdingsAccountIds.length > 0) {
-      holdings = await this.holdingsRepository.find({
-        where: { accountId: In(holdingsAccountIds) },
-        relations: ["security", "account"],
-      });
+      holdings = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Holding).find({
+          where: { accountId: In(holdingsAccountIds) },
+          relations: ["security", "account"],
+        }),
+      );
     }
 
     // Get latest prices for all securities in holdings
@@ -1719,15 +1727,18 @@ export class PortfolioCalculationService {
       return null;
     }
 
-    const earliestRow: { earliest: string }[] =
-      await this.accountsRepository.query(
-        `SELECT MIN(transaction_date) as earliest
+    const earliestRow: { earliest: string }[] = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT MIN(transaction_date) as earliest
        FROM investment_transactions
        WHERE user_id = $1
          AND account_id = ANY($2)
          AND transaction_date <= CURRENT_DATE`,
-        [userId, allInvestmentAccountIds],
-      );
+          [userId, allInvestmentAccountIds],
+        ),
+    );
     if (!earliestRow[0]?.earliest) return null;
 
     const earliest = new Date(earliestRow[0].earliest);
@@ -1762,12 +1773,14 @@ export class PortfolioCalculationService {
       security_id: string;
       price_date: string;
       close_price: string;
-    }[] = await this.securityPriceRepository.query(
-      `SELECT security_id, price_date::text AS price_date, close_price
+    }[] = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT security_id, price_date::text AS price_date, close_price
          FROM security_prices
          WHERE security_id = ANY($1)
          ORDER BY security_id, price_date ASC`,
-      [securityIds],
+        [securityIds],
+      ),
     );
 
     const result = new Map<string, { date: string; price: number }[]>();
@@ -1825,11 +1838,13 @@ export class PortfolioCalculationService {
     if (holdingsAccountIds.length === 0) return null;
 
     // Fetch all investment transactions for these accounts, ordered by date
-    const transactions = await this.investmentTransactionRepository.find({
-      where: { userId, accountId: In(holdingsAccountIds) },
-      relations: ["security"],
-      order: { transactionDate: "ASC", createdAt: "ASC" },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentTransaction).find({
+        where: { userId, accountId: In(holdingsAccountIds) },
+        relations: ["security"],
+        order: { transactionDate: "ASC", createdAt: "ASC" },
+      }),
+    );
 
     if (transactions.length === 0) return null;
 

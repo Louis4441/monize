@@ -1,8 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In } from "typeorm";
+import { DataSource, In } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Holding } from "./entities/holding.entity";
-import { SecurityPrice } from "./entities/security-price.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import {
@@ -327,14 +326,7 @@ export class PortfolioService {
   private readonly intradayCache = new Map<string, IntradayCacheEntry>();
 
   constructor(
-    @InjectRepository(Holding)
-    private holdingsRepository: Repository<Holding>,
-    @InjectRepository(SecurityPrice)
-    private securityPriceRepository: Repository<SecurityPrice>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(UserPreference)
-    private prefRepository: Repository<UserPreference>,
+    private dataSource: DataSource,
     private calculationService: PortfolioCalculationService,
     private yahooFinanceService: YahooFinanceService,
     private quoteProviderRegistry: QuoteProviderRegistry,
@@ -351,12 +343,14 @@ export class PortfolioService {
     }
 
     // Use DISTINCT ON (PostgreSQL) for efficient single-pass latest price lookup
-    const latestPrices = await this.securityPriceRepository.query(
-      `SELECT DISTINCT ON (security_id) security_id, close_price, price_date
+    const latestPrices = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT DISTINCT ON (security_id) security_id, close_price, price_date
          FROM security_prices
          WHERE security_id = ANY($1)
          ORDER BY security_id, price_date DESC`,
-      [securityIds],
+        [securityIds],
+      ),
     );
 
     const priceMap = new Map<string, number>();
@@ -371,13 +365,15 @@ export class PortfolioService {
    * Get all investment accounts (both cash and brokerage) for a user
    */
   async getInvestmentAccounts(userId: string): Promise<Account[]> {
-    return this.accountsRepository.find({
-      where: {
-        userId,
-        accountType: AccountType.INVESTMENT,
-        isClosed: false,
-      },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: {
+          userId,
+          accountType: AccountType.INVESTMENT,
+          isClosed: false,
+        },
+      }),
+    );
   }
 
   /**
@@ -401,7 +397,9 @@ export class PortfolioService {
     accountIds?: string[],
   ): Promise<PortfolioSummary> {
     // Get user's default currency for conversion
-    const pref = await this.prefRepository.findOne({ where: { userId } });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
     const defaultCurrency = pref?.defaultCurrency || "CAD";
     const rateCache = new Map<string, number>();
 
@@ -634,10 +632,12 @@ export class PortfolioService {
     if (holdingsAccountIds.length === 0) return [];
 
     // Get holdings with non-zero quantity
-    const holdings = await this.holdingsRepository.find({
-      where: { accountId: In(holdingsAccountIds) },
-      relations: ["security"],
-    });
+    const holdings = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Holding).find({
+        where: { accountId: In(holdingsAccountIds) },
+        relations: ["security"],
+      }),
+    );
     const activeHoldings = holdings.filter(
       (h) =>
         Math.abs(Number(h.quantity)) >= 0.0001 &&
@@ -664,8 +664,9 @@ export class PortfolioService {
       close_price: string;
       price_date: string;
       rn: string;
-    }> = await this.securityPriceRepository.query(
-      `SELECT security_id, close_price, price_date, rn FROM (
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT security_id, close_price, price_date, rn FROM (
          SELECT security_id, close_price, price_date,
                 ROW_NUMBER() OVER (PARTITION BY security_id ORDER BY price_date DESC) as rn
          FROM security_prices
@@ -673,7 +674,8 @@ export class PortfolioService {
        ) sub
        WHERE rn <= 2
        ORDER BY security_id, rn`,
-      [securityIds],
+        [securityIds],
+      ),
     );
 
     // Build a map: securityId -> [latest, previous] price points (newest first)
@@ -759,10 +761,12 @@ export class PortfolioService {
 
     if (holdingsAccountIds.length === 0) return [];
 
-    const holdings = await this.holdingsRepository.find({
-      where: { accountId: In(holdingsAccountIds) },
-      relations: ["security"],
-    });
+    const holdings = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Holding).find({
+        where: { accountId: In(holdingsAccountIds) },
+        relations: ["security"],
+      }),
+    );
     const activeHoldings = holdings.filter(
       (h) =>
         Math.abs(Number(h.quantity)) >= 0.0001 &&
@@ -781,8 +785,9 @@ export class PortfolioService {
       security_id: string;
       close_price: string;
       period: string;
-    }> = await this.securityPriceRepository.query(
-      `SELECT security_id, close_price, period FROM (
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT security_id, close_price, period FROM (
          SELECT security_id, close_price, 'current' as period,
                 ROW_NUMBER() OVER (PARTITION BY security_id ORDER BY price_date DESC) as rn
          FROM security_prices
@@ -797,7 +802,8 @@ export class PortfolioService {
          WHERE security_id = ANY($1)
            AND price_date <= $3::DATE
        ) sub WHERE rn = 1`,
-      [securityIds, currentEnd, previousEnd],
+        [securityIds, currentEnd, previousEnd],
+      ),
     );
 
     // Build price maps per security
@@ -873,10 +879,12 @@ export class PortfolioService {
       this.calculationService.categoriseAccounts(accounts);
     if (holdingsAccountIds.length === 0) return new Map();
 
-    const holdings = await this.holdingsRepository.find({
-      where: { accountId: In(holdingsAccountIds) },
-      relations: ["security"],
-    });
+    const holdings = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Holding).find({
+        where: { accountId: In(holdingsAccountIds) },
+        relations: ["security"],
+      }),
+    );
     if (holdings.length === 0) return new Map();
 
     const securityIds = [...new Set(holdings.map((h) => h.securityId))];
@@ -1032,7 +1040,9 @@ export class PortfolioService {
 
   /** The user's default display currency, falling back to CAD. */
   private async resolveDefaultCurrency(userId: string): Promise<string> {
-    const pref = await this.prefRepository.findOne({ where: { userId } });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
     return pref?.defaultCurrency || "CAD";
   }
 
@@ -1057,14 +1067,16 @@ export class PortfolioService {
       id: string;
       name: string;
       color: string | null;
-    }> = await this.holdingsRepository.manager.query(
-      `SELECT s.symbol AS symbol, t.id AS id, t.name AS name, t.color AS color
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT s.symbol AS symbol, t.id AS id, t.name AS name, t.color AS color
          FROM securities s
          JOIN security_tags st ON st.security_id = s.id
          JOIN tags t ON t.id = st.tag_id
         WHERE s.user_id = $1 AND s.symbol = ANY($2)
         ORDER BY t.name ASC`,
-      [userId, symbols],
+        [userId, symbols],
+      ),
     );
 
     for (const row of rows) {
@@ -1395,7 +1407,9 @@ export class PortfolioService {
     },
   ): Promise<IntradayLoaded> {
     const { range, accountIds } = query;
-    const pref = await this.prefRepository.findOne({ where: { userId } });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
     const displayCurrency =
       query.displayCurrency || pref?.defaultCurrency || "CAD";
 
@@ -1428,10 +1442,12 @@ export class PortfolioService {
     }> = [];
 
     if (holdingsAccountIds.length > 0) {
-      const holdings = await this.holdingsRepository.find({
-        where: { accountId: In(holdingsAccountIds) },
-        relations: ["security"],
-      });
+      const holdings = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Holding).find({
+          where: { accountId: In(holdingsAccountIds) },
+          relations: ["security"],
+        }),
+      );
 
       const userDefaultProvider = pref?.defaultQuoteProvider ?? null;
 
@@ -1807,13 +1823,15 @@ export class PortfolioService {
     // other tabs) never leaks them into portfolio/holdings computations.
     // Investment-cash siblings are accountType INVESTMENT, so linked pairs
     // still resolve.
-    const requestedAccounts = await this.accountsRepository.find({
-      where: {
-        id: In(accountIds),
-        userId,
-        accountType: AccountType.INVESTMENT,
-      },
-    });
+    const requestedAccounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: {
+          id: In(accountIds),
+          userId,
+          accountType: AccountType.INVESTMENT,
+        },
+      }),
+    );
     // Resolve linked pairs
     const resolvedIds = new Set<string>(requestedAccounts.map((a) => a.id));
     for (const account of requestedAccounts) {
@@ -1826,13 +1844,15 @@ export class PortfolioService {
       (id) => !requestedAccounts.some((a) => a.id === id),
     );
     if (linkedOnly.length > 0) {
-      const linkedAccounts = await this.accountsRepository.find({
-        where: {
-          id: In(linkedOnly),
-          userId,
-          accountType: AccountType.INVESTMENT,
-        },
-      });
+      const linkedAccounts = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Account).find({
+          where: {
+            id: In(linkedOnly),
+            userId,
+            accountType: AccountType.INVESTMENT,
+          },
+        }),
+      );
       return [...requestedAccounts, ...linkedAccounts];
     }
     return requestedAccounts;

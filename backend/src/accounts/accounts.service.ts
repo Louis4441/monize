@@ -6,7 +6,7 @@ import {
   forwardRef,
   Logger,
 } from "@nestjs/common";
-import { DataSource, QueryRunner, In } from "typeorm";
+import { DataSource, In } from "typeorm";
 import {
   Account,
   AccountType,
@@ -951,11 +951,7 @@ export class AccountsService {
    * Update account balance (called internally by transactions).
    * Uses atomic SQL UPDATE to prevent race conditions from concurrent requests.
    */
-  async updateBalance(
-    accountId: string,
-    amount: number,
-    queryRunner?: QueryRunner,
-  ): Promise<Account> {
+  async updateBalance(accountId: string, amount: number): Promise<Account> {
     const account = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id: accountId },
@@ -983,16 +979,9 @@ export class AccountsService {
 
     const sql = `UPDATE accounts SET current_balance = ROUND(CAST(current_balance AS numeric) + $1, 4) WHERE id = $2`;
 
-    if (queryRunner) {
-      await queryRunner.query(sql, [amount, accountId]);
-      // M20: Re-query within transaction to return fresh balance
-      const updated = await queryRunner.manager.findOneOrFail(Account, {
-        where: { id: accountId },
-      });
-      return updated;
-    }
-
-    // Atomic update at the database level to avoid read-modify-write race conditions
+    // Atomic update at the database level to avoid read-modify-write race
+    // conditions. A caller already inside a scoped transaction joins it (F2
+    // re-entrancy), so the update and the re-read stay in that transaction.
     return withScopedDb(this.dataSource, async (m) => {
       await m.query(sql, [amount, accountId]);
       return m.getRepository(Account).findOneOrFail({
@@ -1007,10 +996,7 @@ export class AccountsService {
    * Used when future-dated transactions are created/modified/deleted
    * to ensure the balance is always correct regardless of history.
    */
-  async recalculateCurrentBalance(
-    accountId: string,
-    queryRunner?: QueryRunner,
-  ): Promise<Account> {
+  async recalculateCurrentBalance(accountId: string): Promise<Account> {
     const account = await withScopedDb(this.dataSource, (m) =>
       m.getRepository(Account).findOne({
         where: { id: accountId },
@@ -1035,22 +1021,6 @@ export class AccountsService {
          AND t.transaction_date <= $3`;
 
     const today = todayYMD();
-
-    if (queryRunner) {
-      const result: { balance: string }[] = await queryRunner.query(
-        balanceSql,
-        [accountId, account.openingBalance, today],
-      );
-      const newBalance =
-        result.length > 0
-          ? roundMoney(Number(result[0].balance))
-          : roundMoney(Number(account.openingBalance));
-      await queryRunner.query(
-        `UPDATE accounts SET current_balance = $1 WHERE id = $2`,
-        [newBalance, accountId],
-      );
-      return { ...account, currentBalance: newBalance } as Account;
-    }
 
     return withScopedDb(this.dataSource, async (m) => {
       const result: { balance: string }[] = await m.query(balanceSql, [

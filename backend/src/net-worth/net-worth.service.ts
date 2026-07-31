@@ -14,9 +14,7 @@ import {
   InvestmentTransaction,
   InvestmentAction,
 } from "../securities/entities/investment-transaction.entity";
-import { SecurityPrice } from "../securities/entities/security-price.entity";
 import { Security } from "../securities/entities/security.entity";
-import { ExchangeRate } from "../currencies/entities/exchange-rate.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { convertWithRateLookup } from "../common/currency-conversion.util";
 import { formatDateYMDLocal } from "../common/date-utils";

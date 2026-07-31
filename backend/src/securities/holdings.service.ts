@@ -9,18 +9,18 @@ import {
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
 import { Cron } from "@nestjs/schedule";
-import { InjectRepository } from "@nestjs/typeorm";
 import { todayInTimezone, formatDateYMDLocal } from "../common/date-utils";
 import { sumMoney } from "../common/round.util";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 import {
-  Repository,
+  EntityManager,
   In,
   LessThanOrEqual,
   DataSource,
   QueryRunner,
 } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Holding } from "./entities/holding.entity";
 import {
   InvestmentTransaction,
@@ -39,40 +39,55 @@ export class HoldingsService {
   private readonly logger = new Logger(HoldingsService.name);
 
   constructor(
-    @InjectRepository(Holding)
-    private holdingsRepository: Repository<Holding>,
-    @InjectRepository(InvestmentTransaction)
-    private investmentTransactionsRepository: Repository<InvestmentTransaction>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
     private securitiesService: SecuritiesService,
     private dataSource: DataSource,
   ) {}
 
+  /**
+   * Run `fn` on the caller's transaction when one was handed in, otherwise in a
+   * scoped transaction of our own. The optional-manager parameters on the
+   * holdings mutators exist because the investment-transaction flows call them
+   * from inside their own write block; a nested `withScopedDb` would join that
+   * transaction anyway, but threading the manager keeps the repository
+   * instances identical to what the caller is already using.
+   */
+  private inScope<T>(
+    manager: EntityManager | undefined,
+    fn: (m: EntityManager) => Promise<T>,
+  ): Promise<T> {
+    return manager ? fn(manager) : withScopedDb(this.dataSource, fn);
+  }
+
   async findAll(userId: string, accountId?: string): Promise<Holding[]> {
-    const query = this.holdingsRepository
-      .createQueryBuilder("holding")
-      .leftJoinAndSelect("holding.account", "account")
-      .leftJoinAndSelect("holding.security", "security")
-      .where("account.userId = :userId", { userId });
+    return withScopedDb(this.dataSource, (m) => {
+      const query = m
+        .getRepository(Holding)
+        .createQueryBuilder("holding")
+        .leftJoinAndSelect("holding.account", "account")
+        .leftJoinAndSelect("holding.security", "security")
+        .where("account.userId = :userId", { userId });
 
-    if (accountId) {
-      query.andWhere("holding.accountId = :accountId", { accountId });
-    }
+      if (accountId) {
+        query.andWhere("holding.accountId = :accountId", { accountId });
+      }
 
-    return query.getMany();
+      return query.getMany();
+    });
   }
 
   async findOne(userId: string, id: string): Promise<Holding> {
-    const holding = await this.holdingsRepository
-      .createQueryBuilder("holding")
-      .leftJoinAndSelect("holding.account", "account")
-      .leftJoinAndSelect("holding.security", "security")
-      .where("holding.id = :id", { id })
-      .andWhere("account.userId = :userId", { userId })
-      .getOne();
+    const holding = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Holding)
+        .createQueryBuilder("holding")
+        .leftJoinAndSelect("holding.account", "account")
+        .leftJoinAndSelect("holding.security", "security")
+        .where("holding.id = :id", { id })
+        .andWhere("account.userId = :userId", { userId })
+        .getOne(),
+    );
 
     if (!holding) {
       throw new NotFoundException(
@@ -90,15 +105,14 @@ export class HoldingsService {
   async findByAccountAndSecurity(
     accountId: string,
     securityId: string,
-    queryRunner?: QueryRunner,
+    manager?: EntityManager,
   ): Promise<Holding | null> {
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(Holding)
-      : this.holdingsRepository;
-    return repo.findOne({
-      where: { accountId, securityId },
-      relations: ["account", "security"],
-    });
+    const find = (m: EntityManager) =>
+      m.getRepository(Holding).findOne({
+        where: { accountId, securityId },
+        relations: ["account", "security"],
+      });
+    return manager ? find(manager) : withScopedDb(this.dataSource, find);
   }
 
   /**
@@ -128,13 +142,15 @@ export class HoldingsService {
       securityId: string;
     } = { userId, accountId, securityId };
 
-    const transactions = await this.investmentTransactionsRepository.find({
-      where,
-      order: {
-        transactionDate: "ASC",
-        createdAt: "ASC",
-      },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentTransaction).find({
+        where,
+        order: {
+          transactionDate: "ASC",
+          createdAt: "ASC",
+        },
+      }),
+    );
 
     let qty = 0;
     let totalCost = 0;
@@ -191,7 +207,7 @@ export class HoldingsService {
     securityId: string,
     quantityChange: number,
     pricePerShare: number,
-    queryRunner?: QueryRunner,
+    manager?: EntityManager,
     allowNegative: boolean = false,
   ): Promise<Holding> {
     // Verify account ownership
@@ -200,69 +216,69 @@ export class HoldingsService {
     // Verify security exists and belongs to user
     await this.securitiesService.findOne(userId, securityId);
 
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(Holding)
-      : this.holdingsRepository;
+    return this.inScope(manager, async (m) => {
+      const repo = m.getRepository(Holding);
 
-    // Find existing holding
-    let holding = await this.findByAccountAndSecurity(
-      accountId,
-      securityId,
-      queryRunner,
-    );
-
-    if (!holding) {
-      // Create new holding
-      holding = repo.create({
+      // Find existing holding
+      let holding = await this.findByAccountAndSecurity(
         accountId,
         securityId,
-        quantity: quantityChange,
-        averageCost: pricePerShare,
-      });
-    } else {
-      // Update existing holding
-      const currentQuantity = Number(holding.quantity);
-      const currentAvgCost = Number(holding.averageCost || 0);
-      const newQuantity = currentQuantity + quantityChange;
+        m,
+      );
 
-      if (quantityChange > 0) {
-        if (currentQuantity <= 0 && newQuantity > 0) {
-          // Coming out of a zero-or-negative balance (e.g. reverse-apply
-          // of a past buy): treat this purchase as establishing the new
-          // cost basis rather than blending against a phantom negative
-          // cost basis.
-          holding.averageCost = pricePerShare;
-        } else if (currentQuantity > 0 && newQuantity > 0) {
-          // Blend the purchase into existing positive holdings.
-          const totalCostBefore = currentQuantity * currentAvgCost;
-          const totalCostAdded = quantityChange * pricePerShare;
-          const newAvgCost = (totalCostBefore + totalCostAdded) / newQuantity;
-          holding.averageCost = newAvgCost;
+      if (!holding) {
+        // Create new holding
+        holding = repo.create({
+          accountId,
+          securityId,
+          quantity: quantityChange,
+          averageCost: pricePerShare,
+        });
+      } else {
+        // Update existing holding
+        const currentQuantity = Number(holding.quantity);
+        const currentAvgCost = Number(holding.averageCost || 0);
+        const newQuantity = currentQuantity + quantityChange;
+
+        if (quantityChange > 0) {
+          if (currentQuantity <= 0 && newQuantity > 0) {
+            // Coming out of a zero-or-negative balance (e.g. reverse-apply
+            // of a past buy): treat this purchase as establishing the new
+            // cost basis rather than blending against a phantom negative
+            // cost basis.
+            holding.averageCost = pricePerShare;
+          } else if (currentQuantity > 0 && newQuantity > 0) {
+            // Blend the purchase into existing positive holdings.
+            const totalCostBefore = currentQuantity * currentAvgCost;
+            const totalCostAdded = quantityChange * pricePerShare;
+            const newAvgCost = (totalCostBefore + totalCostAdded) / newQuantity;
+            holding.averageCost = newAvgCost;
+          }
         }
+
+        // Guard against negative holdings from overselling. Skipped when
+        // allowNegative is true, which the investment-transaction update and
+        // remove flows use to permit intermediate negative states during
+        // reverse/re-apply. The caller is responsible for running
+        // validateHoldingsHistory afterward so oversells at any historical
+        // date are still caught.
+        if (!allowNegative && newQuantity < -0.00000001) {
+          const reduceBy = Math.abs(quantityChange);
+          throw new BadRequestException(
+            tr(
+              "errors.securities.insufficientShares",
+              `Insufficient shares: cannot reduce by ${reduceBy}, only ${currentQuantity} held`,
+              { reduceBy, currentQuantity },
+            ),
+          );
+        }
+
+        // Snap to zero to avoid floating-point ghost holdings
+        holding.quantity = Math.abs(newQuantity) < 0.0001 ? 0 : newQuantity;
       }
 
-      // Guard against negative holdings from overselling. Skipped when
-      // allowNegative is true, which the investment-transaction update and
-      // remove flows use to permit intermediate negative states during
-      // reverse/re-apply. The caller is responsible for running
-      // validateHoldingsHistory afterward so oversells at any historical
-      // date are still caught.
-      if (!allowNegative && newQuantity < -0.00000001) {
-        const reduceBy = Math.abs(quantityChange);
-        throw new BadRequestException(
-          tr(
-            "errors.securities.insufficientShares",
-            `Insufficient shares: cannot reduce by ${reduceBy}, only ${currentQuantity} held`,
-            { reduceBy, currentQuantity },
-          ),
-        );
-      }
-
-      // Snap to zero to avoid floating-point ghost holdings
-      holding.quantity = Math.abs(newQuantity) < 0.0001 ? 0 : newQuantity;
-    }
-
-    return repo.save(holding);
+      return repo.save(holding);
+    });
   }
 
   async updateHolding(
@@ -271,7 +287,7 @@ export class HoldingsService {
     securityId: string,
     quantityDelta: number,
     price: number,
-    queryRunner?: QueryRunner,
+    manager?: EntityManager,
     allowNegative: boolean = false,
   ): Promise<Holding> {
     return this.createOrUpdate(
@@ -280,7 +296,7 @@ export class HoldingsService {
       securityId,
       quantityDelta,
       price,
-      queryRunner,
+      manager,
       allowNegative,
     );
   }
@@ -298,7 +314,7 @@ export class HoldingsService {
     accountId: string,
     securityId: string,
     ratio: number,
-    queryRunner?: QueryRunner,
+    manager?: EntityManager,
   ): Promise<Holding | null> {
     if (!ratio || ratio <= 0) {
       throw new BadRequestException(
@@ -309,22 +325,20 @@ export class HoldingsService {
       );
     }
 
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(Holding)
-      : this.holdingsRepository;
+    return this.inScope(manager, async (m) => {
+      const holding = await this.findByAccountAndSecurity(
+        accountId,
+        securityId,
+        m,
+      );
+      if (!holding) return null;
 
-    const holding = await this.findByAccountAndSecurity(
-      accountId,
-      securityId,
-      queryRunner,
-    );
-    if (!holding) return null;
-
-    const currentQty = Number(holding.quantity);
-    const currentAvg = Number(holding.averageCost || 0);
-    holding.quantity = currentQty * ratio;
-    holding.averageCost = currentAvg / ratio;
-    return repo.save(holding);
+      const currentQty = Number(holding.quantity);
+      const currentAvg = Number(holding.averageCost || 0);
+      holding.quantity = currentQty * ratio;
+      holding.averageCost = currentAvg / ratio;
+      return m.getRepository(Holding).save(holding);
+    });
   }
 
   /**
@@ -337,7 +351,7 @@ export class HoldingsService {
     accountId: string,
     securityId: string,
     ratio: number,
-    queryRunner?: QueryRunner,
+    manager?: EntityManager,
   ): Promise<Holding | null> {
     if (!ratio || ratio <= 0) {
       throw new BadRequestException(
@@ -347,7 +361,7 @@ export class HoldingsService {
         ),
       );
     }
-    return this.applySplit(accountId, securityId, 1 / ratio, queryRunner);
+    return this.applySplit(accountId, securityId, 1 / ratio, manager);
   }
 
   /**
@@ -359,41 +373,41 @@ export class HoldingsService {
     accountId: string,
     securityId: string,
     quantityChange: number,
-    queryRunner?: QueryRunner,
+    manager?: EntityManager,
   ): Promise<Holding> {
     await this.accountsService.findOne(userId, accountId);
     await this.securitiesService.findOne(userId, securityId);
 
-    const repo = queryRunner
-      ? queryRunner.manager.getRepository(Holding)
-      : this.holdingsRepository;
+    return this.inScope(manager, async (m) => {
+      const repo = m.getRepository(Holding);
 
-    let holding = await this.findByAccountAndSecurity(
-      accountId,
-      securityId,
-      queryRunner,
-    );
-
-    if (!holding) {
-      if (quantityChange < 0) {
-        throw new NotFoundException(
-          tr(
-            "errors.securities.cannotRemoveSharesNoHolding",
-            "Cannot remove shares from a non-existent holding",
-          ),
-        );
-      }
-      holding = repo.create({
+      let holding = await this.findByAccountAndSecurity(
         accountId,
         securityId,
-        quantity: quantityChange,
-        averageCost: 0,
-      });
-    } else {
-      holding.quantity = Number(holding.quantity) + quantityChange;
-    }
+        m,
+      );
 
-    return repo.save(holding);
+      if (!holding) {
+        if (quantityChange < 0) {
+          throw new NotFoundException(
+            tr(
+              "errors.securities.cannotRemoveSharesNoHolding",
+              "Cannot remove shares from a non-existent holding",
+            ),
+          );
+        }
+        holding = repo.create({
+          accountId,
+          securityId,
+          quantity: quantityChange,
+          averageCost: 0,
+        });
+      } else {
+        holding.quantity = Number(holding.quantity) + quantityChange;
+      }
+
+      return repo.save(holding);
+    });
   }
 
   async getHoldingsSummary(userId: string, accountId: string) {
@@ -431,7 +445,9 @@ export class HoldingsService {
       );
     }
 
-    await this.holdingsRepository.remove(holding);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Holding).remove(holding),
+    );
   }
 
   /**
@@ -460,55 +476,50 @@ export class HoldingsService {
    */
   async validateNoNegativeHoldingsHistory(
     userId: string,
-    queryRunner?: QueryRunner,
+    manager?: EntityManager,
     accountIds?: string[],
     securityIds?: string[],
   ): Promise<void> {
-    const accountsRepo = queryRunner
-      ? queryRunner.manager.getRepository(Account)
-      : this.accountsRepository;
-    const txRepo = queryRunner
-      ? queryRunner.manager.getRepository(InvestmentTransaction)
-      : this.investmentTransactionsRepository;
+    const transactions = await this.inScope(manager, async (m) => {
+      let eligibleAccountIds: string[];
+      if (accountIds && accountIds.length > 0) {
+        eligibleAccountIds = accountIds;
+      } else {
+        const investmentAccounts = await m.getRepository(Account).find({
+          where: {
+            userId,
+            accountType: AccountType.INVESTMENT,
+          },
+        });
 
-    let eligibleAccountIds: string[];
-    if (accountIds && accountIds.length > 0) {
-      eligibleAccountIds = accountIds;
-    } else {
-      const investmentAccounts = await accountsRepo.find({
-        where: {
-          userId,
-          accountType: AccountType.INVESTMENT,
+        eligibleAccountIds = investmentAccounts
+          .filter(
+            (a) =>
+              a.accountSubType === AccountSubType.INVESTMENT_BROKERAGE ||
+              !a.accountSubType,
+          )
+          .map((a) => a.id);
+      }
+
+      if (eligibleAccountIds.length === 0) {
+        return [];
+      }
+
+      const where: Record<string, unknown> = {
+        userId,
+        accountId: In(eligibleAccountIds),
+      };
+      if (securityIds && securityIds.length > 0) {
+        where.securityId = In(securityIds);
+      }
+      return m.getRepository(InvestmentTransaction).find({
+        where,
+        relations: ["security"],
+        order: {
+          transactionDate: "ASC",
+          createdAt: "ASC",
         },
       });
-
-      eligibleAccountIds = investmentAccounts
-        .filter(
-          (a) =>
-            a.accountSubType === AccountSubType.INVESTMENT_BROKERAGE ||
-            !a.accountSubType,
-        )
-        .map((a) => a.id);
-    }
-
-    if (eligibleAccountIds.length === 0) {
-      return;
-    }
-
-    const where: Record<string, unknown> = {
-      userId,
-      accountId: In(eligibleAccountIds),
-    };
-    if (securityIds && securityIds.length > 0) {
-      where.securityId = In(securityIds);
-    }
-    const transactions = await txRepo.find({
-      where,
-      relations: ["security"],
-      order: {
-        transactionDate: "ASC",
-        createdAt: "ASC",
-      },
     });
 
     const balances = new Map<string, number>();
@@ -676,15 +687,20 @@ export class HoldingsService {
   async rebuildAccountsFromTransactions(
     userId: string,
     accountIds: string[],
-    queryRunner: QueryRunner,
+    // The `.mny` importer (R6) still hands this a QueryRunner shim; the union
+    // and the unwrap below go away once that module converts.
+    runnerOrManager: QueryRunner | EntityManager,
     asOfDate?: string,
   ): Promise<void> {
     if (accountIds.length === 0) return;
 
+    const manager =
+      "manager" in runnerOrManager ? runnerOrManager.manager : runnerOrManager;
+
     // Only brokerage / standalone investment accounts track holdings; the cash
     // sleeve of an investment account is excluded everywhere else, so it must be
     // excluded here too or its rows would be deleted but never rebuilt.
-    const accounts = await queryRunner.manager.find(Account, {
+    const accounts = await manager.find(Account, {
       where: {
         id: In(accountIds),
         userId,
@@ -701,7 +717,7 @@ export class HoldingsService {
     if (eligibleIds.length === 0) return;
 
     const cutoff = asOfDate ?? this.serverToday();
-    const transactions = await queryRunner.manager.find(InvestmentTransaction, {
+    const transactions = await manager.find(InvestmentTransaction, {
       where: {
         userId,
         accountId: In(eligibleIds),
@@ -716,14 +732,14 @@ export class HoldingsService {
     const holdingsMap = this.computeHoldingsMap(transactions);
 
     // Delete + recreate holdings for these accounts only.
-    const existing = await queryRunner.manager.find(Holding, {
+    const existing = await manager.find(Holding, {
       where: { accountId: In(eligibleIds) },
     });
     if (existing.length > 0) {
-      await queryRunner.manager.remove(existing);
+      await manager.remove(existing);
     }
 
-    const holdingsRepo = queryRunner.manager.getRepository(Holding);
+    const holdingsRepo = manager.getRepository(Holding);
     const holdingsToCreate: Holding[] = [];
     for (const [accountId, securities] of holdingsMap) {
       for (const [securityId, data] of securities) {
@@ -761,12 +777,14 @@ export class HoldingsService {
     holdingsDeleted: number;
   }> {
     // M14: Get all investment accounts (brokerage + standalone) for the user
-    const investmentAccounts = await this.accountsRepository.find({
-      where: {
-        userId,
-        accountType: AccountType.INVESTMENT,
-      },
-    });
+    const investmentAccounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: {
+          userId,
+          accountType: AccountType.INVESTMENT,
+        },
+      }),
+    );
 
     // Include brokerage accounts and standalone investment accounts (null subType)
     const eligibleAccounts = investmentAccounts.filter(
@@ -787,42 +805,40 @@ export class HoldingsService {
     // hourly cron) pass the user's timezone-correct "today" so a transfer dated
     // today in a timezone ahead of the server isn't wrongly treated as future.
     const cutoff = asOfDate ?? this.serverToday();
-    const transactions = await this.investmentTransactionsRepository.find({
-      where: {
-        userId,
-        accountId: In(brokerageAccountIds),
-        transactionDate: LessThanOrEqual(cutoff),
-      },
-      order: {
-        transactionDate: "ASC",
-        createdAt: "ASC",
-      },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentTransaction).find({
+        where: {
+          userId,
+          accountId: In(brokerageAccountIds),
+          transactionDate: LessThanOrEqual(cutoff),
+        },
+        order: {
+          transactionDate: "ASC",
+          createdAt: "ASC",
+        },
+      }),
+    );
 
     // Rebuild holdings from transactions
     // Map: accountId -> securityId -> { quantity, totalCost }
     const holdingsMap = this.computeHoldingsMap(transactions);
 
     // Wrap delete-all + rebuild in a transaction for atomicity
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     let holdingsDeleted = 0;
     let holdingsCreated = 0;
 
-    try {
+    await withScopedDb(this.dataSource, async (m) => {
       // Delete all existing holdings for these accounts
-      const existingHoldings = await queryRunner.manager.find(Holding, {
+      const existingHoldings = await m.find(Holding, {
         where: { accountId: In(brokerageAccountIds) },
       });
       holdingsDeleted = existingHoldings.length;
       if (existingHoldings.length > 0) {
-        await queryRunner.manager.remove(existingHoldings);
+        await m.remove(existingHoldings);
       }
 
       // Create new holdings from the calculated values (batched)
-      const holdingsRepo = queryRunner.manager.getRepository(Holding);
+      const holdingsRepo = m.getRepository(Holding);
       const holdingsToCreate: Holding[] = [];
       for (const [accountId, securities] of holdingsMap) {
         for (const [securityId, data] of securities) {
@@ -845,14 +861,7 @@ export class HoldingsService {
         await holdingsRepo.save(holdingsToCreate);
       }
       holdingsCreated = holdingsToCreate.length;
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     return {
       holdingsCreated,
@@ -892,12 +901,16 @@ export class HoldingsService {
         const today = todayInTimezone(tz);
         if (!today) continue;
 
-        const maturedRows: { user_id: string }[] = await this.dataSource.query(
-          `SELECT DISTINCT user_id
+        const maturedRows: { user_id: string }[] = await withScopedDb(
+          this.dataSource,
+          (m) =>
+            m.query(
+              `SELECT DISTINCT user_id
              FROM investment_transactions
              WHERE user_id = ANY($1)
                AND transaction_date = $2`,
-          [userIds, today],
+              [userIds, today],
+            ),
         );
 
         for (const { user_id } of maturedRows) {
@@ -929,30 +942,33 @@ export class HoldingsService {
    */
   async removeAllForUser(userId: string): Promise<number> {
     // Get all brokerage accounts for the user
-    const brokerageAccounts = await this.accountsRepository.find({
-      where: {
-        userId,
-        accountType: AccountType.INVESTMENT,
-        accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
-      },
+    return withScopedDb(this.dataSource, async (m) => {
+      const brokerageAccounts = await m.getRepository(Account).find({
+        where: {
+          userId,
+          accountType: AccountType.INVESTMENT,
+          accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
+        },
+      });
+
+      if (brokerageAccounts.length === 0) {
+        return 0;
+      }
+
+      const brokerageAccountIds = brokerageAccounts.map((a) => a.id);
+
+      // Delete all holdings for these accounts
+      const holdingsRepo = m.getRepository(Holding);
+      const holdings = await holdingsRepo.find({
+        where: { accountId: In(brokerageAccountIds) },
+      });
+
+      const count = holdings.length;
+      if (holdings.length > 0) {
+        await holdingsRepo.remove(holdings);
+      }
+
+      return count;
     });
-
-    if (brokerageAccounts.length === 0) {
-      return 0;
-    }
-
-    const brokerageAccountIds = brokerageAccounts.map((a) => a.id);
-
-    // Delete all holdings for these accounts
-    const holdings = await this.holdingsRepository.find({
-      where: { accountId: In(brokerageAccountIds) },
-    });
-
-    const count = holdings.length;
-    if (holdings.length > 0) {
-      await this.holdingsRepository.remove(holdings);
-    }
-
-    return count;
   }
 }
