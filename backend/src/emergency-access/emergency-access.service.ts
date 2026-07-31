@@ -5,8 +5,8 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { tr } from "../i18n/translate";
 import { EmergencyAccessSettings } from "./entities/emergency-access-settings.entity";
 import { EmergencyAccessContact } from "./entities/emergency-access-contact.entity";
@@ -46,16 +46,24 @@ export class EmergencyAccessService {
   private readonly logger = new Logger(EmergencyAccessService.name);
 
   constructor(
-    @InjectRepository(EmergencyAccessSettings)
-    private readonly settingsRepo: Repository<EmergencyAccessSettings>,
-    @InjectRepository(EmergencyAccessContact)
-    private readonly contactsRepo: Repository<EmergencyAccessContact>,
-    @InjectRepository(User)
-    private readonly usersRepo: Repository<User>,
     private readonly encryption: AiEncryptionService,
     private readonly emailService: EmailService,
     private readonly dataSource: DataSource,
   ) {}
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
+  }
 
   private toContactView(c: EmergencyAccessContact): ContactView {
     return {
@@ -98,12 +106,16 @@ export class EmergencyAccessService {
 
   async getView(userId: string): Promise<SettingsView> {
     const [settings, contacts, user] = await Promise.all([
-      this.settingsRepo.findOne({ where: { ownerUserId: userId } }),
-      this.contactsRepo.find({
-        where: { ownerUserId: userId },
-        order: { createdAt: "ASC" },
-      }),
-      this.usersRepo.findOne({ where: { id: userId } }),
+      this.scoped(EmergencyAccessSettings, (repo) =>
+        repo.findOne({ where: { ownerUserId: userId } }),
+      ),
+      this.scoped(EmergencyAccessContact, (repo) =>
+        repo.find({
+          where: { ownerUserId: userId },
+          order: { createdAt: "ASC" },
+        }),
+      ),
+      this.scoped(User, (repo) => repo.findOne({ where: { id: userId } })),
     ]);
 
     const emailConfigured = this.emailService.getStatus().configured;
@@ -127,9 +139,11 @@ export class EmergencyAccessService {
    * their strongest factor in the last few minutes.
    */
   async getMessage(userId: string): Promise<{ message: string | null }> {
-    const settings = await this.settingsRepo.findOne({
-      where: { ownerUserId: userId },
-    });
+    const settings = await this.scoped(EmergencyAccessSettings, (repo) =>
+      repo.findOne({
+        where: { ownerUserId: userId },
+      }),
+    );
     return {
       message: this.decryptMessage(settings?.messageCiphertext ?? null),
     };
@@ -148,15 +162,12 @@ export class EmergencyAccessService {
       );
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      let row = await queryRunner.manager.findOne(EmergencyAccessSettings, {
+    await withScopedDb(this.dataSource, async (manager) => {
+      let row = await manager.findOne(EmergencyAccessSettings, {
         where: { ownerUserId: userId },
       });
       if (!row) {
-        row = queryRunner.manager.create(EmergencyAccessSettings, {
+        row = manager.create(EmergencyAccessSettings, {
           ownerUserId: userId,
         });
       }
@@ -178,7 +189,7 @@ export class EmergencyAccessService {
         row.grantedAt = null;
         row.lastReminderSentAt = null;
         // Void any outstanding magic links -- the owner has revoked the feature.
-        await queryRunner.manager
+        await manager
           .createQueryBuilder()
           .update(EmergencyAccessContact)
           .set({
@@ -193,14 +204,8 @@ export class EmergencyAccessService {
           .execute();
       }
 
-      await queryRunner.manager.save(row);
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      await manager.save(row);
+    });
 
     return this.getView(userId);
   }
@@ -223,28 +228,19 @@ export class EmergencyAccessService {
       );
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      let row = await queryRunner.manager.findOne(EmergencyAccessSettings, {
+    return withScopedDb(this.dataSource, async (manager) => {
+      let row = await manager.findOne(EmergencyAccessSettings, {
         where: { ownerUserId: userId },
       });
       if (!row) {
-        row = queryRunner.manager.create(EmergencyAccessSettings, {
+        row = manager.create(EmergencyAccessSettings, {
           ownerUserId: userId,
         });
       }
       row.messageCiphertext = trimmed ? this.encryption.encrypt(trimmed) : null;
-      const saved = await queryRunner.manager.save(row);
-      await queryRunner.commitTransaction();
+      const saved = await manager.save(row);
       return this.buildMessageMetadata(saved);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   async addContact(
@@ -252,11 +248,13 @@ export class EmergencyAccessService {
     dto: UpsertContactDto,
   ): Promise<ContactView> {
     const normalizedEmail = dto.email.trim().toLowerCase();
-    const existing = await this.contactsRepo
-      .createQueryBuilder("c")
-      .where("c.owner_user_id = :userId", { userId })
-      .andWhere("lower(c.email) = :email", { email: normalizedEmail })
-      .getOne();
+    const existing = await this.scoped(EmergencyAccessContact, (repo) =>
+      repo
+        .createQueryBuilder("c")
+        .where("c.owner_user_id = :userId", { userId })
+        .andWhere("lower(c.email) = :email", { email: normalizedEmail })
+        .getOne(),
+    );
     if (existing) {
       throw new ConflictException(
         tr(
@@ -265,12 +263,15 @@ export class EmergencyAccessService {
         ),
       );
     }
-    const contact = this.contactsRepo.create({
-      ownerUserId: userId,
-      firstName: dto.firstName.trim(),
-      email: dto.email.trim(),
-    });
-    await this.contactsRepo.save(contact);
+    const contact = await this.scoped(EmergencyAccessContact, (repo) =>
+      repo.save(
+        repo.create({
+          ownerUserId: userId,
+          firstName: dto.firstName.trim(),
+          email: dto.email.trim(),
+        }),
+      ),
+    );
     return this.toContactView(contact);
   }
 
@@ -279,9 +280,11 @@ export class EmergencyAccessService {
     contactId: string,
     dto: UpsertContactDto,
   ): Promise<ContactView> {
-    const contact = await this.contactsRepo.findOne({
-      where: { id: contactId, ownerUserId: userId },
-    });
+    const contact = await this.scoped(EmergencyAccessContact, (repo) =>
+      repo.findOne({
+        where: { id: contactId, ownerUserId: userId },
+      }),
+    );
     if (!contact) {
       throw new NotFoundException(
         tr("errors.emergencyAccess.contactNotFound", "Contact not found"),
@@ -289,12 +292,14 @@ export class EmergencyAccessService {
     }
     const normalizedEmail = dto.email.trim().toLowerCase();
     if (normalizedEmail !== contact.email.toLowerCase()) {
-      const dup = await this.contactsRepo
-        .createQueryBuilder("c")
-        .where("c.owner_user_id = :userId", { userId })
-        .andWhere("lower(c.email) = :email", { email: normalizedEmail })
-        .andWhere("c.id <> :id", { id: contactId })
-        .getOne();
+      const dup = await this.scoped(EmergencyAccessContact, (repo) =>
+        repo
+          .createQueryBuilder("c")
+          .where("c.owner_user_id = :userId", { userId })
+          .andWhere("lower(c.email) = :email", { email: normalizedEmail })
+          .andWhere("c.id <> :id", { id: contactId })
+          .getOne(),
+      );
       if (dup) {
         throw new ConflictException(
           tr(
@@ -309,15 +314,17 @@ export class EmergencyAccessService {
     // Editing email invalidates any in-flight magic link.
     contact.claimTokenHash = null;
     contact.claimTokenExpiresAt = null;
-    await this.contactsRepo.save(contact);
+    await this.scoped(EmergencyAccessContact, (repo) => repo.save(contact));
     return this.toContactView(contact);
   }
 
   async removeContact(userId: string, contactId: string): Promise<void> {
-    const result = await this.contactsRepo.delete({
-      id: contactId,
-      ownerUserId: userId,
-    });
+    const result = await this.scoped(EmergencyAccessContact, (repo) =>
+      repo.delete({
+        id: contactId,
+        ownerUserId: userId,
+      }),
+    );
     if (!result.affected) {
       throw new NotFoundException(
         tr("errors.emergencyAccess.contactNotFound", "Contact not found"),
@@ -326,9 +333,11 @@ export class EmergencyAccessService {
   }
 
   async resetGrantedState(userId: string): Promise<SettingsView> {
-    const settings = await this.settingsRepo.findOne({
-      where: { ownerUserId: userId },
-    });
+    const settings = await this.scoped(EmergencyAccessSettings, (repo) =>
+      repo.findOne({
+        where: { ownerUserId: userId },
+      }),
+    );
     if (!settings) {
       throw new NotFoundException(
         tr(
@@ -339,20 +348,22 @@ export class EmergencyAccessService {
     }
     settings.grantedAt = null;
     settings.lastReminderSentAt = null;
-    await this.settingsRepo.save(settings);
-    await this.contactsRepo
-      .createQueryBuilder()
-      .update(EmergencyAccessContact)
-      .set({
-        claimTokenHash: null,
-        claimTokenExpiresAt: null,
-        claimTokenUsedAt: () => "CURRENT_TIMESTAMP",
-        claimVoidedReason: "owner_revoked",
-      })
-      .where("owner_user_id = :userId", { userId })
-      .andWhere("claim_token_hash IS NOT NULL")
-      .andWhere("claim_token_used_at IS NULL")
-      .execute();
+    await this.scoped(EmergencyAccessSettings, (repo) => repo.save(settings));
+    await this.scoped(EmergencyAccessContact, (repo) =>
+      repo
+        .createQueryBuilder()
+        .update(EmergencyAccessContact)
+        .set({
+          claimTokenHash: null,
+          claimTokenExpiresAt: null,
+          claimTokenUsedAt: () => "CURRENT_TIMESTAMP",
+          claimVoidedReason: "owner_revoked",
+        })
+        .where("owner_user_id = :userId", { userId })
+        .andWhere("claim_token_hash IS NOT NULL")
+        .andWhere("claim_token_used_at IS NULL")
+        .execute(),
+    );
     return this.getView(userId);
   }
 }

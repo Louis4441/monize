@@ -11,8 +11,8 @@ import { tr } from "../i18n/translate";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
-import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import { Response } from "express";
 import { SkipCsrf } from "../common/decorators/skip-csrf.decorator";
@@ -39,12 +39,6 @@ export class EmergencyAccessClaimController {
   private readonly useSecureCookies: boolean;
 
   constructor(
-    @InjectRepository(EmergencyAccessContact)
-    private readonly contactsRepo: Repository<EmergencyAccessContact>,
-    @InjectRepository(EmergencyAccessSettings)
-    private readonly settingsRepo: Repository<EmergencyAccessSettings>,
-    @InjectRepository(User)
-    private readonly usersRepo: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly tokenService: TokenService,
     private readonly authService: AuthService,
@@ -61,13 +55,29 @@ export class EmergencyAccessClaimController {
       !disableHttpsHeaders;
   }
 
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
+  }
+
   private async findValidContact(
     rawToken: string,
   ): Promise<EmergencyAccessContact> {
     const tokenHash = hashToken(rawToken);
-    const contact = await this.contactsRepo.findOne({
-      where: { claimTokenHash: tokenHash },
-    });
+    const contact = await this.scoped(EmergencyAccessContact, (repo) =>
+      repo.findOne({
+        where: { claimTokenHash: tokenHash },
+      }),
+    );
     if (
       !contact ||
       !contact.claimTokenExpiresAt ||
@@ -101,12 +111,16 @@ export class EmergencyAccessClaimController {
 
   private async previewWithinContext(dto: ClaimPreviewDto) {
     const contact = await this.findValidContact(dto.token);
-    const settings = await this.settingsRepo.findOne({
-      where: { ownerUserId: contact.ownerUserId },
-    });
-    const owner = await this.usersRepo.findOne({
-      where: { id: contact.ownerUserId },
-    });
+    const settings = await this.scoped(EmergencyAccessSettings, (repo) =>
+      repo.findOne({
+        where: { ownerUserId: contact.ownerUserId },
+      }),
+    );
+    const owner = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: contact.ownerUserId },
+      }),
+    );
     if (!settings || !owner) {
       throw new NotFoundException(
         tr(
@@ -175,18 +189,10 @@ export class EmergencyAccessClaimController {
 
     const tokenHash = hashToken(dto.token);
     const passwordHash = await bcrypt.hash(dto.newPassword, 12);
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    let ownerId: string;
-    try {
-      const contact = await queryRunner.manager.findOne(
-        EmergencyAccessContact,
-        {
-          where: { claimTokenHash: tokenHash },
-        },
-      );
+    const ownerId = await withScopedDb(this.dataSource, async (manager) => {
+      const contact = await manager.findOne(EmergencyAccessContact, {
+        where: { claimTokenHash: tokenHash },
+      });
       if (
         !contact ||
         !contact.claimTokenExpiresAt ||
@@ -200,9 +206,9 @@ export class EmergencyAccessClaimController {
           ),
         );
       }
-      ownerId = contact.ownerUserId;
+      const ownerId = contact.ownerUserId;
 
-      const owner = await queryRunner.manager.findOne(User, {
+      const owner = await manager.findOne(User, {
         where: { id: ownerId },
       });
       if (!owner) {
@@ -215,7 +221,7 @@ export class EmergencyAccessClaimController {
       }
 
       // Replace credentials so the contact can sign in.
-      await queryRunner.manager
+      await manager
         .createQueryBuilder()
         .update(User)
         .set({
@@ -236,7 +242,7 @@ export class EmergencyAccessClaimController {
         .execute();
 
       // 2FA on the preferences side.
-      await queryRunner.manager
+      await manager
         .createQueryBuilder()
         .update(UserPreference)
         .set({ twoFactorEnabled: false })
@@ -244,15 +250,15 @@ export class EmergencyAccessClaimController {
         .execute();
 
       // Trusted devices belonged to the previous holder.
-      await queryRunner.manager.delete(TrustedDevice, { userId: ownerId });
+      await manager.delete(TrustedDevice, { userId: ownerId });
 
       // Consume the claiming token, void all sibling tokens (single-claim wins).
       contact.claimTokenUsedAt = new Date();
       contact.claimVoidedReason = null;
       contact.claimTokenHash = null;
-      await queryRunner.manager.save(contact);
+      await manager.save(contact);
 
-      await queryRunner.manager
+      await manager
         .createQueryBuilder()
         .update(EmergencyAccessContact)
         .set({
@@ -269,26 +275,23 @@ export class EmergencyAccessClaimController {
 
       // Disable the emergency access feature on the now-claimed account so
       // the cron does not re-fire if the new holder ever lapses.
-      await queryRunner.manager
+      await manager
         .createQueryBuilder()
         .update(EmergencyAccessSettings)
         .set({ enabled: false, grantedAt: new Date() })
         .where("owner_user_id = :id", { id: ownerId })
         .execute();
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      return ownerId;
+    });
 
     // Revoke every existing refresh token outside the transaction so it
     // uses the TokenService API (which writes via its own repo).
     await this.tokenService.revokeAllUserRefreshTokens(ownerId);
 
-    const freshOwner = await this.usersRepo.findOne({ where: { id: ownerId } });
+    const freshOwner = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: ownerId } }),
+    );
     if (!freshOwner) {
       throw new NotFoundException(
         tr(

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import {
   BadRequestException,
   NotFoundException,
@@ -10,6 +10,11 @@ import { BackupEncryptionService } from "./backup-encryption.service";
 import { User } from "../users/entities/user.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
 import { PasswordBreachService } from "../auth/password-breach.service";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 jest.mock("bcryptjs");
 
@@ -48,8 +53,12 @@ describe("BackupEncryptionService", () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        {
+          provide: DataSource,
+          useValue: createScopedDbMocks([[User, usersRepo as never]])
+            .dataSource,
+        },
         BackupEncryptionService,
-        { provide: getRepositoryToken(User), useValue: usersRepo },
         { provide: AiEncryptionService, useValue: aiEncryption },
         { provide: PasswordBreachService, useValue: passwordBreach },
       ],

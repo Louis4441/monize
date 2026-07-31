@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { BadRequestException } from "@nestjs/common";
 import * as fs from "fs";
@@ -10,6 +10,11 @@ import {
 import { BackupService } from "./backup.service";
 import { AutoBackupSettings } from "./entities/auto-backup-settings.entity";
 import { User } from "../users/entities/user.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 jest.mock("fs", () => {
   const actual = jest.requireActual("fs");
@@ -86,15 +91,14 @@ describe("AutoBackupService", () => {
   ): Promise<AutoBackupService> {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        {
+          provide: DataSource,
+          useValue: createScopedDbMocks([
+            [AutoBackupSettings, mockSettingsRepo as never],
+            [User, mockUsersRepo as never],
+          ]).dataSource,
+        },
         AutoBackupService,
-        {
-          provide: getRepositoryToken(AutoBackupSettings),
-          useValue: mockSettingsRepo,
-        },
-        {
-          provide: getRepositoryToken(User),
-          useValue: mockUsersRepo,
-        },
         {
           provide: BackupService,
           useValue: mockBackupService,
@@ -228,14 +232,11 @@ describe("AutoBackupService", () => {
         frequency: "weekly",
       });
 
-      expect(mockSettingsRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          userId,
-          folderPath: DEFAULT_BACKUP_CONTAINER_DIR,
-        }),
-      );
+      // The row is built by defaultSettingsFor() and saved directly; the
+      // repo.create() round-trip it used to go through was a no-op clone.
       expect(mockSettingsRepo.save).toHaveBeenCalledWith(
         expect.objectContaining({
+          userId,
           folderPath: "/backups",
           frequency: "weekly",
         }),

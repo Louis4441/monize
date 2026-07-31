@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -17,6 +16,11 @@ import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { TrustedDevice } from "../users/entities/trusted-device.entity";
 import { encrypt, derivePurposeKey } from "./crypto.util";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 const TEST_JWT_SECRET = "test-jwt-secret-minimum-32-chars-long";
 const TEST_TOTP_KEY = derivePurposeKey(TEST_JWT_SECRET, "totp-encryption");
@@ -128,9 +132,24 @@ describe("TwoFactorService", () => {
         }),
     };
 
-    dataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    };
+    // The backup-code consumption block is now one `withScopedDb`, so the
+    // former queryRunner is the transaction's EntityManager.
+    const scoped = createScopedDbMocks([
+      [User, usersRepository as never],
+      [UserPreference, preferencesRepository as never],
+      [TrustedDevice, trustedDevicesRepository as never],
+    ]);
+    // The block's own direct-manager calls (the locked findOne and the
+    // backup-code UPDATE builder) are configured here rather than copied off
+    // the previous run's manager, which would carry a stale getRepository.
+    scoped.manager.createQueryBuilder.mockReturnValue({
+      update: jest.fn().mockReturnThis(),
+      set: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      execute: jest.fn().mockResolvedValue({}),
+    });
+    mockQueryRunner.manager = scoped.manager as never;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     tokenService = {
       generateTokenPair: jest.fn().mockResolvedValue({
@@ -158,15 +177,6 @@ describe("TwoFactorService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TwoFactorService,
-        { provide: getRepositoryToken(User), useValue: usersRepository },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: preferencesRepository,
-        },
-        {
-          provide: getRepositoryToken(TrustedDevice),
-          useValue: trustedDevicesRepository,
-        },
         { provide: JwtService, useValue: jwtService },
         { provide: ConfigService, useValue: configService },
         { provide: DataSource, useValue: dataSource },
@@ -976,7 +986,7 @@ describe("TwoFactorService", () => {
         service.verify2FA("temp-token", "abcd-ef01"),
       ).rejects.toThrow(UnauthorizedException);
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
     it("should handle error during backup code verification", async () => {
@@ -1003,8 +1013,8 @@ describe("TwoFactorService", () => {
         service.verify2FA("temp-token", "abcd-ef01"),
       ).rejects.toThrow("DB connection lost");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
   });
 

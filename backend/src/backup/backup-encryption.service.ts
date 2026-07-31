@@ -5,8 +5,8 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import { User } from "../users/entities/user.entity";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
@@ -29,11 +29,25 @@ export class BackupEncryptionService {
   private readonly logger = new Logger(BackupEncryptionService.name);
 
   constructor(
-    @InjectRepository(User)
-    private readonly usersRepository: Repository<User>,
+    private readonly dataSource: DataSource,
     private readonly aiEncryption: AiEncryptionService,
     private readonly passwordBreach: PasswordBreachService,
   ) {}
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
+  }
 
   async getStatus(
     userId: string,
@@ -77,7 +91,7 @@ export class BackupEncryptionService {
     }
     user.backupPasswordEnc = this.aiEncryption.encrypt(password);
     user.backupEncryptionEnabled = true;
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
   }
 
   /**
@@ -109,14 +123,14 @@ export class BackupEncryptionService {
     }
     user.backupPasswordEnc = this.aiEncryption.encrypt(newBackupPassword);
     user.backupEncryptionEnabled = true;
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
   }
 
   async disable(userId: string): Promise<void> {
     const user = await this.requireUser(userId);
     user.backupEncryptionEnabled = false;
     user.backupPasswordEnc = null;
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
   }
 
   /**
@@ -131,14 +145,16 @@ export class BackupEncryptionService {
     newPassword: string,
   ): Promise<void> {
     try {
-      const user = await this.usersRepository.findOne({
-        where: { id: userId },
-      });
+      const user = await this.scoped(User, (repo) =>
+        repo.findOne({
+          where: { id: userId },
+        }),
+      );
       if (!user || !user.backupEncryptionEnabled) return;
       if (user.authProvider !== "local") return;
       if (!this.aiEncryption.isConfigured()) return;
       user.backupPasswordEnc = this.aiEncryption.encrypt(newPassword);
-      await this.usersRepository.save(user);
+      await this.scoped(User, (repo) => repo.save(user));
     } catch (err) {
       this.logger.error(
         `Failed to sync stored backup password for user ${userId}: ${err.message}`,
@@ -147,7 +163,9 @@ export class BackupEncryptionService {
   }
 
   private async requireUser(userId: string): Promise<User> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user) {
       throw new NotFoundException(
         tr("errors.backup.userNotFoundRestore", "User not found"),

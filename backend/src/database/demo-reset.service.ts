@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 
 import { DemoModeService } from "../common/demo-mode.service";
@@ -30,101 +31,98 @@ export class DemoResetService {
   }
 
   private async resetDemoDataWithinContext(): Promise<void> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     try {
-      // 1. Get demo user ID
-      const [demoUser] = await queryRunner.query(
-        "SELECT id FROM users WHERE email = 'demo@monize.com'",
-      );
+      // The clear runs in one transaction and must COMMIT before the re-seed:
+      // seedDemoData opens its own scoped transactions, and the seeded rows
+      // have to land on a database the clear has already emptied.
+      const userId = await withScopedDb(this.dataSource, async (manager) => {
+        // 1. Get demo user ID
+        const [demoUser] = await manager.query(
+          "SELECT id FROM users WHERE email = 'demo@monize.com'",
+        );
 
-      if (!demoUser) {
-        this.logger.warn("Demo user not found, skipping reset");
-        await queryRunner.rollbackTransaction();
-        return;
-      }
+        if (!demoUser) {
+          this.logger.warn("Demo user not found, skipping reset");
+          // Nothing written yet, so returning commits an empty transaction --
+          // the same net effect as the old explicit rollback.
+          return null;
+        }
 
-      const userId = demoUser.id;
+        const userId: string = demoUser.id;
 
-      // 2. Delete all user data in FK-safe order
-      await queryRunner.query(
-        "DELETE FROM investment_transactions WHERE user_id = $1",
-        [userId],
-      );
-      await queryRunner.query(
-        `DELETE FROM holdings WHERE account_id IN
+        // 2. Delete all user data in FK-safe order
+        await manager.query(
+          "DELETE FROM investment_transactions WHERE user_id = $1",
+          [userId],
+        );
+        await manager.query(
+          `DELETE FROM holdings WHERE account_id IN
          (SELECT id FROM accounts WHERE user_id = $1)`,
-        [userId],
-      );
-      await queryRunner.query(
-        `DELETE FROM security_prices WHERE security_id IN
+          [userId],
+        );
+        await manager.query(
+          `DELETE FROM security_prices WHERE security_id IN
          (SELECT id FROM securities WHERE user_id = $1)`,
-        [userId],
-      );
-      await queryRunner.query("DELETE FROM securities WHERE user_id = $1", [
-        userId,
-      ]);
-      await queryRunner.query(
-        `DELETE FROM transaction_splits WHERE transaction_id IN
+          [userId],
+        );
+        await manager.query("DELETE FROM securities WHERE user_id = $1", [
+          userId,
+        ]);
+        await manager.query(
+          `DELETE FROM transaction_splits WHERE transaction_id IN
          (SELECT id FROM transactions WHERE user_id = $1)`,
-        [userId],
-      );
-      await queryRunner.query("DELETE FROM transactions WHERE user_id = $1", [
-        userId,
-      ]);
-      await queryRunner.query(
-        `DELETE FROM scheduled_transaction_overrides WHERE scheduled_transaction_id IN
+          [userId],
+        );
+        await manager.query("DELETE FROM transactions WHERE user_id = $1", [
+          userId,
+        ]);
+        await manager.query(
+          `DELETE FROM scheduled_transaction_overrides WHERE scheduled_transaction_id IN
          (SELECT id FROM scheduled_transactions WHERE user_id = $1)`,
-        [userId],
-      );
-      await queryRunner.query(
-        `DELETE FROM scheduled_transaction_splits WHERE scheduled_transaction_id IN
+          [userId],
+        );
+        await manager.query(
+          `DELETE FROM scheduled_transaction_splits WHERE scheduled_transaction_id IN
          (SELECT id FROM scheduled_transactions WHERE user_id = $1)`,
-        [userId],
-      );
-      await queryRunner.query(
-        "DELETE FROM scheduled_transactions WHERE user_id = $1",
-        [userId],
-      );
-      await queryRunner.query(
-        "DELETE FROM monthly_account_balances WHERE user_id = $1",
-        [userId],
-      );
-      await queryRunner.query("DELETE FROM custom_reports WHERE user_id = $1", [
-        userId,
-      ]);
-      await queryRunner.query("DELETE FROM payees WHERE user_id = $1", [
-        userId,
-      ]);
-      await queryRunner.query("DELETE FROM accounts WHERE user_id = $1", [
-        userId,
-      ]);
-      // Institutions are referenced by accounts (institution_id FK); delete
-      // after accounts so the re-seed recreates them without duplicates.
-      await queryRunner.query("DELETE FROM institutions WHERE user_id = $1", [
-        userId,
-      ]);
-      await queryRunner.query("DELETE FROM categories WHERE user_id = $1", [
-        userId,
-      ]);
-      await queryRunner.query("DELETE FROM refresh_tokens WHERE user_id = $1", [
-        userId,
-      ]);
-      await queryRunner.query(
-        "DELETE FROM trusted_devices WHERE user_id = $1",
-        [userId],
-      );
-      await queryRunner.query(
-        "DELETE FROM user_preferences WHERE user_id = $1",
-        [userId],
-      );
+          [userId],
+        );
+        await manager.query(
+          "DELETE FROM scheduled_transactions WHERE user_id = $1",
+          [userId],
+        );
+        await manager.query(
+          "DELETE FROM monthly_account_balances WHERE user_id = $1",
+          [userId],
+        );
+        await manager.query("DELETE FROM custom_reports WHERE user_id = $1", [
+          userId,
+        ]);
+        await manager.query("DELETE FROM payees WHERE user_id = $1", [userId]);
+        await manager.query("DELETE FROM accounts WHERE user_id = $1", [
+          userId,
+        ]);
+        // Institutions are referenced by accounts (institution_id FK); delete
+        // after accounts so the re-seed recreates them without duplicates.
+        await manager.query("DELETE FROM institutions WHERE user_id = $1", [
+          userId,
+        ]);
+        await manager.query("DELETE FROM categories WHERE user_id = $1", [
+          userId,
+        ]);
+        await manager.query("DELETE FROM refresh_tokens WHERE user_id = $1", [
+          userId,
+        ]);
+        await manager.query("DELETE FROM trusted_devices WHERE user_id = $1", [
+          userId,
+        ]);
+        await manager.query("DELETE FROM user_preferences WHERE user_id = $1", [
+          userId,
+        ]);
 
-      // 3. Reset user record
-      const hashedPassword = await bcrypt.hash("Demo123!", 10);
-      await queryRunner.query(
-        `UPDATE users SET
+        // 3. Reset user record
+        const hashedPassword = await bcrypt.hash("Demo123!", 10);
+        await manager.query(
+          `UPDATE users SET
           password_hash = $1,
           first_name = 'Demo',
           last_name = 'User',
@@ -134,10 +132,13 @@ export class DemoResetService {
           reset_token_expiry = NULL,
           role = 'user'
         WHERE id = $2`,
-        [hashedPassword, userId],
-      );
+          [hashedPassword, userId],
+        );
 
-      await queryRunner.commitTransaction();
+        return userId;
+      });
+
+      if (!userId) return;
       this.logger.log("Demo data cleared successfully");
 
       // 4. Re-seed demo data
@@ -165,21 +166,12 @@ export class DemoResetService {
         this.logger.log("Demo data re-seeded successfully");
       }
     } catch (error) {
-      if (!queryRunner.isReleased) {
-        try {
-          await queryRunner.rollbackTransaction();
-        } catch {
-          // Transaction may already be committed; ignore rollback errors
-        }
-      }
+      // withScopedDb has already rolled its transaction back by the time we
+      // land here; the reset is best-effort, so log and let the cron continue.
       this.logger.error(
         "Demo reset failed",
         error instanceof Error ? error.stack : String(error),
       );
-    } finally {
-      if (!queryRunner.isReleased) {
-        await queryRunner.release();
-      }
     }
   }
 
@@ -197,8 +189,8 @@ export class DemoResetService {
 
   private async generateIntradayTransactionsWithinContext(): Promise<void> {
     try {
-      const [demoUser] = await this.dataSource.query(
-        "SELECT id FROM users WHERE email = 'demo@monize.com'",
+      const [demoUser] = await withScopedDb(this.dataSource, (manager) =>
+        manager.query("SELECT id FROM users WHERE email = 'demo@monize.com'"),
       );
       if (!demoUser) return;
 
@@ -238,68 +230,82 @@ export class DemoResetService {
 
         // Look up account
         const accountName = accountNameMap[template.accountKey];
-        const [account] = await this.dataSource.query(
-          "SELECT id FROM accounts WHERE user_id = $1 AND name = $2",
-          [userId, accountName],
+        const [account] = await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            "SELECT id FROM accounts WHERE user_id = $1 AND name = $2",
+            [userId, accountName],
+          ),
         );
         if (!account) continue;
 
         // Deduplicate: skip if this exact transaction already exists
-        const [existing] = await this.dataSource.query(
-          `SELECT COUNT(*) as count FROM transactions
+        const [existing] = await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `SELECT COUNT(*) as count FROM transactions
            WHERE user_id = $1 AND transaction_date = $2
              AND payee_name = $3 AND amount = $4`,
-          [userId, today, template.payeeName, amount],
+            [userId, today, template.payeeName, amount],
+          ),
         );
         if (parseInt(existing.count) > 0) continue;
 
         // Look up payee
-        const [payee] = await this.dataSource.query(
-          "SELECT id FROM payees WHERE user_id = $1 AND name = $2",
-          [userId, template.payeeName],
+        const [payee] = await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            "SELECT id FROM payees WHERE user_id = $1 AND name = $2",
+            [userId, template.payeeName],
+          ),
         );
 
         // Look up category (handle "Parent > Child" path)
         let categoryId: string | null = null;
         const parts = template.categoryPath.split(" > ");
         if (parts.length === 2) {
-          const [cat] = await this.dataSource.query(
-            `SELECT c.id FROM categories c
+          const [cat] = await withScopedDb(this.dataSource, (manager) =>
+            manager.query(
+              `SELECT c.id FROM categories c
              JOIN categories p ON c.parent_id = p.id
              WHERE c.user_id = $1 AND p.name = $2 AND c.name = $3`,
-            [userId, parts[0], parts[1]],
+              [userId, parts[0], parts[1]],
+            ),
           );
           categoryId = cat?.id || null;
         } else {
-          const [cat] = await this.dataSource.query(
-            "SELECT id FROM categories WHERE user_id = $1 AND name = $2 AND parent_id IS NULL",
-            [userId, parts[0]],
+          const [cat] = await withScopedDb(this.dataSource, (manager) =>
+            manager.query(
+              "SELECT id FROM categories WHERE user_id = $1 AND name = $2 AND parent_id IS NULL",
+              [userId, parts[0]],
+            ),
           );
           categoryId = cat?.id || null;
         }
 
         // Insert transaction
-        await this.dataSource.query(
-          `INSERT INTO transactions (
+        await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
             category_id, amount, currency_code, description, status
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'CAD', $8, 'UNRECONCILED')`,
-          [
-            userId,
-            account.id,
-            today,
-            payee?.id || null,
-            template.payeeName,
-            categoryId,
-            amount,
-            template.description,
-          ],
+            [
+              userId,
+              account.id,
+              today,
+              payee?.id || null,
+              template.payeeName,
+              categoryId,
+              amount,
+              template.description,
+            ],
+          ),
         );
 
         // Update account balance
-        await this.dataSource.query(
-          "UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2",
-          [amount, account.id],
+        await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            "UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2",
+            [amount, account.id],
+          ),
         );
 
         this.logger.log(

@@ -1,8 +1,12 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { SeedService } from "./seed.service";
 import { User } from "../users/entities/user.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 jest.mock("bcryptjs", () => ({
   hash: jest.fn().mockResolvedValue("$2a$10$hashedpassword"),
@@ -14,13 +18,16 @@ describe("SeedService", () => {
   let usersRepository: Record<string, jest.Mock>;
 
   beforeEach(async () => {
-    dataSource = {
-      query: jest.fn(),
-    };
-
     usersRepository = {
       findOne: jest.fn(),
     };
+
+    // Raw seed SQL now runs on the scoped transaction's EntityManager; alias
+    // `dataSource.query` to it so the existing assertions still watch the same
+    // statements.
+    const scoped = createScopedDbMocks([[User, usersRepository as never]]);
+    scoped.dataSource.query = scoped.manager.query;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -28,10 +35,6 @@ describe("SeedService", () => {
         {
           provide: DataSource,
           useValue: dataSource,
-        },
-        {
-          provide: getRepositoryToken(User),
-          useValue: usersRepository,
         },
       ],
     }).compile();

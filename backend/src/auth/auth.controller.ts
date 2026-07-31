@@ -46,8 +46,8 @@ import {
 } from "../notifications/email-templates";
 import { SwitchContextDto } from "./dto/switch-context.dto";
 import { I18nService } from "nestjs-i18n";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { emailTranslator } from "../i18n/email-translator";
 import { resolveUserEmailLocale } from "../i18n/resolve-user-email-locale";
@@ -82,8 +82,7 @@ export class AuthController {
     private tokenService: TokenService,
     private delegationService: DelegationService,
     private readonly i18n: I18nService,
-    @InjectRepository(UserPreference)
-    private readonly preferencesRepository: Repository<UserPreference>,
+    private readonly dataSource: DataSource,
   ) {
     // Default to true if not explicitly set to 'false'
     const localAuthSetting = this.configService.get<string>(
@@ -306,9 +305,13 @@ export class AuthController {
       "http://localhost:3000",
     );
     const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
-    const lang = await resolveUserEmailLocale(
-      this.preferencesRepository,
-      userId,
+    // Public route (registration / resend): the interceptor's scope carries no
+    // user id, so the recipient's preference row is read under a system
+    // context -- the same wrapping C1 gave the auth service's own token paths.
+    const lang = await withSystemContext(() =>
+      withScopedDb(this.dataSource, (manager) =>
+        resolveUserEmailLocale(manager.getRepository(UserPreference), userId),
+      ),
     );
     const t = emailTranslator(this.i18n, lang);
     const html = emailVerificationTemplate(firstName, verifyUrl, t);
@@ -708,9 +711,14 @@ export class AuthController {
         "http://localhost:3000",
       );
       const resetUrl = `${frontendUrl}/reset-password?token=${result.token}`;
-      const lang = await resolveUserEmailLocale(
-        this.preferencesRepository,
-        result.user.id,
+      // Public forgot-password route: no ambient user id (see above).
+      const lang = await withSystemContext(() =>
+        withScopedDb(this.dataSource, (manager) =>
+          resolveUserEmailLocale(
+            manager.getRepository(UserPreference),
+            result.user.id,
+          ),
+        ),
       );
       const t = emailTranslator(this.i18n, lang);
       const html = passwordResetTemplate(

@@ -1,8 +1,14 @@
 import { Injectable, UnauthorizedException, Logger } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan, DataSource } from "typeorm";
+import {
+  DataSource,
+  EntityTarget,
+  LessThan,
+  ObjectLiteral,
+  Repository,
+} from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import * as crypto from "crypto";
 
@@ -25,8 +31,6 @@ export class TokenService {
   private readonly REMEMBER_ME_EXPIRY_MS: number;
 
   constructor(
-    @InjectRepository(RefreshToken)
-    private refreshTokensRepository: Repository<RefreshToken>,
     private jwtService: JwtService,
     private dataSource: DataSource,
     private configService: ConfigService,
@@ -37,6 +41,21 @@ export class TokenService {
     );
     this.REMEMBER_ME_EXPIRY_MS =
       (rememberMeDays > 0 ? rememberMeDays : 30) * 24 * 60 * 60 * 1000;
+  }
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
   }
 
   getRefreshExpiryMs(rememberMe?: boolean): number {
@@ -73,18 +92,22 @@ export class TokenService {
     const familyId = crypto.randomUUID();
     const expiryMs = this.getRefreshExpiryMs(rememberMe);
 
-    const refreshTokenEntity = this.refreshTokensRepository.create({
-      userId: user.id,
-      tokenHash,
-      familyId,
-      isRevoked: false,
-      expiresAt: new Date(Date.now() + expiryMs),
-      replacedByHash: null,
-      rememberMe: !!rememberMe,
-      actingAsUserId: context?.actingAsUserId ?? null,
-      delegationId: context?.delegationId ?? null,
+    await withScopedDb(this.dataSource, (manager) => {
+      const repo = manager.getRepository(RefreshToken);
+      return repo.save(
+        repo.create({
+          userId: user.id,
+          tokenHash,
+          familyId,
+          isRevoked: false,
+          expiresAt: new Date(Date.now() + expiryMs),
+          replacedByHash: null,
+          rememberMe: !!rememberMe,
+          actingAsUserId: context?.actingAsUserId ?? null,
+          delegationId: context?.delegationId ?? null,
+        }),
+      );
     });
-    await this.refreshTokensRepository.save(refreshTokenEntity);
 
     return { accessToken, refreshToken: rawRefreshToken };
   }
@@ -94,7 +117,7 @@ export class TokenService {
   ): Promise<{ accessToken: string; refreshToken: string; userId: string }> {
     const tokenHash = hashToken(rawRefreshToken);
 
-    return this.dataSource.transaction(async (manager) => {
+    return withScopedDb(this.dataSource, async (manager) => {
       // SECURITY: Pessimistic lock prevents race condition when two requests
       // try to rotate the same refresh token concurrently
       const existingToken = await manager.findOne(RefreshToken, {
@@ -196,27 +219,27 @@ export class TokenService {
   }
 
   async revokeTokenFamily(familyId: string): Promise<void> {
-    await this.refreshTokensRepository.update(
-      { familyId },
-      { isRevoked: true },
+    await this.scoped(RefreshToken, (repo) =>
+      repo.update({ familyId }, { isRevoked: true }),
     );
   }
 
   async revokeRefreshToken(rawRefreshToken: string): Promise<void> {
     if (!rawRefreshToken) return;
     const tokenHash = hashToken(rawRefreshToken);
-    const token = await this.refreshTokensRepository.findOne({
-      where: { tokenHash },
-    });
+    const token = await this.scoped(RefreshToken, (repo) =>
+      repo.findOne({
+        where: { tokenHash },
+      }),
+    );
     if (token) {
       await this.revokeTokenFamily(token.familyId);
     }
   }
 
   async revokeAllUserRefreshTokens(userId: string): Promise<void> {
-    await this.refreshTokensRepository.update(
-      { userId, isRevoked: false },
-      { isRevoked: true },
+    await this.scoped(RefreshToken, (repo) =>
+      repo.update({ userId, isRevoked: false }, { isRevoked: true }),
     );
   }
 
@@ -229,13 +252,17 @@ export class TokenService {
   }
 
   private async purgeExpiredRefreshTokensWithinContext(): Promise<void> {
-    const expiredResult = await this.refreshTokensRepository.delete({
-      expiresAt: LessThan(new Date()),
-    });
+    const expiredResult = await this.scoped(RefreshToken, (repo) =>
+      repo.delete({
+        expiresAt: LessThan(new Date()),
+      }),
+    );
 
-    const revokedResult = await this.refreshTokensRepository.delete({
-      isRevoked: true,
-    });
+    const revokedResult = await this.scoped(RefreshToken, (repo) =>
+      repo.delete({
+        isRevoked: true,
+      }),
+    );
 
     const totalPurged =
       (expiredResult.affected || 0) + (revokedResult.affected || 0);

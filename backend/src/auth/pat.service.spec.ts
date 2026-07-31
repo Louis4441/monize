@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import {
   BadRequestException,
   NotFoundException,
@@ -10,6 +10,11 @@ import { PatService } from "./pat.service";
 import { PersonalAccessToken } from "./entities/personal-access-token.entity";
 import { User } from "../users/entities/user.entity";
 import { getRequestContext } from "../common/request-context";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("PatService", () => {
   let service: PatService;
@@ -46,15 +51,14 @@ describe("PatService", () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        {
+          provide: DataSource,
+          useValue: createScopedDbMocks([
+            [PersonalAccessToken, repository as never],
+            [User, userRepository as never],
+          ]).dataSource,
+        },
         PatService,
-        {
-          provide: getRepositoryToken(PersonalAccessToken),
-          useValue: repository,
-        },
-        {
-          provide: getRepositoryToken(User),
-          useValue: userRepository,
-        },
       ],
     }).compile();
 

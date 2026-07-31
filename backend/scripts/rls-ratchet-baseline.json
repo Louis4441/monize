@@ -1,4 +1,4 @@
 {
-  "injectRepository": 50,
-  "createQueryRunner": 9
+  "injectRepository": 0,
+  "createQueryRunner": 0
 }

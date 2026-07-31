@@ -92,39 +92,30 @@ After writing or editing code, check LSP diagnostics and fix errors before proce
 - API keys encrypted with AES-256-GCM before storage, never returned to client
 - CSRF double-submit cookie pattern is global; use `@SkipCsrf()` only for non-cookie auth (e.g., PAT bearer)
 
-## QueryRunner Transactions (CRITICAL)
+## Transactions (CRITICAL)
 
-Any operation that touches multiple tables or does read-modify-write MUST use a QueryRunner. This is the most common source of bugs in this codebase.
+Any operation that touches multiple tables or does read-modify-write MUST run in a single transaction. This is the most common source of bugs in this codebase.
 
 ```typescript
 async createSomething(userId: string, dto: CreateDto) {
-  const queryRunner = this.dataSource.createQueryRunner();
-  await queryRunner.connect();
-  await queryRunner.startTransaction();
-  try {
-    // All DB operations use queryRunner.manager instead of this.repo
-    const entity = queryRunner.manager.create(Entity, { ...dto, userId });
-    await queryRunner.manager.save(entity);
-    await this.updateBalance(accountId, amount, queryRunner);
-
-    await queryRunner.commitTransaction();
+  return withScopedDb(this.dataSource, async (manager) => {
+    // All DB operations use the transaction's EntityManager
+    const entity = manager.create(Entity, { ...dto, userId });
+    await manager.save(entity);
+    await this.updateBalance(accountId, amount, manager);
     return entity;
-  } catch (error) {
-    await queryRunner.rollbackTransaction();
-    throw error;
-  } finally {
-    await queryRunner.release();
-  }
+  });
 }
 ```
 
-Operations that still use QueryRunner: investment transaction CRUD and holdings rebuild, plus the remaining unmigrated modules. This is the pattern **existing** code follows while the Row-Level Security migration is in progress; **new** DB access must use `withScopedDb` instead (see below).
-
-The accounts, categories, payees, tags, institutions, transactions and scheduled-transactions modules have already migrated (RLS tasks R1-R2): there, `create()`, `update()`, `remove()`, transfers, splits, bulk update/delete and reconciliation each wrap their work in a single `withScopedDb` instead, and helpers take an `EntityManager` rather than a `QueryRunner`. Follow those files, not the block above, when working in them.
+`withScopedDb` commits when the callback returns and rolls back when it throws, so there is no
+commit/rollback/release bookkeeping to get wrong. **There are no `QueryRunner`s left in `src/`** —
+RLS tasks R1–R7 converted every one, and both ratchet counts are 0. Helpers take an `EntityManager`,
+never a `QueryRunner`. If you find a `createQueryRunner()` in a diff, it is new and wrong.
 
 ## Database Access & Row-Level Security (RLS ratchet — CRITICAL)
 
-All **new** database access must go through `withScopedDb` (`backend/src/common/db/scoped-db.ts`) — the single RLS-compliant door to the DB. **Do not add new `@InjectRepository(...)` fields or `this.dataSource.createQueryRunner()` calls.** A CI ratchet (`backend/scripts/rls-ratchet.mjs`, baseline `backend/scripts/rls-ratchet-baseline.json`) counts every `@InjectRepository(` and `createQueryRunner(` site under `src/`; the counts **may only decrease**, so adding either fails "Backend Lint & Type Check". The ~87 existing injected repos / QueryRunners are being migrated module-by-module behind `RLS_MODE=off`; converting one lets you lower the baseline.
+**All** database access goes through `withScopedDb` (`backend/src/common/db/scoped-db.ts`) — the single RLS-compliant door to the DB. **Never add an `@InjectRepository(...)` field, a `this.dataSource.createQueryRunner()` call, or a bare `this.dataSource.query(...)`.** A CI ratchet (`backend/scripts/rls-ratchet.mjs`, baseline `backend/scripts/rls-ratchet-baseline.json`) counts every `@InjectRepository(` and `createQueryRunner(` site under `src/`; **both baselines are 0** (RLS tasks R1–R7 converted the ~91 original sites), so adding either fails "Backend Lint & Type Check".
 
 ```typescript
 // Read: one short tenant transaction, identical to today's autocommit read.
@@ -140,9 +131,14 @@ await withScopedDb(this.dataSource, async (m) => {
 });
 ```
 
-- Inject `DataSource`, not a repository. Get repositories from the transaction's `EntityManager` (`m.getRepository(X)`); helpers that took a `QueryRunner` take the `EntityManager` instead.
-- `withScopedDb` **throws** without an ambient identity context. Authenticated controllers already have it (the `RequestContextInterceptor` seeds `{ userId }` around the handler). Code with no HTTP request — cron jobs, seeders, guards/strategies, background writes — must wrap the call in `withUserContext(userId, fn)` or `withSystemContext(fn)` (`backend/src/common/db/with-context.ts`).
-- Nested `withScopedDb` calls join the ambient transaction (same connection/atomicity), so a service method calling another is safe — no pool-exhaustion deadlock.
+- Inject `DataSource`, not a repository. Get repositories from the transaction's `EntityManager` (`m.getRepository(X)`); helpers take the `EntityManager`, never a `QueryRunner`.
+- `withScopedDb` **throws** without an ambient identity context. Authenticated cookie/JWT routes already have it (the `RequestContextInterceptor` seeds `{ userId }` around the handler). **Everything else must seed its own** (`backend/src/common/db/with-context.ts`):
+  - `withUserContext(userId, fn)` — cron per-user bodies, background writes, and any surface the interceptor cannot see. **Bearer-only routes count**: `/mcp` has no `AuthGuard('jwt')`, so `req.user` is unset and the interceptor's scope carries an undefined userId — the MCP transport seeds the session's user itself.
+  - `withSystemContext(fn)` — genuinely cross-user work: cron fan-outs, seeders, bootstrap hooks (`onModuleInit` / `onApplicationBootstrap` have no request), admin, and anything that sweeps every user.
+  - `withDelegateContext(ownerUserId, delegateUserId, fn)` — a delegate acting on an owner's data, where the two GUCs must **differ**. `withUserContext` collapses them onto one id, which silently returns zero rows for whichever half it is not. Used by `jwt.strategy`'s acting-context re-validation and `AccountDelegateGuard`.
+- Nested `withScopedDb` calls join the ambient transaction (same connection/atomicity), so a service method calling another is safe — no pool-exhaustion deadlock. The exceptions are deliberate: `runOutsideActiveScopedManager` for a background timer or a progress write a concurrent reader must see.
+- A callback that returns early (before writing) commits an empty transaction — that is the correct replacement for an explicit rollback, not a bug.
+- Pass an isolation level as the optional third argument only when the logic depends on it (registration uses `"SERIALIZABLE"` for the first-user-admin race). Requesting one while joining an ambient transaction throws rather than silently downgrading.
 - At `RLS_MODE=off` (the default) `withScopedDb` still wraps the transaction but skips the identity GUCs, so behavior is identical to pre-RLS. See `docs/future-plans/row-level-security.md`.
 
 ## Financial Math

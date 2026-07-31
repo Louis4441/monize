@@ -9,6 +9,11 @@ import { demoPayees } from "./demo-seed-data/payees";
 import { demoScheduledTransactions } from "./demo-seed-data/scheduled";
 import { demoSecurities } from "./demo-seed-data/securities";
 import { demoReports } from "./demo-seed-data/reports";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("DemoSeedService", () => {
   let service: DemoSeedService;
@@ -17,9 +22,9 @@ describe("DemoSeedService", () => {
   let logoService: Record<string, jest.Mock>;
 
   beforeEach(async () => {
-    dataSource = {
-      query: jest.fn(),
-    };
+    const scoped = createScopedDbMocks([]);
+    scoped.dataSource.query = scoped.manager.query;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     seedService = {
       seedAll: jest.fn().mockResolvedValue(undefined),

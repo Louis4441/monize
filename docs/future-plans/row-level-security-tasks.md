@@ -60,10 +60,10 @@ uses four classes:
 | R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral | done |
 | R4 | Refactor: budgets | F3, C1–C4, C6 | neutral | done |
 | R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral | done |
-| R6 | Refactor: ai, mcp, import, action-history, currencies, updates, notifications | F3, C1–C4, C6 | neutral | not started |
-| R7 | Refactor: auth, users, delegation, admin, emergency-access, backup, database | F3, C1–C4, C6 | neutral | not started |
-| C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral | blocked (needs M1, R7) |
-| L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none | not started |
+| R6 | Refactor: ai, mcp, import, action-history, currencies, updates, notifications | F3, C1–C4, C6 | neutral | done |
+| R7 | Refactor: auth, users, delegation, admin, emergency-access, backup, database | F3, C1–C4, C6 | neutral | done |
+| C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral | unblocked (R7 done) |
+| L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none | unblocked (ratchet at 0) |
 | D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none | not started |
 
 **Why context wrapping (C1–C4, C6) comes BEFORE the refactors (R1–R7), not after.** `withScopedDb` throws
@@ -95,13 +95,15 @@ Notes on the subtle rows:
 Operator-only steps (not agent tasks — see runbook): shadow flip, staging enforce, prod flip A
 (privilege drop), prod flip B (deploy M3), monitoring during soaks.
 
-### Open findings from M2's ownership audit — must be closed before flip B
+### Open findings from M2's ownership audit — **all three closed in R6/R7**
 
 M2 audited how every candidate table is actually keyed at its call sites (rather than trusting the
 design doc's lists). That audit surfaced three call paths that **no policy can fix** — they will
 return zero rows under enforcement because the ambient context does not name the right user. They are
 context-wrapping bugs, out of M2's file scope, and are recorded here rather than papered over with a
-policy arm. None of them affects anything today (`RLS_MODE=off`, policies not enabled).
+policy arm. None of them affected anything at `RLS_MODE=off`. **All three are now fixed** -- see R7's status note;
+findings 1 and 2 share the new `withDelegateContext` helper, and finding 3 wrapped every
+`AdminService` method in `withSystemContext`. The original text is kept below for the audit trail.
 
 1. **`delegation.service.ts` `delegateMustEnrollOwn2FA` reads the *owner's* `user_preferences` under
    `withUserContext(delegate)`.** Reached from `jwt.strategy`'s `validateActingContext`, i.e. on
@@ -671,23 +673,136 @@ It caught two things unit tests could not:
 verified by reproducing it with the branch's changes stashed.)
 
 ### R6. ai, mcp, import, action-history, currencies, updates, notifications
-- [ ] Status: not started — ~12 service files. AI relay/query SSE and MCP HTTP must hold **no**
-  connection between queries (verify streaming paths call `withScopedDb` per operation, not around the
-  stream).
+- [x] Status: done (branch `claude/rls-task-list-r6-r7-usodqx`). All 14 service files converted
+  (ai ×7: `ai`, `ai-usage`, `insights-aggregator`, `ai-insights`, `forecast-aggregator`,
+  `ai-forecast`, `financial-context.builder`; import ×2 + the 3 processor/context files;
+  `action-history`; currencies ×2; `updates`; notifications ×2). Ratchet lowered **78 → 50**
+  `@InjectRepository` / **13 → 9** `createQueryRunner` (zero left in the listed modules). Full
+  `npm run test:unit` green, build + lint clean.
 
-  **Inherited from R3:** `HoldingsService.rebuildAccountsFromTransactions` still accepts
-  `QueryRunner | EntityManager` because `mny-import.service.ts` passes a `{ manager }` shim. Drop
-  the union and pass the transaction's `EntityManager` directly when the importer converts. Also
-  in scope: `securities.controller.ts`'s fire-and-forget `recalculateAllInvestmentSnapshots()` is a
-  cross-user sweep running under the requesting user's context (harmless at `off`, silently
-  single-user under enforcement) — it needs a `withSystemContext` wrap before flip B.
+  **The MCP transport was broken at `RLS_MODE=off` before this task — that is the significant
+  finding.** `/mcp` is bearer-authenticated with `@SkipCsrf()` and no `AuthGuard('jwt')`, so
+  `req.user` is never set and `RequestContextInterceptor` enters its ALS scope with an **undefined**
+  userId. The moment R1–R5 moved the domain services onto `withScopedDb`, every MCP tool handler
+  reached them with no ambient identity and threw the missing-context error — a live regression, not
+  a latent one, and exactly the class of break the C-before-R ordering exists to prevent (C1 had
+  flagged `mcp-http.controller` as "R6's file scope"). Each of the four `transport.handleRequest`
+  calls now runs under `withUserContext(session user)` — the MCP counterpart of what the interceptor
+  does for cookie/JWT routes, with the id from `validatePat` (PAT or OAuth token), never from tool
+  arguments. Regression spec `src/mcp/rls-context-smoke.spec.ts` runs the **real** `withScopedDb`
+  from inside a fake transport's `handleRequest` and fails if the wrapper is removed.
+
+  **SSE / streaming verified, as the task required.** `ai/query`, `ai/relay`, `ai/actions` and
+  `mcp/**` hold no `DataSource` at all — they delegate to domain services, each of which opens its
+  own short `withScopedDb` per operation. No connection is held across a stream.
+
+  **Boundary decisions (for R7 and L1):**
+  - **R3's `QueryRunner | EntityManager` union is gone.**
+    `HoldingsService.rebuildAccountsFromTransactions` takes a plain `EntityManager`; the `.mny`
+    importer passes the import transaction's own manager instead of a `{ manager }` shim.
+  - **`getUsersByEffectiveTimezone` (`common/users-by-timezone.util.ts`) is converted**, closing the
+    deferral R1/R2/R3 each carried. Its three callers (accounts, scheduled-transactions, securities
+    crons) are already inside `withSystemContext`, so it needs no identity of its own.
+  - `securities.controller.ts`'s fire-and-forget `recalculateAllInvestmentSnapshots()` now runs under
+    `withSystemContext` (the R3 finding): prices are global, so a manual refresh moves every user's
+    snapshots, and the requesting user's context would have silently narrowed it to their own.
+  - `AiUsageService.getUsageSummary` keeps its five reads **independent** (a private `usageLogs()`
+    helper, one short transaction each) rather than sharing one manager, so they still run
+    concurrently instead of serializing on a single connection.
+  - The QIF/CSV importer's two `createQueryRunner` blocks became one `withScopedDb` each, keeping the
+    per-transaction `SAVEPOINT`s inside them — a single bad row still rolls back alone.
+  - **`CurrenciesService.onApplicationBootstrap` and `ExchangeRateService.onModuleInit` gained
+    `withSystemContext` wraps.** Bootstrap hooks are out-of-request entry points that no C-task
+    covered; without them the converted reads throw at `off` on every boot. The startup backfill
+    fan-out re-wraps each user in `withUserContext`. Enumerated under "scope extensions" below.
+
+  **Tests:** the R1 harness (`src/test-helpers/scoped-db-testing.ts`) carried the batch. Cron and
+  bootstrap smokes run the **real** `withScopedDb` at `RLS_MODE=off`, each with a negative control:
+  `src/currencies/rls-context-smoke.spec.ts` (both bootstrap hooks + the FX cron),
+  `src/ai/rls-context-smoke.spec.ts` (usage purge + daily insight fan-out) and
+  `src/mcp/rls-context-smoke.spec.ts` (above).
 
 ### R7. auth, users, delegation, admin, emergency-access, backup, database
-- [ ] Status: not started — ~15 service files. The context wrapping for these modules already landed
-  in C1/C3/C4 (this is why R7 depends on them) — the refactor converts data access *inside* those
-  existing scopes. Delegation paths keyed by `realUserId` (`changePassword`,
-  `delegate_account_favourites`) need no special handling: the context carries `realUserId` and the
-  special policies match it. Restore's `preserveTimestamps` swap stays out of scope (C5).
+- [x] Status: done (branch `claude/rls-task-list-r6-r7-usodqx`). All 17 service/controller files
+  converted. Ratchet lowered **50 → 0** `@InjectRepository` / **9 → 0** `createQueryRunner`:
+  **the ratchet is now at zero, so R1–R7 are complete and L1 is unblocked.** Full
+  `npm run test:unit` green (10,165), build + lint clean, and the 15 integration suites (160 tests)
+  green against a real PostgreSQL 16.
+
+  **All three of M2's open ownership findings are closed.**
+  1. **`delegateMustEnrollOwn2FA` reading the owner's rows under the delegate's context** — fixed by
+     a new `withDelegateContext(owner, delegate, fn)` helper (`common/db/with-context.ts`), which
+     seeds `current = owner` and `real = delegate`. `jwt.strategy` re-seeds the acting-context
+     re-validation with it; `withUserContext` alone collapses both GUCs onto one id, and the
+     owner's `users`/`user_preferences` half then matches neither policy arm.
+  2. **`AccountDelegateGuard` needed the same two-GUC seeding** — it runs before `AuthGuard('jwt')`
+     and before the interceptor's scope, so its `DelegationService` reads had no identity at all.
+     Its whole delegate branch now runs under `withDelegateContext(payload.actingAsUserId,
+     payload.sub)`, using the ids the guard already verifies itself.
+  3. **`admin/` had no `withSystemContext` anywhere** — every public `AdminService` method now wraps
+     its body (the `*WithinContext` shape C1/C3 used). Every one of them is cross-user by
+     definition (they act on `targetUserId`), so under enforcement they would have affected zero
+     rows. Authorization is unchanged: `AdminController` is still class-guarded by
+     `AuthGuard('jwt') + RolesGuard + @Roles("admin")`.
+
+  **`withScopedDb` gained an optional isolation level.** Registration and OIDC first-user creation
+  used `dataSource.transaction("SERIALIZABLE", ...)` to close the first-user-admin race; the door had
+  no way to express that, so converting them would have silently downgraded the isolation and
+  reopened the race. The third parameter is passed straight through, and a request for an isolation
+  level while *joining* an ambient transaction throws rather than being silently ignored.
+
+  **Boundary decisions:**
+  - Services with many one-statement reads (`delegation`, `auth`, `users`, `emergency-access`,
+    `backup`, `admin`) grew a private `scoped(Entity, fn)` helper: one repository call in one short
+    transaction, the same autocommit boundary each injected-repository call had. Multi-statement
+    units use an explicit `withScopedDb` block instead.
+  - Read-modify-writes that were split across autocommit statements now share one transaction where
+    a concurrent writer could slip between them: the admin last-admin check + demotion, the admin
+    account wipe, `AdminService.revokeSessionsAndTokens`, the delegate-favourite upsert, and
+    `AiService.createConfig`'s per-user provider cap.
+  - `DelegationService.accountIdsForTransfer` reads both transfer legs from one snapshot — the guard
+    gates a write on holding the permission for *every* account the transfer touches.
+  - Backup restore's whole block is one `withScopedDb`, as the QueryRunner was. The
+    `preserveTimestamps` swap stays out of scope (C5), so the `DISABLE TRIGGER` pair is untouched.
+  - `DemoResetService` had to be restructured, not just renamed: the clear must **COMMIT** before the
+    re-seed (which opens its own scoped transactions), so the transaction now returns the demo user
+    id and the re-seed runs after it.
+
+  **Fixed while here (reported bug, `backup.service.ts`):** the restore wipe's user-created-currency
+  delete guarded only `user_currency_preferences` and `accounts`, but `currencies.code` is
+  referenced by nine columns across eight tables and only the preferences FK cascades. The one that
+  bit was `exchange_rates` — global, never cleared by a restore, and populated for every currency the
+  FX backfill has seen — so any user who added a custom currency and let the daily rate refresh run
+  could not restore a backup at all (`violates foreign key constraint
+  exchange_rates_to_currency_fkey`). The guard now covers every referencing table. Verified against a
+  real PostgreSQL 16: the old query reproduces the reported error, the new one succeeds and correctly
+  keeps a currency that exchange rates still reference. Regression test in
+  `backup.service.spec.ts` fails on the original query.
+
+  **Tests:** the R1 harness carried the batch; QueryRunner-lifecycle assertions became
+  `dataSource.transaction` grouping assertions, and specs that stub the transaction body directly got
+  a shared `installTransactionMock` that accepts both call shapes and routes `getRepository` at the
+  same per-entity mocks. `scopedDbMockModule` now forwards an explicit isolation level so the
+  SERIALIZABLE assertion stays writable. Cron/guard smoke: `src/auth/rls-context-smoke.spec.ts` runs
+  the token purge, auto-backup cron, emergency-access sweep and the delegate guard under the **real**
+  `withScopedDb`, plus a negative control.
+
+### Scope extensions taken in R6/R7 (deviations from the R-task rules, enumerated)
+
+R-task rules say "Out of scope: any *new* `withSystemContext`/`withUserContext` wrapping" and "if you
+find a call path with no wrapping, stop and note it". Six paths needed wrapping that no C-task owned.
+Each was added **in the same commit as the conversion that needs it**, so the ordering hazard the rule
+guards against (wrapping landing in a later PR than the conversion) never existed. They are:
+
+| Path | Wrapper | Why no C-task covered it |
+|------|---------|--------------------------|
+| `mcp-http.controller` ×4 `handleRequest` | `withUserContext(session user)` | C1 explicitly deferred this file to R6; the break was already live |
+| `CurrenciesService.onApplicationBootstrap` | `withSystemContext` | bootstrap hooks are not crons, seeders, guards or interceptors |
+| `ExchangeRateService.onModuleInit` | `withSystemContext` + per-user `withUserContext` | same |
+| `securities.controller` snapshot recalc | `withSystemContext` | flagged by R3, assigned to R6 |
+| `AccountDelegateGuard` delegate branch | `withDelegateContext` | M2 finding #2, "must land before R7 converts DelegationService" |
+| `AdminService` public methods | `withSystemContext` | M2 finding #3, "needs its own C-task or an explicit extension of R7's scope" |
+| `auth.controller` email-locale reads ×2 | `withSystemContext` | public routes; C1 wrapped the service, not the controller's own reads |
 
 ---
 
@@ -865,11 +980,12 @@ grantee-side audit result in the PR description.
 
 ### C5. Backup restore
 
-- [ ] Status: **blocked** -- not started. Unlike C1-C4/C6 (which only depend on F2), C5 also depends
-  on **M1** (the GUC-aware `update_updated_at_column()` trigger must be in the DB) and **R7** (the
-  restore path must already be on `withScopedDb` to carry the `preserveTimestamps` flag). Both are not
-  started, so C5 cannot begin yet without a scope violation ("never start a task whose dependencies
-  are unmerged").
+- [ ] Status: not started, but **unblocked**. Unlike C1-C4/C6 (which only depend on F2), C5 also
+  depends on **M1** (the GUC-aware `update_updated_at_column()` trigger must be in the DB) and **R7**
+  (the restore path must already be on `withScopedDb` to carry the `preserveTimestamps` flag). Both
+  have now landed: M1 shipped as migration `111`, and R7 put the whole restore block in one
+  `withScopedDb` -- the `DISABLE TRIGGER` / `ENABLE TRIGGER` pair around it is deliberately untouched
+  and is exactly what C5 replaces.
 
 **Scope:** `backend/src/backup/backup.service.ts` (restore path, ~line 1317).
 
@@ -921,7 +1037,12 @@ behavior unchanged; no context-throw in dev smoke once R7 lands (verified again 
 
 ### L1. Lint bans
 
-- [ ] Status: not started — requires R1–R7 complete (ratchet at zero).
+- [ ] Status: not started, but **unblocked** — R1–R7 are done and both ratchet counts are 0
+  (`backend/scripts/rls-ratchet-baseline.json`). L1's note from C1 still applies: the
+  `with-context.ts` allowlist must include `backend/src/oauth/**`, and R6/R7 added imports in
+  `backend/src/mcp/**`, `backend/src/currencies/**`, `backend/src/securities/securities.controller.ts`
+  and `backend/src/delegation/guards/**` as well. The now-unused `TypeOrmModule.forFeature`
+  registrations R1–R5 left behind were removed in R6/R7, so that L1 clean-up is already done.
 
 **Do:** ESLint `no-restricted-imports`: `with-context.ts` importable only from the allowlist (admin,
 auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepository` and

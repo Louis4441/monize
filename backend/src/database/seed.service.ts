@@ -1,19 +1,14 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
-import { User } from "../users/entities/user.entity";
 import { withSystemContext } from "../common/db/with-context";
 
 @Injectable()
 export class SeedService {
   private readonly logger = new Logger(SeedService.name);
 
-  constructor(
-    private dataSource: DataSource,
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-  ) {}
+  constructor(private dataSource: DataSource) {}
 
   async seedAll(): Promise<void> {
     this.logger.log("Starting database seeding");
@@ -71,14 +66,16 @@ export class SeedService {
     ];
 
     for (const currency of currencies) {
-      await this.dataSource.query(
-        `INSERT INTO currencies (code, name, symbol, decimal_places)
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO currencies (code, name, symbol, decimal_places)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (code) DO UPDATE SET
            name = EXCLUDED.name,
            symbol = EXCLUDED.symbol,
            decimal_places = EXCLUDED.decimal_places`,
-        [currency.code, currency.name, currency.symbol, currency.decimals],
+          [currency.code, currency.name, currency.symbol, currency.decimals],
+        ),
       );
     }
 
@@ -92,9 +89,8 @@ export class SeedService {
     const password = "Demo123!";
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const existingUser = await this.dataSource.query(
-      "SELECT id FROM users WHERE email = $1",
-      [email],
+    const existingUser = await withScopedDb(this.dataSource, (manager) =>
+      manager.query("SELECT id FROM users WHERE email = $1", [email]),
     );
 
     if (existingUser.length > 0) {
@@ -102,11 +98,13 @@ export class SeedService {
       return existingUser[0].id;
     }
 
-    const result = await this.dataSource.query(
-      `INSERT INTO users (email, password_hash, first_name, last_name, auth_provider, is_active, email_verified)
+    const result = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `INSERT INTO users (email, password_hash, first_name, last_name, auth_provider, is_active, email_verified)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id`,
-      [email, hashedPassword, "Demo", "User", "local", true, true],
+        [email, hashedPassword, "Demo", "User", "local", true, true],
+      ),
     );
 
     this.logger.log(`Created demo user: ${email}`);
@@ -220,21 +218,25 @@ export class SeedService {
 
     // Seed income categories
     for (const cat of incomeCategories) {
-      await this.dataSource.query(
-        `INSERT INTO categories (user_id, name, icon, color, is_income)
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO categories (user_id, name, icon, color, is_income)
          VALUES ($1, $2, $3, $4, $5)`,
-        [userId, cat.name, cat.icon, cat.color, cat.isIncome],
+          [userId, cat.name, cat.icon, cat.color, cat.isIncome],
+        ),
       );
       categoryCount++;
     }
 
     // Seed expense categories with subcategories
     for (const cat of expenseCategories) {
-      const parentResult = await this.dataSource.query(
-        `INSERT INTO categories (user_id, name, icon, color, is_income)
+      const parentResult = await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO categories (user_id, name, icon, color, is_income)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING id`,
-        [userId, cat.name, cat.icon, cat.color, false],
+          [userId, cat.name, cat.icon, cat.color, false],
+        ),
       );
       categoryCount++;
 
@@ -242,10 +244,12 @@ export class SeedService {
 
       // Add subcategories
       for (const subName of cat.subcategories) {
-        await this.dataSource.query(
-          `INSERT INTO categories (user_id, parent_id, name, is_income)
+        await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO categories (user_id, parent_id, name, is_income)
            VALUES ($1, $2, $3, $4)`,
-          [userId, parentId, subName, false],
+            [userId, parentId, subName, false],
+          ),
         );
         categoryCount++;
       }
@@ -311,23 +315,25 @@ export class SeedService {
     const accountIds: { [key: string]: string } = {};
 
     for (const acc of accounts) {
-      const result = await this.dataSource.query(
-        `INSERT INTO accounts (
+      const result = await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO accounts (
           user_id, account_type, name, description, currency_code,
           opening_balance, current_balance, credit_limit, interest_rate
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING id`,
-        [
-          userId,
-          acc.type,
-          acc.name,
-          acc.description,
-          acc.currency,
-          acc.balance,
-          acc.balance,
-          acc.creditLimit || null,
-          acc.interestRate || null,
-        ],
+          [
+            userId,
+            acc.type,
+            acc.name,
+            acc.description,
+            acc.currency,
+            acc.balance,
+            acc.balance,
+            acc.creditLimit || null,
+            acc.interestRate || null,
+          ],
+        ),
       );
       accountIds[acc.type] = result[0].id;
     }
@@ -453,21 +459,23 @@ export class SeedService {
     ];
 
     for (const tx of transactions) {
-      await this.dataSource.query(
-        `INSERT INTO transactions (
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO transactions (
           user_id, account_id, transaction_date, payee_name, amount,
           currency_code, description, status
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [
-          userId,
-          tx.accountId,
-          tx.date,
-          tx.payeeName,
-          tx.amount,
-          "CAD",
-          tx.description,
-          tx.status,
-        ],
+          [
+            userId,
+            tx.accountId,
+            tx.date,
+            tx.payeeName,
+            tx.amount,
+            "CAD",
+            tx.description,
+            tx.status,
+          ],
+        ),
       );
     }
 

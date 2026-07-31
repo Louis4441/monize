@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -27,6 +26,11 @@ import { encrypt, derivePurposeKey } from "./crypto.util";
 import { PasswordBreachService } from "./password-breach.service";
 import { EmailService } from "../notifications/email.service";
 import { getRequestContext } from "../common/request-context";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 const TEST_JWT_SECRET = "test-jwt-secret-minimum-32-chars-long";
 const TEST_TOTP_KEY = derivePurposeKey(TEST_JWT_SECRET, "totp-encryption");
@@ -47,6 +51,7 @@ jest.mock("qrcode", () => ({
 
 describe("AuthService", () => {
   let service: AuthService;
+  let scopedManager: Record<string, jest.Mock>;
   let usersRepository: Record<string, jest.Mock>;
   let preferencesRepository: Record<string, jest.Mock>;
   let trustedDevicesRepository: Record<string, jest.Mock>;
@@ -119,10 +124,19 @@ describe("AuthService", () => {
       verify: jest.fn(),
     };
 
-    dataSource = {
-      transaction: jest.fn(),
-      createQueryRunner: jest.fn(),
-    };
+    // Every read/write now goes through `withScopedDb`, which the harness maps
+    // onto `dataSource.transaction` with the per-entity repository mocks routed
+    // through `manager.getRepository`.
+    const scoped = createScopedDbMocks([
+      [User, usersRepository as never],
+      [UserPreference, preferencesRepository as never],
+      [TrustedDevice, trustedDevicesRepository as never],
+      // The spec provides a real TokenService, whose refresh-token writes now
+      // go through the same scoped manager.
+      [RefreshToken, refreshTokensRepository as never],
+    ]);
+    scopedManager = scoped.manager;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     passwordBreachService = {
       isBreached: jest.fn().mockResolvedValue(false),
@@ -139,19 +153,6 @@ describe("AuthService", () => {
         TokenService,
         TwoFactorService,
         AuthEmailService,
-        { provide: getRepositoryToken(User), useValue: usersRepository },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: preferencesRepository,
-        },
-        {
-          provide: getRepositoryToken(TrustedDevice),
-          useValue: trustedDevicesRepository,
-        },
-        {
-          provide: getRepositoryToken(RefreshToken),
-          useValue: refreshTokensRepository,
-        },
         { provide: JwtService, useValue: jwtService },
         {
           provide: ConfigService,
@@ -208,6 +209,50 @@ describe("AuthService", () => {
       );
   });
 
+  /**
+   * Install a `dataSource.transaction` stub for a spec that drives the
+   * transaction body directly. It accepts both call shapes -- registration asks
+   * for SERIALIZABLE and so arrives as `transaction(isolation, cb)`, while every
+   * other scoped call is `transaction(cb)` -- and gives the supplied manager a
+   * `getRepository` routed at the same per-entity mocks, so unrelated scoped
+   * reads inside the same flow still resolve.
+   */
+
+  /**
+   * Make only the SERIALIZABLE user-creation transaction reject; every other
+   * scoped read still runs normally against the harness manager. Before the
+   * refactor those reads went through injected repositories and so were
+   * unaffected by a blanket `transaction.mockRejectedValue`.
+   */
+  function failCreateTransaction(error: unknown) {
+    dataSource.transaction.mockImplementation(async (...args: any[]) => {
+      if (typeof args[0] === "string") throw error;
+      return args[0](scopedManager);
+    });
+  }
+
+  function installTransactionMock(txManager: Record<string, any>) {
+    txManager.getRepository ??= jest.fn((entity: unknown) => {
+      if (entity === User) return usersRepository;
+      if (entity === UserPreference) return preferencesRepository;
+      if (entity === TrustedDevice) return trustedDevicesRepository;
+      if (entity === RefreshToken) return refreshTokensRepository;
+      return {
+        find: jest.fn().mockResolvedValue([]),
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation((d: unknown) => d),
+        save: jest.fn().mockImplementation((d: unknown) => d),
+        update: jest.fn().mockResolvedValue({ affected: 1 }),
+        delete: jest.fn().mockResolvedValue({ affected: 0 }),
+      };
+    });
+    dataSource.transaction.mockImplementation(async (...args: any[]) => {
+      const cb = typeof args[0] === "function" ? args[0] : args[1];
+      return cb(txManager);
+    });
+    return txManager;
+  }
+
   describe("register", () => {
     /**
      * Helper: set up dataSource.transaction mock for register()'s
@@ -225,10 +270,7 @@ describe("AuthService", () => {
           id: user.id || "new-user",
         })),
       };
-      dataSource.transaction.mockImplementation(
-        async (_isolation: string, cb: any) => cb(txManager),
-      );
-      return txManager;
+      return installTransactionMock(txManager);
     }
 
     it("creates a new user and returns token pair", async () => {
@@ -328,7 +370,13 @@ describe("AuthService", () => {
       expect(delegationService.isDelegateUser).toHaveBeenCalledWith("deleg-1");
       expect(invitedDelegate.passwordHash).toBeTruthy();
       expect(usersRepository.save).toHaveBeenCalledWith(invitedDelegate);
-      expect(dataSource.transaction).not.toHaveBeenCalled();
+      // The claim path reuses the existing row: no SERIALIZABLE create
+      // transaction is opened (every other scoped read is transaction(cb)).
+      expect(
+        dataSource.transaction.mock.calls.some(
+          (call) => call[0] === "SERIALIZABLE",
+        ),
+      ).toBe(false);
       expect(result.accessToken).toBeDefined();
       expect(result.user).not.toHaveProperty("passwordHash");
     });
@@ -368,7 +416,13 @@ describe("AuthService", () => {
       expect(tempDelegate.lockedUntil).toBeNull();
       expect(result.accessToken).toBeDefined();
       expect(result.user).not.toHaveProperty("passwordHash");
-      expect(dataSource.transaction).not.toHaveBeenCalled();
+      // The claim path reuses the existing row: no SERIALIZABLE create
+      // transaction is opened (every other scoped read is transaction(cb)).
+      expect(
+        dataSource.transaction.mock.calls.some(
+          (call) => call[0] === "SERIALIZABLE",
+        ),
+      ).toBe(false);
     });
 
     it("claims a delegate when the new account password happens to match the delegate's password (no currentPassword needed)", async () => {
@@ -897,7 +951,7 @@ describe("AuthService", () => {
         .mockResolvedValueOnce(existing); // catch path re-lookup by email
       // Force the create INSERT to fail with a unique-violation so we exercise
       // the duplicate-email catch path (not the primary merge path).
-      dataSource.transaction.mockRejectedValue({ code: "23505" });
+      failCreateTransaction({ code: "23505" });
       usersRepository.save.mockImplementation(async (u: any) => u);
       const sendSpy = jest
         .spyOn(service as any, "sendOidcLinkEmail")
@@ -928,9 +982,7 @@ describe("AuthService", () => {
         })),
         save: jest.fn().mockImplementation((user) => user),
       };
-      dataSource.transaction.mockImplementation(
-        async (_isolation: string, cb: any) => cb(txManager),
-      );
+      installTransactionMock(txManager);
 
       const result = await service.register({
         email: "test@example.com",
@@ -1474,10 +1526,7 @@ describe("AuthService", () => {
         findOne: jest.fn(),
         ...overrides,
       };
-      dataSource.transaction.mockImplementation(
-        async (_isolation: string, cb: any) => cb(txManager),
-      );
-      return txManager;
+      return installTransactionMock(txManager);
     }
 
     it("creates new user with verified email", async () => {
@@ -1755,7 +1804,7 @@ describe("AuthService", () => {
         .mockResolvedValueOnce(existingUser); // found after duplicate error
 
       // C9: transaction throws duplicate error
-      dataSource.transaction.mockRejectedValue(duplicateError);
+      failCreateTransaction(duplicateError);
 
       usersRepository.save.mockImplementation((u) => u); // subsequent saves succeed
 
@@ -1786,7 +1835,7 @@ describe("AuthService", () => {
         .mockResolvedValueOnce(null) // no existing by email (race condition)
         .mockResolvedValueOnce(existingLocal); // found after duplicate error
 
-      dataSource.transaction.mockRejectedValue(duplicateError);
+      failCreateTransaction(duplicateError);
       usersRepository.save.mockImplementation((u) => u);
 
       const result = await service.findOrCreateOidcUser({
@@ -1811,7 +1860,7 @@ describe("AuthService", () => {
       usersRepository.findOne.mockResolvedValue(null);
 
       // C9: transaction throws duplicate error
-      dataSource.transaction.mockRejectedValue(duplicateError);
+      failCreateTransaction(duplicateError);
 
       await expect(
         service.findOrCreateOidcUser({
@@ -1969,9 +2018,7 @@ describe("AuthService", () => {
         save: jest.fn().mockImplementation((user) => user),
         findOne: jest.fn(),
       };
-      dataSource.transaction.mockImplementation(
-        async (_isolation: string, cb: any) => cb(txManager),
-      );
+      installTransactionMock(txManager);
       usersRepository.save.mockImplementation((u) => u);
 
       const result = await service.validateOidcUser({
@@ -2000,8 +2047,7 @@ describe("AuthService", () => {
         create: jest.fn().mockImplementation((_entity, data) => data),
         ...managerOverrides,
       };
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
-      return manager;
+      return installTransactionMock(manager);
     }
 
     it("rotates token successfully", async () => {
@@ -3043,16 +3089,8 @@ describe("AuthService", () => {
           execute: jest.fn().mockResolvedValue({ affected: 1 }),
         }),
       };
-      const mockQueryRunner = {
-        connect: jest.fn().mockResolvedValue(undefined),
-        startTransaction: jest.fn().mockResolvedValue(undefined),
-        commitTransaction: jest.fn().mockResolvedValue(undefined),
-        rollbackTransaction: jest.fn().mockResolvedValue(undefined),
-        release: jest.fn().mockResolvedValue(undefined),
-        manager: mockQRManager,
-      };
-      dataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
-      return { mockQueryRunner, mockQRManager, mockSetFn };
+      installTransactionMock(mockQRManager);
+      return { mockQRManager, mockSetFn };
     }
 
     it("accepts a valid backup code", async () => {
@@ -3280,9 +3318,7 @@ describe("AuthService", () => {
         })),
         save: jest.fn().mockImplementation((user) => user),
       };
-      dataSource.transaction.mockImplementation(
-        async (_isolation: string, cb: any) => cb(txManager),
-      );
+      installTransactionMock(txManager);
 
       const result = await service.register({
         email: "test@example.com",
@@ -3472,15 +3508,7 @@ describe("AuthService", () => {
           execute: jest.fn().mockResolvedValue({ affected: 1 }),
         }),
       };
-      const mockQueryRunner = {
-        connect: jest.fn().mockResolvedValue(undefined),
-        startTransaction: jest.fn().mockResolvedValue(undefined),
-        commitTransaction: jest.fn().mockResolvedValue(undefined),
-        rollbackTransaction: jest.fn().mockResolvedValue(undefined),
-        release: jest.fn().mockResolvedValue(undefined),
-        manager: mockQRManager,
-      };
-      dataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      installTransactionMock(mockQRManager);
 
       // Set up verify2FA context
       (jwtService.verify as jest.Mock).mockReturnValue({
@@ -3497,16 +3525,15 @@ describe("AuthService", () => {
       const result = await service.verify2FA("atomic-backup-token", codes[0]);
 
       expect(result.user).toBeDefined();
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
+      // The consumption now runs in one withScopedDb transaction; what matters
+      // is that the read still takes the pessimistic lock.
+      expect(dataSource.transaction).toHaveBeenCalled();
       expect(mockQRManager.findOne).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
           lock: { mode: "pessimistic_write" },
         }),
       );
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
     });
 
     it("rolls back transaction if backup code was already consumed", async () => {
@@ -3520,15 +3547,7 @@ describe("AuthService", () => {
           backupCodes: null,
         }),
       };
-      const mockQueryRunner = {
-        connect: jest.fn().mockResolvedValue(undefined),
-        startTransaction: jest.fn().mockResolvedValue(undefined),
-        commitTransaction: jest.fn().mockResolvedValue(undefined),
-        rollbackTransaction: jest.fn().mockResolvedValue(undefined),
-        release: jest.fn().mockResolvedValue(undefined),
-        manager: mockQRManager,
-      };
-      dataSource.createQueryRunner.mockReturnValue(mockQueryRunner);
+      installTransactionMock(mockQRManager);
 
       (jwtService.verify as jest.Mock).mockReturnValue({
         sub: "user-1",
@@ -3545,8 +3564,9 @@ describe("AuthService", () => {
         service.verify2FA("consumed-backup-token", "abcd-1234"),
       ).rejects.toThrow("Invalid verification code");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // The consumption block returns early without writing, so its
+      // transaction commits empty -- same net effect as the old rollback.
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
   });
 });

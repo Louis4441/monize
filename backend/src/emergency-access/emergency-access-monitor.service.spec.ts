@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { EmergencyAccessMonitorService } from "./emergency-access-monitor.service";
@@ -10,6 +10,11 @@ import { EmailService } from "../notifications/email.service";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { getRequestContext } from "../common/request-context";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("EmergencyAccessMonitorService", () => {
   let service: EmergencyAccessMonitorService;
@@ -57,22 +62,21 @@ describe("EmergencyAccessMonitorService", () => {
       get: jest.fn((key: string, fallback: string) => fallback),
     };
 
+    // Every read/write now runs through `withScopedDb`; the former QueryRunner
+    // is the transaction's EntityManager, so keep `queryRunner.manager` pointing
+    // at the same jest.fn()s the manager exposes.
+    const scoped = createScopedDbMocks([
+      [EmergencyAccessSettings, settingsRepo as never],
+      [EmergencyAccessContact, contactsRepo as never],
+      [User, usersRepo as never],
+      [UserPreference, prefsRepo as never],
+    ]);
+    const dataSource = scoped.dataSource;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: DataSource, useValue: dataSource },
         EmergencyAccessMonitorService,
-        {
-          provide: getRepositoryToken(EmergencyAccessSettings),
-          useValue: settingsRepo,
-        },
-        {
-          provide: getRepositoryToken(EmergencyAccessContact),
-          useValue: contactsRepo,
-        },
-        { provide: getRepositoryToken(User), useValue: usersRepo },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: prefsRepo,
-        },
         { provide: EmailService, useValue: emailService },
         { provide: AiEncryptionService, useValue: encryption },
         { provide: ConfigService, useValue: configService },

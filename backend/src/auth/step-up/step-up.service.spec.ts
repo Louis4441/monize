@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import {
@@ -13,6 +13,13 @@ import { StepUpAuthService } from "./step-up.service";
 import { TwoFactorService } from "../two-factor.service";
 import { User } from "../../users/entities/user.entity";
 import { UserPreference } from "../../users/entities/user-preference.entity";
+import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+
+jest.mock("../../common/db/scoped-db", () =>
+  jest
+    .requireActual("../../test-helpers/scoped-db-testing")
+    .scopedDbMockModule(),
+);
 
 describe("StepUpAuthService", () => {
   let service: StepUpAuthService;
@@ -31,12 +38,14 @@ describe("StepUpAuthService", () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        StepUpAuthService,
-        { provide: getRepositoryToken(User), useValue: usersRepo },
         {
-          provide: getRepositoryToken(UserPreference),
-          useValue: preferencesRepo,
+          provide: DataSource,
+          useValue: createScopedDbMocks([
+            [User, usersRepo as never],
+            [UserPreference, preferencesRepo as never],
+          ]).dataSource,
         },
+        StepUpAuthService,
         { provide: TwoFactorService, useValue: twoFactor },
         { provide: JwtService, useValue: jwt },
         { provide: ConfigService, useValue: { get: jest.fn() } },

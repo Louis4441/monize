@@ -68,9 +68,25 @@ export function runOutsideActiveScopedManager<T>(fn: () => T): T {
 export const MISSING_CONTEXT_MESSAGE =
   "DB access outside request/user/system context -- wrap the call path in withUserContext/withSystemContext";
 
+/**
+ * Isolation levels callers may request. Only the registration paths need one
+ * (SERIALIZABLE, to close the first-user-admin race); everything else uses the
+ * connection default, exactly as before.
+ *
+ * Spelled out rather than imported from `typeorm/driver/types/IsolationLevel`:
+ * that deep path type-checks under tsc but does not resolve under ts-jest, so
+ * importing it takes every suite in the repo down.
+ */
+export type ScopedDbIsolation =
+  | "READ UNCOMMITTED"
+  | "READ COMMITTED"
+  | "REPEATABLE READ"
+  | "SERIALIZABLE";
+
 export async function withScopedDb<T>(
   dataSource: DataSource,
   fn: (manager: EntityManager) => Promise<T>,
+  isolation?: ScopedDbIsolation,
 ): Promise<T> {
   const ctx = getRequestContext();
   if (!ctx || (!ctx.userId && !ctx.system)) {
@@ -79,12 +95,21 @@ export async function withScopedDb<T>(
 
   const active = getActiveScopedManager();
   if (active) {
+    if (isolation) {
+      // A joined transaction already has an isolation level, chosen by whoever
+      // opened it. Silently downgrading a SERIALIZABLE request to whatever the
+      // caller happened to be running under would reintroduce exactly the race
+      // the caller asked to prevent, invisibly -- so refuse instead.
+      throw new Error(
+        `withScopedDb cannot apply isolation "${isolation}": it is joining an ambient transaction`,
+      );
+    }
     // Re-entrant call: join the ambient transaction (same connection, same
     // GUCs, same atomicity). Never open a second transaction.
     return fn(active);
   }
 
-  return dataSource.transaction(async (manager) => {
+  const runInTransaction = async (manager: EntityManager) => {
     const mode = getRlsMode();
     if (mode !== "off") {
       if (ctx.system) {
@@ -112,5 +137,9 @@ export async function withScopedDb<T>(
     }
 
     return runWithActiveScopedManager(manager, () => fn(manager));
-  });
+  };
+
+  return isolation
+    ? dataSource.transaction(isolation, runInTransaction)
+    : dataSource.transaction(runInTransaction);
 }

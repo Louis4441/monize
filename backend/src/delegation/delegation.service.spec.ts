@@ -7,6 +7,19 @@ import * as bcrypt from "bcryptjs";
 import { I18nService } from "nestjs-i18n";
 import { DelegationService, DELEGATE_2FA_REQUIRED } from "./delegation.service";
 import { DelegateAccountFavourite } from "./entities/delegate-account-favourite.entity";
+import { AccountDelegate } from "./entities/account-delegate.entity";
+import { AccountDelegateGrant } from "./entities/account-delegate-grant.entity";
+import { User } from "../users/entities/user.entity";
+import { UserPreference } from "../users/entities/user-preference.entity";
+import { RefreshToken } from "../auth/entities/refresh-token.entity";
+import { Account } from "../accounts/entities/account.entity";
+import { Transaction } from "../transactions/entities/transaction.entity";
+import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("DelegationService", () => {
   let service: DelegationService;
@@ -46,7 +59,21 @@ describe("DelegationService", () => {
     };
     emailService = { getStatus: jest.fn(), sendMail: jest.fn() };
     configService = { get: jest.fn() };
-    dataSource = { transaction: jest.fn() };
+    // Every read/write now runs through `withScopedDb`, which the harness maps
+    // onto `dataSource.transaction`, with the per-entity repository mocks
+    // routed through `manager.getRepository`.
+    const scoped = createScopedDbMocks([
+      [AccountDelegate, delegatesRepo as never],
+      [AccountDelegateGrant, grantsRepo as never],
+      [User, usersRepo as never],
+      [UserPreference, prefsRepo as never],
+      [RefreshToken, refreshRepo as never],
+      [Account, accountsRepo as never],
+      [Transaction, transactionsRepo as never],
+      [ScheduledTransaction, scheduledTxRepo as never],
+      [DelegateAccountFavourite, delegateFavouritesRepo as never],
+    ]);
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     const i18nStub = {
       translate: (key: string, opts?: { defaultValue?: string }) =>
@@ -54,21 +81,35 @@ describe("DelegationService", () => {
     } as unknown as I18nService;
 
     service = new DelegationService(
-      delegatesRepo as any,
-      grantsRepo as any,
-      usersRepo as any,
-      prefsRepo as any,
-      refreshRepo as any,
-      accountsRepo as any,
-      transactionsRepo as any,
-      scheduledTxRepo as any,
-      delegateFavouritesRepo as any,
       emailService as any,
       configService as any,
       dataSource as any,
       i18nStub,
     );
   });
+
+  /**
+   * Install a `dataSource.transaction` stub for a spec that drives the
+   * transaction body directly, giving the supplied manager a `getRepository`
+   * routed at the same per-entity mocks so unrelated scoped reads inside the
+   * same flow still resolve.
+   */
+  function installTransactionMock(manager: Record<string, any>) {
+    manager.getRepository ??= jest.fn((entity: unknown) => {
+      if (entity === AccountDelegate) return delegatesRepo;
+      if (entity === AccountDelegateGrant) return grantsRepo;
+      if (entity === User) return usersRepo;
+      if (entity === UserPreference) return prefsRepo;
+      if (entity === RefreshToken) return refreshRepo;
+      if (entity === Account) return accountsRepo;
+      if (entity === Transaction) return transactionsRepo;
+      if (entity === ScheduledTransaction) return scheduledTxRepo;
+      if (entity === DelegateAccountFavourite) return delegateFavouritesRepo;
+      throw new Error(`unregistered entity in transaction: ${String(entity)}`);
+    });
+    dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+    return manager;
+  }
 
   describe("validateActingContext", () => {
     const args = {
@@ -294,7 +335,7 @@ describe("DelegationService", () => {
         create: jest.fn((_e, v) => v),
         save: jest.fn((rows) => saved.push(...rows)),
       };
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       await service.setGrants("o1", "g1", [
         {
@@ -825,7 +866,7 @@ describe("DelegationService", () => {
         ownsDelegations: 0,
         isDelegateOnly: true,
       });
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       await service.revokeDelegate("o1", "g1");
 
@@ -853,7 +894,7 @@ describe("DelegationService", () => {
         ownsDelegations: 0,
         isDelegateOnly: false,
       });
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       await service.revokeDelegate("o1", "g1");
 
@@ -874,7 +915,7 @@ describe("DelegationService", () => {
         ownsAccounts: 0,
         ownsDelegations: 0,
       });
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       await service.revokeDelegate("o1", "g1");
 
@@ -900,7 +941,7 @@ describe("DelegationService", () => {
         ownsDelegations: 0,
         isDelegateOnly: true,
       });
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       await service.revokeDelegate("o1", "g1");
 
@@ -918,7 +959,7 @@ describe("DelegationService", () => {
         ownsAccounts: 3,
         ownsDelegations: 0,
       });
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       await service.revokeDelegate("o1", "g1");
 
@@ -937,7 +978,7 @@ describe("DelegationService", () => {
         ownsDelegations: 0,
         role: "admin",
       });
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       await service.revokeDelegate("o1", "g1");
 
@@ -1133,7 +1174,7 @@ describe("DelegationService", () => {
       usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
       const manager = makeManager();
       manager.findOne.mockResolvedValue(null); // no existing user, no delegation
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
       const res = await service.createDelegate("o1", {
         email: "new@x.y",
       } as any);
@@ -1163,7 +1204,7 @@ describe("DelegationService", () => {
         if (opts?.where?.delegateUserId === "d1") return Promise.resolve(1);
         return Promise.resolve(0);
       });
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
       await service.createDelegate("o1", {
         email: "new@x.y",
         password: "StrongPass1!xyz",
@@ -1180,7 +1221,7 @@ describe("DelegationService", () => {
       configService.get.mockReturnValue("http://app");
       const manager = makeManager();
       manager.findOne.mockResolvedValue(null);
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
       const res = await service.createDelegate("o1", {
         email: "new@x.y",
         sendInvite: true,
@@ -1197,7 +1238,7 @@ describe("DelegationService", () => {
       prefsRepo.findOne.mockResolvedValue({ userId: "g-new", language: "fr" });
       const manager = makeManager();
       manager.findOne.mockResolvedValue(null);
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       await service.createDelegate("o1", {
         email: "new@x.y",
@@ -1214,7 +1255,7 @@ describe("DelegationService", () => {
       emailService.getStatus.mockReturnValue({ configured: false });
       const manager = makeManager();
       manager.findOne.mockResolvedValue(null);
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
       await expect(
         service.createDelegate("o1", {
           email: "new@x.y",
@@ -1227,7 +1268,7 @@ describe("DelegationService", () => {
       usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
       const manager = makeManager();
       manager.findOne.mockResolvedValue(null);
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
       const res = await service.createDelegate("o1", {
         email: "new@x.y",
         password: "StrongPass1!xyz",
@@ -1243,7 +1284,7 @@ describe("DelegationService", () => {
       manager.findOne
         .mockResolvedValueOnce({ id: "d1" }) // existing user
         .mockResolvedValueOnce(existingDelegation); // existing delegation
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
       await service.createDelegate("o1", { email: "new@x.y" } as any);
       expect(existingDelegation.status).toBe("active");
     });
@@ -1254,7 +1295,7 @@ describe("DelegationService", () => {
       manager.findOne
         .mockResolvedValueOnce({ id: "d1" })
         .mockResolvedValueOnce({ id: "g1", status: "active" });
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
       await expect(
         service.createDelegate("o1", { email: "new@x.y" } as any),
       ).rejects.toThrow(/already a delegate/);
@@ -1264,7 +1305,7 @@ describe("DelegationService", () => {
       usersRepo.findOne.mockResolvedValue({ id: "o1", email: "own@x.y" });
       const manager = makeManager();
       manager.findOne.mockResolvedValueOnce({ id: "o1" });
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
       await expect(
         service.createDelegate("o1", { email: "new@x.y" } as any),
       ).rejects.toThrow(/yourself/);
@@ -1278,7 +1319,7 @@ describe("DelegationService", () => {
         .mockResolvedValueOnce(existing) // existing user
         .mockResolvedValueOnce(null); // no delegation yet
       // count(Account)=0, count(AccountDelegate owner)=0 -> pure delegate
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       await service.createDelegate("o1", {
         email: "shared@x.y",
@@ -1304,7 +1345,7 @@ describe("DelegationService", () => {
         .mockResolvedValueOnce(existing)
         .mockResolvedValueOnce(null);
       manager.count.mockResolvedValue(2); // owns accounts -> full user
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       const res = await service.createDelegate("o1", {
         email: "full@x.y",
@@ -1334,7 +1375,7 @@ describe("DelegationService", () => {
       // ownsAccounts=0, ownsDelegations=0, alreadyDelegate=0 -- a fresh
       // self-registered user who is not yet anybody's delegate row.
       manager.count.mockResolvedValue(0);
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
 
       const res = await service.createDelegate("o1", {
         email: "fresh@x.y",
@@ -1355,7 +1396,7 @@ describe("DelegationService", () => {
         create: jest.fn((_e: any, v: any) => v),
         save: jest.fn((v: any) => ({ id: "g-new", ...v })),
       };
-      dataSource.transaction.mockImplementation(async (cb: any) => cb(manager));
+      installTransactionMock(manager);
       const res = await service.createDelegate("o1", {
         email: "new@x.y",
         sendInvite: true,
@@ -1467,19 +1508,11 @@ describe("DelegationService", () => {
     });
 
     it("reorderDelegateFavourites sets sortOrder by position", async () => {
-      const manager = { update: jest.fn() };
-      const queryRunner = {
-        connect: jest.fn(),
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        rollbackTransaction: jest.fn(),
-        release: jest.fn(),
-        manager,
-      };
-      dataSource.createQueryRunner = jest.fn().mockReturnValue(queryRunner);
+      const manager = installTransactionMock({ update: jest.fn() });
       await service.reorderDelegateFavourites("d1", ["a2", "a1"]);
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
-      expect(queryRunner.release).toHaveBeenCalled();
+      // The whole reorder is one transaction, so a partially applied order can
+      // never be committed.
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
       expect(manager.update).toHaveBeenNthCalledWith(
         1,
         DelegateAccountFavourite,

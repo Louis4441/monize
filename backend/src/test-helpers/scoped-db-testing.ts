@@ -34,14 +34,29 @@ export interface DataSourceMock {
  * caller-provided (mock) `dataSource.transaction`, so specs can both drive the
  * callback (via `createScopedDbMocks`) and assert transactional grouping (via
  * `dataSource.transaction.mock.calls`).
+ *
+ * An explicit isolation level is forwarded in TypeORM's own argument order
+ * (`transaction(isolation, fn)`), so a spec can still assert that a caller asked
+ * for SERIALIZABLE -- registration's first-user-admin race depends on it, and
+ * swallowing the argument here would make that assertion unwritable.
  */
 export function scopedDbMockModule() {
   return {
     withScopedDb: jest.fn(
       (
-        dataSource: { transaction: (fn: (m: unknown) => unknown) => unknown },
+        dataSource: {
+          transaction: (
+            ...args:
+              | [(m: unknown) => unknown]
+              | [string, (m: unknown) => unknown]
+          ) => unknown;
+        },
         fn: (m: unknown) => unknown,
-      ) => dataSource.transaction(fn),
+        isolation?: string,
+      ) =>
+        isolation
+          ? dataSource.transaction(isolation, fn)
+          : dataSource.transaction(fn),
     ),
   };
 }

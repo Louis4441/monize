@@ -2,15 +2,9 @@ import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { PassportModule } from "@nestjs/passport";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { TypeOrmModule } from "@nestjs/typeorm";
 
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
-import { User } from "../users/entities/user.entity";
-import { UserPreference } from "../users/entities/user-preference.entity";
-import { TrustedDevice } from "../users/entities/trusted-device.entity";
-import { RefreshToken } from "./entities/refresh-token.entity";
-import { PersonalAccessToken } from "./entities/personal-access-token.entity";
 import { LocalStrategy } from "./strategies/local.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { OidcService } from "./oidc/oidc.service";
@@ -29,13 +23,6 @@ import { DelegationModule } from "../delegation/delegation.module";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      User,
-      UserPreference,
-      TrustedDevice,
-      RefreshToken,
-      PersonalAccessToken,
-    ]),
     PassportModule,
     UsersModule,
     NotificationsModule,

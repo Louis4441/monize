@@ -23,6 +23,7 @@ import {
   DelegateSection,
 } from "../decorators/delegate-access.decorator";
 import { DelegationService } from "../delegation.service";
+import { withDelegateContext } from "../../common/db/with-context";
 
 const SECTION_LABELS: Record<DelegateSection, string> = {
   bills: "Bills & Deposits",
@@ -81,6 +82,22 @@ export class AccountDelegateGuard implements CanActivate {
       return true; // acting as self / normal user
     }
 
+    // RLS: global guards run before AuthGuard('jwt') and before the
+    // RequestContextInterceptor's scope exists, so every DelegationService read
+    // below would have no ambient identity to spend. The verified token names
+    // both parties -- `actingAsUserId` is the owner, `sub` is the delegate --
+    // and the grant/account rows these checks read are keyed by one or the
+    // other, so seed both GUCs rather than a single-id user context.
+    return withDelegateContext(payload.actingAsUserId, payload.sub, () =>
+      this.checkDelegateAccess(context, req, payload),
+    );
+  }
+
+  private async checkDelegateAccess(
+    context: ExecutionContext,
+    req: Request,
+    payload: any,
+  ): Promise<boolean> {
     const allowed = this.reflector.getAllAndOverride<boolean>(
       ALLOW_DELEGATE_KEY,
       [context.getHandler(), context.getClass()],

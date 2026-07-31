@@ -1,7 +1,13 @@
 import { Injectable, Logger, BadRequestException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
-import { Repository, LessThanOrEqual } from "typeorm";
+import {
+  DataSource,
+  EntityTarget,
+  LessThanOrEqual,
+  ObjectLiteral,
+  Repository,
+} from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Cron } from "@nestjs/schedule";
 import { promises as fs, readdirSync, unlinkSync, copyFileSync } from "fs";
 import { resolve } from "path";
@@ -68,15 +74,26 @@ export class AutoBackupService {
   private readonly defaultFolderPath: string;
 
   constructor(
-    @InjectRepository(AutoBackupSettings)
-    private readonly settingsRepo: Repository<AutoBackupSettings>,
-    @InjectRepository(User)
-    private readonly usersRepo: Repository<User>,
+    private readonly dataSource: DataSource,
     private readonly backupService: BackupService,
     config: ConfigService,
   ) {
     this.defaultFolderPath = this.resolveConfiguredFolderPath(
       config.get<string>("BACKUP_CONTAINER_DIR"),
+    );
+  }
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
     );
   }
 
@@ -127,9 +144,11 @@ export class AutoBackupService {
   }
 
   async getSettings(userId: string): Promise<AutoBackupSettings> {
-    const existing = await this.settingsRepo.findOne({
-      where: { userId },
-    });
+    const existing = await this.scoped(AutoBackupSettings, (repo) =>
+      repo.findOne({
+        where: { userId },
+      }),
+    );
     if (!existing) return this.defaultSettingsFor(userId);
 
     // Report the folder backups are actually written to, so a stored row that
@@ -143,14 +162,16 @@ export class AutoBackupService {
     userId: string,
     dto: UpdateAutoBackupSettingsDto,
   ): Promise<AutoBackupSettings> {
-    let settings = await this.settingsRepo.findOne({
-      where: { userId },
-    });
+    let settings = await this.scoped(AutoBackupSettings, (repo) =>
+      repo.findOne({
+        where: { userId },
+      }),
+    );
 
     if (!settings) {
       // Seed the row with the same defaults getSettings reports, so an update
       // that only touches one field still lands on a complete row.
-      settings = this.settingsRepo.create(this.defaultSettingsFor(userId));
+      settings = this.defaultSettingsFor(userId);
     }
 
     if (dto.folderPath !== undefined) {
@@ -193,7 +214,7 @@ export class AutoBackupService {
       }
     }
 
-    return this.settingsRepo.save(settings);
+    return this.scoped(AutoBackupSettings, (repo) => repo.save(settings));
   }
 
   async validateFolder(
@@ -261,8 +282,9 @@ export class AutoBackupService {
     // manual run: the row is seeded with defaults here and persisted by the
     // save at the end of this method.
     const settings =
-      (await this.settingsRepo.findOne({ where: { userId } })) ??
-      this.settingsRepo.create(this.defaultSettingsFor(userId));
+      (await this.scoped(AutoBackupSettings, (repo) =>
+        repo.findOne({ where: { userId } }),
+      )) ?? this.defaultSettingsFor(userId);
     settings.folderPath = this.resolveFolderPath(settings.folderPath);
 
     await this.assertFolderWritable(settings.folderPath);
@@ -287,7 +309,7 @@ export class AutoBackupService {
         new Date(),
       );
     }
-    await this.settingsRepo.save(settings);
+    await this.scoped(AutoBackupSettings, (repo) => repo.save(settings));
 
     return { message: "Backup completed successfully", filename };
   }
@@ -297,12 +319,14 @@ export class AutoBackupService {
     const now = new Date();
     // RLS (task C2): cross-user fan-out over every user's due backup settings.
     const dueSettings = await withSystemContext(() =>
-      this.settingsRepo.find({
-        where: {
-          enabled: true,
-          nextBackupAt: LessThanOrEqual(now),
-        },
-      }),
+      this.scoped(AutoBackupSettings, (repo) =>
+        repo.find({
+          where: {
+            enabled: true,
+            nextBackupAt: LessThanOrEqual(now),
+          },
+        }),
+      ),
     );
 
     if (dueSettings.length === 0) return;
@@ -333,7 +357,7 @@ export class AutoBackupService {
           now,
         );
         await withUserContext(settings.userId, () =>
-          this.settingsRepo.save(settings),
+          this.scoped(AutoBackupSettings, (repo) => repo.save(settings)),
         );
 
         this.logger.log(
@@ -353,7 +377,7 @@ export class AutoBackupService {
           now,
         );
         await withUserContext(settings.userId, () =>
-          this.settingsRepo.save(settings),
+          this.scoped(AutoBackupSettings, (repo) => repo.save(settings)),
         );
       }
     }
@@ -364,7 +388,9 @@ export class AutoBackupService {
     folderPath: string,
     timezone: string,
   ): Promise<string> {
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user) {
       throw new BadRequestException(
         tr("errors.backup.userNotFound", `User ${userId} not found`, {

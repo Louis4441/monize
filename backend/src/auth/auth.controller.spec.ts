@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import {
   BadRequestException,
   ForbiddenException,
@@ -16,6 +16,11 @@ import { TokenService } from "./token.service";
 import { DelegationService } from "../delegation/delegation.service";
 import { encrypt, derivePurposeKey } from "./crypto.util";
 import { I18nService } from "nestjs-i18n";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 // Matches the JWT_SECRET used in the configService mock below; kept in one
 // place so encrypt/decrypt in tests can round-trip against the controller's
@@ -172,8 +177,10 @@ describe("AuthController", () => {
           },
         },
         {
-          provide: getRepositoryToken(UserPreference),
-          useValue: { findOne: jest.fn().mockResolvedValue(null) },
+          provide: DataSource,
+          useValue: createScopedDbMocks([
+            [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+          ]).dataSource,
         },
       ],
     }).compile();
@@ -233,8 +240,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -298,8 +307,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -419,8 +430,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -702,8 +715,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -869,8 +884,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -1809,8 +1826,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -1884,8 +1903,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -1982,8 +2003,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -2068,8 +2091,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -2156,8 +2181,13 @@ describe("AuthController", () => {
               },
             },
             {
-              provide: getRepositoryToken(UserPreference),
-              useValue: { findOne: jest.fn().mockResolvedValue(null) },
+              provide: DataSource,
+              useValue: createScopedDbMocks([
+                [
+                  UserPreference,
+                  { findOne: jest.fn().mockResolvedValue(null) },
+                ],
+              ]).dataSource,
             },
           ],
         }).compile();
@@ -2216,8 +2246,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -2277,8 +2309,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -2348,8 +2382,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -2405,8 +2441,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();
@@ -2600,8 +2638,10 @@ describe("AuthController", () => {
             },
           },
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: { findOne: jest.fn().mockResolvedValue(null) },
+            provide: DataSource,
+            useValue: createScopedDbMocks([
+              [UserPreference, { findOne: jest.fn().mockResolvedValue(null) }],
+            ]).dataSource,
           },
         ],
       }).compile();

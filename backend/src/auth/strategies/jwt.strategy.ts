@@ -5,7 +5,10 @@ import { ConfigService } from "@nestjs/config";
 import { Request } from "express";
 import { AuthService } from "../auth.service";
 import { DelegationService } from "../../delegation/delegation.service";
-import { withUserContext } from "../../common/db/with-context";
+import {
+  withDelegateContext,
+  withUserContext,
+} from "../../common/db/with-context";
 import { tr } from "../../i18n/translate";
 
 /**
@@ -98,11 +101,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       // Delegate acting as an owner. Re-validate every request (fail closed):
       // revoked/inactive delegation, inactive owner, or an unmet 2FA
       // requirement all reject the token here.
-      await this.delegationService.validateActingContext({
-        delegateUserId: payload.sub,
-        actingAsUserId: payload.actingAsUserId,
-        delegationId: payload.delegationId,
-      });
+      //
+      // RLS: this re-validation reads the OWNER's `users` and `user_preferences`
+      // rows (delegateMustEnrollOwn2FA) as well as the delegate's own, so the
+      // surrounding `withUserContext(payload.sub)` -- which names only the
+      // delegate -- is the wrong identity for half of it. Re-seed both:
+      // current = owner, real = delegate, which is what the special policies
+      // M2 wrote for delegation expect.
+      await withDelegateContext(payload.actingAsUserId, payload.sub, () =>
+        this.delegationService.validateActingContext({
+          delegateUserId: payload.sub,
+          actingAsUserId: payload.actingAsUserId,
+          delegationId: payload.delegationId,
+        }),
+      );
 
       // SECURITY: `id` becomes the OWNER's id so every existing
       // `where: { userId }` query is correctly scoped to the owner's data.

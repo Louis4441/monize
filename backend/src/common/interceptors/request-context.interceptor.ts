@@ -5,9 +5,9 @@ import {
   Logger,
   NestInterceptor,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
 import { Observable, from, switchMap } from "rxjs";
-import { Repository } from "typeorm";
+import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import { withScopedDb } from "../../common/db/scoped-db";
 import { Request } from "express";
 import { User } from "../../users/entities/user.entity";
 import { UserPreference } from "../../users/entities/user-preference.entity";
@@ -38,12 +38,22 @@ export class RequestContextInterceptor implements NestInterceptor {
   private readonly logger = new Logger(RequestContextInterceptor.name);
   private readonly lastActivityWrite = new Map<string, number>();
 
-  constructor(
-    @InjectRepository(UserPreference)
-    private readonly preferencesRepository: Repository<UserPreference>,
-    @InjectRepository(User)
-    private readonly usersRepository: Repository<User>,
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
+  }
 
   private touchLastActivity(userId: string): void {
     const now = Date.now();
@@ -57,9 +67,8 @@ export class RequestContextInterceptor implements NestInterceptor {
     // has ambient identity once this repository moves to withScopedDb (R7). Inert
     // at RLS_MODE=off; the update writes the same row it always did.
     withUserContext(userId, () =>
-      this.usersRepository.update(
-        { id: userId },
-        { lastActivityAt: new Date(now) },
+      this.scoped(User, (repo) =>
+        repo.update({ id: userId }, { lastActivityAt: new Date(now) }),
       ),
     ).catch((err) => {
       // Roll the cached timestamp back so a transient failure does not
@@ -127,9 +136,11 @@ export class RequestContextInterceptor implements NestInterceptor {
       // result), so seed a user context around its reads/writes. Inert at
       // RLS_MODE=off -- same preference row, same fire-and-forget semantics.
       const pref = await withUserContext(userId, () =>
-        this.preferencesRepository.findOne({
-          where: { userId },
-        }),
+        this.scoped(UserPreference, (repo) =>
+          repo.findOne({
+            where: { userId },
+          }),
+        ),
       );
       const stored = pref?.timezone?.trim();
       if (stored && stored !== "browser") {
@@ -145,9 +156,8 @@ export class RequestContextInterceptor implements NestInterceptor {
         pref?.lastClientTimezone !== headerTz
       ) {
         withUserContext(userId, () =>
-          this.preferencesRepository.update(
-            { userId },
-            { lastClientTimezone: headerTz },
+          this.scoped(UserPreference, (repo) =>
+            repo.update({ userId }, { lastClientTimezone: headerTz }),
           ),
         ).catch((err) => {
           this.logger.warn(
