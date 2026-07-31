@@ -120,14 +120,15 @@ export function PayeeSeasonalityPanel({
                             amount,
                             years: entry.years,
                           })}
-                          // Colour carries the sign, matching the app's other
-                          // CSS bars (TopGroupsPanel): money out red, money in
-                          // green -- but through the theme's chart tokens, so
-                          // the row re-colours with the palette instead of
-                          // staying Tailwind red/green on every theme. The peak
-                          // is the same token at full strength and the rest are
-                          // washed back toward the card, so highlighting it does
-                          // not cost the sign or introduce a colour of its own.
+                          // The theme accent, matching TopGroupsPanel: a
+                          // twelve-month shape is a magnitude comparison, not a
+                          // warning, and red here would both fight the palette
+                          // and borrow the emphasis the Monthly Totals chart
+                          // needs. Inflow months keep green so the sign
+                          // survives. The peak is the same token at full
+                          // strength and the rest are washed back toward the
+                          // card, so highlighting it costs neither the sign nor
+                          // a colour of its own.
                           className="w-full rounded-t"
                           // A month with history but a zero average still shows
                           // a sliver, so it reads as "billed, netted out"
@@ -135,7 +136,7 @@ export function PayeeSeasonalityPanel({
                           style={{
                             height: `${Math.max(height, 2)}%`,
                             backgroundColor:
-                              average > 0 ? chartColors.income : chartColors.expense,
+                              average > 0 ? chartColors.income : chartColors.primary,
                             opacity: isPeak ? 1 : 0.6,
                           }}
                         />

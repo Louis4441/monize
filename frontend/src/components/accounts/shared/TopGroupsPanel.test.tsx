@@ -32,7 +32,7 @@ describe('TopGroupsPanel', () => {
     expect(screen.getByText('Uncategorised')).toBeInTheDocument();
   });
 
-  it('colours amounts and bars with the theme chart tokens, not fixed red/green', () => {
+  it('colours outflows with the theme accent and inflows with the income token', () => {
     const { container } = render(
       <TopGroupsPanel
         title="Top Categories"
@@ -44,12 +44,15 @@ describe('TopGroupsPanel', () => {
       />,
     );
     const items = screen.getAllByRole('listitem');
-    // Salary (+3000) ranks first and reads as income, Rent (-1200) as expense.
+    // Salary (+3000) ranks first and reads as income; Rent (-1200) takes the
+    // theme accent rather than red.
     expect(items[0].innerHTML).toContain('var(--chart-income)');
-    expect(items[1].innerHTML).toContain('var(--chart-expense)');
-    // Guard against the original mistake: hardcoded Tailwind shades ignore the
-    // active colour theme, so no row may carry one.
+    expect(items[1].innerHTML).toContain('var(--chart-primary)');
+    // Guard against both mistakes this panel has made: hardcoded Tailwind
+    // shades ignore the active colour theme, and red belongs to the Monthly
+    // Totals chart rather than to a routine breakdown.
     expect(container.innerHTML).not.toMatch(/(text|bg)-(red|green)-\d/);
+    expect(container.innerHTML).not.toContain('var(--chart-expense)');
   });
 
   it('calls onSelect with the group id for identified rows only', () => {
