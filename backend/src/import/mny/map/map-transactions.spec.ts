@@ -174,6 +174,49 @@ describe("mapTransactions", () => {
       expect(result.skipped).toBe(0);
     });
 
+    /**
+     * A scheduled instance Money holds but never posted. The register does not
+     * show it and the balance does not count it -- the maintainer confirmed
+     * both against Money -- so importing it put four accounts out by exactly
+     * these rows' total: $7,671.79 on one chequing account whose Money balance
+     * is $0.00, -$156.55 on a credit card, $91.00 and $350.00 elsewhere.
+     */
+    it("excludes a scheduled instance Money never posted", () => {
+      const scheduled = MNY_TRANSACTION_FLAG.SCHEDULED_SERIES;
+      const result = mapTransactions(
+        input({
+          transactions: transactionData({
+            transactions: [
+              // Posted by the scheduler: real, and imported.
+              mnyTransaction({ handle: 1, amount: -100, flags: scheduled }),
+              // The two bits occur alone and together; each marks the same
+              // thing.
+              mnyTransaction({
+                handle: 2,
+                amount: -50,
+                flags: scheduled | 0x20000,
+              }),
+              mnyTransaction({
+                handle: 3,
+                amount: -25,
+                flags: scheduled | 0x40000,
+              }),
+              mnyTransaction({
+                handle: 4,
+                amount: -75,
+                flags: scheduled | 0x60000,
+              }),
+            ],
+          }),
+        }),
+      );
+
+      expect(result.transactions.map((t) => t.handle)).toEqual([1]);
+      // Money does not show them either, so there is nothing to report.
+      expect(result.warnings).toEqual([]);
+      expect(result.skipped).toBe(0);
+    });
+
     it("excludes a split child from the top level", () => {
       const result = mapTransactions(
         input({

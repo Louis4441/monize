@@ -14,6 +14,7 @@ import {
   decodeReference,
   hasInvestmentDetail,
   isRecurrenceTemplate,
+  isUnpostedRow,
   mapInvestmentAction,
   mapTransactionStatus,
 } from "../model/mny-model";
@@ -442,7 +443,8 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
       row.security === null ||
       splitChildren.has(row.handle) ||
       templates.has(row.handle) ||
-      isRecurrenceTemplate(row.frequency)
+      isRecurrenceTemplate(row.frequency) ||
+      isUnpostedRow(row.flags)
     ) {
       continue;
     }

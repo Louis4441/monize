@@ -525,6 +525,14 @@ real mappers and, in the integration spec, the real INSERT path.
   debt account: an account-less split parent, its legs, and the legs' counterparts *in the loan
   account*, which have a real account and date and so import as ordinary principal postings if
   only the parent is skipped. `BILL.lHtrn` does not reference them.
+- **`grftt & 0x60000` is a scheduled instance Money never posted**, and is skipped like the
+  loan-payment family. 67 rows, none reconciled in a file that is 74% reconciled, all inside
+  2003-10-15..2004-09-28, every one also carrying `0x200000`. Importing them left four accounts
+  out by exactly their total: CIBC Chequing $7,671.79 against Money's $0.00, CIBC VISA -$156.55
+  against $0.00, the Standard Life sleeve $91.00 and Mortgage - 33 Spring $350.00, plus two of
+  the three holdings mismatches. `ACCT.amtEndRec` agreed but could not prove it -- these rows are
+  unreconciled, so a reconciled balance excludes them under either reading -- and the maintainer
+  confirmed the rows are absent from Money's register.
 - **`BILL.lHtrn` is not the template.** It points at whatever transaction the series currently
   holds, which for an entered bill is the posting: 1,843 of the maintainer's 1,845 are `frq != -1`
   and excluded anyway, and the other two were real 2003 postings worth $6,243.96. The row's own

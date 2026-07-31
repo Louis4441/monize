@@ -425,6 +425,31 @@ describe("mapInvestments", () => {
       expect(result.skipped).toBe(0);
     });
 
+    // The two share-adjustment rows this catches in the maintainer's file are
+    // the whole of two holdings mismatches: 2 shares of one fund and 3 of
+    // another, in an account Money shows as empty.
+    it("ignores a scheduled instance Money never posted", () => {
+      const result = mapInvestments(
+        input({
+          transactions: transactionData({
+            transactions: [
+              invRow({ handle: 1, action: MNY_ACTION.BUY, flags: 0x20000 }),
+              invRow({ handle: 2, action: MNY_ACTION.BUY, flags: 0x40000 }),
+            ],
+          }),
+          investments: investmentData({
+            investmentDetails: [
+              mnyInvestmentDetail({ transaction: 1, quantity: 2, price: 10 }),
+              mnyInvestmentDetail({ transaction: 2, quantity: 3, price: 10 }),
+            ],
+          }),
+        }),
+      );
+
+      expect(result.transactions).toEqual([]);
+      expect(result.skipped).toBe(0);
+    });
+
     it("ignores recurrence templates, bill templates and split children", () => {
       const result = mapInvestments(
         input({

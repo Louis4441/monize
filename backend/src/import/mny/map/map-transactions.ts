@@ -12,6 +12,7 @@ import {
   decodeReference,
   isLoanPaymentTemplate,
   isRecurrenceTemplate,
+  isUnpostedRow,
   mapTransactionStatus,
 } from "../model/mny-model";
 import { MnyWarning, MnyWarningRow } from "../model/mny-warnings";
@@ -170,9 +171,9 @@ function buildIndexes(input: MapTransactionsInput): Indexes {
  * Whether a row is a real posting worth importing as a banking transaction.
  *
  * Split children, bill templates, recurrence templates (`frq != -1`),
- * loan-payment templates and genuinely orphaned transfer sides are out.
- * Scheduler-posted rows are **in**: they are real postings, and excluding them
- * emptied PR #192's loan accounts.
+ * loan-payment templates, scheduled instances Money never posted and genuinely
+ * orphaned transfer sides are out. Scheduler-posted rows are **in**: they are
+ * real postings, and excluding them emptied PR #192's loan accounts.
  */
 function isImportablePosting(
   row: MnyTransaction,
@@ -187,6 +188,7 @@ function isImportablePosting(
     !indexes.transfers.orphanedHandles.has(handle) &&
     !isRecurrenceTemplate(row.frequency) &&
     !isLoanPaymentTemplate(row.flags) &&
+    !isUnpostedRow(row.flags) &&
     row.security === null &&
     row.date !== null &&
     row.account !== null &&
@@ -443,6 +445,7 @@ function reportUnusable(
       indexes.billTemplates.has(handle) ||
       isRecurrenceTemplate(row.frequency) ||
       isLoanPaymentTemplate(row.flags) ||
+      isUnpostedRow(row.flags) ||
       row.security !== null
     ) {
       continue;

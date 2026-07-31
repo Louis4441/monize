@@ -342,9 +342,10 @@ row sits in, whether it appears in `TRN_SPLIT` or `TRN_XFER`, whether it carries
 | `0x80` | Row is in a loan or mortgage account | 1,239 rows, every one of them in a debt account, and every row in those accounts has it |
 | `0x100` | Voided | 31 rows, all `cs = 2`, half zero-amount, memos naming a cancelled or never-presented cheque |
 | `0x4000` | Loan-payment template | 50 rows, exactly the ten account-less `ps = 5` split parents plus their legs and those legs' `TRN_XFER` counterparts -- set equality both ways, one family per debt account |
+| `0x20000`, `0x40000` | A scheduled instance Money never posted | 67 rows, none reconciled where the file is 74% reconciled, all inside one eleven-month window, all also carrying `0x200000`; excluding them lands four accounts on Money's own balances, and the register does not show them |
 | `0x200000` | Member of a scheduled series | 4,653 of 4,692 are `frq != -1` templates, and no template lacks it |
 
-`0x8000` does not occur in the file at all.
+`0x8000` and `0x80000` do not occur in the file at all.
 
 ### Loan-payment templates
 

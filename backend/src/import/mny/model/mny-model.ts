@@ -131,10 +131,45 @@ export const MNY_TRANSACTION_FLAG = {
    * accounts. The bit catches the whole family in one test.
    */
   LOAN_PAYMENT_TEMPLATE: 0x4000,
+  /**
+   * The row is a scheduled instance Money holds but **never posted**: it is not
+   * in the register and not in the balance. Either bit of the mask marks one;
+   * they occur alone and together, and all 67 rows carrying them behave alike.
+   *
+   * Measured, and then confirmed against Money itself. In the maintainer's file
+   * all 67 are unreconciled where the file is 74% reconciled, all fall in one
+   * eleven-month window (2003-10-15 to 2004-09-28), and they sit almost
+   * entirely in the two accounts he banked online with. Every one of them also
+   * carries `SCHEDULED_SERIES`.
+   *
+   * Importing them put four accounts out by exactly their total: CIBC Chequing
+   * by $7,671.79 against an `ACCT.amtEndRec` of 0.00, CIBC VISA by -$156.55
+   * against 0.00, the Standard Life sleeve by $91.00 and Mortgage - 33 Spring
+   * by $350.00. `amtEndRec` alone could not settle it -- it is a *reconciled*
+   * balance, and these rows are unreconciled, so the two readings predict the
+   * same number. The maintainer looked: the rows are not in Money's register,
+   * and its ending balance for that account is $0.00.
+   */
+  UNPOSTED: 0x60000,
+  /**
+   * The row belongs to a scheduled series. Informational: 4,653 of the 4,692
+   * rows carrying it are `frq != -1` templates and no template lacks it, but
+   * the 39 that remain are real postings the scheduler entered, so the bit is
+   * never a reason to skip a row -- `frq` and `UNPOSTED` decide that.
+   */
+  SCHEDULED_SERIES: 0x200000,
 } as const;
 
 export function isVoided(flags: number): boolean {
   return (flags & MNY_TRANSACTION_FLAG.VOID) !== 0;
+}
+
+/**
+ * True for a scheduled instance Money never posted. Not a warning: the register
+ * does not show these rows either, so there is nothing for the user to fix.
+ */
+export function isUnpostedRow(flags: number): boolean {
+  return (flags & MNY_TRANSACTION_FLAG.UNPOSTED) !== 0;
 }
 
 /**

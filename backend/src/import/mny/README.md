@@ -158,6 +158,15 @@ about 3,255 rows the user cannot act on is a sign the mapping is wrong, not that
   other than 1 are surfaced as `securitySplitNotApplied`, never acted on.
 - **"No date" is year 10000, not a two-digit-year pivot.** `toDate` returns null outside
   1900–2199; never parse Money dates by hand.
+- **`grftt & 0x60000` marks a scheduled instance Money never posted.** Neither the register nor
+  the balance shows it. Importing them put four of the maintainer's accounts out by exactly their
+  total -- $7,671.79 on a chequing account whose Money balance is $0.00, -$156.55 on a credit
+  card, $91.00 on a plan sleeve and $350.00 on a mortgage -- and accounted for two of the three
+  holdings mismatches. All 67 are unreconciled in a file that is 74% reconciled, all fall in one
+  eleven-month window, and every one also carries `0x200000`. `ACCT.amtEndRec` could not settle
+  it on its own (a *reconciled* balance excludes unreconciled rows either way); the maintainer
+  confirmed against Money that the rows are absent from the register. Dropped silently, like the
+  loan-payment family: Money does not show them, so there is nothing to fix.
 - **`act` 12 credits units that no cash pays for.** It opens lots with a value and a quantity,
   like a buy, but never has a `TRN_XFER` cash counterpart -- 0 times in 92, where `act` 1 has one
   2,015 times in 2,029 and `act` 3 1,090 times in 1,090. Mapping it to BUY charged the sleeve and
