@@ -15,3 +15,6 @@ coverage
 *.spec.ts
 src/test/
 vitest.config.*
+
+# Microsoft Money files: never belong in an image
+*.mny
