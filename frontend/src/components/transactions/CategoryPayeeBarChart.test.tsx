@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent } from '@testing-library/react';
+import { act, fireEvent } from '@testing-library/react';
 import { render, screen } from '@/test/render';
 import { CategoryPayeeBarChart } from './CategoryPayeeBarChart';
 
@@ -61,6 +61,15 @@ const chartSource = Object.values(
   }) as Record<string, string>,
 )[0];
 
+// The download button hands the summary rows to `captureSvgAsImage` as its
+// third argument; capture the call to assert what the exported PNG contains.
+const mockCapture = vi.fn(async (..._args: unknown[]) => ({
+  dataUrl: 'data:image/png;base64,x',
+}));
+vi.mock('@/lib/pdf-export-charts', () => ({
+  captureSvgAsImage: (...args: unknown[]) => mockCapture(...args),
+}));
+
 // Control the mobile breakpoint deterministically from tests.
 const mockIsMobile = vi.fn(() => false);
 vi.mock('@/hooks/useIsMobile', () => ({
@@ -91,6 +100,7 @@ describe('CategoryPayeeBarChart', () => {
     capturedProps.barChart = null;
     capturedProps.cartesianGrid = null;
     capturedProps.cells = [];
+    mockCapture.mockClear();
   });
 
   const buildMonths = (n: number) =>
@@ -168,6 +178,30 @@ describe('CategoryPayeeBarChart', () => {
       expect(chartSource).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
       expect(chartSource).not.toMatch(/dark:stroke-/);
     });
+  });
+
+  it('exports the summary figures below the chart, not the bars alone', async () => {
+    render(
+      <CategoryPayeeBarChart
+        data={[
+          { month: '2025-01', total: -500, count: 10 },
+          { month: '2025-02', total: -300, count: 8 },
+        ]}
+        isLoading={false}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Download/i }));
+    });
+
+    // Same three figures the on-screen footer shows, in the same order.
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+    expect(mockCapture.mock.calls[0][2]).toEqual([
+      { label: 'Monthly Avg', value: '$-400.00' },
+      { label: 'Total', value: '$-800.00' },
+      { label: 'Transactions', value: '18' },
+    ]);
   });
 
   it('renders a download button titled after the chart when data is present', () => {

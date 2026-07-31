@@ -135,6 +135,13 @@ body {
   --chart-income: #10b981;
   --chart-expense: #ef4444;
   --chart-warning: #f59e0b;
+  /* The card a chart sits on. Rings drawn around a dot to lift it off the
+     line under it use this, so the ring reads as a gap rather than as a
+     white outline on a dark card. Follows the theme via the gray ramp. */
+  --chart-surface: var(--color-white);
+  /* Unclassified data -- an "Other" pie slice, a series with no colour of
+     its own. Recessive by design, so it never competes with real series. */
+  --chart-neutral: var(--color-gray-400);
   --chart-1: #3b82f6;
   --chart-2: #10b981;
   --chart-3: #f59e0b;
@@ -150,6 +157,8 @@ body {
 .dark {
   --chart-grid: var(--color-gray-700);
   --chart-axis: var(--color-gray-400);
+  --chart-surface: var(--color-gray-800);
+  --chart-neutral: var(--color-gray-500);
 }
 
 /* Form element styling (replaces @tailwindcss/forms) */

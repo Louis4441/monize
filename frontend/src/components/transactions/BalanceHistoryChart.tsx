@@ -610,12 +610,11 @@ export function BalanceHistoryChart({
                     ? chartColors.income
                     : chartColors.expense
                 }
-                // Same white ring the min/max flag dots use (see
+                // Same ring the min/max flag dots use (see
                 // portfolio-chart-utils): it separates the dot from the line
-                // under it on every theme. A themed ring would need a new
-                // `--chart-surface` variable, worth adding for all of them at
-                // once rather than for this one dot.
-                stroke="#fff"
+                // under it. `--chart-surface` now exists, so the ring is the
+                // card colour on every theme rather than a white outline.
+                stroke={chartColors.surface}
                 strokeWidth={1.5}
                 ifOverflow="extendDomain"
               />

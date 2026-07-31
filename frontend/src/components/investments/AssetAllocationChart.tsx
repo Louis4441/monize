@@ -405,7 +405,7 @@ export function AssetAllocationChart({
         fullName: label,
         value: item.value,
         percentage: item.percentage,
-        color: item.color || '#6b7280',
+        color: item.color || chartColors.neutral,
         currencyCode: item.currencyCode,
       };
     });

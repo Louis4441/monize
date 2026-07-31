@@ -98,7 +98,7 @@ describe('ForeignCurrencyFeeChart', () => {
     expect(screen.getByText('5')).toBeInTheDocument();
   });
 
-  it('colours fee bars red (a cost) and refund months green', () => {
+  it('colours fee bars from the expense token and refund months from income', () => {
     render(
       <ForeignCurrencyFeeChart
         data={[
@@ -110,9 +110,11 @@ describe('ForeignCurrencyFeeChart', () => {
       />,
     );
 
+    // Still red and green, but via the palette: the literals these replaced
+    // stayed the default theme's shades on all twenty-odd colour themes.
     expect(capturedProps.cells.map((c) => c.fill)).toEqual([
-      '#ef4444',
-      '#22c55e',
+      'var(--chart-expense)',
+      'var(--chart-income)',
     ]);
   });
 

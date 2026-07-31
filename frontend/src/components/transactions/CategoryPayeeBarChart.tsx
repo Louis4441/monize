@@ -203,6 +203,24 @@ export const CategoryPayeeBarChart = memo(function CategoryPayeeBarChart({
     return { total, totalCount, periodAvg };
   }, [chartData]);
 
+  // The three figures under the chart, repeated into the exported PNG. Without
+  // this the download is the bars alone: the same shape with no idea what it
+  // totals. Mirrors the on-screen footer below, and the sibling
+  // ForeignCurrencyFeeChart, so the export matches what was on screen.
+  const exportSummary = summary
+    ? [
+        {
+          label: t(`charts.monthlyTotals.${AVG_LABEL_KEY[granularity]}`),
+          value: formatCurrency(summary.periodAvg),
+        },
+        { label: t('charts.monthlyTotals.total'), value: formatCurrency(summary.total) },
+        {
+          label: t('charts.monthlyTotals.transactions'),
+          value: summary.totalCount.toLocaleString(),
+        },
+      ]
+    : [];
+
   if (isLoading) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-3 sm:p-6 mb-6 min-h-[420px]">
@@ -270,7 +288,11 @@ export const CategoryPayeeBarChart = memo(function CategoryPayeeBarChart({
               );
             })}
           </div>
-          <ChartDownloadButton chartRef={chartRef} filename={downloadFilename} />
+          <ChartDownloadButton
+            chartRef={chartRef}
+            filename={downloadFilename}
+            summary={exportSummary}
+          />
         </div>
       </div>
 

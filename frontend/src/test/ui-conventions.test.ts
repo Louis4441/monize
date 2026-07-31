@@ -88,3 +88,54 @@ describe('a scrollbar you need is not hidden', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('chart colours come from the theme tokens', () => {
+  /**
+   * `src/lib/chart-colors.ts` exposes `var(--chart-*)` strings so a chart
+   * follows the active colour theme and light/dark mode with no JS. A literal
+   * `fill="#22c55e"` looks correct on the default palette and then stays that
+   * exact green on all twenty-odd themes -- the charts were the last thing on
+   * screen still doing it.
+   *
+   * Matched per colour prop rather than per file, because the same components
+   * legitimately hold hex for the PDF export: `pdf-export.ts` parses
+   * `summaryCards[].color` as hex, and a `var(...)` there produces NaN. Those
+   * are `color:` keys and never reach a chart.
+   *
+   * The value is captured whole (`{...}`, `"..."`, `'...'`) so a conditional
+   * like `fill={up ? '#16a34a' : '#dc2626'}` is caught too, not just the
+   * literal-valued form.
+   */
+  const COLOUR_PROP = /\b(fill|stroke|stopColor)\s*[=:]\s*(\{[^{}]*\}|"[^"]*"|'[^']*')/g;
+  const HEX = /#[0-9a-fA-F]{3,8}\b/;
+
+  /**
+   * Drawn on top of a filled flag bubble rather than on the card, so these are
+   * contrast against the fill -- white is the point. `chartColors.surface`
+   * would make them the card colour and so invisible on the bubble in dark
+   * mode. The only exemption; anything new needs its own reason here.
+   */
+  const ON_FILL_WHITE = '/src/components/investments/portfolio-chart-utils.tsx';
+
+  it('never hardcodes a hex colour on a chart fill or stroke', () => {
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      if (!/from ['"]recharts['"]/.test(content)) continue;
+      for (const match of content.matchAll(COLOUR_PROP)) {
+        if (!HEX.test(match[2])) continue;
+        // The bubble text/divider/cross, and nothing else in that file.
+        if (path === ON_FILL_WHITE && /#fff\b/.test(match[2])) continue;
+        offenders.push(`${path}: ${match[0].trim()}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('still matches the colour props it is meant to police', () => {
+    // Were the regex to stop matching -- a Recharts rename, a bad edit -- the
+    // check above would pass over an empty set. This fails first and says so.
+    const sample = `fill="#22c55e" stroke={up ? '#16a34a' : '#dc2626'}`;
+    const hits = [...sample.matchAll(COLOUR_PROP)].filter((m) => HEX.test(m[2]));
+    expect(hits).toHaveLength(2);
+  });
+});

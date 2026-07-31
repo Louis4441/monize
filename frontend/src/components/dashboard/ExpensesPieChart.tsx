@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { chartColors } from '@/lib/chart-colors';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Account } from '@/types/account';
 import { Category } from '@/types/category';
@@ -126,7 +127,7 @@ export function ExpensesPieChart({
         id: '',
         name: t('expensesPieChart.uncategorized'),
         value: uncategorizedTotal,
-        colour: '#9ca3af',
+        colour: chartColors.neutral,
       });
     }
 
@@ -142,7 +143,7 @@ export function ExpensesPieChart({
       const otherTotal = sorted.slice(MAX_SLICES).reduce((sum, item) => sum + item.value, 0);
       data = [
         ...top,
-        { id: '', name: t('expensesPieChart.other'), value: otherTotal, colour: '#9ca3af' },
+        { id: '', name: t('expensesPieChart.other'), value: otherTotal, colour: chartColors.neutral },
       ];
     } else {
       data = sorted;
