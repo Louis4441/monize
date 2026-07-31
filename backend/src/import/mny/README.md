@@ -143,6 +143,20 @@ not the cause -- see `helm/README.md` for the sizing table.
   shape.
 - **`CAT.lType` says income or expense directly** -- `{2, 3}` income, `{0, 1}` expense, `-1` the
   two roots. Use `isIncomeCategoryType` and fall back to the root ancestor only for the roots.
+- **A `.mny` is a snapshot, so bill activity is measured from the file, not the clock.**
+  `billActivityAnchor` anchors the horizon to the newest `BILL` instance the file holds,
+  falling back to `asOf` for a file still in use. Judging against `todayIsoDate()` meant the
+  same file imported differently depending on the day it was run, and a file a quarter old
+  lost *every* bill -- 292 series reduced to one candidate.
+- **A series is judged against its own cadence.** The window is
+  `max(BILL_FUTURE_HORIZON_DAYS, one cycle + BILL_PAST_HORIZON_DAYS)`. A flat quarter declared
+  a yearly bill dead 100 days after its last occurrence, on a current file. Detection erring
+  generous is recoverable -- the wizard's checkbox list unticks it -- while erring strict drops
+  the series with no UI that ever mentions it.
+- **Money's newest instance is where the series stood when the file was last used**, which is
+  in the past for any real import. `rollForward` advances it through its own cadence to the
+  next occurrence at or after `asOf`, so a bill arrives due next month rather than a year
+  overdue. Rolling is step-bounded; a stale daily series would otherwise iterate for ever.
 - **`BILL` is an accumulation of instances, not a list of bills.** One row per occurrence, so a
   long history holds thousands (1,844 in the maintainer's file for ~20 real bills). Group by
   `hbillHead` and reduce each series to one representative before doing anything else.
