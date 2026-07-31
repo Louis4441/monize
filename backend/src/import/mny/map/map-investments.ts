@@ -17,7 +17,7 @@ import {
   mapTransactionStatus,
 } from "../model/mny-model";
 import { MnyBill, MnyTransaction } from "../model/mny-rows";
-import { MnyWarning } from "../model/mny-warnings";
+import { MnyWarning, MnyWarningRow } from "../model/mny-warnings";
 import { MnyInvestmentData } from "../tables/read-investments";
 import { MnyTransactionData } from "../tables/read-transactions";
 
@@ -93,6 +93,28 @@ interface Context {
   /** Account keys that are brokerage sides, so shares land somewhere real. */
   readonly brokerageKeys: ReadonlySet<string>;
   readonly warnings: MnyWarning[];
+}
+
+/**
+ * The flagged-row context an investment warning carries, so the review step can
+ * point at a transaction the user can find in Money rather than a bare `htrn`.
+ */
+function warningRow(
+  row: MnyTransaction,
+  input: MapInvestmentsInput,
+): MnyWarningRow {
+  return {
+    handle: row.handle as number,
+    accountKey:
+      row.account === null
+        ? null
+        : (input.accounts.keyByHandle.get(row.account) ?? null),
+    date: row.date,
+    amount: row.amount,
+    payeeHandle: row.payee,
+    reference: row.reference,
+    memo: row.memo,
+  };
 }
 
 interface MnyInvestmentDetailValues {
@@ -208,6 +230,7 @@ function mapOne(
       code: "missingInvestmentDetail",
       subject: `htrn=${handle}`,
       detail: `act=${row.action}`,
+      row: warningRow(row, context.input),
     });
   }
 
@@ -474,6 +497,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "unusableTransaction",
         subject: `htrn=${row.handle}`,
         detail: "no usable date",
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -485,6 +509,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "missingInvestmentDetail",
         subject: `htrn=${row.handle}`,
         detail: `hsec=${row.security}`,
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -495,6 +520,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "investmentAccountMismatch",
         subject: `htrn=${row.handle}`,
         detail: accountKey,
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -506,6 +532,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "unknownInvestmentAction",
         subject: `htrn=${row.handle}`,
         detail: `act=${row.action}`,
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -515,6 +542,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "unconfirmedInvestmentAction",
         subject: `htrn=${row.handle}`,
         detail: `act=${row.action}`,
+        row: warningRow(row, input),
       });
     }
 

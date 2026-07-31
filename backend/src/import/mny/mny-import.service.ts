@@ -38,7 +38,11 @@ import {
   MnyImportOptions,
   resolveImportOptions,
 } from "./model/mny-import-options";
-import { MnyWarning, summarizeWarnings } from "./model/mny-warnings";
+import {
+  MnyWarning,
+  summarizeWarnings,
+  warningLookup,
+} from "./model/mny-warnings";
 import {
   applyDeferredClosures,
   writeAccounts,
@@ -319,7 +323,13 @@ export class MnyImportService {
       existingDataRemoved: options.wipeExistingData,
       verification,
       holdings,
-      warnings: summarizeWarnings(warnings),
+      warnings: summarizeWarnings(
+        warnings,
+        warningLookup({
+          accounts: parsed.accounts.accounts,
+          payeeNameByHandle: parsed.payees.nameByHandle,
+        }),
+      ),
     };
   }
 

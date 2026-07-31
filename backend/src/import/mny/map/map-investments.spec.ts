@@ -13,7 +13,7 @@ import {
   transactionData,
 } from "../__fixtures__/mny-row-builders";
 import { MappedAccounts, MappedSecurities } from "../model/mny-import-model";
-import { MNY_ACTION } from "../model/mny-model";
+import { MNY_ACTION, MNY_TRANSACTION_FLAG } from "../model/mny-model";
 import { mapSecurities } from "./map-securities";
 import { MapInvestmentsInput, mapInvestments } from "./map-investments";
 
@@ -292,6 +292,7 @@ describe("mapInvestments", () => {
           code: "unknownInvestmentAction",
           subject: "htrn=1",
           detail: "act=99",
+          row: expect.objectContaining({ handle: 1 }),
         },
       ]);
     });
@@ -316,6 +317,7 @@ describe("mapInvestments", () => {
         code: "unconfirmedInvestmentAction",
         subject: "htrn=1",
         detail: `act=${MNY_ACTION.CAPITAL_GAIN}`,
+        row: expect.objectContaining({ handle: 1 }),
       });
     });
 
@@ -340,6 +342,7 @@ describe("mapInvestments", () => {
         code: "missingInvestmentDetail",
         subject: "htrn=1",
         detail: `act=${MNY_ACTION.BUY}`,
+        row: expect.objectContaining({ handle: 1 }),
       });
     });
 
@@ -349,7 +352,11 @@ describe("mapInvestments", () => {
           transactions: transactionData({
             transactions: [
               invRow({ handle: 1, action: MNY_ACTION.BUY, clearedStatus: 2 }),
-              invRow({ handle: 2, action: MNY_ACTION.BUY, flags: 0x80 }),
+              invRow({
+                handle: 2,
+                action: MNY_ACTION.BUY,
+                flags: MNY_TRANSACTION_FLAG.VOID,
+              }),
             ],
           }),
         }),

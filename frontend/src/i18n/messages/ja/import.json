@@ -475,7 +475,20 @@
     "holdingsMismatch": "{count, plural, other {# 件の保有銘柄}} が Money ファイルに記録された株数と一致しません。",
     "billTemplateMissing": "{count, plural, other {# 件の予定された支払い}} にファイル内のテンプレート取引がなく、スキップしました。",
     "unusableBill": "{count, plural, other {# 件の予定された支払い}} に口座、利用可能な日付、または認識できる繰り返し設定がなく、スキップしました。",
-    "billFrequencyApproximated": "{count, plural, other {# 件の予定された支払い}} は Monize が正確に表現できない繰り返し間隔を使用しているため、最も近い短い間隔を使用しました。"
+    "billFrequencyApproximated": "{count, plural, other {# 件の予定された支払い}} は Monize が正確に表現できない繰り返し間隔を使用しているため、最も近い短い間隔を使用しました。",
+    "showTransactions": "{count, plural, other {# 件の取引}}を表示",
+    "hideTransactions": "取引を隠す",
+    "reviewInMoney": "Microsoft Money でこれらを開いて確認または修正し、あらためてエクスポートしてインポートしてください。",
+    "reviewInMoneyTruncated": "{total} 件のうち最初の {shown} 件を表示しています。Microsoft Money でこれらを開いて確認または修正し、あらためてエクスポートしてインポートしてください。",
+    "reference": "参照番号 {reference}",
+    "noValue": "未設定",
+    "table": {
+      "date": "日付",
+      "account": "口座",
+      "payee": "支払先",
+      "amount": "金額",
+      "problem": "問題"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "インポート中に問題が発生しました。何も保存されていないため、やり直せます。",

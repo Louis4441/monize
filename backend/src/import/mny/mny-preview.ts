@@ -4,7 +4,11 @@ import {
 } from "../../accounts/entities/account.entity";
 import { FrequencyType } from "../../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { MnyImportOptions } from "./model/mny-import-options";
-import { MnyWarningSummary, summarizeWarnings } from "./model/mny-warnings";
+import {
+  MnyWarningSummary,
+  summarizeWarnings,
+  warningLookup,
+} from "./model/mny-warnings";
 import { MnyEra, MnyFileCounts, MnyParsedFile } from "./mny-parser.service";
 
 /**
@@ -199,7 +203,13 @@ export function buildPreview(input: BuildPreviewInput): MnyPreview {
     fileCounts: parsed.fileCounts,
     missingTables: parsed.missingTables,
     missingFields: parsed.missingFields,
-    warnings: summarizeWarnings(parsed.warnings),
+    warnings: summarizeWarnings(
+      parsed.warnings,
+      warningLookup({
+        accounts: parsed.accounts.accounts,
+        payeeNameByHandle: parsed.payees.nameByHandle,
+      }),
+    ),
     options: parsed.options,
   };
 }

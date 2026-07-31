@@ -8,7 +8,7 @@ import {
   MappedTransactions,
 } from "../model/mny-import-model";
 import { isRecurrenceTemplate, mapTransactionStatus } from "../model/mny-model";
-import { MnyWarning } from "../model/mny-warnings";
+import { MnyWarning, MnyWarningRow } from "../model/mny-warnings";
 import { MnyTransactionData } from "../tables/read-transactions";
 import { TransferIndex, indexTransfers } from "./map-transfers";
 
@@ -18,9 +18,12 @@ import { TransferIndex, indexTransfers } from "./map-transfers";
  * The two rules that carry the most history:
  *
  * **The phantom filter is `frq != -1` and nothing else.** PR #192 also excluded
- * auto-entered rows (`grftt & 0x8000`), but Money marks scheduler-posted rows
- * auto-entered -- including every loan payment -- so that filter is what made
- * loan and mortgage accounts import with zero transactions.
+ * rows it read as auto-entered, but Money's scheduler posts real transactions --
+ * including every loan payment -- so that filter is what made loan and mortgage
+ * accounts import with zero transactions. Its sibling mistake outlived it:
+ * `grftt & 0x80` was read as "voided" when it actually marks a row in a debt
+ * account, so the loan payments that survived the filter all imported VOID and
+ * dropped straight back out of the balance (see `MNY_TRANSACTION_FLAG`).
  *
  * **A split leg that is really a transfer stays a transfer.** PR #192 imported
  * every `TRN_SPLIT` child as a category-only row, so the principal leg of a loan
@@ -53,6 +56,28 @@ interface Context {
   /** Pre-generated ids for the rows that will be imported as transactions. */
   readonly idByHandle: ReadonlyMap<number, string>;
   readonly warnings: MnyWarning[];
+}
+
+/**
+ * The flagged-row context a warning carries, so the review step can show the
+ * user which transactions to look at in Money rather than a bare `htrn`.
+ */
+function warningRow(
+  row: MnyTransaction,
+  input: MapTransactionsInput,
+): MnyWarningRow {
+  return {
+    handle: row.handle as number,
+    accountKey:
+      row.account === null
+        ? null
+        : (input.accountKeyByHandle.get(row.account) ?? null),
+    date: row.date,
+    amount: row.amount,
+    payeeHandle: row.payee,
+    reference: row.reference,
+    memo: row.memo,
+  };
 }
 
 /** `BILL.lHtrn` rows are recurrence templates, never postings. */
@@ -103,6 +128,7 @@ function buildIndexes(input: MapTransactionsInput): Indexes {
         code: "orphanedSplit",
         subject: `htrn=${split.child}`,
         detail: `parent htrn=${split.parent}`,
+        row: warningRow(child, input),
       });
       continue;
     }
@@ -126,8 +152,8 @@ function buildIndexes(input: MapTransactionsInput): Indexes {
  * Whether a row is a real posting worth importing as a banking transaction.
  *
  * Split children, bill templates, recurrence templates (`frq != -1`) and
- * genuinely orphaned transfer sides are out. Auto-entered rows are **in**: they
- * are real postings, and excluding them is what emptied PR #192's loan accounts.
+ * genuinely orphaned transfer sides are out. Scheduler-posted rows are **in**:
+ * they are real postings, and excluding them emptied PR #192's loan accounts.
  */
 function isImportablePosting(
   row: MnyTransaction,
@@ -207,6 +233,7 @@ function mapSplitChild(
       code: "transferAcrossExcludedAccount",
       subject: `htrn=${handle}`,
       detail: `partner htrn=${partner}`,
+      row: warningRow(child, context.input),
     });
   }
 
@@ -240,6 +267,7 @@ function mapOne(
         code: "splitSumMismatch",
         subject: `htrn=${handle}`,
         detail: `legs ${legTotal} vs total ${total}`,
+        row: warningRow(row, context.input),
       });
     }
   }
@@ -257,6 +285,7 @@ function mapOne(
       code: "transferAcrossExcludedAccount",
       subject: `htrn=${handle}`,
       detail: `partner htrn=${partner}`,
+      row: warningRow(row, context.input),
     });
   }
 
@@ -307,6 +336,7 @@ function reportUnusable(
       warnings.push({
         code: "orphanedTransferSide",
         subject: `htrn=${handle}`,
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -317,6 +347,7 @@ function reportUnusable(
         code: "unusableTransaction",
         subject: `htrn=${handle}`,
         detail: "no account",
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -332,6 +363,7 @@ function reportUnusable(
         code: "unusableTransaction",
         subject: `htrn=${handle}`,
         detail: "no usable date",
+        row: warningRow(row, input),
       });
     }
   }

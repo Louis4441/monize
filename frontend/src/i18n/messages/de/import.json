@@ -475,7 +475,20 @@
     "holdingsMismatch": "{count, plural, one {# Position stimmt} other {# Positionen stimmen}} nicht mit den in Ihrer Money-Datei erfassten Anteilen überein.",
     "billTemplateMissing": "{count, plural, one {# geplante Rechnung hatte} other {# geplante Rechnungen hatten}} keine Vorlagentransaktion in der Datei und wurden übersprungen.",
     "unusableBill": "{count, plural, one {# geplante Rechnung hatte} other {# geplante Rechnungen hatten}} kein Konto, kein brauchbares Datum oder eine unbekannte Wiederholung und wurden übersprungen.",
-    "billFrequencyApproximated": "{count, plural, one {# geplante Rechnung verwendet} other {# geplante Rechnungen verwenden}} ein Wiederholungsintervall, das Monize nicht exakt abbilden kann; das nächstkürzere wurde verwendet."
+    "billFrequencyApproximated": "{count, plural, one {# geplante Rechnung verwendet} other {# geplante Rechnungen verwenden}} ein Wiederholungsintervall, das Monize nicht exakt abbilden kann; das nächstkürzere wurde verwendet.",
+    "showTransactions": "{count, plural, one {Die # Transaktion anzeigen} other {Die # Transaktionen anzeigen}}",
+    "hideTransactions": "Transaktionen ausblenden",
+    "reviewInMoney": "Öffnen Sie diese in Microsoft Money, um sie zu prüfen oder zu korrigieren, und exportieren und importieren Sie danach erneut.",
+    "reviewInMoneyTruncated": "Es werden die ersten {shown} von {total} angezeigt. Öffnen Sie diese in Microsoft Money, um sie zu prüfen oder zu korrigieren, und exportieren und importieren Sie danach erneut.",
+    "reference": "Beleg {reference}",
+    "noValue": "Nicht gesetzt",
+    "table": {
+      "date": "Datum",
+      "account": "Konto",
+      "payee": "Zahlungsempfänger",
+      "amount": "Betrag",
+      "problem": "Problem"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Beim Import ist etwas schiefgegangen. Es wurde nichts gespeichert -- Sie können es erneut versuchen.",

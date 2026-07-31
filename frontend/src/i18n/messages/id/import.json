@@ -475,7 +475,20 @@
     "holdingsMismatch": "{count, plural, other {# kepemilikan}} tidak sesuai dengan jumlah lembar yang dicatat berkas Money Anda.",
     "billTemplateMissing": "{count, plural, other {# tagihan terjadwal}} tidak memiliki transaksi templat dalam berkas dan dilewati.",
     "unusableBill": "{count, plural, other {# tagihan terjadwal}} tidak memiliki akun, tanggal yang bisa dipakai, atau pengulangan yang dikenali, sehingga dilewati.",
-    "billFrequencyApproximated": "{count, plural, other {# tagihan terjadwal}} memakai interval pengulangan yang tidak bisa dinyatakan persis oleh Monize, jadi dipakai interval terpendek terdekat."
+    "billFrequencyApproximated": "{count, plural, other {# tagihan terjadwal}} memakai interval pengulangan yang tidak bisa dinyatakan persis oleh Monize, jadi dipakai interval terpendek terdekat.",
+    "showTransactions": "Tampilkan {count, plural, other {# transaksi}}",
+    "hideTransactions": "Sembunyikan transaksi",
+    "reviewInMoney": "Buka transaksi ini di Microsoft Money untuk memeriksa atau memperbaikinya, lalu ekspor dan impor ulang.",
+    "reviewInMoneyTruncated": "Menampilkan {shown} pertama dari {total}. Buka transaksi ini di Microsoft Money untuk memeriksa atau memperbaikinya, lalu ekspor dan impor ulang.",
+    "reference": "Ref {reference}",
+    "noValue": "Tidak diisi",
+    "table": {
+      "date": "Tanggal",
+      "account": "Akun",
+      "payee": "Penerima",
+      "amount": "Jumlah",
+      "problem": "Masalah"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Terjadi kesalahan saat mengimpor. Tidak ada yang disimpan -- Anda dapat mencoba lagi.",

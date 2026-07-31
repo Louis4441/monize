@@ -125,10 +125,36 @@ export interface MnyFileCounts {
   transactions: number;
 }
 
+/**
+ * One transaction a warning flagged, with enough of Money's own detail -- date,
+ * account, payee, amount, cheque number -- for the user to find it in Money and
+ * fix it there before importing.
+ */
+export interface MnyFlaggedRow {
+  /** `TRN.htrn`. Shown only when nothing else identifies the row. */
+  handle: number;
+  accountName: string | null;
+  date: string | null;
+  amount: number | null;
+  currencyCode: string | null;
+  payeeName: string | null;
+  reference: string | null;
+  memo: string | null;
+  /** This occurrence's specifics, e.g. `legs 1832.07 vs total 1750.44`. */
+  detail: string | null;
+}
+
 export interface MnyWarningSummary {
   code: string;
   count: number;
   samples: string[];
+  /**
+   * The flagged transactions, capped server-side. Empty for warnings that are
+   * not about a transaction, and absent on a report from an older backend.
+   */
+  rows?: MnyFlaggedRow[];
+  /** True when this code flagged more transactions than `rows` carries. */
+  rowsTruncated?: boolean;
 }
 
 export interface MnyImportOptions {

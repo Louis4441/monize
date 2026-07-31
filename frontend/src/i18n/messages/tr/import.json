@@ -475,7 +475,20 @@
     "holdingsMismatch": "{count, plural, other {# pozisyon}} Money dosyanızda kayıtlı hisse adediyle uyuşmuyor.",
     "billTemplateMissing": "{count, plural, other {# planlanmış faturanın}} dosyada şablon işlemi yoktu ve atlandı.",
     "unusableBill": "{count, plural, other {# planlanmış faturanın}} hesabı, kullanılabilir tarihi veya tanınan bir yinelenmesi yoktu ve atlandı.",
-    "billFrequencyApproximated": "{count, plural, other {# planlanmış fatura}} Monize'ın tam olarak ifade edemediği bir yineleme aralığı kullanıyor; en yakın daha kısa aralık kullanıldı."
+    "billFrequencyApproximated": "{count, plural, other {# planlanmış fatura}} Monize'ın tam olarak ifade edemediği bir yineleme aralığı kullanıyor; en yakın daha kısa aralık kullanıldı.",
+    "showTransactions": "{count, plural, other {# işlemi}} göster",
+    "hideTransactions": "İşlemleri gizle",
+    "reviewInMoney": "Bunları Microsoft Money içinde açıp kontrol edin veya düzeltin, ardından yeniden dışa aktarıp içe aktarın.",
+    "reviewInMoneyTruncated": "{total} kaydın ilk {shown} tanesi gösteriliyor. Bunları Microsoft Money içinde açıp kontrol edin veya düzeltin, ardından yeniden dışa aktarıp içe aktarın.",
+    "reference": "Ref {reference}",
+    "noValue": "Ayarlanmadı",
+    "table": {
+      "date": "Tarih",
+      "account": "Hesap",
+      "payee": "Alacaklı",
+      "amount": "Miktar",
+      "problem": "Sorun"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "İçe aktarma sırasında bir şeyler ters gitti. Hiçbir şey kaydedilmedi -- yeniden denebilirsiniz.",

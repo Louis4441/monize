@@ -475,7 +475,20 @@
     "holdingsMismatch": "{count, plural, other {보유 자산 #개}}가 Money 파일에 기록된 주식수와 일치하지 않습니다.",
     "billTemplateMissing": "{count, plural, other {#개 예약된 청구}}에 파일 내 템플릿 거래가 없어 건너뛰었습니다.",
     "unusableBill": "{count, plural, other {#개 예약된 청구}}에 계정, 사용 가능한 날짜 또는 인식된 반복 주기가 없어 건너뛰었습니다.",
-    "billFrequencyApproximated": "{count, plural, other {#개 예약된 청구}}가 Monize에서 정확히 표현할 수 없는 반복 주기를 사용하여 가장 가까운 더 짧은 주기를 사용했습니다."
+    "billFrequencyApproximated": "{count, plural, other {#개 예약된 청구}}가 Monize에서 정확히 표현할 수 없는 반복 주기를 사용하여 가장 가까운 더 짧은 주기를 사용했습니다.",
+    "showTransactions": "{count, plural, other {#건 거래}} 표시",
+    "hideTransactions": "거래 숨기기",
+    "reviewInMoney": "Microsoft Money에서 이 거래들을 열어 확인하거나 수정한 뒤 다시 내보내고 가져오세요.",
+    "reviewInMoneyTruncated": "{total}건 중 처음 {shown}건을 표시하고 있습니다. Microsoft Money에서 이 거래들을 열어 확인하거나 수정한 뒤 다시 내보내고 가져오세요.",
+    "reference": "참조 {reference}",
+    "noValue": "설정되지 않음",
+    "table": {
+      "date": "날짜",
+      "account": "계정",
+      "payee": "수취인",
+      "amount": "금액",
+      "problem": "문제"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "가져오는 중 문제가 발생했습니다. 저장된 것은 없으므로 다시 시도할 수 있습니다.",

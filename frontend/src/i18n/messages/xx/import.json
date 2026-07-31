@@ -475,7 +475,20 @@
     "holdingsMismatch": "[XX-{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records.-XX]",
     "billTemplateMissing": "[XX-{count, plural, one {# scheduled bill} other {# scheduled bills}} had no template transaction in the file and were skipped.-XX]",
     "unusableBill": "[XX-{count, plural, one {# scheduled bill} other {# scheduled bills}} had no account, no usable date or an unrecognized recurrence, and were skipped.-XX]",
-    "billFrequencyApproximated": "[XX-{count, plural, one {# scheduled bill uses} other {# scheduled bills use}} a repeat interval Monize cannot express exactly, so the closest shorter one was used.-XX]"
+    "billFrequencyApproximated": "[XX-{count, plural, one {# scheduled bill uses} other {# scheduled bills use}} a repeat interval Monize cannot express exactly, so the closest shorter one was used.-XX]",
+    "showTransactions": "[XX-Show {count, plural, one {the # transaction} other {the # transactions}}-XX]",
+    "hideTransactions": "[XX-Hide transactions-XX]",
+    "reviewInMoney": "[XX-Open these in Microsoft Money to check or correct them, then export and import again.-XX]",
+    "reviewInMoneyTruncated": "[XX-Showing the first {shown} of {total}. Open these in Microsoft Money to check or correct them, then export and import again.-XX]",
+    "reference": "[XX-Ref {reference}-XX]",
+    "noValue": "[XX-Not set-XX]",
+    "table": {
+      "date": "[XX-Date-XX]",
+      "account": "[XX-Account-XX]",
+      "payee": "[XX-Payee-XX]",
+      "amount": "[XX-Amount-XX]",
+      "problem": "[XX-Problem-XX]"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "[XX-Something went wrong while importing. Nothing was saved -- you can try again.-XX]",

@@ -22,6 +22,15 @@ const CURRENCIES = new Map([
   [9, "USD"],
 ]);
 
+/**
+ * `grftt` on a real loan payment: 0x80 (the row is in a debt account) plus the
+ * transfer bits. Every one of the 1,239 loan and mortgage rows in the
+ * maintainer's file carries 0x80, and reading it as the void flag imported all
+ * of them VOID -- which then kept them out of the balance, freezing every loan
+ * at its opening balance.
+ */
+const LOAN_PAYMENT_FLAGS = MNY_TRANSACTION_FLAG.DEBT_ACCOUNT | 0x6;
+
 function input(
   overrides: Partial<MapTransactionsInput> = {},
 ): MapTransactionsInput {
@@ -36,9 +45,9 @@ function input(
 
 describe("mapTransactions", () => {
   describe("the phantom filter", () => {
-    it("imports an auto-entered row -- the PR #192 loan regression", () => {
-      // Money marks every scheduler-posted row auto-entered, loan payments
-      // included. Excluding them is what made loan accounts import empty.
+    it("imports a scheduler-posted row -- the PR #192 loan regression", () => {
+      // Money marks every scheduler-posted row, loan payments included.
+      // Excluding them is what made loan accounts import empty.
       const result = mapTransactions(
         input({
           transactions: transactionData({
@@ -46,7 +55,7 @@ describe("mapTransactions", () => {
               mnyTransaction({
                 handle: 1,
                 amount: -500,
-                flags: MNY_TRANSACTION_FLAG.AUTO_ENTERED,
+                flags: LOAN_PAYMENT_FLAGS,
               }),
             ],
           }),
@@ -138,6 +147,7 @@ describe("mapTransactions", () => {
           code: "unusableTransaction",
           subject: "htrn=1",
           detail: "no account",
+          row: expect.objectContaining({ handle: 1 }),
         },
       ]);
     });
@@ -343,6 +353,7 @@ describe("mapTransactions", () => {
           code: "transferAcrossExcludedAccount",
           subject: "htrn=1",
           detail: "partner htrn=2",
+          row: expect.objectContaining({ handle: 1 }),
         },
       ]);
     });
@@ -360,7 +371,11 @@ describe("mapTransactions", () => {
       expect(result.transactions).toEqual([]);
       expect(result.skipped).toBe(1);
       expect(result.warnings).toEqual([
-        { code: "orphanedTransferSide", subject: "htrn=1" },
+        {
+          code: "orphanedTransferSide",
+          subject: "htrn=1",
+          row: expect.objectContaining({ handle: 1 }),
+        },
       ]);
     });
   });
@@ -449,8 +464,43 @@ describe("mapTransactions", () => {
           code: "splitSumMismatch",
           subject: "htrn=1",
           detail: "legs -70 vs total -100",
+          row: expect.objectContaining({ handle: 1 }),
         },
       ]);
+    });
+
+    it("carries the flagged transaction, not only its handle", () => {
+      // The review step expands this into a list the user takes back to Money
+      // to fix. `htrn=1` cannot be searched for there; a date, an account, a
+      // payee and an amount can.
+      const result = mapTransactions(
+        input({
+          transactions: transactionData({
+            transactions: [
+              mnyTransaction({
+                handle: 1,
+                amount: -100,
+                date: "2001-04-30",
+                payee: 30,
+                reference: "1042",
+                memo: "Payroll",
+              }),
+              mnyTransaction({ handle: 2, amount: -70, category: 51 }),
+            ],
+            splits: [mnySplit({ parent: 1, child: 2 })],
+          }),
+        }),
+      );
+
+      expect(result.warnings[0].row).toEqual({
+        handle: 1,
+        accountKey: "acct-1",
+        date: "2001-04-30",
+        amount: -100,
+        payeeHandle: 30,
+        reference: "1042",
+        memo: "Payroll",
+      });
     });
 
     it("reports a leg whose parent is not in the file", () => {
@@ -465,7 +515,12 @@ describe("mapTransactions", () => {
 
       expect(result.transactions).toEqual([]);
       expect(result.warnings).toEqual([
-        { code: "orphanedSplit", subject: "htrn=2", detail: "parent htrn=1" },
+        {
+          code: "orphanedSplit",
+          subject: "htrn=2",
+          detail: "parent htrn=1",
+          row: expect.objectContaining({ handle: 2 }),
+        },
       ]);
     });
   });
@@ -486,7 +541,7 @@ describe("mapTransactions", () => {
             account: 1,
             amount: -1500,
             payee: 30,
-            flags: MNY_TRANSACTION_FLAG.AUTO_ENTERED,
+            clearedStatus: 2,
           }),
           // Principal leg.
           mnyTransaction({ handle: 2, account: 1, amount: -400 }),
@@ -498,8 +553,16 @@ describe("mapTransactions", () => {
             category: 60,
             memo: "Interest",
           }),
-          // The loan-side row Money posts against the mortgage account.
-          mnyTransaction({ handle: 4, account: 9, amount: 400 }),
+          // The loan-side row Money posts against the mortgage account. It
+          // carries 0x80 because it lives in a debt account -- the bit PR #192
+          // read as "voided".
+          mnyTransaction({
+            handle: 4,
+            account: 9,
+            amount: 400,
+            clearedStatus: 2,
+            flags: LOAN_PAYMENT_FLAGS,
+          }),
         ],
         splits: [
           mnySplit({ parent: 1, child: 2, position: 0 }),
@@ -559,6 +622,20 @@ describe("mapTransactions", () => {
       const result = mapTransactions(input({ transactions: loanPayment() }));
 
       expect(result.transfersLinked).toBe(1);
+    });
+
+    it("imports neither side as VOID", () => {
+      // The reported bug: "all loan payments are being imported as VOID".
+      // 0x80 marks a row in a debt account, not a voided one, so both sides
+      // keep the reconciliation state Money gave them.
+      const result = mapTransactions(input({ transactions: loanPayment() }));
+
+      expect(result.transactions.map((t) => t.status)).not.toContain(
+        TransactionStatus.VOID,
+      );
+      expect(result.transactions.find((t) => t.handle === 4)!.status).toBe(
+        TransactionStatus.RECONCILED,
+      );
     });
 
     it("keeps the principal leg as a category split when the loan account is left out", () => {

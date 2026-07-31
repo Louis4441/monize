@@ -475,7 +475,20 @@
     "holdingsMismatch": "{count, plural, one {# pozycja nie zgadza się} few {# pozycje nie zgadzają się} many {# pozycji nie zgadza się} other {# pozycji nie zgadza się}} z udziałami zapisanymi w pliku Money.",
     "billTemplateMissing": "{count, plural, one {# zaplanowany rachunek nie miał} few {# zaplanowane rachunki nie miały} many {# zaplanowanych rachunków nie miało} other {# zaplanowanych rachunków nie miało}} transakcji szablonowej w pliku i zostały pominięte.",
     "unusableBill": "{count, plural, one {# zaplanowany rachunek nie miał} few {# zaplanowane rachunki nie miały} many {# zaplanowanych rachunków nie miało} other {# zaplanowanych rachunków nie miało}} konta, użytecznej daty ani rozpoznanej cykliczności i zostały pominięte.",
-    "billFrequencyApproximated": "{count, plural, one {# zaplanowany rachunek używa} few {# zaplanowane rachunki używają} many {# zaplanowanych rachunków używa} other {# zaplanowanych rachunków używa}} interwału powtarzania, którego Monize nie potrafi wyrazić dokładnie, więc użyto najbliższego krótszego."
+    "billFrequencyApproximated": "{count, plural, one {# zaplanowany rachunek używa} few {# zaplanowane rachunki używają} many {# zaplanowanych rachunków używa} other {# zaplanowanych rachunków używa}} interwału powtarzania, którego Monize nie potrafi wyrazić dokładnie, więc użyto najbliższego krótszego.",
+    "showTransactions": "{count, plural, one {Pokaż # transakcję} few {Pokaż # transakcje} many {Pokaż # transakcji} other {Pokaż # transakcji}}",
+    "hideTransactions": "Ukryj transakcje",
+    "reviewInMoney": "Otwórz je w Microsoft Money, aby je sprawdzić lub poprawić, a następnie ponownie wyeksportuj i zaimportuj.",
+    "reviewInMoneyTruncated": "Wyświetlono pierwsze {shown} z {total}. Otwórz je w Microsoft Money, aby je sprawdzić lub poprawić, a następnie ponownie wyeksportuj i zaimportuj.",
+    "reference": "Nr {reference}",
+    "noValue": "Nie ustawiono",
+    "table": {
+      "date": "Data",
+      "account": "Konto",
+      "payee": "Odbiorca",
+      "amount": "Kwota",
+      "problem": "Problem"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Coś poszło nie tak podczas importu. Nic nie zostało zapisane -- możesz spróbować ponownie.",

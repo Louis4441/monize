@@ -475,7 +475,20 @@
     "holdingsMismatch": "{count, plural, one {# posizione non corrisponde} other {# posizioni non corrispondono}} alle azioni registrate nel file Money.",
     "billTemplateMissing": "{count, plural, one {# bolletta pianificata non aveva} other {# bollette pianificate non avevano}} una transazione modello nel file e sono state saltate.",
     "unusableBill": "{count, plural, one {# bolletta pianificata non aveva} other {# bollette pianificate non avevano}} un conto, una data utilizzabile o una ricorrenza riconosciuta e sono state saltate.",
-    "billFrequencyApproximated": "{count, plural, one {# bolletta pianificata usa} other {# bollette pianificate usano}} un intervallo di ripetizione che Monize non può esprimere esattamente, quindi è stato usato il più breve più vicino."
+    "billFrequencyApproximated": "{count, plural, one {# bolletta pianificata usa} other {# bollette pianificate usano}} un intervallo di ripetizione che Monize non può esprimere esattamente, quindi è stato usato il più breve più vicino.",
+    "showTransactions": "{count, plural, one {Mostra la # transazione} other {Mostra le # transazioni}}",
+    "hideTransactions": "Nascondi le transazioni",
+    "reviewInMoney": "Aprile in Microsoft Money per verificarle o correggerle, poi esporta e importa di nuovo.",
+    "reviewInMoneyTruncated": "Vengono mostrate le prime {shown} di {total}. Aprile in Microsoft Money per verificarle o correggerle, poi esporta e importa di nuovo.",
+    "reference": "Rif. {reference}",
+    "noValue": "Non impostato",
+    "table": {
+      "date": "Data",
+      "account": "Conto",
+      "payee": "Beneficiario",
+      "amount": "Importo",
+      "problem": "Problema"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Qualcosa è andato storto durante l'importazione. Non è stato salvato nulla: puoi riprovare.",

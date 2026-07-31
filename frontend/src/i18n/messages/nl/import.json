@@ -475,7 +475,20 @@
     "holdingsMismatch": "{count, plural, one {# positie komt} other {# posities komen}} niet overeen met de aandelen in uw Money-bestand.",
     "billTemplateMissing": "{count, plural, one {# geplande rekening had} other {# geplande rekeningen hadden}} geen sjabloontransactie in het bestand en zijn overgeslagen.",
     "unusableBill": "{count, plural, one {# geplande rekening had} other {# geplande rekeningen hadden}} geen rekening, geen bruikbare datum of een onbekende herhaling en zijn overgeslagen.",
-    "billFrequencyApproximated": "{count, plural, one {# geplande rekening gebruikt} other {# geplande rekeningen gebruiken}} een herhalingsinterval dat Monize niet exact kan weergeven, dus het dichtstbijzijnde kortere interval is gebruikt."
+    "billFrequencyApproximated": "{count, plural, one {# geplande rekening gebruikt} other {# geplande rekeningen gebruiken}} een herhalingsinterval dat Monize niet exact kan weergeven, dus het dichtstbijzijnde kortere interval is gebruikt.",
+    "showTransactions": "{count, plural, one {De # transactie tonen} other {De # transacties tonen}}",
+    "hideTransactions": "Transacties verbergen",
+    "reviewInMoney": "Open deze in Microsoft Money om ze te controleren of te corrigeren en exporteer en importeer daarna opnieuw.",
+    "reviewInMoneyTruncated": "De eerste {shown} van {total} worden getoond. Open deze in Microsoft Money om ze te controleren of te corrigeren en exporteer en importeer daarna opnieuw.",
+    "reference": "Ref. {reference}",
+    "noValue": "Niet ingesteld",
+    "table": {
+      "date": "Datum",
+      "account": "Rekening",
+      "payee": "Begunstigde",
+      "amount": "Bedrag",
+      "problem": "Probleem"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Er is iets misgegaan tijdens de import. Er is niets opgeslagen -- u kunt het opnieuw proberen.",

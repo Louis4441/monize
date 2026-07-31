@@ -7,6 +7,7 @@ import { formatAccountType } from '@/lib/account-utils';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { MnyImportResult } from '@/lib/import-mny';
 import { AccountType } from '@/types/account';
+import { MnyWarningsPanel } from './MnyWarningsPanel';
 
 /** Account types whose verification line is badged, per the comment below. */
 const LOAN_TYPES: ReadonlySet<string> = new Set(['LOAN', 'MORTGAGE']);
@@ -306,28 +307,11 @@ export function MnyVerificationReport({
         </div>
       )}
 
-      {/* Warnings */}
-      {result.warnings.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-foreground mb-2">
-            {t('mnyComplete.warningsHeading')}
-          </h3>
-          <ul className="bg-card border border-border rounded-lg divide-y divide-border text-sm">
-            {result.warnings.map((warning) => (
-              <li key={warning.code} className="px-4 py-2">
-                <span className="text-foreground">
-                  {t(`mnyWarnings.${warning.code}`, { count: warning.count })}
-                </span>
-                {warning.samples.length > 0 && (
-                  <span className="block text-xs text-muted-foreground">
-                    {warning.samples.join(', ')}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* Warnings, expandable to the transactions behind each one */}
+      <MnyWarningsPanel
+        warnings={result.warnings}
+        heading={t('mnyComplete.warningsHeading')}
+      />
 
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={downloadReport}>
