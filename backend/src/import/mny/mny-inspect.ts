@@ -19,7 +19,7 @@
 import { MnyImportError } from "./mny-errors";
 import { currencyCodesByHandle, mapAccounts } from "./map/map-reference";
 import { mapTransactions } from "./map/map-transactions";
-import { mapSecurities } from "./map/map-securities";
+import { mapSecurities, tradedSecurityHandles } from "./map/map-securities";
 import { mapInvestments } from "./map/map-investments";
 import { mapBills } from "./map/map-bills";
 import { mapLoans } from "./map/map-loans";
@@ -179,6 +179,10 @@ export function mappingSummary(tables: MnyTables): string[] {
     securities: tables.investments.securities,
     currencyByHandle: currencyCodesByHandle(tables.reference),
     baseCurrency: accounts.baseCurrency,
+    activeHandles: tradedSecurityHandles(
+      tables.transactions.transactions,
+      tables.investments.lots,
+    ),
   });
   const investments = mapInvestments({
     transactions: tables.transactions,

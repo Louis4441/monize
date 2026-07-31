@@ -82,6 +82,7 @@ function securitiesFixture(handles: number[] = [1]): MappedSecurities {
     ),
     currencyByHandle: new Map(),
     baseCurrency: "USD",
+    activeHandles: new Set(handles),
   });
 }
 

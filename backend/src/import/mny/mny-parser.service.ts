@@ -17,7 +17,7 @@ import {
   mapPayees,
 } from "./map/map-reference";
 import { mapTransactions } from "./map/map-transactions";
-import { mapSecurities } from "./map/map-securities";
+import { mapSecurities, tradedSecurityHandles } from "./map/map-securities";
 import { mapInvestments } from "./map/map-investments";
 import { billReferences, mapBills, selectedBills } from "./map/map-bills";
 import { mapLoans } from "./map/map-loans";
@@ -376,6 +376,10 @@ export class MnyParserService {
       securities: tables.investments.securities,
       currencyByHandle,
       baseCurrency: accounts.baseCurrency,
+      activeHandles: tradedSecurityHandles(
+        tables.transactions.transactions,
+        tables.investments.lots,
+      ),
     });
     const investments = mapInvestments({
       transactions: tables.transactions,

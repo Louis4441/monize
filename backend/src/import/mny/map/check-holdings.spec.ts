@@ -45,6 +45,7 @@ const securities: MappedSecurities = mapSecurities({
   securities: [mnySecurity({ handle: 1, symbol: "VOO", name: "Vanguard" })],
   currencyByHandle: new Map(),
   baseCurrency: "USD",
+  activeHandles: new Set([1]),
 });
 
 function tx(

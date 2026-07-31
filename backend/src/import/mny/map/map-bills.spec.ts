@@ -100,6 +100,7 @@ function securitiesFixture(): MappedSecurities {
     securities: [mnySecurity({ handle: 1, symbol: "VOO" })],
     currencyByHandle: new Map(),
     baseCurrency: "USD",
+    activeHandles: new Set([1]),
   });
 }
 

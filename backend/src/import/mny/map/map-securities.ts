@@ -1,4 +1,4 @@
-import { MnySecurity } from "../model/mny-rows";
+import { MnyLot, MnySecurity, MnyTransaction } from "../model/mny-rows";
 import { MappedSecurities, MappedSecurity } from "../model/mny-import-model";
 import { isCurrencyPseudoSecurity } from "../model/mny-model";
 import { MnyWarning } from "../model/mny-warnings";
@@ -21,6 +21,17 @@ import { MnyWarning } from "../model/mny-warnings";
  *   which collided for similarly-named funds. Placeholders carry
  *   `skipPriceUpdates`, matching what the QIF importer does for the securities
  *   it auto-creates.
+ *
+ * **A security the user never traded or held is not imported.** Money's `SEC`
+ * doubles as its watch list and its index-quote store, and the two are not
+ * distinguishable by `sct` -- the maintainer's file has the Dow, the NASDAQ,
+ * the DAX, the FTSE, the Hang Seng, the Nikkei, the TSX and the Straits Times
+ * sitting under the same code as two ETFs actually owned. What does separate
+ * them is activity: 31 of 98 securities appear in no `TRN` row and no `LOT`,
+ * and they carry 17,025 of the file's 69,076 prices. Monize has nowhere to show
+ * an index, and a security with no position is a row the user has to clean up,
+ * so the whole quarter is left behind. `dedupePrices` keys off the imported
+ * securities, so their price history drops out with them.
  *
  * `SEC.sct` is deliberately **not** mapped onto Monize's `securityType`: the
  * same Amex index securities are `sct` 6 in Money 2001/2002 and 7 in Money Plus,
@@ -114,6 +125,35 @@ export interface MapSecuritiesInput {
   readonly currencyByHandle: ReadonlyMap<number, string>;
   /** Used when a security names no currency, or one the file does not define. */
   readonly baseCurrency: string;
+  /**
+   * Handles the user actually traded or held -- every `TRN.hsec` and `LOT.hsec`
+   * in the file. Securities outside it are Money's watch list, not holdings.
+   */
+  readonly activeHandles: ReadonlySet<number>;
+}
+
+/**
+ * The securities the file shows real activity for: transacted (`TRN.hsec`) or
+ * still held as a lot (`LOT.hsec`). This is the `activeHandles` every caller
+ * should pass -- `LOT` as well as `TRN`, so a position carried in without a
+ * transaction of its own still counts as held.
+ */
+export function tradedSecurityHandles(
+  transactions: readonly MnyTransaction[],
+  lots: readonly MnyLot[],
+): ReadonlySet<number> {
+  const handles = new Set<number>();
+  for (const row of transactions) {
+    if (row.security !== null) {
+      handles.add(row.security);
+    }
+  }
+  for (const lot of lots) {
+    if (lot.security !== null) {
+      handles.add(lot.security);
+    }
+  }
+  return handles;
 }
 
 export function mapSecurities(input: MapSecuritiesInput): MappedSecurities {
@@ -133,6 +173,13 @@ export function mapSecurities(input: MapSecuritiesInput): MappedSecurities {
     if (isCurrencyPseudoSecurity(row.securityType, moneySymbol)) {
       // Money keeps every currency in SEC too. Importing them produces
       // securities the user never held.
+      skipped += 1;
+      continue;
+    }
+
+    if (!input.activeHandles.has(row.handle)) {
+      // Never traded and never held: a watch-list entry or a market index Money
+      // was tracking quotes for. See the note above `mapSecurities`.
       skipped += 1;
       continue;
     }

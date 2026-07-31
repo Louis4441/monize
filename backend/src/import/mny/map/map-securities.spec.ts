@@ -1,10 +1,30 @@
+import { MappedSecurities } from "../model/mny-import-model";
 import { mnySecurity } from "../__fixtures__/mny-row-builders";
 import {
   MAX_SECURITY_SYMBOL_LENGTH,
+  MapSecuritiesInput,
   mapSecurities,
   placeholderSymbol,
   stripMarketPrefix,
 } from "./map-securities";
+
+/**
+ * Every security the case hands in counts as held, so a test about symbols or
+ * currencies is not also a test about the activity filter. The cases that care
+ * about that filter call `mapSecurities` directly.
+ */
+function mapHeld(
+  input: Omit<MapSecuritiesInput, "activeHandles">,
+): MappedSecurities {
+  return mapSecurities({
+    ...input,
+    activeHandles: new Set(
+      input.securities
+        .map((security) => security.handle)
+        .filter((handle): handle is number => handle !== null),
+    ),
+  });
+}
 
 describe("mapSecurities", () => {
   const base = {
@@ -16,7 +36,7 @@ describe("mapSecurities", () => {
   };
 
   it("maps a plain security", () => {
-    const result = mapSecurities({
+    const result = mapHeld({
       ...base,
       securities: [
         mnySecurity({
@@ -43,7 +63,7 @@ describe("mapSecurities", () => {
   });
 
   it("falls back to the base currency when the security names none", () => {
-    const result = mapSecurities({
+    const result = mapHeld({
       ...base,
       securities: [mnySecurity({ handle: 1, currency: null })],
     });
@@ -53,7 +73,7 @@ describe("mapSecurities", () => {
   });
 
   it("warns and falls back when the currency handle is not in the file", () => {
-    const result = mapSecurities({
+    const result = mapHeld({
       ...base,
       securities: [mnySecurity({ handle: 1, currency: 99 })],
     });
@@ -68,9 +88,59 @@ describe("mapSecurities", () => {
     ]);
   });
 
+  describe("the activity filter", () => {
+    // Money's SEC doubles as its watch list and its index-quote store. In the
+    // maintainer's file 31 of 98 securities appear in no TRN row and no LOT,
+    // and they carry 17,025 of the 69,076 prices -- the Dow, the NASDAQ, the
+    // DAX, the FTSE, the Nikkei and the TSX among them, under the same `sct`
+    // as two ETFs actually owned. Only activity separates the two.
+    it("keeps a security the user transacted in", () => {
+      const result = mapSecurities({
+        ...base,
+        securities: [mnySecurity({ handle: 7, symbol: "VOO" })],
+        activeHandles: new Set([7]),
+      });
+
+      expect(result.securities.map((s) => s.handle)).toEqual([7]);
+      expect(result.skipped).toBe(0);
+    });
+
+    it("drops a security with no transaction and no lot", () => {
+      const result = mapSecurities({
+        ...base,
+        securities: [
+          mnySecurity({ handle: 7, symbol: "VOO" }),
+          mnySecurity({ handle: 8, symbol: "$INDU", name: "Dow Jones" }),
+        ],
+        activeHandles: new Set([7]),
+      });
+
+      expect(result.securities.map((s) => s.handle)).toEqual([7]);
+      expect(result.skipped).toBe(1);
+      // Nothing to warn about: the user never held it.
+      expect(result.warnings).toEqual([]);
+    });
+
+    it("does not spend a symbol on a security it drops", () => {
+      // The dropped row must not push the held one onto `VOO-2`, which would
+      // leave the user's real holding under a symbol no quote provider knows.
+      const result = mapSecurities({
+        ...base,
+        securities: [
+          mnySecurity({ handle: 8, symbol: "VOO", name: "Watched" }),
+          mnySecurity({ handle: 7, symbol: "VOO", name: "Held" }),
+        ],
+        activeHandles: new Set([7]),
+      });
+
+      expect(result.securities.map((s) => s.symbol)).toEqual(["VOO"]);
+      expect(result.warnings).toEqual([]);
+    });
+  });
+
   describe("currency pseudo-securities", () => {
     it("excludes rows whose symbol has Money's currency-quote shape", () => {
-      const result = mapSecurities({
+      const result = mapHeld({
         ...base,
         securities: [
           mnySecurity({ handle: 1, symbol: "/GBPUS", name: "British pound" }),
@@ -83,7 +153,7 @@ describe("mapSecurities", () => {
     });
 
     it("excludes rows carrying the currency security type", () => {
-      const result = mapSecurities({
+      const result = mapHeld({
         ...base,
         securities: [
           mnySecurity({ handle: 1, symbol: "EUR", securityType: 4 }),
@@ -99,7 +169,7 @@ describe("mapSecurities", () => {
     // PR #192 upserted on (user_id, symbol), so two funds sharing a ticker
     // became one security with one price history.
     it("suffixes the second security instead of collapsing the two", () => {
-      const result = mapSecurities({
+      const result = mapHeld({
         ...base,
         securities: [
           mnySecurity({ handle: 1, symbol: "VOO", name: "Vanguard S&P 500" }),
@@ -115,7 +185,7 @@ describe("mapSecurities", () => {
     });
 
     it("keeps suffixing past the second collision", () => {
-      const result = mapSecurities({
+      const result = mapHeld({
         ...base,
         securities: [1, 2, 3, 4].map((handle) =>
           mnySecurity({ handle, symbol: "VOO", name: `Fund ${handle}` }),
@@ -131,7 +201,7 @@ describe("mapSecurities", () => {
     });
 
     it("compares case-insensitively, as the app's own uniqueness does", () => {
-      const result = mapSecurities({
+      const result = mapHeld({
         ...base,
         securities: [
           mnySecurity({ handle: 1, symbol: "voo" }),
@@ -144,7 +214,7 @@ describe("mapSecurities", () => {
 
     it("trims the stem so a suffixed symbol still fits the column", () => {
       const long = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const result = mapSecurities({
+      const result = mapHeld({
         ...base,
         securities: [
           mnySecurity({ handle: 1, symbol: long }),
@@ -163,7 +233,7 @@ describe("mapSecurities", () => {
 
   describe("empty symbols", () => {
     it("generates a placeholder and disables price updates", () => {
-      const result = mapSecurities({
+      const result = mapHeld({
         ...base,
         securities: [
           mnySecurity({ handle: 1, symbol: "  ", name: "Acme Growth Fund" }),
@@ -186,7 +256,7 @@ describe("mapSecurities", () => {
     });
 
     it("keeps two similarly-named funds apart", () => {
-      const result = mapSecurities({
+      const result = mapHeld({
         ...base,
         securities: [
           mnySecurity({ handle: 1, symbol: "", name: "Acme Growth Fund" }),
@@ -202,7 +272,7 @@ describe("mapSecurities", () => {
     });
 
     it("skips a row with neither symbol nor name", () => {
-      const result = mapSecurities({
+      const result = mapHeld({
         ...base,
         securities: [mnySecurity({ handle: 1, symbol: "", name: "  " })],
       });
@@ -213,7 +283,7 @@ describe("mapSecurities", () => {
   });
 
   it("skips a row with no handle: nothing can reference it", () => {
-    const result = mapSecurities({
+    const result = mapHeld({
       ...base,
       securities: [mnySecurity({ handle: null })],
     });
@@ -286,7 +356,7 @@ describe("mapSecurities market prefixes", () => {
     // symbol, so an imported `US:VTI` sat beside the user's own `VTI` as a
     // second security and asked the quote providers for a symbol that does
     // not exist.
-    const result = mapSecurities({
+    const result = mapHeld({
       ...base,
       securities: [
         mnySecurity({ handle: 1, symbol: "US:VTI", name: "Vanguard" }),
@@ -299,7 +369,7 @@ describe("mapSecurities market prefixes", () => {
   });
 
   it("suffixes rather than merges when stripping collides", () => {
-    const result = mapSecurities({
+    const result = mapHeld({
       ...base,
       securities: [
         mnySecurity({ handle: 1, symbol: "VTI", name: "Held directly" }),
