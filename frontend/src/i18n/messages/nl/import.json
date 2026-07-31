@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "Transacties importeren",
-    "subtitle": "Importeer transacties vanuit QIF-, OFX/QFX- of CSV-bestanden"
+    "subtitle": "Importeer transacties vanuit QIF-, OFX/QFX- of CSV-bestanden, of neem een volledig Microsoft Money-bestand (.mny) over"
   },
   "upload": {
     "heading": "Transactiebestanden uploaden",
-    "instructions": "Selecteer een of meer bestanden om te importeren. Ondersteunde indelingen: QIF, OFX/QFX, CSV.\nJe kunt meerdere bestanden van hetzelfde type selecteren voor bulkimport.",
+    "instructions": "Selecteer een of meer bestanden om te importeren. Ondersteunde indelingen: QIF, OFX/QFX, CSV en Microsoft Money (.mny).\nJe kunt meerdere bestanden van hetzelfde type selecteren voor bulkimport. Importeer Microsoft Money-bestanden één voor één — een .mny-bestand bevat een volledig profiel.",
     "importingTo": "Importeren naar:",
     "clickToSelect": "Klik om bestand(en) te selecteren",
     "processing": "Verwerken...",
-    "acceptedFormats": "QIF, OFX, QFX of CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV of Microsoft Money (.mny)",
     "mnyFailedHeading": "Dit Microsoft Money-bestand kon niet worden geopend",
     "wikiNotice": {
       "title": "Voordat u importeert",
@@ -315,7 +315,7 @@
       "accounts": "Rekeningen",
       "securities": "Effecten",
       "investments": "Beleggingstransacties",
-      "investmentDetail": "{transfers} effectenoverboekingen, {splits} aandelensplitsingen",
+      "investmentDetail": "{transfers} effectenoverboekingen",
       "prices": "Koersgeschiedenis",
       "exchangeRates": "Wisselkoersen",
       "ofTotal": "van {total} in het bestand",
@@ -471,11 +471,24 @@
     "unconfirmedInvestmentAction": "{count, plural, one {# beleggingstransactie gebruikte} other {# beleggingstransacties gebruikten}} een Money-actie waarvan de betekenis is afgeleid en niet gedocumenteerd; controleer ze tegen Money.",
     "missingInvestmentDetail": "{count, plural, one {# beleggingstransactie had} other {# beleggingstransacties hadden}} geen aandelengegevens in het bestand en zijn alleen op hun geldbedrag geïmporteerd.",
     "investmentAccountMismatch": "{count, plural, one {# beleggingstransactie stond} other {# beleggingstransacties stonden}} op een rekening die geen beleggingsrekening is en zijn overgeslagen.",
-    "unusableSecuritySplit": "{count, plural, one {# aandelensplitsing kon} other {# aandelensplitsingen konden}} niet aan een effect worden gekoppeld of had een onbruikbare verhouding, en is niet toegepast.",
+    "securitySplitNotApplied": "{count, plural, one {# aandelensplitsing is vastgelegd in het bestand en is niet toegepast op de aantallen aandelen, omdat Money die ook niet toepast} other {# aandelensplitsingen zijn vastgelegd in het bestand en zijn niet toegepast op de aantallen aandelen, omdat Money die ook niet toepast}}. Controleer de posities aan de hand van uw afschriften.",
     "holdingsMismatch": "{count, plural, one {# positie komt} other {# posities komen}} niet overeen met de aandelen in uw Money-bestand.",
     "billTemplateMissing": "{count, plural, one {# geplande rekening had} other {# geplande rekeningen hadden}} geen sjabloontransactie in het bestand en zijn overgeslagen.",
     "unusableBill": "{count, plural, one {# geplande rekening had} other {# geplande rekeningen hadden}} geen rekening, geen bruikbare datum of een onbekende herhaling en zijn overgeslagen.",
-    "billFrequencyApproximated": "{count, plural, one {# geplande rekening gebruikt} other {# geplande rekeningen gebruiken}} een herhalingsinterval dat Monize niet exact kan weergeven, dus het dichtstbijzijnde kortere interval is gebruikt."
+    "billFrequencyApproximated": "{count, plural, one {# geplande rekening gebruikt} other {# geplande rekeningen gebruiken}} een herhalingsinterval dat Monize niet exact kan weergeven, dus het dichtstbijzijnde kortere interval is gebruikt.",
+    "showTransactions": "{count, plural, one {De # transactie tonen} other {De # transacties tonen}}",
+    "hideTransactions": "Transacties verbergen",
+    "reviewInMoney": "Open deze in Microsoft Money om ze te controleren of te corrigeren en exporteer en importeer daarna opnieuw.",
+    "reviewInMoneyTruncated": "De eerste {shown} van {total} worden getoond. Open deze in Microsoft Money om ze te controleren of te corrigeren en exporteer en importeer daarna opnieuw.",
+    "reference": "Ref. {reference}",
+    "noValue": "Niet ingesteld",
+    "table": {
+      "date": "Datum",
+      "account": "Rekening",
+      "payee": "Begunstigde",
+      "amount": "Bedrag",
+      "problem": "Probleem"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Er is iets misgegaan tijdens de import. Er is niets opgeslagen -- u kunt het opnieuw proberen.",

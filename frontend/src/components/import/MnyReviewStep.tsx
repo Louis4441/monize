@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/format';
 import { formatAccountType } from '@/lib/account-utils';
 import { MnyImportOptionsInput, MnyPreview } from '@/lib/import-mny';
 import { MnyBillsPanel } from './MnyBillsPanel';
+import { MnyWarningsPanel } from './MnyWarningsPanel';
 
 interface MnyReviewStepProps {
   preview: MnyPreview;
@@ -68,7 +69,10 @@ export function MnyReviewStep({
   ).length;
 
   return (
-    <div className="max-w-4xl mx-auto">
+    // Wider than the rest of the wizard on purpose: this step carries the
+    // account list with its currency selects, the bill checkboxes and the
+    // warnings panel, and at max-w-4xl every one of them wraps.
+    <div className="max-w-6xl mx-auto">
       <h2 className="text-lg font-semibold text-foreground mb-1">
         {t('mnyReview.heading')}
       </h2>
@@ -136,7 +140,6 @@ export function MnyReviewStep({
             value={String(counts.investmentsToCreate)}
             detail={t('mnyReview.counts.investmentDetail', {
               transfers: counts.shareTransfersPaired,
-              splits: counts.stockSplitsApplied,
             })}
           />
           <SummaryTile
@@ -388,30 +391,16 @@ export function MnyReviewStep({
         </div>
       </div>
 
-      {/* Mapper warnings */}
-      {preview.warnings.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-foreground mb-2">
-            {t('mnyReview.warningsHeading')}
-          </h3>
-          <ul className="bg-card border border-border rounded-lg divide-y divide-border text-sm">
-            {preview.warnings.map((warning) => (
-              <li key={warning.code} className="px-4 py-2">
-                <span className="text-foreground">
-                  {t(`mnyWarnings.${warning.code}`, {
-                    count: warning.count,
-                  })}
-                </span>
-                {warning.samples.length > 0 && (
-                  <span className="block text-xs text-muted-foreground">
-                    {warning.samples.join(', ')}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/*
+        Mapper warnings, each expandable to the transactions behind it. This is
+        the last point at which the answer to "why is that split wrong" is to
+        go and fix it in Money, so the list has to name the transactions rather
+        than only count them.
+      */}
+      <MnyWarningsPanel
+        warnings={preview.warnings}
+        heading={t('mnyReview.warningsHeading')}
+      />
 
       {/*
         A start that never began. Without this the button simply does nothing --

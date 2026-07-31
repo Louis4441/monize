@@ -202,7 +202,6 @@ function parsedFile(overrides: Partial<MnyParsedFile> = {}): MnyParsedFile {
       referencedPayees: new Set(),
       referencedCategories: new Set(),
       transfersPaired: 0,
-      splitsApplied: 0,
       skipped: 0,
       warnings: [],
     },

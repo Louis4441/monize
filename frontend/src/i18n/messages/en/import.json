@@ -34,11 +34,11 @@
   },
   "page": {
     "title": "Import Transactions",
-    "subtitle": "Import transactions from QIF, OFX/QFX, or CSV files"
+    "subtitle": "Import transactions from QIF, OFX/QFX, or CSV files, or bring across a whole Microsoft Money (.mny) file"
   },
   "upload": {
     "heading": "Upload Transaction Files",
-    "instructions": "Select one or more files to import. Supported formats: QIF, OFX/QFX, CSV.\nYou can select multiple files of the same type for bulk import.",
+    "instructions": "Select one or more files to import. Supported formats: QIF, OFX/QFX, CSV, and Microsoft Money (.mny).\nYou can select multiple files of the same type for bulk import. Import Microsoft Money files one at a time — a .mny file holds a whole profile.",
     "importingTo": "Importing to:",
     "clickToSelect": "Click to select file(s)",
     "processing": "Processing...",
@@ -315,7 +315,7 @@
       "accounts": "Accounts",
       "securities": "Securities",
       "investments": "Investment transactions",
-      "investmentDetail": "{transfers} share transfers, {splits} stock splits",
+      "investmentDetail": "{transfers} share transfers",
       "prices": "Price history",
       "exchangeRates": "Exchange rates",
       "ofTotal": "of {total} in the file",
@@ -471,11 +471,24 @@
     "unconfirmedInvestmentAction": "{count, plural, one {# investment transaction} other {# investment transactions}} used a Money action whose meaning is inferred rather than documented; check them against Money.",
     "missingInvestmentDetail": "{count, plural, one {# investment transaction} other {# investment transactions}} had no share detail in the file and were imported for their cash amount only.",
     "investmentAccountMismatch": "{count, plural, one {# investment transaction} other {# investment transactions}} sat in an account that is not an investment account and were skipped.",
-    "unusableSecuritySplit": "{count, plural, one {# stock split} other {# stock splits}} could not be matched to a security or had an unusable ratio, and were not applied.",
+    "securitySplitNotApplied": "{count, plural, one {# stock split is recorded in the file and was not applied to share counts, because Money does not apply it either} other {# stock splits are recorded in the file and were not applied to share counts, because Money does not apply them either}}. Check the holdings against your statements.",
     "holdingsMismatch": "{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records.",
     "billTemplateMissing": "{count, plural, one {# scheduled bill} other {# scheduled bills}} had no template transaction in the file and were skipped.",
     "unusableBill": "{count, plural, one {# scheduled bill} other {# scheduled bills}} had no account, no usable date or an unrecognized recurrence, and were skipped.",
-    "billFrequencyApproximated": "{count, plural, one {# scheduled bill uses} other {# scheduled bills use}} a repeat interval Monize cannot express exactly, so the closest shorter one was used."
+    "billFrequencyApproximated": "{count, plural, one {# scheduled bill uses} other {# scheduled bills use}} a repeat interval Monize cannot express exactly, so the closest shorter one was used.",
+    "showTransactions": "Show {count, plural, one {the # transaction} other {the # transactions}}",
+    "hideTransactions": "Hide transactions",
+    "reviewInMoney": "Open these in Microsoft Money to check or correct them, then export and import again.",
+    "reviewInMoneyTruncated": "Showing the first {shown} of {total}. Open these in Microsoft Money to check or correct them, then export and import again.",
+    "reference": "Ref {reference}",
+    "noValue": "Not set",
+    "table": {
+      "date": "Date",
+      "account": "Account",
+      "payee": "Payee",
+      "amount": "Amount",
+      "problem": "Problem"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Something went wrong while importing. Nothing was saved -- you can try again.",

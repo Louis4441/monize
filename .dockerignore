@@ -21,3 +21,9 @@
 **/.env
 **/.env.*
 !**/.env.example
+
+# Microsoft Money files. A .mny is somebody's entire financial history, and the
+# backend context is the repo root -- so a file dropped anywhere in the tree to
+# test an import would otherwise be baked into the image. The committed test
+# fixtures are excluded too: nothing in the image reads them.
+**/*.mny

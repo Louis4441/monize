@@ -18,10 +18,11 @@ import {
   MNY_REAL_POSTING_FREQUENCY,
   MNY_TRANSACTION_FLAG,
   MNY_UNCONFIRMED_ACTIONS,
+  decodeReference,
   hasInvestmentDetail,
-  isAutoEntered,
   isCurrencyPseudoSecurity,
   isCurrencyQuoteSymbol,
+  isDebtAccountRow,
   isIncomeCategoryType,
   isRecurrenceTemplate,
   isVoided,
@@ -80,30 +81,38 @@ describe("transaction status", () => {
     ).toBe(TransactionStatus.VOID);
   });
 
-  it("does not treat an auto-entered row as voided", () => {
-    // PR #192 excluded auto-entered rows, which emptied every loan account.
-    const flags = MNY_TRANSACTION_FLAG.AUTO_ENTERED;
+  it("does not treat a loan payment as voided", () => {
+    // 0x86 is the flag word every loan and mortgage payment in the
+    // maintainer's file carries: 0x80 (debt account) | 0x4 | 0x2 (transfer
+    // side). Reading 0x80 as void made all 1,084 of them import VOID, which
+    // then excluded them from the balance, so every loan sat at its opening
+    // balance forever.
+    const loanPayment = 0x86;
 
-    expect(isAutoEntered(flags)).toBe(true);
-    expect(isVoided(flags)).toBe(false);
-    expect(mapTransactionStatus(MNY_CLEARED_STATUS.CLEARED, flags)).toBe(
-      TransactionStatus.CLEARED,
-    );
+    expect(isDebtAccountRow(loanPayment)).toBe(true);
+    expect(isVoided(loanPayment)).toBe(false);
+    expect(
+      mapTransactionStatus(MNY_CLEARED_STATUS.RECONCILED, loanPayment),
+    ).toBe(TransactionStatus.RECONCILED);
   });
 
-  it("reads both flags out of a combined word", () => {
+  it("reads void and debt-account out of a combined word", () => {
     const flags =
-      MNY_TRANSACTION_FLAG.VOID | MNY_TRANSACTION_FLAG.AUTO_ENTERED | 0x12;
+      MNY_TRANSACTION_FLAG.VOID | MNY_TRANSACTION_FLAG.DEBT_ACCOUNT | 0x12;
 
     expect(isVoided(flags)).toBe(true);
-    expect(isAutoEntered(flags)).toBe(true);
+    expect(isDebtAccountRow(flags)).toBe(true);
   });
 
-  it("treats the fixture flag words as neither voided nor auto-entered", () => {
-    // money2001/2002 rows carry 0x2, Money Plus rows 0x10.
-    for (const flags of [0x2, 0x10]) {
+  it("treats every observed non-void flag word as not voided", () => {
+    // Every distinct grftt bit the maintainer's Money Plus file carries, minus
+    // the void bit itself: transfer sides, investment rows, split parents and
+    // children, debt-account rows and scheduled-series members. None is void.
+    for (const flags of [
+      0x2, 0x4, 0x6, 0x10, 0x12, 0x16, 0x20, 0x40, 0x42, 0x46, 0x80, 0x86, 0xa0,
+      0xc0, 0x4086, 0x200016, 0x200086, 0x240016,
+    ]) {
       expect(isVoided(flags)).toBe(false);
-      expect(isAutoEntered(flags)).toBe(false);
     }
   });
 });
@@ -118,6 +127,69 @@ describe("isRecurrenceTemplate", () => {
   });
 });
 
+describe("decodeReference", () => {
+  const plain = 0;
+  const debtRow = MNY_TRANSACTION_FLAG.DEBT_ACCOUNT;
+
+  // Imported whole, `szId` put "1Debit" and "0           2" in the register.
+  it.each([
+    ["1Debit", "Debit"],
+    ["1PC Banking", "PC Banking"],
+    ["1ATM", "ATM"],
+    ["1Telebank", "Telebank"],
+    ["1EComm", "EComm"],
+    ["1US", "US"],
+  ])("reads the text %p as %p", (raw, expected) => {
+    expect(decodeReference(raw, plain)).toBe(expected);
+  });
+
+  it.each([
+    ["0         155", "155"],
+    ["0           1", "1"],
+    ["0         200", "200"],
+  ])("reads the cheque number %p as %p", (raw, expected) => {
+    expect(decodeReference(raw, plain)).toBe(expected);
+  });
+
+  it("drops the number on a loan or mortgage row", () => {
+    // There it is Money's instalment counter, not a reference the user wrote:
+    // the bank side of the transfer carries none, and Money's loan register
+    // has no Num column to show it in.
+    expect(decodeReference("0           2", debtRow)).toBeNull();
+    // The text kind is a real reference wherever it appears.
+    expect(decodeReference("1Debit", debtRow)).toBe("Debit");
+  });
+
+  it("keeps a value that does not fit either shape rather than losing it", () => {
+    // The one that matters: a cheque number a user typed as 1042 is not the
+    // text "042" behind a kind digit.
+    expect(decodeReference("1042", plain)).toBe("1042");
+    expect(decodeReference("1042", debtRow)).toBe("1042");
+    expect(decodeReference("2something", plain)).toBe("2something");
+    expect(decodeReference("0 not-a-number", plain)).toBe("0 not-a-number");
+    expect(decodeReference("7", plain)).toBe("7");
+  });
+
+  it("returns null for nothing at all", () => {
+    expect(decodeReference(null, plain)).toBeNull();
+    expect(decodeReference("", plain)).toBeNull();
+    expect(decodeReference("   ", plain)).toBeNull();
+  });
+
+  it("never leaves the packed shape in what it returns", () => {
+    // No committed fixture carries a single `szId` -- all three are null
+    // throughout -- so the shapes above come from the two Money Plus files that
+    // cannot be committed. This is the general guard: whatever the padding
+    // width, a kind digit followed by spaces never survives.
+    for (const width of [2, 5, 12, 20]) {
+      const padded = `0${"7".padStart(width, " ")}`;
+
+      expect(decodeReference(padded, plain)).toBe("7");
+      expect(decodeReference(padded, debtRow)).toBeNull();
+    }
+  });
+});
+
 describe("mapInvestmentAction", () => {
   it.each([
     [MNY_ACTION.BUY_LEGACY, InvestmentAction.BUY],
@@ -126,7 +198,7 @@ describe("mapInvestmentAction", () => {
     [MNY_ACTION.DIVIDEND, InvestmentAction.DIVIDEND],
     [MNY_ACTION.DISTRIBUTION, InvestmentAction.DIVIDEND],
     [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
-    [MNY_ACTION.BUY_ALT, InvestmentAction.BUY],
+    [MNY_ACTION.CONTRIBUTION, InvestmentAction.REINVEST],
     [MNY_ACTION.REINVEST_ALT, InvestmentAction.REINVEST],
     [MNY_ACTION.CAPITAL_GAIN, InvestmentAction.CAPITAL_GAIN],
     [MNY_ACTION.ADD_SHARES, InvestmentAction.ADD_SHARES],
@@ -171,7 +243,7 @@ describe("mapInvestmentAction", () => {
     for (const act of [
       MNY_ACTION.BUY,
       MNY_ACTION.REINVEST,
-      MNY_ACTION.BUY_ALT,
+      MNY_ACTION.CONTRIBUTION,
       MNY_ACTION.TRANSFER_IN,
     ]) {
       expect(mapInvestmentAction(act)).not.toBeNull();
@@ -202,7 +274,7 @@ describe("mapInvestmentAction", () => {
     expect([...MNY_UNCONFIRMED_ACTIONS].sort((a, b) => a - b)).toEqual([
       MNY_ACTION.DISTRIBUTION,
       MNY_ACTION.REINVEST_ALT,
-      MNY_ACTION.BUY_ALT,
+      MNY_ACTION.CONTRIBUTION,
       MNY_ACTION.CAPITAL_GAIN,
     ]);
   });
@@ -231,12 +303,13 @@ describe("currency pseudo-securities", () => {
     },
   );
 
-  it("excludes a row by either the type code or the symbol shape", () => {
-    // sct codes shift between releases, so the symbol shape is the
-    // version-independent half of the test.
-    expect(isCurrencyPseudoSecurity(4, "anything")).toBe(true);
-    expect(isCurrencyPseudoSecurity(6, "/GBPUS")).toBe(true);
-    expect(isCurrencyPseudoSecurity(6, "$XAL.X")).toBe(false);
+  it("excludes a row by the symbol shape alone", () => {
+    // No `sct` code is read here: 4 was, on the theory that it meant currency,
+    // and it is Money's money-market fund. Nothing else distinguishes a
+    // currency row, and sct codes shift between releases besides.
+    expect(isCurrencyPseudoSecurity("/GBPUS")).toBe(true);
+    expect(isCurrencyPseudoSecurity("$XAL.X")).toBe(false);
+    expect(isCurrencyPseudoSecurity("TDB164")).toBe(false);
   });
 
   it("matches every currency quote symbol in every fixture", () => {
@@ -261,7 +334,7 @@ describe("currency pseudo-securities", () => {
 
       expect(
         securities.some((security) =>
-          isCurrencyPseudoSecurity(security.securityType, security.symbol),
+          isCurrencyPseudoSecurity(security.symbol),
         ),
       ).toBe(false);
     }

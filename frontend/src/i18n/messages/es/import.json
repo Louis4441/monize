@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "Importar Transacciones",
-    "subtitle": "Importa transacciones desde archivos QIF, OFX/QFX o CSV"
+    "subtitle": "Importa transacciones desde archivos QIF, OFX/QFX o CSV, o trae un archivo completo de Microsoft Money (.mny)"
   },
   "upload": {
     "heading": "Cargar Archivos de Transacciones",
-    "instructions": "Selecciona uno o más archivos para importar. Formatos admitidos: QIF, OFX/QFX, CSV.\nPuedes seleccionar varios archivos del mismo tipo para importación masiva.",
+    "instructions": "Selecciona uno o más archivos para importar. Formatos admitidos: QIF, OFX/QFX, CSV y Microsoft Money (.mny).\nPuedes seleccionar varios archivos del mismo tipo para importación masiva. Los archivos de Microsoft Money se importan de uno en uno: un archivo .mny contiene un perfil completo.",
     "importingTo": "Importando a:",
     "clickToSelect": "Haz clic para seleccionar archivo(s)",
     "processing": "Procesando...",
-    "acceptedFormats": "QIF, OFX, QFX o CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV o Microsoft Money (.mny)",
     "mnyFailedHeading": "No se pudo abrir ese archivo de Microsoft Money",
     "wikiNotice": {
       "title": "Antes de importar",
@@ -315,7 +315,7 @@
       "accounts": "Cuentas",
       "securities": "Valores",
       "investments": "Transacciones de inversión",
-      "investmentDetail": "{transfers} traspasos de valores, {splits} divisiones de acciones",
+      "investmentDetail": "{transfers} traspasos de valores",
       "prices": "Historial de precios",
       "exchangeRates": "Tipos de cambio",
       "ofTotal": "de {total} en el archivo",
@@ -471,11 +471,24 @@
     "unconfirmedInvestmentAction": "{count, plural, one {# transacción de inversión usó} other {# transacciones de inversión usaron}} una acción de Money cuyo significado se deduce y no está documentado; compruébelas con Money.",
     "missingInvestmentDetail": "{count, plural, one {# transacción de inversión no tenía} other {# transacciones de inversión no tenían}} detalle de acciones en el archivo y se importaron solo por su importe en efectivo.",
     "investmentAccountMismatch": "{count, plural, one {# transacción de inversión estaba} other {# transacciones de inversión estaban}} en una cuenta que no es de inversión y se omitieron.",
-    "unusableSecuritySplit": "{count, plural, one {# división de acciones no pudo} other {# divisiones de acciones no pudieron}} asociarse a un valor o tenía una proporción inservible, y no se aplicaron.",
+    "securitySplitNotApplied": "{count, plural, one {# división de acciones está registrada en el archivo y no se aplicó al número de acciones, porque Money tampoco la aplica} other {# divisiones de acciones están registradas en el archivo y no se aplicaron al número de acciones, porque Money tampoco las aplica}}. Compruebe las posiciones con sus extractos.",
     "holdingsMismatch": "{count, plural, one {# posición no coincide} other {# posiciones no coinciden}} con las acciones que registra su archivo de Money.",
     "billTemplateMissing": "{count, plural, one {# factura programada no tenía} other {# facturas programadas no tenían}} transacción de plantilla en el archivo y se omitieron.",
     "unusableBill": "{count, plural, one {# factura programada no tenía} other {# facturas programadas no tenían}} cuenta, fecha utilizable o periodicidad reconocida, y se omitieron.",
-    "billFrequencyApproximated": "{count, plural, one {# factura programada usa} other {# facturas programadas usan}} un intervalo de repetición que Monize no puede expresar con exactitud, así que se usó el más corto más cercano."
+    "billFrequencyApproximated": "{count, plural, one {# factura programada usa} other {# facturas programadas usan}} un intervalo de repetición que Monize no puede expresar con exactitud, así que se usó el más corto más cercano.",
+    "showTransactions": "{count, plural, one {Mostrar la # transacción} other {Mostrar las # transacciones}}",
+    "hideTransactions": "Ocultar transacciones",
+    "reviewInMoney": "Ábrelas en Microsoft Money para revisarlas o corregirlas y vuelve a exportar e importar.",
+    "reviewInMoneyTruncated": "Se muestran las primeras {shown} de {total}. Ábrelas en Microsoft Money para revisarlas o corregirlas y vuelve a exportar e importar.",
+    "reference": "Ref. {reference}",
+    "noValue": "Sin definir",
+    "table": {
+      "date": "Fecha",
+      "account": "Cuenta",
+      "payee": "Beneficiario",
+      "amount": "Cantidad",
+      "problem": "Problema"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Algo salió mal durante la importación. No se guardó nada: puede volver a intentarlo.",

@@ -49,7 +49,6 @@ function preview(overrides: Partial<MnyPreview> = {}): MnyPreview {
       investmentsToCreate: 0,
       investmentsSkipped: 0,
       shareTransfersPaired: 0,
-      stockSplitsApplied: 0,
       pricesToImport: 0,
       exchangeRatesToImport: 0,
       billsDetected: 0,
@@ -236,7 +235,6 @@ describe('MnyReviewStep', () => {
           securitiesInFile: 98,
           investmentsToCreate: 412,
           shareTransfersPaired: 4,
-          stockSplitsApplied: 2,
           pricesToImport: 68000,
           exchangeRatesToImport: 120,
         },
@@ -257,9 +255,7 @@ describe('MnyReviewStep', () => {
       expect(screen.getByText('86')).toBeInTheDocument();
       expect(screen.getByText('412')).toBeInTheDocument();
       expect(screen.getByText('68000')).toBeInTheDocument();
-      expect(
-        screen.getByText(/4 share transfers, 2 stock splits/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/4 share transfers/)).toBeInTheDocument();
     });
 
     it('shows an account its investment rows alongside its transactions', () => {

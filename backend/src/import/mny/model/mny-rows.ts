@@ -172,7 +172,7 @@ export interface MnyTransaction {
   readonly amount: number;
   /** `cs`: 0 unreconciled, 1 cleared, 2 reconciled. */
   readonly clearedStatus: number;
-  /** `grftt`: flag word. 0x80 voided, 0x8000 auto-entered (a real posting). */
+  /** `grftt`: flag word. 0x100 voided, 0x80 a loan/mortgage row. See `MNY_TRANSACTION_FLAG`. */
   readonly flags: number;
   /** `act`: investment action code. See section 8.4 of the design. */
   readonly action: number;

@@ -50,6 +50,7 @@ import {
   transactionData,
 } from "@/import/mny/__fixtures__/mny-row-builders";
 import {
+  cashKeyByAccountKey,
   mapAccounts,
   mapCategories,
   mapPayees,
@@ -474,6 +475,7 @@ describe("mny writers (integration)", () => {
         accountKeyByHandle: accounts.keyByHandle,
         currencyByHandle: accounts.currencyByHandle,
         bills: [],
+        cashKeyByAccountKey: cashKeyByAccountKey(accounts),
       });
       const categories = mapCategories(reference, null);
       const payees = mapPayees(reference.payees, null);
@@ -648,7 +650,7 @@ describe("mny writers (integration)", () => {
       const { input } = await setup(
         transactionData({
           transactions: [
-            mnyTransaction({ handle: 1, account: 1, amount: -99, flags: 0x80 }),
+            mnyTransaction({ handle: 1, account: 1, amount: -99, flags: 0x100 }),
           ],
         }),
       );
@@ -661,6 +663,30 @@ describe("mny writers (integration)", () => {
         where: { userId },
       });
       expect(row!.status).toBe("VOID");
+    });
+
+    // The bug this guards: 0x80 was read as the void bit, but it marks a row in
+    // a loan or mortgage account -- so every loan payment reached the database
+    // VOID and `computeExpectedBalances` then skipped it, freezing each debt
+    // account at its opening balance. Asserted here, at the writer, because the
+    // status that matters is the one the row is stored with.
+    it("stores a loan-account row as a normal posting, not voided", async () => {
+      const { input } = await setup(
+        transactionData({
+          transactions: [
+            mnyTransaction({ handle: 1, account: 1, amount: -99, flags: 0x80 }),
+          ],
+        }),
+      );
+
+      await inTransaction((manager) =>
+        writeTransactions(manager, userId, input),
+      );
+
+      const row = await dataSource.getRepository(Transaction).findOne({
+        where: { userId },
+      });
+      expect(row!.status).not.toBe("VOID");
     });
 
     it("writes more rows than one chunk holds", async () => {
@@ -867,11 +893,13 @@ describe("mny writers (integration)", () => {
         accountKeyByHandle: accounts.keyByHandle,
         currencyByHandle: accounts.currencyByHandle,
         bills: bills.bills,
+        cashKeyByAccountKey: cashKeyByAccountKey(accounts),
       });
       const securities = mapSecurities({
         securities: [],
         currencyByHandle: new Map(),
         baseCurrency: "USD",
+        activeHandles: new Set<number>(),
       });
       const mappedBills = mapBills({
         bills,
@@ -1206,20 +1234,25 @@ describe("mny writers (integration)", () => {
     });
 
     /*
-     * money2002.mny is the investment fixture: 86 real securities, 60 `act` 15
+     * money2002.mny is the investment fixture: 86 `SEC` rows, 60 `act` 15
      * transactions and 60 open `LOT` rows across 30 securities. That makes it
      * the one file in the corpus where the holdings a real import produces can
      * be checked against Money's own tax-lot record end to end.
+     *
+     * **30 of the 86 are imported.** The other 56 are the Amex and Dow index
+     * rows Money ships as its quote watch list, which no `TRN` row and no `LOT`
+     * references; the activity filter in `mapSecurities` leaves them behind
+     * along with their price history.
      */
     describe("investments", () => {
-      it("creates the securities, excluding Money's currency pseudo-securities", async () => {
+      it("creates the securities the file shows activity for", async () => {
         const job = await runImport("money2002");
 
-        expect(job.result!.securitiesCreated).toBe(86);
+        expect(job.result!.securitiesCreated).toBe(30);
         const securities = await dataSource
           .getRepository(Security)
           .find({ where: { userId } });
-        expect(securities).toHaveLength(86);
+        expect(securities).toHaveLength(30);
         // A currency pseudo-security would arrive with a `/GBPUS`-shaped symbol.
         expect(
           securities.filter((security) => security.symbol.startsWith("/")),
@@ -1308,7 +1341,7 @@ describe("mny writers (integration)", () => {
         expect(await dataSource.getRepository(SecurityPrice).count()).toBe(0);
         expect(await dataSource.getRepository(ExchangeRate).count()).toBe(0);
         // Securities and investment rows are not price history and still land.
-        expect(job.result!.securitiesCreated).toBe(86);
+        expect(job.result!.securitiesCreated).toBe(30);
       });
     });
   });

@@ -57,8 +57,12 @@ export const MNY_WARNING_CODES = [
   "missingInvestmentDetail",
   /** An investment row in an account that is not an investment account. */
   "investmentAccountMismatch",
-  /** A `SEC_SPLIT` row no price row resolves to a security, or with an unusable ratio. */
-  "unusableSecuritySplit",
+  /**
+   * The file records a stock split that changes a share count, and the import
+   * did not apply it -- because Money does not apply it either. See
+   * `reportUnappliedSplits`.
+   */
+  "securitySplitNotApplied",
   /** LOT-derived open shares and the action replay disagree for a holding. */
   "holdingsMismatch",
   /** A `BILL` series whose template transaction is missing from the file. */
@@ -76,6 +80,150 @@ export const MNY_WARNING_CODES = [
 
 export type MnyWarningCode = (typeof MNY_WARNING_CODES)[number];
 
+/**
+ * The `TRN` row a warning is about, in the terms the mappers have: handles and
+ * account keys, not names.
+ *
+ * Row-level warnings carry one so the review step can show the user *which*
+ * transactions were flagged, in enough detail to find them in Money and fix
+ * them there before importing. `htrn=14595` alone cannot be searched for in
+ * Money's UI; a date, an account, a payee and a cheque number can.
+ */
+export interface MnyWarningRow {
+  /** `TRN.htrn`. Stable across a file, and the last resort when nothing else resolves. */
+  readonly handle: number;
+  /** Import account key, resolved to the account's name for display. */
+  readonly accountKey: string | null;
+  /** `TRN.dt` as `YYYY-MM-DD`. */
+  readonly date: string | null;
+  readonly amount: number | null;
+  /** `TRN.lHpay` / `hpay`, resolved to the payee's name for display. */
+  readonly payeeHandle: number | null;
+  /** `TRN.szId`: the cheque or reference number, which Money's register is searchable by. */
+  readonly reference: string | null;
+  /** `TRN.mMemo`, truncated -- a memo is free text and can be long. */
+  readonly memo: string | null;
+}
+
+/** A flagged row with its handles resolved, ready to render. */
+export interface MnyFlaggedRow {
+  readonly handle: number;
+  readonly accountName: string | null;
+  readonly date: string | null;
+  readonly amount: number | null;
+  readonly currencyCode: string | null;
+  readonly payeeName: string | null;
+  readonly reference: string | null;
+  readonly memo: string | null;
+  /** This occurrence's specifics, e.g. `legs 1832.07 vs total 1750.44`. */
+  readonly detail: string | null;
+}
+
+/** One code's worth of warnings, for the review step's grouped display. */
+export interface MnyWarningSummary {
+  readonly code: MnyWarningCode;
+  readonly count: number;
+  /** Up to `MAX_WARNING_SAMPLES` subjects, so a 4,000-row warning stays small. */
+  readonly samples: readonly string[];
+  /**
+   * The flagged rows, for the expandable list. Empty for warnings that are not
+   * about a transaction (a missing table, a duplicate account name).
+   */
+  readonly rows: readonly MnyFlaggedRow[];
+  /** True when this code has more flagged rows than `rows` carries. */
+  readonly rowsTruncated: boolean;
+}
+
+export const MAX_WARNING_SAMPLES = 5;
+
+/**
+ * Flagged rows kept per code. A preview travels through the Next proxy and is
+ * re-fetched on every wizard step, so this is a payload budget as much as a UI
+ * one: a single code can raise thousands of warnings on a real file -- 3,255
+ * `transferAcrossExcludedAccount` before those became real transfers, and 829
+ * `missingInvestmentDetail` still -- and shipping all of them would cost
+ * roughly half a megabyte. Fifty
+ * is enough to see the shape of a problem; the count still reports the whole of
+ * it, and `rowsTruncated` says the list is partial rather than letting it read
+ * as complete.
+ */
+export const MAX_FLAGGED_ROWS = 50;
+
+/** Longest memo carried on a flagged row. */
+const MAX_MEMO_LENGTH = 120;
+
+/** Resolves the handles on `MnyWarningRow` to the names a user recognizes. */
+export interface MnyWarningLookup {
+  accountName(key: string): string | null;
+  currencyCode(key: string): string | null;
+  payeeName(handle: number): string | null;
+}
+
+/**
+ * Builds a lookup from the mapped accounts and payees.
+ *
+ * Structurally typed rather than taking `MnyParsedFile` so this module stays a
+ * leaf -- the parser imports it, not the other way round. Both surfaces that
+ * summarize warnings (the wizard's preview and the post-import verification
+ * report) build it the same way, so a flagged row reads identically in both.
+ */
+export function warningLookup(input: {
+  readonly accounts: readonly {
+    readonly key: string;
+    readonly name: string;
+    readonly currencyCode: string;
+  }[];
+  readonly payeeNameByHandle: ReadonlyMap<number, string>;
+}): MnyWarningLookup {
+  const accounts = new Map(
+    input.accounts.map((account) => [account.key, account]),
+  );
+  return {
+    accountName: (key) => accounts.get(key)?.name ?? null,
+    currencyCode: (key) => accounts.get(key)?.currencyCode ?? null,
+    payeeName: (handle) => input.payeeNameByHandle.get(handle) ?? null,
+  };
+}
+
+function truncate(text: string | null): string | null {
+  if (text === null) {
+    return null;
+  }
+  return text.length > MAX_MEMO_LENGTH
+    ? `${text.slice(0, MAX_MEMO_LENGTH)}...`
+    : text;
+}
+
+function flagRow(
+  warning: MnyWarning,
+  lookup: MnyWarningLookup | undefined,
+): MnyFlaggedRow | null {
+  const row = warning.row;
+  if (row === undefined) {
+    return null;
+  }
+  return {
+    handle: row.handle,
+    accountName:
+      row.accountKey === null
+        ? null
+        : (lookup?.accountName(row.accountKey) ?? null),
+    date: row.date,
+    amount: row.amount,
+    currencyCode:
+      row.accountKey === null
+        ? null
+        : (lookup?.currencyCode(row.accountKey) ?? null),
+    payeeName:
+      row.payeeHandle === null
+        ? null
+        : (lookup?.payeeName(row.payeeHandle) ?? null),
+    reference: row.reference,
+    memo: truncate(row.memo),
+    detail: warning.detail ?? null,
+  };
+}
+
 export interface MnyWarning {
   readonly code: MnyWarningCode;
   /**
@@ -85,30 +233,30 @@ export interface MnyWarning {
   readonly subject?: string;
   /** Extra specifics: a raw code, a delta, the column that was missing. */
   readonly detail?: string;
+  /**
+   * Set by the mappers on warnings that are about one `TRN` row, so the review
+   * step can list them for the user to fix in Money before importing.
+   */
+  readonly row?: MnyWarningRow;
 }
-
-/** One code's worth of warnings, for the review step's grouped display. */
-export interface MnyWarningSummary {
-  readonly code: MnyWarningCode;
-  readonly count: number;
-  /** Up to `MAX_WARNING_SAMPLES` subjects, so a 4,000-row warning stays small. */
-  readonly samples: readonly string[];
-}
-
-export const MAX_WARNING_SAMPLES = 5;
 
 /**
- * Groups warnings by code, keeping a bounded sample of subjects. The preview
- * and the verification report both travel as JSON through a polling endpoint,
- * so an unbounded warning list is a payload problem, not just a UI one.
+ * Groups warnings by code, keeping a bounded sample of subjects and a bounded
+ * list of flagged rows. The preview and the verification report both travel as
+ * JSON through a polling endpoint, so an unbounded warning list is a payload
+ * problem, not just a UI one.
  */
 export function summarizeWarnings(
   warnings: readonly MnyWarning[],
+  lookup?: MnyWarningLookup,
 ): MnyWarningSummary[] {
   return MNY_WARNING_CODES.filter((code) =>
     warnings.some((warning) => warning.code === code),
   ).map((code) => {
     const matching = warnings.filter((warning) => warning.code === code);
+    const rows = matching
+      .map((warning) => flagRow(warning, lookup))
+      .filter((row): row is MnyFlaggedRow => row !== null);
     return {
       code,
       count: matching.length,
@@ -116,6 +264,8 @@ export function summarizeWarnings(
         .map((warning) => warning.subject)
         .filter((subject): subject is string => subject !== undefined)
         .slice(0, MAX_WARNING_SAMPLES),
+      rows: rows.slice(0, MAX_FLAGGED_ROWS),
+      rowsTruncated: rows.length > MAX_FLAGGED_ROWS,
     };
   });
 }

@@ -387,6 +387,19 @@ describe('ImportPage', () => {
       });
     });
 
+    // The wizard grew a whole Microsoft Money path -- its own review step,
+    // progress screen and verification report -- while this subtitle went on
+    // listing three formats. Somebody arriving with a .mny had no reason from
+    // this page to think it would be read.
+    it('says a Microsoft Money file can be imported too', async () => {
+      render(<ImportPage />);
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Microsoft Money \(\.mny\)/),
+        ).toBeInTheDocument();
+      });
+    });
+
     it('renders within page layout', async () => {
       render(<ImportPage />);
       await waitFor(() => {

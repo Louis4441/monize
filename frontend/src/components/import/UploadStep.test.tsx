@@ -137,6 +137,22 @@ describe('UploadStep', () => {
     expect(input.multiple).toBe(true);
   });
 
+  // `.mny` was accepted by the input above for three phases while the
+  // "Supported formats" sentence still read "QIF, OFX/QFX, CSV" -- the format
+  // was supported and undiscoverable. `messages.import-formats.test.ts` is the
+  // guard that keeps the accept list and the catalogs in step, in every locale;
+  // this one only asserts the copy reaches the screen.
+  it('tells the user a Microsoft Money file is accepted', () => {
+    render(<UploadStep preselectedAccount={undefined} isLoading={false} onFileSelect={onFileSelect} />);
+
+    expect(screen.getByText(/Supported formats/)).toHaveTextContent(
+      'Microsoft Money (.mny)',
+    );
+    expect(
+      screen.getByText(/QIF, OFX, QFX, CSV, or Microsoft Money \(\.mny\)/),
+    ).toBeInTheDocument();
+  });
+
   describe('when a Microsoft Money file would not open', () => {
     it('says nothing while there is nothing to say', () => {
       render(

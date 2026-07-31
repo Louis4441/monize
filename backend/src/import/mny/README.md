@@ -23,6 +23,22 @@ that turns up in a real file must become a warning in the verification report, n
 mapping: `mapAccountType`, `mapInvestmentAction` and `mapFrequency` all return null for codes they
 do not know, and `MNY_UNCONFIRMED_ACTIONS` names the ones whose meaning is inferred.
 
+### A bit mask cannot warn you, so measure it before you trust it
+
+That null-and-warn rule protects lookups over a *value* -- an unknown `at` or `act` has no entry,
+so it is visibly unknown. A **bit mask** has no such failure mode: a wrong mask silently matches
+some other flag and the import completes clean. `MNY_TRANSACTION_FLAG.VOID` was 0x80 for four
+phases; 0x80 is the bit every loan and mortgage row carries, so every loan payment imported VOID,
+`computeExpectedBalances` skipped them, and each debt account sat at its opening balance under a
+full register. Nothing warned, because nothing could.
+
+So a `grftt` bit is only allowed here once it has been **measured on a real file**, by
+cross-tabbing it against something the file already settles -- which account the row is in,
+whether it appears in `TRN_SPLIT` or `TRN_XFER`, whether it carries `hsec`. Each mask in
+`MNY_TRANSACTION_FLAG` records that measurement in its comment, and
+`docs/ms-money-data-model.md` carries the full table. Do not copy a new mask out of the format
+reference and ship it; the fixtures are far too small to contradict one.
+
 ## Reading tables
 
 `readMnyTables(db)` (`tables/read-mny-tables.ts`) is the last layer that knows about Jet; mappers
@@ -80,6 +96,22 @@ not the cause -- see `helm/README.md` for the sizing table.
   transaction is open -- and the wizard only polls every 1500 ms, so a report per 500-row chunk
   writes a hundred-odd updates nobody reads.
 
+### A row Money does not store may still be one Monize has to write
+
+Money's model and Monize's are not the same shape, and the gaps are silent. A transfer from a
+bank account into an investment account is one Money row on each side, and the investment side is
+*both* the arriving cash and the trade. Monize splits those: the trade's cash leg comes out of the
+brokerage's cash sleeve, so something has to pay into it. Money has no row for that, so
+`buildCashCounterparts` synthesizes one.
+
+The failure mode when it does not is that money leaves an account and arrives nowhere, and no
+warning can fire because every row the file *has* was imported correctly. On the maintainer's file
+3,255 transfers were affected and the sleeves silently absorbed $553,225.57.
+
+So when a mapper is about to warn that it cannot represent something, check first whether the
+right answer is to *create* the row Monize needs rather than to report the mismatch. A warning
+about 3,255 rows the user cannot act on is a sign the mapping is wrong, not that the file is.
+
 ## Traps
 
 - **Page 0 is obfuscated.** Jet XORs bytes `0x18..0x95` of the header page with a fixed mask. The
@@ -116,8 +148,30 @@ not the cause -- see `helm/README.md` for the sizing table.
   mapper.
 - **`SEC_SPLIT` has no security column.** Resolve it through `MnyInvestmentData.splitSecurities`,
   which is built from `SP.hss` -> `SP.hsec`.
+- **Never apply a `SEC_SPLIT` ratio to a position.** Money does not adjust its own share counts
+  for those rows, so an importer that does disagrees with the file it read: seven positions
+  across two files (the maintainer's VTI, VWO, XIC and XIU, `sample.mny`'s MSFT, LEH and ADM)
+  match `LOT` exactly when the split is ignored and are wrong by the ratio when it is applied.
+  The rows are quote-feed metadata -- the split's `SP` row is a `dPrice = 0`, `src = 0` marker
+  with continuous prices either side -- and they appear for securities the user never held and
+  for the annual 1:1 entries Canadian ETFs record against a reinvested distribution. Ratios
+  other than 1 are surfaced as `securitySplitNotApplied`, never acted on.
 - **"No date" is year 10000, not a two-digit-year pivot.** `toDate` returns null outside
   1900–2199; never parse Money dates by hand.
+- **`grftt & 0x60000` marks a scheduled instance Money never posted.** Neither the register nor
+  the balance shows it. Importing them put four of the maintainer's accounts out by exactly their
+  total -- $7,671.79 on a chequing account whose Money balance is $0.00, -$156.55 on a credit
+  card, $91.00 on a plan sleeve and $350.00 on a mortgage -- and accounted for two of the three
+  holdings mismatches. All 67 are unreconciled in a file that is 74% reconciled, all fall in one
+  eleven-month window, and every one also carries `0x200000`. `ACCT.amtEndRec` could not settle
+  it on its own (a *reconciled* balance excludes unreconciled rows either way); the maintainer
+  confirmed against Money that the rows are absent from the register. Dropped silently, like the
+  loan-payment family: Money does not show them, so there is nothing to fix.
+- **`act` 12 credits units that no cash pays for.** It opens lots with a value and a quantity,
+  like a buy, but never has a `TRN_XFER` cash counterpart -- 0 times in 92, where `act` 1 has one
+  2,015 times in 2,029 and `act` 3 1,090 times in 1,090. Mapping it to BUY charged the sleeve and
+  left an employer-matched RRSP $18,457.22 overdrawn against Money's own $91.00. REINVEST is the
+  action that has a value and a position but no cash leg.
 - **`act` 16 removes shares; it is not a sale.** Mapping it to SELL closes lots against a
   fabricated price and corrupts average cost. Direction always comes from `act` -- `TRN_INV.qty`
   is stored positive, so a quantity sign proves nothing.
@@ -137,10 +191,13 @@ not the cause -- see `helm/README.md` for the sizing table.
   `US:VTI` creates a second security beside the user's own `VTI` and every quote lookup 404s.
 - **`act` 3 and `act` 4 (cash distributions) have no `TRN_INV` row.** Drive the investment mapper from `TRN`;
   iterating `TRN_INV` drops every dividend.
-- **`SEC.sct` codes shift between releases** (the same index securities are `sct` 6 in Money
-  2001/2002 and `sct` 7 in Money Plus), so the `sct = 4` currency test is not enough on its own.
-  Use `isCurrencyPseudoSecurity`, which also matches the version-independent `/GBPUS` symbol
-  shape.
+- **No `SEC.sct` code means anything portable, so none is read.** The codes shift between
+  releases (the same index securities are `sct` 6 in Money 2001/2002 and `sct` 7 in Money Plus),
+  and `sct = 4` -- long assumed to mark a currency pseudo-security -- is Money's **money-market
+  fund**, which in a brokerage account is the sweep the cash moves through. Excluding it cost
+  829 investment transactions and left five cash sleeves thousands of dollars out. A currency is
+  recognised by the `/GBPUS` symbol shape alone (`isCurrencyPseudoSecurity`), and currencies
+  live in `CRNC`, not `SEC`.
 - **`CAT.lType` says income or expense directly** -- `{2, 3}` income, `{0, 1}` expense, `-1` the
   two roots. Use `isIncomeCategoryType` and fall back to the root ancestor only for the roots.
 - **A `.mny` is a snapshot, so bill activity is measured from the file, not the clock.**

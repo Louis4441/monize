@@ -34,11 +34,11 @@
   },
   "page": {
     "title": "[XX-Import Transactions-XX]",
-    "subtitle": "[XX-Import transactions from QIF, OFX/QFX, or CSV files-XX]"
+    "subtitle": "[XX-Import transactions from QIF, OFX/QFX, or CSV files, or bring across a whole Microsoft Money (.mny) file-XX]"
   },
   "upload": {
     "heading": "[XX-Upload Transaction Files-XX]",
-    "instructions": "[XX-Select one or more files to import. Supported formats: QIF, OFX/QFX, CSV.\nYou can select multiple files of the same type for bulk import.-XX]",
+    "instructions": "[XX-Select one or more files to import. Supported formats: QIF, OFX/QFX, CSV, and Microsoft Money (.mny).\nYou can select multiple files of the same type for bulk import. Import Microsoft Money files one at a time — a .mny file holds a whole profile.-XX]",
     "importingTo": "[XX-Importing to:-XX]",
     "clickToSelect": "[XX-Click to select file(s)-XX]",
     "processing": "[XX-Processing...-XX]",
@@ -315,7 +315,7 @@
       "accounts": "[XX-Accounts-XX]",
       "securities": "[XX-Securities-XX]",
       "investments": "[XX-Investment transactions-XX]",
-      "investmentDetail": "[XX-{transfers} share transfers, {splits} stock splits-XX]",
+      "investmentDetail": "[XX-{transfers} share transfers-XX]",
       "prices": "[XX-Price history-XX]",
       "exchangeRates": "[XX-Exchange rates-XX]",
       "ofTotal": "[XX-of {total} in the file-XX]",
@@ -471,11 +471,24 @@
     "unconfirmedInvestmentAction": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} used a Money action whose meaning is inferred rather than documented; check them against Money.-XX]",
     "missingInvestmentDetail": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} had no share detail in the file and were imported for their cash amount only.-XX]",
     "investmentAccountMismatch": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} sat in an account that is not an investment account and were skipped.-XX]",
-    "unusableSecuritySplit": "[XX-{count, plural, one {# stock split} other {# stock splits}} could not be matched to a security or had an unusable ratio, and were not applied.-XX]",
+    "securitySplitNotApplied": "[XX-{count, plural, one {# stock split is recorded in the file and was not applied to share counts, because Money does not apply it either} other {# stock splits are recorded in the file and were not applied to share counts, because Money does not apply them either}}. Check the holdings against your statements.-XX]",
     "holdingsMismatch": "[XX-{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records.-XX]",
     "billTemplateMissing": "[XX-{count, plural, one {# scheduled bill} other {# scheduled bills}} had no template transaction in the file and were skipped.-XX]",
     "unusableBill": "[XX-{count, plural, one {# scheduled bill} other {# scheduled bills}} had no account, no usable date or an unrecognized recurrence, and were skipped.-XX]",
-    "billFrequencyApproximated": "[XX-{count, plural, one {# scheduled bill uses} other {# scheduled bills use}} a repeat interval Monize cannot express exactly, so the closest shorter one was used.-XX]"
+    "billFrequencyApproximated": "[XX-{count, plural, one {# scheduled bill uses} other {# scheduled bills use}} a repeat interval Monize cannot express exactly, so the closest shorter one was used.-XX]",
+    "showTransactions": "[XX-Show {count, plural, one {the # transaction} other {the # transactions}}-XX]",
+    "hideTransactions": "[XX-Hide transactions-XX]",
+    "reviewInMoney": "[XX-Open these in Microsoft Money to check or correct them, then export and import again.-XX]",
+    "reviewInMoneyTruncated": "[XX-Showing the first {shown} of {total}. Open these in Microsoft Money to check or correct them, then export and import again.-XX]",
+    "reference": "[XX-Ref {reference}-XX]",
+    "noValue": "[XX-Not set-XX]",
+    "table": {
+      "date": "[XX-Date-XX]",
+      "account": "[XX-Account-XX]",
+      "payee": "[XX-Payee-XX]",
+      "amount": "[XX-Amount-XX]",
+      "problem": "[XX-Problem-XX]"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "[XX-Something went wrong while importing. Nothing was saved -- you can try again.-XX]",

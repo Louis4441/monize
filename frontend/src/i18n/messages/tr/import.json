@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "İşlem İçe Aktar",
-    "subtitle": "QIF, OFX/QFX veya CSV dosyalarından işlem içe aktarın"
+    "subtitle": "QIF, OFX/QFX veya CSV dosyalarından işlem içe aktarın ya da bütün bir Microsoft Money (.mny) dosyasını aktarın"
   },
   "upload": {
     "heading": "İşlem Dosyaları Yükle",
-    "instructions": "İçe aktarmak için bir veya daha fazla dosya seçin. Desteklenen biçimler: QIF, OFX/QFX, CSV.\nToplu içe aktarma için aynı türden birden fazla dosya seçebilirsiniz.",
+    "instructions": "İçe aktarmak için bir veya daha fazla dosya seçin. Desteklenen biçimler: QIF, OFX/QFX, CSV ve Microsoft Money (.mny).\nToplu içe aktarma için aynı türden birden fazla dosya seçebilirsiniz. Microsoft Money dosyalarını tek tek içe aktarın — bir .mny dosyası bütün bir profili içerir.",
     "importingTo": "İçe aktarılıyor:",
     "clickToSelect": "Dosya(ları) seçmek için tıklayın",
     "processing": "İşleniyor...",
-    "acceptedFormats": "QIF, OFX, QFX veya CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV veya Microsoft Money (.mny)",
     "mnyFailedHeading": "Bu Microsoft Money dosyası açılamadı",
     "wikiNotice": {
       "title": "İçe aktarmadan önce",
@@ -315,7 +315,7 @@
       "accounts": "Hesaplar",
       "securities": "Menkul kıymetler",
       "investments": "Yatırım işlemleri",
-      "investmentDetail": "{transfers} kıymet transferi, {splits} hisse bölünmesi",
+      "investmentDetail": "{transfers} kıymet transferi",
       "prices": "Fiyat geçmişi",
       "exchangeRates": "Döviz kurları",
       "ofTotal": "dosyadaki {total} içinden",
@@ -471,11 +471,24 @@
     "unconfirmedInvestmentAction": "{count, plural, other {# yatırım işlemi}} anlamı belgelenmiş değil çıkarsanmış bir Money eylemi kullandı; bunları Money ile karşılaştırın.",
     "missingInvestmentDetail": "{count, plural, other {# yatırım işleminin}} dosyada hisse ayrıntısı yoktu ve yalnızca nakit tutarıyla içe aktarıldı.",
     "investmentAccountMismatch": "{count, plural, other {# yatırım işlemi}} yatırım hesabı olmayan bir hesaptaydı ve atlandı.",
-    "unusableSecuritySplit": "{count, plural, other {# hisse bölünmesi}} bir menkul kıymetle eşleştirilemedi ya da kullanılamaz bir orana sahipti; uygulanmadı.",
+    "securitySplitNotApplied": "{count, plural, other {# hisse bölünmesi}} dosyada kayıtlı ancak Money da uygulamadığı için hisse adetlerine uygulanmadı. Pozisyonlarınızı ekstrelerinizle karşılaştırın.",
     "holdingsMismatch": "{count, plural, other {# pozisyon}} Money dosyanızda kayıtlı hisse adediyle uyuşmuyor.",
     "billTemplateMissing": "{count, plural, other {# planlanmış faturanın}} dosyada şablon işlemi yoktu ve atlandı.",
     "unusableBill": "{count, plural, other {# planlanmış faturanın}} hesabı, kullanılabilir tarihi veya tanınan bir yinelenmesi yoktu ve atlandı.",
-    "billFrequencyApproximated": "{count, plural, other {# planlanmış fatura}} Monize'ın tam olarak ifade edemediği bir yineleme aralığı kullanıyor; en yakın daha kısa aralık kullanıldı."
+    "billFrequencyApproximated": "{count, plural, other {# planlanmış fatura}} Monize'ın tam olarak ifade edemediği bir yineleme aralığı kullanıyor; en yakın daha kısa aralık kullanıldı.",
+    "showTransactions": "{count, plural, other {# işlemi}} göster",
+    "hideTransactions": "İşlemleri gizle",
+    "reviewInMoney": "Bunları Microsoft Money içinde açıp kontrol edin veya düzeltin, ardından yeniden dışa aktarıp içe aktarın.",
+    "reviewInMoneyTruncated": "{total} kaydın ilk {shown} tanesi gösteriliyor. Bunları Microsoft Money içinde açıp kontrol edin veya düzeltin, ardından yeniden dışa aktarıp içe aktarın.",
+    "reference": "Ref {reference}",
+    "noValue": "Ayarlanmadı",
+    "table": {
+      "date": "Tarih",
+      "account": "Hesap",
+      "payee": "Alacaklı",
+      "amount": "Miktar",
+      "problem": "Sorun"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "İçe aktarma sırasında bir şeyler ters gitti. Hiçbir şey kaydedilmedi -- yeniden denebilirsiniz.",

@@ -17,9 +17,13 @@
  * without importing anything.
  */
 import { MnyImportError } from "./mny-errors";
-import { currencyCodesByHandle, mapAccounts } from "./map/map-reference";
+import {
+  cashKeyByAccountKey,
+  currencyCodesByHandle,
+  mapAccounts,
+} from "./map/map-reference";
 import { mapTransactions } from "./map/map-transactions";
-import { mapSecurities } from "./map/map-securities";
+import { mapSecurities, tradedSecurityHandles } from "./map/map-securities";
 import { mapInvestments } from "./map/map-investments";
 import { mapBills } from "./map/map-bills";
 import { mapLoans } from "./map/map-loans";
@@ -174,11 +178,16 @@ export function mappingSummary(tables: MnyTables): string[] {
     accountKeyByHandle: accounts.keyByHandle,
     currencyByHandle: accounts.currencyByHandle,
     bills: tables.bills.bills,
+    cashKeyByAccountKey: cashKeyByAccountKey(accounts),
   });
   const securities = mapSecurities({
     securities: tables.investments.securities,
     currencyByHandle: currencyCodesByHandle(tables.reference),
     baseCurrency: accounts.baseCurrency,
+    activeHandles: tradedSecurityHandles(
+      tables.transactions.transactions,
+      tables.investments.lots,
+    ),
   });
   const investments = mapInvestments({
     transactions: tables.transactions,
@@ -251,7 +260,7 @@ export function mappingSummary(tables: MnyTables): string[] {
     `  accounts:        ${accounts.accounts.length} (${accounts.skipped} skipped)`,
     `  transactions:    ${transactions.transactions.length} (${transactions.transfersLinked} transfers linked, ${transactions.skipped} skipped)`,
     `  securities:      ${securities.securities.length} (${securities.skipped} skipped as currencies or unusable)`,
-    `  investments:     ${investments.transactions.length} (${investments.transfersPaired} share transfers paired, ${investments.splitsApplied} stock splits, ${investments.skipped} skipped)`,
+    `  investments:     ${investments.transactions.length} (${investments.transfersPaired} share transfers paired, ${investments.skipped} skipped)`,
     "",
     "  account                                    ccy   txns        opening          final",
     ...accounts.accounts.map((account) =>

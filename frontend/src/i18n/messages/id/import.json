@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "Impor Transaksi",
-    "subtitle": "Impor transaksi dari file QIF, OFX/QFX, atau CSV"
+    "subtitle": "Impor transaksi dari file QIF, OFX/QFX, atau CSV, atau bawa satu berkas Microsoft Money (.mny) utuh"
   },
   "upload": {
     "heading": "Unggah File Transaksi",
-    "instructions": "Pilih satu atau lebih file untuk diimpor. Format yang didukung: QIF, OFX/QFX, CSV.\nAnda dapat memilih beberapa file dengan tipe yang sama untuk impor massal.",
+    "instructions": "Pilih satu atau lebih file untuk diimpor. Format yang didukung: QIF, OFX/QFX, CSV, dan Microsoft Money (.mny).\nAnda dapat memilih beberapa file dengan tipe yang sama untuk impor massal. Impor berkas Microsoft Money satu per satu — berkas .mny memuat satu profil utuh.",
     "importingTo": "Mengimpor ke:",
     "clickToSelect": "Klik untuk memilih file",
     "processing": "Memproses...",
-    "acceptedFormats": "QIF, OFX, QFX, atau CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV, atau Microsoft Money (.mny)",
     "mnyFailedHeading": "Berkas Microsoft Money itu tidak dapat dibuka",
     "wikiNotice": {
       "title": "Sebelum Anda mengimpor",
@@ -315,7 +315,7 @@
       "accounts": "Akun",
       "securities": "Efek",
       "investments": "Transaksi investasi",
-      "investmentDetail": "{transfers} transfer efek, {splits} pemecahan saham",
+      "investmentDetail": "{transfers} transfer efek",
       "prices": "Riwayat harga",
       "exchangeRates": "Kurs tukar",
       "ofTotal": "dari {total} di berkas",
@@ -471,11 +471,24 @@
     "unconfirmedInvestmentAction": "{count, plural, other {# transaksi investasi}} memakai aksi Money yang artinya disimpulkan, bukan terdokumentasi; periksa terhadap Money.",
     "missingInvestmentDetail": "{count, plural, other {# transaksi investasi}} tidak memiliki rincian lembar di berkas dan hanya diimpor sebesar jumlah tunainya.",
     "investmentAccountMismatch": "{count, plural, other {# transaksi investasi}} berada di akun yang bukan akun investasi dan dilewati.",
-    "unusableSecuritySplit": "{count, plural, other {# pemecahan saham}} tidak dapat dicocokkan dengan suatu efek atau memiliki rasio yang tidak dapat dipakai, dan tidak diterapkan.",
+    "securitySplitNotApplied": "{count, plural, other {# pemecahan saham}} tercatat dalam berkas dan tidak diterapkan pada jumlah lembar, karena Money juga tidak menerapkannya. Periksa kepemilikan Anda terhadap laporan rekening.",
     "holdingsMismatch": "{count, plural, other {# kepemilikan}} tidak sesuai dengan jumlah lembar yang dicatat berkas Money Anda.",
     "billTemplateMissing": "{count, plural, other {# tagihan terjadwal}} tidak memiliki transaksi templat dalam berkas dan dilewati.",
     "unusableBill": "{count, plural, other {# tagihan terjadwal}} tidak memiliki akun, tanggal yang bisa dipakai, atau pengulangan yang dikenali, sehingga dilewati.",
-    "billFrequencyApproximated": "{count, plural, other {# tagihan terjadwal}} memakai interval pengulangan yang tidak bisa dinyatakan persis oleh Monize, jadi dipakai interval terpendek terdekat."
+    "billFrequencyApproximated": "{count, plural, other {# tagihan terjadwal}} memakai interval pengulangan yang tidak bisa dinyatakan persis oleh Monize, jadi dipakai interval terpendek terdekat.",
+    "showTransactions": "Tampilkan {count, plural, other {# transaksi}}",
+    "hideTransactions": "Sembunyikan transaksi",
+    "reviewInMoney": "Buka transaksi ini di Microsoft Money untuk memeriksa atau memperbaikinya, lalu ekspor dan impor ulang.",
+    "reviewInMoneyTruncated": "Menampilkan {shown} pertama dari {total}. Buka transaksi ini di Microsoft Money untuk memeriksa atau memperbaikinya, lalu ekspor dan impor ulang.",
+    "reference": "Ref {reference}",
+    "noValue": "Tidak diisi",
+    "table": {
+      "date": "Tanggal",
+      "account": "Akun",
+      "payee": "Penerima",
+      "amount": "Jumlah",
+      "problem": "Masalah"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Terjadi kesalahan saat mengimpor. Tidak ada yang disimpan -- Anda dapat mencoba lagi.",

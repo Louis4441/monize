@@ -4,7 +4,11 @@ import {
 } from "../../accounts/entities/account.entity";
 import { FrequencyType } from "../../scheduled-transactions/dto/create-scheduled-transaction.dto";
 import { MnyImportOptions } from "./model/mny-import-options";
-import { MnyWarningSummary, summarizeWarnings } from "./model/mny-warnings";
+import {
+  MnyWarningSummary,
+  summarizeWarnings,
+  warningLookup,
+} from "./model/mny-warnings";
 import { MnyEra, MnyFileCounts, MnyParsedFile } from "./mny-parser.service";
 
 /**
@@ -77,8 +81,6 @@ export interface MnyPreviewCounts {
   readonly investmentsSkipped: number;
   /** `act` 15/16 rows matched into linked TRANSFER_IN / TRANSFER_OUT pairs. */
   readonly shareTransfersPaired: number;
-  /** SPLIT rows synthesized from `SEC_SPLIT`. */
-  readonly stockSplitsApplied: number;
   /** Price rows after the `(security, date)` dedupe; 0 when the toggle is off. */
   readonly pricesToImport: number;
   /** Exchange-rate rows; 0 when the toggle is off. */
@@ -186,7 +188,6 @@ export function buildPreview(input: BuildPreviewInput): MnyPreview {
       investmentsToCreate: parsed.investments.transactions.length,
       investmentsSkipped: parsed.investments.skipped,
       shareTransfersPaired: parsed.investments.transfersPaired,
-      stockSplitsApplied: parsed.investments.splitsApplied,
       pricesToImport: parsed.options.importPrices
         ? parsed.fileCounts.securityPrices
         : 0,
@@ -199,7 +200,13 @@ export function buildPreview(input: BuildPreviewInput): MnyPreview {
     fileCounts: parsed.fileCounts,
     missingTables: parsed.missingTables,
     missingFields: parsed.missingFields,
-    warnings: summarizeWarnings(parsed.warnings),
+    warnings: summarizeWarnings(
+      parsed.warnings,
+      warningLookup({
+        accounts: parsed.accounts.accounts,
+        payeeNameByHandle: parsed.payees.nameByHandle,
+      }),
+    ),
     options: parsed.options,
   };
 }

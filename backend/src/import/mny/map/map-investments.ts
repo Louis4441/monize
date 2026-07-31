@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AccountSubType } from "../../../accounts/entities/account.entity";
 import { InvestmentAction } from "../../../securities/entities/investment-transaction.entity";
-import { TransactionStatus } from "../../../transactions/entities/transaction.entity";
 import { roundMoney, roundToDecimals } from "../../../common/round.util";
 import {
   MappedAccounts,
@@ -11,14 +10,18 @@ import {
 } from "../model/mny-import-model";
 import {
   MNY_UNCONFIRMED_ACTIONS,
+  billTemplateHandles,
+  decodeReference,
   hasInvestmentDetail,
   isRecurrenceTemplate,
+  isUnpostedRow,
   mapInvestmentAction,
   mapTransactionStatus,
 } from "../model/mny-model";
 import { MnyBill, MnyTransaction } from "../model/mny-rows";
-import { MnyWarning } from "../model/mny-warnings";
+import { MnyWarning, MnyWarningRow } from "../model/mny-warnings";
 import { MnyInvestmentData } from "../tables/read-investments";
+import { cashKeyByAccountKey } from "./map-reference";
 import { MnyTransactionData } from "../tables/read-transactions";
 
 /**
@@ -37,8 +40,9 @@ import { MnyTransactionData } from "../tables/read-transactions";
  * - **Quantity is always positive.** `TRN_INV.qty` is stored positive and
  *   direction comes only from the action; inferring it from a sign is what
  *   produced negative positions.
- * - **`SEC_SPLIT` is applied.** Ignoring stock splits leaves every post-split
- *   position wrong by the split ratio.
+ * - **`SEC_SPLIT` is *not* applied to positions.** See `reportUnappliedSplits`:
+ *   Money does not adjust its own share counts for those rows, and adjusting
+ *   ours makes the import disagree with the file it came from.
  *
  * Nothing here touches the database, and no code is guessed: an action outside
  * the known set is skipped and counted, and an action whose meaning is inferred
@@ -95,6 +99,28 @@ interface Context {
   readonly warnings: MnyWarning[];
 }
 
+/**
+ * The flagged-row context an investment warning carries, so the review step can
+ * point at a transaction the user can find in Money rather than a bare `htrn`.
+ */
+function warningRow(
+  row: MnyTransaction,
+  input: MapInvestmentsInput,
+): MnyWarningRow {
+  return {
+    handle: row.handle as number,
+    accountKey:
+      row.account === null
+        ? null
+        : (input.accounts.keyByHandle.get(row.account) ?? null),
+    date: row.date,
+    amount: row.amount,
+    payeeHandle: row.payee,
+    reference: decodeReference(row.reference, row.flags),
+    memo: row.memo,
+  };
+}
+
 interface MnyInvestmentDetailValues {
   readonly price: number;
   readonly quantity: number;
@@ -102,24 +128,21 @@ interface MnyInvestmentDetailValues {
 }
 
 /**
- * Ordering key within a date. A split applies to whatever the account holds at
- * the end of the day, so it must fold after that day's trades -- the holdings
- * rebuild orders by date and then by insertion, and rows inserted in one
- * statement share a `created_at`.
+ * Replay order: by date, and by file order within a date. The holdings rebuild
+ * orders the same way -- by date and then by insertion, since rows inserted in
+ * one statement share a `created_at` -- so this is the order the positions will
+ * be folded in after the write.
  */
-function sortRank(transaction: MappedInvestmentTransaction): number {
-  return transaction.action === InvestmentAction.SPLIT ? 1 : 0;
-}
-
 function orderForReplay(
   transactions: readonly MappedInvestmentTransaction[],
 ): MappedInvestmentTransaction[] {
-  return [...transactions].sort((a, b) => {
-    if (a.transactionDate !== b.transactionDate) {
-      return a.transactionDate < b.transactionDate ? -1 : 1;
-    }
-    return sortRank(a) - sortRank(b);
-  });
+  return [...transactions].sort((a, b) =>
+    a.transactionDate === b.transactionDate
+      ? 0
+      : a.transactionDate < b.transactionDate
+        ? -1
+        : 1,
+  );
 }
 
 function indexDetails(
@@ -137,15 +160,6 @@ function indexDetails(
     });
   }
   return byHandle;
-}
-
-/** `BILL.lHtrn` rows are recurrence templates, never postings. */
-function billTemplateHandles(bills: readonly MnyBill[]): ReadonlySet<number> {
-  return new Set(
-    bills
-      .map((bill) => bill.templateTransaction)
-      .filter((handle): handle is number => handle !== null),
-  );
 }
 
 /**
@@ -208,6 +222,7 @@ function mapOne(
       code: "missingInvestmentDetail",
       subject: `htrn=${handle}`,
       detail: `act=${row.action}`,
+      row: warningRow(row, context.input),
     });
   }
 
@@ -327,109 +342,80 @@ function pairShareTransfers(
 }
 
 /**
- * Synthesizes a SPLIT row per account holding the security on the split date.
+ * Reports the `SEC_SPLIT` rows the file records, without applying any of them.
  *
- * `SEC_SPLIT` carries no security handle of its own -- the link runs through the
- * `SP` price rows that reference it -- and no account, because a split applies
- * to every holder. So the accounts come from which ones traded the security on
- * or before the record date, and the quantity is the ratio the holdings fold
- * multiplies the position by.
+ * The importer used to synthesize a SPLIT transaction per holder, on the design's
+ * premise that ignoring a split leaves every later position wrong by its ratio.
+ * **Money does not adjust its own share counts for these rows**, so applying them
+ * makes the import disagree with the file. Two files say so, at seven positions,
+ * with no counter-example:
+ *
+ * - The maintainer's brokerage held 200 VTI bought pre-`SEC_SPLIT` plus 100
+ *   after, and transferred the account away with a single 300-share row. Money's
+ *   `LOT` rows for both purchases are fully consumed by that transfer; applying
+ *   the 1:2 ratio leaves 200 shares in an account Money shows as empty. XIU
+ *   (1:4), XIC (1:4) and VWO (1:2) each do the same thing.
+ * - Money Plus's own `sample.mny` agrees: `LOT` holds 3 MSFT against 6 replayed
+ *   with the 1:2 split, 50 LEH against 1,225, and 110.25 ADM against 115.7625.
+ *
+ * The price series makes the reason visible. A split's `SP` row carries
+ * `dPrice = 0` and `src = 0` -- a marker in the quote history, not a quote -- and
+ * the prices either side of it are continuous, in the same units as the
+ * transactions. `SEC_SPLIT` is quote-feed metadata: it turns up for securities
+ * the user never held, and for the annual 1:1 "splits" Canadian ETFs record
+ * against a reinvested distribution.
+ *
+ * So the rows are surfaced rather than acted on, and only when they could have
+ * mattered: a ratio of exactly 1 changes no position, and a security the import
+ * left behind has no position to change.
  */
-function synthesizeSplits(
-  transactions: readonly MappedInvestmentTransaction[],
-  context: Context,
-): MappedInvestmentTransaction[] {
+function reportUnappliedSplits(context: Context): void {
   const { securitySplits, splitSecurities } = context.input.investments;
-  if (securitySplits.length === 0) {
-    return [];
-  }
-
-  const created: MappedInvestmentTransaction[] = [];
 
   for (const split of securitySplits) {
     if (split.handle === null) {
       continue;
     }
     const securityHandle = splitSecurities.get(split.handle) ?? null;
+    const security =
+      securityHandle === null
+        ? undefined
+        : context.input.securities.byHandle.get(securityHandle);
     const ratio =
       split.sharesBefore > 0 ? split.sharesAfter / split.sharesBefore : 0;
 
     if (
-      securityHandle === null ||
-      !context.input.securities.byHandle.has(securityHandle) ||
+      security === undefined ||
       split.recordDate === null ||
       !Number.isFinite(ratio) ||
-      ratio <= 0
+      ratio <= 0 ||
+      ratio === 1
     ) {
-      context.warnings.push({
-        code: "unusableSecuritySplit",
-        subject: `hss=${split.handle}`,
-        detail:
-          securityHandle === null
-            ? "no security"
-            : split.recordDate === null
-              ? "no record date"
-              : `ratio ${split.sharesAfter}/${split.sharesBefore}`,
-      });
       continue;
     }
 
-    const holders = new Set(
-      transactions
-        .filter(
-          (transaction) =>
-            transaction.securityHandle === securityHandle &&
-            transaction.transactionDate <= (split.recordDate as string),
-        )
-        .map((transaction) => transaction.accountKey),
-    );
-
-    for (const accountKey of holders) {
-      created.push({
-        id: randomUUID(),
-        handle: null,
-        accountKey,
-        cashAccountKey: null,
-        securityHandle,
-        action: InvestmentAction.SPLIT,
-        transactionDate: split.recordDate,
-        quantity: roundToDecimals(ratio, QUANTITY_DECIMALS),
-        price: positiveOrNull(split.price, PRICE_DECIMALS),
-        commission: 0,
-        totalAmount: 0,
-        currencyCode:
-          context.input.securities.byHandle.get(securityHandle)?.currencyCode ??
-          "",
-        cashAmount: 0,
-        status: TransactionStatus.CLEARED,
-        payeeHandle: null,
-        categoryHandle: null,
-        description: null,
-        linkedInvestmentId: null,
-      });
-    }
+    context.warnings.push({
+      code: "securitySplitNotApplied",
+      subject: security.symbol,
+      detail: `${split.recordDate}: ${split.sharesBefore} -> ${split.sharesAfter}`,
+    });
   }
-
-  return created;
 }
 
 function buildContext(input: MapInvestmentsInput): Context {
-  const cashKeyByAccountKey = new Map<string, string>();
   const brokerageKeys = new Set<string>();
-
   for (const account of input.accounts.accounts) {
     if (account.accountSubType === AccountSubType.INVESTMENT_BROKERAGE) {
       brokerageKeys.add(account.key);
-      if (account.linkedKey) {
-        cashKeyByAccountKey.set(account.key, account.linkedKey);
-      }
     }
   }
 
   return {
     input,
     detailByHandle: indexDetails(input.investments),
-    cashKeyByAccountKey,
+    // Shared with the transaction mapper, which routes transfers into the same
+    // sleeve this puts trade cash legs in.
+    cashKeyByAccountKey: cashKeyByAccountKey(input.accounts),
     brokerageKeys,
     warnings: [],
   };
@@ -438,7 +424,10 @@ function buildContext(input: MapInvestmentsInput): Context {
 export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
   const context = buildContext(input);
   const warnings = context.warnings;
-  const templates = billTemplateHandles(input.bills);
+  const templates = billTemplateHandles(
+    input.bills,
+    input.transactions.transactions,
+  );
   const splitChildren = new Set(
     input.transactions.splits
       .map((split) => split.child)
@@ -454,7 +443,8 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
       row.security === null ||
       splitChildren.has(row.handle) ||
       templates.has(row.handle) ||
-      isRecurrenceTemplate(row.frequency)
+      isRecurrenceTemplate(row.frequency) ||
+      isUnpostedRow(row.flags)
     ) {
       continue;
     }
@@ -474,6 +464,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "unusableTransaction",
         subject: `htrn=${row.handle}`,
         detail: "no usable date",
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -485,6 +476,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "missingInvestmentDetail",
         subject: `htrn=${row.handle}`,
         detail: `hsec=${row.security}`,
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -495,6 +487,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "investmentAccountMismatch",
         subject: `htrn=${row.handle}`,
         detail: accountKey,
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -506,6 +499,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "unknownInvestmentAction",
         subject: `htrn=${row.handle}`,
         detail: `act=${row.action}`,
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -515,6 +509,7 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         code: "unconfirmedInvestmentAction",
         subject: `htrn=${row.handle}`,
         detail: `act=${row.action}`,
+        row: warningRow(row, input),
       });
     }
 
@@ -522,8 +517,8 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
   }
 
   const paired = pairShareTransfers(mapped);
-  const splits = synthesizeSplits(paired.transactions, context);
-  const transactions = orderForReplay([...paired.transactions, ...splits]);
+  reportUnappliedSplits(context);
+  const transactions = orderForReplay(paired.transactions);
 
   return {
     transactions,
@@ -541,7 +536,6 @@ export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
         .filter((handle): handle is number => handle !== null),
     ),
     transfersPaired: paired.paired,
-    splitsApplied: splits.length,
     skipped,
     warnings,
   };

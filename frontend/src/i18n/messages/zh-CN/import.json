@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "导入交易",
-    "subtitle": "从 QIF、OFX/QFX 或 CSV 文件导入交易"
+    "subtitle": "从 QIF、OFX/QFX 或 CSV 文件导入交易，或整体导入 Microsoft Money (.mny) 文件"
   },
   "upload": {
     "heading": "上传交易文件",
-    "instructions": "选择一个或多个文件进行导入。支持的格式：QIF、OFX/QFX、CSV。\n您可以选择多个相同类型的文件进行批量导入。",
+    "instructions": "选择一个或多个文件进行导入。支持的格式：QIF、OFX/QFX、CSV 和 Microsoft Money (.mny)。\n您可以选择多个相同类型的文件进行批量导入。请一次导入一个 Microsoft Money 文件——一个 .mny 文件包含完整的账套。",
     "importingTo": "导入至：",
     "clickToSelect": "点击选择文件",
     "processing": "处理中...",
-    "acceptedFormats": "QIF、OFX、QFX 或 CSV",
+    "acceptedFormats": "QIF、OFX、QFX、CSV 或 Microsoft Money (.mny)",
     "mnyFailedHeading": "无法打开该 Microsoft Money 文件",
     "wikiNotice": {
       "title": "导入之前",
@@ -315,7 +315,7 @@
       "accounts": "账户",
       "securities": "证券",
       "investments": "投资交易",
-      "investmentDetail": "{transfers} 笔证券转移，{splits} 次拆股",
+      "investmentDetail": "{transfers} 笔证券转移",
       "prices": "价格历史",
       "exchangeRates": "汇率",
       "ofTotal": "共 {total} 项",
@@ -471,11 +471,24 @@
     "unconfirmedInvestmentAction": "{count, plural, other {# 笔投资交易}}使用了含义靠推断而非有据可查的 Money 操作，请与 Money 核对。",
     "missingInvestmentDetail": "{count, plural, other {# 笔投资交易}}在文件中没有股数明细，仅按其现金金额导入。",
     "investmentAccountMismatch": "{count, plural, other {# 笔投资交易}}位于非投资账户中，已跳过。",
-    "unusableSecuritySplit": "{count, plural, other {# 次拆股}}无法对应到证券，或比例不可用，因此未予应用。",
+    "securitySplitNotApplied": "文件中记录了{count, plural, other {# 次拆股}}，但未应用于股数，因为 Money 本身也不应用。请对照您的对账单核对持仓。",
     "holdingsMismatch": "{count, plural, other {# 项持仓}}与 Money 文件记录的股数不符。",
     "billTemplateMissing": "{count, plural, other {# 个定期账单}}在文件中没有模板交易，已跳过。",
     "unusableBill": "{count, plural, other {# 个定期账单}}没有账户、可用日期或可识别的重复周期，已跳过。",
-    "billFrequencyApproximated": "{count, plural, other {# 个定期账单}}使用了 Monize 无法精确表达的重复间隔，因此采用了最接近的较短间隔。"
+    "billFrequencyApproximated": "{count, plural, other {# 个定期账单}}使用了 Monize 无法精确表达的重复间隔，因此采用了最接近的较短间隔。",
+    "showTransactions": "显示{count, plural, other {# 笔交易}}",
+    "hideTransactions": "隐藏交易",
+    "reviewInMoney": "请在 Microsoft Money 中打开这些交易进行核对或更正，然后重新导出并导入。",
+    "reviewInMoneyTruncated": "正在显示 {total} 笔中的前 {shown} 笔。请在 Microsoft Money 中打开这些交易进行核对或更正，然后重新导出并导入。",
+    "reference": "参考号 {reference}",
+    "noValue": "未设置",
+    "table": {
+      "date": "日期",
+      "account": "账户",
+      "payee": "收款人",
+      "amount": "金额",
+      "problem": "问题"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "导入过程中出现问题。没有保存任何内容 -- 您可以重试。",

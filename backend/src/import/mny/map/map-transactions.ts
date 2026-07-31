@@ -7,8 +7,15 @@ import {
   MappedTransaction,
   MappedTransactions,
 } from "../model/mny-import-model";
-import { isRecurrenceTemplate, mapTransactionStatus } from "../model/mny-model";
-import { MnyWarning } from "../model/mny-warnings";
+import {
+  billTemplateHandles,
+  decodeReference,
+  isLoanPaymentTemplate,
+  isRecurrenceTemplate,
+  isUnpostedRow,
+  mapTransactionStatus,
+} from "../model/mny-model";
+import { MnyWarning, MnyWarningRow } from "../model/mny-warnings";
 import { MnyTransactionData } from "../tables/read-transactions";
 import { TransferIndex, indexTransfers } from "./map-transfers";
 
@@ -18,9 +25,12 @@ import { TransferIndex, indexTransfers } from "./map-transfers";
  * The two rules that carry the most history:
  *
  * **The phantom filter is `frq != -1` and nothing else.** PR #192 also excluded
- * auto-entered rows (`grftt & 0x8000`), but Money marks scheduler-posted rows
- * auto-entered -- including every loan payment -- so that filter is what made
- * loan and mortgage accounts import with zero transactions.
+ * rows it read as auto-entered, but Money's scheduler posts real transactions --
+ * including every loan payment -- so that filter is what made loan and mortgage
+ * accounts import with zero transactions. Its sibling mistake outlived it:
+ * `grftt & 0x80` was read as "voided" when it actually marks a row in a debt
+ * account, so the loan payments that survived the filter all imported VOID and
+ * dropped straight back out of the balance (see `MNY_TRANSACTION_FLAG`).
  *
  * **A split leg that is really a transfer stays a transfer.** PR #192 imported
  * every `TRN_SPLIT` child as a category-only row, so the principal leg of a loan
@@ -39,6 +49,22 @@ export interface MapTransactionsInput {
   readonly currencyByHandle: ReadonlyMap<number, string>;
   /** `BILL` rows, so their template transactions are not imported as postings. */
   readonly bills: readonly MnyBill[];
+  /**
+   * Brokerage account key -> its linked cash sleeve, from `mapAccounts`. A
+   * transfer whose far side is an investment row lands in the sleeve, because
+   * that is where Monize keeps a brokerage's cash.
+   */
+  readonly cashKeyByAccountKey: ReadonlyMap<string, string>;
+}
+
+/**
+ * The cash-sleeve side of a transfer between a bank account and an investment
+ * account -- a transaction Money does not store, because its investment row is
+ * both the transfer destination and the trade.
+ */
+interface CashCounterpart extends MappedTransaction {
+  /** `TRN.htrn` of the investment row this is the cash side of. */
+  readonly handle: number;
 }
 
 /** Everything the per-row mapping needs, computed once. */
@@ -52,16 +78,31 @@ interface Context {
   readonly transfers: TransferIndex;
   /** Pre-generated ids for the rows that will be imported as transactions. */
   readonly idByHandle: ReadonlyMap<number, string>;
+  /** Investment row handle -> the cash-sleeve transaction standing in for it. */
+  readonly cashCounterparts: ReadonlyMap<number, CashCounterpart>;
   readonly warnings: MnyWarning[];
 }
 
-/** `BILL.lHtrn` rows are recurrence templates, never postings. */
-function billTemplateHandles(bills: readonly MnyBill[]): ReadonlySet<number> {
-  return new Set(
-    bills
-      .map((bill) => bill.templateTransaction)
-      .filter((handle): handle is number => handle !== null),
-  );
+/**
+ * The flagged-row context a warning carries, so the review step can show the
+ * user which transactions to look at in Money rather than a bare `htrn`.
+ */
+function warningRow(
+  row: MnyTransaction,
+  input: MapTransactionsInput,
+): MnyWarningRow {
+  return {
+    handle: row.handle as number,
+    accountKey:
+      row.account === null
+        ? null
+        : (input.accountKeyByHandle.get(row.account) ?? null),
+    date: row.date,
+    amount: row.amount,
+    payeeHandle: row.payee,
+    reference: decodeReference(row.reference, row.flags),
+    memo: row.memo,
+  };
 }
 
 interface Indexes {
@@ -103,6 +144,7 @@ function buildIndexes(input: MapTransactionsInput): Indexes {
         code: "orphanedSplit",
         subject: `htrn=${split.child}`,
         detail: `parent htrn=${split.parent}`,
+        row: warningRow(child, input),
       });
       continue;
     }
@@ -116,7 +158,10 @@ function buildIndexes(input: MapTransactionsInput): Indexes {
     byHandle,
     parentOfChild,
     childrenByParent,
-    billTemplates: billTemplateHandles(input.bills),
+    billTemplates: billTemplateHandles(
+      input.bills,
+      input.transactions.transactions,
+    ),
     transfers: indexTransfers(input.transactions.transfers, rows),
     warnings,
   };
@@ -125,9 +170,10 @@ function buildIndexes(input: MapTransactionsInput): Indexes {
 /**
  * Whether a row is a real posting worth importing as a banking transaction.
  *
- * Split children, bill templates, recurrence templates (`frq != -1`) and
- * genuinely orphaned transfer sides are out. Auto-entered rows are **in**: they
- * are real postings, and excluding them is what emptied PR #192's loan accounts.
+ * Split children, bill templates, recurrence templates (`frq != -1`),
+ * loan-payment templates, scheduled instances Money never posted and genuinely
+ * orphaned transfer sides are out. Scheduler-posted rows are **in**: they are
+ * real postings, and excluding them emptied PR #192's loan accounts.
  */
 function isImportablePosting(
   row: MnyTransaction,
@@ -141,11 +187,101 @@ function isImportablePosting(
     !indexes.billTemplates.has(handle) &&
     !indexes.transfers.orphanedHandles.has(handle) &&
     !isRecurrenceTemplate(row.frequency) &&
+    !isLoanPaymentTemplate(row.flags) &&
+    !isUnpostedRow(row.flags) &&
     row.security === null &&
     row.date !== null &&
     row.account !== null &&
     input.accountKeyByHandle.has(row.account)
   );
+}
+
+/**
+ * The cash-sleeve transactions that make bank-to-investment transfers balance.
+ *
+ * Money stores such a transfer as a pair whose far side carries `hsec`: one row
+ * that is simultaneously "cash arrived from chequing" and "shares were bought".
+ * The investment mapper takes that row and writes the trade, including its cash
+ * leg *out* of the sleeve -- so nothing was left to represent the cash coming
+ * *in*, and the bank row, whose partner is not a banking transaction, imported
+ * as an ordinary payment with no counterpart.
+ *
+ * Money then simply vanished: across the maintainer's file 2,718 top-level rows
+ * and 537 split legs debited a bank account with nothing arriving anywhere, and
+ * the sleeves absorbed the whole difference -- $604,161.81 negative in total,
+ * of which $553,225.57 is this.
+ *
+ * So the missing side is synthesized here, in the sleeve, linked to the bank
+ * row both ways. The sleeve then nets out: the transfer pays cash in, the
+ * trade's own leg takes it out.
+ */
+function buildCashCounterparts(
+  rows: readonly MnyTransaction[],
+  indexes: Indexes,
+  input: MapTransactionsInput,
+  idByHandle: ReadonlyMap<number, string>,
+): Map<number, CashCounterpart> {
+  const counterparts = new Map<number, CashCounterpart>();
+
+  for (const row of rows) {
+    const handle = row.handle;
+    if (handle === null) {
+      continue;
+    }
+
+    // The near side has to be a row this import actually creates: a posting, or
+    // a leg of one. A leg's transfer points back at its parent payment, the
+    // same wiring `counterpartId` uses in the other direction.
+    const parent = indexes.parentOfChild.get(handle);
+    const nearId =
+      parent === undefined
+        ? isImportablePosting(row, indexes, input)
+          ? idByHandle.get(handle)
+          : undefined
+        : idByHandle.get(parent);
+    if (nearId === undefined) {
+      continue;
+    }
+
+    const partner = indexes.transfers.partnerByHandle.get(handle);
+    if (partner === undefined || counterparts.has(partner)) {
+      continue;
+    }
+    const far = indexes.byHandle.get(partner);
+    // Only an investment row needs standing in for. Anything else either
+    // imports as a banking transaction of its own or is genuinely excluded.
+    if (!far || far.security === null || far.account === null) {
+      continue;
+    }
+    const brokerageKey = input.accountKeyByHandle.get(far.account);
+    const cashKey =
+      brokerageKey === undefined
+        ? undefined
+        : input.cashKeyByAccountKey.get(brokerageKey);
+    if (cashKey === undefined) {
+      continue;
+    }
+
+    counterparts.set(partner, {
+      id: randomUUID(),
+      handle: partner,
+      accountKey: cashKey,
+      transactionDate: (far.date ?? row.date) as string,
+      // The mirror of the bank side, so the pair sums to zero.
+      amount: roundMoney(-row.amount),
+      currencyCode: input.currencyByHandle.get(far.account) ?? "",
+      status: mapTransactionStatus(row.clearedStatus, row.flags),
+      payeeHandle: row.payee,
+      categoryHandle: null,
+      description: row.memo,
+      referenceNumber: null,
+      isTransfer: true,
+      linkedTransactionId: nearId,
+      splits: [],
+    });
+  }
+
+  return counterparts;
 }
 
 /** The Monize account a row's transaction belongs in, or null when not imported. */
@@ -167,6 +303,10 @@ function accountKeyOf(
  * parent payment.
  */
 function counterpartId(partner: number, context: Context): string | null {
+  const synthesized = context.cashCounterparts.get(partner);
+  if (synthesized !== undefined) {
+    return synthesized.id;
+  }
   const throughParent = context.parentOfChild.get(partner);
   const target = throughParent ?? partner;
   return context.idByHandle.get(target) ?? null;
@@ -184,7 +324,12 @@ function mapSplitChild(
   const partner = context.transfers.partnerByHandle.get(handle) ?? null;
   const partnerRow =
     partner === null ? null : (context.byHandle.get(partner) ?? null);
-  const partnerKey = accountKeyOf(partnerRow, context.input);
+  // A leg paying into an investment account lands in that account's cash
+  // sleeve, not on the brokerage side where the shares are.
+  const synthesized =
+    partner === null ? undefined : context.cashCounterparts.get(partner);
+  const partnerKey =
+    synthesized?.accountKey ?? accountKeyOf(partnerRow, context.input);
   const partnerId = partner === null ? null : counterpartId(partner, context);
 
   // A split leg Money records in TRN_XFER is a transfer -- most often the
@@ -207,6 +352,7 @@ function mapSplitChild(
       code: "transferAcrossExcludedAccount",
       subject: `htrn=${handle}`,
       detail: `partner htrn=${partner}`,
+      row: warningRow(child, context.input),
     });
   }
 
@@ -240,6 +386,7 @@ function mapOne(
         code: "splitSumMismatch",
         subject: `htrn=${handle}`,
         detail: `legs ${legTotal} vs total ${total}`,
+        row: warningRow(row, context.input),
       });
     }
   }
@@ -257,6 +404,7 @@ function mapOne(
       code: "transferAcrossExcludedAccount",
       subject: `htrn=${handle}`,
       detail: `partner htrn=${partner}`,
+      row: warningRow(row, context.input),
     });
   }
 
@@ -273,7 +421,7 @@ function mapOne(
     // A split parent carries no category of its own: the legs do.
     categoryHandle: splits.length > 0 ? null : row.category,
     description: row.memo,
-    referenceNumber: row.reference,
+    referenceNumber: decodeReference(row.reference, row.flags),
     isTransfer: linkedTransactionId !== null,
     linkedTransactionId,
     splits,
@@ -296,6 +444,8 @@ function reportUnusable(
       indexes.parentOfChild.has(handle) ||
       indexes.billTemplates.has(handle) ||
       isRecurrenceTemplate(row.frequency) ||
+      isLoanPaymentTemplate(row.flags) ||
+      isUnpostedRow(row.flags) ||
       row.security !== null
     ) {
       continue;
@@ -307,6 +457,7 @@ function reportUnusable(
       warnings.push({
         code: "orphanedTransferSide",
         subject: `htrn=${handle}`,
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -317,6 +468,7 @@ function reportUnusable(
         code: "unusableTransaction",
         subject: `htrn=${handle}`,
         detail: "no account",
+        row: warningRow(row, input),
       });
       continue;
     }
@@ -332,6 +484,7 @@ function reportUnusable(
         code: "unusableTransaction",
         subject: `htrn=${handle}`,
         detail: "no usable date",
+        row: warningRow(row, input),
       });
     }
   }
@@ -347,9 +500,11 @@ function countPlainTransferPairs(context: Context): number {
     if (counted.has(handle) || counted.has(partner)) {
       continue;
     }
+    const linked = (side: number): boolean =>
+      context.idByHandle.has(side) || context.cashCounterparts.has(side);
     if (
-      context.idByHandle.has(handle) &&
-      context.idByHandle.has(partner) &&
+      linked(handle) &&
+      linked(partner) &&
       !context.parentOfChild.has(handle) &&
       !context.parentOfChild.has(partner)
     ) {
@@ -382,6 +537,13 @@ export function mapTransactions(
       .map((row) => [row.handle as number, randomUUID()]),
   );
 
+  const cashCounterparts = buildCashCounterparts(
+    rows,
+    indexes,
+    input,
+    idByHandle,
+  );
+
   const context: Context = {
     input,
     byHandle: indexes.byHandle,
@@ -390,12 +552,16 @@ export function mapTransactions(
     billTemplates: indexes.billTemplates,
     transfers: indexes.transfers,
     idByHandle,
+    cashCounterparts,
     warnings,
   };
 
-  const transactions = rows
-    .filter((row) => isImportablePosting(row, indexes, input))
-    .map((row) => mapOne(row, accountKeyOf(row, input) as string, context));
+  const transactions = [
+    ...rows
+      .filter((row) => isImportablePosting(row, indexes, input))
+      .map((row) => mapOne(row, accountKeyOf(row, input) as string, context)),
+    ...cashCounterparts.values(),
+  ];
 
   const referencedPayees = new Set(
     transactions

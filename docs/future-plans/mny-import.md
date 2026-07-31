@@ -73,8 +73,9 @@ as the living format reference (now `docs/ms-money-data-model.md`, with the corr
 
 - Money account type map (`at` 0..6) and the `hacctRel` investment/cash account pairing, which
   matches Monize's linked INVESTMENT_CASH + INVESTMENT_BROKERAGE pair exactly.
-- Cleared-status map (`cs` 0/1/2 -> UNRECONCILED/CLEARED/RECONCILED) and voided detection
-  (`grftt` bit 0x80 -> VOID).
+- Cleared-status map (`cs` 0/1/2 -> UNRECONCILED/CLEARED/RECONCILED). Voided detection was
+  **not** correct: the reference's `grftt` bit 0x80 is the debt-account bit, and the void bit is
+  0x100 (measured in Phase 4 against a real Money Plus file; see `docs/ms-money-data-model.md`).
 - Phantom exclusions: bill template transactions (referenced by `BILL.lHtrn`), orphaned transfer
   sides, and split children (`TRN_SPLIT.htrn` rows) must not be imported as standalone rows.
 - Currency resolution through `CRNC.szIsoCode`; `SP` price dedup by `(hsec, dt)`; additive
@@ -384,9 +385,10 @@ an unrepresentable interval (weekly × 3, monthly × 5) still approximates.
 exercise only `act` 0, 1 and 15, so `BILL.st` (question 12.3) and the `act` 5 / 14 semantics
 (12.4) need a real file. `mny-model.ts` deliberately exports **no** `BILL.st` constant — a
 plausible-looking one would only make the guess harder to see — and lists 5 and 14 in
-`MNY_UNCONFIRMED_ACTIONS` so mappers can warn per transaction. Account types beyond `at` 0 and 5,
-and the `grftt` void/auto-entered bits, are likewise unconfirmed: the fixture rows carry `grftt`
-0x2 (Money 2001/2002) and 0x10 (Money Plus), neither of which is 0x80 or 0x8000.
+`MNY_UNCONFIRMED_ACTIONS` so mappers can warn per transaction. Account types beyond `at` 0 and 5 are likewise unconfirmed. The
+`grftt` bits **are** now settled, but only because Phase 4 measured them on a real file: the
+fixture rows carry 0x2 (Money 2001/2002) and 0x10 (Money Plus) and could never have shown that
+0x80 is the debt-account bit rather than the void bit, or that void is 0x100.
 
 `npm run mny:inspect -- file.mny --table BILL` against a real Money Plus file closes 12.3 and
 12.4 in one pass.
@@ -510,10 +512,38 @@ real mappers and, in the integration spec, the real INSERT path.
 ### 8.2 Transactions
 
 - Include a `TRN` row when: it has an account, a valid date, is not a split child, not a bill
-  template (`BILL.lHtrn`), not an orphaned transfer side, and `frq == -1`.
-  **Auto-entered (`grftt & 0x8000`) rows are imported** — they are real postings (loan payments,
+  template (`BILL.lHtrn`), not part of a loan-payment template (`grftt & 0x4000`), not an
+  orphaned transfer side, and `frq == -1`.
+  **Scheduler-posted rows are imported** — they are real postings (loan payments,
   online-banking imports); excluding them was PR bug #1.
-- `grftt & 0x80` -> status VOID (imported, excluded from balances by existing logic).
+- **A transfer whose far side carries `hsec` is a transfer into the brokerage's cash sleeve.**
+  Money's investment row is both the arriving cash and the trade, and the investment mapper
+  spends that cash on the trade — so the import synthesizes the sleeve-side row Money has no
+  place for. Without it 3,255 of the maintainer's transfers debited a bank account with nothing
+  arriving anywhere, and the sleeves absorbed $553,225.57.
+- **Loan-payment templates (`grftt & 0x4000`) are phantoms, whole families of them.** One per
+  debt account: an account-less split parent, its legs, and the legs' counterparts *in the loan
+  account*, which have a real account and date and so import as ordinary principal postings if
+  only the parent is skipped. `BILL.lHtrn` does not reference them.
+- **`grftt & 0x60000` is a scheduled instance Money never posted**, and is skipped like the
+  loan-payment family. 67 rows, none reconciled in a file that is 74% reconciled, all inside
+  2003-10-15..2004-09-28, every one also carrying `0x200000`. Importing them left four accounts
+  out by exactly their total: CIBC Chequing $7,671.79 against Money's $0.00, CIBC VISA -$156.55
+  against $0.00, the Standard Life sleeve $91.00 and Mortgage - 33 Spring $350.00, plus two of
+  the three holdings mismatches. `ACCT.amtEndRec` agreed but could not prove it -- these rows are
+  unreconciled, so a reconciled balance excludes them under either reading -- and the maintainer
+  confirmed the rows are absent from Money's register.
+- **`BILL.lHtrn` is not the template.** It points at whatever transaction the series currently
+  holds, which for an entered bill is the posting: 1,843 of the maintainer's 1,845 are `frq != -1`
+  and excluded anyway, and the other two were real 2003 postings worth $6,243.96. The row's own
+  `frq` decides.
+- **`TRN.szId` packs a kind digit in front of the reference** -- `1` then free text (`1Debit`),
+  `0` then a number right-aligned in twelve characters (`0           2`). Imported whole it shows
+  as `1Debit` and `0 2`. The number is Money's instalment counter inside a debt account, where
+  the register has no Num column, and a cheque number everywhere else.
+- `grftt & 0x100` -> status VOID (imported, excluded from balances by existing logic). **Not**
+  `0x80`, which marks a row in a loan or mortgage account: using it voided every loan payment
+  and left each debt account frozen at its opening balance.
 - `cs`: 0 -> UNRECONCILED, 1 -> CLEARED, 2 -> RECONCILED. `dt` -> `transaction_date`
   (`YYYY-MM-DD` string per repo DATE convention; mdb-reader decodes Jet datetimes natively, which
   should obsolete the PoC's MM/DD/YY 70-year-pivot parsing — spike confirms; day-00 null
@@ -552,13 +582,51 @@ positive):
 | 16 | REMOVE_SHARES — never SELL | Closes lots despite the name |
 | 15+16 pair | TRANSFER_IN / TRANSFER_OUT | Paired across accounts by date + security + quantity; cross-linked via `linked_transaction_id`; unpaired rows stay ADD/REMOVE_SHARES |
 
-`SEC_SPLIT` -> SPLIT investment transactions (ratio applied by the existing holdings fold).
+`SEC_SPLIT` produces **no** transaction: Money does not apply those ratios to its own share
+counts, and applying them makes the import disagree with the file (see the note below).
 Cash legs use `TRN.amt` in the account currency. Holdings come only from
 `HoldingsService.rebuildAccountsFromTransactions` after the write; the mapper's independent
 LOT-derived open-lot positions (`htrnSell` empty, sum `qty`) and its action-replay positions are
 compared and any disagreement becomes a verification-report warning. Foreign-currency cost basis
 differences (Money stores base-currency values at historical rates) surface as warnings —
 documented v1 limitation.
+
+**Only securities the file shows activity for are imported.** `SEC` doubles as Money's watch list
+and its index-quote store, and `sct` does not separate those from real holdings — the maintainer's
+file keeps the Dow, the NASDAQ, the DAX, the FTSE, the Hang Seng, the Nikkei, the TSX and the
+Straits Times under the same code as two ETFs actually owned. Activity does separate them: a
+security referenced by no `TRN` row and no `LOT` is dropped, and its quote history goes with it
+(31 of 98 securities, 17,025 of 69,076 prices).
+
+**`SEC.sct` 4 is a money-market fund, not a currency.** The currency-pseudo-security test
+excluded that code on the format reference's word; the four rows it hides in the maintainer's
+file are TD Canadian Money Market, CIBC Canadian Money Market, CIBC Canadian T-Bill and McLean
+Budden Money Market, and Money Plus's own `sample.mny` files four more under it. In a brokerage
+account that fund *is* the sweep, so skipping the security took its cash movements with it: 829
+of 4,524 investment transactions dropped, and five cash sleeves ended thousands of dollars out
+(+11,571.95, -11,957.78, -941.58, -43.42, -11.17). Importing it lands every one of them within
+two cents of zero. A currency is now recognised by the `/GBPUS` symbol shape alone, which is
+where currencies actually live (`CRNC`); no `sct` code is read for meaning anywhere.
+
+**`act` 12 is a credit of units, not a purchase.** It opens lots with a value and a quantity, so
+it read as a buy — and charging the cash sleeve for it left the maintainer's Standard Life RRSP
+$18,457.22 overdrawn where Money's own cash rows for that account net to $91.00, one unspent
+contribution. The signal is `TRN_XFER`: `act` 1 has a cash counterpart 2,015 times in 2,029 and
+`act` 3 has one 1,090 times in 1,090, while `act` 12 has one **zero** times in 92, exactly like
+the `act` 9 reinvestments. 82 of the 92 sit in the one RRSP whose `ACCT` row sets `fEmpMatch`.
+Mapped to REINVEST — a value and a position, no cash leg — the sleeve lands on Money's $91.00.
+It stays in `MNY_UNCONFIRMED_ACTIONS`: the effect is measured, the name is not.
+
+**`SEC_SPLIT` ratios are not applied to positions, because Money does not apply them either.**
+Seven positions across two files prove it: the maintainer's brokerage bought 200 VTI before a 1:2
+split row and 100 after, then transferred the whole account away in a single 300-share row, and
+`LOT` shows both purchases fully consumed — applying the ratio leaves 200 shares in an account
+Money shows as empty, and XIU (1:4), XIC (1:4) and VWO (1:2) do the same. `sample.mny` agrees at
+MSFT (`LOT` 3 against 6 replayed), LEH (50 against 1,225) and ADM (110.25 against 115.7625).
+The rows are quote-feed metadata: the split's `SP` row is a `dPrice = 0`, `src = 0` marker with
+continuous prices either side, they exist for securities the user never held, and Canadian ETFs
+record a 1:1 one every December against a reinvested distribution. Ratios other than 1 raise
+`securitySplitNotApplied` so the user can check the share counts; nothing is adjusted.
 
 ## 9. Task list
 

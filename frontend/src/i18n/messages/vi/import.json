@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "Nhập Khẩu Giao Dịch",
-    "subtitle": "Nhập khẩu giao dịch từ các tệp QIF, OFX/QFX hoặc CSV"
+    "subtitle": "Nhập khẩu giao dịch từ các tệp QIF, OFX/QFX hoặc CSV, hoặc mang sang toàn bộ một tệp Microsoft Money (.mny)"
   },
   "upload": {
     "heading": "Tải Lên Tệp Giao Dịch",
-    "instructions": "Chọn một hoặc nhiều tệp để nhập khẩu. Các định dạng được hỗ trợ: QIF, OFX/QFX, CSV.\nBạn có thể chọn nhiều tệp cùng loại để nhập khẩu hàng loạt.",
+    "instructions": "Chọn một hoặc nhiều tệp để nhập khẩu. Các định dạng được hỗ trợ: QIF, OFX/QFX, CSV và Microsoft Money (.mny).\nBạn có thể chọn nhiều tệp cùng loại để nhập khẩu hàng loạt. Hãy nhập từng tệp Microsoft Money một — một tệp .mny chứa toàn bộ một hồ sơ.",
     "importingTo": "Đang nhập khẩu vào:",
     "clickToSelect": "Nhấp để chọn tệp",
     "processing": "Đang xử lý...",
-    "acceptedFormats": "QIF, OFX, QFX hoặc CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV hoặc Microsoft Money (.mny)",
     "mnyFailedHeading": "Không thể mở tệp Microsoft Money đó",
     "wikiNotice": {
       "title": "Trước khi nhập khẩu",
@@ -315,7 +315,7 @@
       "accounts": "Tài khoản",
       "securities": "Chứng khoán",
       "investments": "Giao dịch đầu tư",
-      "investmentDetail": "{transfers} lần chuyển chứng khoán, {splits} lần tách cổ phiếu",
+      "investmentDetail": "{transfers} lần chuyển chứng khoán",
       "prices": "Lịch sử giá",
       "exchangeRates": "Tỷ giá hối đoái",
       "ofTotal": "trong {total} có trong tệp",
@@ -471,11 +471,24 @@
     "unconfirmedInvestmentAction": "{count, plural, other {# giao dịch đầu tư}} dùng một thao tác Money có ý nghĩa được suy đoán chứ không được ghi nhận; hãy đối chiếu với Money.",
     "missingInvestmentDetail": "{count, plural, other {# giao dịch đầu tư}} không có chi tiết cổ phiếu trong tệp và chỉ được nhập theo số tiền mặt.",
     "investmentAccountMismatch": "{count, plural, other {# giao dịch đầu tư}} nằm trong tài khoản không phải tài khoản đầu tư và đã bị bỏ qua.",
-    "unusableSecuritySplit": "{count, plural, other {# lần tách cổ phiếu}} không khớp được với chứng khoán nào hoặc có tỷ lệ không dùng được, nên không được áp dụng.",
+    "securitySplitNotApplied": "{count, plural, other {# lần chia tách cổ phiếu}} được ghi trong tệp và không được áp dụng vào số lượng cổ phiếu, vì bản thân Money cũng không áp dụng. Hãy đối chiếu các khoản nắm giữ với sao kê của bạn.",
     "holdingsMismatch": "{count, plural, other {# khoản nắm giữ}} không khớp với số cổ phiếu ghi trong tệp Money của bạn.",
     "billTemplateMissing": "{count, plural, other {# hóa đơn theo lịch}} không có giao dịch mẫu trong tệp và đã bị bỏ qua.",
     "unusableBill": "{count, plural, other {# hóa đơn theo lịch}} không có tài khoản, ngày dùng được hoặc chu kỳ nhận diện được, nên đã bị bỏ qua.",
-    "billFrequencyApproximated": "{count, plural, other {# hóa đơn theo lịch}} dùng khoảng lặp mà Monize không thể diễn đạt chính xác, nên đã dùng khoảng ngắn hơn gần nhất."
+    "billFrequencyApproximated": "{count, plural, other {# hóa đơn theo lịch}} dùng khoảng lặp mà Monize không thể diễn đạt chính xác, nên đã dùng khoảng ngắn hơn gần nhất.",
+    "showTransactions": "Hiện {count, plural, other {# giao dịch}}",
+    "hideTransactions": "Ẩn giao dịch",
+    "reviewInMoney": "Mở các giao dịch này trong Microsoft Money để kiểm tra hoặc sửa, sau đó xuất và nhập lại.",
+    "reviewInMoneyTruncated": "Đang hiện {shown} mục đầu tiên trong {total}. Mở các giao dịch này trong Microsoft Money để kiểm tra hoặc sửa, sau đó xuất và nhập lại.",
+    "reference": "Số tham chiếu {reference}",
+    "noValue": "Chưa đặt",
+    "table": {
+      "date": "Ngày",
+      "account": "Tài khoản",
+      "payee": "Người nhận",
+      "amount": "Số tiền",
+      "problem": "Vấn đề"
+    }
   },
   "mnyErrors": {
     "mnyImportFailed": "Đã xảy ra lỗi khi nhập. Không có gì được lưu -- bạn có thể thử lại.",

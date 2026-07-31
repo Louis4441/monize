@@ -53,6 +53,7 @@ import {
   ParsedSearchTerm,
 } from "./transaction-search-parse.util";
 import { buildTagKeyFilterClause, TagKeyFilter } from "./tag-key-filter.util";
+import { onlyBalanceAffecting } from "./balance-affecting.util";
 import { tr } from "../i18n/translate";
 import { stripHtml } from "../common/sanitization.util";
 import {
@@ -1358,13 +1359,18 @@ export class TransactionsService {
       .addOrderBy("t.id", "DESC")
       .limit(skip);
 
-    const sumResult = await m
-      .getRepository(Transaction)
-      .createQueryBuilder("transaction")
-      .select("SUM(transaction.amount)", "sum")
-      .where(`transaction.id IN (${previousPagesQuery.getQuery()})`)
-      .setParameters(previousPagesQuery.getParameters())
-      .getRawOne();
+    // The window is every row the register lists above this page -- voids
+    // included, because they occupy a line each. What is summed out of that
+    // window is only what the projected balance counted in.
+    const sumResult = await onlyBalanceAffecting(
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .select("SUM(transaction.amount)", "sum")
+        .where(`transaction.id IN (${previousPagesQuery.getQuery()})`)
+        .setParameters(previousPagesQuery.getParameters()),
+      "transaction",
+    ).getRawOne();
 
     const sumBefore = Number(sumResult?.sum) || 0;
     return projectedBalance - sumBefore;
@@ -1497,16 +1503,18 @@ export class TransactionsService {
         accountId,
       );
 
-      const sumAfterResult = await m
-        .getRepository(Transaction)
-        .createQueryBuilder("t")
-        .select("COALESCE(SUM(t.amount), 0)", "sum")
-        .where("t.userId = :userId", { userId })
-        .andWhere("t.accountId = :accountId", { accountId })
-        .andWhere("t.transactionDate > :endDate", {
-          endDate: filters.endDate,
-        })
-        .getRawOne();
+      const sumAfterResult = await onlyBalanceAffecting(
+        m
+          .getRepository(Transaction)
+          .createQueryBuilder("t")
+          .select("COALESCE(SUM(t.amount), 0)", "sum")
+          .where("t.userId = :userId", { userId })
+          .andWhere("t.accountId = :accountId", { accountId })
+          .andWhere("t.transactionDate > :endDate", {
+            endDate: filters.endDate,
+          }),
+        "t",
+      ).getRawOne();
 
       baseBalance = projectedBalance - (Number(sumAfterResult?.sum) || 0);
     } else {
@@ -1539,13 +1547,15 @@ export class TransactionsService {
       });
     }
 
-    const sumResult = await m
-      .getRepository(Transaction)
-      .createQueryBuilder("transaction")
-      .select("SUM(transaction.amount)", "sum")
-      .where(`transaction.id IN (${previousPagesQuery.getQuery()})`)
-      .setParameters(previousPagesQuery.getParameters())
-      .getRawOne();
+    const sumResult = await onlyBalanceAffecting(
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .select("SUM(transaction.amount)", "sum")
+        .where(`transaction.id IN (${previousPagesQuery.getQuery()})`)
+        .setParameters(previousPagesQuery.getParameters()),
+      "transaction",
+    ).getRawOne();
 
     return baseBalance - (Number(sumResult?.sum) || 0);
   }
@@ -1631,21 +1641,26 @@ export class TransactionsService {
     const hasTags = (filters.tagIds?.length ?? 0) > 0;
 
     if (!hasRegularCategories && !hasTags) {
-      const result = await m
-        .getRepository(Transaction)
-        .createQueryBuilder("sa")
-        .select("COALESCE(SUM(sa.amount), 0)", "totalSum")
-        .where(`sa.id IN (${idsSubquery.getQuery()})`)
-        .setParameters(idsSubquery.getParameters())
-        .getRawOne();
+      const result = await onlyBalanceAffecting(
+        m
+          .getRepository(Transaction)
+          .createQueryBuilder("sa")
+          .select("COALESCE(SUM(sa.amount), 0)", "totalSum")
+          .where(`sa.id IN (${idsSubquery.getQuery()})`)
+          .setParameters(idsSubquery.getParameters()),
+        "sa",
+      ).getRawOne();
       return Number(result?.totalSum) || 0;
     }
 
-    const sumQb = m
-      .getRepository(Transaction)
-      .createQueryBuilder("sa")
-      .where(`sa.id IN (${idsSubquery.getQuery()})`)
-      .setParameters(idsSubquery.getParameters());
+    const sumQb = onlyBalanceAffecting(
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("sa")
+        .where(`sa.id IN (${idsSubquery.getQuery()})`)
+        .setParameters(idsSubquery.getParameters()),
+      "sa",
+    );
 
     sumQb.leftJoin("sa.splits", "saSplits");
 
