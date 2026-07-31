@@ -3,6 +3,7 @@
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { gainLossColor, sumMoney } from '@/lib/format';
+import { chartColors } from '@/lib/chart-colors';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import {
   BarChart,
@@ -292,16 +293,14 @@ export const CategoryPayeeBarChart = memo(function CategoryPayeeBarChart({
             } : undefined}
             style={onMonthClick ? { cursor: 'pointer' } : undefined}
           >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#e5e7eb"
-              className="dark:stroke-gray-700"
-            />
+            {/* The token carries its own dark override, so the dark-variant
+                stroke class this used to need alongside it is gone. */}
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
             <XAxis
               dataKey="periodStart"
-              tick={{ fill: '#6b7280', fontSize: isMobile ? 10 : 12 }}
+              tick={{ fill: chartColors.axis, fontSize: isMobile ? 10 : 12 }}
               tickLine={false}
-              axisLine={{ stroke: '#e5e7eb' }}
+              axisLine={{ stroke: chartColors.grid }}
               tickFormatter={axisTick}
               interval="preserveStartEnd"
               angle={isMobile ? -35 : 0}
@@ -310,7 +309,7 @@ export const CategoryPayeeBarChart = memo(function CategoryPayeeBarChart({
               height={isMobile ? 64 : 30}
             />
             <YAxis
-              tick={{ fill: '#6b7280', fontSize: 11 }}
+              tick={{ fill: chartColors.axis, fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatCurrencyAxis}
@@ -325,7 +324,11 @@ export const CategoryPayeeBarChart = memo(function CategoryPayeeBarChart({
               {chartData.map((entry, index) => (
                 <Cell
                   key={index}
-                  fill={entry.total >= 0 ? '#22c55e' : '#ef4444'}
+                  // This chart is the one place the app spends red on purpose:
+                  // it is about the in/out split, so the sign is the subject
+                  // rather than incidental. The tokens keep that meaning while
+                  // letting each palette pick its own red and green.
+                  fill={entry.total >= 0 ? chartColors.income : chartColors.expense}
                 />
               ))}
               {showBarLabels && (
@@ -341,7 +344,7 @@ export const CategoryPayeeBarChart = memo(function CategoryPayeeBarChart({
                       : formatCurrency(Number(value))
                   }
                   style={{
-                    fill: '#6b7280',
+                    fill: chartColors.axis,
                     fontSize: isMobile ? 10 : 11,
                     fontWeight: 500,
                     ...(verticalLabels && { dominantBaseline: 'central' as const }),
