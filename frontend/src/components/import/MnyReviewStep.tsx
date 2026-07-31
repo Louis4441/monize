@@ -69,7 +69,10 @@ export function MnyReviewStep({
   ).length;
 
   return (
-    <div className="max-w-4xl mx-auto">
+    // Wider than the rest of the wizard on purpose: this step carries the
+    // account list with its currency selects, the bill checkboxes and the
+    // warnings panel, and at max-w-4xl every one of them wraps.
+    <div className="max-w-6xl mx-auto">
       <h2 className="text-lg font-semibold text-foreground mb-1">
         {t('mnyReview.heading')}
       </h2>
