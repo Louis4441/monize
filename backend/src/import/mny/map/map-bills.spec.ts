@@ -18,7 +18,6 @@ import { MappedAccounts, MappedSecurities } from "../model/mny-import-model";
 import { mapSecurities } from "./map-securities";
 import {
   BILL_FUTURE_HORIZON_DAYS,
-  BILL_PAST_HORIZON_DAYS,
   MapBillsInput,
   billReferences,
   mapBills,
@@ -235,18 +234,88 @@ describe("mapBills", () => {
     });
 
     it("keeps a recently-overdue series and drops one past the grace period", () => {
+      // A monthly series is judged over max(400, 31 + 92) = 400 days. Handle 1
+      // is current and so pins the file's present at AS_OF.
       const result = mapBills(
         input({
           bills: billData({
             bills: [
+              mnyBill({ handle: 1, nextDue: AS_OF, templateTransaction: 500 }),
+              mnyBill({
+                handle: 2,
+                nextDue: shiftIsoDate(AS_OF, -BILL_FUTURE_HORIZON_DAYS),
+                templateTransaction: 501,
+              }),
+              mnyBill({
+                handle: 3,
+                nextDue: shiftIsoDate(AS_OF, -(BILL_FUTURE_HORIZON_DAYS + 1)),
+                templateTransaction: 502,
+              }),
+            ],
+          }),
+          transactions: transactionData({
+            transactions: [
+              template({ handle: 500, account: 1 }),
+              template({ handle: 501, account: 1 }),
+              template({ handle: 502, account: 1 }),
+            ],
+          }),
+        }),
+      );
+
+      expect(result.bills.map((bill) => bill.handle).sort()).toEqual([1, 2]);
+    });
+
+    it("judges a series against its own cadence, not a flat quarter", () => {
+      // The defect this guards: a flat 92-day window declared a yearly bill
+      // dead 100 days after its last occurrence, when it had missed nothing.
+      const yearly = (handle: number, daysAgo: number) =>
+        mnyBill({
+          handle,
+          frequency: 6,
+          nextDue: shiftIsoDate(AS_OF, -daysAgo),
+          templateTransaction: 500 + handle,
+        });
+
+      const result = mapBills(
+        input({
+          bills: billData({
+            bills: [
+              mnyBill({ handle: 1, nextDue: AS_OF, templateTransaction: 500 }),
+              yearly(2, 100),
+            ],
+          }),
+          transactions: transactionData({
+            transactions: [
+              template({ handle: 500, account: 1 }),
+              template({ handle: 502, account: 1 }),
+            ],
+          }),
+        }),
+      );
+
+      expect(result.bills.map((bill) => bill.handle)).toContain(2);
+    });
+
+    it("measures the horizon from the file's own present, not the clock", () => {
+      // A .mny is a snapshot. Judging it against the wall clock meant that the
+      // longer a user waited before importing, the fewer bills survived -- and
+      // at a quarter old, none did. This file was last used a year ago and its
+      // bills are still its bills.
+      const lastUsed = shiftIsoDate(AS_OF, -365);
+      const result = mapBills(
+        input({
+          asOf: AS_OF,
+          bills: billData({
+            bills: [
               mnyBill({
                 handle: 1,
-                nextDue: shiftIsoDate(AS_OF, -BILL_PAST_HORIZON_DAYS),
+                nextDue: lastUsed,
                 templateTransaction: 500,
               }),
               mnyBill({
                 handle: 2,
-                nextDue: shiftIsoDate(AS_OF, -(BILL_PAST_HORIZON_DAYS + 1)),
+                nextDue: shiftIsoDate(lastUsed, -30),
                 templateTransaction: 501,
               }),
             ],
@@ -260,7 +329,38 @@ describe("mapBills", () => {
         }),
       );
 
-      expect(result.bills.map((bill) => bill.handle)).toEqual([1]);
+      expect(result.bills.map((bill) => bill.handle).sort()).toEqual([1, 2]);
+    });
+
+    it("rolls a stale due date forward to the next occurrence", () => {
+      // Money's newest instance is where the series stood when the file was
+      // last used. Written through unchanged, a monthly bill arrives in Monize
+      // a year overdue instead of due next month.
+      const result = mapBills(
+        input({
+          asOf: AS_OF,
+          bills: billData({
+            bills: [
+              mnyBill({
+                handle: 1,
+                nextDue: shiftIsoDate(AS_OF, -365),
+                templateTransaction: 500,
+              }),
+            ],
+          }),
+          transactions: transactionData({
+            transactions: [template({ handle: 500, account: 1 })],
+          }),
+        }),
+      );
+
+      expect(result.bills[0].frequency).toBe("MONTHLY");
+      // The next occurrence, not merely some future date: one cycle's worth of
+      // slack and no more. (The shared helper clamps a 30th onto a short
+      // February and keeps the earlier day thereafter, which is the
+      // scheduler's own behaviour, so the day of month is not asserted.)
+      expect(result.bills[0].nextDueDate >= AS_OF).toBe(true);
+      expect(result.bills[0].nextDueDate <= shiftIsoDate(AS_OF, 31)).toBe(true);
     });
 
     it("drops a series whose next due date is implausibly far out", () => {

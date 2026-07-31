@@ -8,6 +8,7 @@ import {
   MnyUnreadableDatabaseError,
 } from "../mny-errors";
 import { JET_PAGE_SIZE } from "./jet-header";
+import { decryptMsisamInPlace } from "./msisam-decrypt";
 import { openDecryptedMnyFile, openMnyFile } from "./open-mny";
 
 function open(fixture: MnyFixtureName) {
@@ -200,5 +201,73 @@ describe("MnyTable", () => {
 
     expect(db.getTableOrNull("ACCT")?.rowCount).toBe(3);
     expect(db.getTableOrNull("TRN")?.rowCount).toBe(60);
+  });
+});
+
+/**
+ * `mdb-reader` writes into the buffer it reads, and a second read of those
+ * bytes returns every currency value with its sign stripped -- row counts,
+ * dates and text all stay correct, so nothing downstream looks wrong until a
+ * ledger of pure credits arrives.
+ *
+ * The wizard reads a buffer twice by design: `POST /parse` reads the upload
+ * and stages those same bytes, and the background job reads them again. That
+ * shipped as "every imported transaction is a credit, including both sides of
+ * a transfer", with account opening balances absolute too because they share
+ * `toAmount`.
+ *
+ * These guard the mechanism rather than the symptom: no committed fixture has
+ * a negative currency value, so an amount assertion would pass on the broken
+ * reader. Buffer identity would not.
+ */
+describe("reading a .mny buffer leaves it reusable", () => {
+  const TABLES = ["ACCT", "TRN", "CRNC", "PAY", "CAT"];
+
+  function readEverything(db: ReturnType<typeof openDecryptedMnyFile>) {
+    return TABLES.map((name) => db.getTableOrNull(name)?.rows() ?? null);
+  }
+
+  it.each(Object.keys(MNY_FIXTURES) as MnyFixtureName[])(
+    "does not modify the bytes of %s while reading them",
+    (fixture) => {
+      const buffer = readMnyFixture(fixture);
+      decryptMsisamInPlace(buffer, MNY_FIXTURES[fixture].password);
+      const pristine = Buffer.from(buffer);
+
+      readEverything(openDecryptedMnyFile(buffer));
+
+      expect(Buffer.compare(buffer, pristine)).toBe(0);
+    },
+  );
+
+  it.each(Object.keys(MNY_FIXTURES) as MnyFixtureName[])(
+    "returns identical rows when %s is read a second time",
+    (fixture) => {
+      const buffer = readMnyFixture(fixture);
+      decryptMsisamInPlace(buffer, MNY_FIXTURES[fixture].password);
+
+      const first = readEverything(openDecryptedMnyFile(buffer));
+      const second = readEverything(openDecryptedMnyFile(buffer));
+
+      expect(second).toEqual(first);
+    },
+  );
+
+  it("keeps the sign of a negative currency value on a re-read", () => {
+    // Built here rather than taken from a fixture: the sample files happen to
+    // hold no negative amount, which is exactly why this went unnoticed.
+    const buffer = readMnyFixture("money2002");
+    decryptMsisamInPlace(buffer, MNY_FIXTURES.money2002.password);
+
+    const amounts = (db: ReturnType<typeof openDecryptedMnyFile>) =>
+      (db.getTableOrNull("TRN")?.rows(["amt"]) ?? []).map((row) =>
+        Number(row.amt),
+      );
+
+    const first = amounts(openDecryptedMnyFile(buffer));
+    const second = amounts(openDecryptedMnyFile(buffer));
+
+    expect(first.some((amount) => amount !== 0)).toBe(true);
+    expect(second).toEqual(first);
   });
 });

@@ -3,6 +3,7 @@ import {
   MAX_SECURITY_SYMBOL_LENGTH,
   mapSecurities,
   placeholderSymbol,
+  stripMarketPrefix,
 } from "./map-securities";
 
 describe("mapSecurities", () => {
@@ -238,5 +239,77 @@ describe("placeholderSymbol", () => {
   it("stays inside the column width", () => {
     const symbol = placeholderSymbol("A B C D E F G H I J K L M N O P Q R S T");
     expect(symbol.length).toBeLessThanOrEqual(MAX_SECURITY_SYMBOL_LENGTH);
+  });
+});
+
+describe("stripMarketPrefix", () => {
+  // Money qualifies a symbol with the market it trades on. Real Money Plus
+  // files hold both shapes side by side: `US:VTI` for a holding and
+  // `$US:INDU`, `$DE:DAX` for an index, where `$` is Money's index marker.
+  it("removes the market a holding trades on", () => {
+    expect(stripMarketPrefix("US:VTI")).toBe("VTI");
+    expect(stripMarketPrefix("US:GLDM")).toBe("GLDM");
+  });
+
+  it("keeps an index an index, dropping only the market", () => {
+    expect(stripMarketPrefix("$US:INDU")).toBe("$INDU");
+    expect(stripMarketPrefix("$DE:DAX")).toBe("$DAX");
+    expect(stripMarketPrefix("$JP:NI225")).toBe("$NI225");
+  });
+
+  it("leaves a symbol Money never qualified alone", () => {
+    expect(stripMarketPrefix("XIU")).toBe("XIU");
+    expect(stripMarketPrefix("$OSPTX")).toBe("$OSPTX");
+    expect(stripMarketPrefix("BMO146")).toBe("BMO146");
+    // A currency pseudo-security, which must survive to be recognised as one.
+    expect(stripMarketPrefix("/GBPUS")).toBe("/GBPUS");
+  });
+
+  it("does not treat a longer prefix as a market", () => {
+    expect(stripMarketPrefix("NYSE:VTI")).toBe("NYSE:VTI");
+  });
+
+  it("keeps what Money stored when stripping would leave nothing", () => {
+    expect(stripMarketPrefix("US:")).toBe("US:");
+    expect(stripMarketPrefix("$US:")).toBe("$US:");
+  });
+});
+
+describe("mapSecurities market prefixes", () => {
+  const base = {
+    currencyByHandle: new Map<number, string>([[1, "USD"]]),
+    baseCurrency: "USD",
+  };
+
+  it("imports a qualified symbol under its bare ticker", () => {
+    // The defect this guards: `writeSecurities` matches existing holdings by
+    // symbol, so an imported `US:VTI` sat beside the user's own `VTI` as a
+    // second security and asked the quote providers for a symbol that does
+    // not exist.
+    const result = mapSecurities({
+      ...base,
+      securities: [
+        mnySecurity({ handle: 1, symbol: "US:VTI", name: "Vanguard" }),
+      ],
+    });
+
+    expect(result.securities[0].symbol).toBe("VTI");
+    // The file's own spelling is still recorded.
+    expect(result.securities[0].moneySymbol).toBe("US:VTI");
+  });
+
+  it("suffixes rather than merges when stripping collides", () => {
+    const result = mapSecurities({
+      ...base,
+      securities: [
+        mnySecurity({ handle: 1, symbol: "VTI", name: "Held directly" }),
+        mnySecurity({ handle: 2, symbol: "US:VTI", name: "Held in the US" }),
+      ],
+    });
+
+    expect(result.securities.map((s) => s.symbol)).toEqual(["VTI", "VTI-2"]);
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ code: "duplicateSecuritySymbol" }),
+    );
   });
 });

@@ -54,7 +54,8 @@ committed here, so the pipeline measures itself and the run is what gets recorde
 
 ## Memory
 
-An upload is buffered whole and decrypted in place, so peak usage is roughly **twice the file
+An upload is buffered whole and decrypted in place, and the reader works on its own copy of
+those bytes (see the `mdb-reader` trap below), so peak usage is roughly **twice the file
 size** above baseline. `MNY_IMPORT_LIMIT_MB` (default 300) bounds it; the pod needs at least
 `2x` that plus headroom, which the default Helm limit of `150Mi` is nowhere near. A pod that hits
 its limit mid-import is OOM-killed and the wizard reports a *stalled job*, naming the symptom and
@@ -91,6 +92,15 @@ not the cause -- see `helm/README.md` for the sizing table.
 - **`decryptMsisamInPlace` takes ownership of its buffer.** It mutates and returns the same
   buffer, deliberately (ADR-6). Tests must read a fresh fixture per assertion --
   `readMnyFixture` does that.
+- **`mdb-reader` writes into the bytes it reads, and the corruption is silent and specific.**
+  A second read of the same buffer returns every currency value with its sign stripped
+  (`-20.0000` reads back as `20.0000`) while row counts, dates and text stay correct, so
+  nothing looks wrong until a ledger of pure credits arrives. The wizard reads a buffer twice
+  by design -- `POST /parse` reads the upload and stages *those same bytes*, and the job reads
+  them again -- so this made every imported transaction a credit, both sides of every transfer
+  positive, and account opening balances absolute (they share `toAmount`). `openDatabase` hands
+  the reader its own copy, which is what makes `openMnyFile` a door you may walk through twice.
+  Do not "optimise" that copy away.
 - **Decrypt each buffer exactly once; RC4 is symmetric.** A second pass re-encrypts pages
   1..0xE, and the only symptom is `MnyUnreadableDatabaseError` from a layer that looks
   unrelated. Staged bytes are stored *decrypted* so the password is spent on the parse request
@@ -111,7 +121,21 @@ not the cause -- see `helm/README.md` for the sizing table.
 - **`act` 16 removes shares; it is not a sale.** Mapping it to SELL closes lots against a
   fabricated price and corrupts average cost. Direction always comes from `act` -- `TRN_INV.qty`
   is stored positive, so a quantity sign proves nothing.
-- **`act` 4 (cash dividend) has no `TRN_INV` row.** Drive the investment mapper from `TRN`;
+- **Read `act` off `LOT`, never off a format reference.** `LOT.htrnBuy` and `LOT.htrnSell` name
+  the transactions that opened and closed each tax lot, so whatever `act` those rows carry
+  acquires and disposes *by definition*. PR #192's reference had `act` 1 as SELL; in both Money
+  Plus files available (the maintainer's, 4,616 lots, and the `sample.mny` shipped with Money
+  Plus) `act` 1 opens lots and closes none. Every purchase imported as a sale, so no cash ever
+  left a brokerage sleeve and holdings replayed negative. Money Plus uses
+  1/2/3/4/9/12/13/32/33; codes 0, 5, 14, 15 and 16 appear only in the older fixtures.
+- **Investment `TRN.amt` is signed the opposite way to a banking row.** A buy is positive and a
+  sale negative -- it is what you paid, not the effect on the sleeve. Take the magnitude from
+  `amt` and the direction from `act`, which is what `totalAmountOf`/`cashAmountOf` do.
+- **Money qualifies a symbol with its market**: `US:VTI`, and `$US:INDU` for an index, where
+  `$` is Money's index marker rather than part of the prefix. `stripMarketPrefix` removes only
+  the market segment. Left on, `writeSecurities` matches existing holdings by symbol, so
+  `US:VTI` creates a second security beside the user's own `VTI` and every quote lookup 404s.
+- **`act` 3 and `act` 4 (cash distributions) have no `TRN_INV` row.** Drive the investment mapper from `TRN`;
   iterating `TRN_INV` drops every dividend.
 - **`SEC.sct` codes shift between releases** (the same index securities are `sct` 6 in Money
   2001/2002 and `sct` 7 in Money Plus), so the `sct = 4` currency test is not enough on its own.
@@ -119,6 +143,20 @@ not the cause -- see `helm/README.md` for the sizing table.
   shape.
 - **`CAT.lType` says income or expense directly** -- `{2, 3}` income, `{0, 1}` expense, `-1` the
   two roots. Use `isIncomeCategoryType` and fall back to the root ancestor only for the roots.
+- **A `.mny` is a snapshot, so bill activity is measured from the file, not the clock.**
+  `billActivityAnchor` anchors the horizon to the newest `BILL` instance the file holds,
+  falling back to `asOf` for a file still in use. Judging against `todayIsoDate()` meant the
+  same file imported differently depending on the day it was run, and a file a quarter old
+  lost *every* bill -- 292 series reduced to one candidate.
+- **A series is judged against its own cadence.** The window is
+  `max(BILL_FUTURE_HORIZON_DAYS, one cycle + BILL_PAST_HORIZON_DAYS)`. A flat quarter declared
+  a yearly bill dead 100 days after its last occurrence, on a current file. Detection erring
+  generous is recoverable -- the wizard's checkbox list unticks it -- while erring strict drops
+  the series with no UI that ever mentions it.
+- **Money's newest instance is where the series stood when the file was last used**, which is
+  in the past for any real import. `rollForward` advances it through its own cadence to the
+  next occurrence at or after `asOf`, so a bill arrives due next month rather than a year
+  overdue. Rolling is step-bounded; a stale daily series would otherwise iterate for ever.
 - **`BILL` is an accumulation of instances, not a list of bills.** One row per occurrence, so a
   long history holds thousands (1,844 in the maintainer's file for ~20 real bills). Group by
   `hbillHead` and reduce each series to one representative before doing anything else.

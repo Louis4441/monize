@@ -7,7 +7,15 @@ import {
   MappedBills,
   MappedSecurities,
 } from "../model/mny-import-model";
-import { mapFrequency, mapInvestmentAction } from "../model/mny-model";
+import {
+  MnyFrequencyMapping,
+  mapFrequency,
+  mapInvestmentAction,
+} from "../model/mny-model";
+import {
+  FrequencyType,
+  calculateNextDueDate,
+} from "../../../common/recurrence";
 import { MnyBill, MnyPayee, MnyTransaction } from "../model/mny-rows";
 import { MnyWarning } from "../model/mny-warnings";
 import { isDegeneratePayeeName } from "./map-reference";
@@ -33,11 +41,58 @@ import { MnyTransactionData } from "../tables/read-transactions";
  */
 
 /**
- * How long past its next due date a series stays an active candidate. A bill
- * the user is a few weeks behind on is still a bill; one silent for a quarter
- * is a dead series left in the table.
+ * Grace on top of a series' own cadence before it counts as dead. A bill the
+ * user is a few weeks behind on is still a bill.
+ *
+ * This is added to one full cycle rather than used on its own: a yearly bill
+ * observed 100 days after its last occurrence has not missed anything, and the
+ * flat 92-day rule this replaces declared it dead -- on a *current* file, not
+ * just a stale one.
  */
 export const BILL_PAST_HORIZON_DAYS = 92;
+
+/** One cycle of each frequency, in days, rounded up. */
+const CYCLE_DAYS: Record<FrequencyType, number> = {
+  ONCE: 0,
+  DAILY: 1,
+  WEEKLY: 7,
+  BIWEEKLY: 14,
+  EVERY4WEEKS: 28,
+  SEMIMONTHLY: 15,
+  MONTHLY: 31,
+  EVERY2MONTHS: 62,
+  QUARTERLY: 92,
+  SEMIANNUAL: 184,
+  YEARLY: 366,
+};
+
+/**
+ * The date a series' activity is judged against.
+ *
+ * A `.mny` is a **snapshot**, not a live database: the user stops using Money,
+ * exports, and imports whenever they get to it. Measuring "is this series still
+ * live" against the wall clock therefore makes the same file import differently
+ * depending on the day it is run, and once the file is a quarter old every bill
+ * in it is silently dropped -- which is what reduced a file holding ~30 live
+ * bills to a single one.
+ *
+ * So the horizon is anchored to the file's own present: the newest `BILL`
+ * instance it contains. A file still in use has that at or ahead of today, and
+ * `asOf` wins, which is the behaviour a current file always had.
+ */
+export function billActivityAnchor(
+  bills: readonly MnyBill[],
+  asOf: string,
+): string {
+  const newest = bills
+    .map((bill) => bill.nextDue)
+    .filter((due): due is string => due !== null)
+    .reduce<string | null>(
+      (latest, due) => (latest === null || due > latest ? due : latest),
+      null,
+    );
+  return newest !== null && newest < asOf ? newest : asOf;
+}
 
 /**
  * How far into the future a next due date may plausibly sit. A yearly bill's
@@ -193,17 +248,73 @@ function representativeOf(
   );
 }
 
-/** Whether a series' schedule falls inside the active horizon. */
-function isActive(representative: MnyBill, asOf: string): boolean {
+/**
+ * Whether a series' schedule falls inside the active horizon, measured from the
+ * file's own present (`anchor`) rather than the wall clock.
+ *
+ * A series stays a candidate for one full cycle plus `BILL_PAST_HORIZON_DAYS`
+ * of grace, floored at `BILL_FUTURE_HORIZON_DAYS` so nothing is judged over a
+ * window shorter than a year -- a monthly bill that lapsed for two months is
+ * still the bill the user thinks they have, and the wizard's checkbox list is
+ * where it gets unticked. Detection erring generous is recoverable; erring
+ * strict drops the series with no UI that ever mentions it.
+ */
+function isActive(
+  representative: MnyBill,
+  anchor: string,
+  mapping: MnyFrequencyMapping | null,
+): boolean {
   const nextDue = representative.nextDue as string;
-  if (nextDue < shiftIsoDate(asOf, -BILL_PAST_HORIZON_DAYS)) {
+  if (nextDue > shiftIsoDate(anchor, BILL_FUTURE_HORIZON_DAYS)) {
     return false;
   }
-  if (nextDue > shiftIsoDate(asOf, BILL_FUTURE_HORIZON_DAYS)) {
+  if (representative.endsOn !== null && representative.endsOn < anchor) {
     return false;
   }
-  return representative.endsOn === null || representative.endsOn >= asOf;
+
+  // A one-off that has already fallen due is spent, not a schedule.
+  if (mapping === null || mapping.frequency === "ONCE") {
+    return nextDue >= anchor;
+  }
+
+  const window = Math.max(
+    BILL_FUTURE_HORIZON_DAYS,
+    CYCLE_DAYS[mapping.frequency] + BILL_PAST_HORIZON_DAYS,
+  );
+  return nextDue >= shiftIsoDate(anchor, -window);
 }
+
+/**
+ * The series' next occurrence at or after `asOf`, rolled forward through its own
+ * cadence.
+ *
+ * Money's newest instance is where the series stood when the file was last
+ * used, which for any real import is in the past. Writing that date through
+ * unchanged hands Monize a schedule that is months overdue on arrival, so the
+ * bill lands looking like a backlog rather than a schedule. Rolling is bounded:
+ * a daily series twenty years stale would otherwise iterate for ever.
+ */
+export function rollForward(
+  due: string,
+  frequency: FrequencyType,
+  asOf: string,
+): string {
+  if (frequency === "ONCE") {
+    return due;
+  }
+  let next = due;
+  for (let step = 0; step < MAX_ROLL_STEPS && next < asOf; step += 1) {
+    const advanced = calculateNextDueDate(next, frequency);
+    if (advanced <= next) {
+      return next;
+    }
+    next = advanced;
+  }
+  return next;
+}
+
+/** Enough to roll a daily series through a decade, and no further. */
+const MAX_ROLL_STEPS = 4000;
 
 /** The account key a template row's schedule belongs to, or null. */
 function accountKeyOf(
@@ -402,7 +513,14 @@ function mapOne(
         : (context.input.accounts.currencyByHandle.get(template.account) ?? ""),
     frequency: mapping.frequency,
     approximate: mapping.approximate,
-    nextDueDate: representative.nextDue as string,
+    // Rolled to the next occurrence at or after the import's cut-off: Money's
+    // own newest instance is where the series stood when the file was last
+    // used, which is in the past for any real import.
+    nextDueDate: rollForward(
+      representative.nextDue as string,
+      mapping.frequency,
+      context.input.asOf,
+    ),
     endDate: representative.endsOn,
     description: template.memo,
     isTransfer: transferAccountKey !== null,
@@ -483,9 +601,18 @@ export function mapBills(input: MapBillsInput): MappedBills {
   const mapped: MappedBill[] = [];
   const templateByBillHandle = new Map<number, number>();
 
+  const anchor = billActivityAnchor(input.bills.bills, input.asOf);
+
   for (const instances of bySeries.values()) {
-    const representative = representativeOf(instances, input.asOf);
-    if (representative === null || !isActive(representative, input.asOf)) {
+    const representative = representativeOf(instances, anchor);
+    if (
+      representative === null ||
+      !isActive(
+        representative,
+        anchor,
+        mapFrequency(representative.frequency, representative.interval),
+      )
+    ) {
       continue;
     }
     const bill = mapOne(representative, context);
