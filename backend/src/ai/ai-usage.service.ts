@@ -1,12 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { LessThan, Repository } from "typeorm";
+import { DataSource, LessThan, Repository } from "typeorm";
 import { Cron } from "@nestjs/schedule";
 import { AiUsageLog } from "./entities/ai-usage-log.entity";
 import { AiProviderConfig } from "./entities/ai-provider-config.entity";
 import { AiUsageSummary, EstimatedCostByCurrency } from "./dto/ai-response.dto";
 import { roundMoney } from "../common/round.util";
 import { withSystemContext } from "../common/db/with-context";
+import { withScopedDb } from "../common/db/scoped-db";
 
 interface CostRate {
   inputCostPer1M: number | null;
@@ -64,12 +64,7 @@ interface LogUsageParams {
 export class AiUsageService {
   private readonly logger = new Logger(AiUsageService.name);
 
-  constructor(
-    @InjectRepository(AiUsageLog)
-    private readonly usageLogRepository: Repository<AiUsageLog>,
-    @InjectRepository(AiProviderConfig)
-    private readonly providerConfigRepository: Repository<AiProviderConfig>,
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
 
   @Cron("0 4 * * *")
   async purgeOldUsageLogs(): Promise<void> {
@@ -79,9 +74,11 @@ export class AiUsageService {
 
       // RLS (task C2): cross-user bulk purge -- runs under a system context.
       const result = await withSystemContext(() =>
-        this.usageLogRepository.delete({
-          createdAt: LessThan(cutoff),
-        }),
+        withScopedDb(this.dataSource, (manager) =>
+          manager.getRepository(AiUsageLog).delete({
+            createdAt: LessThan(cutoff),
+          }),
+        ),
       );
 
       if (result.affected && result.affected > 0) {
@@ -96,17 +93,33 @@ export class AiUsageService {
   }
 
   async logUsage(params: LogUsageParams): Promise<AiUsageLog> {
-    const log = this.usageLogRepository.create({
-      userId: params.userId,
-      provider: params.provider,
-      model: params.model,
-      feature: params.feature,
-      inputTokens: params.inputTokens,
-      outputTokens: params.outputTokens,
-      durationMs: params.durationMs,
-      error: params.error || null,
+    return withScopedDb(this.dataSource, (manager) => {
+      const repo = manager.getRepository(AiUsageLog);
+      const log = repo.create({
+        userId: params.userId,
+        provider: params.provider,
+        model: params.model,
+        feature: params.feature,
+        inputTokens: params.inputTokens,
+        outputTokens: params.outputTokens,
+        durationMs: params.durationMs,
+        error: params.error || null,
+      });
+      return repo.save(log);
     });
-    return this.usageLogRepository.save(log);
+  }
+
+  /**
+   * Run one AI-usage-log read in its own short scoped transaction. The five
+   * reads in getUsageSummary stay independent (as they were when each ran on
+   * its own pooled connection) instead of serializing on a shared one.
+   */
+  private usageLogs<T>(
+    fn: (repo: Repository<AiUsageLog>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(AiUsageLog)),
+    );
   }
 
   async getUsageSummary(
@@ -116,74 +129,87 @@ export class AiUsageService {
     const [byProviderModel, byFeatureModel, recentLogs, totals, userConfigs] =
       await Promise.all([
         // Group by provider AND model so we can look up per-model cost rates.
-        this.usageLogRepository
-          .createQueryBuilder("log")
-          .select("log.provider", "provider")
-          .addSelect("log.model", "model")
-          .addSelect("COUNT(*)", "requests")
-          .addSelect("SUM(log.input_tokens)", "inputTokens")
-          .addSelect("SUM(log.output_tokens)", "outputTokens")
-          .where("log.user_id = :userId", { userId })
-          .andWhere(
-            days
-              ? "log.created_at >= NOW() - make_interval(days => :days)"
-              : "1=1",
-            { days },
-          )
-          .groupBy("log.provider")
-          .addGroupBy("log.model")
-          .getRawMany(),
+        this.usageLogs((repo) =>
+          repo
+            .createQueryBuilder("log")
+            .select("log.provider", "provider")
+            .addSelect("log.model", "model")
+            .addSelect("COUNT(*)", "requests")
+            .addSelect("SUM(log.input_tokens)", "inputTokens")
+            .addSelect("SUM(log.output_tokens)", "outputTokens")
+            .where("log.user_id = :userId", { userId })
+            .andWhere(
+              days
+                ? "log.created_at >= NOW() - make_interval(days => :days)"
+                : "1=1",
+              { days },
+            )
+            .groupBy("log.provider")
+            .addGroupBy("log.model")
+            .getRawMany(),
+        ),
 
-        this.usageLogRepository
-          .createQueryBuilder("log")
-          .select("log.feature", "feature")
-          .addSelect("log.provider", "provider")
-          .addSelect("log.model", "model")
-          .addSelect("COUNT(*)", "requests")
-          .addSelect("SUM(log.input_tokens)", "inputTokens")
-          .addSelect("SUM(log.output_tokens)", "outputTokens")
-          .where("log.user_id = :userId", { userId })
-          .andWhere(
-            days
-              ? "log.created_at >= NOW() - make_interval(days => :days)"
-              : "1=1",
-            { days },
-          )
-          .groupBy("log.feature")
-          .addGroupBy("log.provider")
-          .addGroupBy("log.model")
-          .getRawMany(),
+        this.usageLogs((repo) =>
+          repo
+            .createQueryBuilder("log")
+            .select("log.feature", "feature")
+            .addSelect("log.provider", "provider")
+            .addSelect("log.model", "model")
+            .addSelect("COUNT(*)", "requests")
+            .addSelect("SUM(log.input_tokens)", "inputTokens")
+            .addSelect("SUM(log.output_tokens)", "outputTokens")
+            .where("log.user_id = :userId", { userId })
+            .andWhere(
+              days
+                ? "log.created_at >= NOW() - make_interval(days => :days)"
+                : "1=1",
+              { days },
+            )
+            .groupBy("log.feature")
+            .addGroupBy("log.provider")
+            .addGroupBy("log.model")
+            .getRawMany(),
+        ),
 
-        this.usageLogRepository.find({
-          where: { userId },
-          order: { createdAt: "DESC" },
-          take: 20,
-        }),
+        this.usageLogs((repo) =>
+          repo.find({
+            where: { userId },
+            order: { createdAt: "DESC" },
+            take: 20,
+          }),
+        ),
 
-        this.usageLogRepository
-          .createQueryBuilder("log")
-          .select("COUNT(*)", "totalRequests")
-          .addSelect("COALESCE(SUM(log.input_tokens), 0)", "totalInputTokens")
-          .addSelect("COALESCE(SUM(log.output_tokens), 0)", "totalOutputTokens")
-          .where("log.user_id = :userId", { userId })
-          .andWhere(
-            days
-              ? "log.created_at >= NOW() - make_interval(days => :days)"
-              : "1=1",
-            { days },
-          )
-          .getRawOne(),
+        this.usageLogs((repo) =>
+          repo
+            .createQueryBuilder("log")
+            .select("COUNT(*)", "totalRequests")
+            .addSelect("COALESCE(SUM(log.input_tokens), 0)", "totalInputTokens")
+            .addSelect(
+              "COALESCE(SUM(log.output_tokens), 0)",
+              "totalOutputTokens",
+            )
+            .where("log.user_id = :userId", { userId })
+            .andWhere(
+              days
+                ? "log.created_at >= NOW() - make_interval(days => :days)"
+                : "1=1",
+              { days },
+            )
+            .getRawOne(),
+        ),
 
-        this.providerConfigRepository.find({
-          where: { userId },
-          select: [
-            "provider",
-            "model",
-            "inputCostPer1M",
-            "outputCostPer1M",
-            "costCurrency",
-          ] as (keyof AiProviderConfig)[],
-        }),
+        withScopedDb(this.dataSource, (manager) =>
+          manager.getRepository(AiProviderConfig).find({
+            where: { userId },
+            select: [
+              "provider",
+              "model",
+              "inputCostPer1M",
+              "outputCostPer1M",
+              "costCurrency",
+            ] as (keyof AiProviderConfig)[],
+          }),
+        ),
       ]);
 
     // Build (provider, model) -> rate lookup from the user's configured providers.

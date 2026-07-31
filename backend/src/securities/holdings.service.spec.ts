@@ -2144,10 +2144,10 @@ describe("HoldingsService", () => {
 
   describe("applyMaturedInvestmentHoldings", () => {
     it("rebuilds holdings for users with an investment transaction maturing today", async () => {
-      // getUsersByEffectiveTimezone still reads the DataSource directly (it is
-      // shared with other modules' crons); the matured-user query runs inside
-      // the cron's scoped transaction.
-      dataSource.query.mockResolvedValueOnce([
+      // Both the timezone fan-out and the matured-user query run inside the
+      // cron's system context, each in its own scoped transaction -- so both
+      // land on the transaction manager, in this order.
+      mockQueryRunner.manager.query.mockResolvedValueOnce([
         {
           user_id: "11111111-1111-1111-1111-111111111111",
           timezone: "UTC",
@@ -2183,7 +2183,7 @@ describe("HoldingsService", () => {
     });
 
     it("does nothing when there are no users", async () => {
-      dataSource.query.mockResolvedValueOnce([]);
+      mockQueryRunner.manager.query.mockResolvedValueOnce([]);
       const rebuildSpy = jest.spyOn(service, "rebuildFromTransactions");
 
       await service.applyMaturedInvestmentHoldings();

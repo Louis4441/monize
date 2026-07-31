@@ -5,10 +5,9 @@ import {
   Inject,
   forwardRef,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
 import {
-  Repository,
   DataSource,
+  EntityManager,
   MoreThanOrEqual,
   LessThanOrEqual,
   And,
@@ -16,12 +15,12 @@ import {
 import { Cron } from "@nestjs/schedule";
 import { ExchangeRate } from "./entities/exchange-rate.entity";
 import { Currency } from "./entities/currency.entity";
-import { Account } from "../accounts/entities/account.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { YahooFinanceService } from "../securities/yahoo-finance.service";
 import { mapWithConcurrency } from "../common/concurrency.util";
 import { roundMoney } from "../common/round.util";
-import { withSystemContext } from "../common/db/with-context";
+import { withScopedDb } from "../common/db/scoped-db";
+import { withSystemContext, withUserContext } from "../common/db/with-context";
 
 // Cap concurrent Yahoo FX fetches so the daily refresh does not burst every
 // currency pair at once (this cron also runs alongside the security price
@@ -63,14 +62,6 @@ export class ExchangeRateService implements OnModuleInit {
   private readonly logger = new Logger(ExchangeRateService.name);
 
   constructor(
-    @InjectRepository(ExchangeRate)
-    private exchangeRateRepository: Repository<ExchangeRate>,
-    @InjectRepository(Currency)
-    private currencyRepository: Repository<Currency>,
-    @InjectRepository(Account)
-    private accountRepository: Repository<Account>,
-    @InjectRepository(UserPreference)
-    private userPreferenceRepository: Repository<UserPreference>,
     private dataSource: DataSource,
     @Inject(forwardRef(() => YahooFinanceService))
     private yahooFinanceService: YahooFinanceService,
@@ -79,8 +70,18 @@ export class ExchangeRateService implements OnModuleInit {
   /**
    * On application startup, check if exchange rates exist and are recent.
    * If not, trigger a refresh so currency conversions work immediately.
+   *
+   * RLS: a bootstrap hook has no request context, and everything this reads is
+   * cross-user (the recency probe on the global exchange_rates table, then the
+   * sweep for users holding foreign-currency accounts), so the whole body runs
+   * under `withSystemContext` -- the same shape C2 gave the crons. The per-user
+   * backfills it fans out are re-wrapped in `withUserContext` below.
    */
   async onModuleInit(): Promise<void> {
+    await withSystemContext(() => this.checkRatesOnStartup());
+  }
+
+  private async checkRatesOnStartup(): Promise<void> {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -89,9 +90,11 @@ export class ExchangeRateService implements OnModuleInit {
       const cutoff = new Date(today);
       cutoff.setDate(cutoff.getDate() - 3);
 
-      const recentRate = await this.exchangeRateRepository.findOne({
-        where: { rateDate: MoreThanOrEqual(cutoff) },
-      });
+      const recentRate = await withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(ExchangeRate).findOne({
+          where: { rateDate: MoreThanOrEqual(cutoff) },
+        }),
+      );
 
       if (!recentRate) {
         this.logger.log(
@@ -106,8 +109,9 @@ export class ExchangeRateService implements OnModuleInit {
       }
       // Check if historical rates need backfilling for any user's accounts or securities
       const usersWithForeignAccounts: Array<{ user_id: string }> =
-        await this.dataSource.query(
-          `SELECT DISTINCT user_id FROM (
+        await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `SELECT DISTINCT user_id FROM (
              SELECT a.user_id
              FROM accounts a
              INNER JOIN user_preferences up ON up.user_id = a.user_id
@@ -123,10 +127,13 @@ export class ExchangeRateService implements OnModuleInit {
                AND s.is_active = true
                AND h.quantity > 0
            ) sub`,
+          ),
         );
 
       for (const { user_id } of usersWithForeignAccounts) {
-        this.backfillHistoricalRates(user_id).catch((err) =>
+        withUserContext(user_id, () =>
+          this.backfillHistoricalRates(user_id),
+        ).catch((err) =>
           this.logger.warn(
             `Startup historical rate backfill failed for user ${user_id}: ${err.message}`,
           ),
@@ -204,22 +211,28 @@ export class ExchangeRateService implements OnModuleInit {
     rate: number,
     date: Date,
   ): Promise<ExchangeRate> {
-    const result = await this.saveOneDirection(from, to, rate, date);
+    // Both directions in one transaction: a pair persisted only one way would
+    // make the reverse lookup fall through to a live fetch forever.
+    return withScopedDb(this.dataSource, async (manager) => {
+      const result = await this.saveOneDirection(manager, from, to, rate, date);
 
-    // Also save the inverse rate so both directions stay current
-    const inverseRate = roundMoney(1 / rate);
-    await this.saveOneDirection(to, from, inverseRate, date);
+      // Also save the inverse rate so both directions stay current
+      const inverseRate = roundMoney(1 / rate);
+      await this.saveOneDirection(manager, to, from, inverseRate, date);
 
-    return result;
+      return result;
+    });
   }
 
   private async saveOneDirection(
+    manager: EntityManager,
     from: string,
     to: string,
     rate: number,
     date: Date,
   ): Promise<ExchangeRate> {
-    const existing = await this.exchangeRateRepository.findOne({
+    const repo = manager.getRepository(ExchangeRate);
+    const existing = await repo.findOne({
       where: {
         fromCurrency: from,
         toCurrency: to,
@@ -230,17 +243,17 @@ export class ExchangeRateService implements OnModuleInit {
     if (existing) {
       existing.rate = rate;
       existing.source = "yahoo_finance";
-      return this.exchangeRateRepository.save(existing);
+      return repo.save(existing);
     }
 
-    const newRate = this.exchangeRateRepository.create({
+    const newRate = repo.create({
       fromCurrency: from,
       toCurrency: to,
       rate,
       rateDate: date,
       source: "yahoo_finance",
     });
-    return this.exchangeRateRepository.save(newRate);
+    return repo.save(newRate);
   }
 
   /**
@@ -255,8 +268,11 @@ export class ExchangeRateService implements OnModuleInit {
     // defaults ensures we fetch (CAD, GBP) even when the user has no GBP-
     // denominated accounts -- otherwise their GBP totals would silently fall
     // back to unconverted CAD values.
-    const usedCurrencies: { code: string }[] = await this.dataSource.query(
-      `SELECT DISTINCT code FROM (
+    const usedCurrencies: { code: string }[] = await withScopedDb(
+      this.dataSource,
+      (manager) =>
+        manager.query(
+          `SELECT DISTINCT code FROM (
          SELECT currency_code AS code FROM accounts WHERE is_closed = false
          UNION
          SELECT s.currency_code AS code
@@ -268,6 +284,7 @@ export class ExchangeRateService implements OnModuleInit {
          SELECT default_currency AS code FROM user_preferences
          WHERE default_currency IS NOT NULL
        ) sub`,
+        ),
     );
 
     const codes = usedCurrencies.map((c) => c.code);
@@ -363,9 +380,11 @@ export class ExchangeRateService implements OnModuleInit {
     this.logger.log("Starting historical exchange rate backfill");
 
     // 1. Get user's default currency
-    const pref = await this.userPreferenceRepository.findOne({
-      where: { userId },
-    });
+    const pref = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(UserPreference).findOne({
+        where: { userId },
+      }),
+    );
     const defaultCurrency = pref?.defaultCurrency || "USD";
 
     // 2. Find non-default currencies and their earliest transaction dates
@@ -378,12 +397,17 @@ export class ExchangeRateService implements OnModuleInit {
       params.push(accountIds);
     }
 
-    // Query 1: Account-level currencies (accounts in a non-default currency)
-    const accountCurrencyRows: Array<{
-      currency_code: string;
-      earliest: string;
-    }> = await this.dataSource.query(
-      `SELECT a.currency_code,
+    // Both discovery queries read from one snapshot -- they feed a single
+    // pair->earliest-date map, so a row appearing between them would skew it.
+    const [accountCurrencyRows, securityCurrencyRows] = await withScopedDb(
+      this.dataSource,
+      async (manager) => {
+        // Query 1: Account-level currencies (accounts in a non-default currency)
+        const accountRows: Array<{
+          currency_code: string;
+          earliest: string;
+        }> = await manager.query(
+          `SELECT a.currency_code,
               LEAST(
                 (SELECT MIN(t.transaction_date) FROM transactions t WHERE t.account_id = a.id),
                 (SELECT MIN(it.transaction_date) FROM investment_transactions it WHERE it.account_id = a.id)
@@ -392,15 +416,15 @@ export class ExchangeRateService implements OnModuleInit {
        WHERE a.currency_code != $1
          AND a.is_closed = false
          ${accountFilter}`,
-      params,
-    );
+          params,
+        );
 
-    // Query 2: Security-level currencies (securities in a non-default currency held in active accounts)
-    const securityCurrencyRows: Array<{
-      currency_code: string;
-      earliest: string;
-    }> = await this.dataSource.query(
-      `SELECT DISTINCT s.currency_code,
+        // Query 2: Security-level currencies (securities in a non-default currency held in active accounts)
+        const securityRows: Array<{
+          currency_code: string;
+          earliest: string;
+        }> = await manager.query(
+          `SELECT DISTINCT s.currency_code,
               (SELECT MIN(it.transaction_date)::TEXT
                FROM investment_transactions it
                WHERE it.security_id = s.id) AS earliest
@@ -411,7 +435,11 @@ export class ExchangeRateService implements OnModuleInit {
          AND s.is_active = true
          AND h.quantity > 0
          ${accountFilter ? `AND h.account_id = ANY($2::UUID[])` : ""}`,
-      params,
+          params,
+        );
+
+        return [accountRows, securityRows] as const;
+      },
     );
 
     // 3. Determine unique currency pairs and the global earliest date per pair
@@ -453,10 +481,12 @@ export class ExchangeRateService implements OnModuleInit {
       const [from, to] = pairKey.split("->");
 
       // Skip if we already have historical rates for this pair
-      const existingRates = await this.dataSource.query(
-        `SELECT COUNT(*)::INT AS count FROM exchange_rates
+      const existingRates = await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `SELECT COUNT(*)::INT AS count FROM exchange_rates
          WHERE from_currency = $1 AND to_currency = $2`,
-        [from, to],
+          [from, to],
+        ),
       );
 
       if (existingRates[0]?.count > 0) {
@@ -515,13 +545,15 @@ export class ExchangeRateService implements OnModuleInit {
             batchParams.push(from, to, r.date, r.rate);
           }
 
-          await this.dataSource.query(
-            `INSERT INTO exchange_rates (from_currency, to_currency, rate_date, rate, source)
+          await withScopedDb(this.dataSource, (manager) =>
+            manager.query(
+              `INSERT INTO exchange_rates (from_currency, to_currency, rate_date, rate, source)
              VALUES ${values}
              ON CONFLICT (from_currency, to_currency, rate_date) DO UPDATE SET
                rate = EXCLUDED.rate,
                source = EXCLUDED.source`,
-            batchParams,
+              batchParams,
+            ),
           );
         }
 
@@ -570,13 +602,16 @@ export class ExchangeRateService implements OnModuleInit {
    * Get the latest exchange rates (most recent per currency pair)
    */
   async getLatestRates(): Promise<ExchangeRate[]> {
-    return this.exchangeRateRepository
-      .createQueryBuilder("er")
-      .distinctOn(["er.from_currency", "er.to_currency"])
-      .orderBy("er.from_currency")
-      .addOrderBy("er.to_currency")
-      .addOrderBy("er.rate_date", "DESC")
-      .getMany();
+    return withScopedDb(this.dataSource, (manager) =>
+      manager
+        .getRepository(ExchangeRate)
+        .createQueryBuilder("er")
+        .distinctOn(["er.from_currency", "er.to_currency"])
+        .orderBy("er.from_currency")
+        .addOrderBy("er.to_currency")
+        .addOrderBy("er.rate_date", "DESC")
+        .getMany(),
+    );
   }
 
   /**
@@ -584,10 +619,12 @@ export class ExchangeRateService implements OnModuleInit {
    */
   async getLatestRate(from: string, to: string): Promise<number | null> {
     if (from === to) return 1;
-    const rate = await this.exchangeRateRepository.findOne({
-      where: { fromCurrency: from, toCurrency: to },
-      order: { rateDate: "DESC" },
-    });
+    const rate = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ExchangeRate).findOne({
+        where: { fromCurrency: from, toCurrency: to },
+        order: { rateDate: "DESC" },
+      }),
+    );
     return rate ? Number(rate.rate) : null;
   }
 
@@ -621,14 +658,16 @@ export class ExchangeRateService implements OnModuleInit {
     const targetDate = new Date(`${target}T00:00:00.000Z`);
 
     // 1. Closest stored rate on or before the target date.
-    const stored = await this.exchangeRateRepository.findOne({
-      where: {
-        fromCurrency: from,
-        toCurrency: to,
-        rateDate: LessThanOrEqual(targetDate),
-      },
-      order: { rateDate: "DESC" },
-    });
+    const stored = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ExchangeRate).findOne({
+        where: {
+          fromCurrency: from,
+          toCurrency: to,
+          rateDate: LessThanOrEqual(targetDate),
+        },
+        order: { rateDate: "DESC" },
+      }),
+    );
     if (stored) return Number(stored.rate);
 
     // 2. Fetch a short Yahoo window around the target (not the full "max"
@@ -717,30 +756,36 @@ export class ExchangeRateService implements OnModuleInit {
         : LessThanOrEqual(endDate);
     }
 
-    return this.exchangeRateRepository.find({
-      where,
-      order: { rateDate: "ASC", fromCurrency: "ASC", toCurrency: "ASC" },
-    });
+    return withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ExchangeRate).find({
+        where,
+        order: { rateDate: "ASC", fromCurrency: "ASC", toCurrency: "ASC" },
+      }),
+    );
   }
 
   /**
    * Get all active currencies
    */
   async getCurrencies(): Promise<Currency[]> {
-    return this.currencyRepository.find({
-      where: { isActive: true },
-      order: { code: "ASC" },
-    });
+    return withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(Currency).find({
+        where: { isActive: true },
+        order: { code: "ASC" },
+      }),
+    );
   }
 
   /**
    * Get the last time exchange rates were updated
    */
   async getLastUpdateTime(): Promise<Date | null> {
-    const latest = await this.exchangeRateRepository.findOne({
-      where: {},
-      order: { createdAt: "DESC" },
-    });
+    const latest = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ExchangeRate).findOne({
+        where: {},
+        order: { createdAt: "DESC" },
+      }),
+    );
     return latest?.createdAt ?? null;
   }
 

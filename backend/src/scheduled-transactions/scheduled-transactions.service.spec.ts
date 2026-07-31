@@ -171,6 +171,10 @@ describe("ScheduledTransactionsService", () => {
       [Tag, tagRepo],
     ]);
     mockDataSource = tenantMocks.dataSource;
+    // The timezone fan-out now runs through withScopedDb too, so its raw SQL
+    // lands on the transaction manager: alias `dataSource.query` to it and the
+    // per-test fan-out fixtures below keep working unchanged.
+    mockDataSource.query = tenantMocks.manager.query;
     // Direct EntityManager calls inside withScopedDb blocks (converted from the
     // old queryRunner.manager usage in update()/post()/createSplits()).
     const txManager = tenantMocks.manager;

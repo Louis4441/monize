@@ -108,12 +108,12 @@ describe("scheduled-transactions module RLS context smoke (real withScopedDb)", 
       createQueryBuilder: jest.fn().mockImplementation(overrideQueryBuilder),
     };
 
-    const { service, manager, dataSource, transactionsService } =
-      await buildModule(scheduledRepo, overridesRepo);
-    // The timezone fan-out is still a direct dataSource.query.
-    dataSource.query.mockResolvedValue([
-      { user_id: OWNER_ID, timezone: "UTC" },
-    ]);
+    const { service, manager, transactionsService } = await buildModule(
+      scheduledRepo,
+      overridesRepo,
+    );
+    // The timezone fan-out now runs through its own withScopedDb.
+    manager.query.mockResolvedValue([{ user_id: OWNER_ID, timezone: "UTC" }]);
     manager.createQueryBuilder.mockImplementation(() => ({
       delete: jest.fn().mockReturnThis(),
       from: jest.fn().mockReturnThis(),

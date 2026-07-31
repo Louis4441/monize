@@ -1,10 +1,17 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { FinancialContextBuilder } from "./financial-context.builder";
 import { AccountsService } from "../../accounts/accounts.service";
 import { CategoriesService } from "../../categories/categories.service";
 import { UserPreference } from "../../users/entities/user-preference.entity";
 import { QUERY_SYSTEM_PROMPT } from "./prompt-templates";
+import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+
+jest.mock("../../common/db/scoped-db", () =>
+  jest
+    .requireActual("../../test-helpers/scoped-db-testing")
+    .scopedDbMockModule(),
+);
 
 describe("FinancialContextBuilder", () => {
   let builder: FinancialContextBuilder;
@@ -72,8 +79,9 @@ describe("FinancialContextBuilder", () => {
         { provide: AccountsService, useValue: mockAccountsService },
         { provide: CategoriesService, useValue: mockCategoriesService },
         {
-          provide: getRepositoryToken(UserPreference),
-          useValue: mockPrefRepo,
+          provide: DataSource,
+          useValue: createScopedDbMocks([[UserPreference, mockPrefRepo]])
+            .dataSource,
         },
       ],
     }).compile();

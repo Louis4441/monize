@@ -1,11 +1,16 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException } from "@nestjs/common";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { I18nService } from "nestjs-i18n";
 import { NotificationsController } from "./notifications.controller";
 import { EmailService } from "./email.service";
 import { UsersService } from "../users/users.service";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("NotificationsController", () => {
   let controller: NotificationsController;
@@ -52,8 +57,9 @@ describe("NotificationsController", () => {
           },
         },
         {
-          provide: getRepositoryToken(UserPreference),
-          useValue: mockPreferencesRepo,
+          provide: DataSource,
+          useValue: createScopedDbMocks([[UserPreference, mockPreferencesRepo]])
+            .dataSource,
         },
       ],
     }).compile();

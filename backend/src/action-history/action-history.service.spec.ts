@@ -1,9 +1,13 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { NotFoundException, ConflictException } from "@nestjs/common";
 import { DataSource } from "typeorm";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import { ActionHistoryService } from "./action-history.service";
 import { ActionHistory } from "./entities/action-history.entity";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("ActionHistoryService", () => {
   let service: ActionHistoryService;
@@ -37,34 +41,20 @@ describe("ActionHistoryService", () => {
       createQueryBuilder: jest.fn(),
     };
 
+    // The service now runs every write through `withScopedDb`, so the former
+    // QueryRunner is the transaction's EntityManager: `queryRunner.query` and
+    // `queryRunner.manager.*` are the same jest.fn()s the manager exposes, which
+    // keeps the assertions below pointed at the same calls they always were.
+    const scoped = createScopedDbMocks([[ActionHistory, mockRepository]]);
     mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      query: jest.fn(),
-      manager: {
-        findOne: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-        remove: jest.fn(),
-        create: jest.fn(),
-        save: jest.fn(),
-      },
+      query: scoped.manager.query,
+      manager: scoped.manager,
     };
-
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    };
+    mockDataSource = scoped.dataSource;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ActionHistoryService,
-        {
-          provide: getRepositoryToken(ActionHistory),
-          useValue: mockRepository,
-        },
         {
           provide: DataSource,
           useValue: mockDataSource,
@@ -236,7 +226,7 @@ describe("ActionHistoryService", () => {
       const result = await service.undo(userId);
 
       expect(result.description).toContain("Undone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockQueryRunner.manager.delete).toHaveBeenCalled();
     });
 
@@ -256,7 +246,7 @@ describe("ActionHistoryService", () => {
       const result = await service.undo(userId);
 
       expect(result.description).toContain("Undone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       // Should have called query to re-insert
       expect(mockQueryRunner.query).toHaveBeenCalled();
     });
@@ -282,7 +272,7 @@ describe("ActionHistoryService", () => {
       const result = await service.undo(userId);
 
       expect(result.description).toContain("Undone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       // The INSERT query should not contain the malicious column
       const insertCall = mockQueryRunner.query.mock.calls.find(
         (call: any[]) =>
@@ -307,7 +297,7 @@ describe("ActionHistoryService", () => {
       const result = await service.undo(userId);
 
       expect(result.description).toContain("Undone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockQueryRunner.manager.delete).toHaveBeenCalled();
     });
 
@@ -334,7 +324,7 @@ describe("ActionHistoryService", () => {
       const result = await service.undo(userId);
 
       expect(result.description).toContain("Undone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockQueryRunner.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO "custom_reports"'),
         expect.any(Array),
@@ -364,7 +354,7 @@ describe("ActionHistoryService", () => {
       const result = await service.undo(userId);
 
       expect(result.description).toContain("Undone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(mockQueryRunner.manager.update).toHaveBeenCalledWith(
         expect.any(Function),
         "report-1",
@@ -384,7 +374,7 @@ describe("ActionHistoryService", () => {
       mockRepository.findOne.mockResolvedValue(deleteAction);
 
       await expect(service.undo(userId)).rejects.toThrow(ConflictException);
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should rollback on error", async () => {
@@ -398,8 +388,8 @@ describe("ActionHistoryService", () => {
       mockQueryRunner.manager.delete.mockRejectedValue(new Error("DB error"));
 
       await expect(service.undo(userId)).rejects.toThrow("DB error");
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
   });
 
@@ -427,7 +417,7 @@ describe("ActionHistoryService", () => {
       const result = await service.redo(userId);
 
       expect(result.description).toContain("Redone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
   });
 
@@ -462,7 +452,7 @@ describe("ActionHistoryService", () => {
       const result = await service.undo(userId);
 
       expect(result.description).toContain("Undone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
   });
 
@@ -503,7 +493,7 @@ describe("ActionHistoryService", () => {
       const result = await service.undo(userId);
 
       expect(result.description).toContain("Undone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       // Verify transaction was re-inserted via raw query
       expect(mockQueryRunner.query).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO transactions"),
@@ -557,7 +547,7 @@ describe("ActionHistoryService", () => {
         "tx-1",
         expect.objectContaining({ amount: 50, payeeName: "Old Payee" }),
       );
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should restore splits when beforeData contains splits", async () => {
@@ -649,7 +639,7 @@ describe("ActionHistoryService", () => {
       mockQueryRunner.manager.findOne.mockResolvedValue(null);
 
       await expect(service.undo(userId)).rejects.toThrow(ConflictException);
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should return early if entityId is null", async () => {
@@ -848,7 +838,7 @@ describe("ActionHistoryService", () => {
       const result = await service.undo(userId);
 
       expect(result.description).toContain("Undone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should undo transfer delete by re-inserting both transactions", async () => {
@@ -1785,7 +1775,7 @@ describe("ActionHistoryService", () => {
       const result = await service.redo(userId);
 
       expect(result.description).toContain("Redone");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should rollback on redo error", async () => {
@@ -1801,8 +1791,8 @@ describe("ActionHistoryService", () => {
       mockQueryRunner.query.mockRejectedValue(new Error("DB error"));
 
       await expect(service.redo(userId)).rejects.toThrow("DB error");
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
   });
 

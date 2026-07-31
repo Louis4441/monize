@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { BadRequestException } from "@nestjs/common";
 import { AiForecastService } from "./ai-forecast.service";
 import { AiService } from "../ai.service";
@@ -10,6 +10,13 @@ import {
   ForecastAggregates,
 } from "./forecast-aggregator.service";
 import { UserPreference } from "../../users/entities/user-preference.entity";
+import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+
+jest.mock("../../common/db/scoped-db", () =>
+  jest
+    .requireActual("../../test-helpers/scoped-db-testing")
+    .scopedDbMockModule(),
+);
 
 describe("AiForecastService", () => {
   let service: AiForecastService;
@@ -185,12 +192,11 @@ describe("AiForecastService", () => {
       providers: [
         AiForecastService,
         {
-          provide: getRepositoryToken(UserPreference),
-          useValue: mockPrefRepo,
-        },
-        {
-          provide: getRepositoryToken(AiUsageLog),
-          useValue: mockUsageLogRepo,
+          provide: DataSource,
+          useValue: createScopedDbMocks([
+            [UserPreference, mockPrefRepo],
+            [AiUsageLog, mockUsageLogRepo],
+          ]).dataSource,
         },
         { provide: AiService, useValue: mockAiService },
         { provide: AiUsageService, useValue: mockUsageService },

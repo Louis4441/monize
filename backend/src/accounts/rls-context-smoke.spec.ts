@@ -34,12 +34,10 @@ describe("accounts module RLS context smoke (real withScopedDb)", () => {
     const { manager, dataSource } = createScopedDbMocks([
       [Account, accountsRepo],
     ]);
-    // Timezone fan-out (still direct dataSource.query) finds one UTC user...
-    dataSource.query.mockResolvedValue([
-      { user_id: OWNER_ID, timezone: "UTC" },
-    ]);
+    // Timezone fan-out (its own withScopedDb) finds one UTC user...
     // ...whose due-account scan (inside withScopedDb) returns one account to apply.
     manager.query
+      .mockResolvedValueOnce([{ user_id: OWNER_ID, timezone: "UTC" }])
       .mockResolvedValueOnce([{ account_id: "a1" }])
       .mockResolvedValueOnce([{ account_id: "a1", balance: "150" }])
       .mockResolvedValueOnce(undefined);

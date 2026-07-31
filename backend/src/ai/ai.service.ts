@@ -4,9 +4,10 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
+
 import { ConfigService } from "@nestjs/config";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { AiProviderConfig } from "./entities/ai-provider-config.entity";
 import { AiEncryptionService } from "./ai-encryption.service";
 import { AiProviderFactory } from "./ai-provider.factory";
@@ -58,8 +59,7 @@ export class AiService {
   private defaultBaseUrlValidated = false;
 
   constructor(
-    @InjectRepository(AiProviderConfig)
-    private readonly configRepository: Repository<AiProviderConfig>,
+    private readonly dataSource: DataSource,
     private readonly encryptionService: AiEncryptionService,
     private readonly providerFactory: AiProviderFactory,
     private readonly usageService: AiUsageService,
@@ -116,17 +116,21 @@ export class AiService {
   }
 
   async getConfigs(userId: string): Promise<AiProviderConfigResponse[]> {
-    const configs = await this.configRepository.find({
-      where: { userId },
-      order: { priority: "ASC", createdAt: "ASC" },
-    });
+    const configs = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AiProviderConfig).find({
+        where: { userId },
+        order: { priority: "ASC", createdAt: "ASC" },
+      }),
+    );
     return configs.map((c) => this.toResponseDto(c));
   }
 
   async getConfig(userId: string, configId: string): Promise<AiProviderConfig> {
-    const config = await this.configRepository.findOne({
-      where: { id: configId, userId },
-    });
+    const config = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AiProviderConfig).findOne({
+        where: { id: configId, userId },
+      }),
+    );
     if (!config) {
       throw new NotFoundException(
         tr(
@@ -148,46 +152,53 @@ export class AiService {
       await this.validateBaseUrl(dto.baseUrl, dto.provider);
     }
 
-    const existingCount = await this.configRepository.count({
-      where: { userId },
-    });
-    if (existingCount >= this.maxProvidersPerUser) {
-      throw new BadRequestException(
-        tr(
-          "errors.ai.maxProvidersExceeded",
-          `Maximum of ${this.maxProvidersPerUser} AI provider configurations per user`,
-          { maxProvidersPerUser: this.maxProvidersPerUser },
-        ),
-      );
-    }
+    // One transaction: the per-user cap is a read-modify-write, so counting on
+    // one connection and inserting on another would let two concurrent creates
+    // both pass the check.
+    const saved = await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(AiProviderConfig);
 
-    const config = this.configRepository.create({
-      userId,
-      provider: dto.provider,
-      displayName: dto.displayName || null,
-      model: dto.model || null,
-      baseUrl: dto.baseUrl || null,
-      priority: dto.priority ?? 0,
-      config: dto.config || {},
-      inputCostPer1M: dto.inputCostPer1M ?? null,
-      outputCostPer1M: dto.outputCostPer1M ?? null,
-      costCurrency: dto.costCurrency || "USD",
-      isActive: true,
-    });
-
-    if (dto.apiKey) {
-      if (!this.encryptionService.isConfigured()) {
+      const existingCount = await repo.count({
+        where: { userId },
+      });
+      if (existingCount >= this.maxProvidersPerUser) {
         throw new BadRequestException(
           tr(
-            "errors.ai.encryptionKeyNotConfigured",
-            "AI_ENCRYPTION_KEY is not configured. Cannot store API keys securely.",
+            "errors.ai.maxProvidersExceeded",
+            `Maximum of ${this.maxProvidersPerUser} AI provider configurations per user`,
+            { maxProvidersPerUser: this.maxProvidersPerUser },
           ),
         );
       }
-      config.apiKeyEnc = this.encryptionService.encrypt(dto.apiKey);
-    }
 
-    const saved = await this.configRepository.save(config);
+      const config = repo.create({
+        userId,
+        provider: dto.provider,
+        displayName: dto.displayName || null,
+        model: dto.model || null,
+        baseUrl: dto.baseUrl || null,
+        priority: dto.priority ?? 0,
+        config: dto.config || {},
+        inputCostPer1M: dto.inputCostPer1M ?? null,
+        outputCostPer1M: dto.outputCostPer1M ?? null,
+        costCurrency: dto.costCurrency || "USD",
+        isActive: true,
+      });
+
+      if (dto.apiKey) {
+        if (!this.encryptionService.isConfigured()) {
+          throw new BadRequestException(
+            tr(
+              "errors.ai.encryptionKeyNotConfigured",
+              "AI_ENCRYPTION_KEY is not configured. Cannot store API keys securely.",
+            ),
+          );
+        }
+        config.apiKeyEnc = this.encryptionService.encrypt(dto.apiKey);
+      }
+
+      return repo.save(config);
+    });
     return this.toResponseDto(saved);
   }
 
@@ -233,13 +244,18 @@ export class AiService {
       }
     }
 
-    const saved = await this.configRepository.save(config);
+    const saved = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AiProviderConfig).save(config),
+    );
     return this.toResponseDto(saved);
   }
 
   async deleteConfig(userId: string, configId: string): Promise<void> {
-    const config = await this.getConfig(userId, configId);
-    await this.configRepository.remove(config);
+    // Read-modify-write: the ownership check and the delete are one unit.
+    await withScopedDb(this.dataSource, async (manager) => {
+      const config = await this.getConfig(userId, configId);
+      await manager.getRepository(AiProviderConfig).remove(config);
+    });
   }
 
   async testConnection(
@@ -548,10 +564,12 @@ export class AiService {
   }
 
   async getStatus(userId: string): Promise<AiStatusResponse> {
-    const configs = await this.configRepository.find({
-      where: { userId, isActive: true },
-      order: { priority: "ASC" },
-    });
+    const configs = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AiProviderConfig).find({
+        where: { userId, isActive: true },
+        order: { priority: "ASC" },
+      }),
+    );
 
     const defaultConfig = this.buildDefaultConfig(userId);
     const hasSystemDefault = defaultConfig !== null;
@@ -592,10 +610,12 @@ export class AiService {
   }
 
   private async getActiveConfigs(userId: string): Promise<AiProviderConfig[]> {
-    const userConfigs = await this.configRepository.find({
-      where: { userId, isActive: true },
-      order: { priority: "ASC" },
-    });
+    const userConfigs = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AiProviderConfig).find({
+        where: { userId, isActive: true },
+        order: { priority: "ASC" },
+      }),
+    );
 
     if (userConfigs.length > 0) {
       return userConfigs;

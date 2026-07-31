@@ -1,8 +1,13 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { AiUsageService } from "./ai-usage.service";
 import { AiUsageLog } from "./entities/ai-usage-log.entity";
 import { AiProviderConfig } from "./entities/ai-provider-config.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("AiUsageService", () => {
   let service: AiUsageService;
@@ -49,12 +54,11 @@ describe("AiUsageService", () => {
       providers: [
         AiUsageService,
         {
-          provide: getRepositoryToken(AiUsageLog),
-          useValue: mockRepository,
-        },
-        {
-          provide: getRepositoryToken(AiProviderConfig),
-          useValue: mockConfigRepository,
+          provide: DataSource,
+          useValue: createScopedDbMocks([
+            [AiUsageLog, mockRepository],
+            [AiProviderConfig, mockConfigRepository],
+          ]).dataSource,
         },
       ],
     }).compile();

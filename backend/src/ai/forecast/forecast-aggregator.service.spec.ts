@@ -1,10 +1,17 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { ForecastAggregatorService } from "./forecast-aggregator.service";
 import { Transaction } from "../../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
 import { AccountsService } from "../../accounts/accounts.service";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
+import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+
+jest.mock("../../common/db/scoped-db", () =>
+  jest
+    .requireActual("../../test-helpers/scoped-db-testing")
+    .scopedDbMockModule(),
+);
 
 describe("ForecastAggregatorService", () => {
   let service: ForecastAggregatorService;
@@ -70,12 +77,11 @@ describe("ForecastAggregatorService", () => {
       providers: [
         ForecastAggregatorService,
         {
-          provide: getRepositoryToken(Transaction),
-          useValue: mockTransactionRepo,
-        },
-        {
-          provide: getRepositoryToken(ScheduledTransaction),
-          useValue: mockScheduledTransactionRepo,
+          provide: DataSource,
+          useValue: createScopedDbMocks([
+            [Transaction, mockTransactionRepo],
+            [ScheduledTransaction, mockScheduledTransactionRepo],
+          ]).dataSource,
         },
         {
           provide: AccountsService,

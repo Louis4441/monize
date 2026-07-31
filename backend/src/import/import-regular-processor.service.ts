@@ -64,7 +64,7 @@ export class ImportRegularProcessorService {
 
     // Create transaction (use canonical payee name if alias-matched)
     const isTransfer = !isSplit && (qifTx.isTransfer || isLoanPaymentTx);
-    const transaction = ctx.queryRunner.manager.create(Transaction, {
+    const transaction = ctx.manager.create(Transaction, {
       userId: ctx.userId,
       accountId: ctx.accountId,
       transactionDate: qifTx.date,
@@ -81,7 +81,7 @@ export class ImportRegularProcessorService {
       createdAt: baseTime,
     });
 
-    const savedTx = await ctx.queryRunner.manager.save(transaction);
+    const savedTx = await ctx.manager.save(transaction);
 
     // Assign tags to the transaction
     await this.assignTransactionTags(ctx, savedTx.id, qifTx.tagNames);
@@ -92,7 +92,7 @@ export class ImportRegularProcessorService {
     }
 
     // Update account balance
-    await updateAccountBalance(ctx.queryRunner, ctx.accountId, qifTx.amount);
+    await updateAccountBalance(ctx.manager, ctx.accountId, qifTx.amount);
 
     // Handle non-split transfers
     if (isTransfer && transferAccountId) {
@@ -152,7 +152,7 @@ export class ImportRegularProcessorService {
         }
       }
       if (mappedTransferAccountId) {
-        const existingCount = await ctx.queryRunner.manager
+        const existingCount = await ctx.manager
           .createQueryBuilder(Transaction, "t")
           .innerJoin(
             Transaction,
@@ -187,7 +187,7 @@ export class ImportRegularProcessorService {
 
     // Check for split-linked transfers (same counting approach)
     if (qifTx.isTransfer) {
-      const existingCount = await ctx.queryRunner.manager
+      const existingCount = await ctx.manager
         .createQueryBuilder(Transaction, "t")
         .innerJoin(
           TransactionSplit,
@@ -234,7 +234,7 @@ export class ImportRegularProcessorService {
           parentId: string;
           totalAmount: string;
           splitCount: string;
-        }> = await ctx.queryRunner.manager
+        }> = await ctx.manager
           .createQueryBuilder(Transaction, "t")
           .innerJoin(
             TransactionSplit,
@@ -285,7 +285,7 @@ export class ImportRegularProcessorService {
     if (!mappedTransferAccountId) return false;
 
     const expectedSign = qifTx.amount >= 0 ? 1 : -1;
-    const pendingTransfer = await ctx.queryRunner.manager
+    const pendingTransfer = await ctx.manager
       .createQueryBuilder(Transaction, "t")
       .leftJoinAndSelect("t.linkedTransaction", "linked")
       .where("t.user_id = :userId", { userId: ctx.userId })
@@ -309,7 +309,7 @@ export class ImportRegularProcessorService {
     const newAmount = qifTx.amount;
     const balanceDiff = newAmount - oldAmount;
 
-    await ctx.queryRunner.manager.update(Transaction, pendingTransfer.id, {
+    await ctx.manager.update(Transaction, pendingTransfer.id, {
       amount: newAmount,
       description: qifTx.memo || null,
       payeeName: qifTx.payee || pendingTransfer.payeeName,
@@ -317,7 +317,7 @@ export class ImportRegularProcessorService {
     });
 
     if (balanceDiff !== 0) {
-      await updateAccountBalance(ctx.queryRunner, ctx.accountId, balanceDiff);
+      await updateAccountBalance(ctx.manager, ctx.accountId, balanceDiff);
     }
 
     return true;
@@ -335,7 +335,7 @@ export class ImportRegularProcessorService {
       return { payeeId: null, payeeName: null, defaultCategoryId: null };
 
     // 1. Check for exact name match
-    const existingPayee = await ctx.queryRunner.manager.findOne(Payee, {
+    const existingPayee = await ctx.manager.findOne(Payee, {
       where: { userId: ctx.userId, name: qifTx.payee },
     });
     if (existingPayee) {
@@ -347,7 +347,7 @@ export class ImportRegularProcessorService {
     }
 
     // 2. Check for alias match (case-insensitive, supports wildcards)
-    const aliases = await ctx.queryRunner.manager.find(PayeeAlias, {
+    const aliases = await ctx.manager.find(PayeeAlias, {
       where: { userId: ctx.userId },
       relations: ["payee"],
     });
@@ -366,11 +366,11 @@ export class ImportRegularProcessorService {
     }
 
     // 3. No match found - create new payee
-    const newPayee = ctx.queryRunner.manager.create(Payee, {
+    const newPayee = ctx.manager.create(Payee, {
       userId: ctx.userId,
       name: qifTx.payee,
     });
-    const savedPayee = await ctx.queryRunner.manager.save(newPayee);
+    const savedPayee = await ctx.manager.save(newPayee);
     ctx.importResult.payeesCreated++;
     return {
       payeeId: savedPayee.id,
@@ -489,21 +489,16 @@ export class ImportRegularProcessorService {
         }
       }
 
-      const transactionSplit = ctx.queryRunner.manager.create(
-        TransactionSplit,
-        {
-          transactionId: savedTx.id,
-          kind: splitTransferAccountId
-            ? SplitKind.TRANSFER
-            : SplitKind.CATEGORY,
-          categoryId: splitTransferAccountId ? null : splitCategoryId,
-          transferAccountId: splitTransferAccountId,
-          amount: split.amount,
-          memo: split.memo,
-        },
-      );
+      const transactionSplit = ctx.manager.create(TransactionSplit, {
+        transactionId: savedTx.id,
+        kind: splitTransferAccountId ? SplitKind.TRANSFER : SplitKind.CATEGORY,
+        categoryId: splitTransferAccountId ? null : splitCategoryId,
+        transferAccountId: splitTransferAccountId,
+        amount: split.amount,
+        memo: split.memo,
+      });
 
-      const savedSplit = await ctx.queryRunner.manager.save(transactionSplit);
+      const savedSplit = await ctx.manager.save(transactionSplit);
 
       // Assign tags to the split
       await this.assignSplitTags(ctx, savedSplit.id, split.tagNames);
@@ -546,7 +541,7 @@ export class ImportRegularProcessorService {
     // (non-split) placeholder in the current account. This prevents stealing
     // a linked transaction that already belongs to another split parent
     // transaction imported earlier in the same block.
-    const existingLinkedTx = await ctx.queryRunner.manager
+    const existingLinkedTx = await ctx.manager
       .createQueryBuilder(Transaction, "t")
       .leftJoin(
         Transaction,
@@ -578,7 +573,7 @@ export class ImportRegularProcessorService {
 
     // Check for pending cross-currency transfer
     const expectedSign = linkedAmount >= 0 ? 1 : -1;
-    const pendingTransfer = await ctx.queryRunner.manager
+    const pendingTransfer = await ctx.manager
       .createQueryBuilder(Transaction, "t")
       .where("t.user_id = :userId", { userId: ctx.userId })
       .andWhere("t.account_id = :accountId", {
@@ -597,19 +592,19 @@ export class ImportRegularProcessorService {
       const oldAmount = Number(pendingTransfer.amount);
       const balanceDiff = linkedAmount - oldAmount;
 
-      await ctx.queryRunner.manager.update(Transaction, pendingTransfer.id, {
+      await ctx.manager.update(Transaction, pendingTransfer.id, {
         amount: linkedAmount,
         description: split.memo || qifTx.memo || null,
         linkedTransactionId: savedTx.id,
       });
 
-      await ctx.queryRunner.manager.update(TransactionSplit, savedSplit.id, {
+      await ctx.manager.update(TransactionSplit, savedSplit.id, {
         linkedTransactionId: pendingTransfer.id,
       });
 
       if (balanceDiff !== 0) {
         await updateAccountBalance(
-          ctx.queryRunner,
+          ctx.manager,
           splitTransferAccountId,
           balanceDiff,
         );
@@ -618,7 +613,7 @@ export class ImportRegularProcessorService {
     }
 
     // Create new linked transaction
-    const linkedSplitTx = ctx.queryRunner.manager.create(Transaction, {
+    const linkedSplitTx = ctx.manager.create(Transaction, {
       userId: ctx.userId,
       accountId: splitTransferAccountId,
       transactionDate: qifTx.date,
@@ -633,19 +628,18 @@ export class ImportRegularProcessorService {
       createdAt: new Date(baseTime.getTime() + 0.1),
     });
 
-    const savedLinkedSplitTx =
-      await ctx.queryRunner.manager.save(linkedSplitTx);
+    const savedLinkedSplitTx = await ctx.manager.save(linkedSplitTx);
 
-    await ctx.queryRunner.manager.update(TransactionSplit, savedSplit.id, {
+    await ctx.manager.update(TransactionSplit, savedSplit.id, {
       linkedTransactionId: savedLinkedSplitTx.id,
     });
 
-    await ctx.queryRunner.manager.update(Transaction, savedLinkedSplitTx.id, {
+    await ctx.manager.update(Transaction, savedLinkedSplitTx.id, {
       linkedTransactionId: savedTx.id,
     });
 
     await updateAccountBalance(
-      ctx.queryRunner,
+      ctx.manager,
       splitTransferAccountId,
       linkedAmount,
     );
@@ -657,19 +651,19 @@ export class ImportRegularProcessorService {
     savedSplit: TransactionSplit,
     existingLinkedTx: Transaction,
   ): Promise<void> {
-    await ctx.queryRunner.manager.update(TransactionSplit, savedSplit.id, {
+    await ctx.manager.update(TransactionSplit, savedSplit.id, {
       linkedTransactionId: existingLinkedTx.id,
     });
 
     if (!existingLinkedTx.linkedTransactionId) {
-      await ctx.queryRunner.manager.update(Transaction, existingLinkedTx.id, {
+      await ctx.manager.update(Transaction, existingLinkedTx.id, {
         linkedTransactionId: savedTx.id,
       });
     }
 
     // Clean up placeholder transactions
     if (existingLinkedTx.linkedTransactionId) {
-      const placeholderTx = await ctx.queryRunner.manager.findOne(Transaction, {
+      const placeholderTx = await ctx.manager.findOne(Transaction, {
         where: {
           id: existingLinkedTx.linkedTransactionId,
           accountId: ctx.accountId,
@@ -677,12 +671,12 @@ export class ImportRegularProcessorService {
       });
       if (placeholderTx && placeholderTx.id !== savedTx.id) {
         await updateAccountBalance(
-          ctx.queryRunner,
+          ctx.manager,
           ctx.accountId,
           -Number(placeholderTx.amount),
         );
-        await ctx.queryRunner.manager.delete(Transaction, placeholderTx.id);
-        await ctx.queryRunner.manager.update(Transaction, existingLinkedTx.id, {
+        await ctx.manager.delete(Transaction, placeholderTx.id);
+        await ctx.manager.update(Transaction, existingLinkedTx.id, {
           linkedTransactionId: null,
         });
       }
@@ -699,11 +693,11 @@ export class ImportRegularProcessorService {
     for (const name of tagNames) {
       const tagId = ctx.tagMap.get(name.toLowerCase());
       if (tagId) {
-        const txTag = ctx.queryRunner.manager.create(TransactionTag, {
+        const txTag = ctx.manager.create(TransactionTag, {
           transactionId,
           tagId,
         });
-        await ctx.queryRunner.manager.save(txTag);
+        await ctx.manager.save(txTag);
       }
     }
   }
@@ -718,11 +712,11 @@ export class ImportRegularProcessorService {
     for (const name of tagNames) {
       const tagId = ctx.tagMap.get(name.toLowerCase());
       if (tagId) {
-        const splitTag = ctx.queryRunner.manager.create(TransactionSplitTag, {
+        const splitTag = ctx.manager.create(TransactionSplitTag, {
           transactionSplitId: splitId,
           tagId,
         });
-        await ctx.queryRunner.manager.save(splitTag);
+        await ctx.manager.save(splitTag);
       }
     }
   }
@@ -740,7 +734,7 @@ export class ImportRegularProcessorService {
     const PENDING_IMPORT_NOTE =
       "⚠️ PENDING IMPORT: Amount may need adjustment when importing the other account.";
 
-    const targetAccount = await ctx.queryRunner.manager.findOne(Account, {
+    const targetAccount = await ctx.manager.findOne(Account, {
       where: { id: transferAccountId },
     });
 
@@ -751,7 +745,7 @@ export class ImportRegularProcessorService {
     let existingPendingTransfer: Transaction | null = null;
     if (isCrossCurrency) {
       const expectedSign = qifTx.amount < 0 ? 1 : -1;
-      existingPendingTransfer = await ctx.queryRunner.manager
+      existingPendingTransfer = await ctx.manager
         .createQueryBuilder(Transaction, "t")
         .where("t.user_id = :userId", { userId: ctx.userId })
         .andWhere("t.account_id = :accountId", {
@@ -771,17 +765,13 @@ export class ImportRegularProcessorService {
       const linkedPayeeName = isLoanPaymentTx
         ? qifTx.payee || `Loan Payment from ${ctx.account.name}`
         : qifTx.payee || `Transfer from ${ctx.account.name}`;
-      await ctx.queryRunner.manager.update(
-        Transaction,
-        existingPendingTransfer.id,
-        {
-          linkedTransactionId: savedTx.id,
-          payeeName: linkedPayeeName,
-          description: qifTx.memo || null,
-        },
-      );
+      await ctx.manager.update(Transaction, existingPendingTransfer.id, {
+        linkedTransactionId: savedTx.id,
+        payeeName: linkedPayeeName,
+        description: qifTx.memo || null,
+      });
 
-      await ctx.queryRunner.manager.update(Transaction, savedTx.id, {
+      await ctx.manager.update(Transaction, savedTx.id, {
         linkedTransactionId: existingPendingTransfer.id,
       });
       return;
@@ -797,7 +787,7 @@ export class ImportRegularProcessorService {
     const linkedPayeeName = isLoanPaymentTx
       ? qifTx.payee || `Loan Payment from ${ctx.account.name}`
       : qifTx.payee || `Transfer from ${ctx.account.name}`;
-    const linkedTx = ctx.queryRunner.manager.create(Transaction, {
+    const linkedTx = ctx.manager.create(Transaction, {
       userId: ctx.userId,
       accountId: transferAccountId,
       transactionDate: qifTx.date,
@@ -812,16 +802,12 @@ export class ImportRegularProcessorService {
       createdAt: linkedTime,
     });
 
-    const savedLinkedTx = await ctx.queryRunner.manager.save(linkedTx);
+    const savedLinkedTx = await ctx.manager.save(linkedTx);
 
-    await ctx.queryRunner.manager.update(Transaction, savedTx.id, {
+    await ctx.manager.update(Transaction, savedTx.id, {
       linkedTransactionId: savedLinkedTx.id,
     });
 
-    await updateAccountBalance(
-      ctx.queryRunner,
-      transferAccountId,
-      linkedAmount,
-    );
+    await updateAccountBalance(ctx.manager, transferAccountId, linkedAmount);
   }
 }

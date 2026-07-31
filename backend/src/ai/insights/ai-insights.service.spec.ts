@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { NotFoundException } from "@nestjs/common";
 import { AiInsightsService } from "./ai-insights.service";
 import { AiInsight } from "../entities/ai-insight.entity";
@@ -11,11 +11,19 @@ import {
 } from "./insights-aggregator.service";
 import { ConfigService } from "@nestjs/config";
 import { UserPreference } from "../../users/entities/user-preference.entity";
+import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+
+jest.mock("../../common/db/scoped-db", () =>
+  jest
+    .requireActual("../../test-helpers/scoped-db-testing")
+    .scopedDbMockModule(),
+);
 
 describe("AiInsightsService", () => {
   let service: AiInsightsService;
 
   let mockInsightRepo: Record<string, any>;
+  let scoped: ReturnType<typeof createScopedDbMocks>;
   let mockPrefRepo: Record<string, jest.Mock>;
   let mockAiService: Partial<Record<keyof AiService, jest.Mock>>;
   let mockUsageService: Partial<Record<keyof AiUsageService, jest.Mock>>;
@@ -104,20 +112,25 @@ describe("AiInsightsService", () => {
       update: jest.fn().mockResolvedValue({ affected: 1 }),
       delete: jest.fn().mockResolvedValue({ affected: 0 }),
       remove: jest.fn().mockResolvedValue(undefined),
-      manager: {
-        createQueryBuilder: jest.fn().mockReturnValue({
-          select: jest.fn().mockReturnThis(),
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          andWhere: jest.fn().mockReturnThis(),
-          getRawMany: jest.fn().mockResolvedValue([]),
-        }),
-      },
     };
 
     mockPrefRepo = {
       findOne: jest.fn().mockResolvedValue({ defaultCurrency: "USD" }),
     };
+
+    scoped = createScopedDbMocks([
+      [AiInsight, mockInsightRepo],
+      [UserPreference, mockPrefRepo],
+    ]);
+    // The cross-user "who to generate for" sweep builds its query straight off
+    // the scoped transaction's EntityManager, not off a repository.
+    scoped.manager.createQueryBuilder.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([]),
+    });
 
     mockAiService = {
       complete: jest.fn().mockResolvedValue({
@@ -148,12 +161,8 @@ describe("AiInsightsService", () => {
       providers: [
         AiInsightsService,
         {
-          provide: getRepositoryToken(AiInsight),
-          useValue: mockInsightRepo,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: mockPrefRepo,
+          provide: DataSource,
+          useValue: scoped.dataSource,
         },
         { provide: AiService, useValue: mockAiService },
         { provide: AiUsageService, useValue: mockUsageService },
@@ -1145,7 +1154,7 @@ describe("AiInsightsService", () => {
         andWhere: jest.fn().mockReturnThis(),
         getRawMany: jest.fn().mockResolvedValue([]),
       };
-      mockInsightRepo.manager.createQueryBuilder.mockReturnValue(managerQb);
+      scoped.manager.createQueryBuilder.mockReturnValue(managerQb);
 
       await service.handleDailyInsightGeneration();
 

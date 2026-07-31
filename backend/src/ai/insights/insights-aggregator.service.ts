@@ -1,8 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../../common/db/scoped-db";
 import { Transaction } from "../../transactions/entities/transaction.entity";
-import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
 import { RecurringCharge } from "../../transactions/recurring-charges.util";
 
@@ -44,10 +43,7 @@ export class InsightsAggregatorService {
   private readonly logger = new Logger(InsightsAggregatorService.name);
 
   constructor(
-    @InjectRepository(Transaction)
-    private readonly transactionRepo: Repository<Transaction>,
-    @InjectRepository(ScheduledTransaction)
-    private readonly scheduledTransactionRepo: Repository<ScheduledTransaction>,
+    private readonly dataSource: DataSource,
     private readonly transactionAnalytics: TransactionAnalyticsService,
   ) {}
 
@@ -143,39 +139,42 @@ export class InsightsAggregatorService {
       .toISOString()
       .substring(0, 10);
 
-    const rows = await this.transactionRepo
-      .createQueryBuilder("t")
-      .innerJoin("t.category", "cat")
-      .select("cat.name", "categoryName")
-      .addSelect("cat.id", "categoryId")
-      .addSelect("SUM(ABS(t.amount))", "total")
-      .addSelect("COUNT(*)", "txnCount")
-      .addSelect(
-        `SUM(CASE WHEN t.transactionDate >= :currentMonthStart THEN ABS(t.amount) ELSE 0 END)`,
-        "currentMonthTotal",
-      )
-      .addSelect(
-        `SUM(CASE WHEN t.transactionDate >= :previousMonthStart AND t.transactionDate <= :previousMonthEnd THEN ABS(t.amount) ELSE 0 END)`,
-        "previousMonthTotal",
-      )
-      .addSelect(
-        `COUNT(DISTINCT TO_CHAR(t.transactionDate, 'YYYY-MM'))`,
-        "monthCount",
-      )
-      .where("t.userId = :userId", { userId })
-      .andWhere("t.transactionDate >= :startDate", { startDate })
-      .andWhere("t.transactionDate <= :endDate", { endDate })
-      .andWhere("t.amount < 0")
-      .andWhere("t.status != 'VOID'")
-      .andWhere("t.isTransfer = false")
-      .andWhere("t.parentTransactionId IS NULL")
-      .setParameter("currentMonthStart", currentMonthStart)
-      .setParameter("previousMonthStart", previousMonthStart)
-      .setParameter("previousMonthEnd", previousMonthEnd)
-      .groupBy("cat.id")
-      .addGroupBy("cat.name")
-      .orderBy("total", "DESC")
-      .getRawMany();
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager
+        .getRepository(Transaction)
+        .createQueryBuilder("t")
+        .innerJoin("t.category", "cat")
+        .select("cat.name", "categoryName")
+        .addSelect("cat.id", "categoryId")
+        .addSelect("SUM(ABS(t.amount))", "total")
+        .addSelect("COUNT(*)", "txnCount")
+        .addSelect(
+          `SUM(CASE WHEN t.transactionDate >= :currentMonthStart THEN ABS(t.amount) ELSE 0 END)`,
+          "currentMonthTotal",
+        )
+        .addSelect(
+          `SUM(CASE WHEN t.transactionDate >= :previousMonthStart AND t.transactionDate <= :previousMonthEnd THEN ABS(t.amount) ELSE 0 END)`,
+          "previousMonthTotal",
+        )
+        .addSelect(
+          `COUNT(DISTINCT TO_CHAR(t.transactionDate, 'YYYY-MM'))`,
+          "monthCount",
+        )
+        .where("t.userId = :userId", { userId })
+        .andWhere("t.transactionDate >= :startDate", { startDate })
+        .andWhere("t.transactionDate <= :endDate", { endDate })
+        .andWhere("t.amount < 0")
+        .andWhere("t.status != 'VOID'")
+        .andWhere("t.isTransfer = false")
+        .andWhere("t.parentTransactionId IS NULL")
+        .setParameter("currentMonthStart", currentMonthStart)
+        .setParameter("previousMonthStart", previousMonthStart)
+        .setParameter("previousMonthEnd", previousMonthEnd)
+        .groupBy("cat.id")
+        .addGroupBy("cat.name")
+        .orderBy("total", "DESC")
+        .getRawMany(),
+    );
 
     return rows.map((r) => ({
       categoryName: r.categoryName,
@@ -194,23 +193,26 @@ export class InsightsAggregatorService {
     startDate: string,
     endDate: string,
   ): Promise<MonthlySpending[]> {
-    const rows = await this.transactionRepo
-      .createQueryBuilder("t")
-      .innerJoin("t.category", "cat")
-      .select("TO_CHAR(t.transactionDate, 'YYYY-MM')", "month")
-      .addSelect("cat.name", "categoryName")
-      .addSelect("SUM(ABS(t.amount))", "total")
-      .where("t.userId = :userId", { userId })
-      .andWhere("t.transactionDate >= :startDate", { startDate })
-      .andWhere("t.transactionDate <= :endDate", { endDate })
-      .andWhere("t.amount < 0")
-      .andWhere("t.status != 'VOID'")
-      .andWhere("t.isTransfer = false")
-      .andWhere("t.parentTransactionId IS NULL")
-      .groupBy("TO_CHAR(t.transactionDate, 'YYYY-MM')")
-      .addGroupBy("cat.name")
-      .orderBy("month", "ASC")
-      .getRawMany();
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager
+        .getRepository(Transaction)
+        .createQueryBuilder("t")
+        .innerJoin("t.category", "cat")
+        .select("TO_CHAR(t.transactionDate, 'YYYY-MM')", "month")
+        .addSelect("cat.name", "categoryName")
+        .addSelect("SUM(ABS(t.amount))", "total")
+        .where("t.userId = :userId", { userId })
+        .andWhere("t.transactionDate >= :startDate", { startDate })
+        .andWhere("t.transactionDate <= :endDate", { endDate })
+        .andWhere("t.amount < 0")
+        .andWhere("t.status != 'VOID'")
+        .andWhere("t.isTransfer = false")
+        .andWhere("t.parentTransactionId IS NULL")
+        .groupBy("TO_CHAR(t.transactionDate, 'YYYY-MM')")
+        .addGroupBy("cat.name")
+        .orderBy("month", "ASC")
+        .getRawMany(),
+    );
 
     const monthMap = new Map<
       string,

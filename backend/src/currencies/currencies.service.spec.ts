@@ -1,6 +1,6 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import {
   ConflictException,
   NotFoundException,
@@ -9,6 +9,10 @@ import {
 import { CurrenciesService } from "./currencies.service";
 import { Currency } from "./entities/currency.entity";
 import { UserCurrencyPreference } from "./entities/user-currency-preference.entity";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("CurrenciesService", () => {
   let service: CurrenciesService;
@@ -45,21 +49,19 @@ describe("CurrenciesService", () => {
       delete: jest.fn(),
     };
 
-    mockDataSource = {
-      query: jest.fn(),
-    };
+    // Raw SQL now runs on the scoped transaction's EntityManager, so point the
+    // spec's `mockDataSource.query` at the manager's jest.fn -- the assertions
+    // below keep watching the same statements they always did.
+    const scoped = createScopedDbMocks([
+      [Currency, mockCurrencyRepo as Record<string, jest.Mock>],
+      [UserCurrencyPreference, mockPrefRepo as Record<string, jest.Mock>],
+    ]);
+    scoped.dataSource.query = scoped.manager.query;
+    mockDataSource = scoped.dataSource as unknown as { query: jest.Mock };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CurrenciesService,
-        {
-          provide: getRepositoryToken(Currency),
-          useValue: mockCurrencyRepo,
-        },
-        {
-          provide: getRepositoryToken(UserCurrencyPreference),
-          useValue: mockPrefRepo,
-        },
         {
           provide: DataSource,
           useValue: mockDataSource,

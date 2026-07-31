@@ -7,8 +7,9 @@ import {
   OnApplicationBootstrap,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
+import { withSystemContext } from "../common/db/with-context";
 import { Currency } from "./entities/currency.entity";
 import { UserCurrencyPreference } from "./entities/user-currency-preference.entity";
 import { CreateCurrencyDto } from "./dto/create-currency.dto";
@@ -50,13 +51,7 @@ const DEFAULT_CURRENCY_CODE = "USD";
 export class CurrenciesService implements OnApplicationBootstrap {
   private readonly logger = new Logger(CurrenciesService.name);
 
-  constructor(
-    @InjectRepository(Currency)
-    private currencyRepository: Repository<Currency>,
-    @InjectRepository(UserCurrencyPreference)
-    private userCurrencyPrefRepository: Repository<UserCurrencyPreference>,
-    private dataSource: DataSource,
-  ) {}
+  constructor(private dataSource: DataSource) {}
 
   /**
    * Currencies are created on demand rather than pre-seeded, but a brand-new
@@ -64,10 +59,16 @@ export class CurrenciesService implements OnApplicationBootstrap {
    * writes user_preferences.default_currency = 'USD', which has a foreign key to
    * currencies(code). Guarantee that single currency on startup so the first
    * user can register before anyone picks a currency at onboarding. Idempotent.
+   *
+   * RLS: this is a bootstrap hook, so there is no request/user context for
+   * `withScopedDb` to spend -- and the row it writes is a system currency owned
+   * by nobody. It runs under `withSystemContext`, like the seeders (C3).
    */
   async onApplicationBootstrap(): Promise<void> {
     try {
-      await this.ensureSystemCurrency(DEFAULT_CURRENCY_CODE);
+      await withSystemContext(() =>
+        this.ensureSystemCurrency(DEFAULT_CURRENCY_CODE),
+      );
     } catch (err) {
       this.logger.warn(
         `Could not ensure default currency ${DEFAULT_CURRENCY_CODE} on startup: ${err?.message ?? err}`,
@@ -81,15 +82,32 @@ export class CurrenciesService implements OnApplicationBootstrap {
   ): Promise<UserCurrencyView> {
     const code = dto.code.toUpperCase();
 
-    const existing = await this.currencyRepository.findOne({
+    // One transaction: every branch below is "look, then insert", so splitting
+    // the read from the write would let a concurrent request slip between them.
+    return withScopedDb(this.dataSource, async (manager) =>
+      this.createWithin(manager, userId, dto, code),
+    );
+  }
+
+  private async createWithin(
+    manager: EntityManager,
+    userId: string,
+    dto: CreateCurrencyDto,
+    code: string,
+  ): Promise<UserCurrencyView> {
+    const currencyRepo = manager.getRepository(Currency);
+
+    const existing = await currencyRepo.findOne({
       where: { code },
     });
 
     if (existing) {
       // Check if this user already has this currency in their list
-      const existingPref = await this.userCurrencyPrefRepository.findOne({
-        where: { userId, currencyCode: code },
-      });
+      const existingPref = await manager
+        .getRepository(UserCurrencyPreference)
+        .findOne({
+          where: { userId, currencyCode: code },
+        });
       if (existingPref) {
         // Distinguish an already-active currency from one the user previously
         // deactivated: the inactive case ships a machine-readable `errorCode`
@@ -116,7 +134,7 @@ export class CurrenciesService implements OnApplicationBootstrap {
       }
 
       // Add preference row so user can see/use the existing currency
-      await this.dataSource.query(
+      await manager.query(
         `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
          VALUES ($1, $2, true)
          ON CONFLICT (user_id, currency_code) DO NOTHING`,
@@ -127,17 +145,17 @@ export class CurrenciesService implements OnApplicationBootstrap {
     }
 
     // Currency doesn't exist — create it as a user-created currency
-    const currency = this.currencyRepository.create({
+    const currency = currencyRepo.create({
       ...dto,
       code,
       decimalPlaces: dto.decimalPlaces ?? 2,
       isActive: true,
       createdByUserId: userId,
     });
-    await this.currencyRepository.save(currency);
+    await currencyRepo.save(currency);
 
     // Add preference row for the creator
-    await this.dataSource.query(
+    await manager.query(
       `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
        VALUES ($1, $2, true)
        ON CONFLICT (user_id, currency_code) DO NOTHING`,
@@ -168,28 +186,31 @@ export class CurrenciesService implements OnApplicationBootstrap {
 
     query += ` ORDER BY c.code ASC`;
 
-    const rows: UserCurrencyView[] = await this.dataSource.query(query, [
-      userId,
-    ]);
+    // One transaction around the whole block: the lazy-create fallback re-runs
+    // the same query and must see the row it just wrote. The nested
+    // `ensureSystemCurrency` joins this transaction (scoped-db re-entrancy).
+    return withScopedDb(this.dataSource, async (manager) => {
+      const rows: UserCurrencyView[] = await manager.query(query, [userId]);
 
-    // A fresh instance no longer pre-seeds a list of currencies; the user's
-    // chosen currency is created when they pick it at onboarding. If they
-    // skipped onboarding this list is empty on first use, so lazily create
-    // their default-preference currency (with a proper symbol) here.
-    if (rows.length === 0) {
-      const prefRows: Array<{ default_currency: string | null }> =
-        await this.dataSource.query(
-          `SELECT default_currency FROM user_preferences WHERE user_id = $1`,
-          [userId],
-        );
-      const defaultCurrency = prefRows[0]?.default_currency;
-      if (defaultCurrency) {
-        await this.ensureSystemCurrency(defaultCurrency);
-        return this.dataSource.query(query, [userId]);
+      // A fresh instance no longer pre-seeds a list of currencies; the user's
+      // chosen currency is created when they pick it at onboarding. If they
+      // skipped onboarding this list is empty on first use, so lazily create
+      // their default-preference currency (with a proper symbol) here.
+      if (rows.length === 0) {
+        const prefRows: Array<{ default_currency: string | null }> =
+          await manager.query(
+            `SELECT default_currency FROM user_preferences WHERE user_id = $1`,
+            [userId],
+          );
+        const defaultCurrency = prefRows[0]?.default_currency;
+        if (defaultCurrency) {
+          await this.ensureSystemCurrency(defaultCurrency);
+          return manager.query(query, [userId]);
+        }
       }
-    }
 
-    return rows;
+      return rows;
+    });
   }
 
   /**
@@ -209,24 +230,28 @@ export class CurrenciesService implements OnApplicationBootstrap {
    */
   async ensureSystemCurrency(code: string): Promise<void> {
     const upper = code.toUpperCase();
-    const existing = await this.currencyRepository.findOne({
-      where: { code: upper },
-    });
-    if (existing) return;
+    await withScopedDb(this.dataSource, async (manager) => {
+      const existing = await manager.getRepository(Currency).findOne({
+        where: { code: upper },
+      });
+      if (existing) return;
 
-    const meta = resolveCurrencyMetadata(upper);
-    await this.dataSource.query(
-      `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
+      const meta = resolveCurrencyMetadata(upper);
+      await manager.query(
+        `INSERT INTO currencies (code, name, symbol, decimal_places, is_active, created_by_user_id)
        VALUES ($1, $2, $3, $4, true, NULL)
        ON CONFLICT (code) DO NOTHING`,
-      [upper, meta.name, meta.symbol, meta.decimalPlaces],
-    );
+        [upper, meta.name, meta.symbol, meta.decimalPlaces],
+      );
+    });
   }
 
   async findOne(code: string): Promise<Currency> {
-    const currency = await this.currencyRepository.findOne({
-      where: { code: code.toUpperCase() },
-    });
+    const currency = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(Currency).findOne({
+        where: { code: code.toUpperCase() },
+      }),
+    );
     if (!currency) {
       throw new NotFoundException(
         tr("errors.currencies.notFound", `Currency "${code}" not found`, {
@@ -238,6 +263,19 @@ export class CurrenciesService implements OnApplicationBootstrap {
   }
 
   async update(
+    userId: string,
+    code: string,
+    dto: UpdateCurrencyDto,
+  ): Promise<UserCurrencyView> {
+    // Read-modify-write: the ownership check, the metadata save and the
+    // preference upsert are one unit. Nested calls join this transaction.
+    return withScopedDb(this.dataSource, (manager) =>
+      this.updateWithin(manager, userId, code, dto),
+    );
+  }
+
+  private async updateWithin(
+    manager: EntityManager,
     userId: string,
     code: string,
     dto: UpdateCurrencyDto,
@@ -269,14 +307,14 @@ export class CurrenciesService implements OnApplicationBootstrap {
 
     if (Object.keys(metadataUpdates).length > 0) {
       Object.assign(currency, metadataUpdates);
-      await this.currencyRepository.save(currency);
+      await manager.getRepository(Currency).save(currency);
     }
 
     if (isActive !== undefined) {
       await this.upsertPreference(userId, currency.code, isActive);
     }
 
-    const pref = await this.userCurrencyPrefRepository.findOne({
+    const pref = await manager.getRepository(UserCurrencyPreference).findOne({
       where: { userId, currencyCode: currency.code },
     });
 
@@ -299,6 +337,19 @@ export class CurrenciesService implements OnApplicationBootstrap {
   }
 
   async remove(userId: string, code: string): Promise<void> {
+    // The in-use checks and the two deletes are one read-modify-write: a
+    // concurrent account referencing the currency between them would strand a
+    // foreign key. Nested calls join this transaction.
+    await withScopedDb(this.dataSource, (manager) =>
+      this.removeWithin(manager, userId, code),
+    );
+  }
+
+  private async removeWithin(
+    manager: EntityManager,
+    userId: string,
+    code: string,
+  ): Promise<void> {
     const upperCode = code.toUpperCase();
     const currency = await this.findOne(upperCode);
 
@@ -314,15 +365,17 @@ export class CurrenciesService implements OnApplicationBootstrap {
       );
     }
 
+    const prefRepo = manager.getRepository(UserCurrencyPreference);
+
     // Remove this user's preference row
-    await this.userCurrencyPrefRepository.delete({
+    await prefRepo.delete({
       userId,
       currencyCode: upperCode,
     });
 
     // If non-system currency and no other users reference it, clean up the currency row
     if (currency.createdByUserId !== null) {
-      const remainingPrefs = await this.userCurrencyPrefRepository.count({
+      const remainingPrefs = await prefRepo.count({
         where: { currencyCode: upperCode },
       });
 
@@ -330,15 +383,16 @@ export class CurrenciesService implements OnApplicationBootstrap {
         // Also check no global references (accounts, securities, transactions from any user)
         const globallyInUse = await this.isInUseGlobally(upperCode);
         if (!globallyInUse) {
-          await this.currencyRepository.remove(currency);
+          await manager.getRepository(Currency).remove(currency);
         }
       }
     }
   }
 
   async isInUse(userId: string, code: string): Promise<boolean> {
-    const result = await this.dataSource.query(
-      `SELECT EXISTS (
+    const result = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `SELECT EXISTS (
         SELECT 1 FROM accounts WHERE currency_code = $1 AND user_id = $2
         UNION ALL SELECT 1 FROM securities WHERE currency_code = $1 AND user_id = $2
         UNION ALL SELECT 1 FROM transactions t
@@ -346,7 +400,8 @@ export class CurrenciesService implements OnApplicationBootstrap {
           WHERE t.currency_code = $1 AND a.user_id = $2
         UNION ALL SELECT 1 FROM user_preferences WHERE default_currency = $1 AND user_id = $2
       ) AS "inUse"`,
-      [code.toUpperCase(), userId],
+        [code.toUpperCase(), userId],
+      ),
     );
     return result[0]?.inUse === true;
   }
@@ -356,8 +411,9 @@ export class CurrenciesService implements OnApplicationBootstrap {
       code: string;
       accounts: string;
       securities: string;
-    }> = await this.dataSource.query(
-      `SELECT c.code,
+    }> = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `SELECT c.code,
         COALESCE(a.cnt, 0)::text AS accounts,
         COALESCE(s.cnt, 0)::text AS securities
       FROM currencies c
@@ -374,7 +430,8 @@ export class CurrenciesService implements OnApplicationBootstrap {
         GROUP BY currency_code
       ) s ON s.currency_code = c.code
       WHERE c.created_by_user_id IS NULL OR ucp.user_id IS NOT NULL`,
-      [userId],
+        [userId],
+      ),
     );
 
     const usage: CurrencyUsageMap = {};
@@ -465,24 +522,28 @@ export class CurrenciesService implements OnApplicationBootstrap {
     code: string,
     isActive: boolean,
   ): Promise<void> {
-    await this.dataSource.query(
-      `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `INSERT INTO user_currency_preferences (user_id, currency_code, is_active)
        VALUES ($1, $2, $3)
        ON CONFLICT (user_id, currency_code)
        DO UPDATE SET is_active = $3`,
-      [userId, code.toUpperCase(), isActive],
+        [userId, code.toUpperCase(), isActive],
+      ),
     );
   }
 
   private async isInUseGlobally(code: string): Promise<boolean> {
-    const result = await this.dataSource.query(
-      `SELECT EXISTS (
+    const result = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `SELECT EXISTS (
         SELECT 1 FROM accounts WHERE currency_code = $1
         UNION ALL SELECT 1 FROM securities WHERE currency_code = $1
         UNION ALL SELECT 1 FROM transactions WHERE currency_code = $1
         UNION ALL SELECT 1 FROM user_preferences WHERE default_currency = $1
       ) AS "inUse"`,
-      [code.toUpperCase()],
+        [code.toUpperCase()],
+      ),
     );
     return result[0]?.inUse === true;
   }

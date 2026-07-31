@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { AiService } from "./ai.service";
@@ -8,6 +8,11 @@ import { AiEncryptionService } from "./ai-encryption.service";
 import { AiProviderFactory } from "./ai-provider.factory";
 import { AiUsageService } from "./ai-usage.service";
 import { AiRelayService, RelayTimeoutError } from "./relay/ai-relay.service";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("AiService", () => {
   let service: AiService;
@@ -107,8 +112,10 @@ describe("AiService", () => {
       providers: [
         AiService,
         {
-          provide: getRepositoryToken(AiProviderConfig),
-          useValue: mockConfigRepository,
+          provide: DataSource,
+          useValue: createScopedDbMocks([
+            [AiProviderConfig, mockConfigRepository],
+          ]).dataSource,
         },
         { provide: AiEncryptionService, useValue: mockEncryptionService },
         { provide: AiProviderFactory, useValue: mockProviderFactory },

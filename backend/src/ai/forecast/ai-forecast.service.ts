@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from "@nestjs/common";
 import { tr } from "../../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../../common/db/scoped-db";
 import { AiService } from "../ai.service";
 import { AiUsageService } from "../ai-usage.service";
 import { AiUsageLog } from "../entities/ai-usage-log.entity";
@@ -35,10 +35,7 @@ export class AiForecastService {
   private readonly logger = new Logger(AiForecastService.name);
 
   constructor(
-    @InjectRepository(UserPreference)
-    private readonly prefRepo: Repository<UserPreference>,
-    @InjectRepository(AiUsageLog)
-    private readonly usageLogRepo: Repository<AiUsageLog>,
+    private readonly dataSource: DataSource,
     private readonly aiService: AiService,
     private readonly usageService: AiUsageService,
     private readonly aggregatorService: ForecastAggregatorService,
@@ -50,9 +47,11 @@ export class AiForecastService {
   ): Promise<ForecastResponse> {
     await this.checkRateLimit(userId);
 
-    const preferences = await this.prefRepo.findOne({
-      where: { userId },
-    });
+    const preferences = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(UserPreference).findOne({
+        where: { userId },
+      }),
+    );
     const currency = preferences?.defaultCurrency || "USD";
 
     let aggregates: ForecastAggregates;
@@ -129,13 +128,16 @@ export class AiForecastService {
       Date.now() - MIN_FORECAST_INTERVAL_HOURS * 60 * 60 * 1000,
     );
 
-    const recentLog = await this.usageLogRepo
-      .createQueryBuilder("log")
-      .where("log.userId = :userId", { userId })
-      .andWhere("log.feature = :feature", { feature: "forecast" })
-      .andWhere("log.error IS NULL")
-      .andWhere("log.createdAt > :cutoff", { cutoff })
-      .getOne();
+    const recentLog = await withScopedDb(this.dataSource, (manager) =>
+      manager
+        .getRepository(AiUsageLog)
+        .createQueryBuilder("log")
+        .where("log.userId = :userId", { userId })
+        .andWhere("log.feature = :feature", { feature: "forecast" })
+        .andWhere("log.error IS NULL")
+        .andWhere("log.createdAt > :cutoff", { cutoff })
+        .getOne(),
+    );
 
     if (recentLog) {
       throw new BadRequestException(

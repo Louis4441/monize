@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { IsNull } from "typeorm";
+import { EntityManager, IsNull } from "typeorm";
 import {
   Account,
   AccountType,
@@ -67,7 +67,7 @@ function getCurrencyFromExchange(
 @Injectable()
 export class ImportEntityCreatorService {
   async createCategories(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     categoriesToCreate: CategoryMappingDto[],
     categoryMap: Map<string, string | null>,
@@ -81,7 +81,7 @@ export class ImportEntityCreatorService {
       // If a new parent category name is provided, create (or find) the parent first
       if (!parentId && catMapping.createNewParentCategoryName) {
         parentId = await this.findOrCreateParentCategory(
-          queryRunner,
+          manager,
           userId,
           catMapping.createNewParentCategoryName,
           processedCategories,
@@ -99,7 +99,7 @@ export class ImportEntityCreatorService {
         continue;
       }
 
-      const existingCategory = await queryRunner.manager.findOne(Category, {
+      const existingCategory = await manager.findOne(Category, {
         where: {
           userId,
           name: categoryName,
@@ -113,13 +113,13 @@ export class ImportEntityCreatorService {
         continue;
       }
 
-      const newCategory = queryRunner.manager.create(Category, {
+      const newCategory = manager.create(Category, {
         userId,
         name: categoryName,
         parentId,
         isIncome: false,
       });
-      const saved = await queryRunner.manager.save(newCategory);
+      const saved = await manager.save(newCategory);
       categoryMap.set(catMapping.originalName, saved.id);
       processedCategories.set(cacheKey, saved.id);
       importResult.categoriesCreated++;
@@ -129,7 +129,7 @@ export class ImportEntityCreatorService {
   }
 
   private async findOrCreateParentCategory(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     parentName: string,
     processedCategories: Map<string, string>,
@@ -140,7 +140,7 @@ export class ImportEntityCreatorService {
       return processedCategories.get(cacheKey)!;
     }
 
-    const existing = await queryRunner.manager.findOne(Category, {
+    const existing = await manager.findOne(Category, {
       where: { userId, name: parentName, parentId: IsNull() },
     });
 
@@ -149,20 +149,20 @@ export class ImportEntityCreatorService {
       return existing.id;
     }
 
-    const newParent = queryRunner.manager.create(Category, {
+    const newParent = manager.create(Category, {
       userId,
       name: parentName,
       parentId: null,
       isIncome: false,
     });
-    const saved = await queryRunner.manager.save(newParent);
+    const saved = await manager.save(newParent);
     processedCategories.set(cacheKey, saved.id);
     importResult.categoriesCreated++;
     return saved.id;
   }
 
   async createAccounts(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     accountsToCreate: AccountMappingDto[],
     accountMap: Map<string, string | null>,
@@ -183,11 +183,11 @@ export class ImportEntityCreatorService {
         continue;
       }
 
-      let existingAccount = await queryRunner.manager.findOne(Account, {
+      let existingAccount = await manager.findOne(Account, {
         where: { userId, name: accountName },
       });
       if (!existingAccount && accountType === AccountType.INVESTMENT) {
-        existingAccount = await queryRunner.manager.findOne(Account, {
+        existingAccount = await manager.findOne(Account, {
           where: { userId, name: `${accountName} - Cash` },
         });
       }
@@ -204,7 +204,7 @@ export class ImportEntityCreatorService {
       }
 
       if (accountType === AccountType.INVESTMENT) {
-        const cashAccount = queryRunner.manager.create(Account, {
+        const cashAccount = manager.create(Account, {
           userId,
           name: `${accountName} - Cash`,
           accountType: AccountType.INVESTMENT,
@@ -213,9 +213,9 @@ export class ImportEntityCreatorService {
           openingBalance: 0,
           currentBalance: 0,
         });
-        const savedCash = await queryRunner.manager.save(cashAccount);
+        const savedCash = await manager.save(cashAccount);
 
-        const brokerageAccount = queryRunner.manager.create(Account, {
+        const brokerageAccount = manager.create(Account, {
           userId,
           name: `${accountName} - Brokerage`,
           accountType: AccountType.INVESTMENT,
@@ -225,10 +225,10 @@ export class ImportEntityCreatorService {
           currentBalance: 0,
           linkedAccountId: savedCash.id,
         });
-        const savedBrokerage = await queryRunner.manager.save(brokerageAccount);
+        const savedBrokerage = await manager.save(brokerageAccount);
 
         savedCash.linkedAccountId = savedBrokerage.id;
-        await queryRunner.manager.save(savedCash);
+        await manager.save(savedCash);
 
         accountMap.set(accMapping.originalName, savedCash.id);
         processedAccounts.set(accountName, savedCash.id);
@@ -236,7 +236,7 @@ export class ImportEntityCreatorService {
         importResult.createdMappings!.accounts[accMapping.originalName] =
           savedCash.id;
       } else {
-        const newAccount = queryRunner.manager.create(Account, {
+        const newAccount = manager.create(Account, {
           userId,
           name: accountName,
           accountType,
@@ -244,7 +244,7 @@ export class ImportEntityCreatorService {
           openingBalance: 0,
           currentBalance: 0,
         });
-        const saved = await queryRunner.manager.save(newAccount);
+        const saved = await manager.save(newAccount);
         accountMap.set(accMapping.originalName, saved.id);
         processedAccounts.set(accountName, saved.id);
         importResult.accountsCreated++;
@@ -255,7 +255,7 @@ export class ImportEntityCreatorService {
   }
 
   async createLoanAccounts(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     loanAccountsToCreate: CategoryMappingDto[],
     loanCategoryMap: Map<string, string>,
@@ -268,7 +268,7 @@ export class ImportEntityCreatorService {
         loanMapping.newLoanType === "MORTGAGE"
           ? AccountType.MORTGAGE
           : AccountType.LOAN;
-      const newLoanAccount = queryRunner.manager.create(Account, {
+      const newLoanAccount = manager.create(Account, {
         userId,
         name: loanMapping.createNewLoan,
         accountType: loanType,
@@ -277,7 +277,7 @@ export class ImportEntityCreatorService {
         openingBalance: -loanAmount,
         currentBalance: -loanAmount,
       });
-      const saved = await queryRunner.manager.save(newLoanAccount);
+      const saved = await manager.save(newLoanAccount);
       loanCategoryMap.set(loanMapping.originalName, saved.id);
       importResult.accountsCreated++;
       importResult.createdMappings!.loans[loanMapping.originalName] = saved.id;
@@ -285,7 +285,7 @@ export class ImportEntityCreatorService {
   }
 
   async createSecurities(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     securitiesToCreate: SecurityMappingDto[],
     securityMap: Map<string, string | null>,
@@ -296,7 +296,7 @@ export class ImportEntityCreatorService {
       if (!secMapping.createNew) continue;
       const symbol = secMapping.createNew.toUpperCase();
 
-      const existingSecurity = await queryRunner.manager.findOne(Security, {
+      const existingSecurity = await manager.findOne(Security, {
         where: { symbol, userId },
       });
 
@@ -319,7 +319,7 @@ export class ImportEntityCreatorService {
         newSecurity.exchange = secMapping.exchange || null;
         newSecurity.currencyCode = currencyCode;
         newSecurity.isActive = true;
-        const saved = await queryRunner.manager.save(newSecurity);
+        const saved = await manager.save(newSecurity);
         securityMap.set(secMapping.originalName, saved.id);
         importResult.securitiesCreated++;
         importResult.createdMappings!.securities[secMapping.originalName] =
@@ -329,7 +329,7 @@ export class ImportEntityCreatorService {
   }
 
   async applyOpeningBalance(
-    queryRunner: any,
+    manager: EntityManager,
     accountId: string,
     account: Account,
     openingBalance: number,
@@ -344,7 +344,7 @@ export class ImportEntityCreatorService {
           100,
       ) / 100;
 
-    await queryRunner.manager.update(Account, accountId, {
+    await manager.update(Account, accountId, {
       openingBalance: newOpeningBalance,
       currentBalance: newCurrentBalance,
     });

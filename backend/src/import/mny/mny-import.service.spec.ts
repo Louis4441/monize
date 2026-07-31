@@ -792,10 +792,13 @@ describe("MnyImportService", () => {
       expect(
         holdingsService.rebuildAccountsFromTransactions,
       ).toHaveBeenCalledWith("user-1", ["account-1"], expect.anything());
-      const [, , runner] = (
+      // The third argument is the import transaction's own EntityManager, not
+      // a QueryRunner shim (the union was dropped when this module converted).
+      const [, , manager] = (
         holdingsService.rebuildAccountsFromTransactions as jest.Mock
       ).mock.calls[0];
-      expect(runner.manager).toBeDefined();
+      expect(manager).toBeDefined();
+      expect(manager.getRepository).toBeDefined();
     });
 
     it("does not rebuild holdings when no brokerage account was touched", async () => {

@@ -1,4 +1,5 @@
 import { DataSource } from "typeorm";
+import { withScopedDb } from "./db/scoped-db";
 
 /**
  * Group all users by their effective IANA timezone so cron jobs that operate
@@ -17,6 +18,10 @@ import { DataSource } from "typeorm";
  *   3. `"UTC"`, only as a last resort.
  *
  * Returns an empty map when no users exist.
+ *
+ * RLS: this reads every user's row, so each caller is a cron handler already
+ * inside `withSystemContext` (task C2). It goes through `withScopedDb` like all
+ * other data access; there is no ambient identity of its own to establish.
  */
 export async function getUsersByEffectiveTimezone(
   dataSource: DataSource,
@@ -25,10 +30,12 @@ export async function getUsersByEffectiveTimezone(
     user_id: string;
     timezone: string | null;
     last_client_timezone: string | null;
-  }[] = await dataSource.query(
-    `SELECT u.id as user_id, p.timezone, p.last_client_timezone
+  }[] = await withScopedDb(dataSource, (manager) =>
+    manager.query(
+      `SELECT u.id as user_id, p.timezone, p.last_client_timezone
        FROM users u
        LEFT JOIN user_preferences p ON p.user_id = u.id`,
+    ),
   );
 
   const userIdsByTz = new Map<string, string[]>();

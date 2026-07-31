@@ -1,13 +1,5 @@
 import { Module, forwardRef } from "@nestjs/common";
-import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule } from "@nestjs/config";
-import { AiProviderConfig } from "./entities/ai-provider-config.entity";
-import { AiUsageLog } from "./entities/ai-usage-log.entity";
-import { AiInsight } from "./entities/ai-insight.entity";
-import { UserPreference } from "../users/entities/user-preference.entity";
-import { Transaction } from "../transactions/entities/transaction.entity";
-import { Category } from "../categories/entities/category.entity";
-import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { AiService } from "./ai.service";
 import { AiUsageService } from "./ai-usage.service";
 import { AiEncryptionService } from "./ai-encryption.service";
@@ -42,15 +34,6 @@ import { AiRelayModule } from "./relay/ai-relay.module";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      AiProviderConfig,
-      AiUsageLog,
-      AiInsight,
-      UserPreference,
-      Transaction,
-      Category,
-      ScheduledTransaction,
-    ]),
     ConfigModule,
     forwardRef(() => AccountsModule),
     forwardRef(() => CategoriesModule),

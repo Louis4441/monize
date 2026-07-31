@@ -10,9 +10,7 @@ import { ImportResultDto, CategoryMappingDto } from "./dto/import.dto";
 
 describe("ImportEntityCreatorService", () => {
   let service: ImportEntityCreatorService;
-  let queryRunner: {
-    manager: Record<string, jest.Mock>;
-  };
+  let manager: Record<string, jest.Mock>;
   let importResult: ImportResultDto;
 
   const userId = "user-123";
@@ -49,18 +47,16 @@ describe("ImportEntityCreatorService", () => {
   }
 
   beforeEach(() => {
-    queryRunner = {
-      manager: {
-        findOne: jest.fn(),
-        create: jest.fn().mockImplementation((_entity, data) => ({
-          ...data,
-        })),
-        save: jest.fn().mockImplementation((data) => ({
-          ...data,
-          id: data.id || `generated-${Math.random().toString(36).slice(2, 8)}`,
-        })),
-        update: jest.fn().mockResolvedValue(undefined),
-      },
+    manager = {
+      findOne: jest.fn(),
+      create: jest.fn().mockImplementation((_entity, data) => ({
+        ...data,
+      })),
+      save: jest.fn().mockImplementation((data) => ({
+        ...data,
+        id: data.id || `generated-${Math.random().toString(36).slice(2, 8)}`,
+      })),
+      update: jest.fn().mockResolvedValue(undefined),
     };
     importResult = makeImportResult();
     service = new ImportEntityCreatorService();
@@ -68,9 +64,9 @@ describe("ImportEntityCreatorService", () => {
 
   describe("createCategories", () => {
     it("should create a new category when it does not exist", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       const savedCat = { id: "cat-new-1", name: "Groceries", userId };
-      queryRunner.manager.save.mockResolvedValue(savedCat);
+      manager.save.mockResolvedValue(savedCat);
 
       const categoryMap = new Map<string, string | null>();
       const categoriesToCreate: CategoryMappingDto[] = [
@@ -78,20 +74,20 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createCategories(
-        queryRunner,
+        manager as any,
         userId,
         categoriesToCreate,
         categoryMap,
         importResult,
       );
 
-      expect(queryRunner.manager.findOne).toHaveBeenCalledWith(
+      expect(manager.findOne).toHaveBeenCalledWith(
         Category,
         expect.objectContaining({
           where: expect.objectContaining({ userId, name: "Groceries" }),
         }),
       );
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Category,
         expect.objectContaining({
           userId,
@@ -109,7 +105,7 @@ describe("ImportEntityCreatorService", () => {
 
     it("should reuse existing category when found in database", async () => {
       const existingCat = { id: "cat-existing", name: "Food", userId };
-      queryRunner.manager.findOne.mockResolvedValue(existingCat);
+      manager.findOne.mockResolvedValue(existingCat);
 
       const categoryMap = new Map<string, string | null>();
       const categoriesToCreate: CategoryMappingDto[] = [
@@ -117,7 +113,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createCategories(
-        queryRunner,
+        manager as any,
         userId,
         categoriesToCreate,
         categoryMap,
@@ -126,13 +122,13 @@ describe("ImportEntityCreatorService", () => {
 
       expect(categoryMap.get("Food")).toBe("cat-existing");
       expect(importResult.categoriesCreated).toBe(0);
-      expect(queryRunner.manager.save).not.toHaveBeenCalled();
+      expect(manager.save).not.toHaveBeenCalled();
     });
 
     it("should deduplicate categories with the same name and parent", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       const savedCat = { id: "cat-once", name: "Transport", userId };
-      queryRunner.manager.save.mockResolvedValue(savedCat);
+      manager.save.mockResolvedValue(savedCat);
 
       const categoryMap = new Map<string, string | null>();
       const categoriesToCreate: CategoryMappingDto[] = [
@@ -141,23 +137,23 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createCategories(
-        queryRunner,
+        manager as any,
         userId,
         categoriesToCreate,
         categoryMap,
         importResult,
       );
 
-      expect(queryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(manager.save).toHaveBeenCalledTimes(1);
       expect(categoryMap.get("Transport-1")).toBe("cat-once");
       expect(categoryMap.get("Transport-2")).toBe("cat-once");
       expect(importResult.categoriesCreated).toBe(1);
     });
 
     it("should create new parent category when createNewParentCategoryName is provided", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       let saveCount = 0;
-      queryRunner.manager.save.mockImplementation((data: any) => {
+      manager.save.mockImplementation((data: any) => {
         saveCount++;
         return { ...data, id: `cat-${saveCount}` };
       });
@@ -172,7 +168,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createCategories(
-        queryRunner,
+        manager as any,
         userId,
         categoriesToCreate,
         categoryMap,
@@ -180,15 +176,15 @@ describe("ImportEntityCreatorService", () => {
       );
 
       // Should create parent first (cat-1), then child (cat-2)
-      expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.save).toHaveBeenCalledTimes(2);
+      expect(manager.create).toHaveBeenCalledWith(
         Category,
         expect.objectContaining({
           name: "Fees & Charges",
           parentId: null,
         }),
       );
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Category,
         expect.objectContaining({
           name: "Bank Fee",
@@ -205,19 +201,17 @@ describe("ImportEntityCreatorService", () => {
         name: "Bills & Utilities",
         userId,
       };
-      queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (
-            opts?.where?.name === "Bills & Utilities" &&
-            opts?.where?.parentId
-          ) {
-            return Promise.resolve(existingParent);
-          }
-          return Promise.resolve(null);
-        },
-      );
+      manager.findOne.mockImplementation((_entity: any, opts: any) => {
+        if (
+          opts?.where?.name === "Bills & Utilities" &&
+          opts?.where?.parentId
+        ) {
+          return Promise.resolve(existingParent);
+        }
+        return Promise.resolve(null);
+      });
       const savedChild = { id: "child-new", name: "Electricity", userId };
-      queryRunner.manager.save.mockResolvedValue(savedChild);
+      manager.save.mockResolvedValue(savedChild);
 
       const categoryMap = new Map<string, string | null>();
       const categoriesToCreate: CategoryMappingDto[] = [
@@ -229,7 +223,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createCategories(
-        queryRunner,
+        manager as any,
         userId,
         categoriesToCreate,
         categoryMap,
@@ -237,7 +231,7 @@ describe("ImportEntityCreatorService", () => {
       );
 
       // Only child should be created; parent already exists
-      expect(queryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(manager.save).toHaveBeenCalledTimes(1);
       expect(categoryMap.get("Bills & Utilities:Electricity")).toBe(
         "child-new",
       );
@@ -245,9 +239,9 @@ describe("ImportEntityCreatorService", () => {
     });
 
     it("should reuse same new parent for multiple children", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       let saveCount = 0;
-      queryRunner.manager.save.mockImplementation((data: any) => {
+      manager.save.mockImplementation((data: any) => {
         saveCount++;
         return { ...data, id: `cat-${saveCount}` };
       });
@@ -267,7 +261,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createCategories(
-        queryRunner,
+        manager as any,
         userId,
         categoriesToCreate,
         categoryMap,
@@ -275,15 +269,15 @@ describe("ImportEntityCreatorService", () => {
       );
 
       // Parent created once (cat-1), two children (cat-2, cat-3)
-      expect(queryRunner.manager.save).toHaveBeenCalledTimes(3);
+      expect(manager.save).toHaveBeenCalledTimes(3);
       expect(importResult.categoriesCreated).toBe(3);
       expect(categoryMap.get("Taxes:Income Tax")).toBe("cat-2");
       expect(categoryMap.get("Taxes:CPP")).toBe("cat-3");
     });
 
     it("should prefer parentCategoryId over createNewParentCategoryName", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
-      queryRunner.manager.save.mockImplementation((data: any) => ({
+      manager.findOne.mockResolvedValue(null);
+      manager.save.mockImplementation((data: any) => ({
         ...data,
         id: "child-id",
       }));
@@ -299,7 +293,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createCategories(
-        queryRunner,
+        manager as any,
         userId,
         categoriesToCreate,
         categoryMap,
@@ -307,20 +301,20 @@ describe("ImportEntityCreatorService", () => {
       );
 
       // Should use parentCategoryId, not create a new parent
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Category,
         expect.objectContaining({
           name: "Sub",
           parentId: "existing-parent-id",
         }),
       );
-      expect(queryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(manager.save).toHaveBeenCalledTimes(1);
     });
 
     it("should create categories with different parents separately", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       let callCount = 0;
-      queryRunner.manager.save.mockImplementation((data: any) => {
+      manager.save.mockImplementation((data: any) => {
         callCount++;
         return { ...data, id: `cat-${callCount}` };
       });
@@ -340,14 +334,14 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createCategories(
-        queryRunner,
+        manager as any,
         userId,
         categoriesToCreate,
         categoryMap,
         importResult,
       );
 
-      expect(queryRunner.manager.save).toHaveBeenCalledTimes(2);
+      expect(manager.save).toHaveBeenCalledTimes(2);
       expect(categoryMap.get("Gas:Auto")).toBe("cat-1");
       expect(categoryMap.get("Gas:Home")).toBe("cat-2");
       expect(importResult.categoriesCreated).toBe(2);
@@ -358,9 +352,9 @@ describe("ImportEntityCreatorService", () => {
     const account = makeAccount();
 
     it("should create a regular (non-investment) account", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       const savedAcc = { id: "acc-new-1", name: "Savings", userId };
-      queryRunner.manager.save.mockResolvedValue(savedAcc);
+      manager.save.mockResolvedValue(savedAcc);
 
       const accountMap = new Map<string, string | null>();
       const accountsToCreate = [
@@ -372,7 +366,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createAccounts(
-        queryRunner,
+        manager as any,
         userId,
         accountsToCreate,
         accountMap,
@@ -380,7 +374,7 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Account,
         expect.objectContaining({
           userId,
@@ -396,9 +390,9 @@ describe("ImportEntityCreatorService", () => {
     });
 
     it("should create investment account pair (cash + brokerage)", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       let saveCount = 0;
-      queryRunner.manager.save.mockImplementation((data: any) => {
+      manager.save.mockImplementation((data: any) => {
         saveCount++;
         return { ...data, id: `inv-${saveCount}` };
       });
@@ -413,7 +407,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createAccounts(
-        queryRunner,
+        manager as any,
         userId,
         accountsToCreate,
         accountMap,
@@ -422,8 +416,8 @@ describe("ImportEntityCreatorService", () => {
       );
 
       // Should create cash account first, then brokerage, then update cash
-      expect(queryRunner.manager.create).toHaveBeenCalledTimes(2);
-      expect(queryRunner.manager.save).toHaveBeenCalledTimes(3);
+      expect(manager.create).toHaveBeenCalledTimes(2);
+      expect(manager.save).toHaveBeenCalledTimes(3);
       expect(importResult.accountsCreated).toBe(2);
       // accountMap should point to the cash account id
       expect(accountMap.get("MyBrokerage")).toBe("inv-1");
@@ -435,7 +429,7 @@ describe("ImportEntityCreatorService", () => {
         name: "Checking",
         accountSubType: null,
       };
-      queryRunner.manager.findOne.mockResolvedValue(existingAccount);
+      manager.findOne.mockResolvedValue(existingAccount);
 
       const accountMap = new Map<string, string | null>();
       const accountsToCreate = [
@@ -447,7 +441,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createAccounts(
-        queryRunner,
+        manager as any,
         userId,
         accountsToCreate,
         accountMap,
@@ -466,7 +460,7 @@ describe("ImportEntityCreatorService", () => {
         accountSubType: AccountSubType.INVESTMENT_BROKERAGE,
         linkedAccountId: "linked-cash-acc",
       };
-      queryRunner.manager.findOne.mockResolvedValue(existingBrokerage);
+      manager.findOne.mockResolvedValue(existingBrokerage);
 
       const accountMap = new Map<string, string | null>();
       const accountsToCreate = [
@@ -478,7 +472,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createAccounts(
-        queryRunner,
+        manager as any,
         userId,
         accountsToCreate,
         accountMap,
@@ -490,9 +484,9 @@ describe("ImportEntityCreatorService", () => {
     });
 
     it("should deduplicate accounts with the same name", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       const savedAcc = { id: "acc-dedup", name: "Joint", userId };
-      queryRunner.manager.save.mockResolvedValue(savedAcc);
+      manager.save.mockResolvedValue(savedAcc);
 
       const accountMap = new Map<string, string | null>();
       const accountsToCreate = [
@@ -509,7 +503,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createAccounts(
-        queryRunner,
+        manager as any,
         userId,
         accountsToCreate,
         accountMap,
@@ -517,14 +511,14 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.save).toHaveBeenCalledTimes(1);
+      expect(manager.save).toHaveBeenCalledTimes(1);
       expect(accountMap.get("Joint-1")).toBe("acc-dedup");
       expect(accountMap.get("Joint-2")).toBe("acc-dedup");
     });
 
     it("should use account currencyCode when mapping has no currencyCode", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
-      queryRunner.manager.save.mockImplementation((data: any) => ({
+      manager.findOne.mockResolvedValue(null);
+      manager.save.mockImplementation((data: any) => ({
         ...data,
         id: "acc-curr",
       }));
@@ -539,7 +533,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createAccounts(
-        queryRunner,
+        manager as any,
         userId,
         accountsToCreate,
         accountMap,
@@ -547,15 +541,15 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Account,
         expect.objectContaining({ currencyCode: "CAD" }),
       );
     });
 
     it("should use mapping currencyCode when provided", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
-      queryRunner.manager.save.mockImplementation((data: any) => ({
+      manager.findOne.mockResolvedValue(null);
+      manager.save.mockImplementation((data: any) => ({
         ...data,
         id: "acc-usd",
       }));
@@ -571,7 +565,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createAccounts(
-        queryRunner,
+        manager as any,
         userId,
         accountsToCreate,
         accountMap,
@@ -579,15 +573,15 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Account,
         expect.objectContaining({ currencyCode: "USD" }),
       );
     });
 
     it("should default accountType to CHEQUING when not provided", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
-      queryRunner.manager.save.mockImplementation((data: any) => ({
+      manager.findOne.mockResolvedValue(null);
+      manager.save.mockImplementation((data: any) => ({
         ...data,
         id: "acc-default",
       }));
@@ -598,7 +592,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createAccounts(
-        queryRunner,
+        manager as any,
         userId,
         accountsToCreate,
         accountMap,
@@ -606,7 +600,7 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Account,
         expect.objectContaining({ accountType: "CHEQUING" }),
       );
@@ -614,13 +608,11 @@ describe("ImportEntityCreatorService", () => {
 
     it("should try name + ' - Cash' for investment accounts not found by name", async () => {
       // First findOne (by name) returns null, second (by name + " - Cash") returns match
-      queryRunner.manager.findOne
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({
-          id: "cash-acc-found",
-          name: "Invest - Cash",
-          accountSubType: AccountSubType.INVESTMENT_CASH,
-        });
+      manager.findOne.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        id: "cash-acc-found",
+        name: "Invest - Cash",
+        accountSubType: AccountSubType.INVESTMENT_CASH,
+      });
 
       const accountMap = new Map<string, string | null>();
       const accountsToCreate = [
@@ -632,7 +624,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createAccounts(
-        queryRunner,
+        manager as any,
         userId,
         accountsToCreate,
         accountMap,
@@ -640,7 +632,7 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.findOne).toHaveBeenCalledWith(Account, {
+      expect(manager.findOne).toHaveBeenCalledWith(Account, {
         where: { userId, name: "Invest - Cash" },
       });
       expect(accountMap.get("Invest")).toBe("cash-acc-found");
@@ -652,7 +644,7 @@ describe("ImportEntityCreatorService", () => {
 
     it("should create a new loan account", async () => {
       const savedLoan = { id: "loan-1" };
-      queryRunner.manager.save.mockResolvedValue(savedLoan);
+      manager.save.mockResolvedValue(savedLoan);
 
       const loanCategoryMap = new Map<string, string>();
       const loanAccountsToCreate: CategoryMappingDto[] = [
@@ -665,7 +657,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createLoanAccounts(
-        queryRunner,
+        manager as any,
         userId,
         loanAccountsToCreate,
         loanCategoryMap,
@@ -673,7 +665,7 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Account,
         expect.objectContaining({
           userId,
@@ -692,7 +684,7 @@ describe("ImportEntityCreatorService", () => {
 
     it("should create a mortgage account when newLoanType is MORTGAGE", async () => {
       const savedLoan = { id: "mortgage-1" };
-      queryRunner.manager.save.mockResolvedValue(savedLoan);
+      manager.save.mockResolvedValue(savedLoan);
 
       const loanCategoryMap = new Map<string, string>();
       const loanAccountsToCreate: CategoryMappingDto[] = [
@@ -706,7 +698,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createLoanAccounts(
-        queryRunner,
+        manager as any,
         userId,
         loanAccountsToCreate,
         loanCategoryMap,
@@ -714,7 +706,7 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Account,
         expect.objectContaining({
           userId,
@@ -732,7 +724,7 @@ describe("ImportEntityCreatorService", () => {
 
     it("should default to LOAN type when newLoanType is not provided", async () => {
       const savedLoan = { id: "loan-default" };
-      queryRunner.manager.save.mockResolvedValue(savedLoan);
+      manager.save.mockResolvedValue(savedLoan);
 
       const loanCategoryMap = new Map<string, string>();
       const loanAccountsToCreate: CategoryMappingDto[] = [
@@ -744,7 +736,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createLoanAccounts(
-        queryRunner,
+        manager as any,
         userId,
         loanAccountsToCreate,
         loanCategoryMap,
@@ -752,7 +744,7 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Account,
         expect.objectContaining({
           accountType: AccountType.LOAN,
@@ -762,7 +754,7 @@ describe("ImportEntityCreatorService", () => {
 
     it("should default loan amount to 0 when not provided", async () => {
       const savedLoan = { id: "loan-zero" };
-      queryRunner.manager.save.mockResolvedValue(savedLoan);
+      manager.save.mockResolvedValue(savedLoan);
 
       const loanCategoryMap = new Map<string, string>();
       const loanAccountsToCreate: CategoryMappingDto[] = [
@@ -773,7 +765,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createLoanAccounts(
-        queryRunner,
+        manager as any,
         userId,
         loanAccountsToCreate,
         loanCategoryMap,
@@ -783,7 +775,7 @@ describe("ImportEntityCreatorService", () => {
 
       // Loan amounts get negated: -undefined → NaN is not the case;
       // when loanAmount is undefined, the code uses -loanAmount which gives -0
-      expect(queryRunner.manager.create).toHaveBeenCalledWith(
+      expect(manager.create).toHaveBeenCalledWith(
         Account,
         expect.objectContaining({
           openingBalance: -0,
@@ -798,9 +790,9 @@ describe("ImportEntityCreatorService", () => {
     const account = makeAccount();
 
     it("should create a new security", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       const savedSec = { id: "sec-1" };
-      queryRunner.manager.save.mockResolvedValue(savedSec);
+      manager.save.mockResolvedValue(savedSec);
 
       const securityMap = new Map<string, string | null>();
       const securitiesToCreate = [
@@ -815,7 +807,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createSecurities(
-        queryRunner,
+        manager as any,
         userId,
         securitiesToCreate,
         securityMap,
@@ -831,8 +823,8 @@ describe("ImportEntityCreatorService", () => {
     });
 
     it("should uppercase the symbol on creation", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
-      queryRunner.manager.save.mockImplementation((data: any) => ({
+      manager.findOne.mockResolvedValue(null);
+      manager.save.mockImplementation((data: any) => ({
         ...data,
         id: "sec-upper",
       }));
@@ -841,7 +833,7 @@ describe("ImportEntityCreatorService", () => {
       const securitiesToCreate = [{ originalName: "test", createNew: "msft" }];
 
       await service.createSecurities(
-        queryRunner,
+        manager as any,
         userId,
         securitiesToCreate,
         securityMap,
@@ -850,14 +842,14 @@ describe("ImportEntityCreatorService", () => {
       );
 
       // The findOne should look for uppercase symbol
-      expect(queryRunner.manager.findOne).toHaveBeenCalledWith(Security, {
+      expect(manager.findOne).toHaveBeenCalledWith(Security, {
         where: { symbol: "MSFT", userId },
       });
     });
 
     it("should reuse existing security by symbol", async () => {
       const existingSec = { id: "sec-existing", symbol: "GOOG" };
-      queryRunner.manager.findOne.mockResolvedValue(existingSec);
+      manager.findOne.mockResolvedValue(existingSec);
 
       const securityMap = new Map<string, string | null>();
       const securitiesToCreate = [
@@ -865,7 +857,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createSecurities(
-        queryRunner,
+        manager as any,
         userId,
         securitiesToCreate,
         securityMap,
@@ -882,7 +874,7 @@ describe("ImportEntityCreatorService", () => {
       const securitiesToCreate = [{ originalName: "Nothing", createNew: "" }];
 
       await service.createSecurities(
-        queryRunner,
+        manager as any,
         userId,
         securitiesToCreate,
         securityMap,
@@ -890,13 +882,13 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      expect(queryRunner.manager.findOne).not.toHaveBeenCalled();
+      expect(manager.findOne).not.toHaveBeenCalled();
       expect(importResult.securitiesCreated).toBe(0);
     });
 
     it("should use exchange-derived currency when securityMapping has no currencyCode", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
-      queryRunner.manager.save.mockImplementation((data: any) => ({
+      manager.findOne.mockResolvedValue(null);
+      manager.save.mockImplementation((data: any) => ({
         ...data,
         id: "sec-tsx",
       }));
@@ -911,7 +903,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createSecurities(
-        queryRunner,
+        manager as any,
         userId,
         securitiesToCreate,
         securityMap,
@@ -919,13 +911,13 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      const savedArg = queryRunner.manager.save.mock.calls[0][0];
+      const savedArg = manager.save.mock.calls[0][0];
       expect(savedArg.currencyCode).toBe("CAD");
     });
 
     it("should fall back to account currency when no exchange or currencyCode", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
-      queryRunner.manager.save.mockImplementation((data: any) => ({
+      manager.findOne.mockResolvedValue(null);
+      manager.save.mockImplementation((data: any) => ({
         ...data,
         id: "sec-fallback",
       }));
@@ -938,7 +930,7 @@ describe("ImportEntityCreatorService", () => {
       const usdAccount = makeAccount({ currencyCode: "USD" });
 
       await service.createSecurities(
-        queryRunner,
+        manager as any,
         userId,
         securitiesToCreate,
         securityMap,
@@ -946,13 +938,13 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      const savedArg = queryRunner.manager.save.mock.calls[0][0];
+      const savedArg = manager.save.mock.calls[0][0];
       expect(savedArg.currencyCode).toBe("USD");
     });
 
     it("should use exchange-derived currency over explicit currencyCode from mapping", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
-      queryRunner.manager.save.mockImplementation((data: any) => ({
+      manager.findOne.mockResolvedValue(null);
+      manager.save.mockImplementation((data: any) => ({
         ...data,
         id: "sec-explicit",
       }));
@@ -968,7 +960,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createSecurities(
-        queryRunner,
+        manager as any,
         userId,
         securitiesToCreate,
         securityMap,
@@ -976,14 +968,14 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      const savedArg = queryRunner.manager.save.mock.calls[0][0];
+      const savedArg = manager.save.mock.calls[0][0];
       // NYSE maps to USD, which takes priority over the stale EUR from the mapping
       expect(savedArg.currencyCode).toBe("USD");
     });
 
     it("should fall back to mapping currencyCode when exchange is not in the map", async () => {
-      queryRunner.manager.findOne.mockResolvedValue(null);
-      queryRunner.manager.save.mockImplementation((data: any) => ({
+      manager.findOne.mockResolvedValue(null);
+      manager.save.mockImplementation((data: any) => ({
         ...data,
         id: "sec-unknown-exchange",
       }));
@@ -999,7 +991,7 @@ describe("ImportEntityCreatorService", () => {
       ];
 
       await service.createSecurities(
-        queryRunner,
+        manager as any,
         userId,
         securitiesToCreate,
         securityMap,
@@ -1007,7 +999,7 @@ describe("ImportEntityCreatorService", () => {
         importResult,
       );
 
-      const savedArg = queryRunner.manager.save.mock.calls[0][0];
+      const savedArg = manager.save.mock.calls[0][0];
       // JSE is not in EXCHANGE_CURRENCY_MAP, so falls back to mapping currencyCode
       expect(savedArg.currencyCode).toBe("ZAR");
     });
@@ -1020,16 +1012,12 @@ describe("ImportEntityCreatorService", () => {
         currentBalance: 500,
       } as any);
 
-      await service.applyOpeningBalance(queryRunner, "acc-1", account, 250);
+      await service.applyOpeningBalance(manager as any, "acc-1", account, 250);
 
-      expect(queryRunner.manager.update).toHaveBeenCalledWith(
-        Account,
-        "acc-1",
-        {
-          openingBalance: 250,
-          currentBalance: 650,
-        },
-      );
+      expect(manager.update).toHaveBeenCalledWith(Account, "acc-1", {
+        openingBalance: 250,
+        currentBalance: 650,
+      });
     });
 
     it("should handle zero opening balance", async () => {
@@ -1038,16 +1026,12 @@ describe("ImportEntityCreatorService", () => {
         currentBalance: 300,
       } as any);
 
-      await service.applyOpeningBalance(queryRunner, "acc-1", account, 100);
+      await service.applyOpeningBalance(manager as any, "acc-1", account, 100);
 
-      expect(queryRunner.manager.update).toHaveBeenCalledWith(
-        Account,
-        "acc-1",
-        {
-          openingBalance: 100,
-          currentBalance: 400,
-        },
-      );
+      expect(manager.update).toHaveBeenCalledWith(Account, "acc-1", {
+        openingBalance: 100,
+        currentBalance: 400,
+      });
     });
 
     it("should handle negative opening balance", async () => {
@@ -1056,16 +1040,12 @@ describe("ImportEntityCreatorService", () => {
         currentBalance: 1000,
       } as any);
 
-      await service.applyOpeningBalance(queryRunner, "acc-1", account, -500);
+      await service.applyOpeningBalance(manager as any, "acc-1", account, -500);
 
-      expect(queryRunner.manager.update).toHaveBeenCalledWith(
-        Account,
-        "acc-1",
-        {
-          openingBalance: -500,
-          currentBalance: 500,
-        },
-      );
+      expect(manager.update).toHaveBeenCalledWith(Account, "acc-1", {
+        openingBalance: -500,
+        currentBalance: 500,
+      });
     });
 
     it("should round to two decimal places", async () => {
@@ -1074,16 +1054,17 @@ describe("ImportEntityCreatorService", () => {
         currentBalance: 0,
       } as any);
 
-      await service.applyOpeningBalance(queryRunner, "acc-1", account, 100.555);
-
-      expect(queryRunner.manager.update).toHaveBeenCalledWith(
-        Account,
+      await service.applyOpeningBalance(
+        manager as any,
         "acc-1",
-        {
-          openingBalance: 100.56,
-          currentBalance: 100.56,
-        },
+        account,
+        100.555,
       );
+
+      expect(manager.update).toHaveBeenCalledWith(Account, "acc-1", {
+        openingBalance: 100.56,
+        currentBalance: 100.56,
+      });
     });
   });
 });

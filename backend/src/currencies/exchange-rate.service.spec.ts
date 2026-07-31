@@ -1,18 +1,20 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import { ExchangeRateService } from "./exchange-rate.service";
 import { ExchangeRate } from "./entities/exchange-rate.entity";
 import { Currency } from "./entities/currency.entity";
-import { Account } from "../accounts/entities/account.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { YahooFinanceService } from "../securities/yahoo-finance.service";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("ExchangeRateService", () => {
   let service: ExchangeRateService;
   let exchangeRateRepository: Record<string, jest.Mock>;
   let currencyRepository: Record<string, jest.Mock>;
-  let accountRepository: Record<string, jest.Mock>;
   let userPreferenceRepository: Record<string, jest.Mock>;
   let dataSource: Record<string, jest.Mock>;
   let yahooFinanceService: Record<string, jest.Mock>;
@@ -66,15 +68,20 @@ describe("ExchangeRateService", () => {
       find: jest.fn(),
     };
 
-    accountRepository = {};
-
     userPreferenceRepository = {
       findOne: jest.fn(),
     };
 
-    dataSource = {
-      query: jest.fn(),
-    };
+    // Raw SQL now runs on the scoped transaction's EntityManager; alias the
+    // spec's `dataSource.query` to it so the existing assertions still watch
+    // the same statements.
+    const scoped = createScopedDbMocks([
+      [ExchangeRate, exchangeRateRepository],
+      [Currency, currencyRepository],
+      [UserPreference, userPreferenceRepository],
+    ]);
+    scoped.dataSource.query = scoped.manager.query;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     yahooFinanceService = {
       fetchQuote: jest.fn(),
@@ -85,16 +92,6 @@ describe("ExchangeRateService", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ExchangeRateService,
-        {
-          provide: getRepositoryToken(ExchangeRate),
-          useValue: exchangeRateRepository,
-        },
-        { provide: getRepositoryToken(Currency), useValue: currencyRepository },
-        { provide: getRepositoryToken(Account), useValue: accountRepository },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: userPreferenceRepository,
-        },
         { provide: DataSource, useValue: dataSource },
         { provide: YahooFinanceService, useValue: yahooFinanceService },
       ],
@@ -133,12 +130,15 @@ describe("ExchangeRateService", () => {
     });
 
     it("triggers backfill for users with foreign accounts", async () => {
+      // A real UUID: the startup fan-out re-wraps each backfill in
+      // withUserContext, which rejects a non-UUID id.
+      const backfillUserId = "11111111-1111-4111-8111-111111111111";
       exchangeRateRepository.findOne.mockResolvedValue(mockExchangeRate);
-      dataSource.query.mockResolvedValue([{ user_id: "user-1" }]);
+      dataSource.query.mockResolvedValue([{ user_id: backfillUserId }]);
 
       // Mock backfillHistoricalRates dependencies
       userPreferenceRepository.findOne.mockResolvedValue({
-        userId: "user-1",
+        userId: backfillUserId,
         defaultCurrency: "USD",
       });
 
@@ -146,7 +146,7 @@ describe("ExchangeRateService", () => {
       // First call: usersWithForeignAccounts
       // Subsequent calls: backfill queries
       dataSource.query
-        .mockResolvedValueOnce([{ user_id: "user-1" }]) // usersWithForeignAccounts
+        .mockResolvedValueOnce([{ user_id: backfillUserId }]) // usersWithForeignAccounts
         .mockResolvedValueOnce([]) // accountCurrencyRows
         .mockResolvedValueOnce([]); // securityCurrencyRows
 
@@ -155,7 +155,9 @@ describe("ExchangeRateService", () => {
       // Give the async backfill a moment to execute
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(dataSource.query).toHaveBeenCalled();
+      expect(userPreferenceRepository.findOne).toHaveBeenCalledWith({
+        where: { userId: backfillUserId },
+      });
     });
 
     it("handles errors gracefully without throwing", async () => {

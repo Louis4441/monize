@@ -1,8 +1,9 @@
+import { EntityManager } from "typeorm";
 import { Account } from "../accounts/entities/account.entity";
 import { ImportResultDto } from "./dto/import.dto";
 
 export interface ImportContext {
-  queryRunner: any;
+  manager: EntityManager;
   userId: string;
   accountId: string;
   account: Account;
@@ -26,18 +27,18 @@ export interface ImportContext {
  * Uses explicit read-modify-write to avoid TypeORM increment precision issues.
  */
 export async function updateAccountBalance(
-  queryRunner: any,
+  manager: EntityManager,
   accountId: string,
   amount: number,
 ): Promise<void> {
-  const account = await queryRunner.manager.findOne(Account, {
+  const account = await manager.findOne(Account, {
     where: { id: accountId },
   });
   if (account) {
     const currentBalance = Number(account.currentBalance) || 0;
     const newBalance =
       Math.round((currentBalance + Number(amount)) * 100) / 100;
-    await queryRunner.manager.update(Account, accountId, {
+    await manager.update(Account, accountId, {
       currentBalance: newBalance,
     });
   }

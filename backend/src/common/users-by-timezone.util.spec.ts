@@ -1,5 +1,10 @@
 import { DataSource } from "typeorm";
 import { getUsersByEffectiveTimezone } from "./users-by-timezone.util";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("./db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 function makeDataSource(
   rows: Array<{
@@ -8,7 +13,9 @@ function makeDataSource(
     last_client_timezone: string | null;
   }>,
 ): DataSource {
-  return { query: jest.fn().mockResolvedValue(rows) } as unknown as DataSource;
+  const { manager, dataSource } = createScopedDbMocks([]);
+  manager.query.mockResolvedValue(rows);
+  return dataSource as unknown as DataSource;
 }
 
 describe("getUsersByEffectiveTimezone", () => {

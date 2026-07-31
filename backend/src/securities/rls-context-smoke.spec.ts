@@ -37,13 +37,13 @@ describe("securities module RLS context smoke (real withScopedDb)", () => {
       [InvestmentTransaction, txRepo],
       [Holding, { create: jest.fn(), save: jest.fn() }],
     ]);
-    // The timezone fan-out still reads the DataSource directly (the helper is
-    // shared with other modules' crons); the matured-user scan runs inside the
-    // cron's system-context transaction.
-    dataSource.query.mockResolvedValue([
-      { user_id: OWNER_ID, timezone: "UTC", last_client_timezone: null },
-    ]);
-    manager.query.mockResolvedValue([{ user_id: OWNER_ID }]);
+    // The timezone fan-out and the matured-user scan both run inside the cron's
+    // system context, each in its own withScopedDb.
+    manager.query
+      .mockResolvedValueOnce([
+        { user_id: OWNER_ID, timezone: "UTC", last_client_timezone: null },
+      ])
+      .mockResolvedValue([{ user_id: OWNER_ID }]);
     manager.find.mockResolvedValue([]);
 
     const service = new HoldingsService(
