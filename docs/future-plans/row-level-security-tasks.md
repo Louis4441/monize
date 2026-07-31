@@ -57,7 +57,7 @@ uses four classes:
 | C6 | Interceptor restructure: fire-and-forget writes moved inside the ALS scope | F2 | neutral | done |
 | R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral | done |
 | R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral | done |
-| R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral | not started |
+| R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral | done |
 | R4 | Refactor: budgets | F3, C1–C4, C6 | neutral | not started |
 | R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral | not started |
 | R6 | Refactor: ai, mcp, import, action-history, currencies, updates, notifications | F3, C1–C4, C6 | neutral | not started |
@@ -545,8 +545,66 @@ Shared instructions for every R task — the per-task list only names the module
   control proving an unwrapped call still throws).
 
 ### R3. securities, investment-reports, net-worth, monte-carlo, loan-rate-changes, loan-scenarios
-- [ ] Status: not started — ~14 service files; includes holdings rebuild and investment CRUD
-  QueryRunner flows.
+- [x] Status: done (branch `claude/rls-tasks-r3-r5-hcxbst`). All 14 service files converted
+  (securities ×7: `securities`, `holdings`, `investment-transactions`, `portfolio`,
+  `portfolio-calculation`, `security-price`, `sector-weighting`; `investment-reports` ×2;
+  `net-worth`; `monte-carlo`; `loan-rate-changes` ×2; `loan-scenarios`). Ratchet lowered
+  **187 → 137** `@InjectRepository` / **31 → 15** `createQueryRunner` (−66 sites, zero left in the
+  six modules). Full `npm run test:unit` green (10154), build + lint clean.
+
+  **One real bug found and fixed, not just a mechanical conversion.**
+  `NetWorthService.triggerDebouncedRecalc` schedules a `setTimeout`, and several callers trigger it
+  from *inside* a `withScopedDb` block (`TransactionSplitService.createSplits` is the clearest).
+  AsyncLocalStorage propagates into a real timer, so the debounced body would have inherited that
+  block's `EntityManager` through F2's scoped-manager ALS and fired ~2s later — after the
+  transaction had committed and its connection had gone back to the pool. Every query in the recalc
+  would then have run on a dead manager. The timer is now registered inside
+  `runOutsideActiveScopedManager`, so the recalc opens its own transaction (which is what a
+  background job wants anyway); the *identity* context lives in a different ALS and is preserved.
+  Regression test: `src/net-worth/rls-context-smoke.spec.ts`, which fails on the original mistake.
+
+  **Boundary decisions (for R6/R7 and L1):**
+  - Helpers that took an optional `QueryRunner` now take an optional `EntityManager`:
+    `HoldingsService.{findByAccountAndSecurity,createOrUpdate,updateHolding,applySplit,reverseSplit,adjustQuantity,validateNoNegativeHoldingsHistory}`
+    and `SecuritiesService.setSecurityTags`. A private `inScope(manager, fn)` on `HoldingsService`
+    is the one-liner for "use the caller's manager, else open a scoped one".
+  - **R2's `QueryRunner | EntityManager` shim is gone.**
+    `InvestmentTransactionsService.createEmbeddedForSplit` / `reverseAndRemoveEmbedded` now take a
+    plain `EntityManager`, as R2 anticipated.
+  - **`AccountsService.updateBalance` / `recalculateCurrentBalance` dropped their `queryRunner`
+    parameter** — securities was the last caller passing one (R1 deferred this until "after those
+    callers convert"). Their QueryRunner branches are deleted; a caller already inside a scoped
+    transaction joins it via F2 re-entrancy.
+  - `HoldingsService.rebuildAccountsFromTransactions` **keeps** a `QueryRunner | EntityManager`
+    union: the `.mny` importer (R6) still passes a `{ manager }` shim. **R6 should drop the union**
+    when it converts, passing the manager directly.
+  - `getUsersByEffectiveTimezone` still queries the DataSource directly (unchanged from R1/R2).
+  - Read-heavy report reads stayed one statement per short `withScopedDb`, matching the autocommit
+    boundaries they had. Two exceptions wrap a whole read block in one transaction because the
+    statements are a single logical snapshot: `InvestmentTransactionsService.findAll` (count + page)
+    and `getLlmInvestmentTransactions` / `getSummary` (filter build + execute).
+  - `NetWorthService` gained a private `scopedQuery(sql, params)` — one raw statement in its own
+    short scoped transaction — because ~20 call sites there were bare `dataSource.query`.
+  - `SecuritiesService.remove` now deletes the zero-quantity holdings and the security in **one**
+    transaction; they were two autocommit statements before, which could strand holdings.
+
+  **Flagged, NOT fixed (out of R3's scope):** `securities.controller.ts`'s fire-and-forget
+  `netWorthService.recalculateAllInvestmentSnapshots()` after a manual price refresh is a
+  cross-user sweep running under the *requesting user's* context. Harmless at `RLS_MODE=off`; under
+  enforcement it would silently recalculate only that user's accounts. It needs a `withSystemContext`
+  wrap, which R-task rules forbid adding here — it belongs with R6 (the controller is not in any R
+  task's file list) or a follow-up C-task, and must land before flip B.
+
+  **Tests:** the R1 harness (`src/test-helpers/scoped-db-testing.ts`, extended with a `merge` mock)
+  carried the batch. Where a spec previously separated "reporting reads" (`dataSource.query`) from
+  "writes" (`queryRunner.query`), the two now share `manager.query`, so those specs route it back to
+  the same two mocks by statement text (`net-worth.service.spec.ts`, `portfolio.service.spec.ts`,
+  `security-price.service.spec.ts`) rather than collapsing the fixtures. QueryRunner-lifecycle
+  assertions became `dataSource.transaction` grouping assertions. Cron smokes:
+  `src/securities/rls-context-smoke.spec.ts` (matured-holdings + price-refresh crons under the real
+  `withScopedDb` + C2 wrappers, plus a negative control) and `src/net-worth/rls-context-smoke.spec.ts`
+  (the debounce regression above; real timers, because jest's fake timers invoke the callback
+  directly and would make the ALS-propagation assertion vacuous).
 
 ### R4. budgets
 - [ ] Status: not started — ~8 service files.
