@@ -194,6 +194,67 @@ describe("TransactionsService (integration)", () => {
     });
   });
 
+  describe("findAll() running-balance anchor", () => {
+    /**
+     * The register draws its balance column by walking down from the
+     * `startingBalance` the backend returns for the page, skipping VOID rows
+     * because they do not move a balance. The anchor for page 2 and beyond used
+     * a plain `SUM(amount)` over the rows above the page, voids included, so
+     * every earlier page was off by their total: a Money import carrying 31
+     * voided cheques put an account's oldest row $73.22 out.
+     *
+     * Four transactions, two per page: page 2 holds the two oldest, and its
+     * anchor must be the balance *before* them -- opening 1000, plus the two
+     * newer rows, with the void contributing nothing.
+     */
+    it("excludes VOID rows from the page-2 anchor, as the balance does", async () => {
+      const dates = ["2026-01-01", "2026-01-02", "2026-01-03", "2026-01-04"];
+      for (const [index, transactionDate] of dates.entries()) {
+        await withUserContext(userId, () =>
+          service.create(userId, {
+            accountId,
+            transactionDate,
+            amount: -10,
+            currencyCode: "USD",
+            // The newest row is voided: it sits above page 2 and must not
+            // count toward what page 2 starts from.
+            status:
+              index === 3 ? TransactionStatus.VOID : TransactionStatus.CLEARED,
+          }),
+        );
+      }
+
+      const page2 = await withUserContext(userId, () =>
+        service.findAll(
+          userId,
+          [accountId],
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          2,
+          2,
+        ),
+      );
+
+      expect(page2.data.map((tx) => tx.transactionDate)).toEqual([
+        "2026-01-02",
+        "2026-01-01",
+      ]);
+
+      // Page 1 holds the void and Jan 3, so page 2 starts from the balance
+      // after Jan 2: 1000 - 10 - 10 = 980. Counting the void as well -- the
+      // defect -- made it 990.
+      expect(page2.startingBalance).toBe(980);
+
+      // What the user sees: the register walks down from that anchor, and the
+      // oldest row lands on the opening balance plus its own amount.
+      const oldestRowBalance = page2.startingBalance! - -10;
+      expect(oldestRowBalance).toBe(990);
+      expect(oldestRowBalance - -10).toBe(1000);
+    });
+  });
+
   describe("findOne()", () => {
     it("should load relations correctly", async () => {
       const category = await createTestCategory(dataSource, userId, {
