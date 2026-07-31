@@ -512,9 +512,19 @@ real mappers and, in the integration spec, the real INSERT path.
 ### 8.2 Transactions
 
 - Include a `TRN` row when: it has an account, a valid date, is not a split child, not a bill
-  template (`BILL.lHtrn`), not an orphaned transfer side, and `frq == -1`.
+  template (`BILL.lHtrn`), not part of a loan-payment template (`grftt & 0x4000`), not an
+  orphaned transfer side, and `frq == -1`.
   **Scheduler-posted rows are imported** — they are real postings (loan payments,
   online-banking imports); excluding them was PR bug #1.
+- **A transfer whose far side carries `hsec` is a transfer into the brokerage's cash sleeve.**
+  Money's investment row is both the arriving cash and the trade, and the investment mapper
+  spends that cash on the trade — so the import synthesizes the sleeve-side row Money has no
+  place for. Without it 3,255 of the maintainer's transfers debited a bank account with nothing
+  arriving anywhere, and the sleeves absorbed $553,225.57.
+- **Loan-payment templates (`grftt & 0x4000`) are phantoms, whole families of them.** One per
+  debt account: an account-less split parent, its legs, and the legs' counterparts *in the loan
+  account*, which have a real account and date and so import as ordinary principal postings if
+  only the parent is skipped. `BILL.lHtrn` does not reference them.
 - `grftt & 0x100` -> status VOID (imported, excluded from balances by existing logic). **Not**
   `0x80`, which marks a row in a loan or mortgage account: using it voided every loan payment
   and left each debt account frozen at its opening balance.
@@ -563,6 +573,13 @@ LOT-derived open-lot positions (`htrnSell` empty, sum `qty`) and its action-repl
 compared and any disagreement becomes a verification-report warning. Foreign-currency cost basis
 differences (Money stores base-currency values at historical rates) surface as warnings —
 documented v1 limitation.
+
+**Only securities the file shows activity for are imported.** `SEC` doubles as Money's watch list
+and its index-quote store, and `sct` does not separate those from real holdings — the maintainer's
+file keeps the Dow, the NASDAQ, the DAX, the FTSE, the Hang Seng, the Nikkei, the TSX and the
+Straits Times under the same code as two ETFs actually owned. Activity does separate them: a
+security referenced by no `TRN` row and no `LOT` is dropped, and its quote history goes with it
+(31 of 98 securities, 17,025 of 69,076 prices).
 
 ## 9. Task list
 
