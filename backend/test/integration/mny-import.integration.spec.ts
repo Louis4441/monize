@@ -648,7 +648,7 @@ describe("mny writers (integration)", () => {
       const { input } = await setup(
         transactionData({
           transactions: [
-            mnyTransaction({ handle: 1, account: 1, amount: -99, flags: 0x80 }),
+            mnyTransaction({ handle: 1, account: 1, amount: -99, flags: 0x100 }),
           ],
         }),
       );
@@ -661,6 +661,30 @@ describe("mny writers (integration)", () => {
         where: { userId },
       });
       expect(row!.status).toBe("VOID");
+    });
+
+    // The bug this guards: 0x80 was read as the void bit, but it marks a row in
+    // a loan or mortgage account -- so every loan payment reached the database
+    // VOID and `computeExpectedBalances` then skipped it, freezing each debt
+    // account at its opening balance. Asserted here, at the writer, because the
+    // status that matters is the one the row is stored with.
+    it("stores a loan-account row as a normal posting, not voided", async () => {
+      const { input } = await setup(
+        transactionData({
+          transactions: [
+            mnyTransaction({ handle: 1, account: 1, amount: -99, flags: 0x80 }),
+          ],
+        }),
+      );
+
+      await inTransaction((manager) =>
+        writeTransactions(manager, userId, input),
+      );
+
+      const row = await dataSource.getRepository(Transaction).findOne({
+        where: { userId },
+      });
+      expect(row!.status).not.toBe("VOID");
     });
 
     it("writes more rows than one chunk holds", async () => {
