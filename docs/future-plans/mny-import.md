@@ -525,6 +525,14 @@ real mappers and, in the integration spec, the real INSERT path.
   debt account: an account-less split parent, its legs, and the legs' counterparts *in the loan
   account*, which have a real account and date and so import as ordinary principal postings if
   only the parent is skipped. `BILL.lHtrn` does not reference them.
+- **`BILL.lHtrn` is not the template.** It points at whatever transaction the series currently
+  holds, which for an entered bill is the posting: 1,843 of the maintainer's 1,845 are `frq != -1`
+  and excluded anyway, and the other two were real 2003 postings worth $6,243.96. The row's own
+  `frq` decides.
+- **`TRN.szId` packs a kind digit in front of the reference** -- `1` then free text (`1Debit`),
+  `0` then a number right-aligned in twelve characters (`0           2`). Imported whole it shows
+  as `1Debit` and `0 2`. The number is Money's instalment counter inside a debt account, where
+  the register has no Num column, and a cheque number everywhere else.
 - `grftt & 0x100` -> status VOID (imported, excluded from balances by existing logic). **Not**
   `0x80`, which marks a row in a loan or mortgage account: using it voided every loan payment
   and left each debt account frozen at its opening balance.

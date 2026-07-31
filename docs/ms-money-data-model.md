@@ -221,7 +221,7 @@ pair. Not every investment account has one.
 | `hcat` | Category FK |
 | `lHpay` / `hpay` | Payee FK |
 | `mMemo` | Memo |
-| `szId` | Reference number (cheque number) |
+| `szId` | Reference, behind a one-digit kind marker (below) |
 | `cs` | Cleared status: 0 unreconciled, 1 cleared, 2 reconciled |
 | `frq` | `-1` for a real posting; anything else is a scheduler artefact |
 | `grftt` | Bit flags (below) |
@@ -229,6 +229,25 @@ pair. Not every investment account has one.
 
 An investment row is identified by carrying a security, not by its action code:
 `act = 0` is BUY and is indistinguishable from a plain payment by `act` alone.
+
+> **Correction.** The original gives `szId` as the reference number outright. It
+> is the reference behind a leading digit naming its kind, and importing the
+> string whole puts `1Debit` and `0           2` in the register.
+>
+> - `1` prefixes free text -- Debit, ATM, Telebank, PC Banking, EComm. 2,209
+>   rows in the maintainer's file, not one of them numeric.
+> - `0` prefixes a number right-aligned in twelve characters, so the value is
+>   always thirteen characters long. 1,060 rows, every one numeric.
+>
+> A `0` number in a loan or mortgage account is Money's instalment counter, not
+> a reference: 657 of the 1,060 sit in debt accounts counting up the payment
+> schedule, all 461 in Money Plus's own `sample.mny` are the Home Loan payment
+> numbers, the bank side of the transfer carries none of them in any of 642
+> cases, and Money's loan register has no Num column to show one in.
+>
+> Both shapes are matched strictly and anything else is passed through, so a
+> cheque number typed as `1042` stays `1042` rather than becoming the text `042`
+> behind a kind digit (`model/mny-model.ts`, `decodeReference`).
 
 ### The `act` field
 
