@@ -54,7 +54,8 @@ committed here, so the pipeline measures itself and the run is what gets recorde
 
 ## Memory
 
-An upload is buffered whole and decrypted in place, so peak usage is roughly **twice the file
+An upload is buffered whole and decrypted in place, and the reader works on its own copy of
+those bytes (see the `mdb-reader` trap below), so peak usage is roughly **twice the file
 size** above baseline. `MNY_IMPORT_LIMIT_MB` (default 300) bounds it; the pod needs at least
 `2x` that plus headroom, which the default Helm limit of `150Mi` is nowhere near. A pod that hits
 its limit mid-import is OOM-killed and the wizard reports a *stalled job*, naming the symptom and
@@ -91,6 +92,15 @@ not the cause -- see `helm/README.md` for the sizing table.
 - **`decryptMsisamInPlace` takes ownership of its buffer.** It mutates and returns the same
   buffer, deliberately (ADR-6). Tests must read a fresh fixture per assertion --
   `readMnyFixture` does that.
+- **`mdb-reader` writes into the bytes it reads, and the corruption is silent and specific.**
+  A second read of the same buffer returns every currency value with its sign stripped
+  (`-20.0000` reads back as `20.0000`) while row counts, dates and text stay correct, so
+  nothing looks wrong until a ledger of pure credits arrives. The wizard reads a buffer twice
+  by design -- `POST /parse` reads the upload and stages *those same bytes*, and the job reads
+  them again -- so this made every imported transaction a credit, both sides of every transfer
+  positive, and account opening balances absolute (they share `toAmount`). `openDatabase` hands
+  the reader its own copy, which is what makes `openMnyFile` a door you may walk through twice.
+  Do not "optimise" that copy away.
 - **Decrypt each buffer exactly once; RC4 is symmetric.** A second pass re-encrypts pages
   1..0xE, and the only symptom is `MnyUnreadableDatabaseError` from a layer that looks
   unrelated. Staged bytes are stored *decrypted* so the password is spent on the parse request

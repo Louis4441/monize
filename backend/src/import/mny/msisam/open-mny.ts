@@ -133,7 +133,20 @@ function openDatabase(
   let reader: MDBReader;
   let tableNames: string[];
   try {
-    reader = new MDBReader(buffer);
+    // `mdb-reader` writes into the bytes it reads, and the damage is silent:
+    // a second read of the same buffer returns every currency value with its
+    // sign stripped (-20.0000 reads back as 20.0000) while row counts, dates
+    // and text all stay correct. The wizard hits this on every import --
+    // `POST /parse` reads the upload and then stages those same bytes, so the
+    // background job's re-read saw an all-positive ledger: every debit became
+    // a credit, both sides of a transfer came out positive, and account
+    // opening balances were absolute too, because they share `toAmount`.
+    //
+    // The reader therefore gets its own copy and the caller's buffer stays
+    // readable plaintext. That costs one extra file-size of peak memory (see
+    // the README's Memory section) and is the price of `openMnyFile` being a
+    // door you may walk through twice.
+    reader = new MDBReader(Buffer.from(buffer));
     tableNames = reader.getTableNames();
   } catch (error) {
     throw new MnyUnreadableDatabaseError(error);
