@@ -1,5 +1,3 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { PortfolioService } from "./portfolio.service";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { Holding } from "./entities/holding.entity";
@@ -14,10 +12,11 @@ import {
   AccountSubType,
 } from "../accounts/entities/account.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { ExchangeRateService } from "../currencies/exchange-rate.service";
-import { YahooFinanceService } from "./yahoo-finance.service";
-import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
-import { SectorWeightingService } from "./sector-weighting.service";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("PortfolioService", () => {
   let service: PortfolioService;
@@ -213,50 +212,33 @@ describe("PortfolioService", () => {
       }),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PortfolioService,
-        PortfolioCalculationService,
-        {
-          provide: getRepositoryToken(Holding),
-          useValue: holdingsRepository,
-        },
-        {
-          provide: getRepositoryToken(SecurityPrice),
-          useValue: securityPriceRepository,
-        },
-        {
-          provide: getRepositoryToken(InvestmentTransaction),
-          useValue: investmentTransactionRepository,
-        },
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: prefRepository,
-        },
-        {
-          provide: ExchangeRateService,
-          useValue: exchangeRateService,
-        },
-        {
-          provide: YahooFinanceService,
-          useValue: yahooFinanceService,
-        },
-        {
-          provide: QuoteProviderRegistry,
-          useValue: quoteProviderRegistry,
-        },
-        {
-          provide: SectorWeightingService,
-          useValue: sectorWeightingService,
-        },
-      ],
-    }).compile();
+    const { manager, dataSource } = createScopedDbMocks([
+      [Holding, holdingsRepository],
+      [SecurityPrice, securityPriceRepository],
+      [InvestmentTransaction, investmentTransactionRepository],
+      [Account, accountsRepository],
+      [UserPreference, prefRepository],
+    ]);
+    // Every raw statement now runs through the transaction manager. Route it
+    // back to the two mocks the assertions already use -- price history vs.
+    // everything else -- so each test's fixtures stay independent.
+    manager.query.mockImplementation((sql: string, params?: unknown[]) =>
+      /security_prices/.test(sql)
+        ? securityPriceRepository.query(sql, params)
+        : accountsRepository.query(sql, params),
+    );
 
-    service = module.get<PortfolioService>(PortfolioService);
+    const calculationService = new PortfolioCalculationService(
+      dataSource as never,
+      exchangeRateService as never,
+    );
+    service = new PortfolioService(
+      dataSource as never,
+      calculationService,
+      yahooFinanceService as never,
+      quoteProviderRegistry as never,
+      sectorWeightingService as never,
+    );
   });
 
   describe("getLatestPrices", () => {
@@ -3867,12 +3849,12 @@ describe("PortfolioService", () => {
         ],
       });
 
-      (holdingsRepository as Record<string, unknown>).manager = {
-        query: jest.fn().mockResolvedValue([
-          { symbol: "VWCE", id: "t-aw", name: "All-World", color: null },
-          { symbol: "SMH", id: "t-ai", name: "AI", color: null },
-        ]),
-      };
+      // The symbol -> tag lookup is a raw statement; it lands on the
+      // non-price branch of the manager.query router.
+      accountsRepository.query.mockResolvedValue([
+        { symbol: "VWCE", id: "t-aw", name: "All-World", color: null },
+        { symbol: "SMH", id: "t-ai", name: "AI", color: null },
+      ]);
 
       const result = await service.getAllocationByTag("user-1");
 

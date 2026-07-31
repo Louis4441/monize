@@ -1,15 +1,15 @@
-import { Test, TestingModule } from "@nestjs/testing";
 import { NotFoundException } from "@nestjs/common";
-import { getRepositoryToken } from "@nestjs/typeorm";
-import { DataSource } from "typeorm";
 import { SecurityPriceService } from "./security-price.service";
 import { SecurityPrice } from "./entities/security-price.entity";
 import { Security } from "./entities/security.entity";
-import { NetWorthService } from "../net-worth/net-worth.service";
 import { YahooFinanceService } from "./yahoo-finance.service";
-import { MsnFinanceService } from "./msn-finance.service";
 import { QuoteProviderRegistry } from "./providers/quote-provider.registry";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 const TEST_USER_ID = "user-1";
 
@@ -158,9 +158,9 @@ describe("SecurityPriceService", () => {
       find: jest.fn().mockResolvedValue([]),
     };
 
-    dataSourceMock = {
-      query: jest.fn(),
-    };
+    // Raw statements now run through the scoped transaction's manager; the
+    // spec keeps asserting against this mock.
+    dataSourceMock = { query: jest.fn() };
 
     netWorthService = {
       recalculateAllInvestmentSnapshots: jest.fn().mockResolvedValue(undefined),
@@ -188,39 +188,26 @@ describe("SecurityPriceService", () => {
     // The registry reads provider.name to order/resolve providers.
     (msnFinanceService as Record<string, unknown>).name = "msn";
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SecurityPriceService,
-        {
-          provide: getRepositoryToken(SecurityPrice),
-          useValue: securityPriceRepository,
-        },
-        {
-          provide: getRepositoryToken(Security),
-          useValue: securitiesRepository,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: userPreferenceRepository,
-        },
-        {
-          provide: DataSource,
-          useValue: dataSourceMock,
-        },
-        {
-          provide: NetWorthService,
-          useValue: netWorthService,
-        },
-        YahooFinanceService,
-        {
-          provide: MsnFinanceService,
-          useValue: msnFinanceService,
-        },
-        QuoteProviderRegistry,
-      ],
-    }).compile();
+    const { manager, dataSource } = createScopedDbMocks([
+      [SecurityPrice, securityPriceRepository],
+      [Security, securitiesRepository],
+      [UserPreference, userPreferenceRepository],
+    ]);
+    manager.query.mockImplementation((sql: string, params?: unknown[]) =>
+      dataSourceMock.query(sql, params),
+    );
 
-    service = module.get<SecurityPriceService>(SecurityPriceService);
+    const yahooFinanceService = new YahooFinanceService();
+    const providers = new QuoteProviderRegistry(
+      yahooFinanceService,
+      msnFinanceService as never,
+    );
+
+    service = new SecurityPriceService(
+      dataSource as never,
+      netWorthService as never,
+      providers,
+    );
   });
 
   afterEach(() => {

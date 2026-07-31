@@ -1,5 +1,12 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
+
 import {
   NotFoundException,
   BadRequestException,
@@ -16,17 +23,6 @@ import {
 } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { AccountSubType } from "../accounts/entities/account.entity";
-import { AccountsService } from "../accounts/accounts.service";
-import { TransactionsService } from "../transactions/transactions.service";
-import { HoldingsService } from "./holdings.service";
-import { PortfolioCalculationService } from "./portfolio-calculation.service";
-import { SecuritiesService } from "./securities.service";
-import { SecurityPriceService } from "./security-price.service";
-import { NetWorthService } from "../net-worth/net-worth.service";
-import { ExchangeRateService } from "../currencies/exchange-rate.service";
-import { CurrenciesService } from "../currencies/currencies.service";
-import { DataSource } from "typeorm";
-import { ActionHistoryService } from "../action-history/action-history.service";
 import { isTransactionInFuture } from "../common/date-utils";
 
 jest.mock("../common/date-utils", () => ({
@@ -49,7 +45,7 @@ describe("InvestmentTransactionsService", () => {
   let netWorthService: Record<string, jest.Mock>;
   let exchangeRateService: Record<string, jest.Mock>;
   let currenciesService: Record<string, jest.Mock>;
-  let dataSource: Record<string, jest.Mock>;
+  let dataSource: DataSourceMock;
   let mockQueryRunner: Record<string, any>;
   let mockActionHistoryService: Record<string, jest.Mock>;
 
@@ -293,13 +289,10 @@ describe("InvestmentTransactionsService", () => {
       ),
     };
 
+    // Was the QueryRunner every write block opened; now the scoped
+    // transaction's EntityManager, kept under `.manager` so the existing
+    // assertions read unchanged.
     mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      query: jest.fn().mockResolvedValue([]),
       manager: {
         create: jest.fn().mockImplementation((_Entity: any, data: any) => {
           if (_Entity === InvestmentTransaction)
@@ -338,73 +331,35 @@ describe("InvestmentTransactionsService", () => {
       record: jest.fn().mockResolvedValue(null),
     };
 
-    dataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
+    portfolioCalculationService = {
+      calculateRealizedGains: jest.fn().mockResolvedValue([]),
+      calculateCapitalGainsByMonth: jest.fn().mockResolvedValue([]),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        InvestmentTransactionsService,
-        {
-          provide: getRepositoryToken(InvestmentTransaction),
-          useValue: investmentTransactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionRepository,
-        },
-        {
-          provide: DataSource,
-          useValue: dataSource,
-        },
-        {
-          provide: AccountsService,
-          useValue: accountsService,
-        },
-        {
-          provide: TransactionsService,
-          useValue: transactionsService,
-        },
-        {
-          provide: HoldingsService,
-          useValue: holdingsService,
-        },
-        {
-          provide: PortfolioCalculationService,
-          useValue: (portfolioCalculationService = {
-            calculateRealizedGains: jest.fn().mockResolvedValue([]),
-            calculateCapitalGainsByMonth: jest.fn().mockResolvedValue([]),
-          }),
-        },
-        {
-          provide: SecuritiesService,
-          useValue: securitiesService,
-        },
-        {
-          provide: SecurityPriceService,
-          useValue: securityPriceService,
-        },
-        {
-          provide: NetWorthService,
-          useValue: netWorthService,
-        },
-        {
-          provide: ActionHistoryService,
-          useValue: mockActionHistoryService,
-        },
-        {
-          provide: ExchangeRateService,
-          useValue: exchangeRateService,
-        },
-        {
-          provide: CurrenciesService,
-          useValue: currenciesService,
-        },
-      ],
-    }).compile();
+    const mocks = createScopedDbMocks([
+      [InvestmentTransaction, investmentTransactionsRepository],
+      [Transaction, transactionRepository],
+    ]);
+    dataSource = mocks.dataSource;
+    // Reuse the direct-manager behaviours the spec already defines.
+    for (const [name, impl] of Object.entries(mockQueryRunner.manager)) {
+      mocks.manager[name] = impl as jest.Mock;
+    }
+    mocks.manager.query = jest.fn().mockResolvedValue([]);
+    mockQueryRunner = { manager: mocks.manager };
 
-    service = module.get<InvestmentTransactionsService>(
-      InvestmentTransactionsService,
+    service = new InvestmentTransactionsService(
+      dataSource as never,
+      accountsService as never,
+      transactionsService as never,
+      holdingsService as never,
+      portfolioCalculationService as never,
+      securitiesService as never,
+      securityPriceService as never,
+      netWorthService as never,
+      mockActionHistoryService as never,
+      exchangeRateService as never,
+      currenciesService as never,
     );
   });
 
@@ -490,7 +445,6 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         cashAccountId,
         -1509.99,
-        expect.anything(),
       );
     });
 
@@ -980,7 +934,6 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         fundingAccountId,
         expect.any(Number),
-        expect.anything(),
       );
     });
 
@@ -1782,11 +1735,10 @@ describe("InvestmentTransactionsService", () => {
         // security so unrelated pre-existing oversells don't get blamed.
         expect.arrayContaining([expect.any(String)]),
       );
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
-    it("rolls back when the edit would cause negative holdings on some date", async () => {
+    it("aborts the edit when it would cause negative holdings on some date", async () => {
       const existingTx = { ...mockBuyTransaction };
       const firstFindQB = createMockQueryBuilder(existingTx);
       investmentTransactionsRepository.createQueryBuilder.mockReturnValueOnce(
@@ -1808,8 +1760,9 @@ describe("InvestmentTransactionsService", () => {
         service.update(userId, transactionId, { quantity: 1 }),
       ).rejects.toThrow(/Negative holdings/);
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
+      // The guard throws inside the scoped transaction, which rolls back, so
+      // the post-commit history record never runs.
+      expect(mockActionHistoryService.record).not.toHaveBeenCalled();
     });
 
     it("recalculates totalAmount when quantity changes", async () => {
@@ -1995,7 +1948,6 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         cashAccountId,
         1509.99, // Reverse of -1509.99
-        expect.anything(),
       );
 
       // Should remove the cash transaction
@@ -2119,14 +2071,12 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         fundingAccountId,
         1509.99,
-        expect.anything(),
       );
 
       // NEW funding account should be debited via a freshly created cash tx
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         newFundingAccountId,
         -1509.99,
-        expect.anything(),
       );
 
       // The new linked cash transaction must be persisted on the NEW account
@@ -2291,7 +2241,6 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         cashAccountId,
         1509.99,
-        expect.anything(),
       );
       expect(transactionRepository.remove).toHaveBeenCalled();
 
@@ -3218,12 +3167,10 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         cashAccountId,
         1509.99,
-        mockQueryRunner,
       );
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         cashAccountId,
         -790.01,
-        mockQueryRunner,
       );
       // Should remove cash transactions
       expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith([
@@ -3797,7 +3744,6 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         cashAccountId,
         -1365,
-        expect.anything(),
       );
     });
 
@@ -3952,7 +3898,6 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         cashAccountId,
         1300,
-        expect.anything(),
       );
     });
 
@@ -4054,7 +3999,6 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         cashAccountId,
         -9.93,
-        expect.anything(),
       );
     });
 
@@ -4261,7 +4205,7 @@ describe("InvestmentTransactionsService", () => {
       });
     });
 
-    it("create commits transaction on success and releases queryRunner", async () => {
+    it("create runs its writes in one scoped transaction", async () => {
       const savedTx = {
         id: "inv-tx-1",
         ...createBuyDto,
@@ -4287,14 +4231,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.create(userId, createBuyDto);
 
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.save).toHaveBeenCalled();
     });
 
-    it("create rolls back on error and releases queryRunner", async () => {
+    it("create propagates a write failure out of the transaction", async () => {
       investmentTransactionsRepository.save.mockRejectedValue(
         new Error("DB error"),
       );
@@ -4303,13 +4244,13 @@ describe("InvestmentTransactionsService", () => {
         "DB error",
       );
 
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // The transaction rolled back, so none of the post-commit side effects
+      // (price upsert, history record) ran.
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(mockActionHistoryService.record).not.toHaveBeenCalled();
     });
 
-    it("update commits transaction on success and releases queryRunner", async () => {
+    it("update runs its writes in one scoped transaction", async () => {
       const existingTx = {
         id: "inv-tx-1",
         userId,
@@ -4335,14 +4276,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.update(userId, "inv-tx-1", { quantity: 20 });
 
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.save).toHaveBeenCalled();
     });
 
-    it("remove commits transaction on success and releases queryRunner", async () => {
+    it("remove runs its writes in one scoped transaction", async () => {
       const existingTx = {
         id: "inv-tx-1",
         userId,
@@ -4367,14 +4305,11 @@ describe("InvestmentTransactionsService", () => {
 
       await service.remove(userId, "inv-tx-1");
 
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.remove).toHaveBeenCalled();
     });
 
-    it("remove rolls back on error and releases queryRunner", async () => {
+    it("remove propagates a delete failure out of the transaction", async () => {
       const existingTx = {
         id: "inv-tx-1",
         userId,
@@ -4412,9 +4347,9 @@ describe("InvestmentTransactionsService", () => {
         "Balance error",
       );
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // Rolled back inside the scoped transaction, so nothing was recorded.
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(mockActionHistoryService.record).not.toHaveBeenCalled();
     });
   });
 
@@ -4426,7 +4361,7 @@ describe("InvestmentTransactionsService", () => {
       exchangeRateService.getLatestRate.mockResolvedValue(1);
 
       const created = await service.createEmbeddedForSplit(
-        mockQueryRunner as any,
+        mockQueryRunner.manager as any,
         userId,
         "2026-05-09",
         "split-1",
@@ -4453,7 +4388,7 @@ describe("InvestmentTransactionsService", () => {
         securityId,
         75,
         10,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         false,
       );
       // The embedded path should never invoke the cash-side balance update
@@ -4479,7 +4414,7 @@ describe("InvestmentTransactionsService", () => {
     it("rejects disallowed actions in an embedded split", async () => {
       await expect(
         service.createEmbeddedForSplit(
-          mockQueryRunner as any,
+          mockQueryRunner.manager as any,
           userId,
           "2026-05-09",
           "split-1",
@@ -4502,7 +4437,7 @@ describe("InvestmentTransactionsService", () => {
 
       await expect(
         service.createEmbeddedForSplit(
-          mockQueryRunner as any,
+          mockQueryRunner.manager as any,
           userId,
           "2026-05-09",
           "split-1",
@@ -4523,7 +4458,7 @@ describe("InvestmentTransactionsService", () => {
 
       await expect(
         service.createEmbeddedForSplit(
-          mockQueryRunner as any,
+          mockQueryRunner.manager as any,
           userId,
           "2026-05-09",
           "split-1",
@@ -4546,7 +4481,7 @@ describe("InvestmentTransactionsService", () => {
 
         await expect(
           service.createEmbeddedForSplit(
-            mockQueryRunner as any,
+            mockQueryRunner.manager as any,
             userId,
             "2026-05-09",
             "split-1",
@@ -4564,7 +4499,7 @@ describe("InvestmentTransactionsService", () => {
       exchangeRateService.getLatestRate.mockResolvedValue(1);
 
       const created = await service.createEmbeddedForSplit(
-        mockQueryRunner as any,
+        mockQueryRunner.manager as any,
         userId,
         "2026-05-09",
         "split-1",
@@ -4597,7 +4532,7 @@ describe("InvestmentTransactionsService", () => {
       exchangeRateService.getLatestRate.mockResolvedValue(1);
 
       await service.createEmbeddedForSplit(
-        mockQueryRunner as any,
+        mockQueryRunner.manager as any,
         userId,
         "2026-05-09",
         "split-1",
@@ -4618,7 +4553,7 @@ describe("InvestmentTransactionsService", () => {
         securityId,
         -10,
         50,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         false,
       );
       // Cash side suppressed
@@ -4785,7 +4720,6 @@ describe("InvestmentTransactionsService", () => {
       expect(accountsService.updateBalance).toHaveBeenCalledWith(
         cashAccountId,
         -500,
-        mockQueryRunner,
       );
     });
 
@@ -4851,7 +4785,7 @@ describe("InvestmentTransactionsService", () => {
       };
 
       await service.reverseAndRemoveEmbedded(
-        mockQueryRunner as any,
+        mockQueryRunner.manager as any,
         userId,
         embedded,
       );
@@ -4863,7 +4797,7 @@ describe("InvestmentTransactionsService", () => {
         securityId,
         -5,
         10,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         true,
       );
       expect(mockQueryRunner.manager.remove).toHaveBeenCalledWith(embedded);
@@ -4915,7 +4849,7 @@ describe("InvestmentTransactionsService", () => {
         securityId,
         -100,
         1.67,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         false,
       );
       // TRANSFER_IN adds to the destination at the same per-share cost.
@@ -4925,10 +4859,10 @@ describe("InvestmentTransactionsService", () => {
         securityId,
         100,
         1.67,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         false,
       );
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
       expect(result).toHaveProperty("transferOut");
       expect(result).toHaveProperty("transferIn");
     });
@@ -4945,7 +4879,7 @@ describe("InvestmentTransactionsService", () => {
         holdingsService.validateNoNegativeHoldingsHistory,
       ).toHaveBeenCalledWith(
         userId,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         [accountId, toAccountId],
         [securityId],
       );
@@ -4958,7 +4892,7 @@ describe("InvestmentTransactionsService", () => {
           toAccountId: accountId,
         }),
       ).rejects.toThrow(BadRequestException);
-      expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
     it("rejects when an account is not an investment account", async () => {
@@ -4992,8 +4926,7 @@ describe("InvestmentTransactionsService", () => {
       await expect(
         service.transferSecurity(userId, transferDto),
       ).rejects.toThrow(BadRequestException);
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
     it("links the two legs to each other", async () => {
@@ -5023,7 +4956,7 @@ describe("InvestmentTransactionsService", () => {
         securityId,
         -100,
         0,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         false,
       );
       expect(holdingsService.updateHolding).toHaveBeenCalledWith(
@@ -5032,10 +4965,10 @@ describe("InvestmentTransactionsService", () => {
         securityId,
         100,
         0,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         false,
       );
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
     it("carries the source holding's average cost, ignoring the client value", async () => {
@@ -5058,7 +4991,7 @@ describe("InvestmentTransactionsService", () => {
         securityId,
         -100,
         4.25,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         false,
       );
       expect(holdingsService.updateHolding).toHaveBeenCalledWith(
@@ -5067,7 +5000,7 @@ describe("InvestmentTransactionsService", () => {
         securityId,
         100,
         4.25,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         false,
       );
     });
@@ -5086,7 +5019,7 @@ describe("InvestmentTransactionsService", () => {
       await expect(
         service.transferSecurity(userId, transferDto),
       ).rejects.toThrow(BadRequestException);
-      expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+      expect(dataSource.transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -5165,11 +5098,11 @@ describe("InvestmentTransactionsService", () => {
         holdingsService.validateNoNegativeHoldingsHistory,
       ).toHaveBeenCalledWith(
         userId,
-        mockQueryRunner,
+        mockQueryRunner.manager,
         expect.arrayContaining([accountId, toAccountId]),
         [securityId],
       );
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
     it("update propagates the edit to both legs and keeps them linked", async () => {
@@ -5191,7 +5124,7 @@ describe("InvestmentTransactionsService", () => {
       expect(savedActions).toContain(InvestmentAction.TRANSFER_IN);
       // Edit propagated to the linked leg too.
       expect(inLeg.quantity).toBe(50);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
     it("update rejects changing the transfer direction", async () => {
@@ -5228,7 +5161,7 @@ describe("InvestmentTransactionsService", () => {
 
       // The destination (linked) leg moves to the new account.
       expect(inLeg.accountId).toBe(account3);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
     it("update rejects rerouting the destination to the source account", async () => {
@@ -5270,7 +5203,7 @@ describe("InvestmentTransactionsService", () => {
       // Source account applied to the OUT leg, destination to the IN leg.
       expect(outLeg.accountId).toBe(account3);
       expect(inLeg.accountId).toBe(toAccountId);
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
     it("rebuilds the affected accounts' holdings inside the edit transaction", async () => {
@@ -5289,7 +5222,7 @@ describe("InvestmentTransactionsService", () => {
       ).toHaveBeenCalledWith(
         userId,
         expect.arrayContaining([accountId, toAccountId]),
-        mockQueryRunner,
+        mockQueryRunner.manager,
       );
     });
 
