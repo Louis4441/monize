@@ -315,7 +315,7 @@
       "accounts": "帳戶",
       "securities": "證券",
       "investments": "投資交易",
-      "investmentDetail": "{transfers} 筆證券移轉、{splits} 次股票分割",
+      "investmentDetail": "{transfers} 筆證券移轉",
       "prices": "價格歷史",
       "exchangeRates": "匯率",
       "ofTotal": "共 {total} 項",

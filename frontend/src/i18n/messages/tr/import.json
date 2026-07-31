@@ -315,7 +315,7 @@
       "accounts": "Hesaplar",
       "securities": "Menkul kıymetler",
       "investments": "Yatırım işlemleri",
-      "investmentDetail": "{transfers} kıymet transferi, {splits} hisse bölünmesi",
+      "investmentDetail": "{transfers} kıymet transferi",
       "prices": "Fiyat geçmişi",
       "exchangeRates": "Döviz kurları",
       "ofTotal": "dosyadaki {total} içinden",

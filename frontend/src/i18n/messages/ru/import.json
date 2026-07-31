@@ -315,7 +315,7 @@
       "accounts": "Счета",
       "securities": "Ценные бумаги",
       "investments": "Инвестиционные операции",
-      "investmentDetail": "{transfers} переводов бумаг, {splits} дроблений акций",
+      "investmentDetail": "{transfers} переводов бумаг",
       "prices": "История цен",
       "exchangeRates": "Курсы валют",
       "ofTotal": "из {total} в файле",

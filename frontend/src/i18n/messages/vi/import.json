@@ -315,7 +315,7 @@
       "accounts": "Tài khoản",
       "securities": "Chứng khoán",
       "investments": "Giao dịch đầu tư",
-      "investmentDetail": "{transfers} lần chuyển chứng khoán, {splits} lần tách cổ phiếu",
+      "investmentDetail": "{transfers} lần chuyển chứng khoán",
       "prices": "Lịch sử giá",
       "exchangeRates": "Tỷ giá hối đoái",
       "ofTotal": "trong {total} có trong tệp",

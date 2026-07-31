@@ -315,7 +315,7 @@
       "accounts": "Comptes",
       "securities": "Titres",
       "investments": "Transactions de placement",
-      "investmentDetail": "{transfers} transferts de titres, {splits} divisions d'actions",
+      "investmentDetail": "{transfers} transferts de titres",
       "prices": "Historique du cours",
       "exchangeRates": "Taux de change",
       "ofTotal": "sur {total} dans le fichier",

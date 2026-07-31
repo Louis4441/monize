@@ -315,7 +315,7 @@
       "accounts": "账户",
       "securities": "证券",
       "investments": "投资交易",
-      "investmentDetail": "{transfers} 笔证券转移，{splits} 次拆股",
+      "investmentDetail": "{transfers} 笔证券转移",
       "prices": "价格历史",
       "exchangeRates": "汇率",
       "ofTotal": "共 {total} 项",

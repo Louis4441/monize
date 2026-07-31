@@ -315,7 +315,7 @@
       "accounts": "口座",
       "securities": "有価証券",
       "investments": "投資取引",
-      "investmentDetail": "証券振替 {transfers} 件、株式分割 {splits} 件",
+      "investmentDetail": "証券振替 {transfers} 件",
       "prices": "価格履歴",
       "exchangeRates": "為替レート",
       "ofTotal": "ファイル内 {total} 件のうち",

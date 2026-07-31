@@ -315,7 +315,7 @@
       "accounts": "Rekeningen",
       "securities": "Effecten",
       "investments": "Beleggingstransacties",
-      "investmentDetail": "{transfers} effectenoverboekingen, {splits} aandelensplitsingen",
+      "investmentDetail": "{transfers} effectenoverboekingen",
       "prices": "Koersgeschiedenis",
       "exchangeRates": "Wisselkoersen",
       "ofTotal": "van {total} in het bestand",

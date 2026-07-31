@@ -315,7 +315,7 @@
       "accounts": "Akun",
       "securities": "Efek",
       "investments": "Transaksi investasi",
-      "investmentDetail": "{transfers} transfer efek, {splits} pemecahan saham",
+      "investmentDetail": "{transfers} transfer efek",
       "prices": "Riwayat harga",
       "exchangeRates": "Kurs tukar",
       "ofTotal": "dari {total} di berkas",

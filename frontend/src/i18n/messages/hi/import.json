@@ -315,7 +315,7 @@
       "accounts": "खाते",
       "securities": "प्रतिभूतियाँ",
       "investments": "निवेश लेन-देन",
-      "investmentDetail": "{transfers} प्रतिभूति स्थानांतरण, {splits} स्टॉक विभाजन",
+      "investmentDetail": "{transfers} प्रतिभूति स्थानांतरण",
       "prices": "मूल्य इतिहास",
       "exchangeRates": "विनिमय दरें",
       "ofTotal": "फ़ाइल में {total} में से",

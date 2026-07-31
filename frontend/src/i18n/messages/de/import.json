@@ -315,7 +315,7 @@
       "accounts": "Konten",
       "securities": "Wertpapiere",
       "investments": "Investitionstransaktionen",
-      "investmentDetail": "{transfers} Wertpapierübertragungen, {splits} Aktienteilungen",
+      "investmentDetail": "{transfers} Wertpapierübertragungen",
       "prices": "Kursverlauf",
       "exchangeRates": "Wechselkurse",
       "ofTotal": "von {total} in der Datei",

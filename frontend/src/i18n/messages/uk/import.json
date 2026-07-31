@@ -315,7 +315,7 @@
       "accounts": "Рахунки",
       "securities": "Цінні папери",
       "investments": "Інвестиційні операції",
-      "investmentDetail": "{transfers} переказів паперів, {splits} дроблень акцій",
+      "investmentDetail": "{transfers} переказів паперів",
       "prices": "Історія цін",
       "exchangeRates": "Обмінні курси",
       "ofTotal": "з {total} у файлі",

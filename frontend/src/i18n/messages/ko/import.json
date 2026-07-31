@@ -315,7 +315,7 @@
       "accounts": "계정",
       "securities": "증권",
       "investments": "투자 거래",
-      "investmentDetail": "증권 이전 {transfers}건, 주식 분할 {splits}건",
+      "investmentDetail": "증권 이전 {transfers}건",
       "prices": "가격 이력",
       "exchangeRates": "환율",
       "ofTotal": "파일의 {total}개 중",
