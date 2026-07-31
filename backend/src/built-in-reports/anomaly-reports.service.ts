@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Transaction } from "../transactions/entities/transaction.entity";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Category } from "../categories/entities/category.entity";
 import { ReportCurrencyService } from "./report-currency.service";
 import {
@@ -15,10 +14,7 @@ import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
 @Injectable()
 export class AnomalyReportsService {
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
+    private dataSource: DataSource,
     private currencyService: ReportCurrencyService,
   ) {}
 
@@ -70,9 +66,8 @@ export class AnomalyReportsService {
       amount: string;
     }
 
-    const rawResults: RawExpense[] = await this.transactionsRepository.query(
-      query,
-      [userId, startDate, endDate],
+    const rawResults: RawExpense[] = await withScopedDb(this.dataSource, (m) =>
+      m.query(query, [userId, startDate, endDate]),
     );
 
     if (rawResults.length < 10) {
@@ -83,9 +78,11 @@ export class AnomalyReportsService {
       };
     }
 
-    const categories = await this.categoriesRepository.find({
-      where: { userId },
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId },
+      }),
+    );
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
     const amounts = rawResults.map((r) =>

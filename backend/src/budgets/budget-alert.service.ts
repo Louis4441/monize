@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { InjectRepository } from "@nestjs/typeorm";
-import { LessThan, IsNull, Repository } from "typeorm";
+import { LessThan, IsNull, DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { emailTranslator } from "../i18n/email-translator";
@@ -74,20 +74,7 @@ export class BudgetAlertService {
   private readonly logger = new Logger(BudgetAlertService.name);
 
   constructor(
-    @InjectRepository(Budget)
-    private budgetsRepository: Repository<Budget>,
-    @InjectRepository(BudgetAlert)
-    private alertsRepository: Repository<BudgetAlert>,
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(TransactionSplit)
-    private splitsRepository: Repository<TransactionSplit>,
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    @InjectRepository(UserPreference)
-    private preferencesRepository: Repository<UserPreference>,
-    @InjectRepository(ScheduledTransaction)
-    private scheduledTransactionsRepository: Repository<ScheduledTransaction>,
+    private dataSource: DataSource,
     private emailService: EmailService,
     private configService: ConfigService,
     private readonly i18n: I18nService,
@@ -100,15 +87,17 @@ export class BudgetAlertService {
     try {
       // RLS (task C2): cross-user fan-out over all active budgets.
       const activeBudgets = await withSystemContext(() =>
-        this.budgetsRepository.find({
-          where: { isActive: true },
-          relations: [
-            "categories",
-            "categories.category",
-            "categories.category.parent",
-            "categories.transferAccount",
-          ],
-        }),
+        withScopedDb(this.dataSource, (m) =>
+          m.getRepository(Budget).find({
+            where: { isActive: true },
+            relations: [
+              "categories",
+              "categories.category",
+              "categories.category.parent",
+              "categories.transferAccount",
+            ],
+          }),
+        ),
       );
 
       if (activeBudgets.length === 0) {
@@ -153,15 +142,17 @@ export class BudgetAlertService {
     try {
       // RLS (task C2): cross-user fan-out over all active budgets.
       const activeBudgets = await withSystemContext(() =>
-        this.budgetsRepository.find({
-          where: { isActive: true },
-          relations: [
-            "categories",
-            "categories.category",
-            "categories.category.parent",
-            "categories.transferAccount",
-          ],
-        }),
+        withScopedDb(this.dataSource, (m) =>
+          m.getRepository(Budget).find({
+            where: { isActive: true },
+            relations: [
+              "categories",
+              "categories.category",
+              "categories.category.parent",
+              "categories.transferAccount",
+            ],
+          }),
+        ),
       );
 
       if (activeBudgets.length === 0) {
@@ -316,12 +307,14 @@ export class BudgetAlertService {
     }
 
     // De-duplicate against existing alerts for same period
-    const existingAlerts = await this.alertsRepository.find({
-      where: {
-        budgetId: budget.id,
-        periodStart,
-      },
-    });
+    const existingAlerts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetAlert).find({
+        where: {
+          budgetId: budget.id,
+          periodStart,
+        },
+      }),
+    );
 
     const newCandidates = this.deduplicateAlerts(candidates, existingAlerts);
 
@@ -332,18 +325,24 @@ export class BudgetAlertService {
     // Save new alerts
     const savedAlerts: BudgetAlert[] = [];
     for (const candidate of newCandidates) {
-      const alert = this.alertsRepository.create({
-        userId: budget.userId,
-        budgetId: candidate.budgetId,
-        budgetCategoryId: candidate.budgetCategoryId,
-        alertType: candidate.alertType,
-        severity: candidate.severity,
-        title: candidate.title,
-        message: candidate.message,
-        data: candidate.data,
-        periodStart,
-      });
-      savedAlerts.push(await this.alertsRepository.save(alert));
+      savedAlerts.push(
+        await withScopedDb(this.dataSource, (m) => {
+          const repo = m.getRepository(BudgetAlert);
+          return repo.save(
+            repo.create({
+              userId: budget.userId,
+              budgetId: candidate.budgetId,
+              budgetCategoryId: candidate.budgetCategoryId,
+              alertType: candidate.alertType,
+              severity: candidate.severity,
+              title: candidate.title,
+              message: candidate.message,
+              data: candidate.data,
+              periodStart,
+            }),
+          );
+        }),
+      );
     }
 
     // Send immediate emails for critical alerts
@@ -365,7 +364,9 @@ export class BudgetAlertService {
         emailsSent = 1;
         for (const alert of criticalAlerts) {
           alert.isEmailSent = true;
-          await this.alertsRepository.save(alert);
+          await withScopedDb(this.dataSource, (m) =>
+            m.getRepository(BudgetAlert).save(alert),
+          );
         }
       }
     }
@@ -605,14 +606,18 @@ export class BudgetAlertService {
     if (!this.emailService.getStatus().configured) return false;
 
     try {
-      const prefs = await this.preferencesRepository.findOne({
-        where: { userId },
-      });
+      const prefs = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(UserPreference).findOne({
+          where: { userId },
+        }),
+      );
       if (prefs && !prefs.notificationEmail) return false;
 
-      const user = await this.usersRepository.findOne({
-        where: { id: userId },
-      });
+      const user = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(User).findOne({
+          where: { id: userId },
+        }),
+      );
       if (!user || !user.email) return false;
 
       const appUrl = this.configService.get<string>(
@@ -665,27 +670,33 @@ export class BudgetAlertService {
     userId: string,
     budgets: Budget[],
   ): Promise<boolean> {
-    const prefs = await this.preferencesRepository.findOne({
-      where: { userId },
-    });
+    const prefs = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({
+        where: { userId },
+      }),
+    );
     if (prefs && !prefs.notificationEmail) return false;
     if (prefs && prefs.budgetDigestEnabled === false) return false;
 
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-    });
+    const user = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(User).findOne({
+        where: { id: userId },
+      }),
+    );
     if (!user || !user.email) return false;
 
     const { periodStart } = this.getCurrentPeriodDates();
 
-    const allRecentAlerts = await this.alertsRepository.find({
-      where: {
-        userId,
-        periodStart,
-      },
-      order: { createdAt: "DESC" },
-      take: 20,
-    });
+    const allRecentAlerts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetAlert).find({
+        where: {
+          userId,
+          periodStart,
+        },
+        order: { createdAt: "DESC" },
+        take: 20,
+      }),
+    );
 
     if (allRecentAlerts.length === 0) return false;
 
@@ -699,10 +710,13 @@ export class BudgetAlertService {
         .map((a) => (a.data as Record<string, unknown>)?.billId as string)
         .filter(Boolean);
       if (billIds.length > 0) {
-        const bills = await this.scheduledTransactionsRepository
-          .createQueryBuilder("st")
-          .where("st.id IN (:...billIds)", { billIds })
-          .getMany();
+        const bills = await withScopedDb(this.dataSource, (m) =>
+          m
+            .getRepository(ScheduledTransaction)
+            .createQueryBuilder("st")
+            .where("st.id IN (:...billIds)", { billIds })
+            .getMany(),
+        );
         for (const bill of bills) {
           const alertForBill = billAlerts.find(
             (a) => (a.data as Record<string, unknown>)?.billId === bill.id,
@@ -837,35 +851,41 @@ export class BudgetAlertService {
       endDate.getMonth() + 1,
     );
 
-    const directSpending = await this.transactionsRepository
-      .createQueryBuilder("t")
-      .select("t.category_id", "categoryId")
-      .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
-      .addSelect("COALESCE(ABS(SUM(t.amount)), 0)", "total")
-      .where("t.user_id = :userId", { userId })
-      .andWhere("t.category_id IN (:...categoryIds)", { categoryIds })
-      .andWhere("t.transaction_date >= :startStr", { startStr })
-      .andWhere("t.transaction_date <= :endStr", { endStr })
-      .andWhere("t.status != :void", { void: "VOID" })
-      .andWhere("t.is_split = false")
-      .groupBy("t.category_id")
-      .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
-      .getRawMany();
+    const directSpending = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("t")
+        .select("t.category_id", "categoryId")
+        .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
+        .addSelect("COALESCE(ABS(SUM(t.amount)), 0)", "total")
+        .where("t.user_id = :userId", { userId })
+        .andWhere("t.category_id IN (:...categoryIds)", { categoryIds })
+        .andWhere("t.transaction_date >= :startStr", { startStr })
+        .andWhere("t.transaction_date <= :endStr", { endStr })
+        .andWhere("t.status != :void", { void: "VOID" })
+        .andWhere("t.is_split = false")
+        .groupBy("t.category_id")
+        .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
+        .getRawMany(),
+    );
 
-    const splitSpending = await this.splitsRepository
-      .createQueryBuilder("s")
-      .innerJoin("s.transaction", "t")
-      .select("s.category_id", "categoryId")
-      .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
-      .addSelect("COALESCE(ABS(SUM(s.amount)), 0)", "total")
-      .where("t.user_id = :userId", { userId })
-      .andWhere("s.category_id IN (:...categoryIds)", { categoryIds })
-      .andWhere("t.transaction_date >= :startStr", { startStr })
-      .andWhere("t.transaction_date <= :endStr", { endStr })
-      .andWhere("t.status != :void", { void: "VOID" })
-      .groupBy("s.category_id")
-      .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
-      .getRawMany();
+    const splitSpending = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(TransactionSplit)
+        .createQueryBuilder("s")
+        .innerJoin("s.transaction", "t")
+        .select("s.category_id", "categoryId")
+        .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
+        .addSelect("COALESCE(ABS(SUM(s.amount)), 0)", "total")
+        .where("t.user_id = :userId", { userId })
+        .andWhere("s.category_id IN (:...categoryIds)", { categoryIds })
+        .andWhere("t.transaction_date >= :startStr", { startStr })
+        .andWhere("t.transaction_date <= :endStr", { endStr })
+        .andWhere("t.status != :void", { void: "VOID" })
+        .groupBy("s.category_id")
+        .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
+        .getRawMany(),
+    );
 
     const spendingMap = new Map<string, Map<number, number>>();
 
@@ -980,13 +1000,19 @@ export class BudgetAlertService {
       return [];
     }
 
-    const { spendingMap, transferSpendingMap } = await queryCategorySpending(
-      this.transactionsRepository,
-      this.splitsRepository,
-      userId,
-      budgetCategories,
-      periodStart,
-      periodEnd,
+    // The two spending queries share one scoped transaction so the direct and
+    // split halves of a category's total come from the same snapshot.
+    const { spendingMap, transferSpendingMap } = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        queryCategorySpending(
+          m.getRepository(Transaction),
+          m.getRepository(TransactionSplit),
+          userId,
+          budgetCategories,
+          periodStart,
+          periodEnd,
+        ),
     );
 
     return budgetCategories.map((bc) => {
@@ -1021,14 +1047,18 @@ export class BudgetAlertService {
 
       // RLS (task C2): cross-user bulk purge -- runs under a system context.
       const { dismissed, read } = await withSystemContext(async () => {
-        const result = await this.alertsRepository.delete({
-          dismissedAt: LessThan(cutoff),
-        });
-        const readResult = await this.alertsRepository.delete({
-          isRead: true,
-          dismissedAt: IsNull(),
-          createdAt: LessThan(cutoff),
-        });
+        const result = await withScopedDb(this.dataSource, (m) =>
+          m.getRepository(BudgetAlert).delete({
+            dismissedAt: LessThan(cutoff),
+          }),
+        );
+        const readResult = await withScopedDb(this.dataSource, (m) =>
+          m.getRepository(BudgetAlert).delete({
+            isRead: true,
+            dismissedAt: IsNull(),
+            createdAt: LessThan(cutoff),
+          }),
+        );
         return {
           dismissed: result.affected || 0,
           read: readResult.affected || 0,

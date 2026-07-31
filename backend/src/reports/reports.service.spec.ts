@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { NotFoundException, BadRequestException } from "@nestjs/common";
@@ -18,8 +19,17 @@ import { Category } from "../categories/entities/category.entity";
 import { Payee } from "../payees/entities/payee.entity";
 import { BudgetsService } from "../budgets/budgets.service";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("ReportsService", () => {
+  let scopedDataSource: DataSourceMock;
   let service: ReportsService;
   let reportsRepository: Record<string, jest.Mock>;
   let transactionsRepository: Record<string, jest.Mock>;
@@ -179,6 +189,13 @@ describe("ReportsService", () => {
       record: jest.fn().mockResolvedValue(null),
     };
 
+    ({ dataSource: scopedDataSource } = createScopedDbMocks([
+      [CustomReport, reportsRepository as never],
+      [Transaction, transactionsRepository as never],
+      [Category, categoriesRepository as never],
+      [Payee, payeesRepository as never],
+    ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ReportsService,
@@ -206,6 +223,7 @@ describe("ReportsService", () => {
           provide: ActionHistoryService,
           useValue: mockActionHistoryService,
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 

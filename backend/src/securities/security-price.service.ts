@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In, DataSource } from "typeorm";
+import { In, DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Cron } from "@nestjs/schedule";
 import { SecurityPrice } from "./entities/security-price.entity";
 import { Security } from "./entities/security.entity";
@@ -109,12 +109,6 @@ export class SecurityPriceService {
   private readonly logger = new Logger(SecurityPriceService.name);
 
   constructor(
-    @InjectRepository(SecurityPrice)
-    private securityPriceRepository: Repository<SecurityPrice>,
-    @InjectRepository(Security)
-    private securitiesRepository: Repository<Security>,
-    @InjectRepository(UserPreference)
-    private userPreferencesRepository: Repository<UserPreference>,
     private dataSource: DataSource,
     private netWorthService: NetWorthService,
     private providers: QuoteProviderRegistry,
@@ -133,9 +127,11 @@ export class SecurityPriceService {
     const ctx = new Map<string, UserContext>();
     if (userIds.length === 0) return ctx;
 
-    const prefs = await this.userPreferencesRepository.find({
-      where: { userId: In([...new Set(userIds)]) },
-    });
+    const prefs = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).find({
+        where: { userId: In([...new Set(userIds)]) },
+      }),
+    );
 
     for (const p of prefs) {
       ctx.set(p.userId, {
@@ -263,9 +259,11 @@ export class SecurityPriceService {
         `Persisting upgraded MSN instrumentId for ${security.symbol}: ${security.msnInstrumentId ?? "(none)"} → ${upgradedId}`,
       );
       security.msnInstrumentId = upgradedId;
-      await this.securitiesRepository.update(security.id, {
-        msnInstrumentId: upgradedId,
-      });
+      await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Security).update(security.id, {
+          msnInstrumentId: upgradedId,
+        }),
+      );
     } catch (err) {
       this.logger.warn(
         `Failed to persist upgraded MSN id for ${security.symbol}: ${err instanceof Error ? err.message : String(err)}`,
@@ -298,11 +296,13 @@ export class SecurityPriceService {
       security.marketTimezone = session.timezone;
       security.marketOpenTime = session.openTime;
       security.marketCloseTime = session.closeTime;
-      await this.securitiesRepository.update(security.id, {
-        marketTimezone: session.timezone,
-        marketOpenTime: session.openTime,
-        marketCloseTime: session.closeTime,
-      });
+      await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Security).update(security.id, {
+          marketTimezone: session.timezone,
+          marketOpenTime: session.openTime,
+          marketCloseTime: session.closeTime,
+        }),
+      );
     } catch (err) {
       // A price refresh that worked must not fail over its metadata.
       this.logger.warn(
@@ -331,9 +331,11 @@ export class SecurityPriceService {
       );
       if (id) {
         security.msnInstrumentId = id;
-        await this.securitiesRepository.update(security.id, {
-          msnInstrumentId: id,
-        });
+        await withScopedDb(this.dataSource, (m) =>
+          m.getRepository(Security).update(security.id, {
+            msnInstrumentId: id,
+          }),
+        );
       }
     } catch (err) {
       this.logger.warn(
@@ -368,9 +370,11 @@ export class SecurityPriceService {
     const startTime = Date.now();
     this.logger.log("Starting price refresh for all securities");
 
-    const allActive = await this.securitiesRepository.find({
-      where: { isActive: true },
-    });
+    const allActive = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({
+        where: { isActive: true },
+      }),
+    );
     const eligible = allActive.filter((s) => isRefreshEligible(s));
 
     let securities = eligible;
@@ -378,11 +382,13 @@ export class SecurityPriceService {
     if (skipFresh && eligible.length > 0) {
       const today = formatDateYMD(new Date());
       const freshRows: { security_id: string }[] =
-        (await this.dataSource.query(
-          `SELECT DISTINCT security_id FROM security_prices
+        (await withScopedDb(this.dataSource, (m) =>
+          m.query(
+            `SELECT DISTINCT security_id FROM security_prices
            WHERE security_id = ANY($1) AND price_date >= $2
              AND source IS DISTINCT FROM 'manual'`,
-          [eligible.map((s) => s.id), today],
+            [eligible.map((s) => s.id), today],
+          ),
         )) ?? [];
       const freshIds = new Set(freshRows.map((r) => r.security_id));
       if (freshIds.size > 0) {
@@ -510,9 +516,11 @@ export class SecurityPriceService {
   async refreshPricesForSecurities(
     securityIds: string[],
   ): Promise<PriceRefreshSummary> {
-    const securities = await this.securitiesRepository.find({
-      where: { id: In(securityIds), isActive: true },
-    });
+    const securities = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({
+        where: { id: In(securityIds), isActive: true },
+      }),
+    );
     const eligible = securities.filter((s) => isRefreshEligible(s));
     const skipped = securities.length - eligible.length;
     if (skipped > 0) {
@@ -637,9 +645,11 @@ export class SecurityPriceService {
       ? new Date(quote.regularMarketTime * 1000)
       : null;
 
-    const existing = await this.securityPriceRepository.findOne({
-      where: { securityId, priceDate },
-    });
+    const existing = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(SecurityPrice).findOne({
+        where: { securityId, priceDate },
+      }),
+    );
 
     if (existing) {
       existing.openPrice = quote.regularMarketOpen ?? existing.openPrice;
@@ -649,31 +659,37 @@ export class SecurityPriceService {
       existing.volume = quote.regularMarketVolume ?? existing.volume;
       existing.source = source;
       existing.quotedAt = quotedAt ?? existing.quotedAt;
-      return this.securityPriceRepository.save(existing);
+      return withScopedDb(this.dataSource, (m) =>
+        m.getRepository(SecurityPrice).save(existing),
+      );
     }
 
-    const priceEntry = this.securityPriceRepository.create({
-      securityId,
-      priceDate,
-      openPrice: quote.regularMarketOpen,
-      highPrice: quote.regularMarketDayHigh,
-      lowPrice: quote.regularMarketDayLow,
-      closePrice: quote.regularMarketPrice!,
-      volume: quote.regularMarketVolume,
-      source,
-      quotedAt,
+    return withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(SecurityPrice);
+      const priceEntry = repo.create({
+        securityId,
+        priceDate,
+        openPrice: quote.regularMarketOpen,
+        highPrice: quote.regularMarketDayHigh,
+        lowPrice: quote.regularMarketDayLow,
+        closePrice: quote.regularMarketPrice!,
+        volume: quote.regularMarketVolume,
+        source,
+        quotedAt,
+      });
+      return repo.save(priceEntry);
     });
-
-    return this.securityPriceRepository.save(priceEntry);
   }
 
   // ─── Read helpers ────────────────────────────────────────────────────────
 
   async getLatestPrice(securityId: string): Promise<SecurityPrice | null> {
-    return this.securityPriceRepository.findOne({
-      where: { securityId },
-      order: { priceDate: "DESC" },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(SecurityPrice).findOne({
+        where: { securityId },
+        order: { priceDate: "DESC" },
+      }),
+    );
   }
 
   async getPriceHistory(
@@ -682,21 +698,24 @@ export class SecurityPriceService {
     endDate?: Date,
     limit: number = 365,
   ): Promise<SecurityPrice[]> {
-    const query = this.securityPriceRepository
-      .createQueryBuilder("sp")
-      .where("sp.securityId = :securityId", { securityId })
-      .orderBy("sp.priceDate", "DESC")
-      .take(limit);
+    return withScopedDb(this.dataSource, (m) => {
+      const query = m
+        .getRepository(SecurityPrice)
+        .createQueryBuilder("sp")
+        .where("sp.securityId = :securityId", { securityId })
+        .orderBy("sp.priceDate", "DESC")
+        .take(limit);
 
-    if (startDate) {
-      query.andWhere("sp.priceDate >= :startDate", { startDate });
-    }
+      if (startDate) {
+        query.andWhere("sp.priceDate >= :startDate", { startDate });
+      }
 
-    if (endDate) {
-      query.andWhere("sp.priceDate <= :endDate", { endDate });
-    }
+      if (endDate) {
+        query.andWhere("sp.priceDate <= :endDate", { endDate });
+      }
 
-    return query.getMany();
+      return query.getMany();
+    });
   }
 
   /**
@@ -811,10 +830,12 @@ export class SecurityPriceService {
   }
 
   async getLastUpdateTime(): Promise<Date | null> {
-    const latest = await this.securityPriceRepository.findOne({
-      where: {},
-      order: { createdAt: "DESC" },
-    });
+    const latest = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(SecurityPrice).findOne({
+        where: {},
+        order: { createdAt: "DESC" },
+      }),
+    );
     return latest?.createdAt ?? null;
   }
 
@@ -842,9 +863,11 @@ export class SecurityPriceService {
     const startTime = Date.now();
     this.logger.log("Starting historical price backfill");
 
-    const allActive = await this.securitiesRepository.find({
-      where: { isActive: true },
-    });
+    const allActive = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({
+        where: { isActive: true },
+      }),
+    );
     const securities = allActive.filter((s) => isRefreshEligible(s));
 
     const userContexts = await this.loadUserContexts(
@@ -852,11 +875,13 @@ export class SecurityPriceService {
     );
 
     const earliestTxRows: Array<{ security_id: string; earliest: string }> =
-      await this.dataSource.query(
-        `SELECT security_id, MIN(transaction_date)::TEXT as earliest
+      await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `SELECT security_id, MIN(transaction_date)::TEXT as earliest
          FROM investment_transactions
          WHERE security_id IS NOT NULL
          GROUP BY security_id`,
+        ),
       );
     const earliestTxDate = new Map(
       earliestTxRows.map((r) => [r.security_id, r.earliest]),
@@ -1049,8 +1074,9 @@ export class SecurityPriceService {
       // Only overwrite adjusted_close on conflict when the new payload has a
       // non-null value, so providers without adjclose support (MSN today)
       // don't blow away a previously-stored Yahoo value.
-      await this.dataSource.query(
-        `INSERT INTO security_prices (security_id, price_date, open_price, high_price, low_price, close_price, adjusted_close, volume, source)
+      await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `INSERT INTO security_prices (security_id, price_date, open_price, high_price, low_price, close_price, adjusted_close, volume, source)
          VALUES ${values}
          ON CONFLICT (security_id, price_date) DO UPDATE SET
            close_price = EXCLUDED.close_price,
@@ -1060,7 +1086,8 @@ export class SecurityPriceService {
            adjusted_close = COALESCE(EXCLUDED.adjusted_close, security_prices.adjusted_close),
            volume = EXCLUDED.volume,
            source = EXCLUDED.source`,
-        params,
+          params,
+        ),
       );
     }
   }
@@ -1159,9 +1186,11 @@ export class SecurityPriceService {
     userId: string,
     securityId: string,
   ): Promise<HistoricalBackfillResult> {
-    const security = await this.securitiesRepository.findOne({
-      where: { id: securityId, userId },
-    });
+    const security = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).findOne({
+        where: { id: securityId, userId },
+      }),
+    );
     if (!security) {
       throw new NotFoundException(
         tr(
@@ -1179,13 +1208,16 @@ export class SecurityPriceService {
 
     // Earliest date the user has held the security. Null when there are no
     // transactions yet (e.g. a watchlist-only security) -- fall back to 1y.
-    const earliestRows: Array<{ earliest: string | null }> =
-      await this.dataSource.query(
-        `SELECT MIN(transaction_date)::TEXT as earliest
+    const earliestRows: Array<{ earliest: string | null }> = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT MIN(transaction_date)::TEXT as earliest
          FROM investment_transactions
          WHERE security_id = $1`,
-        [securityId],
-      );
+          [securityId],
+        ),
+    );
     const earliestTx = earliestRows[0]?.earliest ?? null;
 
     const oneYearAgo = new Date();
@@ -1285,8 +1317,9 @@ export class SecurityPriceService {
     const rows: Array<{
       avg_price: string;
       latest_action: string;
-    }> = await this.dataSource.query(
-      `SELECT AVG(price::numeric) as avg_price,
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT AVG(price::numeric) as avg_price,
               (SELECT action FROM investment_transactions
                WHERE security_id = $1 AND transaction_date = $2
                  AND action IN ('BUY', 'SELL', 'REINVEST')
@@ -1297,7 +1330,8 @@ export class SecurityPriceService {
          AND transaction_date = $2
          AND action IN ('BUY', 'SELL', 'REINVEST')
          AND price IS NOT NULL`,
-      [securityId, transactionDate],
+        [securityId, transactionDate],
+      ),
     );
 
     const avgPrice = rows[0]?.avg_price
@@ -1306,24 +1340,28 @@ export class SecurityPriceService {
     const latestAction = rows[0]?.latest_action;
 
     if (avgPrice === null || latestAction === null) {
-      await this.dataSource.query(
-        `DELETE FROM security_prices
+      await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `DELETE FROM security_prices
          WHERE security_id = $1 AND price_date = $2
            AND source = ANY($3)`,
-        [securityId, transactionDate, TRANSACTION_SOURCES],
+          [securityId, transactionDate, TRANSACTION_SOURCES],
+        ),
       );
       return;
     }
 
     const source = latestAction.toLowerCase();
 
-    await this.dataSource.query(
-      `INSERT INTO security_prices (security_id, price_date, close_price, source)
+    await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `INSERT INTO security_prices (security_id, price_date, close_price, source)
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (security_id, price_date)
        DO UPDATE SET close_price = $3, source = $4
        WHERE security_prices.source = ANY($5)`,
-      [securityId, transactionDate, avgPrice, source, TRANSACTION_SOURCES],
+        [securityId, transactionDate, avgPrice, source, TRANSACTION_SOURCES],
+      ),
     );
   }
 
@@ -1339,8 +1377,9 @@ export class SecurityPriceService {
       transaction_date: string;
       avg_price: string;
       latest_action: string;
-    }> = await this.dataSource.query(
-      `SELECT it.security_id, it.transaction_date,
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT it.security_id, it.transaction_date,
               AVG(it.price::numeric) as avg_price,
               (SELECT it2.action FROM investment_transactions it2
                WHERE it2.security_id = it.security_id
@@ -1353,6 +1392,7 @@ export class SecurityPriceService {
          AND it.price IS NOT NULL
          AND it.action IN ('BUY', 'SELL', 'REINVEST')
        GROUP BY it.security_id, it.transaction_date`,
+      ),
     );
 
     let created = 0;
@@ -1379,13 +1419,15 @@ export class SecurityPriceService {
         );
       }
 
-      const result = await this.dataSource.query(
-        `INSERT INTO security_prices (security_id, price_date, close_price, source)
+      const result = await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `INSERT INTO security_prices (security_id, price_date, close_price, source)
          VALUES ${values}
          ON CONFLICT (security_id, price_date)
          DO UPDATE SET close_price = EXCLUDED.close_price, source = EXCLUDED.source
          WHERE security_prices.source = ANY($${params.length + 1})`,
-        [...params, TRANSACTION_SOURCES],
+          [...params, TRANSACTION_SOURCES],
+        ),
       );
 
       const affected = Array.isArray(result)
@@ -1407,9 +1449,11 @@ export class SecurityPriceService {
     securityId: string,
     dto: CreateSecurityPriceDto,
   ): Promise<SecurityPrice> {
-    const existing = await this.securityPriceRepository.findOne({
-      where: { securityId, priceDate: dto.priceDate },
-    });
+    const existing = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(SecurityPrice).findOne({
+        where: { securityId, priceDate: dto.priceDate },
+      }),
+    );
 
     if (existing) {
       existing.closePrice = dto.closePrice;
@@ -1418,21 +1462,25 @@ export class SecurityPriceService {
       existing.lowPrice = dto.lowPrice as number;
       existing.volume = dto.volume as number;
       existing.source = "manual";
-      return this.securityPriceRepository.save(existing);
+      return withScopedDb(this.dataSource, (m) =>
+        m.getRepository(SecurityPrice).save(existing),
+      );
     }
 
-    const priceEntry = this.securityPriceRepository.create({
-      securityId,
-      priceDate: dto.priceDate,
-      closePrice: dto.closePrice,
-      openPrice: dto.openPrice as number,
-      highPrice: dto.highPrice as number,
-      lowPrice: dto.lowPrice as number,
-      volume: dto.volume as number,
-      source: "manual",
+    return withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(SecurityPrice);
+      const priceEntry = repo.create({
+        securityId,
+        priceDate: dto.priceDate,
+        closePrice: dto.closePrice,
+        openPrice: dto.openPrice as number,
+        highPrice: dto.highPrice as number,
+        lowPrice: dto.lowPrice as number,
+        volume: dto.volume as number,
+        source: "manual",
+      });
+      return repo.save(priceEntry);
     });
-
-    return this.securityPriceRepository.save(priceEntry);
   }
 
   async updatePrice(
@@ -1440,9 +1488,11 @@ export class SecurityPriceService {
     priceId: number,
     dto: UpdateSecurityPriceDto,
   ): Promise<SecurityPrice> {
-    const price = await this.securityPriceRepository.findOne({
-      where: { id: priceId, securityId },
-    });
+    const price = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(SecurityPrice).findOne({
+        where: { id: priceId, securityId },
+      }),
+    );
 
     if (!price) {
       throw new NotFoundException(
@@ -1458,13 +1508,17 @@ export class SecurityPriceService {
     if (dto.priceDate !== undefined) price.priceDate = dto.priceDate;
     price.source = "manual";
 
-    return this.securityPriceRepository.save(price);
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(SecurityPrice).save(price),
+    );
   }
 
   async deletePrice(securityId: string, priceId: number): Promise<void> {
-    const price = await this.securityPriceRepository.findOne({
-      where: { id: priceId, securityId },
-    });
+    const price = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(SecurityPrice).findOne({
+        where: { id: priceId, securityId },
+      }),
+    );
 
     if (!price) {
       throw new NotFoundException(
@@ -1474,7 +1528,9 @@ export class SecurityPriceService {
 
     const priceDate = price.priceDate;
 
-    await this.securityPriceRepository.remove(price);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(SecurityPrice).remove(price),
+    );
 
     await this.upsertTransactionPrice(securityId, priceDate).catch((err) =>
       this.logger.warn(

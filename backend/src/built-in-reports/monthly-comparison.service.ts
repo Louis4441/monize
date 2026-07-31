@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { SpendingReportsService } from "./spending-reports.service";
 import { IncomeReportsService } from "./income-reports.service";
 import { ReportCurrencyService } from "./report-currency.service";
@@ -34,8 +34,6 @@ export class MonthlyComparisonService {
     private currencyService: ReportCurrencyService,
     private netWorthService: NetWorthService,
     private portfolioService: PortfolioService,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
     private dataSource: DataSource,
   ) {}
 
@@ -356,9 +354,11 @@ export class MonthlyComparisonService {
     topMovers: TopMover[],
   ): Promise<MonthlyComparisonInvestments> {
     // Get investment accounts
-    const investmentAccounts = await this.accountsRepository.find({
-      where: { userId, accountType: AccountType.INVESTMENT, isClosed: false },
-    });
+    const investmentAccounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { userId, accountType: AccountType.INVESTMENT, isClosed: false },
+      }),
+    );
 
     // Get per-account monthly data from monthly_account_balances
     const brokerageIds = investmentAccounts
@@ -373,8 +373,9 @@ export class MonthlyComparisonService {
 
     if (brokerageIds.length > 0) {
       // Get monthly snapshots for investment accounts
-      const snapshots: any[] = await this.dataSource.query(
-        `SELECT mab.account_id, mab.month, mab.balance, mab.market_value,
+      const snapshots: any[] = await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `SELECT mab.account_id, mab.month, mab.balance, mab.market_value,
                 a.name, a.account_sub_type
          FROM monthly_account_balances mab
          JOIN accounts a ON a.id = mab.account_id
@@ -383,7 +384,8 @@ export class MonthlyComparisonService {
            AND mab.month >= DATE_TRUNC('month', $3::DATE)
            AND mab.month <= DATE_TRUNC('month', $4::DATE)
          ORDER BY mab.account_id, mab.month`,
-        [userId, brokerageIds, historyStart, currentEnd],
+          [userId, brokerageIds, historyStart, currentEnd],
+        ),
       );
 
       // Group by account

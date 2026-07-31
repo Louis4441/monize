@@ -40,6 +40,16 @@ describe("Security transfer between accounts (integration)", () => {
 
   const qty = (h: { quantity: number } | null) => Number(h?.quantity ?? 0);
 
+  /**
+   * Read a holding the way a request would -- inside the owner's context.
+   * `HoldingsService` goes through `withScopedDb`, which refuses to run
+   * without one (RLS task R3).
+   */
+  const holdingOf = (accountId: string) =>
+    withUserContext(userId, () =>
+      holdingsService.findByAccountAndSecurity(accountId, securityId),
+    );
+
   beforeAll(async () => {
     module = await createIntegrationModule([SecuritiesModule]);
     service = module.get(InvestmentTransactionsService);
@@ -142,14 +152,8 @@ describe("Security transfer between accounts (integration)", () => {
     );
 
     // Source emptied, destination holds the shares at the original cost.
-    const aHolding = await holdingsService.findByAccountAndSecurity(
-      brokerageA,
-      securityId,
-    );
-    const bHolding = await holdingsService.findByAccountAndSecurity(
-      brokerageB,
-      securityId,
-    );
+    const aHolding = await holdingOf(brokerageA);
+    const bHolding = await holdingOf(brokerageB);
     expect(qty(aHolding)).toBe(0);
     expect(qty(bHolding)).toBe(100);
     expect(Number(bHolding?.averageCost)).toBeCloseTo(1.67, 6);
@@ -195,14 +199,8 @@ describe("Security transfer between accounts (integration)", () => {
     expect(remainingIn).toBeNull();
 
     // Shares are back in A, gone from B.
-    const aHolding = await holdingsService.findByAccountAndSecurity(
-      brokerageA,
-      securityId,
-    );
-    const bHolding = await holdingsService.findByAccountAndSecurity(
-      brokerageB,
-      securityId,
-    );
+    const aHolding = await holdingOf(brokerageA);
+    const bHolding = await holdingOf(brokerageB);
     expect(qty(aHolding)).toBe(100);
     expect(qty(bHolding)).toBe(0);
   });
@@ -237,14 +235,8 @@ describe("Security transfer between accounts (integration)", () => {
     expect(Number(inAfter.quantity)).toBe(60);
 
     // 40 stay in A, 60 land in B, cost basis preserved on both sides.
-    const aHolding = await holdingsService.findByAccountAndSecurity(
-      brokerageA,
-      securityId,
-    );
-    const bHolding = await holdingsService.findByAccountAndSecurity(
-      brokerageB,
-      securityId,
-    );
+    const aHolding = await holdingOf(brokerageA);
+    const bHolding = await holdingOf(brokerageB);
     expect(qty(aHolding)).toBe(40);
     expect(qty(bHolding)).toBe(60);
     expect(Number(bHolding?.averageCost)).toBeCloseTo(1.67, 6);
@@ -281,14 +273,8 @@ describe("Security transfer between accounts (integration)", () => {
     );
 
     // Shares now sit in C, not B; cost basis preserved.
-    const bHolding = await holdingsService.findByAccountAndSecurity(
-      brokerageB,
-      securityId,
-    );
-    const cHolding = await holdingsService.findByAccountAndSecurity(
-      c.id,
-      securityId,
-    );
+    const bHolding = await holdingOf(brokerageB);
+    const cHolding = await holdingOf(c.id);
     expect(qty(bHolding)).toBe(0);
     expect(qty(cHolding)).toBe(100);
     expect(Number(cHolding?.averageCost)).toBeCloseTo(1.67, 6);
@@ -310,10 +296,7 @@ describe("Security transfer between accounts (integration)", () => {
     ).rejects.toBeDefined();
 
     // Nothing moved.
-    const aHolding = await holdingsService.findByAccountAndSecurity(
-      brokerageA,
-      securityId,
-    );
+    const aHolding = await holdingOf(brokerageA);
     expect(qty(aHolding)).toBe(100);
   });
 });

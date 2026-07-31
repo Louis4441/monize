@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { SpendingReportsService } from "./spending-reports.service";
@@ -7,8 +8,19 @@ import { Category } from "../categories/entities/category.entity";
 import { Payee } from "../payees/entities/payee.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("SpendingReportsService", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let service: SpendingReportsService;
   let transactionsRepository: Record<string, jest.Mock>;
   let categoriesRepository: Record<string, jest.Mock>;
@@ -75,6 +87,14 @@ describe("SpendingReportsService", () => {
       getLatestRates: jest.fn().mockResolvedValue(mockExchangeRates),
     };
 
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([
+        [Transaction, transactionsRepository as never],
+        [Category, categoriesRepository as never],
+        [Payee, payeesRepository as never],
+        [UserPreference, userPreferenceRepository as never],
+      ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SpendingReportsService,
@@ -99,6 +119,7 @@ describe("SpendingReportsService", () => {
           provide: ExchangeRateService,
           useValue: exchangeRateService,
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 
@@ -110,7 +131,7 @@ describe("SpendingReportsService", () => {
   // ---------------------------------------------------------------------------
   describe("getSpendingByCategory", () => {
     it("returns empty data when no transactions exist", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingByCategory(
@@ -124,7 +145,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("aggregates spending by parent category with rollup", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { category_id: "cat-child", currency_code: "USD", total: "150.00" },
         { category_id: "cat-parent", currency_code: "USD", total: "50.00" },
       ]);
@@ -147,7 +168,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("handles uncategorized transactions (null category_id)", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { category_id: null, currency_code: "USD", total: "75.50" },
       ]);
       categoriesRepository.find.mockResolvedValue([]);
@@ -165,7 +186,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("treats unknown category_id as uncategorized", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { category_id: "unknown-cat", currency_code: "USD", total: "30.00" },
       ]);
       categoriesRepository.find.mockResolvedValue([mockParentCategory]);
@@ -182,7 +203,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("converts foreign currency amounts to default currency", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { category_id: "cat-parent", currency_code: "EUR", total: "100.00" },
       ]);
       categoriesRepository.find.mockResolvedValue([mockParentCategory]);
@@ -216,7 +237,7 @@ describe("SpendingReportsService", () => {
         isSystem: false,
         createdAt: new Date(),
       }));
-      transactionsRepository.query.mockResolvedValue(rawResults);
+      scopedManager.query.mockResolvedValue(rawResults);
       categoriesRepository.find.mockResolvedValue(categories);
 
       const result = await service.getSpendingByCategory(
@@ -231,7 +252,7 @@ describe("SpendingReportsService", () => {
 
     it("uses default currency USD when user preference not found", async () => {
       userPreferenceRepository.findOne.mockResolvedValue(null);
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { category_id: "cat-parent", currency_code: "USD", total: "100.00" },
       ]);
       categoriesRepository.find.mockResolvedValue([mockParentCategory]);
@@ -246,7 +267,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("passes startDate parameter when provided", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       await service.getSpendingByCategory(
@@ -255,23 +276,23 @@ describe("SpendingReportsService", () => {
         "2025-12-31",
       );
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toEqual([mockUserId, "2025-12-31", "2025-01-01"]);
     });
 
     it("omits startDate filter when startDate is undefined", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       await service.getSpendingByCategory(mockUserId, undefined, "2025-12-31");
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toEqual([mockUserId, "2025-12-31"]);
       expect(queryCall[0]).not.toContain("$3");
     });
 
     it("returns color from parent category in response", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { category_id: "cat-child", currency_code: "USD", total: "100.00" },
       ]);
       categoriesRepository.find.mockResolvedValue([
@@ -289,7 +310,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("merges multiple uncategorized rows", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { category_id: null, currency_code: "USD", total: "50.00" },
         { category_id: null, currency_code: "EUR", total: "100.00" },
       ]);
@@ -308,7 +329,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("uses inverse rate for currency conversion when direct not available", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { category_id: "cat-parent", currency_code: "CAD", total: "136.00" },
       ]);
       categoriesRepository.find.mockResolvedValue([mockParentCategory]);
@@ -324,7 +345,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("filters out the asset value change category in the SQL query", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       await service.getSpendingByCategory(
@@ -333,7 +354,7 @@ describe("SpendingReportsService", () => {
         "2025-12-31",
       );
 
-      const sql = transactionsRepository.query.mock.calls[0][0];
+      const sql = scopedManager.query.mock.calls[0][0];
       expect(sql).toContain("NOT EXISTS");
       expect(sql).toContain("asset_category_id");
       expect(sql).toMatch(
@@ -343,7 +364,7 @@ describe("SpendingReportsService", () => {
 
     describe("rollupToParent = false", () => {
       it("keeps subcategories separate with 'Parent: Child' name format", async () => {
-        transactionsRepository.query.mockResolvedValue([
+        scopedManager.query.mockResolvedValue([
           { category_id: "cat-child", currency_code: "USD", total: "150.00" },
           { category_id: "cat-parent", currency_code: "USD", total: "50.00" },
         ]);
@@ -371,7 +392,7 @@ describe("SpendingReportsService", () => {
       });
 
       it("keeps parent-only categories with their own name", async () => {
-        transactionsRepository.query.mockResolvedValue([
+        scopedManager.query.mockResolvedValue([
           { category_id: "cat-parent", currency_code: "USD", total: "200.00" },
         ]);
         categoriesRepository.find.mockResolvedValue([mockParentCategory]);
@@ -388,7 +409,7 @@ describe("SpendingReportsService", () => {
       });
 
       it("uses the subcategory's own color", async () => {
-        transactionsRepository.query.mockResolvedValue([
+        scopedManager.query.mockResolvedValue([
           { category_id: "cat-child", currency_code: "USD", total: "100.00" },
         ]);
         categoriesRepository.find.mockResolvedValue([
@@ -407,7 +428,7 @@ describe("SpendingReportsService", () => {
       });
 
       it("merges multi-currency rows for the same subcategory", async () => {
-        transactionsRepository.query.mockResolvedValue([
+        scopedManager.query.mockResolvedValue([
           { category_id: "cat-child", currency_code: "USD", total: "100.00" },
           { category_id: "cat-child", currency_code: "EUR", total: "50.00" },
         ]);
@@ -436,7 +457,7 @@ describe("SpendingReportsService", () => {
   // ---------------------------------------------------------------------------
   describe("getSpendingByPayee", () => {
     it("returns empty data when no transactions exist", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       const result = await service.getSpendingByPayee(
         mockUserId,
@@ -449,7 +470,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("aggregates spending by payee and merges multi-currency rows", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: "payee-1",
           payee_name: "Starbucks",
@@ -480,7 +501,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("handles transactions without payee_id using payee_name", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: null,
           payee_name: "Corner Store",
@@ -514,7 +535,7 @@ describe("SpendingReportsService", () => {
           name: `Payee ${i}`,
         })),
       );
-      transactionsRepository.query.mockResolvedValue(rawResults);
+      scopedManager.query.mockResolvedValue(rawResults);
 
       const result = await service.getSpendingByPayee(
         mockUserId,
@@ -527,7 +548,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("skips payee lookup when no payee_ids in results", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: null,
           payee_name: "Cash Payment",
@@ -542,7 +563,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("displays 'Unknown' for payee with neither payee_id nor payee_name", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: null,
           payee_name: null,
@@ -562,25 +583,25 @@ describe("SpendingReportsService", () => {
     });
 
     it("passes startDate when provided", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getSpendingByPayee(mockUserId, "2025-06-01", "2025-12-31");
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toEqual([mockUserId, "2025-12-31", "2025-06-01"]);
     });
 
     it("omits startDate filter when undefined", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getSpendingByPayee(mockUserId, undefined, "2025-12-31");
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toEqual([mockUserId, "2025-12-31"]);
     });
 
     it("calculates totalSpending from the top 20 results", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: "payee-1",
           payee_name: "Store A",
@@ -609,11 +630,11 @@ describe("SpendingReportsService", () => {
     });
 
     it("filters out the asset value change category in the SQL query", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getSpendingByPayee(mockUserId, "2025-01-01", "2025-12-31");
 
-      const sql = transactionsRepository.query.mock.calls[0][0];
+      const sql = scopedManager.query.mock.calls[0][0];
       expect(sql).toContain("NOT EXISTS");
       expect(sql).toContain("asset_category_id");
       expect(sql).toMatch(/ax\.asset_category_id\s*=\s*t\.category_id/);
@@ -625,7 +646,7 @@ describe("SpendingReportsService", () => {
   // ---------------------------------------------------------------------------
   describe("getMonthlySpendingTrend", () => {
     it("returns empty data when no transactions exist", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getMonthlySpendingTrend(
@@ -638,7 +659,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("groups spending by month and category with parent rollup", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           month: "2025-01",
           category_id: "cat-child",
@@ -699,7 +720,7 @@ describe("SpendingReportsService", () => {
         total: `${(12 - i) * 10}.00`,
       }));
 
-      transactionsRepository.query.mockResolvedValue(rawResults);
+      scopedManager.query.mockResolvedValue(rawResults);
       categoriesRepository.find.mockResolvedValue(manyCategories);
 
       const result = await service.getMonthlySpendingTrend(
@@ -712,7 +733,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("sorts months in ascending order", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           month: "2025-03",
           category_id: "cat-parent",
@@ -739,7 +760,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("handles uncategorized spending in trend data", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           month: "2025-01",
           category_id: null,
@@ -765,7 +786,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("converts foreign currency amounts in trend", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           month: "2025-01",
           category_id: "cat-parent",
@@ -786,7 +807,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("fills zero for months where a category has no spending", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           month: "2025-01",
           category_id: "cat-parent",
@@ -817,7 +838,7 @@ describe("SpendingReportsService", () => {
     });
 
     it("filters out the asset value change category in the SQL query", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       await service.getMonthlySpendingTrend(
@@ -826,7 +847,7 @@ describe("SpendingReportsService", () => {
         "2025-12-31",
       );
 
-      const sql = transactionsRepository.query.mock.calls[0][0];
+      const sql = scopedManager.query.mock.calls[0][0];
       expect(sql).toContain("NOT EXISTS");
       expect(sql).toContain("asset_category_id");
       expect(sql).toMatch(

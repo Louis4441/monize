@@ -1,11 +1,23 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { AnomalyReportsService } from "./anomaly-reports.service";
 import { ReportCurrencyService } from "./report-currency.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("AnomalyReportsService", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let service: AnomalyReportsService;
   let transactionsRepository: Record<string, jest.Mock>;
   let categoriesRepository: Record<string, jest.Mock>;
@@ -98,6 +110,12 @@ describe("AnomalyReportsService", () => {
       convertAmount: jest.fn().mockImplementation((amount) => amount),
     };
 
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([
+        [Transaction, transactionsRepository as never],
+        [Category, categoriesRepository as never],
+      ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AnomalyReportsService,
@@ -113,6 +131,7 @@ describe("AnomalyReportsService", () => {
           provide: getRepositoryToken(Category),
           useValue: categoriesRepository,
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 
@@ -124,7 +143,7 @@ describe("AnomalyReportsService", () => {
   // ---------------------------------------------------------------------------
   describe("getSpendingAnomalies", () => {
     it("returns empty result when fewer than 10 transactions exist", async () => {
-      transactionsRepository.query.mockResolvedValue(buildRawExpenses(5, 20));
+      scopedManager.query.mockResolvedValue(buildRawExpenses(5, 20));
 
       const result = await service.getSpendingAnomalies(mockUserId);
 
@@ -140,7 +159,7 @@ describe("AnomalyReportsService", () => {
       jest.useFakeTimers();
       jest.setSystemTime(new Date("2025-06-25T12:00:00Z"));
 
-      transactionsRepository.query.mockResolvedValue(buildRawExpenses(10, 50));
+      scopedManager.query.mockResolvedValue(buildRawExpenses(10, 50));
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -157,7 +176,7 @@ describe("AnomalyReportsService", () => {
       const raw = buildRawExpenses(20, 50, [
         { id: "tx-anomaly-1", amount: 500, payee_name: "Big Purchase" },
       ]);
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -201,7 +220,7 @@ describe("AnomalyReportsService", () => {
         category_id: null,
         amount: "5000.00",
       });
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -217,7 +236,7 @@ describe("AnomalyReportsService", () => {
     it("calculates mean and stdDev correctly", async () => {
       // 10 transactions: all $100
       const raw = buildRawExpenses(10, 100);
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -229,7 +248,7 @@ describe("AnomalyReportsService", () => {
     it("uses custom threshold parameter", async () => {
       // With a very high threshold (e.g., 100), even outliers won't be anomalies
       const raw = buildRawExpenses(20, 50, [{ id: "tx-big", amount: 200 }]);
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId, 100);
@@ -283,7 +302,7 @@ describe("AnomalyReportsService", () => {
         amount: "350.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([mockCategory]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -325,7 +344,7 @@ describe("AnomalyReportsService", () => {
         amount: "200.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([mockCategory]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -356,7 +375,7 @@ describe("AnomalyReportsService", () => {
         amount: "150.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -384,7 +403,7 @@ describe("AnomalyReportsService", () => {
         amount: "50.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -424,7 +443,7 @@ describe("AnomalyReportsService", () => {
         amount: "200.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -472,7 +491,7 @@ describe("AnomalyReportsService", () => {
         amount: "500.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -524,7 +543,7 @@ describe("AnomalyReportsService", () => {
         amount: "50000.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -558,7 +577,7 @@ describe("AnomalyReportsService", () => {
         });
       }
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -568,7 +587,7 @@ describe("AnomalyReportsService", () => {
     });
 
     it("calls currency service with correct user id", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getSpendingAnomalies(mockUserId);
 
@@ -579,11 +598,11 @@ describe("AnomalyReportsService", () => {
     });
 
     it("passes correct date range to the query (6 months)", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getSpendingAnomalies(mockUserId);
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       const [, startDate, endDate] = queryCall[1];
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -622,7 +641,7 @@ describe("AnomalyReportsService", () => {
         amount: "600.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -673,7 +692,7 @@ describe("AnomalyReportsService", () => {
         amount: "150.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -719,7 +738,7 @@ describe("AnomalyReportsService", () => {
         amount: "50000.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getSpendingAnomalies(mockUserId);
@@ -761,7 +780,7 @@ describe("AnomalyReportsService", () => {
         amount: "500.00",
       });
 
-      transactionsRepository.query.mockResolvedValue(raw);
+      scopedManager.query.mockResolvedValue(raw);
       categoriesRepository.find.mockResolvedValue([mockCategory]);
 
       const result = await service.getSpendingAnomalies(mockUserId);

@@ -80,6 +80,7 @@ export function createScopedDbMocks(
     findOneOrFail: jest.fn(),
     count: jest.fn(),
     create: jest.fn(),
+    merge: jest.fn(),
     save: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),

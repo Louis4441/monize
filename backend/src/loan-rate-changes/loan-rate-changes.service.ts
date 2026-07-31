@@ -7,9 +7,9 @@ import {
   ConflictException,
   BadRequestException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, EntityManager, Repository } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
 import { tr } from "../i18n/translate";
+import { withScopedDb } from "../common/db/scoped-db";
 import { LoanRateChange } from "./entities/loan-rate-change.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { CreateLoanRateChangeDto } from "./dto/create-loan-rate-change.dto";
@@ -87,10 +87,6 @@ export class LoanRateChangesService {
   private readonly logger = new Logger(LoanRateChangesService.name);
 
   constructor(
-    @InjectRepository(LoanRateChange)
-    private rateChangesRepository: Repository<LoanRateChange>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
     private dataSource: DataSource,
     @Inject(forwardRef(() => ScheduledTransactionsService))
     private scheduledTransactionsService: ScheduledTransactionsService,
@@ -98,10 +94,12 @@ export class LoanRateChangesService {
 
   async findAll(userId: string, accountId: string): Promise<LoanRateChange[]> {
     await this.verifyLoanAccount(userId, accountId);
-    return this.rateChangesRepository.find({
-      where: { userId, accountId },
-      order: { effectiveDate: "ASC" },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(LoanRateChange).find({
+        where: { userId, accountId },
+        order: { effectiveDate: "ASC" },
+      }),
+    );
   }
 
   /**
@@ -156,47 +154,28 @@ export class LoanRateChangesService {
         )
       : (dto.newPaymentAmount ?? null);
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    let saved: LoanRateChange;
-    let resolved: { annualRate: number; paymentAmount: number | null } | null =
-      null;
-    try {
-      await this.rejectDuplicateDate(
-        queryRunner.manager,
-        accountId,
-        dto.effectiveDate,
-      );
-      await this.insertInitialRowIfFirst(
-        queryRunner.manager,
-        account,
-        dto.effectiveDate,
-      );
+    const { saved, resolved } = await withScopedDb(
+      this.dataSource,
+      async (m) => {
+        await this.rejectDuplicateDate(m, accountId, dto.effectiveDate);
+        await this.insertInitialRowIfFirst(m, account, dto.effectiveDate);
 
-      const rateChange = queryRunner.manager.create(LoanRateChange, {
-        userId,
-        accountId,
-        effectiveDate: dto.effectiveDate,
-        annualRate: dto.annualRate,
-        newPaymentAmount,
-        source: "manual" as const,
-        note: dto.note ?? null,
-      });
-      saved = await queryRunner.manager.save(rateChange);
+        const rateChange = m.create(LoanRateChange, {
+          userId,
+          accountId,
+          effectiveDate: dto.effectiveDate,
+          annualRate: dto.annualRate,
+          newPaymentAmount,
+          source: "manual" as const,
+          note: dto.note ?? null,
+        });
 
-      resolved = await this.resolveCurrentTimeline(
-        queryRunner.manager,
-        account,
-      );
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+        return {
+          saved: await m.save(rateChange),
+          resolved: await this.resolveCurrentTimeline(m, account),
+        };
+      },
+    );
 
     let scheduledPaymentPreview: ScheduledPaymentPreview | null = null;
     if (resolved) {
@@ -219,53 +198,40 @@ export class LoanRateChangesService {
     const account = await this.verifyLoanAccount(userId, accountId);
     const rateChange = await this.findOne(userId, accountId, id);
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    let saved: LoanRateChange;
-    let resolved: { annualRate: number; paymentAmount: number | null } | null =
-      null;
-    try {
-      if (
-        dto.effectiveDate !== undefined &&
-        dto.effectiveDate !== rateChange.effectiveDate
-      ) {
-        await this.rejectDuplicateDate(
-          queryRunner.manager,
-          accountId,
-          dto.effectiveDate,
-        );
-      }
+    const { saved, resolved } = await withScopedDb(
+      this.dataSource,
+      async (m) => {
+        if (
+          dto.effectiveDate !== undefined &&
+          dto.effectiveDate !== rateChange.effectiveDate
+        ) {
+          await this.rejectDuplicateDate(m, accountId, dto.effectiveDate);
+        }
 
-      const merged = queryRunner.manager.merge(LoanRateChange, rateChange, {
-        ...(dto.effectiveDate !== undefined
-          ? { effectiveDate: dto.effectiveDate }
-          : {}),
-        ...(dto.annualRate !== undefined ? { annualRate: dto.annualRate } : {}),
-        ...(dto.newPaymentAmount !== undefined
-          ? { newPaymentAmount: dto.newPaymentAmount }
-          : {}),
-        ...(dto.note !== undefined ? { note: dto.note } : {}),
-        // A user-edited inferred row becomes manual so re-running detection
-        // never clobbers their correction.
-        ...(rateChange.source === "inferred"
-          ? { source: "manual" as const }
-          : {}),
-      });
-      saved = await queryRunner.manager.save(merged);
+        const merged = m.merge(LoanRateChange, rateChange, {
+          ...(dto.effectiveDate !== undefined
+            ? { effectiveDate: dto.effectiveDate }
+            : {}),
+          ...(dto.annualRate !== undefined
+            ? { annualRate: dto.annualRate }
+            : {}),
+          ...(dto.newPaymentAmount !== undefined
+            ? { newPaymentAmount: dto.newPaymentAmount }
+            : {}),
+          ...(dto.note !== undefined ? { note: dto.note } : {}),
+          // A user-edited inferred row becomes manual so re-running detection
+          // never clobbers their correction.
+          ...(rateChange.source === "inferred"
+            ? { source: "manual" as const }
+            : {}),
+        });
 
-      resolved = await this.resolveCurrentTimeline(
-        queryRunner.manager,
-        account,
-      );
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+        return {
+          saved: await m.save(merged),
+          resolved: await this.resolveCurrentTimeline(m, account),
+        };
+      },
+    );
 
     if (resolved) {
       await this.syncScheduledTransaction(userId, account, resolved);
@@ -277,24 +243,10 @@ export class LoanRateChangesService {
     const account = await this.verifyLoanAccount(userId, accountId);
     const rateChange = await this.findOne(userId, accountId, id);
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    let resolved: { annualRate: number; paymentAmount: number | null } | null =
-      null;
-    try {
-      await queryRunner.manager.remove(rateChange);
-      resolved = await this.resolveCurrentTimeline(
-        queryRunner.manager,
-        account,
-      );
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    const resolved = await withScopedDb(this.dataSource, async (m) => {
+      await m.remove(rateChange);
+      return this.resolveCurrentTimeline(m, account);
+    });
 
     if (resolved) {
       await this.syncScheduledTransaction(userId, account, resolved);
@@ -375,9 +327,8 @@ export class LoanRateChangesService {
     accountId: string,
   ): Promise<ScheduledPaymentPreview | null> {
     const account = await this.verifyLoanAccount(userId, accountId);
-    const resolved = await this.resolveCurrentTimeline(
-      this.dataSource.manager,
-      account,
+    const resolved = await withScopedDb(this.dataSource, (m) =>
+      this.resolveCurrentTimeline(m, account),
     );
     const plan = await this.buildScheduledUpdate(
       userId,
@@ -558,9 +509,11 @@ export class LoanRateChangesService {
 
   /** Ownership and type gate applied before any rate-change operation */
   async verifyLoanAccount(userId: string, accountId: string): Promise<Account> {
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId, userId },
-    });
+    const account = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id: accountId, userId },
+      }),
+    );
     if (!account) {
       throw new NotFoundException(
         tr(
@@ -586,9 +539,11 @@ export class LoanRateChangesService {
     accountId: string,
     id: string,
   ): Promise<LoanRateChange> {
-    const rateChange = await this.rateChangesRepository.findOne({
-      where: { id, userId, accountId },
-    });
+    const rateChange = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(LoanRateChange).findOne({
+        where: { id, userId, accountId },
+      }),
+    );
     if (!rateChange) {
       throw new NotFoundException(
         tr(

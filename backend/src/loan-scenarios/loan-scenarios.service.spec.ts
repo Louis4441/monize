@@ -1,5 +1,3 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import {
   BadRequestException,
   ConflictException,
@@ -8,6 +6,11 @@ import {
 import { LoanScenariosService } from "./loan-scenarios.service";
 import { LoanScenario } from "./entities/loan-scenario.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("LoanScenariosService", () => {
   let service: LoanScenariosService;
@@ -37,7 +40,7 @@ describe("LoanScenariosService", () => {
     updatedAt: new Date("2026-01-01"),
   } as LoanScenario;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     queryBuilderMock = {
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
@@ -58,21 +61,12 @@ describe("LoanScenariosService", () => {
       findOne: jest.fn().mockResolvedValue(mockAccount),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        LoanScenariosService,
-        {
-          provide: getRepositoryToken(LoanScenario),
-          useValue: scenariosRepository,
-        },
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
-      ],
-    }).compile();
+    const { dataSource } = createScopedDbMocks([
+      [LoanScenario, scenariosRepository],
+      [Account, accountsRepository],
+    ]);
 
-    service = module.get<LoanScenariosService>(LoanScenariosService);
+    service = new LoanScenariosService(dataSource as never);
   });
 
   describe("findAll", () => {

@@ -1,22 +1,21 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import {
   BadRequestException,
   ConflictException,
   NotFoundException,
   ForbiddenException,
 } from "@nestjs/common";
-import { DataSource } from "typeorm";
 import { SecuritiesService } from "./securities.service";
 import { Security } from "./entities/security.entity";
 import { SecurityTag } from "./entities/security-tag.entity";
 import { Holding } from "./entities/holding.entity";
 import { InvestmentTransaction } from "./entities/investment-transaction.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
-import { SecurityPriceService } from "./security-price.service";
-import { YahooFinanceService } from "./yahoo-finance.service";
-import { ActionHistoryService } from "../action-history/action-history.service";
 import { withUserContext } from "../common/db/with-context";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("SecuritiesService", () => {
   let service: SecuritiesService;
@@ -46,7 +45,7 @@ describe("SecuritiesService", () => {
     updatedAt: new Date(),
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     securitiesRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
@@ -56,21 +55,30 @@ describe("SecuritiesService", () => {
       save: jest.fn().mockImplementation((data) => data),
       // `findAll` decorates results with lastPriceSource via manager.query.
       manager: { query: jest.fn().mockResolvedValue([]) },
+      update: jest.fn().mockResolvedValue(undefined),
+      remove: jest.fn().mockResolvedValue(undefined),
       createQueryBuilder: jest.fn(() => ({
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        innerJoin: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue(null),
+        getRawMany: jest.fn().mockResolvedValue([]),
         getMany: jest.fn().mockResolvedValue([]),
       })),
     };
 
     holdingsRepository = {
+      remove: jest.fn().mockResolvedValue(undefined),
       createQueryBuilder: jest.fn(() => ({
         leftJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getCount: jest.fn().mockResolvedValue(0),
+        getMany: jest.fn().mockResolvedValue([]),
       })),
     };
 
@@ -131,77 +139,32 @@ describe("SecuritiesService", () => {
       find: jest.fn().mockResolvedValue([]),
     };
 
-    scopedRepository = {
-      createQueryBuilder: jest.fn(() => ({
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValue([]),
-      })),
-      update: jest.fn().mockResolvedValue(undefined),
-    };
+    // deleteAssetOption and the other query-builder reads go through the same
+    // Security repository mock now that every path shares one EntityManager.
+    scopedRepository = securitiesRepository;
 
-    scopedManager = {
-      getRepository: jest.fn(() => scopedRepository),
-    };
+    const { manager, dataSource } = createScopedDbMocks([
+      [Security, securitiesRepository],
+      [SecurityTag, securityTagsRepository],
+      [Holding, holdingsRepository],
+      [InvestmentTransaction, investmentTransactionsRepository],
+      [UserPreference, userPreferencesRepository],
+    ]);
+    scopedManager = manager;
+    // The direct EntityManager calls create()/update()/setSecurityTags make.
+    for (const [name, impl] of Object.entries(queryRunnerManager)) {
+      manager[name].mockImplementation(impl.getMockImplementation()!);
+    }
+    queryRunnerManager = manager;
+    manager.query.mockResolvedValue([]);
+    mockDataSource = dataSource;
 
-    mockDataSource = {
-      manager: queryRunnerManager,
-      // withScopedDb (used by deleteAssetOption) runs its body inside a
-      // transaction and hands it the transaction's EntityManager.
-      transaction: jest.fn((cb) => cb(scopedManager)),
-      createQueryRunner: jest.fn(() => ({
-        connect: jest.fn().mockResolvedValue(undefined),
-        startTransaction: jest.fn().mockResolvedValue(undefined),
-        commitTransaction: jest.fn().mockResolvedValue(undefined),
-        rollbackTransaction: jest.fn().mockResolvedValue(undefined),
-        release: jest.fn().mockResolvedValue(undefined),
-        manager: queryRunnerManager,
-      })),
-    };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SecuritiesService,
-        {
-          provide: getRepositoryToken(Security),
-          useValue: securitiesRepository,
-        },
-        {
-          provide: getRepositoryToken(SecurityTag),
-          useValue: securityTagsRepository,
-        },
-        {
-          provide: getRepositoryToken(Holding),
-          useValue: holdingsRepository,
-        },
-        {
-          provide: getRepositoryToken(InvestmentTransaction),
-          useValue: investmentTransactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: userPreferencesRepository,
-        },
-        {
-          provide: SecurityPriceService,
-          useValue: mockSecurityPriceService,
-        },
-        {
-          provide: YahooFinanceService,
-          useValue: mockYahooFinanceService,
-        },
-        {
-          provide: ActionHistoryService,
-          useValue: mockActionHistoryService,
-        },
-        {
-          provide: DataSource,
-          useValue: mockDataSource,
-        },
-      ],
-    }).compile();
-
-    service = module.get<SecuritiesService>(SecuritiesService);
+    service = new SecuritiesService(
+      mockSecurityPriceService as never,
+      mockYahooFinanceService as never,
+      mockActionHistoryService as never,
+      dataSource as never,
+    );
   });
 
   describe("previewCreateSecurity", () => {
@@ -782,12 +745,12 @@ describe("SecuritiesService", () => {
         order: { symbol: "ASC" },
       });
       // No price query when there are no favourites.
-      expect(securitiesRepository.manager.query).not.toHaveBeenCalled();
+      expect(scopedManager.query).not.toHaveBeenCalled();
     });
 
     it("computes the daily change from the two most recent prices", async () => {
       securitiesRepository.find.mockResolvedValue([{ ...mockSecurity }]);
-      securitiesRepository.manager.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { security_id: "sec-1", close_price: "110", rn: "1" },
         { security_id: "sec-1", close_price: "100", rn: "2" },
       ]);
@@ -808,7 +771,7 @@ describe("SecuritiesService", () => {
 
     it("reports a zero change when fewer than two prices exist", async () => {
       securitiesRepository.find.mockResolvedValue([{ ...mockSecurity }]);
-      securitiesRepository.manager.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         { security_id: "sec-1", close_price: "110", rn: "1" },
       ]);
 
@@ -822,7 +785,7 @@ describe("SecuritiesService", () => {
 
     it("returns a null price when the security has no prices yet", async () => {
       securitiesRepository.find.mockResolvedValue([{ ...mockSecurity }]);
-      securitiesRepository.manager.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       const [quote] = await service.getFavouriteSecurities("user-1");
 
@@ -1754,7 +1717,7 @@ describe("SecuritiesService", () => {
         "sec-1",
         ["tag-1", "tag-2"],
         "user-1",
-        mockDataSource.createQueryRunner(),
+        scopedManager as never,
       );
 
       expect(queryRunnerManager.delete).toHaveBeenCalledWith(SecurityTag, {

@@ -1,7 +1,4 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { NotFoundException, ForbiddenException } from "@nestjs/common";
-import { DataSource } from "typeorm";
 import { HoldingsService } from "./holdings.service";
 import { Holding } from "./entities/holding.entity";
 import {
@@ -13,8 +10,14 @@ import {
   AccountType,
   AccountSubType,
 } from "../accounts/entities/account.entity";
-import { AccountsService } from "../accounts/accounts.service";
-import { SecuritiesService } from "./securities.service";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("HoldingsService", () => {
   let service: HoldingsService;
@@ -23,19 +26,11 @@ describe("HoldingsService", () => {
   let accountsRepository: Record<string, jest.Mock>;
   let accountsService: Record<string, jest.Mock>;
   let securitiesService: Record<string, jest.Mock>;
-  let mockQueryRunner: {
-    connect: jest.Mock;
-    startTransaction: jest.Mock;
-    commitTransaction: jest.Mock;
-    rollbackTransaction: jest.Mock;
-    release: jest.Mock;
-    query: jest.Mock;
-    manager: {
-      find: jest.Mock;
-      remove: jest.Mock;
-      getRepository: jest.Mock;
-    };
-  };
+  // Was the QueryRunner the rebuild opened; now the scoped transaction's
+  // EntityManager. `mockQueryRunner.manager` is kept as an alias so the
+  // existing direct-manager assertions read unchanged.
+  let mockQueryRunner: { manager: Record<string, jest.Mock> };
+  let dataSource: DataSourceMock;
   let mockQrRepo: {
     create: jest.Mock;
     save: jest.Mock;
@@ -118,7 +113,7 @@ describe("HoldingsService", () => {
     return qb;
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     holdingsRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
@@ -146,62 +141,28 @@ describe("HoldingsService", () => {
       findOne: jest.fn().mockResolvedValue(mockSecurity),
     };
 
-    mockQrRepo = {
-      create: jest.fn().mockImplementation((data: any) => ({ ...data })),
-      save: jest.fn().mockImplementation((data: any) => ({
-        ...data,
-        id: data.id || "new-hold",
-      })),
-      findOne: jest.fn().mockResolvedValue(null),
-    };
+    // The rebuild paths get their Holding repository from the transaction's
+    // EntityManager, which is the same mock every other path uses now.
+    mockQrRepo = holdingsRepository as unknown as typeof mockQrRepo;
+    holdingsRepository.findOne.mockResolvedValue(null);
 
-    mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      query: jest.fn().mockResolvedValue([]),
-      manager: {
-        find: jest.fn().mockResolvedValue([]),
-        remove: jest.fn().mockResolvedValue(undefined),
-        getRepository: jest.fn().mockReturnValue(mockQrRepo),
-      },
-    };
+    const mocks = createScopedDbMocks([
+      [Holding, holdingsRepository],
+      [InvestmentTransaction, investmentTransactionsRepository],
+      [Account, accountsRepository],
+    ]);
+    dataSource = mocks.dataSource;
+    const manager = mocks.manager;
+    manager.find.mockResolvedValue([]);
+    manager.remove.mockResolvedValue(undefined);
+    manager.query.mockResolvedValue([]);
+    mockQueryRunner = { manager };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        HoldingsService,
-        {
-          provide: getRepositoryToken(Holding),
-          useValue: holdingsRepository,
-        },
-        {
-          provide: getRepositoryToken(InvestmentTransaction),
-          useValue: investmentTransactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
-        {
-          provide: AccountsService,
-          useValue: accountsService,
-        },
-        {
-          provide: SecuritiesService,
-          useValue: securitiesService,
-        },
-        {
-          provide: DataSource,
-          useValue: {
-            createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-          },
-        },
-      ],
-    }).compile();
-
-    service = module.get<HoldingsService>(HoldingsService);
+    service = new HoldingsService(
+      accountsService as never,
+      securitiesService as never,
+      dataSource as never,
+    );
   });
 
   describe("findAll", () => {
@@ -2125,7 +2086,7 @@ describe("HoldingsService", () => {
   });
 
   describe("rebuildFromTransactions atomicity", () => {
-    it("commits transaction on success and releases queryRunner", async () => {
+    it("rebuilds inside a scoped transaction", async () => {
       accountsRepository.find.mockResolvedValue([mockAccount]);
       investmentTransactionsRepository.find.mockResolvedValue([]);
 
@@ -2133,14 +2094,15 @@ describe("HoldingsService", () => {
         "11111111-1111-1111-1111-111111111111",
       );
 
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.rollbackTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // The delete-all + recreate pair shares one transaction.
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(mockQueryRunner.manager.find).toHaveBeenCalledWith(
+        Holding,
+        expect.anything(),
+      );
     });
 
-    it("rolls back on error during delete and releases queryRunner", async () => {
+    it("propagates a delete failure out of the transaction", async () => {
       accountsRepository.find.mockResolvedValue([mockAccount]);
       investmentTransactionsRepository.find.mockResolvedValue([]);
       mockQueryRunner.manager.find.mockResolvedValue([{ id: "old-hold" }]);
@@ -2152,12 +2114,11 @@ describe("HoldingsService", () => {
         service.rebuildFromTransactions("11111111-1111-1111-1111-111111111111"),
       ).rejects.toThrow("Delete failed");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      // The failure escapes the scoped transaction, so nothing is recreated.
+      expect(mockQrRepo.save).not.toHaveBeenCalled();
     });
 
-    it("rolls back on error during save and releases queryRunner", async () => {
+    it("propagates a save failure out of the transaction", async () => {
       accountsRepository.find.mockResolvedValue([mockAccount]);
       const transactions = [
         {
@@ -2177,31 +2138,30 @@ describe("HoldingsService", () => {
         service.rebuildFromTransactions("11111111-1111-1111-1111-111111111111"),
       ).rejects.toThrow("Save failed");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
   });
 
   describe("applyMaturedInvestmentHoldings", () => {
     it("rebuilds holdings for users with an investment transaction maturing today", async () => {
-      (service as any).dataSource.query = jest
-        .fn()
-        .mockResolvedValueOnce([
-          {
-            user_id: "11111111-1111-1111-1111-111111111111",
-            timezone: "UTC",
-            last_client_timezone: null,
-          },
-          {
-            user_id: "22222222-2222-2222-2222-222222222222",
-            timezone: "UTC",
-            last_client_timezone: null,
-          },
-        ])
-        .mockResolvedValueOnce([
-          { user_id: "11111111-1111-1111-1111-111111111111" },
-        ]);
+      // getUsersByEffectiveTimezone still reads the DataSource directly (it is
+      // shared with other modules' crons); the matured-user query runs inside
+      // the cron's scoped transaction.
+      dataSource.query.mockResolvedValueOnce([
+        {
+          user_id: "11111111-1111-1111-1111-111111111111",
+          timezone: "UTC",
+          last_client_timezone: null,
+        },
+        {
+          user_id: "22222222-2222-2222-2222-222222222222",
+          timezone: "UTC",
+          last_client_timezone: null,
+        },
+      ]);
+      mockQueryRunner.manager.query.mockResolvedValueOnce([
+        { user_id: "11111111-1111-1111-1111-111111111111" },
+      ]);
       const rebuildSpy = jest
         .spyOn(service, "rebuildFromTransactions")
         .mockResolvedValue({
@@ -2223,7 +2183,7 @@ describe("HoldingsService", () => {
     });
 
     it("does nothing when there are no users", async () => {
-      (service as any).dataSource.query = jest.fn().mockResolvedValueOnce([]);
+      dataSource.query.mockResolvedValueOnce([]);
       const rebuildSpy = jest.spyOn(service, "rebuildFromTransactions");
 
       await service.applyMaturedInvestmentHoldings();

@@ -5,8 +5,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, In, Repository } from "typeorm";
+import { DataSource, In } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { MonteCarloScenario } from "./entities/monte-carlo-scenario.entity";
 import { MonteCarloCashFlow } from "./entities/monte-carlo-cash-flow.entity";
 import { CreateScenarioDto } from "./dto/create-scenario.dto";
@@ -22,7 +22,6 @@ import { PortfolioService } from "../securities/portfolio.service";
 import { SecurityPriceService } from "../securities/security-price.service";
 import { Holding } from "../securities/entities/holding.entity";
 import { Security } from "../securities/entities/security.entity";
-import { SecurityPrice } from "../securities/entities/security-price.entity";
 import { Account } from "../accounts/entities/account.entity";
 import { roundMoney } from "../common/round.util";
 
@@ -60,18 +59,6 @@ export class MonteCarloService {
   private readonly logger = new Logger(MonteCarloService.name);
 
   constructor(
-    @InjectRepository(MonteCarloScenario)
-    private scenariosRepository: Repository<MonteCarloScenario>,
-    @InjectRepository(MonteCarloCashFlow)
-    private cashFlowsRepository: Repository<MonteCarloCashFlow>,
-    @InjectRepository(Holding)
-    private holdingsRepository: Repository<Holding>,
-    @InjectRepository(SecurityPrice)
-    private securityPriceRepository: Repository<SecurityPrice>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(Security)
-    private securitiesRepository: Repository<Security>,
     private simulationService: MonteCarloSimulationService,
     private portfolioService: PortfolioService,
     private securityPriceService: SecurityPriceService,
@@ -82,38 +69,43 @@ export class MonteCarloService {
     userId: string,
     dto: CreateScenarioDto,
   ): Promise<MonteCarloScenario> {
-    const scenario = this.scenariosRepository.create({
-      userId,
-      name: dto.name,
-      description: dto.description ?? null,
-      accountIds: dto.accountIds,
-      startingValue: dto.startingValue,
-      useCurrentBalance: dto.useCurrentBalance,
-      yearsToRetirement: dto.yearsToRetirement,
-      annualContribution: dto.annualContribution,
-      contributionGrowthRate: dto.contributionGrowthRate,
-      yearsInRetirement: dto.yearsInRetirement,
-      annualWithdrawal: dto.annualWithdrawal,
-      expectedReturn: dto.expectedReturn,
-      volatility: dto.volatility,
-      inflationRate: dto.inflationRate,
-      showRealValues: dto.showRealValues,
-      useHistoricalReturns: dto.useHistoricalReturns,
-      simulationCount: dto.simulationCount,
-      targetValue: dto.targetValue ?? null,
-      randomSeed: dto.randomSeed ?? null,
+    const saved = await withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(MonteCarloScenario);
+      const scenario = repo.create({
+        userId,
+        name: dto.name,
+        description: dto.description ?? null,
+        accountIds: dto.accountIds,
+        startingValue: dto.startingValue,
+        useCurrentBalance: dto.useCurrentBalance,
+        yearsToRetirement: dto.yearsToRetirement,
+        annualContribution: dto.annualContribution,
+        contributionGrowthRate: dto.contributionGrowthRate,
+        yearsInRetirement: dto.yearsInRetirement,
+        annualWithdrawal: dto.annualWithdrawal,
+        expectedReturn: dto.expectedReturn,
+        volatility: dto.volatility,
+        inflationRate: dto.inflationRate,
+        showRealValues: dto.showRealValues,
+        useHistoricalReturns: dto.useHistoricalReturns,
+        simulationCount: dto.simulationCount,
+        targetValue: dto.targetValue ?? null,
+        randomSeed: dto.randomSeed ?? null,
+      });
+      return repo.save(scenario);
     });
-    const saved = await this.scenariosRepository.save(scenario);
     await this.replaceCashFlows(saved.id, dto.cashFlows);
     return this.findOne(userId, saved.id);
   }
 
   async findAll(userId: string): Promise<MonteCarloScenario[]> {
-    const scenarios = await this.scenariosRepository.find({
-      where: { userId },
-      relations: ["cashFlows"],
-      order: { isFavourite: "DESC", sortOrder: "ASC", updatedAt: "DESC" },
-    });
+    const scenarios = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(MonteCarloScenario).find({
+        where: { userId },
+        relations: ["cashFlows"],
+        order: { isFavourite: "DESC", sortOrder: "ASC", updatedAt: "DESC" },
+      }),
+    );
     for (const s of scenarios) {
       if (s.cashFlows) {
         s.cashFlows.sort((a, b) => a.sortOrder - b.sortOrder);
@@ -123,10 +115,12 @@ export class MonteCarloService {
   }
 
   async findOne(userId: string, id: string): Promise<MonteCarloScenario> {
-    const scenario = await this.scenariosRepository.findOne({
-      where: { id, userId },
-      relations: ["cashFlows"],
-    });
+    const scenario = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(MonteCarloScenario).findOne({
+        where: { id, userId },
+        relations: ["cashFlows"],
+      }),
+    );
     if (!scenario) {
       throw new NotFoundException(
         tr("errors.monteCarlo.scenarioNotFound", `Scenario ${id} not found`, {
@@ -150,21 +144,24 @@ export class MonteCarloService {
     flows: CashFlowDto[] | undefined,
   ): Promise<void> {
     if (flows === undefined) return;
-    await this.cashFlowsRepository.delete({ scenarioId });
-    if (flows.length === 0) return;
-    const rows = flows.map((cf, idx) =>
-      this.cashFlowsRepository.create({
-        scenarioId,
-        name: cf.name,
-        amount: cf.amount,
-        flowType: cf.flowType,
-        startYear: cf.startYear,
-        endYear: cf.endYear ?? null,
-        inflationAdjust: cf.inflationAdjust,
-        sortOrder: idx,
-      }),
-    );
-    await this.cashFlowsRepository.save(rows);
+    await withScopedDb(this.dataSource, async (m) => {
+      const repo = m.getRepository(MonteCarloCashFlow);
+      await repo.delete({ scenarioId });
+      if (flows.length === 0) return;
+      const rows = flows.map((cf, idx) =>
+        repo.create({
+          scenarioId,
+          name: cf.name,
+          amount: cf.amount,
+          flowType: cf.flowType,
+          startYear: cf.startYear,
+          endYear: cf.endYear ?? null,
+          inflationAdjust: cf.inflationAdjust,
+          sortOrder: idx,
+        }),
+      );
+      await repo.save(rows);
+    });
   }
 
   async update(
@@ -210,14 +207,18 @@ export class MonteCarloService {
       scenario.randomSeed = dto.randomSeed ?? null;
     if (dto.isFavourite !== undefined) scenario.isFavourite = dto.isFavourite;
 
-    const saved = await this.scenariosRepository.save(scenario);
+    const saved = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(MonteCarloScenario).save(scenario),
+    );
     await this.replaceCashFlows(saved.id, dto.cashFlows);
     return this.findOne(userId, saved.id);
   }
 
   async remove(userId: string, id: string): Promise<void> {
     const scenario = await this.findOne(userId, id);
-    await this.scenariosRepository.remove(scenario);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(MonteCarloScenario).remove(scenario),
+    );
   }
 
   async reorder(userId: string, scenarioIds: string[]): Promise<void> {
@@ -232,24 +233,15 @@ export class MonteCarloService {
         ),
       );
     }
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
+    await withScopedDb(this.dataSource, async (m) => {
       for (let i = 0; i < scenarioIds.length; i++) {
-        await queryRunner.manager.update(
+        await m.update(
           MonteCarloScenario,
           { id: scenarioIds[i], userId },
           { sortOrder: i },
         );
       }
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   async runSaved(userId: string, id: string): Promise<SimulationResult> {
@@ -286,7 +278,9 @@ export class MonteCarloService {
     });
 
     scenario.lastRunAt = new Date();
-    await this.scenariosRepository.save(scenario);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(MonteCarloScenario).save(scenario),
+    );
 
     return result;
   }
@@ -387,10 +381,12 @@ export class MonteCarloService {
     // of currently held securities. This answers "what would my current mix
     // have returned year-over-year", which is what users expect when they
     // pick 'Use historical' on this report.
-    const holdings = await this.holdingsRepository.find({
-      where: { accountId: In(accountIds) },
-      relations: ["security"],
-    });
+    const holdings = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Holding).find({
+        where: { accountId: In(accountIds) },
+        relations: ["security"],
+      }),
+    );
     const active = holdings.filter(
       (h) => Math.abs(Number(h.quantity)) > 0.0001,
     );
@@ -484,15 +480,19 @@ export class MonteCarloService {
 
     // Verify the requested accounts belong to the user before running queries
     // that don't carry their own userId clause.
-    const accounts = await this.accountsRepository.find({
-      where: { id: In(accountIds), userId },
-    });
+    const accounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { id: In(accountIds), userId },
+      }),
+    );
     if (accounts.length === 0) return [];
 
-    const holdings = await this.holdingsRepository.find({
-      where: { accountId: In(accounts.map((a) => a.id)) },
-      relations: ["security"],
-    });
+    const holdings = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Holding).find({
+        where: { accountId: In(accounts.map((a) => a.id)) },
+        relations: ["security"],
+      }),
+    );
     const active = holdings.filter(
       (h) => Math.abs(Number(h.quantity)) > 0.0001,
     );
@@ -566,9 +566,11 @@ export class MonteCarloService {
     );
     if (sparseIds.length === 0) return yearlyReturns;
 
-    const securities = await this.securitiesRepository.find({
-      where: { id: In(sparseIds) },
-    });
+    const securities = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({
+        where: { id: In(sparseIds) },
+      }),
+    );
     const now = Date.now();
     const dueForBackfill = securities.filter((s) => {
       const last = s.historicalBackfillAttemptedAt;
@@ -599,9 +601,13 @@ export class MonteCarloService {
     // Stamp every security we attempted, regardless of whether the provider
     // actually returned new rows. The cooldown is about not hammering the
     // API, not about whether the data improved.
-    await this.securitiesRepository.update(
-      { id: In(dueForBackfill.map((s) => s.id)) },
-      { historicalBackfillAttemptedAt: new Date() },
+    await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Security)
+        .update(
+          { id: In(dueForBackfill.map((s) => s.id)) },
+          { historicalBackfillAttemptedAt: new Date() },
+        ),
     );
 
     yearlyReturns = await this.queryYearlyReturns(securityIds);
@@ -619,15 +625,17 @@ export class MonteCarloService {
       security_id: string;
       year: string;
       close_price: string;
-    }> = await this.securityPriceRepository.query(
-      `SELECT DISTINCT ON (security_id, EXTRACT(YEAR FROM price_date))
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT DISTINCT ON (security_id, EXTRACT(YEAR FROM price_date))
          security_id,
          EXTRACT(YEAR FROM price_date)::text AS year,
          COALESCE(adjusted_close, close_price)::text AS close_price
        FROM security_prices
        WHERE security_id = ANY($1)
        ORDER BY security_id, EXTRACT(YEAR FROM price_date), price_date DESC`,
-      [securityIds],
+        [securityIds],
+      ),
     );
 
     const pricesBySecurity = new Map<

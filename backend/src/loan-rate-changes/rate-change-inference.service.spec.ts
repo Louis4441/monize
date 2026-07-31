@@ -1,14 +1,17 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
-import { DataSource } from "typeorm";
 import { BadRequestException } from "@nestjs/common";
 import { RateChangeInferenceService } from "./rate-change-inference.service";
 import { LoanRateChange } from "./entities/loan-rate-change.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
-import { LoanPaymentDetectorService } from "../accounts/loan-payment-detector.service";
 import type { PaymentRecord } from "../accounts/loan-payment-detector.service";
-import { LoanRateChangesService } from "./loan-rate-changes.service";
+import {
+  createScopedDbMocks,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 interface SyntheticSegment {
   /** Quoted annual rate as a percentage */
@@ -95,8 +98,7 @@ describe("RateChangeInferenceService", () => {
   let service: RateChangeInferenceService;
   let detector: Record<string, jest.Mock>;
   let rateChangesService: Record<string, jest.Mock>;
-  let manager: Record<string, jest.Mock>;
-  let queryRunner: Record<string, any>;
+  let manager: ManagerMock;
   let transactionsRepository: Record<string, jest.Mock>;
 
   const userId = "user-1";
@@ -130,27 +132,7 @@ describe("RateChangeInferenceService", () => {
     return manager.save.mock.calls.map((call) => call[0]);
   }
 
-  beforeEach(async () => {
-    manager = {
-      find: jest.fn().mockResolvedValue([]),
-      create: jest.fn().mockImplementation((_entity, data) => ({ ...data })),
-      save: jest
-        .fn()
-        .mockImplementation((data) =>
-          Promise.resolve({ ...data, id: `rc-${Math.random()}` }),
-        ),
-      delete: jest.fn().mockResolvedValue({ affected: 0 }),
-    };
-
-    queryRunner = {
-      connect: jest.fn().mockResolvedValue(undefined),
-      startTransaction: jest.fn().mockResolvedValue(undefined),
-      commitTransaction: jest.fn().mockResolvedValue(undefined),
-      rollbackTransaction: jest.fn().mockResolvedValue(undefined),
-      release: jest.fn().mockResolvedValue(undefined),
-      manager,
-    };
-
+  beforeEach(() => {
     transactionsRepository = {
       find: jest.fn().mockResolvedValue([]),
     };
@@ -170,24 +152,22 @@ describe("RateChangeInferenceService", () => {
       verifyLoanAccount: jest.fn().mockResolvedValue(makeAccount()),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        RateChangeInferenceService,
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionsRepository,
-        },
-        {
-          provide: DataSource,
-          useValue: { createQueryRunner: jest.fn(() => queryRunner) },
-        },
-        { provide: LoanPaymentDetectorService, useValue: detector },
-        { provide: LoanRateChangesService, useValue: rateChangesService },
-      ],
-    }).compile();
+    const { manager: managerMock, dataSource } = createScopedDbMocks([
+      [Transaction, transactionsRepository],
+      [LoanRateChange, {}],
+    ]);
+    manager = managerMock;
+    manager.find.mockResolvedValue([]);
+    manager.create.mockImplementation((_entity, data) => ({ ...data }));
+    manager.save.mockImplementation((data) =>
+      Promise.resolve({ ...data, id: `rc-${Math.random()}` }),
+    );
+    manager.delete.mockResolvedValue({ affected: 0 });
 
-    service = module.get<RateChangeInferenceService>(
-      RateChangeInferenceService,
+    service = new RateChangeInferenceService(
+      dataSource as never,
+      detector as never,
+      rateChangesService as never,
     );
   });
 

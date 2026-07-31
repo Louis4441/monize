@@ -7,8 +7,8 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, QueryRunner, In } from "typeorm";
+import { DataSource, EntityManager, In } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Security } from "./entities/security.entity";
 import { SecurityTag } from "./entities/security-tag.entity";
 import { Holding } from "./entities/holding.entity";
@@ -29,7 +29,6 @@ import {
   countryForCurrency,
   COUNTRY_OPTIONS,
 } from "./security-enums";
-import { withScopedDb } from "../common/db/scoped-db";
 
 /** A single {name, weight} allocation slice; weight is a decimal 0-1. */
 export interface AllocationWeight {
@@ -130,16 +129,6 @@ export class SecuritiesService {
   private readonly logger = new Logger(SecuritiesService.name);
 
   constructor(
-    @InjectRepository(Security)
-    private securitiesRepository: Repository<Security>,
-    @InjectRepository(SecurityTag)
-    private securityTagsRepository: Repository<SecurityTag>,
-    @InjectRepository(Holding)
-    private holdingsRepository: Repository<Holding>,
-    @InjectRepository(InvestmentTransaction)
-    private investmentTransactionsRepository: Repository<InvestmentTransaction>,
-    @InjectRepository(UserPreference)
-    private userPreferencesRepository: Repository<UserPreference>,
     private securityPriceService: SecurityPriceService,
     private yahooFinanceService: YahooFinanceService,
     private actionHistoryService: ActionHistoryService,
@@ -256,21 +245,28 @@ export class SecuritiesService {
    * base-currency country floated to the top when it maps to a known country.
    */
   async getCountryOptions(userId: string): Promise<string[]> {
-    const pref = await this.userPreferencesRepository.findOne({
-      where: { userId },
-    });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({
+        where: { userId },
+      }),
+    );
     const baseCountry = countryForCurrency(pref?.defaultCurrency);
 
     // Distinct country names already stored in this user's manual breakdowns.
-    const rows: { name: string | null }[] = await this.securitiesRepository
-      .createQueryBuilder("s")
-      .select(
-        "DISTINCT jsonb_array_elements(s.country_weightings)->>'name'",
-        "name",
-      )
-      .where("s.user_id = :userId", { userId })
-      .andWhere("s.country_weightings IS NOT NULL")
-      .getRawMany();
+    const rows: { name: string | null }[] = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m
+          .getRepository(Security)
+          .createQueryBuilder("s")
+          .select(
+            "DISTINCT jsonb_array_elements(s.country_weightings)->>'name'",
+            "name",
+          )
+          .where("s.user_id = :userId", { userId })
+          .andWhere("s.country_weightings IS NOT NULL")
+          .getRawMany(),
+    );
 
     const seen = new Set<string>(COUNTRY_OPTIONS.map((c) => c.toLowerCase()));
     const custom: string[] = [];
@@ -307,15 +303,20 @@ export class SecuritiesService {
    * entered once is available for every other security. Sorted alphabetically.
    */
   async getAssetOptions(userId: string): Promise<string[]> {
-    const rows: { name: string | null }[] = await this.securitiesRepository
-      .createQueryBuilder("s")
-      .select(
-        "DISTINCT jsonb_array_elements(s.asset_weightings)->>'name'",
-        "name",
-      )
-      .where("s.user_id = :userId", { userId })
-      .andWhere("s.asset_weightings IS NOT NULL")
-      .getRawMany();
+    const rows: { name: string | null }[] = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m
+          .getRepository(Security)
+          .createQueryBuilder("s")
+          .select(
+            "DISTINCT jsonb_array_elements(s.asset_weightings)->>'name'",
+            "name",
+          )
+          .where("s.user_id = :userId", { userId })
+          .andWhere("s.asset_weightings IS NOT NULL")
+          .getRawMany(),
+    );
 
     const seen = new Set<string>();
     const names: string[] = [];
@@ -406,13 +407,9 @@ export class SecuritiesService {
       securityData.irWebsite = this.normalizeWebsite(securityData.irWebsite);
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    let saved: Security;
-    try {
+    const saved = await withScopedDb(this.dataSource, async (m) => {
       // Check if symbol already exists for this user
-      const existing = await queryRunner.manager.findOne(Security, {
+      const existing = await m.findOne(Security, {
         where: { symbol: securityData.symbol, userId },
       });
 
@@ -426,26 +423,21 @@ export class SecuritiesService {
         );
       }
 
-      const security = queryRunner.manager.create(Security, {
+      const security = m.create(Security, {
         ...securityData,
         countryWeightings:
           this.normalizeAllocationWeightings(countryWeightings),
         assetWeightings: this.normalizeAssetWeightings(assetWeightings),
         userId,
       });
-      saved = await queryRunner.manager.save(security);
+      const persisted = await m.save(security);
 
       if (tagIds && tagIds.length > 0) {
-        await this.setSecurityTags(saved.id, tagIds, userId, queryRunner);
+        await this.setSecurityTags(persisted.id, tagIds, userId, m);
       }
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      return persisted;
+    });
 
     // Fire-and-forget: backfill 1Y of daily prices for the new security
     this.securityPriceService.backfillSecurity(saved).catch((err) => {
@@ -475,11 +467,13 @@ export class SecuritiesService {
     if (!includeInactive) {
       where.isActive = true;
     }
-    const securities = await this.securitiesRepository.find({
-      where,
-      relations: ["tags"],
-      order: { symbol: "ASC" },
-    });
+    const securities = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({
+        where,
+        relations: ["tags"],
+        order: { symbol: "ASC" },
+      }),
+    );
     return this.attachLastPriceSource(securities);
   }
 
@@ -494,12 +488,14 @@ export class SecuritiesService {
     if (securities.length === 0) return [];
     const ids = securities.map((s) => s.id);
     const rows: Array<{ security_id: string; source: string | null }> =
-      await this.securitiesRepository.manager.query(
-        `SELECT DISTINCT ON (security_id) security_id, source
+      await withScopedDb(this.dataSource, (m) =>
+        m.query(
+          `SELECT DISTINCT ON (security_id) security_id, source
          FROM security_prices
          WHERE security_id = ANY($1::uuid[])
          ORDER BY security_id, price_date DESC, created_at DESC`,
-        [ids],
+          [ids],
+        ),
       );
     const sourceById = new Map(rows.map((r) => [r.security_id, r.source]));
     return securities.map((s) => ({
@@ -509,10 +505,12 @@ export class SecuritiesService {
   }
 
   async findOne(userId: string, id: string): Promise<Security> {
-    const security = await this.securitiesRepository.findOne({
-      where: { id, userId },
-      relations: ["tags"],
-    });
+    const security = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).findOne({
+        where: { id, userId },
+        relations: ["tags"],
+      }),
+    );
     if (!security) {
       throw new NotFoundException(
         tr(
@@ -526,9 +524,11 @@ export class SecuritiesService {
   }
 
   async findBySymbol(userId: string, symbol: string): Promise<Security> {
-    const security = await this.securitiesRepository.findOne({
-      where: { symbol, userId },
-    });
+    const security = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).findOne({
+        where: { symbol, userId },
+      }),
+    );
     if (!security) {
       throw new NotFoundException(
         tr(
@@ -566,9 +566,11 @@ export class SecuritiesService {
       updateSecurityDto.symbol &&
       updateSecurityDto.symbol !== security.symbol
     ) {
-      const existing = await this.securitiesRepository.findOne({
-        where: { symbol: updateSecurityDto.symbol, userId },
-      });
+      const existing = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Security).findOne({
+          where: { symbol: updateSecurityDto.symbol, userId },
+        }),
+      );
       if (existing) {
         throw new ConflictException(
           tr(
@@ -619,29 +621,15 @@ export class SecuritiesService {
 
     // Persist the scalar fields and the tag set together so a security and its
     // classification never drift apart on a partial failure.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
+    await withScopedDb(this.dataSource, async (m) => {
       // The relation is loaded onto `security`; strip it before save so
       // TypeORM does not try to cascade-write the join table itself.
       const { tags: _tags, ...scalars } = security;
-      await queryRunner.manager.save(Security, scalars);
+      await m.save(Security, scalars);
       if (updateSecurityDto.tagIds !== undefined) {
-        await this.setSecurityTags(
-          id,
-          updateSecurityDto.tagIds,
-          userId,
-          queryRunner,
-        );
+        await this.setSecurityTags(id, updateSecurityDto.tagIds, userId, m);
       }
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     const saved = await this.findOne(userId, id);
 
@@ -664,13 +652,18 @@ export class SecuritiesService {
 
     // Check if security has any holdings with non-zero quantity
     // Using ABS() to handle potential small negative values from rounding
-    const holdingsCount = await this.holdingsRepository
-      .createQueryBuilder("holding")
-      .leftJoin("holding.account", "account")
-      .where("holding.securityId = :securityId", { securityId: id })
-      .andWhere("account.userId = :userId", { userId })
-      .andWhere("ABS(holding.quantity) > :threshold", { threshold: 0.00000001 })
-      .getCount();
+    const holdingsCount = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Holding)
+        .createQueryBuilder("holding")
+        .leftJoin("holding.account", "account")
+        .where("holding.securityId = :securityId", { securityId: id })
+        .andWhere("account.userId = :userId", { userId })
+        .andWhere("ABS(holding.quantity) > :threshold", {
+          threshold: 0.00000001,
+        })
+        .getCount(),
+    );
 
     if (holdingsCount > 0) {
       throw new ForbiddenException(
@@ -682,13 +675,17 @@ export class SecuritiesService {
     }
 
     security.isActive = false;
-    return this.securitiesRepository.save(security);
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).save(security),
+    );
   }
 
   async activate(userId: string, id: string): Promise<Security> {
     const security = await this.findOne(userId, id);
     security.isActive = true;
-    return this.securitiesRepository.save(security);
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).save(security),
+    );
   }
 
   async remove(userId: string, id: string): Promise<void> {
@@ -696,13 +693,18 @@ export class SecuritiesService {
 
     // Check for any holdings with non-zero quantity
     // Using ABS() to handle potential small negative values from rounding
-    const holdingsCount = await this.holdingsRepository
-      .createQueryBuilder("holding")
-      .leftJoin("holding.account", "account")
-      .where("holding.securityId = :securityId", { securityId: id })
-      .andWhere("account.userId = :userId", { userId })
-      .andWhere("ABS(holding.quantity) > :threshold", { threshold: 0.00000001 })
-      .getCount();
+    const holdingsCount = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Holding)
+        .createQueryBuilder("holding")
+        .leftJoin("holding.account", "account")
+        .where("holding.securityId = :securityId", { securityId: id })
+        .andWhere("account.userId = :userId", { userId })
+        .andWhere("ABS(holding.quantity) > :threshold", {
+          threshold: 0.00000001,
+        })
+        .getCount(),
+    );
 
     if (holdingsCount > 0) {
       throw new ForbiddenException(
@@ -714,11 +716,14 @@ export class SecuritiesService {
     }
 
     // Check for any investment transactions referencing this security
-    const transactionsCount = await this.investmentTransactionsRepository
-      .createQueryBuilder("tx")
-      .where("tx.securityId = :securityId", { securityId: id })
-      .andWhere("tx.userId = :userId", { userId })
-      .getCount();
+    const transactionsCount = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(InvestmentTransaction)
+        .createQueryBuilder("tx")
+        .where("tx.securityId = :securityId", { securityId: id })
+        .andWhere("tx.userId = :userId", { userId })
+        .getCount(),
+    );
 
     if (transactionsCount > 0) {
       throw new ForbiddenException(
@@ -729,20 +734,25 @@ export class SecuritiesService {
       );
     }
 
-    // Clean up any zero-quantity holding records before deleting the security
-    const zeroHoldings = await this.holdingsRepository
-      .createQueryBuilder("holding")
-      .leftJoin("holding.account", "account")
-      .where("holding.securityId = :securityId", { securityId: id })
-      .andWhere("account.userId = :userId", { userId })
-      .getMany();
-    if (zeroHoldings.length > 0) {
-      await this.holdingsRepository.remove(zeroHoldings);
-    }
-
-    // Security prices cascade-delete via FK constraint
+    // Clean up any zero-quantity holding records before deleting the security,
+    // then delete the security itself -- one transaction so a failure can never
+    // strand the holdings without their security.
     const beforeData = { ...security };
-    await this.securitiesRepository.remove(security);
+    await withScopedDb(this.dataSource, async (m) => {
+      const holdingsRepo = m.getRepository(Holding);
+      const zeroHoldings = await holdingsRepo
+        .createQueryBuilder("holding")
+        .leftJoin("holding.account", "account")
+        .where("holding.securityId = :securityId", { securityId: id })
+        .andWhere("account.userId = :userId", { userId })
+        .getMany();
+      if (zeroHoldings.length > 0) {
+        await holdingsRepo.remove(zeroHoldings);
+      }
+
+      // Security prices cascade-delete via FK constraint
+      await m.getRepository(Security).remove(security);
+    });
 
     this.actionHistoryService.record(userId, {
       entityType: "security",
@@ -765,10 +775,12 @@ export class SecuritiesService {
   async getFavouriteSecurities(
     userId: string,
   ): Promise<FavouriteSecurityQuote[]> {
-    const securities = await this.securitiesRepository.find({
-      where: { userId, isFavourite: true, isActive: true },
-      order: { symbol: "ASC" },
-    });
+    const securities = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({
+        where: { userId, isFavourite: true, isActive: true },
+        order: { symbol: "ASC" },
+      }),
+    );
     if (securities.length === 0) return [];
 
     const ids = securities.map((s) => s.id);
@@ -777,8 +789,9 @@ export class SecuritiesService {
       security_id: string;
       close_price: string;
       rn: string;
-    }> = await this.securitiesRepository.manager.query(
-      `SELECT security_id, close_price, rn FROM (
+    }> = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT security_id, close_price, rn FROM (
          SELECT security_id, close_price,
                 ROW_NUMBER() OVER (PARTITION BY security_id ORDER BY price_date DESC) as rn
          FROM security_prices
@@ -786,7 +799,8 @@ export class SecuritiesService {
        ) sub
        WHERE rn <= 2
        ORDER BY security_id, rn`,
-      [ids],
+        [ids],
+      ),
     );
 
     const priceMap = new Map<string, number[]>();
@@ -824,28 +838,34 @@ export class SecuritiesService {
   }
 
   async getSecurityIdsWithTransactions(userId: string): Promise<string[]> {
-    const results = await this.investmentTransactionsRepository
-      .createQueryBuilder("tx")
-      .select("DISTINCT tx.securityId", "securityId")
-      .where("tx.userId = :userId", { userId })
-      .andWhere("tx.securityId IS NOT NULL")
-      .getRawMany();
+    const results = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(InvestmentTransaction)
+        .createQueryBuilder("tx")
+        .select("DISTINCT tx.securityId", "securityId")
+        .where("tx.userId = :userId", { userId })
+        .andWhere("tx.securityId IS NOT NULL")
+        .getRawMany(),
+    );
 
     return results.map((r) => r.securityId);
   }
 
   async search(userId: string, query: string): Promise<Security[]> {
-    return this.securitiesRepository
-      .createQueryBuilder("security")
-      .where("security.userId = :userId", { userId })
-      .andWhere("security.isActive = :isActive", { isActive: true })
-      .andWhere(
-        "(LOWER(security.symbol) LIKE LOWER(:query) OR LOWER(security.name) LIKE LOWER(:query))",
-        { query: `%${query}%` },
-      )
-      .orderBy("security.symbol", "ASC")
-      .take(20)
-      .getMany();
+    return withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Security)
+        .createQueryBuilder("security")
+        .where("security.userId = :userId", { userId })
+        .andWhere("security.isActive = :isActive", { isActive: true })
+        .andWhere(
+          "(LOWER(security.symbol) LIKE LOWER(:query) OR LOWER(security.name) LIKE LOWER(:query))",
+          { query: `%${query}%` },
+        )
+        .orderBy("security.symbol", "ASC")
+        .take(20)
+        .getMany(),
+    );
   }
 
   /**
@@ -872,24 +892,30 @@ export class SecuritiesService {
       return { match: null, candidates: [] };
     }
 
-    const bySymbol = await this.securitiesRepository
-      .createQueryBuilder("security")
-      .where("security.userId = :userId", { userId })
-      .andWhere("LOWER(security.symbol) = LOWER(:q)", { q: trimmed })
-      .getOne();
+    const bySymbol = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Security)
+        .createQueryBuilder("security")
+        .where("security.userId = :userId", { userId })
+        .andWhere("LOWER(security.symbol) = LOWER(:q)", { q: trimmed })
+        .getOne(),
+    );
     if (bySymbol) {
       return { match: bySymbol, candidates: [] };
     }
 
-    const byName = await this.securitiesRepository
-      .createQueryBuilder("security")
-      .where("security.userId = :userId", { userId })
-      .andWhere("LOWER(security.name) = LOWER(:q)", { q: trimmed })
-      // Prefer an active security when several share a name (e.g. a delisted
-      // duplicate); fall back to the symbol for a stable order.
-      .orderBy("security.isActive", "DESC")
-      .addOrderBy("security.symbol", "ASC")
-      .getMany();
+    const byName = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Security)
+        .createQueryBuilder("security")
+        .where("security.userId = :userId", { userId })
+        .andWhere("LOWER(security.name) = LOWER(:q)", { q: trimmed })
+        // Prefer an active security when several share a name (e.g. a delisted
+        // duplicate); fall back to the symbol for a stable order.
+        .orderBy("security.isActive", "DESC")
+        .addOrderBy("security.symbol", "ASC")
+        .getMany(),
+    );
     if (byName.length === 1) {
       return { match: byName[0], candidates: [] };
     }
@@ -897,17 +923,20 @@ export class SecuritiesService {
       return { match: null, candidates: byName };
     }
 
-    const partial = await this.securitiesRepository
-      .createQueryBuilder("security")
-      .where("security.userId = :userId", { userId })
-      .andWhere("security.isActive = :isActive", { isActive: true })
-      .andWhere(
-        "(LOWER(security.symbol) LIKE LOWER(:like) OR LOWER(security.name) LIKE LOWER(:like))",
-        { like: `%${trimmed}%` },
-      )
-      .orderBy("security.symbol", "ASC")
-      .take(10)
-      .getMany();
+    const partial = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Security)
+        .createQueryBuilder("security")
+        .where("security.userId = :userId", { userId })
+        .andWhere("security.isActive = :isActive", { isActive: true })
+        .andWhere(
+          "(LOWER(security.symbol) LIKE LOWER(:like) OR LOWER(security.name) LIKE LOWER(:like))",
+          { like: `%${trimmed}%` },
+        )
+        .orderBy("security.symbol", "ASC")
+        .take(10)
+        .getMany(),
+    );
     if (partial.length === 1) {
       return { match: partial[0], candidates: [] };
     }
@@ -1117,9 +1146,11 @@ export class SecuritiesService {
 
     // Enforce the per-user unique symbol up front so a duplicate is reported at
     // preview time with the same message the REST/confirm write would throw.
-    const existing = await this.securitiesRepository.findOne({
-      where: { symbol: lookup.symbol, userId },
-    });
+    const existing = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).findOne({
+        where: { symbol: lookup.symbol, userId },
+      }),
+    );
     if (existing) {
       throw new ConflictException(
         tr(
@@ -1175,10 +1206,12 @@ export class SecuritiesService {
       input.provider,
     );
 
-    const owned = await this.securitiesRepository.find({
-      where: { userId },
-      select: ["symbol"],
-    });
+    const owned = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({
+        where: { userId },
+        select: ["symbol"],
+      }),
+    );
     const ownedSymbols = new Set(owned.map((s) => s.symbol.toUpperCase()));
 
     const candidates: LlmSecurityLookupCandidate[] = results.map((r) => ({
@@ -1205,29 +1238,30 @@ export class SecuritiesService {
     securityId: string,
     tagIds: string[],
     userId: string,
-    queryRunner?: QueryRunner,
+    manager?: EntityManager,
   ): Promise<void> {
-    const manager = queryRunner ? queryRunner.manager : this.dataSource.manager;
-
-    if (tagIds.length > 0) {
-      const tags = await manager.find(Tag, {
-        where: { id: In(tagIds), userId },
-      });
-      if (tags.length !== tagIds.length) {
-        throw new NotFoundException(
-          tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
-        );
+    const apply = async (m: EntityManager): Promise<void> => {
+      if (tagIds.length > 0) {
+        const tags = await m.find(Tag, {
+          where: { id: In(tagIds), userId },
+        });
+        if (tags.length !== tagIds.length) {
+          throw new NotFoundException(
+            tr("errors.tags.oneOrMoreNotFound", "One or more tags not found"),
+          );
+        }
       }
-    }
 
-    await manager.delete(SecurityTag, { securityId });
+      await m.delete(SecurityTag, { securityId });
 
-    if (tagIds.length > 0) {
-      const newTags = tagIds.map((tagId) =>
-        manager.create(SecurityTag, { securityId, tagId }),
-      );
-      await manager.save(SecurityTag, newTags);
-    }
+      if (tagIds.length > 0) {
+        const newTags = tagIds.map((tagId) =>
+          m.create(SecurityTag, { securityId, tagId }),
+        );
+        await m.save(SecurityTag, newTags);
+      }
+    };
+    return manager ? apply(manager) : withScopedDb(this.dataSource, apply);
   }
 
   /**
@@ -1235,16 +1269,19 @@ export class SecuritiesService {
    * Mirrors the per-user scoping of the rest of the service.
    */
   async findByTag(userId: string, tagId: string): Promise<Security[]> {
-    return this.securitiesRepository
-      .createQueryBuilder("security")
-      .innerJoin(
-        SecurityTag,
-        "st",
-        "st.security_id = security.id AND st.tag_id = :tagId",
-        { tagId },
-      )
-      .where("security.userId = :userId", { userId })
-      .orderBy("security.symbol", "ASC")
-      .getMany();
+    return withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Security)
+        .createQueryBuilder("security")
+        .innerJoin(
+          SecurityTag,
+          "st",
+          "st.security_id = security.id AND st.tag_id = :tagId",
+          { tagId },
+        )
+        .where("security.userId = :userId", { userId })
+        .orderBy("security.symbol", "ASC")
+        .getMany(),
+    );
   }
 }

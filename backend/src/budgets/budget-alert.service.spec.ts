@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -19,6 +20,14 @@ import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { EmailService } from "../notifications/email.service";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 function makeCategory(overrides: Partial<BudgetCategory> = {}): BudgetCategory {
   return {
@@ -92,6 +101,7 @@ function makeAlert(overrides: Partial<BudgetAlert> = {}): BudgetAlert {
 }
 
 describe("BudgetAlertService", () => {
+  let scopedDataSource: DataSourceMock;
   let service: BudgetAlertService;
   let budgetsRepository: Record<string, jest.Mock>;
   let alertsRepository: Record<string, jest.Mock>;
@@ -175,6 +185,16 @@ describe("BudgetAlertService", () => {
       }),
     };
 
+    ({ dataSource: scopedDataSource } = createScopedDbMocks([
+      [Budget, budgetsRepository as never],
+      [BudgetAlert, alertsRepository as never],
+      [Transaction, transactionsRepository as never],
+      [TransactionSplit, splitsRepository as never],
+      [User, usersRepository as never],
+      [UserPreference, preferencesRepository as never],
+      [ScheduledTransaction, scheduledTransactionsRepository as never],
+    ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BudgetAlertService,
@@ -209,6 +229,7 @@ describe("BudgetAlertService", () => {
               opts?.defaultValue ?? key,
           },
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 

@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Transaction } from "../transactions/entities/transaction.entity";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Category } from "../categories/entities/category.entity";
 import { ReportCurrencyService } from "./report-currency.service";
 import {
@@ -18,10 +17,7 @@ import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
 @Injectable()
 export class TaxRecurringReportsService {
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
+    private dataSource: DataSource,
     private currencyService: ReportCurrencyService,
   ) {}
 
@@ -60,14 +56,15 @@ export class TaxRecurringReportsService {
       amount: string;
     }
 
-    const rawResults: RawTaxRow[] = await this.transactionsRepository.query(
-      query,
-      [userId, startDate, endDate],
+    const rawResults: RawTaxRow[] = await withScopedDb(this.dataSource, (m) =>
+      m.query(query, [userId, startDate, endDate]),
     );
 
-    const categories = await this.categoriesRepository.find({
-      where: { userId },
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId },
+      }),
+    );
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
     const taxDeductibleKeywords = [
@@ -227,9 +224,9 @@ export class TaxRecurringReportsService {
       last_transaction_date: Date;
     }
 
-    const rawResults: RawRecurring[] = await this.transactionsRepository.query(
-      query,
-      [userId, startDate, endDate, minOccurrences],
+    const rawResults: RawRecurring[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, [userId, startDate, endDate, minOccurrences]),
     );
 
     const payeeMerged = new Map<
@@ -337,9 +334,9 @@ export class TaxRecurringReportsService {
       payee_name: string | null;
     }
 
-    const scheduledTx: RawScheduled[] = await this.transactionsRepository.query(
-      scheduledQuery,
-      [userId],
+    const scheduledTx: RawScheduled[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(scheduledQuery, [userId]),
     );
 
     if (scheduledTx.length === 0) {
@@ -402,9 +399,8 @@ export class TaxRecurringReportsService {
       payee_name_normalized: string | null;
     }
 
-    const transactions: RawTx[] = await this.transactionsRepository.query(
-      txQuery,
-      params,
+    const transactions: RawTx[] = await withScopedDb(this.dataSource, (m) =>
+      m.query(txQuery, params),
     );
 
     const billPaymentMap = new Map<

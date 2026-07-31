@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { BudgetHealthReportsService } from "./budget-health-reports.service";
@@ -11,8 +12,17 @@ import {
 import { BudgetPeriod, PeriodStatus } from "./entities/budget-period.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("BudgetHealthReportsService", () => {
+  let scopedDataSource: DataSourceMock;
   let service: BudgetHealthReportsService;
   let periodsRepository: Record<string, jest.Mock>;
   let transactionsRepository: Record<string, jest.Mock>;
@@ -101,6 +111,12 @@ describe("BudgetHealthReportsService", () => {
       getSummary: jest.fn(),
     };
 
+    ({ dataSource: scopedDataSource } = createScopedDbMocks([
+      [BudgetPeriod, periodsRepository as never],
+      [Transaction, transactionsRepository as never],
+      [TransactionSplit, splitsRepository as never],
+    ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BudgetHealthReportsService,
@@ -117,6 +133,7 @@ describe("BudgetHealthReportsService", () => {
           useValue: splitsRepository,
         },
         { provide: BudgetsService, useValue: budgetsService },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 

@@ -1,25 +1,27 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
-import { DataSource } from "typeorm";
 import { MonteCarloService } from "./monte-carlo.service";
 import { MonteCarloSimulationService } from "./monte-carlo-simulation.service";
 import { MonteCarloScenario } from "./entities/monte-carlo-scenario.entity";
 import { Holding } from "../securities/entities/holding.entity";
 import { Security } from "../securities/entities/security.entity";
-import { SecurityPrice } from "../securities/entities/security-price.entity";
 import { Account } from "../accounts/entities/account.entity";
-import { SecurityPriceService } from "../securities/security-price.service";
 import { MonteCarloCashFlow } from "./entities/monte-carlo-cash-flow.entity";
-import { PortfolioService } from "../securities/portfolio.service";
 import { CreateScenarioDto } from "./dto/create-scenario.dto";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("MonteCarloService", () => {
   let service: MonteCarloService;
   let scenariosRepository: Record<string, jest.Mock>;
   let cashFlowsRepository: Record<string, jest.Mock>;
   let holdingsRepository: Record<string, jest.Mock>;
-  let securityPriceRepository: Record<string, jest.Mock>;
   let accountsRepository: Record<string, jest.Mock>;
   let securitiesRepository: Record<string, jest.Mock>;
   let securityPriceService: { backfillSecurityRange: jest.Mock };
@@ -27,15 +29,8 @@ describe("MonteCarloService", () => {
     getPortfolioSummary: jest.Mock;
     getLatestPrices: jest.Mock;
   };
-  let queryRunner: {
-    connect: jest.Mock;
-    startTransaction: jest.Mock;
-    commitTransaction: jest.Mock;
-    rollbackTransaction: jest.Mock;
-    release: jest.Mock;
-    manager: { update: jest.Mock };
-  };
-  let dataSource: { createQueryRunner: jest.Mock };
+  let manager: ManagerMock;
+  let dataSource: DataSourceMock;
 
   const userId = "user-1";
   const otherUserId = "user-2";
@@ -92,7 +87,7 @@ describe("MonteCarloService", () => {
     randomSeed: "1",
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     scenariosRepository = {
       create: jest.fn((entity) => entity),
       save: jest.fn((entity) => Promise.resolve({ id: "scn-1", ...entity })),
@@ -107,9 +102,6 @@ describe("MonteCarloService", () => {
     };
     holdingsRepository = {
       find: jest.fn().mockResolvedValue([]),
-    };
-    securityPriceRepository = {
-      query: jest.fn().mockResolvedValue([]),
     };
     accountsRepository = {
       find: jest.fn().mockResolvedValue([]),
@@ -131,62 +123,22 @@ describe("MonteCarloService", () => {
       getPortfolioSummary: jest.Mock;
       getLatestPrices: jest.Mock;
     };
-    queryRunner = {
-      connect: jest.fn().mockResolvedValue(undefined),
-      startTransaction: jest.fn().mockResolvedValue(undefined),
-      commitTransaction: jest.fn().mockResolvedValue(undefined),
-      rollbackTransaction: jest.fn().mockResolvedValue(undefined),
-      release: jest.fn().mockResolvedValue(undefined),
-      manager: { update: jest.fn().mockResolvedValue({ affected: 1 }) },
-    };
-    dataSource = {
-      createQueryRunner: jest.fn(() => queryRunner),
-    };
+    ({ manager, dataSource } = createScopedDbMocks([
+      [MonteCarloScenario, scenariosRepository],
+      [MonteCarloCashFlow, cashFlowsRepository],
+      [Holding, holdingsRepository],
+      [Account, accountsRepository],
+      [Security, securitiesRepository],
+    ]));
+    manager.update.mockResolvedValue({ affected: 1 });
+    manager.query.mockResolvedValue([]);
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        MonteCarloService,
-        MonteCarloSimulationService,
-        {
-          provide: getRepositoryToken(MonteCarloScenario),
-          useValue: scenariosRepository,
-        },
-        {
-          provide: getRepositoryToken(MonteCarloCashFlow),
-          useValue: cashFlowsRepository,
-        },
-        {
-          provide: getRepositoryToken(Holding),
-          useValue: holdingsRepository,
-        },
-        {
-          provide: getRepositoryToken(SecurityPrice),
-          useValue: securityPriceRepository,
-        },
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
-        {
-          provide: getRepositoryToken(Security),
-          useValue: securitiesRepository,
-        },
-        {
-          provide: SecurityPriceService,
-          useValue: securityPriceService,
-        },
-        {
-          provide: PortfolioService,
-          useValue: portfolioService,
-        },
-        {
-          provide: DataSource,
-          useValue: dataSource,
-        },
-      ],
-    }).compile();
-
-    service = module.get(MonteCarloService);
+    service = new MonteCarloService(
+      new MonteCarloSimulationService(),
+      portfolioService as never,
+      securityPriceService as never,
+      dataSource as never,
+    );
   });
 
   describe("create", () => {
@@ -361,7 +313,7 @@ describe("MonteCarloService", () => {
       // COALESCE(adjusted_close, close_price) under the close_price alias.
       // Both the initial query and the post-backfill re-query return the
       // same series — backfill is mocked to a no-op below.
-      securityPriceRepository.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-1", year: "2020", close_price: "100" },
         { security_id: "sec-1", year: "2021", close_price: "110" },
         { security_id: "sec-1", year: "2022", close_price: "121" },
@@ -395,7 +347,7 @@ describe("MonteCarloService", () => {
       };
       holdingsRepository.find.mockResolvedValueOnce([holding]);
       // Sparse: only 1 yearly return → triggers backfill check.
-      securityPriceRepository.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-new", year: "2024", close_price: "100" },
         { security_id: "sec-new", year: "2025", close_price: "110" },
       ]);
@@ -428,7 +380,7 @@ describe("MonteCarloService", () => {
         security: { symbol: "RCNT", name: "Recent", currencyCode: "USD" },
       };
       holdingsRepository.find.mockResolvedValueOnce([holding]);
-      securityPriceRepository.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-recent", year: "2024", close_price: "100" },
         { security_id: "sec-recent", year: "2025", close_price: "110" },
       ]);
@@ -458,7 +410,7 @@ describe("MonteCarloService", () => {
         security: { symbol: "STAL", name: "Stale", currencyCode: "USD" },
       };
       holdingsRepository.find.mockResolvedValueOnce([holding]);
-      securityPriceRepository.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-stale", year: "2024", close_price: "100" },
         { security_id: "sec-stale", year: "2025", close_price: "110" },
       ]);
@@ -492,38 +444,37 @@ describe("MonteCarloService", () => {
   describe("reorder", () => {
     it("writes sortOrder to each scenario inside a transaction", async () => {
       await service.reorder(userId, ["scn-2", "scn-1", "scn-3"]);
-      expect(queryRunner.connect).toHaveBeenCalled();
-      expect(queryRunner.startTransaction).toHaveBeenCalled();
-      expect(queryRunner.manager.update).toHaveBeenNthCalledWith(
+      // All three writes share one scoped transaction.
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(manager.update).toHaveBeenNthCalledWith(
         1,
         MonteCarloScenario,
         { id: "scn-2", userId },
         { sortOrder: 0 },
       );
-      expect(queryRunner.manager.update).toHaveBeenNthCalledWith(
+      expect(manager.update).toHaveBeenNthCalledWith(
         2,
         MonteCarloScenario,
         { id: "scn-1", userId },
         { sortOrder: 1 },
       );
-      expect(queryRunner.manager.update).toHaveBeenNthCalledWith(
+      expect(manager.update).toHaveBeenNthCalledWith(
         3,
         MonteCarloScenario,
         { id: "scn-3", userId },
         { sortOrder: 2 },
       );
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
-      expect(queryRunner.release).toHaveBeenCalled();
     });
 
-    it("rolls the transaction back when an update fails", async () => {
-      queryRunner.manager.update.mockRejectedValueOnce(new Error("boom"));
+    it("aborts the transaction when an update fails", async () => {
+      manager.update.mockRejectedValueOnce(new Error("boom"));
       await expect(service.reorder(userId, ["scn-1", "scn-2"])).rejects.toThrow(
         "boom",
       );
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(queryRunner.release).toHaveBeenCalled();
+      // The failure propagates out of the single scoped transaction, so the
+      // second update never runs.
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(manager.update).toHaveBeenCalledTimes(1);
     });
 
     it("rejects a non-array argument", async () => {
@@ -692,7 +643,7 @@ describe("MonteCarloService", () => {
         security: undefined, // exercise the ?? fallbacks
       };
       holdingsRepository.find.mockResolvedValueOnce([holding]);
-      securityPriceRepository.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-1", year: "2023", close_price: "100" },
         { security_id: "sec-1", year: "2024", close_price: "110" },
       ]);
@@ -723,7 +674,7 @@ describe("MonteCarloService", () => {
         security: { symbol: "X", name: "X co", currencyCode: "EUR" },
       };
       holdingsRepository.find.mockResolvedValueOnce([holding]);
-      securityPriceRepository.query.mockResolvedValue([]);
+      manager.query.mockResolvedValue([]);
       portfolioService.getLatestPrices = jest.fn().mockResolvedValue(new Map());
 
       const result = await service.getHoldingStats(userId, ["acct-1"]);
@@ -832,7 +783,7 @@ describe("MonteCarloService", () => {
         security: { symbol: "VOO", name: "VOO", currencyCode: "USD" },
       };
       holdingsRepository.find.mockResolvedValueOnce([holding]);
-      securityPriceRepository.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-1", year: "2020", close_price: "100" },
         { security_id: "sec-1", year: "2021", close_price: "110" },
         { security_id: "sec-1", year: "2022", close_price: "121" },
@@ -869,7 +820,7 @@ describe("MonteCarloService", () => {
         security: { symbol: "X", name: "X", currencyCode: "USD" },
       };
       holdingsRepository.find.mockResolvedValueOnce([holding]);
-      securityPriceRepository.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-x", year: "2024", close_price: "100" },
         { security_id: "sec-x", year: "2025", close_price: "110" },
       ]);
@@ -902,7 +853,7 @@ describe("MonteCarloService", () => {
         security: { symbol: "X", name: "X", currencyCode: "USD" },
       };
       holdingsRepository.find.mockResolvedValueOnce([holding]);
-      securityPriceRepository.query.mockResolvedValue([
+      manager.query.mockResolvedValue([
         { security_id: "sec-x", year: "2024", close_price: "100" },
         { security_id: "sec-x", year: "2025", close_price: "110" },
       ]);

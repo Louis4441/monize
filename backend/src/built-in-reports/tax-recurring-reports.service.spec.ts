@@ -1,11 +1,23 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { TaxRecurringReportsService } from "./tax-recurring-reports.service";
 import { ReportCurrencyService } from "./report-currency.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("TaxRecurringReportsService", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let service: TaxRecurringReportsService;
   let transactionsRepository: Record<string, jest.Mock>;
   let categoriesRepository: Record<string, jest.Mock>;
@@ -118,6 +130,12 @@ describe("TaxRecurringReportsService", () => {
       convertAmount: jest.fn().mockImplementation((amount) => amount),
     };
 
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([
+        [Transaction, transactionsRepository as never],
+        [Category, categoriesRepository as never],
+      ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TaxRecurringReportsService,
@@ -133,6 +151,7 @@ describe("TaxRecurringReportsService", () => {
           provide: getRepositoryToken(Category),
           useValue: categoriesRepository,
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 
@@ -146,7 +165,7 @@ describe("TaxRecurringReportsService", () => {
   // ---------------------------------------------------------------------------
   describe("getTaxSummary", () => {
     it("returns empty result when no transactions exist", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getTaxSummary(mockUserId, 2025);
@@ -162,7 +181,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("separates income from expenses correctly", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: "cat-salary",
           currency_code: "USD",
@@ -190,7 +209,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("identifies tax-deductible expenses by keyword matching", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: "cat-medical",
           currency_code: "USD",
@@ -224,7 +243,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("uses parent category name for keyword matching", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: "cat-dental",
           currency_code: "USD",
@@ -244,7 +263,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("handles uncategorized transactions", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: null,
           currency_code: "USD",
@@ -272,7 +291,7 @@ describe("TaxRecurringReportsService", () => {
         },
       );
 
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: "cat-salary",
           currency_code: "EUR",
@@ -289,7 +308,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("sorts income by total descending", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: "cat-salary",
           currency_code: "USD",
@@ -311,7 +330,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("sorts expenses by total descending", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: "cat-groceries",
           currency_code: "USD",
@@ -336,7 +355,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("rounds monetary values to 2 decimal places", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: "cat-salary",
           currency_code: "USD",
@@ -361,17 +380,17 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("passes correct year date range to the query", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       await service.getTaxSummary(mockUserId, 2024);
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toEqual([mockUserId, "2024-01-01", "2024-12-31"]);
     });
 
     it("detects education-related deductible expenses", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: "cat-education",
           currency_code: "USD",
@@ -387,7 +406,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("aggregates multiple transactions in the same category", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           category_id: "cat-medical",
           currency_code: "USD",
@@ -409,7 +428,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("calls currency service with correct user id", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       await service.getTaxSummary(mockUserId, 2025);
@@ -426,7 +445,7 @@ describe("TaxRecurringReportsService", () => {
   // ---------------------------------------------------------------------------
   describe("getRecurringExpenses", () => {
     it("returns empty result when no recurring expenses found", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       const result = await service.getRecurringExpenses(mockUserId);
 
@@ -440,7 +459,7 @@ describe("TaxRecurringReportsService", () => {
 
     it("identifies recurring expenses by payee", async () => {
       const lastDate = new Date();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: "payee-1",
           payee_name_normalized: "netflix",
@@ -465,7 +484,7 @@ describe("TaxRecurringReportsService", () => {
 
     it("determines frequency based on occurrence count", async () => {
       const lastDate = new Date();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: "p-1",
           payee_name_normalized: "weekly",
@@ -528,7 +547,7 @@ describe("TaxRecurringReportsService", () => {
         },
       );
 
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: "payee-1",
           payee_name_normalized: "spotify",
@@ -564,7 +583,7 @@ describe("TaxRecurringReportsService", () => {
       const olderDate = new Date("2025-05-01");
       const newerDate = new Date("2025-07-01");
 
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: "payee-1",
           payee_name_normalized: "gym",
@@ -594,7 +613,7 @@ describe("TaxRecurringReportsService", () => {
 
     it("calculates summary totals correctly", async () => {
       const lastDate = new Date();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: "p-1",
           payee_name_normalized: "netflix",
@@ -626,26 +645,26 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("passes custom minOccurrences to query", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getRecurringExpenses(mockUserId, 5);
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1][3]).toBe(5);
     });
 
     it("uses default minOccurrences of 3", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getRecurringExpenses(mockUserId);
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1][3]).toBe(3);
     });
 
     it("rounds monetary values to 2 decimal places", async () => {
       const lastDate = new Date();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: "p-1",
           payee_name_normalized: "service",
@@ -666,7 +685,7 @@ describe("TaxRecurringReportsService", () => {
 
     it("uses 'Uncategorized' when category_name is null", async () => {
       const lastDate = new Date();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           payee_id: "p-1",
           payee_name_normalized: "payee",
@@ -685,7 +704,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("calls currency service with correct user id", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getRecurringExpenses(mockUserId);
 
@@ -702,7 +721,7 @@ describe("TaxRecurringReportsService", () => {
   describe("getBillPaymentHistory", () => {
     it("returns empty result when no scheduled transactions exist", async () => {
       // First query (scheduled_transactions) returns empty
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       const result = await service.getBillPaymentHistory(
         mockUserId,
@@ -722,7 +741,7 @@ describe("TaxRecurringReportsService", () => {
 
     it("matches transactions to scheduled bills by payee name", async () => {
       // First query returns scheduled transactions
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Rent Payment",
@@ -732,7 +751,7 @@ describe("TaxRecurringReportsService", () => {
       ]);
 
       // Second query returns actual transactions
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-01-15"),
@@ -765,7 +784,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("only matches transactions within 20% tolerance of scheduled amount", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Internet Bill",
@@ -774,7 +793,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-match",
           transaction_date: new Date("2025-03-01"),
@@ -811,7 +830,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("skips transactions without payee names", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Some Bill",
@@ -820,7 +839,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-03-01"),
@@ -840,7 +859,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("calculates monthly totals correctly", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Rent",
@@ -849,7 +868,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-01-15"),
@@ -887,7 +906,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("sorts monthly totals in ascending order", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Bill",
@@ -896,7 +915,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-06-01"),
@@ -924,7 +943,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("sorts bill payments by totalPaid descending", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Cheap Bill",
@@ -939,7 +958,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-03-01"),
@@ -971,7 +990,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("calculates summary values correctly", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Bill A",
@@ -986,7 +1005,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-01-15"),
@@ -1024,7 +1043,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("includes startDate filter when provided", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       await service.getBillPaymentHistory(
         mockUserId,
@@ -1033,11 +1052,11 @@ describe("TaxRecurringReportsService", () => {
       );
 
       // Second query should not be called since no scheduled transactions
-      expect(transactionsRepository.query).toHaveBeenCalledTimes(1);
+      expect(scopedManager.query).toHaveBeenCalledTimes(1);
     });
 
     it("omits startDate filter from transaction query when undefined", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Bill",
@@ -1045,17 +1064,17 @@ describe("TaxRecurringReportsService", () => {
           payee_name: "Vendor",
         },
       ]);
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       await service.getBillPaymentHistory(mockUserId, undefined, "2025-12-31");
 
-      const txQueryCall = transactionsRepository.query.mock.calls[1];
+      const txQueryCall = scopedManager.query.mock.calls[1];
       expect(txQueryCall[1]).toEqual([mockUserId, "2025-12-31"]);
       expect(txQueryCall[0]).not.toContain("$3");
     });
 
     it("handles lastPaymentDate correctly", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Bill",
@@ -1064,7 +1083,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-03-15"),
@@ -1098,7 +1117,7 @@ describe("TaxRecurringReportsService", () => {
         },
       );
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Euro Bill",
@@ -1107,7 +1126,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-03-01"),
@@ -1127,7 +1146,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("skips scheduled transactions without payee names", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "No Payee Bill",
@@ -1136,7 +1155,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-03-01"),
@@ -1156,7 +1175,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("calls currency service with correct user id", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       await service.getBillPaymentHistory(
         mockUserId,
@@ -1171,7 +1190,7 @@ describe("TaxRecurringReportsService", () => {
     });
 
     it("rounds monetary values to 2 decimal places", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "st-1",
           name: "Bill",
@@ -1180,7 +1199,7 @@ describe("TaxRecurringReportsService", () => {
         },
       ]);
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: new Date("2025-01-15"),

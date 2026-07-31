@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Transaction } from "../transactions/entities/transaction.entity";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { ReportCurrencyService } from "./report-currency.service";
 import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
 import {
@@ -15,8 +14,7 @@ import {
 @Injectable()
 export class DataQualityReportsService {
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
+    private dataSource: DataSource,
     private currencyService: ReportCurrencyService,
   ) {}
 
@@ -80,9 +78,9 @@ export class DataQualityReportsService {
       account_id: string;
     }
 
-    const rows: RawUncategorizedTx[] = await this.transactionsRepository.query(
-      query,
-      params,
+    const rows: RawUncategorizedTx[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, params),
     );
 
     const transactions: UncategorizedTransactionItem[] = rows.map((row) => ({
@@ -143,9 +141,8 @@ export class DataQualityReportsService {
       income_total: string;
     }
 
-    const summaryRows: RawSummary[] = await this.transactionsRepository.query(
-      summaryQuery,
-      summaryParams,
+    const summaryRows: RawSummary[] = await withScopedDb(this.dataSource, (m) =>
+      m.query(summaryQuery, summaryParams),
     );
 
     let totalCount = 0;
@@ -231,9 +228,8 @@ export class DataQualityReportsService {
       account_name: string | null;
     }
 
-    const rows: RawTx[] = await this.transactionsRepository.query(
-      query,
-      params,
+    const rows: RawTx[] = await withScopedDb(this.dataSource, (m) =>
+      m.query(query, params),
     );
 
     const transactions: DuplicateTransactionItem[] = rows.map((row) => ({

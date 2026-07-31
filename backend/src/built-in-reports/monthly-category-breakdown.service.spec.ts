@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { MonthlyCategoryBreakdownService } from "./monthly-category-breakdown.service";
@@ -6,8 +7,19 @@ import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("MonthlyCategoryBreakdownService", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let service: MonthlyCategoryBreakdownService;
   let transactionsRepository: Record<string, jest.Mock>;
   let categoriesRepository: Record<string, jest.Mock>;
@@ -80,6 +92,16 @@ describe("MonthlyCategoryBreakdownService", () => {
       getLatestRates: jest.fn().mockResolvedValue(mockExchangeRates),
     };
 
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([
+        [Transaction, transactionsRepository as never],
+        [Category, categoriesRepository as never],
+        [UserPreference, userPreferenceRepository as never],
+      ]));
+    // The raw statements the reports issue default to no rows, as the
+    // repository query mock they replaced did.
+    scopedManager.query.mockResolvedValue([]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MonthlyCategoryBreakdownService,
@@ -100,6 +122,7 @@ describe("MonthlyCategoryBreakdownService", () => {
           provide: ExchangeRateService,
           useValue: exchangeRateService,
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 
@@ -124,26 +147,24 @@ describe("MonthlyCategoryBreakdownService", () => {
   it("splits transfers into signed from/to rows per account", async () => {
     // First query (categories) returns nothing; second query (transfers)
     // returns per-account, per-month aggregates of the two transfer legs.
-    transactionsRepository.query
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          month: "2025-01",
-          account_id: "acc-chequing",
-          account_name: "Chequing",
-          currency_code: "USD",
-          outflow: "500.00",
-          inflow: "0.00",
-        },
-        {
-          month: "2025-01",
-          account_id: "acc-savings",
-          account_name: "Savings",
-          currency_code: "USD",
-          outflow: "0.00",
-          inflow: "500.00",
-        },
-      ]);
+    scopedManager.query.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        month: "2025-01",
+        account_id: "acc-chequing",
+        account_name: "Chequing",
+        currency_code: "USD",
+        outflow: "500.00",
+        inflow: "0.00",
+      },
+      {
+        month: "2025-01",
+        account_id: "acc-savings",
+        account_name: "Savings",
+        currency_code: "USD",
+        outflow: "0.00",
+        inflow: "500.00",
+      },
+    ]);
 
     const result = await service.getMonthlyCategoryBreakdown(
       mockUserId,
@@ -162,13 +183,13 @@ describe("MonthlyCategoryBreakdownService", () => {
     expect(toRow?.valuesByMonth["2025-01"]).toBe(-500);
 
     // The transfer query selects only transfer legs, once each.
-    const transferSql = transactionsRepository.query.mock.calls[1][0];
+    const transferSql = scopedManager.query.mock.calls[1][0];
     expect(transferSql).toContain("t.is_transfer = true");
     expect(transferSql).toContain("parent_transaction_id IS NULL");
   });
 
   it("builds an expense row with parent metadata and signed monthly values", async () => {
-    transactionsRepository.query.mockResolvedValueOnce([
+    scopedManager.query.mockResolvedValueOnce([
       {
         month: "2025-02",
         category_id: "cat-child",
@@ -213,7 +234,7 @@ describe("MonthlyCategoryBreakdownService", () => {
   });
 
   it("classifies a category as income when deposits dominate", async () => {
-    transactionsRepository.query.mockResolvedValueOnce([
+    scopedManager.query.mockResolvedValueOnce([
       {
         month: "2025-01",
         category_id: "cat-income",
@@ -243,7 +264,7 @@ describe("MonthlyCategoryBreakdownService", () => {
     // A refund-heavy month leaves a designated expense category with more
     // deposits than withdrawals. The category's own isIncome flag must still
     // win so the row lands in the expense group with a (negative) net.
-    transactionsRepository.query.mockResolvedValueOnce([
+    scopedManager.query.mockResolvedValueOnce([
       {
         month: "2025-01",
         category_id: "cat-child",
@@ -270,7 +291,7 @@ describe("MonthlyCategoryBreakdownService", () => {
   });
 
   it("treats unknown or missing category as Uncategorized and merges rows", async () => {
-    transactionsRepository.query.mockResolvedValueOnce([
+    scopedManager.query.mockResolvedValueOnce([
       {
         month: "2025-01",
         category_id: null,
@@ -301,7 +322,7 @@ describe("MonthlyCategoryBreakdownService", () => {
   });
 
   it("converts foreign currency amounts to the base currency", async () => {
-    transactionsRepository.query.mockResolvedValueOnce([
+    scopedManager.query.mockResolvedValueOnce([
       {
         month: "2025-01",
         category_id: "cat-child",
@@ -332,20 +353,20 @@ describe("MonthlyCategoryBreakdownService", () => {
       "2025-01-01",
       "2025-12-31",
     );
-    expect(transactionsRepository.query.mock.calls[0][1]).toEqual([
+    expect(scopedManager.query.mock.calls[0][1]).toEqual([
       mockUserId,
       "2025-12-31",
       "2025-01-01",
     ]);
 
-    transactionsRepository.query.mockClear();
+    scopedManager.query.mockClear();
 
     await service.getMonthlyCategoryBreakdown(
       mockUserId,
       undefined,
       "2025-12-31",
     );
-    const call = transactionsRepository.query.mock.calls[0];
+    const call = scopedManager.query.mock.calls[0];
     expect(call[1]).toEqual([mockUserId, "2025-12-31"]);
     expect(call[0]).not.toContain("$3");
   });
@@ -357,7 +378,7 @@ describe("MonthlyCategoryBreakdownService", () => {
       "2025-12-31",
     );
 
-    const sql = transactionsRepository.query.mock.calls[0][0];
+    const sql = scopedManager.query.mock.calls[0][0];
     expect(sql).toContain("t.is_transfer = false");
     expect(sql).toContain("a.account_type != 'INVESTMENT'");
     expect(sql).toContain("asset_category_id");
@@ -371,7 +392,7 @@ describe("MonthlyCategoryBreakdownService", () => {
       "2025-12-31",
     );
 
-    const categorySql = transactionsRepository.query.mock.calls[0][0];
+    const categorySql = scopedManager.query.mock.calls[0][0];
     // A categorized transfer is counted once, as its outflow leg, under its
     // category -- without ever being treated as income/expense elsewhere.
     expect(categorySql).toContain("t.is_transfer = true");
@@ -386,7 +407,7 @@ describe("MonthlyCategoryBreakdownService", () => {
       "2025-12-31",
     );
 
-    const transferSql = transactionsRepository.query.mock.calls[1][0];
+    const transferSql = scopedManager.query.mock.calls[1][0];
     expect(transferSql).toContain("t.is_transfer = true");
     expect(transferSql).toContain("t.category_id IS NULL");
   });

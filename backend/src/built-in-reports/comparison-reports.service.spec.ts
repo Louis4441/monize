@@ -1,11 +1,23 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ComparisonReportsService } from "./comparison-reports.service";
 import { ReportCurrencyService } from "./report-currency.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { Category } from "../categories/entities/category.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("ComparisonReportsService", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let service: ComparisonReportsService;
   let transactionsRepository: Record<string, jest.Mock>;
   let categoriesRepository: Record<string, jest.Mock>;
@@ -73,6 +85,12 @@ describe("ComparisonReportsService", () => {
       convertAmount: jest.fn().mockImplementation((amount) => amount),
     };
 
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([
+        [Transaction, transactionsRepository as never],
+        [Category, categoriesRepository as never],
+      ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ComparisonReportsService,
@@ -88,6 +106,7 @@ describe("ComparisonReportsService", () => {
           provide: getRepositoryToken(Category),
           useValue: categoriesRepository,
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 
@@ -99,7 +118,7 @@ describe("ComparisonReportsService", () => {
   // ---------------------------------------------------------------------------
   describe("getYearOverYear", () => {
     it("returns empty year structures when no transactions exist", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       const result = await service.getYearOverYear(mockUserId, 3);
 
@@ -116,7 +135,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("creates correct number of year entries based on yearsToCompare", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       const result1 = await service.getYearOverYear(mockUserId, 1);
       expect(result1.data).toHaveLength(1);
@@ -127,7 +146,7 @@ describe("ComparisonReportsService", () => {
 
     it("populates income and expenses from raw results", async () => {
       const currentYear = new Date().getFullYear();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           year: currentYear,
           month: 1,
@@ -159,7 +178,7 @@ describe("ComparisonReportsService", () => {
 
     it("calculates year totals correctly", async () => {
       const currentYear = new Date().getFullYear();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           year: currentYear,
           month: 1,
@@ -193,7 +212,7 @@ describe("ComparisonReportsService", () => {
         },
       );
 
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           year: currentYear,
           month: 3,
@@ -222,7 +241,7 @@ describe("ComparisonReportsService", () => {
 
     it("sorts years in ascending order", async () => {
       const currentYear = new Date().getFullYear();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           year: currentYear,
           month: 1,
@@ -248,17 +267,17 @@ describe("ComparisonReportsService", () => {
 
     it("passes correct query parameters", async () => {
       const currentYear = new Date().getFullYear();
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getYearOverYear(mockUserId, 3);
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toEqual([mockUserId, currentYear - 2, currentYear]);
     });
 
     it("rounds monetary values to 2 decimal places", async () => {
       const currentYear = new Date().getFullYear();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           year: currentYear,
           month: 1,
@@ -278,7 +297,7 @@ describe("ComparisonReportsService", () => {
 
     it("rounds year totals to 2 decimal places", async () => {
       const currentYear = new Date().getFullYear();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           year: currentYear,
           month: 1,
@@ -304,7 +323,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("initializes all 12 months for each year", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       const result = await service.getYearOverYear(mockUserId, 1);
 
@@ -316,7 +335,7 @@ describe("ComparisonReportsService", () => {
 
     it("handles zero income and expenses gracefully", async () => {
       const currentYear = new Date().getFullYear();
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           year: currentYear,
           month: 5,
@@ -335,7 +354,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("calls currency service with correct user id", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getYearOverYear(mockUserId, 1);
 
@@ -351,7 +370,7 @@ describe("ComparisonReportsService", () => {
   // ---------------------------------------------------------------------------
   describe("getWeekendVsWeekday", () => {
     it("returns zeroed summary when no transactions exist", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       const result = await service.getWeekendVsWeekday(
@@ -374,7 +393,7 @@ describe("ComparisonReportsService", () => {
     it("separates weekend and weekday spending correctly", async () => {
       // day_of_week: 0 = Sunday, 6 = Saturday (weekend)
       // day_of_week: 1-5 = Mon-Fri (weekday)
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           day_of_week: 0,
           category_id: null,
@@ -419,7 +438,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("returns byDay array with correct day-of-week indexing", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           day_of_week: 2,
           category_id: null,
@@ -445,7 +464,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("groups spending by category using parent category rollup", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           day_of_week: 1,
           category_id: "cat-child",
@@ -481,7 +500,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("separates the same category between weekend and weekday", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           day_of_week: 0,
           category_id: "cat-standalone",
@@ -514,7 +533,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("handles uncategorized transactions", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           day_of_week: 3,
           category_id: null,
@@ -561,7 +580,7 @@ describe("ComparisonReportsService", () => {
         isSystem: false,
         createdAt: new Date(),
       }));
-      transactionsRepository.query.mockResolvedValue(rawResults);
+      scopedManager.query.mockResolvedValue(rawResults);
       categoriesRepository.find.mockResolvedValue(categories);
 
       const result = await service.getWeekendVsWeekday(
@@ -587,7 +606,7 @@ describe("ComparisonReportsService", () => {
         },
       );
 
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           day_of_week: 5,
           category_id: null,
@@ -609,7 +628,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("rounds monetary values to 2 decimal places", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           day_of_week: 0,
           category_id: null,
@@ -639,28 +658,28 @@ describe("ComparisonReportsService", () => {
     });
 
     it("includes startDate filter when provided", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       await service.getWeekendVsWeekday(mockUserId, "2025-06-01", "2025-12-31");
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toEqual([mockUserId, "2025-12-31", "2025-06-01"]);
     });
 
     it("omits startDate filter when undefined", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       await service.getWeekendVsWeekday(mockUserId, undefined, "2025-12-31");
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toEqual([mockUserId, "2025-12-31"]);
       expect(queryCall[0]).not.toContain("$3");
     });
 
     it("handles a category appearing in both weekend and weekday by-category maps", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           day_of_week: 0,
           category_id: "cat-parent",
@@ -693,7 +712,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("handles a category that only appears on weekends", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           day_of_week: 6,
           category_id: "cat-standalone",
@@ -719,7 +738,7 @@ describe("ComparisonReportsService", () => {
     });
 
     it("calls currency service with correct user id", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
       categoriesRepository.find.mockResolvedValue([]);
 
       await service.getWeekendVsWeekday(mockUserId, "2025-01-01", "2025-12-31");

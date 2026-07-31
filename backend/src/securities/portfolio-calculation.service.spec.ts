@@ -1,15 +1,36 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { PortfolioCalculationService } from "./portfolio-calculation.service";
 import { Holding } from "./entities/holding.entity";
-import { SecurityPrice } from "./entities/security-price.entity";
 import {
   InvestmentTransaction,
   InvestmentAction,
 } from "./entities/investment-transaction.entity";
 import { Account } from "../accounts/entities/account.entity";
-import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { HoldingWithMarketValue } from "./portfolio.service";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
+
+/**
+ * Build the service on scoped-db mocks. `repos` maps entity -> mock repository;
+ * `rawQuery` backs the raw statements the service issues through
+ * `manager.query`.
+ */
+function buildService(
+  repos: Array<[unknown, Record<string, jest.Mock>]>,
+  exchangeRateService: unknown,
+  rawQuery?: jest.Mock,
+): PortfolioCalculationService {
+  const { manager, dataSource } = createScopedDbMocks(repos as never);
+  manager.query.mockImplementation((sql: string, params?: unknown[]) =>
+    rawQuery ? rawQuery(sql, params) : Promise.resolve([]),
+  );
+  return new PortfolioCalculationService(
+    dataSource as never,
+    exchangeRateService as never,
+  );
+}
 
 describe("PortfolioCalculationService.calculateRealizedGains", () => {
   let service: PortfolioCalculationService;
@@ -49,22 +70,9 @@ describe("PortfolioCalculationService.calculateRealizedGains", () => {
       ...overrides,
     }) as unknown as InvestmentTransaction;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     txRepo = { find: jest.fn() };
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PortfolioCalculationService,
-        { provide: getRepositoryToken(Holding), useValue: {} },
-        { provide: getRepositoryToken(SecurityPrice), useValue: {} },
-        {
-          provide: getRepositoryToken(InvestmentTransaction),
-          useValue: txRepo,
-        },
-        { provide: getRepositoryToken(Account), useValue: {} },
-        { provide: ExchangeRateService, useValue: {} },
-      ],
-    }).compile();
-    service = module.get(PortfolioCalculationService);
+    service = buildService([[InvestmentTransaction, txRepo as never]], {});
   });
 
   it("uses average cost at sale time, not quantity * price, as the cost basis", async () => {
@@ -269,24 +277,15 @@ describe("PortfolioCalculationService.calculateCapitalGainsByMonth", () => {
       close_price: String(r.price),
     }));
 
-  beforeEach(async () => {
+  beforeEach(() => {
     txRepo = { find: jest.fn() };
     priceRepo = { query: jest.fn().mockResolvedValue([]) };
     exchangeRateService = { getLatestRate: jest.fn().mockResolvedValue(null) };
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PortfolioCalculationService,
-        { provide: getRepositoryToken(Holding), useValue: {} },
-        { provide: getRepositoryToken(SecurityPrice), useValue: priceRepo },
-        {
-          provide: getRepositoryToken(InvestmentTransaction),
-          useValue: txRepo,
-        },
-        { provide: getRepositoryToken(Account), useValue: {} },
-        { provide: ExchangeRateService, useValue: exchangeRateService },
-      ],
-    }).compile();
-    service = module.get(PortfolioCalculationService);
+    service = buildService(
+      [[InvestmentTransaction, txRepo as never]],
+      exchangeRateService,
+      priceRepo.query,
+    );
   });
 
   it("returns an empty array when there are no transactions", async () => {
@@ -545,24 +544,15 @@ describe("PortfolioCalculationService.calculateCapitalGainsByDay", () => {
       close_price: String(r.price),
     }));
 
-  beforeEach(async () => {
+  beforeEach(() => {
     txRepo = { find: jest.fn() };
     priceRepo = { query: jest.fn().mockResolvedValue([]) };
     exchangeRateService = { getLatestRate: jest.fn().mockResolvedValue(null) };
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PortfolioCalculationService,
-        { provide: getRepositoryToken(Holding), useValue: {} },
-        { provide: getRepositoryToken(SecurityPrice), useValue: priceRepo },
-        {
-          provide: getRepositoryToken(InvestmentTransaction),
-          useValue: txRepo,
-        },
-        { provide: getRepositoryToken(Account), useValue: {} },
-        { provide: ExchangeRateService, useValue: exchangeRateService },
-      ],
-    }).compile();
-    service = module.get(PortfolioCalculationService);
+    service = buildService(
+      [[InvestmentTransaction, txRepo as never]],
+      exchangeRateService,
+      priceRepo.query,
+    );
   });
 
   it("returns an empty array when there are no transactions", async () => {
@@ -737,23 +727,13 @@ describe("PortfolioCalculationService.primeLiveRates", () => {
     getRawMany: jest.fn().mockResolvedValue(rawCurrencies),
   });
 
-  beforeEach(async () => {
+  beforeEach(() => {
     rawCurrencies = [];
     holdingsRepo = {
       createQueryBuilder: jest.fn(() => makeQueryBuilder()),
     };
     exchangeRateService = { getLiveRate: jest.fn() };
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PortfolioCalculationService,
-        { provide: getRepositoryToken(Holding), useValue: holdingsRepo },
-        { provide: getRepositoryToken(SecurityPrice), useValue: {} },
-        { provide: getRepositoryToken(InvestmentTransaction), useValue: {} },
-        { provide: getRepositoryToken(Account), useValue: {} },
-        { provide: ExchangeRateService, useValue: exchangeRateService },
-      ],
-    }).compile();
-    service = module.get(PortfolioCalculationService);
+    service = buildService([[Holding, holdingsRepo]], exchangeRateService);
   });
 
   const account = (currencyCode: string) =>
@@ -829,19 +809,9 @@ describe("PortfolioCalculationService daily rate index", () => {
     rateDate: string,
   ) => ({ fromCurrency, toCurrency, rate: r, rateDate });
 
-  beforeEach(async () => {
+  beforeEach(() => {
     exchangeRateService = { getRateHistory: jest.fn().mockResolvedValue([]) };
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PortfolioCalculationService,
-        { provide: getRepositoryToken(Holding), useValue: {} },
-        { provide: getRepositoryToken(SecurityPrice), useValue: {} },
-        { provide: getRepositoryToken(InvestmentTransaction), useValue: {} },
-        { provide: getRepositoryToken(Account), useValue: {} },
-        { provide: ExchangeRateService, useValue: exchangeRateService },
-      ],
-    }).compile();
-    service = module.get(PortfolioCalculationService);
+    service = buildService([], exchangeRateService);
   });
 
   describe("buildDailyRateIndex", () => {
@@ -980,18 +950,8 @@ describe("PortfolioCalculationService daily rate index", () => {
 describe("PortfolioCalculationService.buildAllocationByTag", () => {
   let service: PortfolioCalculationService;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PortfolioCalculationService,
-        { provide: getRepositoryToken(Holding), useValue: {} },
-        { provide: getRepositoryToken(SecurityPrice), useValue: {} },
-        { provide: getRepositoryToken(InvestmentTransaction), useValue: {} },
-        { provide: getRepositoryToken(Account), useValue: {} },
-        { provide: ExchangeRateService, useValue: {} },
-      ],
-    }).compile();
-    service = module.get(PortfolioCalculationService);
+  beforeEach(() => {
+    service = buildService([], {});
   });
 
   const securityItem = (symbol: string, value: number) => ({
@@ -1116,18 +1076,8 @@ describe("PortfolioCalculationService.buildAllocationByTag", () => {
 describe("PortfolioCalculationService.buildAllocationByTagKey", () => {
   let service: PortfolioCalculationService;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PortfolioCalculationService,
-        { provide: getRepositoryToken(Holding), useValue: {} },
-        { provide: getRepositoryToken(SecurityPrice), useValue: {} },
-        { provide: getRepositoryToken(InvestmentTransaction), useValue: {} },
-        { provide: getRepositoryToken(Account), useValue: {} },
-        { provide: ExchangeRateService, useValue: {} },
-      ],
-    }).compile();
-    service = module.get(PortfolioCalculationService);
+  beforeEach(() => {
+    service = buildService([], {});
   });
 
   const securityItem = (symbol: string, value: number) => ({
@@ -1296,18 +1246,8 @@ describe("PortfolioCalculationService.buildAllocationByTagKey", () => {
 describe("PortfolioCalculationService.buildAllocation", () => {
   let service: PortfolioCalculationService;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PortfolioCalculationService,
-        { provide: getRepositoryToken(Holding), useValue: {} },
-        { provide: getRepositoryToken(SecurityPrice), useValue: {} },
-        { provide: getRepositoryToken(InvestmentTransaction), useValue: {} },
-        { provide: getRepositoryToken(Account), useValue: {} },
-        { provide: ExchangeRateService, useValue: {} },
-      ],
-    }).compile();
-    service = module.get(PortfolioCalculationService);
+  beforeEach(() => {
+    service = buildService([], {});
   });
 
   const holdingWithValue = (

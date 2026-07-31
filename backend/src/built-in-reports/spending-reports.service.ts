@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Transaction } from "../transactions/entities/transaction.entity";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Category } from "../categories/entities/category.entity";
 import { Payee } from "../payees/entities/payee.entity";
 import {
@@ -24,12 +23,7 @@ import {
 @Injectable()
 export class SpendingReportsService {
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
-    @InjectRepository(Payee)
-    private payeesRepository: Repository<Payee>,
+    private dataSource: DataSource,
     private currencyService: ReportCurrencyService,
   ) {}
 
@@ -76,12 +70,16 @@ export class SpendingReportsService {
 
     query += ` GROUP BY COALESCE(ts.category_id, t.category_id), t.currency_code`;
 
-    const rawResults: RawCategoryAggregate[] =
-      await this.transactionsRepository.query(query, params);
+    const rawResults: RawCategoryAggregate[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, params),
+    );
 
-    const categories = await this.categoriesRepository.find({
-      where: { userId },
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId },
+      }),
+    );
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
     const parentTotals = new Map<
@@ -212,8 +210,10 @@ export class SpendingReportsService {
 
     query += ` GROUP BY t.payee_id, t.payee_name, t.currency_code`;
 
-    const rawResults: RawPayeeAggregate[] =
-      await this.transactionsRepository.query(query, params);
+    const rawResults: RawPayeeAggregate[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, params),
+    );
 
     const payeeIds = rawResults
       .filter((r) => r.payee_id)
@@ -221,7 +221,9 @@ export class SpendingReportsService {
 
     const payees =
       payeeIds.length > 0
-        ? await this.payeesRepository.findByIds(payeeIds)
+        ? await withScopedDb(this.dataSource, (m) =>
+            m.getRepository(Payee).findByIds(payeeIds),
+          )
         : [];
     const payeeMap = new Map(payees.map((p) => [p.id, p]));
 
@@ -313,12 +315,16 @@ export class SpendingReportsService {
       ORDER BY month
     `;
 
-    const rawResults: RawMonthlyCategoryAggregate[] =
-      await this.transactionsRepository.query(query, params);
+    const rawResults: RawMonthlyCategoryAggregate[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, params),
+    );
 
-    const categories = await this.categoriesRepository.find({
-      where: { userId },
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId },
+      }),
+    );
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
     const monthlyData = new Map<

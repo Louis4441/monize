@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { tr } from "../i18n/translate";
+import { withScopedDb } from "../common/db/scoped-db";
 import { LoanRateChange } from "./entities/loan-rate-change.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
@@ -68,8 +68,6 @@ export class RateChangeInferenceService {
   private readonly logger = new Logger(RateChangeInferenceService.name);
 
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
     private dataSource: DataSource,
     private detector: LoanPaymentDetectorService,
     private rateChangesService: LoanRateChangesService,
@@ -84,10 +82,12 @@ export class RateChangeInferenceService {
       accountId,
     );
 
-    const transactions = await this.transactionsRepository.find({
-      where: { accountId, userId },
-      order: { transactionDate: "ASC" },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Transaction).find({
+        where: { accountId, userId },
+        order: { transactionDate: "ASC" },
+      }),
+    );
 
     const rawPayments = await this.detector.buildPaymentRecords(
       userId,
@@ -401,19 +401,16 @@ export class RateChangeInferenceService {
     // non-amortizing payment.
     interestBookedSeparately: boolean,
   ): Promise<DetectRateChangesResult> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
     const created: LoanRateChange[] = [];
     let replacedCount = 0;
-    try {
-      const deleted = await queryRunner.manager.delete(LoanRateChange, {
+    await withScopedDb(this.dataSource, async (m) => {
+      const deleted = await m.delete(LoanRateChange, {
         accountId: account.id,
         source: "inferred",
       });
       replacedCount = deleted.affected || 0;
 
-      const kept = await queryRunner.manager.find(LoanRateChange, {
+      const kept = await m.find(LoanRateChange, {
         where: { accountId: account.id },
       });
       const keptDates = new Set(kept.map((row) => row.effectiveDate));
@@ -435,7 +432,7 @@ export class RateChangeInferenceService {
           Math.abs(segment.paymentAmount - previous.paymentAmount) >
             PAYMENT_STEP_EPSILON;
 
-        const row = queryRunner.manager.create(LoanRateChange, {
+        const row = m.create(LoanRateChange, {
           userId,
           accountId: account.id,
           effectiveDate,
@@ -452,16 +449,9 @@ export class RateChangeInferenceService {
           source: isFirst ? ("initial" as const) : ("inferred" as const),
           note: null,
         });
-        created.push(await queryRunner.manager.save(row));
+        created.push(await m.save(row));
       }
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     // Detection is historical inference: it only writes timeline rows and must
     // never overwrite the account's user-owned rate/payment or resync the

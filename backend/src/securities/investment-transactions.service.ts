@@ -8,14 +8,8 @@ import {
   forwardRef,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import {
-  Repository,
-  DataSource,
-  EntityManager,
-  QueryRunner,
-  In,
-} from "typeorm";
+import { DataSource, EntityManager, In } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import {
   InvestmentTransaction,
   InvestmentAction,
@@ -306,10 +300,6 @@ export class InvestmentTransactionsService {
   private readonly logger = new Logger(InvestmentTransactionsService.name);
 
   constructor(
-    @InjectRepository(InvestmentTransaction)
-    private investmentTransactionsRepository: Repository<InvestmentTransaction>,
-    @InjectRepository(Transaction)
-    private transactionRepository: Repository<Transaction>,
     private dataSource: DataSource,
     @Inject(forwardRef(() => AccountsService))
     private accountsService: AccountsService,
@@ -514,7 +504,7 @@ export class InvestmentTransactionsService {
   }
 
   private async createCashTransactionInTransaction(
-    queryRunner: QueryRunner,
+    manager: EntityManager,
     userId: string,
     cashAccount: Account,
     investmentTransaction: InvestmentTransaction,
@@ -557,7 +547,7 @@ export class InvestmentTransactionsService {
       cashCurrency.decimalPlaces,
     );
 
-    const cashTransaction = queryRunner.manager.create(Transaction, {
+    const cashTransaction = manager.create(Transaction, {
       userId,
       accountId: cashAccount.id,
       transactionDate: investmentTransaction.transactionDate,
@@ -570,31 +560,27 @@ export class InvestmentTransactionsService {
       status: TransactionStatus.CLEARED,
     });
 
-    const saved = await queryRunner.manager.save(cashTransaction);
+    const saved = await manager.save(cashTransaction);
 
     // Defer the live balance update for future-dated cash entries -- the
     // hourly applyDueTransactionBalances cron rolls them into currentBalance
     // when the user's local date catches up. Crediting now would double-count
     // once the cron runs.
     if (!isTransactionInFuture(investmentTransaction.transactionDate)) {
-      await this.accountsService.updateBalance(
-        cashAccount.id,
-        cashAmount,
-        queryRunner,
-      );
+      await this.accountsService.updateBalance(cashAccount.id, cashAmount);
     }
 
     return saved.id;
   }
 
   private async deleteCashTransactionInTransaction(
-    queryRunner: QueryRunner,
+    manager: EntityManager,
     userId: string,
     transactionId: string | null,
   ): Promise<void> {
     if (!transactionId) return;
 
-    const cashTransaction = await queryRunner.manager.findOne(Transaction, {
+    const cashTransaction = await manager.findOne(Transaction, {
       where: { id: transactionId, userId },
     });
 
@@ -606,10 +592,9 @@ export class InvestmentTransactionsService {
         await this.accountsService.updateBalance(
           cashTransaction.accountId,
           -Number(cashTransaction.amount),
-          queryRunner,
         );
       }
-      await queryRunner.manager.remove(cashTransaction);
+      await manager.remove(cashTransaction);
     }
   }
 
@@ -680,47 +665,28 @@ export class InvestmentTransactionsService {
       createDto.transactionDate,
     );
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    let savedId: string;
-
-    try {
-      const investmentTransaction = queryRunner.manager.create(
-        InvestmentTransaction,
-        {
-          userId,
-          accountId: createDto.accountId,
-          securityId: createDto.securityId,
-          fundingAccountId: createDto.fundingAccountId || null,
-          action: createDto.action,
-          transactionDate: createDto.transactionDate,
-          quantity: createDto.quantity ?? 0,
-          price: createDto.price ?? 0,
-          commission: createDto.commission || 0,
-          totalAmount,
-          exchangeRate,
-          description: createDto.description,
-        },
-      );
-
-      const saved = await queryRunner.manager.save(investmentTransaction);
-      savedId = saved.id;
-
-      await this.processTransactionEffectsInTransaction(
-        queryRunner,
+    const savedId = await withScopedDb(this.dataSource, async (manager) => {
+      const investmentTransaction = manager.create(InvestmentTransaction, {
         userId,
-        saved,
-      );
+        accountId: createDto.accountId,
+        securityId: createDto.securityId,
+        fundingAccountId: createDto.fundingAccountId || null,
+        action: createDto.action,
+        transactionDate: createDto.transactionDate,
+        quantity: createDto.quantity ?? 0,
+        price: createDto.price ?? 0,
+        commission: createDto.commission || 0,
+        totalAmount,
+        exchangeRate,
+        description: createDto.description,
+      });
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      const saved = await manager.save(investmentTransaction);
+
+      await this.processTransactionEffectsInTransaction(manager, userId, saved);
+
+      return saved.id;
+    });
 
     // SPLIT mutations compound on the existing holding state, so a stray
     // residue from a bad import would survive an incremental update. Rebuild
@@ -760,9 +726,11 @@ export class InvestmentTransactionsService {
     // Capture linked cash transaction for redo support
     const afterData: Record<string, unknown> = { ...result };
     if (result.transactionId) {
-      const cashTx = await this.transactionRepository.findOne({
-        where: { id: result.transactionId, userId },
-      });
+      const cashTx = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Transaction).findOne({
+          where: { id: result.transactionId!, userId },
+        }),
+      );
       if (cashTx) {
         afterData.linkedCashTransaction = { ...cashTx };
       }
@@ -784,7 +752,8 @@ export class InvestmentTransactionsService {
   /**
    * Create many investment transactions in one go for the "paste a table" bulk
    * approval flow. Best-effort: each row is created through the single-row
-   * `create()` (its own QueryRunner, holdings/cash effects, action history) so a
+   * `create()` (its own scoped transaction, holdings/cash effects, action
+   * history) so a
    * row that fails -- a bad oversell, an unknown security -- is collected into
    * `skipped` rather than aborting the rest. Rows are processed in input order
    * so dependent rows (e.g. a BUY before a later SELL) compound correctly. The
@@ -1502,88 +1471,79 @@ export class InvestmentTransactionsService {
     // Cost basis flows through quantity * price (per-share cost) instead.
     const totalAmount = 0;
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    const { outId, inId } = await withScopedDb(
+      this.dataSource,
+      async (manager) => {
+        const transferOut = manager.create(InvestmentTransaction, {
+          userId,
+          accountId: dto.fromAccountId,
+          securityId: dto.securityId,
+          fundingAccountId: null,
+          action: InvestmentAction.TRANSFER_OUT,
+          transactionDate: dto.transactionDate,
+          quantity: dto.quantity,
+          price: carriedCost,
+          commission: 0,
+          totalAmount,
+          exchangeRate: 1,
+          description: dto.description,
+        });
+        const savedOut = await manager.save(transferOut);
+        const outId = savedOut.id;
+        await this.processTransactionEffectsInTransaction(
+          manager,
+          userId,
+          savedOut,
+          false,
+          false,
+        );
 
-    let outId: string;
-    let inId: string;
+        const transferIn = manager.create(InvestmentTransaction, {
+          userId,
+          accountId: dto.toAccountId,
+          securityId: dto.securityId,
+          fundingAccountId: null,
+          action: InvestmentAction.TRANSFER_IN,
+          transactionDate: dto.transactionDate,
+          quantity: dto.quantity,
+          price: carriedCost,
+          commission: 0,
+          totalAmount,
+          exchangeRate: 1,
+          description: dto.description,
+        });
+        const savedIn = await manager.save(transferIn);
+        const inId = savedIn.id;
+        await this.processTransactionEffectsInTransaction(
+          manager,
+          userId,
+          savedIn,
+          false,
+          false,
+        );
 
-    try {
-      const transferOut = queryRunner.manager.create(InvestmentTransaction, {
-        userId,
-        accountId: dto.fromAccountId,
-        securityId: dto.securityId,
-        fundingAccountId: null,
-        action: InvestmentAction.TRANSFER_OUT,
-        transactionDate: dto.transactionDate,
-        quantity: dto.quantity,
-        price: carriedCost,
-        commission: 0,
-        totalAmount,
-        exchangeRate: 1,
-        description: dto.description,
-      });
-      const savedOut = await queryRunner.manager.save(transferOut);
-      outId = savedOut.id;
-      await this.processTransactionEffectsInTransaction(
-        queryRunner,
-        userId,
-        savedOut,
-        false,
-        false,
-      );
+        // Link the two legs to each other so a later edit or delete of one
+        // cascades to its pair.
+        await manager.update(InvestmentTransaction, outId, {
+          linkedTransactionId: inId,
+        });
+        await manager.update(InvestmentTransaction, inId, {
+          linkedTransactionId: outId,
+        });
 
-      const transferIn = queryRunner.manager.create(InvestmentTransaction, {
-        userId,
-        accountId: dto.toAccountId,
-        securityId: dto.securityId,
-        fundingAccountId: null,
-        action: InvestmentAction.TRANSFER_IN,
-        transactionDate: dto.transactionDate,
-        quantity: dto.quantity,
-        price: carriedCost,
-        commission: 0,
-        totalAmount,
-        exchangeRate: 1,
-        description: dto.description,
-      });
-      const savedIn = await queryRunner.manager.save(transferIn);
-      inId = savedIn.id;
-      await this.processTransactionEffectsInTransaction(
-        queryRunner,
-        userId,
-        savedIn,
-        false,
-        false,
-      );
+        // Guard against transferring more than the source holds. Validates the
+        // full replayed history so it catches both the immediate over-draw and
+        // any back-dated transfer that would make a past balance go negative.
+        await this.holdingsService.validateNoNegativeHoldingsHistory(
+          userId,
+          manager,
+          [dto.fromAccountId, dto.toAccountId],
+          [dto.securityId],
+        );
 
-      // Link the two legs to each other so a later edit or delete of one
-      // cascades to its pair.
-      await queryRunner.manager.update(InvestmentTransaction, outId, {
-        linkedTransactionId: inId,
-      });
-      await queryRunner.manager.update(InvestmentTransaction, inId, {
-        linkedTransactionId: outId,
-      });
-
-      // Guard against transferring more than the source holds. Validates the
-      // full replayed history so it catches both the immediate over-draw and
-      // any back-dated transfer that would make a past balance go negative.
-      await this.holdingsService.validateNoNegativeHoldingsHistory(
-        userId,
-        queryRunner,
-        [dto.fromAccountId, dto.toAccountId],
-        [dto.securityId],
-      );
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+        return { outId, inId };
+      },
+    );
 
     this.triggerRecalcWithCashAccount(dto.fromAccountId, userId);
     this.triggerRecalcWithCashAccount(dto.toAccountId, userId);
@@ -1653,7 +1613,7 @@ export class InvestmentTransactionsService {
   }
 
   private async processTransactionEffectsInTransaction(
-    queryRunner: QueryRunner,
+    manager: EntityManager,
     userId: string,
     transaction: InvestmentTransaction,
     allowNegative: boolean = false,
@@ -1704,13 +1664,13 @@ export class InvestmentTransactionsService {
             securityId!,
             Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
         if (createCashSide && cashAccount) {
           cashTransactionId = await this.createCashTransactionInTransaction(
-            queryRunner,
+            manager,
             userId,
             cashAccount,
             transaction,
@@ -1727,13 +1687,13 @@ export class InvestmentTransactionsService {
             securityId!,
             -Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
         if (createCashSide && cashAccount) {
           cashTransactionId = await this.createCashTransactionInTransaction(
-            queryRunner,
+            manager,
             userId,
             cashAccount,
             transaction,
@@ -1747,7 +1707,7 @@ export class InvestmentTransactionsService {
       case InvestmentAction.CAPITAL_GAIN:
         if (createCashSide && cashAccount) {
           cashTransactionId = await this.createCashTransactionInTransaction(
-            queryRunner,
+            manager,
             userId,
             cashAccount,
             transaction,
@@ -1768,7 +1728,7 @@ export class InvestmentTransactionsService {
             securityId,
             Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
@@ -1785,7 +1745,7 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             Number(quantity),
-            queryRunner,
+            manager,
           );
         }
         break;
@@ -1798,7 +1758,7 @@ export class InvestmentTransactionsService {
             securityId,
             Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
@@ -1812,7 +1772,7 @@ export class InvestmentTransactionsService {
             securityId,
             -Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
@@ -1825,7 +1785,7 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             Number(quantity),
-            queryRunner,
+            manager,
           );
         }
         break;
@@ -1837,14 +1797,14 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             -Number(quantity),
-            queryRunner,
+            manager,
           );
         }
         break;
     }
 
     if (cashTransactionId) {
-      await queryRunner.manager.update(InvestmentTransaction, transaction.id, {
+      await manager.update(InvestmentTransaction, transaction.id, {
         transactionId: cashTransactionId,
       });
     }
@@ -1861,7 +1821,7 @@ export class InvestmentTransactionsService {
    * free-standing ones in portfolio reports.
    */
   async createEmbeddedForSplit(
-    db: QueryRunner | EntityManager,
+    manager: EntityManager,
     userId: string,
     parentTransactionDate: string,
     parentSplitId: string,
@@ -1877,11 +1837,6 @@ export class InvestmentTransactionsService {
       description?: string | null;
     },
   ): Promise<InvestmentTransaction> {
-    // RLS transition shim (R2): the transactions module now runs on withScopedDb
-    // and passes the transaction's EntityManager; securities-internal callers
-    // still pass their own QueryRunner until task R3 converts this service.
-    // The downstream helpers only ever touch `.manager`.
-    const queryRunner = ("manager" in db ? db : { manager: db }) as QueryRunner;
     if (!isInvestmentActionAllowedInSplit(dto.action)) {
       throw new BadRequestException(
         tr(
@@ -1946,30 +1901,27 @@ export class InvestmentTransactionsService {
       parentTransactionDate,
     );
 
-    const investmentTransaction = queryRunner.manager.create(
-      InvestmentTransaction,
-      {
-        userId,
-        accountId: brokerageAccountId,
-        securityId: dto.securityId ?? null,
-        fundingAccountId: null,
-        transactionId: null,
-        transactionSplitId: parentSplitId,
-        action: dto.action,
-        transactionDate: parentTransactionDate,
-        quantity: dto.quantity ?? 0,
-        price: dto.price ?? 0,
-        commission: dto.commission ?? 0,
-        totalAmount,
-        exchangeRate,
-        description: dto.description ?? null,
-      },
-    );
+    const investmentTransaction = manager.create(InvestmentTransaction, {
+      userId,
+      accountId: brokerageAccountId,
+      securityId: dto.securityId ?? null,
+      fundingAccountId: null,
+      transactionId: null,
+      transactionSplitId: parentSplitId,
+      action: dto.action,
+      transactionDate: parentTransactionDate,
+      quantity: dto.quantity ?? 0,
+      price: dto.price ?? 0,
+      commission: dto.commission ?? 0,
+      totalAmount,
+      exchangeRate,
+      description: dto.description ?? null,
+    });
 
-    const saved = await queryRunner.manager.save(investmentTransaction);
+    const saved = await manager.save(investmentTransaction);
 
     await this.processTransactionEffectsInTransaction(
-      queryRunner,
+      manager,
       userId,
       saved,
       false,
@@ -1985,18 +1937,16 @@ export class InvestmentTransactionsService {
    * via the FK, but we need the holdings reversal to happen first.
    */
   async reverseAndRemoveEmbedded(
-    db: QueryRunner | EntityManager,
+    manager: EntityManager,
     userId: string,
     investmentTransaction: InvestmentTransaction,
   ): Promise<void> {
-    // RLS transition shim (R2): see createEmbeddedForSplit.
-    const queryRunner = ("manager" in db ? db : { manager: db }) as QueryRunner;
     await this.reverseTransactionEffectsInTransaction(
-      queryRunner,
+      manager,
       userId,
       investmentTransaction,
     );
-    await queryRunner.manager.remove(investmentTransaction);
+    await manager.remove(investmentTransaction);
   }
 
   /**
@@ -2007,7 +1957,7 @@ export class InvestmentTransactionsService {
    * its balance stays consistent.
    */
   private async updateEmbeddedSplitParent(
-    queryRunner: QueryRunner,
+    manager: EntityManager,
     userId: string,
     saved: InvestmentTransaction,
     splitId: string,
@@ -2022,7 +1972,7 @@ export class InvestmentTransactionsService {
       cashImpactInSecurity * Number(saved.exchangeRate),
     );
 
-    const split = await queryRunner.manager.findOne(TransactionSplit, {
+    const split = await manager.findOne(TransactionSplit, {
       where: { id: splitId },
     });
     if (!split) {
@@ -2035,11 +1985,11 @@ export class InvestmentTransactionsService {
       );
     }
 
-    await queryRunner.manager.update(TransactionSplit, splitId, {
+    await manager.update(TransactionSplit, splitId, {
       amount: newSplitAmount,
     });
 
-    const parentTransaction = await queryRunner.manager.findOne(Transaction, {
+    const parentTransaction = await manager.findOne(Transaction, {
       where: { id: split.transactionId, userId },
     });
     if (!parentTransaction) {
@@ -2052,7 +2002,7 @@ export class InvestmentTransactionsService {
       );
     }
 
-    const siblingSplits = await queryRunner.manager.find(TransactionSplit, {
+    const siblingSplits = await manager.find(TransactionSplit, {
       where: { transactionId: split.transactionId },
     });
     const newParentAmount = sumMoney(
@@ -2063,7 +2013,7 @@ export class InvestmentTransactionsService {
     const oldParentAmount = Number(parentTransaction.amount);
     const delta = roundMoney(newParentAmount - oldParentAmount);
 
-    await queryRunner.manager.update(Transaction, parentTransaction.id, {
+    await manager.update(Transaction, parentTransaction.id, {
       amount: newParentAmount,
     });
 
@@ -2071,13 +2021,11 @@ export class InvestmentTransactionsService {
       if (isTransactionInFuture(parentTransaction.transactionDate)) {
         await this.accountsService.recalculateCurrentBalance(
           parentTransaction.accountId,
-          queryRunner,
         );
       } else {
         await this.accountsService.updateBalance(
           parentTransaction.accountId,
           delta,
-          queryRunner,
         );
       }
     }
@@ -2099,55 +2047,63 @@ export class InvestmentTransactionsService {
       skip,
     } = clampPagination(page, limit);
 
-    const query = this.investmentTransactionsRepository
-      .createQueryBuilder("it")
-      .leftJoinAndSelect("it.account", "account")
-      .leftJoinAndSelect("it.security", "security")
-      .leftJoinAndSelect("it.fundingAccount", "fundingAccount")
-      .where("it.userId = :userId", { userId });
+    // Count and page share one scoped transaction so the total cannot drift
+    // from the rows returned beside it.
+    return withScopedDb(this.dataSource, async (m) => {
+      const query = m
+        .getRepository(InvestmentTransaction)
+        .createQueryBuilder("it")
+        .leftJoinAndSelect("it.account", "account")
+        .leftJoinAndSelect("it.security", "security")
+        .leftJoinAndSelect("it.fundingAccount", "fundingAccount")
+        .where("it.userId = :userId", { userId });
 
-    if (accountIds && accountIds.length > 0) {
-      const resolvedIds = new Set<string>(accountIds);
-      // Batch-fetch accounts to resolve linked account IDs
-      const accounts = await this.accountsService.findByIds(userId, accountIds);
-      for (const acct of accounts) {
-        if (acct.linkedAccountId) {
-          resolvedIds.add(acct.linkedAccountId);
+      if (accountIds && accountIds.length > 0) {
+        const resolvedIds = new Set<string>(accountIds);
+        // Batch-fetch accounts to resolve linked account IDs
+        const accounts = await this.accountsService.findByIds(
+          userId,
+          accountIds,
+        );
+        for (const acct of accounts) {
+          if (acct.linkedAccountId) {
+            resolvedIds.add(acct.linkedAccountId);
+          }
         }
+        const allIds = [...resolvedIds];
+        query.andWhere("it.accountId IN (:...allIds)", { allIds });
       }
-      const allIds = [...resolvedIds];
-      query.andWhere("it.accountId IN (:...allIds)", { allIds });
-    }
 
-    if (startDate) {
-      query.andWhere("it.transactionDate >= :startDate", { startDate });
-    }
+      if (startDate) {
+        query.andWhere("it.transactionDate >= :startDate", { startDate });
+      }
 
-    if (endDate) {
-      query.andWhere("it.transactionDate <= :endDate", { endDate });
-    }
+      if (endDate) {
+        query.andWhere("it.transactionDate <= :endDate", { endDate });
+      }
 
-    if (symbol) {
-      query.andWhere("LOWER(security.symbol) = LOWER(:symbol)", { symbol });
-    }
+      if (symbol) {
+        query.andWhere("LOWER(security.symbol) = LOWER(:symbol)", { symbol });
+      }
 
-    if (action) {
-      query.andWhere("it.action = :action", { action });
-    }
+      if (action) {
+        query.andWhere("it.action = :action", { action });
+      }
 
-    const total = await query.getCount();
+      const total = await query.getCount();
 
-    const data = await query
-      .orderBy("it.transactionDate", "DESC")
-      .addOrderBy("it.createdAt", "DESC")
-      .skip(skip)
-      .take(pageSize)
-      .getMany();
+      const data = await query
+        .orderBy("it.transactionDate", "DESC")
+        .addOrderBy("it.createdAt", "DESC")
+        .skip(skip)
+        .take(pageSize)
+        .getMany();
 
-    return {
-      data,
-      pagination: buildPaginationMeta(pageNum, pageSize, total),
-    };
+      return {
+        data,
+        pagination: buildPaginationMeta(pageNum, pageSize, total),
+      };
+    });
   }
 
   /**
@@ -2195,11 +2151,13 @@ export class InvestmentTransactionsService {
     // Validates ownership and existence (works for inactive securities too).
     const security = await this.securitiesService.findOne(userId, securityId);
 
-    const transactions = await this.investmentTransactionsRepository.find({
-      where: { userId, securityId },
-      relations: ["account"],
-      order: { transactionDate: "ASC", createdAt: "ASC" },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentTransaction).find({
+        where: { userId, securityId },
+        relations: ["account"],
+        order: { transactionDate: "ASC", createdAt: "ASC" },
+      }),
+    );
 
     const balances = new Map<string, number>();
     const accountMeta = new Map<string, { name: string; isClosed: boolean }>();
@@ -2525,14 +2483,17 @@ export class InvestmentTransactionsService {
   }
 
   async findOne(userId: string, id: string): Promise<InvestmentTransaction> {
-    const transaction = await this.investmentTransactionsRepository
-      .createQueryBuilder("it")
-      .leftJoinAndSelect("it.account", "account")
-      .leftJoinAndSelect("it.security", "security")
-      .leftJoinAndSelect("it.fundingAccount", "fundingAccount")
-      .where("it.id = :id", { id })
-      .andWhere("it.userId = :userId", { userId })
-      .getOne();
+    const transaction = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(InvestmentTransaction)
+        .createQueryBuilder("it")
+        .leftJoinAndSelect("it.account", "account")
+        .leftJoinAndSelect("it.security", "security")
+        .leftJoinAndSelect("it.fundingAccount", "fundingAccount")
+        .where("it.id = :id", { id })
+        .andWhere("it.userId = :userId", { userId })
+        .getOne(),
+    );
 
     if (!transaction) {
       throw new NotFoundException(
@@ -2589,19 +2550,15 @@ export class InvestmentTransactionsService {
       await this.securitiesService.findOne(userId, updateDto.securityId);
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    await withScopedDb(this.dataSource, async (manager) => {
       // Reverse both legs at their original values before reapplying.
       await this.reverseTransactionEffectsInTransaction(
-        queryRunner,
+        manager,
         userId,
         editedLeg,
       );
       await this.reverseTransactionEffectsInTransaction(
-        queryRunner,
+        manager,
         userId,
         linkedLeg,
       );
@@ -2701,18 +2658,18 @@ export class InvestmentTransactionsService {
       affectedAccountIds.add(linkedLeg.accountId);
       if (editedLeg.securityId) affectedSecurityIds.add(editedLeg.securityId);
 
-      const savedEdited = await queryRunner.manager.save(editedLeg);
-      const savedLinked = await queryRunner.manager.save(linkedLeg);
+      const savedEdited = await manager.save(editedLeg);
+      const savedLinked = await manager.save(linkedLeg);
 
       await this.processTransactionEffectsInTransaction(
-        queryRunner,
+        manager,
         userId,
         savedEdited,
         true,
         false,
       );
       await this.processTransactionEffectsInTransaction(
-        queryRunner,
+        manager,
         userId,
         savedLinked,
         true,
@@ -2721,7 +2678,7 @@ export class InvestmentTransactionsService {
 
       await this.holdingsService.validateNoNegativeHoldingsHistory(
         userId,
-        queryRunner,
+        manager,
         Array.from(affectedAccountIds),
         affectedSecurityIds.size > 0
           ? Array.from(affectedSecurityIds)
@@ -2738,16 +2695,9 @@ export class InvestmentTransactionsService {
       await this.holdingsService.rebuildAccountsFromTransactions(
         userId,
         Array.from(affectedAccountIds),
-        queryRunner,
+        manager,
       );
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     for (const accId of affectedAccountIds) {
       this.triggerRecalcWithCashAccount(accId, userId);
@@ -2786,9 +2736,11 @@ export class InvestmentTransactionsService {
       (transaction.action === InvestmentAction.TRANSFER_IN ||
         transaction.action === InvestmentAction.TRANSFER_OUT)
     ) {
-      const linkedLeg = await this.investmentTransactionsRepository.findOne({
-        where: { id: transaction.linkedTransactionId, userId },
-      });
+      const linkedLeg = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(InvestmentTransaction).findOne({
+          where: { id: transaction.linkedTransactionId!, userId },
+        }),
+      );
       if (!linkedLeg) {
         // The pair is missing (stale link / partial data). Editing this leg
         // alone would leave the two legs unbalanced, so refuse rather than
@@ -2867,16 +2819,10 @@ export class InvestmentTransactionsService {
       }
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    let savedId: string;
-
-    try {
+    const savedId = await withScopedDb(this.dataSource, async (manager) => {
       // Reverse the original transaction effects
       await this.reverseTransactionEffectsInTransaction(
-        queryRunner,
+        manager,
         userId,
         transaction,
       );
@@ -3000,8 +2946,7 @@ export class InvestmentTransactionsService {
         }
       }
 
-      const saved = await queryRunner.manager.save(transaction);
-      savedId = saved.id;
+      const saved = await manager.save(transaction);
 
       // Apply the new transaction effects. Allow intermediate negative
       // holdings so editing a past transaction is not blocked by the
@@ -3013,7 +2958,7 @@ export class InvestmentTransactionsService {
       // skip the standalone cash-transaction path and instead reflect the
       // new cash impact into the parent split + parent transaction amount.
       await this.processTransactionEffectsInTransaction(
-        queryRunner,
+        manager,
         userId,
         saved,
         true,
@@ -3022,7 +2967,7 @@ export class InvestmentTransactionsService {
 
       if (isEmbedded) {
         await this.updateEmbeddedSplitParent(
-          queryRunner,
+          manager,
           userId,
           saved,
           transaction.transactionSplitId!,
@@ -3043,18 +2988,13 @@ export class InvestmentTransactionsService {
       );
       await this.holdingsService.validateNoNegativeHoldingsHistory(
         userId,
-        queryRunner,
+        manager,
         affectedAccountIds,
         affectedSecurityIds.length > 0 ? affectedSecurityIds : undefined,
       );
 
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+      return saved.id;
+    });
 
     // If a SPLIT was touched (either before or after the edit), rebuild
     // holdings from history -- the incremental reverse/re-apply assumes
@@ -3125,7 +3065,7 @@ export class InvestmentTransactionsService {
   }
 
   private async reverseTransactionEffectsInTransaction(
-    queryRunner: QueryRunner,
+    manager: EntityManager,
     userId: string,
     transaction: InvestmentTransaction,
     isFutureOverride?: boolean,
@@ -3146,12 +3086,12 @@ export class InvestmentTransactionsService {
 
     if (transactionId) {
       // Clear the FK reference BEFORE deleting the cash transaction
-      await queryRunner.manager.update(InvestmentTransaction, transaction.id, {
+      await manager.update(InvestmentTransaction, transaction.id, {
         transactionId: null,
       });
       transaction.transactionId = null;
       await this.deleteCashTransactionInTransaction(
-        queryRunner,
+        manager,
         userId,
         transactionId,
       );
@@ -3178,7 +3118,7 @@ export class InvestmentTransactionsService {
             securityId,
             -Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
@@ -3192,7 +3132,7 @@ export class InvestmentTransactionsService {
             securityId,
             Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
@@ -3211,7 +3151,7 @@ export class InvestmentTransactionsService {
             securityId,
             -Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
@@ -3225,7 +3165,7 @@ export class InvestmentTransactionsService {
             securityId,
             -Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
@@ -3239,7 +3179,7 @@ export class InvestmentTransactionsService {
             securityId,
             Number(quantity),
             Number(price),
-            queryRunner,
+            manager,
             allowNegative,
           );
         }
@@ -3252,7 +3192,7 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             -Number(quantity),
-            queryRunner,
+            manager,
           );
         }
         break;
@@ -3264,7 +3204,7 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             Number(quantity),
-            queryRunner,
+            manager,
           );
         }
         break;
@@ -3275,7 +3215,7 @@ export class InvestmentTransactionsService {
             accountId,
             securityId,
             Number(quantity),
-            queryRunner,
+            manager,
           );
         }
         break;
@@ -3289,9 +3229,11 @@ export class InvestmentTransactionsService {
 
     // Capture linked cash transaction for undo support
     if (transaction.transactionId) {
-      const cashTx = await this.transactionRepository.findOne({
-        where: { id: transaction.transactionId, userId },
-      });
+      const cashTx = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Transaction).findOne({
+          where: { id: transaction.transactionId!, userId },
+        }),
+      );
       if (cashTx) {
         beforeData.linkedCashTransaction = { ...cashTx };
       }
@@ -3301,9 +3243,11 @@ export class InvestmentTransactionsService {
     // Deleting either one removes the whole transfer so holdings can't be
     // left half-moved.
     const linkedLeg = transaction.linkedTransactionId
-      ? await this.investmentTransactionsRepository.findOne({
-          where: { id: transaction.linkedTransactionId, userId },
-        })
+      ? await withScopedDb(this.dataSource, (m) =>
+          m.getRepository(InvestmentTransaction).findOne({
+            where: { id: transaction.linkedTransactionId!, userId },
+          }),
+        )
       : null;
     if (linkedLeg) {
       beforeData.linkedTransferLeg = { ...linkedLeg };
@@ -3321,16 +3265,12 @@ export class InvestmentTransactionsService {
       ),
     );
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    await withScopedDb(this.dataSource, async (manager) => {
       // Break the mutual link before deleting so neither row's FK points at a
       // row that is about to disappear.
       for (const leg of legsToRemove) {
         if (leg.linkedTransactionId) {
-          await queryRunner.manager.update(InvestmentTransaction, leg.id, {
+          await manager.update(InvestmentTransaction, leg.id, {
             linkedTransactionId: null,
           });
           leg.linkedTransactionId = null;
@@ -3338,28 +3278,17 @@ export class InvestmentTransactionsService {
       }
 
       for (const leg of legsToRemove) {
-        await this.reverseTransactionEffectsInTransaction(
-          queryRunner,
-          userId,
-          leg,
-        );
-        await queryRunner.manager.remove(leg);
+        await this.reverseTransactionEffectsInTransaction(manager, userId, leg);
+        await manager.remove(leg);
       }
 
       await this.holdingsService.validateNoNegativeHoldingsHistory(
         userId,
-        queryRunner,
+        manager,
         affectedAccountIds,
         affectedSecurityIds.length > 0 ? affectedSecurityIds : undefined,
       );
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     if (transaction.action === InvestmentAction.SPLIT) {
       await this.holdingsService
@@ -3432,52 +3361,54 @@ export class InvestmentTransactionsService {
       groupBy?: LlmInvestmentTxGroupBy;
     },
   ): Promise<LlmInvestmentTransactionsResult> {
-    const query = this.investmentTransactionsRepository
-      .createQueryBuilder("it")
-      .leftJoinAndSelect("it.account", "account")
-      .leftJoinAndSelect("it.security", "security")
-      .where("it.userId = :userId", { userId });
+    const rows = await withScopedDb(this.dataSource, async (m) => {
+      const query = m
+        .getRepository(InvestmentTransaction)
+        .createQueryBuilder("it")
+        .leftJoinAndSelect("it.account", "account")
+        .leftJoinAndSelect("it.security", "security")
+        .where("it.userId = :userId", { userId });
 
-    if (options.accountIds && options.accountIds.length > 0) {
-      const resolvedIds = new Set<string>(options.accountIds);
-      const accounts = await this.accountsService.findByIds(
-        userId,
-        options.accountIds,
-      );
-      for (const acct of accounts) {
-        if (acct.linkedAccountId) resolvedIds.add(acct.linkedAccountId);
+      if (options.accountIds && options.accountIds.length > 0) {
+        const resolvedIds = new Set<string>(options.accountIds);
+        const accounts = await this.accountsService.findByIds(
+          userId,
+          options.accountIds,
+        );
+        for (const acct of accounts) {
+          if (acct.linkedAccountId) resolvedIds.add(acct.linkedAccountId);
+        }
+        const allIds = [...resolvedIds];
+        query.andWhere("it.accountId IN (:...allIds)", { allIds });
       }
-      const allIds = [...resolvedIds];
-      query.andWhere("it.accountId IN (:...allIds)", { allIds });
-    }
 
-    if (options.startDate) {
-      query.andWhere("it.transactionDate >= :startDate", {
-        startDate: options.startDate,
-      });
-    }
-    if (options.endDate) {
-      query.andWhere("it.transactionDate <= :endDate", {
-        endDate: options.endDate,
-      });
-    }
-    if (options.symbols && options.symbols.length > 0) {
-      const upperSymbols = options.symbols.map((s) => s.toUpperCase());
-      query.andWhere("UPPER(security.symbol) IN (:...upperSymbols)", {
-        upperSymbols,
-      });
-    }
-    if (options.actions && options.actions.length > 0) {
-      query.andWhere("it.action IN (:...actions)", {
-        actions: options.actions,
-      });
-    }
+      if (options.startDate) {
+        query.andWhere("it.transactionDate >= :startDate", {
+          startDate: options.startDate,
+        });
+      }
+      if (options.endDate) {
+        query.andWhere("it.transactionDate <= :endDate", {
+          endDate: options.endDate,
+        });
+      }
+      if (options.symbols && options.symbols.length > 0) {
+        const upperSymbols = options.symbols.map((s) => s.toUpperCase());
+        query.andWhere("UPPER(security.symbol) IN (:...upperSymbols)", {
+          upperSymbols,
+        });
+      }
+      if (options.actions && options.actions.length > 0) {
+        query.andWhere("it.action IN (:...actions)", {
+          actions: options.actions,
+        });
+      }
 
-    query
-      .orderBy("it.transactionDate", "DESC")
-      .addOrderBy("it.createdAt", "DESC");
-
-    const rows = await query.getMany();
+      return query
+        .orderBy("it.transactionDate", "DESC")
+        .addOrderBy("it.createdAt", "DESC")
+        .getMany();
+    });
 
     // round4 here is reserved for per-share prices (4dp price precision);
     // monetary amounts use the shared roundMoney, quantities use round8 (1e-8).
@@ -3593,23 +3524,29 @@ export class InvestmentTransactionsService {
   }
 
   async getSummary(userId: string, accountIds?: string[]) {
-    const query = this.investmentTransactionsRepository
-      .createQueryBuilder("it")
-      .where("it.userId = :userId", { userId });
+    const transactions = await withScopedDb(this.dataSource, async (m) => {
+      const query = m
+        .getRepository(InvestmentTransaction)
+        .createQueryBuilder("it")
+        .where("it.userId = :userId", { userId });
 
-    if (accountIds && accountIds.length > 0) {
-      const resolvedIds = new Set<string>(accountIds);
-      const accounts = await this.accountsService.findByIds(userId, accountIds);
-      for (const acct of accounts) {
-        if (acct.linkedAccountId) {
-          resolvedIds.add(acct.linkedAccountId);
+      if (accountIds && accountIds.length > 0) {
+        const resolvedIds = new Set<string>(accountIds);
+        const accounts = await this.accountsService.findByIds(
+          userId,
+          accountIds,
+        );
+        for (const acct of accounts) {
+          if (acct.linkedAccountId) {
+            resolvedIds.add(acct.linkedAccountId);
+          }
         }
+        const allIds = [...resolvedIds];
+        query.andWhere("it.accountId IN (:...allIds)", { allIds });
       }
-      const allIds = [...resolvedIds];
-      query.andWhere("it.accountId IN (:...allIds)", { allIds });
-    }
 
-    const transactions = await query.getMany();
+      return query.getMany();
+    });
 
     const summary = {
       totalTransactions: transactions.length,
@@ -3645,15 +3582,10 @@ export class InvestmentTransactionsService {
     holdingsDeleted: number;
     accountsReset: number;
   }> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const transactions = await queryRunner.manager.find(
-        InvestmentTransaction,
-        { where: { userId } },
-      );
+    return withScopedDb(this.dataSource, async (manager) => {
+      const transactions = await manager.find(InvestmentTransaction, {
+        where: { userId },
+      });
       const transactionsDeleted = transactions.length;
 
       // Delete linked cash transactions and reverse their balance effects
@@ -3662,7 +3594,7 @@ export class InvestmentTransactionsService {
         .filter((id): id is string => !!id);
 
       if (linkedCashTxIds.length > 0) {
-        const cashTransactions = await queryRunner.manager.find(Transaction, {
+        const cashTransactions = await manager.find(Transaction, {
           where: { id: In(linkedCashTxIds) },
         });
 
@@ -3671,18 +3603,17 @@ export class InvestmentTransactionsService {
             await this.accountsService.updateBalance(
               cashTx.accountId,
               -Number(cashTx.amount),
-              queryRunner,
             );
           }
         }
 
         if (cashTransactions.length > 0) {
-          await queryRunner.manager.remove(cashTransactions);
+          await manager.remove(cashTransactions);
         }
       }
 
       if (transactions.length > 0) {
-        await queryRunner.manager.remove(transactions);
+        await manager.remove(transactions);
       }
 
       const holdingsResult =
@@ -3691,18 +3622,11 @@ export class InvestmentTransactionsService {
       const accountsReset =
         await this.accountsService.resetBrokerageBalances(userId);
 
-      await queryRunner.commitTransaction();
-
       return {
         transactionsDeleted,
         holdingsDeleted: holdingsResult,
         accountsReset,
       };
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 }

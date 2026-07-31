@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Transaction } from "../transactions/entities/transaction.entity";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Category } from "../categories/entities/category.entity";
 import {
   ReportCurrencyService,
@@ -19,10 +18,7 @@ import {
 @Injectable()
 export class IncomeReportsService {
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
+    private dataSource: DataSource,
     private currencyService: ReportCurrencyService,
   ) {}
 
@@ -70,12 +66,16 @@ export class IncomeReportsService {
 
     query += ` GROUP BY COALESCE(ts.category_id, t.category_id), t.currency_code`;
 
-    const rawResults: RawCategoryAggregate[] =
-      await this.transactionsRepository.query(query, params);
+    const rawResults: RawCategoryAggregate[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, params),
+    );
 
-    const categories = await this.categoriesRepository.find({
-      where: { userId },
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId },
+      }),
+    );
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
     const categoryTotals = new Map<
@@ -188,8 +188,10 @@ export class IncomeReportsService {
       ORDER BY month
     `;
 
-    const rawResults: RawMonthlyAggregate[] =
-      await this.transactionsRepository.query(query, params);
+    const rawResults: RawMonthlyAggregate[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, params),
+    );
 
     const monthlyMap = new Map<string, { income: number; expenses: number }>();
     for (const row of rawResults) {
