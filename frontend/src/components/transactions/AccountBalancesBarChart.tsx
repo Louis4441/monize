@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { gainLossColor } from '@/lib/format';
+import { chartColors } from '@/lib/chart-colors';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import {
   BarChart,
@@ -55,7 +56,7 @@ function VerticalAccountTick({
     <g transform={`translate(${x ?? 0},${y ?? 0})`}>
       <text
         textAnchor="start"
-        fill="#6b7280"
+        fill={chartColors.axis}
         fontSize={12}
         transform="rotate(90)"
       >
@@ -265,20 +266,18 @@ export function AccountBalancesBarChart({
             } : undefined}
             style={onAccountClick ? { cursor: 'pointer' } : undefined}
           >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#e5e7eb"
-              className="dark:stroke-gray-700"
-            />
+            {/* The token carries its own dark override, so the dark-variant
+                stroke class this used to need alongside it is gone. */}
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
             <XAxis
               dataKey="accountName"
               tick={
                 verticalXAxis
                   ? <VerticalAccountTick />
-                  : { fill: '#6b7280', fontSize: 12 }
+                  : { fill: chartColors.axis, fontSize: 12 }
               }
               tickLine={false}
-              axisLine={{ stroke: '#e5e7eb' }}
+              axisLine={{ stroke: chartColors.grid }}
               interval={0}
               angle={0}
               textAnchor="middle"
@@ -286,7 +285,7 @@ export function AccountBalancesBarChart({
               height={verticalXAxis ? 120 : 30}
             />
             <YAxis
-              tick={{ fill: '#6b7280', fontSize: 11 }}
+              tick={{ fill: chartColors.axis, fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={formatAxis}
@@ -299,7 +298,7 @@ export function AccountBalancesBarChart({
               content={<AccountBalanceTooltip formatCurrency={formatCurrency} />}
               // Keep the highlight rect visually present but transparent to
               // pointer events so clicks fall through to BarChart's onClick.
-              cursor={{ fill: '#e5e7eb', fillOpacity: 0.35, style: { pointerEvents: 'none' } }}
+              cursor={{ fill: chartColors.grid, fillOpacity: 0.35, style: { pointerEvents: 'none' } }}
             />
             <Bar
               dataKey="absBalance"
@@ -316,7 +315,10 @@ export function AccountBalancesBarChart({
               {chartData.map((entry, index) => (
                 <Cell
                   key={index}
-                  fill={entry.balance >= 0 ? '#22c55e' : '#ef4444'}
+                  // An asset and a debt are opposites, not degrees of one
+                  // thing, so the sign is the subject here and keeps the
+                  // income/expense pair -- themed, rather than literal.
+                  fill={entry.balance >= 0 ? chartColors.income : chartColors.expense}
                 />
               ))}
               {!isMobile && (
@@ -324,7 +326,7 @@ export function AccountBalancesBarChart({
                   dataKey="balance"
                   position="top"
                   formatter={(value: unknown) => formatCurrency(Number(value))}
-                  style={{ fill: '#6b7280', fontSize: 11, fontWeight: 500 }}
+                  style={{ fill: chartColors.axis, fontSize: 11, fontWeight: 500 }}
                 />
               )}
             </Bar>

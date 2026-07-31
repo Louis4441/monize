@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { sumMoney } from '@/lib/format';
+import { chartColors } from '@/lib/chart-colors';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
 import {
   BarChart,
@@ -327,16 +328,14 @@ export function ForeignCurrencyFeeChart({
             data={chartData}
             margin={{ top: verticalLabels ? 28 : 20, right: isMobile ? 16 : 5, left: 0, bottom: 0 }}
           >
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#e5e7eb"
-              className="dark:stroke-gray-700"
-            />
+            {/* The token carries its own dark override, so the dark-variant
+                stroke class this used to need alongside it is gone. */}
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
             <XAxis
               dataKey="periodStart"
-              tick={{ fill: '#6b7280', fontSize: isMobile ? 10 : 12 }}
+              tick={{ fill: chartColors.axis, fontSize: isMobile ? 10 : 12 }}
               tickLine={false}
-              axisLine={{ stroke: '#e5e7eb' }}
+              axisLine={{ stroke: chartColors.grid }}
               tickFormatter={axisTick}
               interval="preserveStartEnd"
               angle={isMobile ? -35 : 0}
@@ -345,7 +344,7 @@ export function ForeignCurrencyFeeChart({
               height={isMobile ? 64 : 30}
             />
             <YAxis
-              tick={{ fill: '#6b7280', fontSize: 11 }}
+              tick={{ fill: chartColors.axis, fontSize: 11 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(value: number) => formatCurrencyAxis(value, currencyCode)}
@@ -360,7 +359,11 @@ export function ForeignCurrencyFeeChart({
               {chartData.map((entry, index) => (
                 <Cell
                   key={index}
-                  fill={entry.total > 0 ? '#ef4444' : '#22c55e'}
+                  // A fee charged and a fee refunded are opposites, so the
+                  // sign stays the subject and keeps the income/expense pair
+                  // -- note the reversed test: here a positive total is money
+                  // paid out.
+                  fill={entry.total > 0 ? chartColors.expense : chartColors.income}
                 />
               ))}
               {showBarLabels && (
@@ -376,7 +379,7 @@ export function ForeignCurrencyFeeChart({
                       : formatFee(Number(value))
                   }
                   style={{
-                    fill: '#6b7280',
+                    fill: chartColors.axis,
                     fontSize: isMobile ? 10 : 11,
                     fontWeight: 500,
                     ...(verticalLabels && { dominantBaseline: 'central' as const }),

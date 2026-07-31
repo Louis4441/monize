@@ -1,14 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent } from '@testing-library/react';
+import { act, fireEvent } from '@testing-library/react';
 import { render, screen } from '@/test/render';
 import { CategoryPayeeBarChart } from './CategoryPayeeBarChart';
 
 // Capture props passed to the recharts primitives we care about so individual
 // tests can assert on axis / label styling (angle, interval, etc.).
-const capturedProps: { xAxis: any; labelList: any; barChart: any } = {
+const capturedProps: {
+  xAxis: any;
+  yAxis: any;
+  labelList: any;
+  barChart: any;
+  cartesianGrid: any;
+  cells: any[];
+} = {
   xAxis: null,
+  yAxis: null,
   labelList: null,
   barChart: null,
+  cartesianGrid: null,
+  cells: [],
 };
 
 vi.mock('recharts', () => ({
@@ -22,14 +32,42 @@ vi.mock('recharts', () => ({
     capturedProps.xAxis = props;
     return <div data-testid="x-axis" />;
   },
-  YAxis: () => <div data-testid="y-axis" />,
-  CartesianGrid: () => <div data-testid="cartesian-grid" />,
+  YAxis: (props: any) => {
+    capturedProps.yAxis = props;
+    return <div data-testid="y-axis" />;
+  },
+  CartesianGrid: (props: any) => {
+    capturedProps.cartesianGrid = props;
+    return <div data-testid="cartesian-grid" />;
+  },
   Tooltip: () => <div data-testid="tooltip" />,
   LabelList: (props: any) => {
     capturedProps.labelList = props;
     return <div data-testid="label-list" />;
   },
-  Cell: () => <div data-testid="cell" />,
+  Cell: (props: any) => {
+    capturedProps.cells.push(props);
+    return <div data-testid="cell" />;
+  },
+}));
+
+// Raw source of the component under test, so a guard can scan it for colour
+// literals the way `src/test/ui-conventions.test.ts` scans the tree.
+const chartSource = Object.values(
+  import.meta.glob('./CategoryPayeeBarChart.tsx', {
+    query: '?raw',
+    eager: true,
+    import: 'default',
+  }) as Record<string, string>,
+)[0];
+
+// The download button hands the summary rows to `captureSvgAsImage` as its
+// third argument; capture the call to assert what the exported PNG contains.
+const mockCapture = vi.fn(async (..._args: unknown[]) => ({
+  dataUrl: 'data:image/png;base64,x',
+}));
+vi.mock('@/lib/pdf-export-charts', () => ({
+  captureSvgAsImage: (...args: unknown[]) => mockCapture(...args),
 }));
 
 // Control the mobile breakpoint deterministically from tests.
@@ -57,8 +95,12 @@ describe('CategoryPayeeBarChart', () => {
     mockFormatCurrency.mockClear();
     mockIsMobile.mockReturnValue(false);
     capturedProps.xAxis = null;
+    capturedProps.yAxis = null;
     capturedProps.labelList = null;
     capturedProps.barChart = null;
+    capturedProps.cartesianGrid = null;
+    capturedProps.cells = [];
+    mockCapture.mockClear();
   });
 
   const buildMonths = (n: number) =>
@@ -95,6 +137,71 @@ describe('CategoryPayeeBarChart', () => {
     expect(screen.getByText('Monthly Avg')).toBeInTheDocument();
     expect(screen.getByText('Total')).toBeInTheDocument();
     expect(screen.getByText('Transactions')).toBeInTheDocument();
+  });
+
+  describe('theme colours', () => {
+    const renderMixedMonths = () =>
+      render(
+        <CategoryPayeeBarChart
+          data={[
+            { month: '2025-01', total: -500, count: 10 },
+            { month: '2025-02', total: 300, count: 8 },
+          ]}
+          isLoading={false}
+        />
+      );
+
+    it('fills bars from the income and expense tokens, not fixed hex', () => {
+      renderMixedMonths();
+      // This chart is about the in/out split, so red and green are the
+      // subject here -- but they come from the palette, not a literal.
+      expect(capturedProps.cells.map((c) => c.fill)).toEqual([
+        'var(--chart-expense)',
+        'var(--chart-income)',
+      ]);
+    });
+
+    it('draws the grid, axes and bar labels from the theme tokens', () => {
+      renderMixedMonths();
+      expect(capturedProps.cartesianGrid.stroke).toBe('var(--chart-grid)');
+      expect(capturedProps.xAxis.axisLine.stroke).toBe('var(--chart-grid)');
+      expect(capturedProps.xAxis.tick.fill).toBe('var(--chart-axis)');
+      expect(capturedProps.yAxis.tick.fill).toBe('var(--chart-axis)');
+      expect(capturedProps.labelList.style.fill).toBe('var(--chart-axis)');
+    });
+
+    it('leaves no hardcoded hex anywhere in the chart source', () => {
+      // A guard rather than a fixture assertion: the original mistake was six
+      // separate literals, and the next one will be somewhere else in the file.
+      // The grid token carries its own dark override, so the `dark:stroke-*`
+      // class that used to compensate must not come back either.
+      expect(chartSource).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+      expect(chartSource).not.toMatch(/dark:stroke-/);
+    });
+  });
+
+  it('exports the summary figures below the chart, not the bars alone', async () => {
+    render(
+      <CategoryPayeeBarChart
+        data={[
+          { month: '2025-01', total: -500, count: 10 },
+          { month: '2025-02', total: -300, count: 8 },
+        ]}
+        isLoading={false}
+      />
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Download/i }));
+    });
+
+    // Same three figures the on-screen footer shows, in the same order.
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+    expect(mockCapture.mock.calls[0][2]).toEqual([
+      { label: 'Monthly Avg', value: '$-400.00' },
+      { label: 'Total', value: '$-800.00' },
+      { label: 'Transactions', value: '18' },
+    ]);
   });
 
   it('renders a download button titled after the chart when data is present', () => {

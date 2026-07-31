@@ -24,6 +24,18 @@ export const chartColors = {
   grid: 'var(--chart-grid)',
   /** Axis tick label fill. */
   axis: 'var(--chart-axis)',
+  /**
+   * The card colour behind the chart. Use it for the ring around a marker dot
+   * (min/max flags, active points): the ring exists to separate the dot from
+   * the line beneath it, so it has to be the background, not white -- a white
+   * ring on a dark card is an outline rather than a gap.
+   */
+  surface: 'var(--chart-surface)',
+  /**
+   * Unclassified data -- an "Other" slice, an item with no colour assigned.
+   * Deliberately recessive so it never reads as a real series.
+   */
+  neutral: 'var(--chart-neutral)',
 } as const;
 
 /** Categorical palette for multi-series charts (pies, stacked bars, multi-line). */

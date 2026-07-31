@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactElement } from 'react';
+import { chartColors } from '@/lib/chart-colors';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('PortfolioValueChart');
@@ -277,7 +278,10 @@ export function renderChartFlagDot({
             r={5}
             fill={color}
             fillOpacity={1}
-            stroke="#fff"
+            // The ring exists to separate the dot from the line beneath it, so it
+            // is the card colour rather than white -- on a dark card a white
+            // ring is an outline instead of a gap.
+            stroke={chartColors.surface}
             strokeWidth={2}
             strokeOpacity={1}
           />
@@ -304,6 +308,11 @@ export function renderChartFlagDot({
         filter="url(#chartFlagShadow)"
       />
       {showDot && <polygon points={arrowPoints} fill={color} fillOpacity={1} />}
+      {/* Everything from here down is drawn ON the filled bubble, not on the
+          card: the label, the divider and the dismiss cross are all contrast
+          against `color`. They stay literal white deliberately -- swapping in
+          `chartColors.surface` would make them the card colour and so
+          invisible on the bubble in dark mode. */}
       <text
         x={bubbleX + (labelWidth - closeZone) / 2}
         y={bubbleY + labelHeight / 2}

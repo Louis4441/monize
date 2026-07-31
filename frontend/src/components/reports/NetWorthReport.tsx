@@ -462,7 +462,7 @@ export function NetWorthReport() {
                     y={minMax.max.NetWorth}
                     r={6}
                     fill={chartColors.income}
-                    stroke="#fff"
+                    stroke={chartColors.surface}
                     strokeWidth={2}
                     label={{ value: formatCurrencyLabel(minMax.max.NetWorth), position: 'bottom', fontSize: 12, fill: chartColors.income, fontWeight: 600, offset: 8 }}
                   />
@@ -473,7 +473,7 @@ export function NetWorthReport() {
                     y={minMax.min.NetWorth}
                     r={6}
                     fill={chartColors.expense}
-                    stroke="#fff"
+                    stroke={chartColors.surface}
                     strokeWidth={2}
                     label={{ value: formatCurrencyLabel(minMax.min.NetWorth), position: 'top', fontSize: 12, fill: chartColors.expense, fontWeight: 600, offset: 8 }}
                   />

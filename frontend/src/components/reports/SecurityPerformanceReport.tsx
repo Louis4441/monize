@@ -643,7 +643,7 @@ export function SecurityPerformanceReport() {
                         dataKey="buyMarker"
                         stroke="none"
                         fill="none"
-                        dot={{ r: 6, fill: chartColors.income, stroke: '#fff', strokeWidth: 2 }}
+                        dot={{ r: 6, fill: chartColors.income, stroke: chartColors.surface, strokeWidth: 2 }}
                         activeDot={false}
                         connectNulls={false}
                       />
@@ -653,7 +653,7 @@ export function SecurityPerformanceReport() {
                         dataKey="sellMarker"
                         stroke="none"
                         fill="none"
-                        dot={{ r: 6, fill: chartColors.expense, stroke: '#fff', strokeWidth: 2 }}
+                        dot={{ r: 6, fill: chartColors.expense, stroke: chartColors.surface, strokeWidth: 2 }}
                         activeDot={false}
                         connectNulls={false}
                       />

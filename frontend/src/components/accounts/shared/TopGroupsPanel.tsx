@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, type ReactNode } from 'react';
+import { chartColors } from '@/lib/chart-colors';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import type { GroupedTotal } from '@/types/transaction';
 
@@ -73,6 +74,15 @@ export function TopGroupsPanel({
             {rows.ranked.map((g, i) => {
               const amount = Number(g.total) || 0;
               const clickable = !!onSelect && (g.id != null || selectableWhenUnidentified);
+              // Outflows -- nearly every row on these panels -- take the theme
+              // accent, not red. Red is reserved for the Monthly Totals chart,
+              // where a loss month is the point; spending it again on a routine
+              // breakdown makes ordinary spending read as an alarm and leaves
+              // the panel the one thing on screen ignoring the palette. Inflows
+              // stay green so a refund is still distinguishable at a glance.
+              // Amount and bar share the one token so the row reads as a single
+              // mark.
+              const signColor = amount > 0 ? chartColors.income : chartColors.primary;
               const body = (
                 <>
                   <div className="flex items-center justify-between text-sm mb-1">
@@ -80,21 +90,19 @@ export function TopGroupsPanel({
                       {g.name ?? fallbackLabel}
                     </span>
                     <span
-                      className={`font-medium tabular-nums ${
-                        amount < 0
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-green-600 dark:text-green-400'
-                      }`}
+                      className="font-medium tabular-nums"
+                      style={{ color: signColor }}
                     >
                       {formatCurrency(Math.abs(amount), currencyCode)}
                     </span>
                   </div>
                   <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${
-                        amount < 0 ? 'bg-red-400 dark:bg-red-500' : 'bg-green-400 dark:bg-green-500'
-                      }`}
-                      style={{ width: `${rows.max > 0 ? (Math.abs(amount) / rows.max) * 100 : 0}%` }}
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${rows.max > 0 ? (Math.abs(amount) / rows.max) * 100 : 0}%`,
+                        backgroundColor: signColor,
+                      }}
                     />
                   </div>
                 </>
