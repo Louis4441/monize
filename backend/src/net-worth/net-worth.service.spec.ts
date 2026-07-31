@@ -1,6 +1,3 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
-import { DataSource } from "typeorm";
 import { NetWorthService } from "./net-worth.service";
 import { MonthlyAccountBalance } from "./entities/monthly-account-balance.entity";
 import {
@@ -16,6 +13,20 @@ import { SecurityPrice } from "../securities/entities/security-price.entity";
 import { Security } from "../securities/entities/security.entity";
 import { ExchangeRate } from "../currencies/entities/exchange-rate.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () => {
+  const helpers = jest.requireActual("../test-helpers/scoped-db-testing");
+  return {
+    ...helpers.scopedDbMockModule(),
+    // triggerDebouncedRecalc schedules its timer through this; in unit tests
+    // there is no ambient manager to escape, so it just runs the callback.
+    runOutsideActiveScopedManager: (fn: () => unknown) => fn(),
+  };
+});
 
 describe("NetWorthService", () => {
   let service: NetWorthService;
@@ -26,16 +37,24 @@ describe("NetWorthService", () => {
   let securityRepository: Record<string, jest.Mock>;
   let rateRepository: Record<string, jest.Mock>;
   let prefRepository: Record<string, jest.Mock>;
-  let dataSource: Record<string, jest.Mock>;
+  let dataSource: DataSourceMock;
+  // Both the reporting reads and the snapshot delete+insert block now run
+  // through the scoped transaction's `manager.query`. Routing them to two
+  // mocks by statement keeps each test's read fixtures independent of the
+  // write assertions -- the split the spec had when reads used
+  // `reportQuery` and writes used `queryRunner.query`.
+  let reportQuery: jest.Mock;
+  let snapshotQuery: jest.Mock;
 
-  const mockQueryRunner = {
-    connect: jest.fn(),
-    startTransaction: jest.fn(),
-    commitTransaction: jest.fn(),
-    rollbackTransaction: jest.fn(),
-    release: jest.fn(),
-    query: jest.fn(),
-  };
+  /**
+   * How many snapshot rebuild blocks ran. Each recalculated account issues
+   * exactly one `DELETE FROM monthly_account_balances` to open its rebuild, so
+   * counting those replaces the old `createQueryRunner` call count.
+   */
+  const snapshotWriteBlocks = (): number =>
+    snapshotQuery.mock.calls.filter(([sql]: [string]) =>
+      /^\s*DELETE/i.test(sql),
+    ).length;
 
   const mockRegularAccount: Account = {
     id: "account-1",
@@ -149,51 +168,26 @@ describe("NetWorthService", () => {
       findOne: jest.fn().mockResolvedValue(null),
     };
 
-    dataSource = {
-      query: jest.fn().mockResolvedValue([]),
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    };
+    reportQuery = jest.fn().mockResolvedValue([]);
+    snapshotQuery = jest.fn().mockResolvedValue(undefined);
 
-    // Reset all query runner mocks
-    mockQueryRunner.connect.mockReset().mockResolvedValue(undefined);
-    mockQueryRunner.startTransaction.mockReset().mockResolvedValue(undefined);
-    mockQueryRunner.commitTransaction.mockReset().mockResolvedValue(undefined);
-    mockQueryRunner.rollbackTransaction
-      .mockReset()
-      .mockResolvedValue(undefined);
-    mockQueryRunner.release.mockReset().mockResolvedValue(undefined);
-    mockQueryRunner.query.mockReset().mockResolvedValue(undefined);
+    const mocks = createScopedDbMocks([
+      [MonthlyAccountBalance, mabRepository],
+      [Account, accountRepository],
+      [InvestmentTransaction, invTxRepository],
+      [SecurityPrice, priceRepository],
+      [Security, securityRepository],
+      [ExchangeRate, rateRepository],
+      [UserPreference, prefRepository],
+    ]);
+    dataSource = mocks.dataSource;
+    mocks.manager.query.mockImplementation((sql: string, params?: unknown[]) =>
+      /monthly_account_balances/.test(sql) && /^\s*(DELETE|INSERT)/i.test(sql)
+        ? snapshotQuery(sql, params)
+        : reportQuery(sql, params),
+    );
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        NetWorthService,
-        {
-          provide: getRepositoryToken(MonthlyAccountBalance),
-          useValue: mabRepository,
-        },
-        { provide: getRepositoryToken(Account), useValue: accountRepository },
-        {
-          provide: getRepositoryToken(InvestmentTransaction),
-          useValue: invTxRepository,
-        },
-        {
-          provide: getRepositoryToken(SecurityPrice),
-          useValue: priceRepository,
-        },
-        { provide: getRepositoryToken(Security), useValue: securityRepository },
-        {
-          provide: getRepositoryToken(ExchangeRate),
-          useValue: rateRepository,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: prefRepository,
-        },
-        { provide: DataSource, useValue: dataSource },
-      ],
-    }).compile();
-
-    service = module.get<NetWorthService>(NetWorthService);
+    service = new NetWorthService(dataSource as never);
   });
 
   describe("recalculateAccount", () => {
@@ -202,29 +196,26 @@ describe("NetWorthService", () => {
 
       await service.recalculateAccount("user-1", "nonexistent");
 
-      expect(dataSource.query).not.toHaveBeenCalled();
-      expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+      expect(reportQuery).not.toHaveBeenCalled();
+      expect(snapshotWriteBlocks()).toBe(0);
     });
 
     it("delegates to recalculateRegularAccount for non-brokerage accounts", async () => {
       accountRepository.findOne.mockResolvedValue({ ...mockRegularAccount });
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([{ earliest: "2024-01-15" }])
         .mockResolvedValueOnce([{ month: "2024-01-01", balance: 1000 }]);
 
       await service.recalculateAccount("user-1", "account-1");
 
-      expect(dataSource.createQueryRunner).toHaveBeenCalled();
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(snapshotWriteBlocks()).toBe(1);
     });
 
     it("delegates to recalculateBrokerageAccount for brokerage accounts", async () => {
       accountRepository.findOne.mockResolvedValue({ ...mockBrokerageAccount });
       // earliest regular tx
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([{ earliest: "2024-03-01" }])
         // earliest inv tx
         .mockResolvedValueOnce([{ inv_earliest: "2024-02-15" }])
@@ -235,8 +226,8 @@ describe("NetWorthService", () => {
 
       await service.recalculateAccount("user-1", "brokerage-1");
 
-      expect(dataSource.createQueryRunner).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(snapshotWriteBlocks()).toBe(1);
     });
 
     describe("regular account recalculation", () => {
@@ -245,7 +236,7 @@ describe("NetWorthService", () => {
           ...mockRegularAccount,
           openingBalance: 500,
         });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: "2024-01-10" }])
           .mockResolvedValueOnce([
             { month: "2024-01-01", balance: 600 },
@@ -255,12 +246,12 @@ describe("NetWorthService", () => {
         await service.recalculateAccount("user-1", "account-1");
 
         // Verify delete old balances
-        expect(mockQueryRunner.query).toHaveBeenCalledWith(
+        expect(snapshotQuery).toHaveBeenCalledWith(
           "DELETE FROM monthly_account_balances WHERE account_id = $1",
           ["account-1"],
         );
         // Verify insert for each month
-        expect(mockQueryRunner.query).toHaveBeenCalledTimes(3); // 1 delete + 2 inserts
+        expect(snapshotQuery).toHaveBeenCalledTimes(3); // 1 delete + 2 inserts
       });
 
       it("uses createdAt as start date when no earliest transaction exists", async () => {
@@ -269,14 +260,14 @@ describe("NetWorthService", () => {
           createdAt: new Date("2024-06-01"),
         };
         accountRepository.findOne.mockResolvedValue(account);
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: null }])
           .mockResolvedValueOnce([{ month: "2024-06-01", balance: 1000 }]);
 
         await service.recalculateAccount("user-1", "account-1");
 
         // The second query (cost rows) should use account.createdAt substring as startDate
-        const secondQueryCall = dataSource.query.mock.calls[1];
+        const secondQueryCall = reportQuery.mock.calls[1];
         expect(secondQueryCall[1]).toContain("2024-06-01");
       });
 
@@ -286,7 +277,7 @@ describe("NetWorthService", () => {
           openingBalance: 250000,
         };
         accountRepository.findOne.mockResolvedValue(assetAccount);
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: "2023-01-01" }])
           .mockResolvedValueOnce([
             { month: "2023-01-01", balance: 250000 },
@@ -296,7 +287,7 @@ describe("NetWorthService", () => {
 
         await service.recalculateAccount("user-1", "asset-1");
 
-        const insertCalls = mockQueryRunner.query.mock.calls.filter(
+        const insertCalls = snapshotQuery.mock.calls.filter(
           (call: any[]) =>
             typeof call[0] === "string" && call[0].includes("INSERT"),
         );
@@ -316,13 +307,13 @@ describe("NetWorthService", () => {
           dateAcquired: new Date("2023-06-15"),
         };
         accountRepository.findOne.mockResolvedValue(assetAccount);
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: null }])
           .mockResolvedValueOnce([]);
 
         await service.recalculateAccount("user-1", "asset-1");
 
-        const costQuery = dataSource.query.mock.calls[1];
+        const costQuery = reportQuery.mock.calls[1];
         expect(costQuery[1][2]).toBe("2023-06-15");
       });
 
@@ -332,24 +323,24 @@ describe("NetWorthService", () => {
           dateAcquired: new Date("2022-03-01"),
         };
         accountRepository.findOne.mockResolvedValue(assetAccount);
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: "2023-01-01" }])
           .mockResolvedValueOnce([]);
 
         await service.recalculateAccount("user-1", "asset-1");
 
         // The startDate passed to the cost query should be the earlier dateAcquired
-        const costQuery = dataSource.query.mock.calls[1];
+        const costQuery = reportQuery.mock.calls[1];
         expect(costQuery[1][2]).toBe("2022-03-01");
       });
 
-      it("rolls back transaction on error", async () => {
+      it("propagates a snapshot write failure out of the transaction", async () => {
         accountRepository.findOne.mockResolvedValue({ ...mockRegularAccount });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: "2024-01-01" }])
           .mockResolvedValueOnce([{ month: "2024-01-01", balance: 1000 }]);
 
-        mockQueryRunner.query
+        snapshotQuery
           .mockResolvedValueOnce(undefined) // DELETE succeeds
           .mockRejectedValueOnce(new Error("DB error")); // INSERT fails
 
@@ -357,23 +348,25 @@ describe("NetWorthService", () => {
           service.recalculateAccount("user-1", "account-1"),
         ).rejects.toThrow("DB error");
 
-        expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-        expect(mockQueryRunner.release).toHaveBeenCalled();
+        // The delete+insert pair share one scoped transaction, which rolls
+        // back when the callback throws.
+        expect(dataSource.transaction).toHaveBeenCalled();
+        expect(snapshotWriteBlocks()).toBe(1);
       });
 
-      it("always releases query runner even on error", async () => {
+      it("surfaces a failing DELETE instead of writing partial snapshots", async () => {
         accountRepository.findOne.mockResolvedValue({ ...mockRegularAccount });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: "2024-01-01" }])
           .mockResolvedValueOnce([{ month: "2024-01-01", balance: 1000 }]);
 
-        mockQueryRunner.query.mockRejectedValue(new Error("Fatal"));
+        snapshotQuery.mockRejectedValue(new Error("Fatal"));
 
         await expect(
           service.recalculateAccount("user-1", "account-1"),
         ).rejects.toThrow("Fatal");
 
-        expect(mockQueryRunner.release).toHaveBeenCalledTimes(1);
+        expect(snapshotQuery).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -382,7 +375,7 @@ describe("NetWorthService", () => {
         accountRepository.findOne.mockResolvedValue({
           ...mockBrokerageAccount,
         });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: null }])
           .mockResolvedValueOnce([{ inv_earliest: "2024-01-15" }])
           .mockResolvedValueOnce([
@@ -422,7 +415,7 @@ describe("NetWorthService", () => {
         await service.recalculateAccount("user-1", "brokerage-1");
 
         // Verify market_value was inserted
-        const insertCalls = mockQueryRunner.query.mock.calls.filter(
+        const insertCalls = snapshotQuery.mock.calls.filter(
           (call: any[]) =>
             typeof call[0] === "string" && call[0].includes("INSERT"),
         );
@@ -437,7 +430,7 @@ describe("NetWorthService", () => {
         accountRepository.findOne.mockResolvedValue({
           ...mockBrokerageAccount,
         });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: null }])
           .mockResolvedValueOnce([{ inv_earliest: "2024-01-01" }])
           .mockResolvedValueOnce([
@@ -512,7 +505,7 @@ describe("NetWorthService", () => {
 
         await service.recalculateAccount("user-1", "brokerage-1");
 
-        const insertCalls = mockQueryRunner.query.mock.calls.filter(
+        const insertCalls = snapshotQuery.mock.calls.filter(
           (call: any[]) =>
             typeof call[0] === "string" && call[0].includes("INSERT"),
         );
@@ -528,7 +521,7 @@ describe("NetWorthService", () => {
         accountRepository.findOne.mockResolvedValue({
           ...mockBrokerageAccount,
         });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: null }])
           .mockResolvedValueOnce([{ inv_earliest: "2024-01-01" }])
           .mockResolvedValueOnce([{ month: "2024-01-01", balance: 0 }])
@@ -559,7 +552,7 @@ describe("NetWorthService", () => {
 
         await service.recalculateAccount("user-1", "brokerage-1");
 
-        const insertCalls = mockQueryRunner.query.mock.calls.filter(
+        const insertCalls = snapshotQuery.mock.calls.filter(
           (call: any[]) =>
             typeof call[0] === "string" && call[0].includes("INSERT"),
         );
@@ -571,7 +564,7 @@ describe("NetWorthService", () => {
         accountRepository.findOne.mockResolvedValue({
           ...mockBrokerageAccount,
         });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: null }])
           .mockResolvedValueOnce([{ inv_earliest: null }])
           .mockResolvedValueOnce([{ month: "2024-01-01", balance: 0 }]);
@@ -581,7 +574,7 @@ describe("NetWorthService", () => {
         await service.recalculateAccount("user-1", "brokerage-1");
 
         // Market value should be 0 (null) when no holdings
-        const insertCalls = mockQueryRunner.query.mock.calls.filter(
+        const insertCalls = snapshotQuery.mock.calls.filter(
           (call: any[]) =>
             typeof call[0] === "string" && call[0].includes("INSERT"),
         );
@@ -592,7 +585,7 @@ describe("NetWorthService", () => {
         accountRepository.findOne.mockResolvedValue({
           ...mockBrokerageAccount,
         });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: null }])
           .mockResolvedValueOnce([{ inv_earliest: "2024-01-01" }])
           .mockResolvedValueOnce([{ month: "2024-01-01", balance: 0 }])
@@ -630,7 +623,7 @@ describe("NetWorthService", () => {
 
         await service.recalculateAccount("user-1", "brokerage-1");
 
-        const insertCalls = mockQueryRunner.query.mock.calls.filter(
+        const insertCalls = snapshotQuery.mock.calls.filter(
           (call: any[]) =>
             typeof call[0] === "string" && call[0].includes("INSERT"),
         );
@@ -648,7 +641,7 @@ describe("NetWorthService", () => {
           ...mockBrokerageAccount,
           currencyCode: "CAD",
         });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: null }])
           .mockResolvedValueOnce([{ inv_earliest: "2025-02-01" }])
           .mockResolvedValueOnce([{ month: "2025-02-01", balance: 0 }])
@@ -689,7 +682,7 @@ describe("NetWorthService", () => {
 
         await service.recalculateAccount("user-1", "brokerage-1");
 
-        const insertCalls = mockQueryRunner.query.mock.calls.filter(
+        const insertCalls = snapshotQuery.mock.calls.filter(
           (call: any[]) =>
             typeof call[0] === "string" && call[0].includes("INSERT"),
         );
@@ -702,14 +695,14 @@ describe("NetWorthService", () => {
         accountRepository.findOne.mockResolvedValue({
           ...mockBrokerageAccount,
         });
-        dataSource.query
+        reportQuery
           .mockResolvedValueOnce([{ earliest: null }])
           .mockResolvedValueOnce([{ inv_earliest: null }])
           .mockResolvedValueOnce([{ month: "2024-01-01", balance: 0 }]);
 
         invTxRepository.find.mockResolvedValue([]);
 
-        mockQueryRunner.query
+        snapshotQuery
           .mockResolvedValueOnce(undefined) // DELETE succeeds
           .mockRejectedValueOnce(new Error("Insert failed")); // INSERT fails
 
@@ -717,8 +710,8 @@ describe("NetWorthService", () => {
           service.recalculateAccount("user-1", "brokerage-1"),
         ).rejects.toThrow("Insert failed");
 
-        expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-        expect(mockQueryRunner.release).toHaveBeenCalled();
+        expect(dataSource.transaction).toHaveBeenCalled();
+        expect(snapshotWriteBlocks()).toBe(1);
       });
     });
   });
@@ -731,7 +724,7 @@ describe("NetWorthService", () => {
       ]);
 
       // Each regular account recalculation needs: earliest query + cost rows query
-      dataSource.query
+      reportQuery
         // Account 1
         .mockResolvedValueOnce([{ earliest: "2024-01-01" }])
         .mockResolvedValueOnce([{ month: "2024-01-01", balance: 1000 }])
@@ -744,8 +737,8 @@ describe("NetWorthService", () => {
       expect(accountRepository.find).toHaveBeenCalledWith({
         where: { userId: "user-1" },
       });
-      // createQueryRunner should be called once per account
-      expect(dataSource.createQueryRunner).toHaveBeenCalledTimes(2);
+      // one snapshot rebuild per account
+      expect(snapshotWriteBlocks()).toBe(2);
     });
 
     it("continues processing when one account fails", async () => {
@@ -754,7 +747,7 @@ describe("NetWorthService", () => {
         { ...mockRegularAccount, id: "acc-2" },
       ]);
 
-      dataSource.query
+      reportQuery
         // Account 1 - earliest fails
         .mockRejectedValueOnce(new Error("DB down"))
         // Account 2 - works fine
@@ -765,7 +758,7 @@ describe("NetWorthService", () => {
       await service.recalculateAllAccounts("user-1");
 
       // Still attempted both accounts
-      expect(dataSource.createQueryRunner).toHaveBeenCalledTimes(1);
+      expect(snapshotWriteBlocks()).toBe(1);
     });
 
     it("handles empty accounts list", async () => {
@@ -773,8 +766,8 @@ describe("NetWorthService", () => {
 
       await service.recalculateAllAccounts("user-1");
 
-      expect(dataSource.query).not.toHaveBeenCalled();
-      expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+      expect(reportQuery).not.toHaveBeenCalled();
+      expect(snapshotWriteBlocks()).toBe(0);
     });
 
     it("processes brokerage accounts differently from regular accounts", async () => {
@@ -783,7 +776,7 @@ describe("NetWorthService", () => {
         { ...mockBrokerageAccount },
       ]);
 
-      dataSource.query
+      reportQuery
         // Regular account
         .mockResolvedValueOnce([{ earliest: "2024-01-01" }])
         .mockResolvedValueOnce([{ month: "2024-01-01", balance: 1000 }])
@@ -796,7 +789,7 @@ describe("NetWorthService", () => {
 
       await service.recalculateAllAccounts("user-1");
 
-      expect(dataSource.createQueryRunner).toHaveBeenCalledTimes(2);
+      expect(snapshotWriteBlocks()).toBe(2);
     });
   });
 
@@ -897,7 +890,7 @@ describe("NetWorthService", () => {
       };
       accountRepository.createQueryBuilder = jest.fn().mockReturnValue(qb);
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([{ earliest: null }])
         .mockResolvedValueOnce([{ inv_earliest: null }])
         .mockResolvedValueOnce([{ month: "2024-01-01", balance: 0 }]);
@@ -906,7 +899,7 @@ describe("NetWorthService", () => {
       await service.recalculateAllInvestmentSnapshots();
 
       expect(qb.getMany).toHaveBeenCalled();
-      expect(dataSource.createQueryRunner).toHaveBeenCalledTimes(1);
+      expect(snapshotWriteBlocks()).toBe(1);
     });
 
     it("continues when one account fails", async () => {
@@ -920,7 +913,7 @@ describe("NetWorthService", () => {
       };
       accountRepository.createQueryBuilder = jest.fn().mockReturnValue(qb);
 
-      dataSource.query
+      reportQuery
         // First account: earliest call rejects
         .mockRejectedValueOnce(new Error("db down"))
         // Second account: succeeds
@@ -932,7 +925,7 @@ describe("NetWorthService", () => {
       await expect(
         service.recalculateAllInvestmentSnapshots(),
       ).resolves.toBeUndefined();
-      expect(dataSource.createQueryRunner).toHaveBeenCalledTimes(1);
+      expect(snapshotWriteBlocks()).toBe(1);
     });
   });
 
@@ -959,7 +952,7 @@ describe("NetWorthService", () => {
       await service.ensurePopulated("user-1");
 
       expect(accountRepository.findOne).not.toHaveBeenCalled();
-      expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+      expect(snapshotWriteBlocks()).toBe(0);
     });
 
     it("refreshes only accounts missing a current-month snapshot", async () => {
@@ -1035,7 +1028,7 @@ describe("NetWorthService", () => {
       prefRepository.findOne.mockResolvedValue({
         defaultCurrency: "USD",
       });
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       const result = await service.getMonthlyNetWorth("user-1");
 
@@ -1048,7 +1041,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-01-01",
@@ -1105,7 +1098,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-01-01",
           balance: 10000,
@@ -1130,7 +1123,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-01-01",
           balance: 10000,
@@ -1152,22 +1145,22 @@ describe("NetWorthService", () => {
       prefRepository.findOne.mockResolvedValue({
         defaultCurrency: "USD",
       });
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       await service.getMonthlyNetWorth("user-1", "2024-01-01", "2024-06-30");
 
-      const queryArgs = dataSource.query.mock.calls[0];
+      const queryArgs = reportQuery.mock.calls[0];
       expect(queryArgs[1]).toEqual(["user-1", "2024-01-01", "2024-06-30"]);
     });
 
     it("uses default date range when none specified", async () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue(null);
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       await service.getMonthlyNetWorth("user-1");
 
-      const queryArgs = dataSource.query.mock.calls[0];
+      const queryArgs = reportQuery.mock.calls[0];
       expect(queryArgs[1][0]).toBe("user-1");
       expect(queryArgs[1][1]).toBe("1990-01-01");
       // end date should be today
@@ -1177,7 +1170,7 @@ describe("NetWorthService", () => {
     it("defaults to USD when user has no preference", async () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue(null);
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-01-01",
           balance: 1000,
@@ -1201,7 +1194,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-01-01",
@@ -1235,7 +1228,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-01-01",
@@ -1269,7 +1262,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-01-01",
@@ -1296,7 +1289,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-01-01",
           balance: 3000,
@@ -1342,7 +1335,7 @@ describe("NetWorthService", () => {
       });
 
       // Return out of order
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-03-01",
           balance: 3000,
@@ -1385,7 +1378,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-01-01",
           balance: 1000.567,
@@ -1428,7 +1421,7 @@ describe("NetWorthService", () => {
         currency_code: "USD",
       }));
 
-      dataSource.query.mockResolvedValueOnce(snapshots);
+      reportQuery.mockResolvedValueOnce(snapshots);
 
       const result = await service.getMonthlyNetWorth("user-1");
 
@@ -1440,7 +1433,7 @@ describe("NetWorthService", () => {
       mabRepository.count.mockResolvedValue(0);
       accountRepository.find.mockResolvedValue([]);
       prefRepository.findOne.mockResolvedValue(null);
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       await service.getMonthlyNetWorth("user-1");
 
@@ -1457,7 +1450,7 @@ describe("NetWorthService", () => {
       });
 
       // Simulate a brokerage + linked cash account pair
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-01-01",
           balance: 0,
@@ -1490,7 +1483,7 @@ describe("NetWorthService", () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-01-01",
           balance: 2500,
@@ -1512,7 +1505,7 @@ describe("NetWorthService", () => {
     it("returns only the latest month's totals", async () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
-      dataSource.query
+      reportQuery
         // MAX(month) lookup
         .mockResolvedValueOnce([{ month: "2024-03-01" }])
         // snapshots bounded to that single month
@@ -1548,13 +1541,13 @@ describe("NetWorthService", () => {
       });
       // The month range is bounded to the latest month so the snapshot query
       // does not replay the whole history.
-      const snapshotCall = dataSource.query.mock.calls[1];
+      const snapshotCall = reportQuery.mock.calls[1];
       expect(snapshotCall[1]).toEqual(["user-1", "2024-03-01", "2024-03-01"]);
     });
 
     it("returns null when there are no snapshots", async () => {
       mabRepository.count.mockResolvedValue(5);
-      dataSource.query.mockResolvedValueOnce([{ month: null }]);
+      reportQuery.mockResolvedValueOnce([{ month: null }]);
 
       const result = await service.getLatestNetWorth("user-1");
 
@@ -1568,7 +1561,7 @@ describe("NetWorthService", () => {
       prefRepository.findOne.mockResolvedValue({
         defaultCurrency: "USD",
       });
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       const result = await service.getMonthlyInvestments("user-1");
 
@@ -1581,7 +1574,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-01-01",
@@ -1620,7 +1613,7 @@ describe("NetWorthService", () => {
       });
 
       // Linked account resolution query
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           { id: "inv-1", linked_account_id: "inv-cash-1" },
           { id: "inv-cash-1", linked_account_id: "inv-1" },
@@ -1657,11 +1650,11 @@ describe("NetWorthService", () => {
       prefRepository.findOne.mockResolvedValue({
         defaultCurrency: "USD",
       });
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       await service.getMonthlyInvestments("user-1", "2024-01-01", "2024-12-31");
 
-      const queryArgs = dataSource.query.mock.calls[0];
+      const queryArgs = reportQuery.mock.calls[0];
       expect(queryArgs[1]).toContain("2024-01-01");
       expect(queryArgs[1]).toContain("2024-12-31");
     });
@@ -1672,7 +1665,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-01-01",
@@ -1709,7 +1702,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-03-01",
           balance: 3000,
@@ -1740,7 +1733,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
 
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           month: "2024-01-01",
           balance: 1234.567,
@@ -1762,11 +1755,11 @@ describe("NetWorthService", () => {
       prefRepository.findOne.mockResolvedValue({
         defaultCurrency: "USD",
       });
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       await service.getMonthlyInvestments("user-1");
 
-      const queryStr = dataSource.query.mock.calls[0][0];
+      const queryStr = reportQuery.mock.calls[0][0];
       expect(queryStr).toContain("INVESTMENT_CASH");
       expect(queryStr).toContain("INVESTMENT_BROKERAGE");
     });
@@ -1778,7 +1771,7 @@ describe("NetWorthService", () => {
       });
 
       // First call resolves linked accounts for inv-1
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           { id: "inv-1", linked_account_id: "inv-cash-1" },
           { id: "inv-cash-1", linked_account_id: "inv-1" },
@@ -1815,7 +1808,7 @@ describe("NetWorthService", () => {
       ]);
 
       // The snapshot query should include all resolved IDs
-      const mainQueryCall = dataSource.query.mock.calls[2];
+      const mainQueryCall = reportQuery.mock.calls[2];
       expect(mainQueryCall[0]).toContain("IN");
     });
 
@@ -1823,7 +1816,7 @@ describe("NetWorthService", () => {
       mabRepository.count.mockResolvedValue(0);
       accountRepository.find.mockResolvedValue([]);
       prefRepository.findOne.mockResolvedValue(null);
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       await service.getMonthlyInvestments("user-1");
 
@@ -1836,7 +1829,7 @@ describe("NetWorthService", () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
       // Linked account resolution returns empty
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       const result = await service.getMonthlyInvestments(
         "user-1",
@@ -1852,7 +1845,7 @@ describe("NetWorthService", () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-01-01",
@@ -1878,7 +1871,7 @@ describe("NetWorthService", () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
-      dataSource.query
+      reportQuery
         // snapshots
         .mockResolvedValueOnce([
           {
@@ -1942,7 +1935,7 @@ describe("NetWorthService", () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-03-01",
@@ -1974,7 +1967,7 @@ describe("NetWorthService", () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-03-01",
@@ -2014,7 +2007,7 @@ describe("NetWorthService", () => {
       mabRepository.count.mockResolvedValue(5);
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
-      dataSource.query
+      reportQuery
         .mockResolvedValueOnce([
           {
             month: "2024-03-01",
@@ -2075,7 +2068,7 @@ describe("NetWorthService", () => {
         defaultCurrency: "USD",
       });
       // accounts query returns empty
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       const result = await service.getDailyInvestments(
         "user-1",
@@ -2092,7 +2085,7 @@ describe("NetWorthService", () => {
       });
 
       // accounts query
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-1",
           account_type: "INVESTMENT",
@@ -2103,7 +2096,7 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions query
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-1",
           security_id: "sec-1",
@@ -2120,7 +2113,7 @@ describe("NetWorthService", () => {
 
       // security prices query (includes a price from the prior trading day so
       // a first chart point with no same-day close can still fall back to it)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           security_id: "sec-1",
           price_date: "2025-02-28",
@@ -2164,7 +2157,7 @@ describe("NetWorthService", () => {
       });
 
       // accounts query: only a cash account
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "cash-1",
           account_type: "INVESTMENT",
@@ -2180,7 +2173,7 @@ describe("NetWorthService", () => {
       securityRepository.findByIds.mockResolvedValue([]);
 
       // cash balances CTE query
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         { date: "2025-03-01", balance: "5000", account_id: "cash-1" },
         { date: "2025-03-02", balance: "5100", account_id: "cash-1" },
       ]);
@@ -2202,13 +2195,13 @@ describe("NetWorthService", () => {
       });
 
       // Linked account resolution
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         { id: "brok-1", linked_account_id: "cash-1" },
         { id: "cash-1", linked_account_id: "brok-1" },
       ]);
 
       // accounts query with resolved IDs
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-1",
           account_type: "INVESTMENT",
@@ -2226,11 +2219,11 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
       // securities
       securityRepository.findByIds.mockResolvedValue([]);
       // cash balances
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         { date: "2025-03-01", balance: "1000", account_id: "cash-1" },
       ]);
 
@@ -2251,7 +2244,7 @@ describe("NetWorthService", () => {
       });
 
       // accounts query: CAD brokerage
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-cad",
           account_type: "INVESTMENT",
@@ -2262,7 +2255,7 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-cad",
           security_id: "sec-1",
@@ -2278,7 +2271,7 @@ describe("NetWorthService", () => {
       ]);
 
       // security prices (previous trading day's close)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           security_id: "sec-1",
           price_date: "2025-02-28",
@@ -2287,7 +2280,7 @@ describe("NetWorthService", () => {
       ]);
 
       // exchange rates (buildRateIndex)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           from_currency: "CAD",
           to_currency: "USD",
@@ -2313,7 +2306,7 @@ describe("NetWorthService", () => {
       });
 
       // accounts query: CAD brokerage + CAD cash
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-cad",
           account_type: "INVESTMENT",
@@ -2331,7 +2324,7 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-cad",
           security_id: "sec-1",
@@ -2347,7 +2340,7 @@ describe("NetWorthService", () => {
       ]);
 
       // security prices (previous trading day's close)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           security_id: "sec-1",
           price_date: "2025-02-28",
@@ -2356,12 +2349,12 @@ describe("NetWorthService", () => {
       ]);
 
       // cash balances CTE
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         { date: "2025-03-01", balance: "5000", account_id: "cash-cad" },
       ]);
 
       // exchange rates (buildRateIndex)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           from_currency: "CAD",
           to_currency: "USD",
@@ -2389,7 +2382,7 @@ describe("NetWorthService", () => {
       });
 
       // accounts query: standalone EUR investment account (no sub_type)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "inv-eur",
           account_type: "INVESTMENT",
@@ -2400,7 +2393,7 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions (standalone accounts have investment transactions)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "inv-eur",
           security_id: "sec-eur",
@@ -2416,7 +2409,7 @@ describe("NetWorthService", () => {
       ]);
 
       // security prices (previous trading day's close)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           security_id: "sec-eur",
           price_date: "2025-02-28",
@@ -2425,12 +2418,12 @@ describe("NetWorthService", () => {
       ]);
 
       // cash balances CTE (standalone accounts also appear in cashIds)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         { date: "2025-03-01", balance: "1000", account_id: "inv-eur" },
       ]);
 
       // exchange rates (buildRateIndex)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           from_currency: "EUR",
           to_currency: "USD",
@@ -2458,7 +2451,7 @@ describe("NetWorthService", () => {
       });
 
       // accounts query: CAD brokerage + USD brokerage
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-cad",
           account_type: "INVESTMENT",
@@ -2476,7 +2469,7 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions for both accounts
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-cad",
           security_id: "sec-cad",
@@ -2500,7 +2493,7 @@ describe("NetWorthService", () => {
       ]);
 
       // security prices (previous trading day's close)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           security_id: "sec-cad",
           price_date: "2025-02-28",
@@ -2514,7 +2507,7 @@ describe("NetWorthService", () => {
       ]);
 
       // exchange rates (buildRateIndex): USD->CAD rate
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           from_currency: "USD",
           to_currency: "CAD",
@@ -2542,7 +2535,7 @@ describe("NetWorthService", () => {
       });
 
       // accounts query
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-1",
           account_type: "INVESTMENT",
@@ -2553,7 +2546,7 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions: BUY 100, SELL 30, TRANSFER_OUT 20, SPLIT 50 = 100 shares
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-1",
           security_id: "sec-1",
@@ -2590,7 +2583,7 @@ describe("NetWorthService", () => {
       ]);
 
       // security prices (previous trading day's close)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           security_id: "sec-1",
           price_date: "2025-02-28",
@@ -2615,7 +2608,7 @@ describe("NetWorthService", () => {
       });
 
       // accounts query
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-1",
           account_type: "INVESTMENT",
@@ -2626,7 +2619,7 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-1",
           security_id: "sec-skip",
@@ -2643,7 +2636,7 @@ describe("NetWorthService", () => {
 
       // transaction-based prices for skipPriceUpdates securities
       // (market prices query is skipped since marketSecIds is empty)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           security_id: "sec-skip",
           transaction_date: "2025-01-15",
@@ -2668,7 +2661,7 @@ describe("NetWorthService", () => {
       });
 
       // Linked account resolution returns empty
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       const result = await service.getDailyInvestments(
         "user-1",
@@ -2689,7 +2682,7 @@ describe("NetWorthService", () => {
       });
 
       // accounts query: CAD brokerage
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-cad",
           account_type: "INVESTMENT",
@@ -2700,7 +2693,7 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions: 100 shares @ $27.16 USD
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-cad",
           security_id: "sec-usd",
@@ -2716,7 +2709,7 @@ describe("NetWorthService", () => {
       ]);
 
       // security prices (previous trading day's close, in USD)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           security_id: "sec-usd",
           price_date: "2025-02-28",
@@ -2725,7 +2718,7 @@ describe("NetWorthService", () => {
       ]);
 
       // exchange rates (USD -> CAD)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           from_currency: "USD",
           to_currency: "CAD",
@@ -2751,7 +2744,7 @@ describe("NetWorthService", () => {
     it("returns an empty breakdown when no accounts match", async () => {
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
       // accounts query returns empty
-      dataSource.query.mockResolvedValueOnce([]);
+      reportQuery.mockResolvedValueOnce([]);
 
       const result = await service.getInvestmentBreakdown("user-1", {
         granularity: "monthly",
@@ -2769,7 +2762,7 @@ describe("NetWorthService", () => {
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
       // accounts: one brokerage + one cash account
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-1",
           account_type: "INVESTMENT",
@@ -2787,7 +2780,7 @@ describe("NetWorthService", () => {
       ]);
 
       // investment transactions
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-1",
           security_id: "sec-1",
@@ -2808,13 +2801,13 @@ describe("NetWorthService", () => {
       ]);
 
       // month-end security prices (loadSecurityPrices)
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         { security_id: "sec-1", price_date: "2024-05-31", close_price: "100" },
         { security_id: "sec-1", price_date: "2024-06-28", close_price: "110" },
       ]);
 
       // monthly cash balances
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         { account_id: "cash-1", month: "2024-05-01", balance: "5000" },
         { account_id: "cash-1", month: "2024-06-01", balance: "5000" },
       ]);
@@ -2846,7 +2839,7 @@ describe("NetWorthService", () => {
     it("values each daily point at the latest close on or before the date", async () => {
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-1",
           account_type: "INVESTMENT",
@@ -2855,7 +2848,7 @@ describe("NetWorthService", () => {
           opening_balance: 0,
         },
       ]);
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-1",
           security_id: "sec-1",
@@ -2873,7 +2866,7 @@ describe("NetWorthService", () => {
           skipPriceUpdates: false,
         },
       ]);
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         { security_id: "sec-1", price_date: "2025-02-28", close_price: "99" },
         { security_id: "sec-1", price_date: "2025-03-01", close_price: "100" },
       ]);
@@ -2896,7 +2889,7 @@ describe("NetWorthService", () => {
     it("rolls securities beyond the limit into a single 'other' band", async () => {
       prefRepository.findOne.mockResolvedValue({ defaultCurrency: "USD" });
 
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           id: "brok-1",
           account_type: "INVESTMENT",
@@ -2905,7 +2898,7 @@ describe("NetWorthService", () => {
           opening_balance: 0,
         },
       ]);
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         {
           account_id: "brok-1",
           security_id: "sec-1",
@@ -2937,7 +2930,7 @@ describe("NetWorthService", () => {
           skipPriceUpdates: false,
         },
       ]);
-      dataSource.query.mockResolvedValueOnce([
+      reportQuery.mockResolvedValueOnce([
         { security_id: "sec-1", price_date: "2024-05-31", close_price: "100" },
         { security_id: "sec-2", price_date: "2024-05-31", close_price: "50" },
       ]);

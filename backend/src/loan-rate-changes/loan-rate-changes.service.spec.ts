@@ -1,6 +1,3 @@
-import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
-import { DataSource } from "typeorm";
 import {
   BadRequestException,
   ConflictException,
@@ -9,17 +6,25 @@ import {
 import { LoanRateChangesService, toYmd } from "./loan-rate-changes.service";
 import { LoanRateChange } from "./entities/loan-rate-change.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
-import { ScheduledTransactionsService } from "../scheduled-transactions/scheduled-transactions.service";
 import { recalculateMortgageAfterRateChange } from "../accounts/mortgage-amortization.util";
 import { todayYMD } from "../common/date-utils";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("LoanRateChangesService", () => {
   let service: LoanRateChangesService;
   let rateChangesRepository: Record<string, jest.Mock>;
   let accountsRepository: Record<string, jest.Mock>;
   let scheduledTransactionsService: Record<string, jest.Mock>;
-  let manager: Record<string, jest.Mock>;
-  let queryRunner: Record<string, any>;
+  let manager: ManagerMock;
+  let dataSource: DataSourceMock;
 
   const userId = "user-1";
   const accountId = "account-1";
@@ -58,34 +63,7 @@ describe("LoanRateChangesService", () => {
       ...overrides,
     }) as LoanRateChange;
 
-  beforeEach(async () => {
-    manager = {
-      count: jest.fn().mockResolvedValue(1),
-      find: jest.fn().mockResolvedValue([]),
-      findOne: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockImplementation((_entity, data) => ({ ...data })),
-      save: jest
-        .fn()
-        .mockImplementation((data) =>
-          Promise.resolve(data.id ? data : { ...data, id: "rc-new" }),
-        ),
-      remove: jest.fn().mockResolvedValue(undefined),
-      merge: jest.fn().mockImplementation((_entity, target, patch) => ({
-        ...target,
-        ...patch,
-      })),
-      delete: jest.fn().mockResolvedValue({ affected: 0 }),
-    };
-
-    queryRunner = {
-      connect: jest.fn().mockResolvedValue(undefined),
-      startTransaction: jest.fn().mockResolvedValue(undefined),
-      commitTransaction: jest.fn().mockResolvedValue(undefined),
-      rollbackTransaction: jest.fn().mockResolvedValue(undefined),
-      release: jest.fn().mockResolvedValue(undefined),
-      manager,
-    };
-
+  beforeEach(() => {
     rateChangesRepository = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn().mockResolvedValue(null),
@@ -100,29 +78,28 @@ describe("LoanRateChangesService", () => {
       update: jest.fn().mockResolvedValue({ id: "sched-1" }),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        LoanRateChangesService,
-        {
-          provide: getRepositoryToken(LoanRateChange),
-          useValue: rateChangesRepository,
-        },
-        {
-          provide: getRepositoryToken(Account),
-          useValue: accountsRepository,
-        },
-        {
-          provide: DataSource,
-          useValue: { createQueryRunner: jest.fn(() => queryRunner), manager },
-        },
-        {
-          provide: ScheduledTransactionsService,
-          useValue: scheduledTransactionsService,
-        },
-      ],
-    }).compile();
+    ({ manager, dataSource } = createScopedDbMocks([
+      [LoanRateChange, rateChangesRepository],
+      [Account, accountsRepository],
+    ]));
+    manager.count.mockResolvedValue(1);
+    manager.find.mockResolvedValue([]);
+    manager.findOne.mockResolvedValue(null);
+    manager.create.mockImplementation((_entity, data) => ({ ...data }));
+    manager.save.mockImplementation((data) =>
+      Promise.resolve(data.id ? data : { ...data, id: "rc-new" }),
+    );
+    manager.remove.mockResolvedValue(undefined);
+    manager.merge.mockImplementation((_entity, target, patch) => ({
+      ...target,
+      ...patch,
+    }));
+    manager.delete.mockResolvedValue({ affected: 0 });
 
-    service = module.get<LoanRateChangesService>(LoanRateChangesService);
+    service = new LoanRateChangesService(
+      dataSource as never,
+      scheduledTransactionsService as never,
+    );
   });
 
   describe("toYmd", () => {
@@ -243,8 +220,10 @@ describe("LoanRateChangesService", () => {
           annualRate: 4.9,
         }),
       ).rejects.toThrow(ConflictException);
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(queryRunner.release).toHaveBeenCalled();
+      // The duplicate check runs inside the write transaction, so nothing is
+      // saved when it rejects.
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(manager.save).not.toHaveBeenCalled();
     });
 
     it("rejects supplying both a payment and recalculatePayment", async () => {
@@ -435,7 +414,7 @@ describe("LoanRateChangesService", () => {
       expect(scheduledTransactionsService.update).not.toHaveBeenCalled();
     });
 
-    it("rolls back when a write fails", async () => {
+    it("propagates a write failure out of the transaction without syncing", async () => {
       manager.save.mockRejectedValue(new Error("db down"));
 
       await expect(
@@ -444,9 +423,11 @@ describe("LoanRateChangesService", () => {
           annualRate: 4.9,
         }),
       ).rejects.toThrow("db down");
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
-      expect(queryRunner.release).toHaveBeenCalled();
+      // Two scoped transactions: the account lookup, then the write block that
+      // rolls back when the callback throws -- so the post-commit scheduled
+      // sync never runs.
+      expect(dataSource.transaction).toHaveBeenCalledTimes(2);
+      expect(scheduledTransactionsService.update).not.toHaveBeenCalled();
     });
 
     it("does not fail the request when the scheduled-payment sync fails", async () => {

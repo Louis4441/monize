@@ -1,7 +1,21 @@
 import { InvestmentReportDataService } from "./investment-report-data.service";
-import { InvestmentAction } from "../securities/entities/investment-transaction.entity";
+import {
+  InvestmentAction,
+  InvestmentTransaction,
+} from "../securities/entities/investment-transaction.entity";
+import { Holding } from "../securities/entities/holding.entity";
+import { Security } from "../securities/entities/security.entity";
+import { Account } from "../accounts/entities/account.entity";
 import { requestContextStorage } from "../common/request-context";
 import { todayInTimezone, todayYMD } from "../common/date-utils";
+import {
+  createScopedDbMocks,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 function makeTx(overrides: Record<string, unknown>): any {
   return {
@@ -43,25 +57,30 @@ function priceRow(over: Record<string, unknown>): any {
 
 describe("InvestmentReportDataService", () => {
   let service: InvestmentReportDataService;
-  let txRepository: { find: jest.Mock; query: jest.Mock };
+  let txRepository: { find: jest.Mock };
   let holdingsRepository: { find: jest.Mock };
   let securitiesRepository: { find: jest.Mock };
   let accountsRepository: { find: jest.Mock };
   let exchangeRateService: { getLatestRate: jest.Mock };
+  let manager: ManagerMock;
 
   beforeEach(() => {
-    txRepository = { find: jest.fn(), query: jest.fn() };
+    txRepository = { find: jest.fn() };
     holdingsRepository = { find: jest.fn().mockResolvedValue([]) };
     securitiesRepository = { find: jest.fn() };
     accountsRepository = {
       find: jest.fn().mockResolvedValue([{ id: "acc1", name: "Brokerage" }]),
     };
     exchangeRateService = { getLatestRate: jest.fn().mockResolvedValue(null) };
+    const { manager: managerMock, dataSource } = createScopedDbMocks([
+      [InvestmentTransaction, txRepository as never],
+      [Holding, holdingsRepository as never],
+      [Security, securitiesRepository as never],
+      [Account, accountsRepository as never],
+    ]);
+    manager = managerMock;
     service = new InvestmentReportDataService(
-      txRepository as any,
-      holdingsRepository as any,
-      securitiesRepository as any,
-      accountsRepository as any,
+      dataSource as any,
       exchangeRateService as any,
     );
   });
@@ -100,7 +119,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 20,
       }),
     ]);
-    txRepository.query.mockResolvedValue([
+    manager.query.mockResolvedValue([
       priceRow({
         price_date: "2024-01-10",
         open_price: "100",
@@ -204,7 +223,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 1300,
       }),
     ]);
-    txRepository.query.mockResolvedValue([
+    manager.query.mockResolvedValue([
       priceRow({ price_date: "2024-02-10", close_price: "130" }),
     ]);
 
@@ -241,7 +260,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 1000,
       }),
     ]);
-    txRepository.query.mockResolvedValue([priceRow({ close_price: "120" })]);
+    manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
 
     const rows = await service.computeHoldings(
       "u1",
@@ -275,7 +294,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 1000,
       }),
     ]);
-    txRepository.query.mockResolvedValue([priceRow({ close_price: "120" })]);
+    manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
 
     const rows = await service.computeHoldings(
       "u1",
@@ -316,7 +335,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 1300,
       }),
     ]);
-    txRepository.query.mockResolvedValue([
+    manager.query.mockResolvedValue([
       priceRow({ price_date: "2024-05-01", close_price: "110" }),
     ]);
 
@@ -366,7 +385,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 600,
       }),
     ]);
-    txRepository.query.mockResolvedValue([priceRow({ close_price: "130" })]);
+    manager.query.mockResolvedValue([priceRow({ close_price: "130" })]);
 
     const rows = await service.computeHoldings(
       "u1",
@@ -418,7 +437,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 600,
       }),
     ]);
-    txRepository.query.mockResolvedValue([priceRow({ close_price: "130" })]);
+    manager.query.mockResolvedValue([priceRow({ close_price: "130" })]);
 
     const rows = await service.computeHoldings(
       "u1",
@@ -446,7 +465,7 @@ describe("InvestmentReportDataService", () => {
         currencyCode: "USD",
       },
     ]);
-    txRepository.query.mockResolvedValue([
+    manager.query.mockResolvedValue([
       {
         security_id: "sec2",
         price_date: "2024-06-10",
@@ -493,7 +512,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 1000,
       }),
     ]);
-    txRepository.query.mockResolvedValue([
+    manager.query.mockResolvedValue([
       priceRow({
         open_price: "120",
         high_price: "121",
@@ -570,7 +589,7 @@ describe("InvestmentReportDataService", () => {
         quantity: 2,
       }),
     ]);
-    txRepository.query.mockResolvedValue([
+    manager.query.mockResolvedValue([
       priceRow({ price_date: "2021-01-04", close_price: "100", volume: "10" }),
       priceRow({
         price_date: "2024-06-10",
@@ -619,7 +638,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 1000,
       }),
     ]);
-    txRepository.query.mockResolvedValue([priceRow({ close_price: "120" })]);
+    manager.query.mockResolvedValue([priceRow({ close_price: "120" })]);
     // EUR->USD missing, USD->EUR = 0.8 -> rate = 1/0.8 = 1.25
     exchangeRateService.getLatestRate.mockImplementation((from: string) =>
       from === "EUR" ? Promise.resolve(null) : Promise.resolve(0.8),
@@ -656,7 +675,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 1000,
       }),
     ]);
-    txRepository.query.mockResolvedValue([]); // no stored prices
+    manager.query.mockResolvedValue([]); // no stored prices
 
     const rows = await service.computeHoldings(
       "u1",
@@ -713,7 +732,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 700,
       }),
     ]);
-    txRepository.query.mockResolvedValue([
+    manager.query.mockResolvedValue([
       priceRow({
         price_date: "2022-01-10",
         open_price: null,
@@ -777,7 +796,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 1000,
       }),
     ]);
-    txRepository.query.mockResolvedValue([]);
+    manager.query.mockResolvedValue([]);
     const rows = await service.computeHoldings(
       "u1",
       ["acc1"],
@@ -826,7 +845,7 @@ describe("InvestmentReportDataService", () => {
         totalAmount: 250,
       }),
     ]);
-    txRepository.query.mockResolvedValue([
+    manager.query.mockResolvedValue([
       priceRow({ security_id: "sec1", close_price: "100" }),
       priceRow({ security_id: "sec2", close_price: "50" }),
     ]);
@@ -847,14 +866,14 @@ describe("InvestmentReportDataService", () => {
     });
 
     it("returns the max stored price date", async () => {
-      txRepository.query.mockResolvedValue([{ d: "2024-06-10" }]);
+      manager.query.mockResolvedValue([{ d: "2024-06-10" }]);
       expect(await service.getLatestMarketDay("u1", ["acc1"])).toBe(
         "2024-06-10",
       );
     });
 
     it("falls back to today when no prices exist", async () => {
-      txRepository.query.mockResolvedValue([{ d: null }]);
+      manager.query.mockResolvedValue([{ d: null }]);
       expect(await service.getLatestMarketDay("u1", ["acc1"])).toBe(todayYMD());
     });
 

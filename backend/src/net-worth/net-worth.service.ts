@@ -1,6 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, LessThanOrEqual } from "typeorm";
+import { DataSource, LessThanOrEqual } from "typeorm";
+import {
+  runOutsideActiveScopedManager,
+  withScopedDb,
+} from "../common/db/scoped-db";
 import { MonthlyAccountBalance } from "./entities/monthly-account-balance.entity";
 import {
   Account,
@@ -69,23 +72,17 @@ export class NetWorthService {
   >();
   private static readonly RECALC_DEBOUNCE_MS = 2000;
 
-  constructor(
-    @InjectRepository(MonthlyAccountBalance)
-    private mabRepo: Repository<MonthlyAccountBalance>,
-    @InjectRepository(Account)
-    private accountRepo: Repository<Account>,
-    @InjectRepository(InvestmentTransaction)
-    private invTxRepo: Repository<InvestmentTransaction>,
-    @InjectRepository(SecurityPrice)
-    private priceRepo: Repository<SecurityPrice>,
-    @InjectRepository(Security)
-    private securityRepo: Repository<Security>,
-    @InjectRepository(ExchangeRate)
-    private rateRepo: Repository<ExchangeRate>,
-    @InjectRepository(UserPreference)
-    private prefRepo: Repository<UserPreference>,
-    private dataSource: DataSource,
-  ) {}
+  constructor(private dataSource: DataSource) {}
+
+  /**
+   * One raw statement in its own short scoped transaction -- the RLS-compliant
+   * equivalent of the autocommit `dataSource.query` this service used before
+   * the migration. Reporting reads here are independent single statements, so
+   * each gets its own tenant transaction rather than one long-held connection.
+   */
+  private scopedQuery<T = any>(sql: string, params?: any[]): Promise<T> {
+    return withScopedDb(this.dataSource, (m) => m.query(sql, params));
+  }
 
   /** Debounced trigger for recalculating a single account's net worth snapshots. */
   triggerDebouncedRecalc(accountId: string, userId: string): void {
@@ -93,23 +90,36 @@ export class NetWorthService {
     const existing = this.recalcTimers.get(key);
     if (existing) clearTimeout(existing);
 
-    this.recalcTimers.set(
-      key,
-      setTimeout(() => {
-        this.recalcTimers.delete(key);
-        this.recalculateAccount(userId, accountId).catch((err) =>
-          this.logger.warn(
-            `Net worth recalc failed for account ${accountId}: ${err.message}`,
-          ),
-        );
-      }, NetWorthService.RECALC_DEBOUNCE_MS),
+    // Several callers trigger this from *inside* a `withScopedDb` block (see
+    // TransactionSplitService.createSplits). A timer created there would
+    // inherit that block's EntityManager through the scoped-manager ALS, and
+    // fire seconds later -- long after the transaction committed and its
+    // connection went back to the pool -- so every query in the recalc would
+    // run on a dead manager. Registering the timer outside the active manager
+    // makes the recalc open its own transaction, which is what it wants
+    // anyway: it is a background job, not part of the caller's write. The
+    // identity context (userId) lives in a different ALS and is preserved.
+    runOutsideActiveScopedManager(() =>
+      this.recalcTimers.set(
+        key,
+        setTimeout(() => {
+          this.recalcTimers.delete(key);
+          this.recalculateAccount(userId, accountId).catch((err) =>
+            this.logger.warn(
+              `Net worth recalc failed for account ${accountId}: ${err.message}`,
+            ),
+          );
+        }, NetWorthService.RECALC_DEBOUNCE_MS),
+      ),
     );
   }
 
   async recalculateAccount(userId: string, accountId: string): Promise<void> {
-    const account = await this.accountRepo.findOne({
-      where: { id: accountId, userId },
-    });
+    const account = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id: accountId, userId },
+      }),
+    );
     if (!account) return;
 
     if (this.isBrokerageOrStandaloneInvestment(account)) {
@@ -121,9 +131,11 @@ export class NetWorthService {
 
   async recalculateAllAccounts(userId: string): Promise<void> {
     // Include closed accounts - they have important historical balances
-    const accounts = await this.accountRepo.find({
-      where: { userId },
-    });
+    const accounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { userId },
+      }),
+    );
     await Promise.all(
       accounts.map(async (account) => {
         try {
@@ -142,7 +154,9 @@ export class NetWorthService {
   }
 
   async ensurePopulated(userId: string): Promise<void> {
-    const count = await this.mabRepo.count({ where: { userId } });
+    const count = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(MonthlyAccountBalance).count({ where: { userId } }),
+    );
     if (count === 0) {
       await this.recalculateAllAccounts(userId);
       return;
@@ -167,16 +181,20 @@ export class NetWorthService {
       now.getMonth() + 1,
     ).padStart(2, "0")}-01`;
 
-    const accounts = await this.accountRepo.find({
-      where: { userId },
-      select: ["id"],
-    });
+    const accounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { userId },
+        select: ["id"],
+      }),
+    );
     if (accounts.length === 0) return;
 
-    const populated = await this.mabRepo.find({
-      where: { userId, month: currentMonthStr },
-      select: ["accountId"],
-    });
+    const populated = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(MonthlyAccountBalance).find({
+        where: { userId, month: currentMonthStr },
+        select: ["accountId"],
+      }),
+    );
     const populatedIds = new Set(populated.map((p) => p.accountId));
 
     const staleIds = accounts
@@ -212,13 +230,17 @@ export class NetWorthService {
    * Called after security prices are refreshed to keep chart data in sync.
    */
   async recalculateAllInvestmentSnapshots(): Promise<void> {
-    const accounts = await this.accountRepo
-      .createQueryBuilder("a")
-      .where("a.accountType = :type", { type: AccountType.INVESTMENT })
-      .andWhere("(a.accountSubType = :brokerage OR a.accountSubType IS NULL)", {
-        brokerage: AccountSubType.INVESTMENT_BROKERAGE,
-      })
-      .getMany();
+    const accounts = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Account)
+        .createQueryBuilder("a")
+        .where("a.accountType = :type", { type: AccountType.INVESTMENT })
+        .andWhere(
+          "(a.accountSubType = :brokerage OR a.accountSubType IS NULL)",
+          { brokerage: AccountSubType.INVESTMENT_BROKERAGE },
+        )
+        .getMany(),
+    );
 
     await Promise.all(
       accounts.map(async (account) => {
@@ -264,13 +286,15 @@ export class NetWorthService {
   > {
     await this.ensurePopulated(userId);
 
-    const pref = await this.prefRepo.findOne({ where: { userId } });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
     const defaultCurrency = pref?.defaultCurrency || "USD";
 
     const start = startDate || "1990-01-01";
     const end = endDate || new Date().toISOString().slice(0, 10);
 
-    const snapshots: any[] = await this.dataSource.query(
+    const snapshots: any[] = await this.scopedQuery(
       `SELECT mab.month, mab.balance, mab.market_value,
               a.id as account_id, a.account_type, a.account_sub_type, a.currency_code
        FROM monthly_account_balances mab
@@ -371,7 +395,7 @@ export class NetWorthService {
   ): Promise<{ assets: number; liabilities: number; netWorth: number } | null> {
     await this.ensurePopulated(userId);
 
-    const latestRows: { month: string | Date }[] = await this.dataSource.query(
+    const latestRows: { month: string | Date }[] = await this.scopedQuery(
       `SELECT MAX(month) AS month FROM monthly_account_balances WHERE user_id = $1`,
       [userId],
     );
@@ -398,7 +422,9 @@ export class NetWorthService {
   ): Promise<{ month: string; value: number }[]> {
     await this.ensurePopulated(userId);
 
-    const pref = await this.prefRepo.findOne({ where: { userId } });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
     const defaultCurrency = displayCurrency || pref?.defaultCurrency || "USD";
 
     const start = startDate || "1990-01-01";
@@ -411,7 +437,7 @@ export class NetWorthService {
       // Resolve the requested accounts plus their linked pairs in one query
       // (an account, anything linked to it, and the account it links to)
       // instead of one round-trip per id.
-      const resolved: { id: string }[] = await this.dataSource.query(
+      const resolved: { id: string }[] = await this.scopedQuery(
         `SELECT id FROM accounts
          WHERE user_id = $2
            AND (
@@ -437,7 +463,7 @@ export class NetWorthService {
       accountFilter = `AND (a.account_sub_type IN ('INVESTMENT_CASH', 'INVESTMENT_BROKERAGE') OR (a.account_type = 'INVESTMENT' AND a.account_sub_type IS NULL))`;
     }
 
-    const snapshots: any[] = await this.dataSource.query(
+    const snapshots: any[] = await this.scopedQuery(
       `SELECT mab.month, mab.balance, mab.market_value,
               a.id as account_id, a.account_type, a.account_sub_type, a.currency_code
        FROM monthly_account_balances mab
@@ -571,7 +597,7 @@ export class NetWorthService {
 
     const accountIds = [...new Set(eligibleSnapshots.map((s) => s.account_id))];
 
-    const firstMonthRows: any[] = await this.dataSource.query(
+    const firstMonthRows: any[] = await this.scopedQuery(
       `SELECT account_id, MIN(month)::DATE as first_month
        FROM monthly_account_balances
        WHERE account_id = ANY($1::UUID[]) AND user_id = $2
@@ -593,7 +619,7 @@ export class NetWorthService {
     if (targetMonthByAccount.size === 0) return result;
 
     const targetAccountIds = [...targetMonthByAccount.keys()];
-    const txRows: any[] = await this.dataSource.query(
+    const txRows: any[] = await this.scopedQuery(
       `SELECT it.account_id, it.action, it.quantity, it.price, it.transaction_date,
               s.currency_code AS security_currency
        FROM investment_transactions it
@@ -664,7 +690,9 @@ export class NetWorthService {
     accountIds?: string[],
     displayCurrency?: string,
   ): Promise<{ date: string; value: number }[]> {
-    const pref = await this.prefRepo.findOne({ where: { userId } });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
     const defaultCurrency = displayCurrency || pref?.defaultCurrency || "USD";
 
     const end = endDate || new Date().toISOString().slice(0, 10);
@@ -676,7 +704,7 @@ export class NetWorthService {
     if (accountIds && accountIds.length > 0) {
       // Resolve the requested accounts plus their linked pairs in one query
       // instead of one round-trip per id.
-      const resolved: { id: string }[] = await this.dataSource.query(
+      const resolved: { id: string }[] = await this.scopedQuery(
         `SELECT id FROM accounts
          WHERE user_id = $2
            AND (
@@ -699,7 +727,7 @@ export class NetWorthService {
     }
 
     // Get investment accounts in scope
-    const investAccounts: any[] = await this.dataSource.query(
+    const investAccounts: any[] = await this.scopedQuery(
       `SELECT a.id, a.account_type, a.account_sub_type, a.currency_code, a.opening_balance
        FROM accounts a
        WHERE a.user_id = $1 ${accountFilter}`,
@@ -725,7 +753,7 @@ export class NetWorthService {
     // Load investment transactions up to end date for holdings replay
     const invTxs: any[] =
       brokerageIds.length > 0
-        ? await this.dataSource.query(
+        ? await this.scopedQuery(
             `SELECT account_id, security_id, action, quantity, transaction_date
            FROM investment_transactions
            WHERE account_id = ANY($1::UUID[])
@@ -745,7 +773,9 @@ export class NetWorthService {
     // Load securities to check skipPriceUpdates
     const securities =
       securityIds.length > 0
-        ? await this.securityRepo.findByIds(securityIds)
+        ? await withScopedDb(this.dataSource, (m) =>
+            m.getRepository(Security).findByIds(securityIds),
+          )
         : [];
     const securityMap = new Map(securities.map((s) => [s.id, s]));
 
@@ -759,7 +789,7 @@ export class NetWorthService {
     // Load market prices for the date range
     const priceRows: any[] =
       marketSecIds.length > 0
-        ? await this.dataSource.query(
+        ? await this.scopedQuery(
             `SELECT security_id, price_date, close_price
            FROM security_prices
            WHERE security_id = ANY($1::UUID[])
@@ -787,7 +817,7 @@ export class NetWorthService {
     // Load transaction-based prices for skipPriceUpdates securities
     const txPriceRows: any[] =
       skipSecIds.length > 0
-        ? await this.dataSource.query(
+        ? await this.scopedQuery(
             `SELECT security_id, transaction_date, price
            FROM investment_transactions
            WHERE security_id = ANY($1::UUID[])
@@ -814,7 +844,7 @@ export class NetWorthService {
     // Load daily cash balances for INVESTMENT_CASH and standalone accounts
     const cashBalances = new Map<string, Map<string, number>>();
     if (cashIds.length > 0) {
-      const cashRows: any[] = await this.dataSource.query(
+      const cashRows: any[] = await this.scopedQuery(
         `WITH target_accounts AS (
             SELECT id, opening_balance
             FROM accounts WHERE id = ANY($1::UUID[])
@@ -1035,7 +1065,9 @@ export class NetWorthService {
     const { granularity } = opts;
     const limit = opts.limit ?? 10;
 
-    const pref = await this.prefRepo.findOne({ where: { userId } });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
     const defaultCurrency =
       opts.displayCurrency || pref?.defaultCurrency || "USD";
 
@@ -1074,7 +1106,7 @@ export class NetWorthService {
     // can be replayed forward to each sample point.
     const invTxs: any[] =
       brokerageIds.length > 0
-        ? await this.dataSource.query(
+        ? await this.scopedQuery(
             `SELECT account_id, security_id, action, quantity, transaction_date
              FROM investment_transactions
              WHERE account_id = ANY($1::UUID[])
@@ -1091,7 +1123,9 @@ export class NetWorthService {
     ];
     const securities =
       securityIds.length > 0
-        ? await this.securityRepo.findByIds(securityIds)
+        ? await withScopedDb(this.dataSource, (m) =>
+            m.getRepository(Security).findByIds(securityIds),
+          )
         : [];
     const securityMap = new Map(securities.map((s) => [s.id, s]));
 
@@ -1129,7 +1163,7 @@ export class NetWorthService {
 
     if (granularity === "daily") {
       if (marketSecIds.length > 0) {
-        const priceRows: any[] = await this.dataSource.query(
+        const priceRows: any[] = await this.scopedQuery(
           `SELECT security_id, price_date, close_price
              FROM security_prices
              WHERE security_id = ANY($1::UUID[])
@@ -1148,7 +1182,7 @@ export class NetWorthService {
         }
       }
       if (skipSecIds.length > 0) {
-        const txPriceRows: any[] = await this.dataSource.query(
+        const txPriceRows: any[] = await this.scopedQuery(
           `SELECT security_id, transaction_date, price
              FROM investment_transactions
              WHERE security_id = ANY($1::UUID[])
@@ -1341,7 +1375,7 @@ export class NetWorthService {
     const acctParams: any[] = [userId];
 
     if (accountIds && accountIds.length > 0) {
-      const resolved: { id: string }[] = await this.dataSource.query(
+      const resolved: { id: string }[] = await this.scopedQuery(
         `SELECT id FROM accounts
          WHERE user_id = $2
            AND (
@@ -1363,7 +1397,7 @@ export class NetWorthService {
       accountFilter = `AND (a.account_sub_type IN ('INVESTMENT_CASH', 'INVESTMENT_BROKERAGE') OR (a.account_type = 'INVESTMENT' AND a.account_sub_type IS NULL))`;
     }
 
-    return this.dataSource.query(
+    return this.scopedQuery(
       `SELECT a.id, a.account_type, a.account_sub_type, a.currency_code, a.opening_balance
        FROM accounts a
        WHERE a.user_id = $1 ${accountFilter}`,
@@ -1439,7 +1473,7 @@ export class NetWorthService {
     start: string,
     end: string,
   ): Promise<any[]> {
-    return this.dataSource.query(
+    return this.scopedQuery(
       `WITH target_accounts AS (
           SELECT id, opening_balance
           FROM accounts WHERE id = ANY($1::UUID[])
@@ -1486,7 +1520,7 @@ export class NetWorthService {
     start: string,
     end: string,
   ): Promise<any[]> {
-    return this.dataSource.query(
+    return this.scopedQuery(
       `WITH target_accounts AS (
           SELECT id, opening_balance FROM accounts WHERE id = ANY($1::UUID[])
         ),
@@ -1625,7 +1659,7 @@ export class NetWorthService {
   ): Promise<void> {
     const openingBalance = Number(account.openingBalance) || 0;
 
-    const [{ earliest }] = await this.dataSource.query(
+    const [{ earliest }] = await this.scopedQuery(
       `SELECT MIN(transaction_date) as earliest
        FROM transactions
        WHERE account_id = $1
@@ -1642,7 +1676,7 @@ export class NetWorthService {
       if (daStr < startDate) startDate = daStr;
     }
 
-    const rows: any[] = await this.dataSource.query(
+    const rows: any[] = await this.scopedQuery(
       `WITH monthly_tx_sums AS (
         SELECT DATE_TRUNC('month', transaction_date)::DATE as month,
                SUM(amount) as total
@@ -1675,11 +1709,8 @@ export class NetWorthService {
     }
 
     // Atomic delete + insert
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      await queryRunner.query(
+    await withScopedDb(this.dataSource, async (m) => {
+      await m.query(
         "DELETE FROM monthly_account_balances WHERE account_id = $1",
         [account.id],
       );
@@ -1693,20 +1724,13 @@ export class NetWorthService {
           balance = 0;
         }
 
-        await queryRunner.query(
+        await m.query(
           `INSERT INTO monthly_account_balances (user_id, account_id, month, balance)
            VALUES ($1, $2, $3::DATE, $4)`,
           [userId, account.id, monthStr, balance],
         );
       }
-
-      await queryRunner.commitTransaction();
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw err;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   private async recalculateBrokerageAccount(
@@ -1716,7 +1740,7 @@ export class NetWorthService {
     const openingBalance = Number(account.openingBalance) || 0;
 
     // Find earliest date from both regular and investment transactions
-    const [{ earliest }] = await this.dataSource.query(
+    const [{ earliest }] = await this.scopedQuery(
       `SELECT MIN(transaction_date) as earliest
        FROM transactions
        WHERE account_id = $1
@@ -1725,7 +1749,7 @@ export class NetWorthService {
       [account.id],
     );
 
-    const [{ inv_earliest }] = await this.dataSource.query(
+    const [{ inv_earliest }] = await this.scopedQuery(
       `SELECT MIN(transaction_date) as inv_earliest
        FROM investment_transactions
        WHERE account_id = $1`,
@@ -1741,7 +1765,7 @@ export class NetWorthService {
         : account.createdAt.toISOString().substring(0, 10);
 
     // Compute cost-basis via cumulative transaction sums
-    const costRows: any[] = await this.dataSource.query(
+    const costRows: any[] = await this.scopedQuery(
       `WITH monthly_tx_sums AS (
         SELECT DATE_TRUNC('month', transaction_date)::DATE as month,
                SUM(amount) as total
@@ -1777,20 +1801,24 @@ export class NetWorthService {
 
     // Load investment transactions for holdings replay (exclude future-dated)
     const today = formatDateYMDLocal(new Date());
-    const invTxs = await this.invTxRepo.find({
-      where: {
-        accountId: account.id,
-        transactionDate: LessThanOrEqual(today),
-      },
-      order: { transactionDate: "ASC" },
-    });
+    const invTxs = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentTransaction).find({
+        where: {
+          accountId: account.id,
+          transactionDate: LessThanOrEqual(today),
+        },
+        order: { transactionDate: "ASC" },
+      }),
+    );
 
     const securityIds = [
       ...new Set(invTxs.filter((t) => t.securityId).map((t) => t.securityId!)),
     ];
     const securities =
       securityIds.length > 0
-        ? await this.securityRepo.findByIds(securityIds)
+        ? await withScopedDb(this.dataSource, (m) =>
+            m.getRepository(Security).findByIds(securityIds),
+          )
         : [];
     const securityMap = new Map(securities.map((s) => [s.id, s]));
 
@@ -1897,11 +1925,8 @@ export class NetWorthService {
     }
 
     // Atomic write
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      await queryRunner.query(
+    await withScopedDb(this.dataSource, async (m) => {
+      await m.query(
         "DELETE FROM monthly_account_balances WHERE account_id = $1",
         [account.id],
       );
@@ -1910,21 +1935,14 @@ export class NetWorthService {
         const balance = costByMonth.get(monthStr) ?? 0;
         const mv = marketValueByMonth.get(monthStr) ?? null;
 
-        await queryRunner.query(
+        await m.query(
           `INSERT INTO monthly_account_balances
              (user_id, account_id, month, balance, market_value)
            VALUES ($1, $2, $3::DATE, $4, $5)`,
           [userId, account.id, monthStr, balance, mv],
         );
       }
-
-      await queryRunner.commitTransaction();
-    } catch (err) {
-      await queryRunner.rollbackTransaction();
-      throw err;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   private async loadSecurityPrices(
@@ -1938,7 +1956,7 @@ export class NetWorthService {
     );
     if (marketSecIds.length === 0) return;
 
-    const prices: any[] = await this.dataSource.query(
+    const prices: any[] = await this.scopedQuery(
       `SELECT security_id, price_date, close_price
        FROM security_prices
        WHERE security_id = ANY($1::UUID[])
@@ -1985,7 +2003,7 @@ export class NetWorthService {
     );
     if (skipSecIds.length === 0) return;
 
-    const rows: any[] = await this.dataSource.query(
+    const rows: any[] = await this.scopedQuery(
       `SELECT security_id, transaction_date, price
        FROM investment_transactions
        WHERE security_id = ANY($1::UUID[])
@@ -2033,7 +2051,7 @@ export class NetWorthService {
     if (currencies.size === 0) return new Map();
 
     const currArr = Array.from(currencies);
-    const rates: any[] = await this.dataSource.query(
+    const rates: any[] = await this.scopedQuery(
       `SELECT from_currency, to_currency, rate, rate_date
        FROM exchange_rates
        WHERE ((from_currency = ANY($1::TEXT[]) AND to_currency = $2)

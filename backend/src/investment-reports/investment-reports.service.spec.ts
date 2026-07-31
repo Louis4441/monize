@@ -1,11 +1,18 @@
 import { NotFoundException } from "@nestjs/common";
 import { InvestmentReportsService } from "./investment-reports.service";
 import {
+  InvestmentReport,
   InvestmentGroupBy,
   InvestmentSortDirection,
 } from "./entities/investment-report.entity";
-import { AccountSubType } from "../accounts/entities/account.entity";
+import { Account, AccountSubType } from "../accounts/entities/account.entity";
+import { UserPreference } from "../users/entities/user-preference.entity";
 import { ComputedHolding } from "./investment-report-data.service";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 function holding(
   over: Partial<ComputedHolding> & { values?: Record<string, unknown> },
@@ -54,10 +61,13 @@ describe("InvestmentReportsService", () => {
       getLatestMarketDay: jest.fn().mockResolvedValue("2024-06-10"),
     };
     actionHistoryService = { record: jest.fn() };
+    const { dataSource } = createScopedDbMocks([
+      [InvestmentReport, reportsRepository],
+      [Account, accountsRepository],
+      [UserPreference, prefRepository],
+    ]);
     service = new InvestmentReportsService(
-      reportsRepository as any,
-      accountsRepository as any,
-      prefRepository as any,
+      dataSource as any,
       dataService as any,
       actionHistoryService as any,
     );

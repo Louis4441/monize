@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import {
   InvestmentReport,
   InvestmentReportConfig,
@@ -33,12 +33,7 @@ import { ALWAYS_INCLUDED_COLUMN } from "./investment-report-columns";
 @Injectable()
 export class InvestmentReportsService {
   constructor(
-    @InjectRepository(InvestmentReport)
-    private reportsRepository: Repository<InvestmentReport>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(UserPreference)
-    private prefRepository: Repository<UserPreference>,
+    private dataSource: DataSource,
     private dataService: InvestmentReportDataService,
     private actionHistoryService: ActionHistoryService,
   ) {}
@@ -48,18 +43,21 @@ export class InvestmentReportsService {
     dto: CreateInvestmentReportDto,
   ): Promise<InvestmentReport> {
     const config = this.buildConfig(dto.config);
-    const report = this.reportsRepository.create({
-      name: dto.name,
-      description: dto.description ?? null,
-      icon: dto.icon ?? null,
-      backgroundColor: dto.backgroundColor ?? null,
-      groupBy: dto.groupBy ?? InvestmentGroupBy.NONE,
-      config,
-      isFavourite: dto.isFavourite ?? false,
-      sortOrder: dto.sortOrder ?? 0,
-      userId,
+    const saved = await withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(InvestmentReport);
+      const report = repo.create({
+        name: dto.name,
+        description: dto.description ?? null,
+        icon: dto.icon ?? null,
+        backgroundColor: dto.backgroundColor ?? null,
+        groupBy: dto.groupBy ?? InvestmentGroupBy.NONE,
+        config,
+        isFavourite: dto.isFavourite ?? false,
+        sortOrder: dto.sortOrder ?? 0,
+        userId,
+      });
+      return repo.save(report);
     });
-    const saved = await this.reportsRepository.save(report);
 
     this.actionHistoryService.record(userId, {
       entityType: "investment_report",
@@ -75,16 +73,20 @@ export class InvestmentReportsService {
   }
 
   async findAll(userId: string): Promise<InvestmentReport[]> {
-    return this.reportsRepository.find({
-      where: { userId },
-      order: { sortOrder: "ASC", createdAt: "DESC" },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentReport).find({
+        where: { userId },
+        order: { sortOrder: "ASC", createdAt: "DESC" },
+      }),
+    );
   }
 
   async findOne(userId: string, id: string): Promise<InvestmentReport> {
-    const report = await this.reportsRepository.findOne({
-      where: { id, userId },
-    });
+    const report = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentReport).findOne({
+        where: { id, userId },
+      }),
+    );
     if (!report) {
       throw new NotFoundException(
         tr(
@@ -118,7 +120,9 @@ export class InvestmentReportsService {
       report.config = this.buildConfig(dto.config, report.config);
     }
 
-    const saved = await this.reportsRepository.save(report);
+    const saved = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentReport).save(report),
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "investment_report",
@@ -137,7 +141,9 @@ export class InvestmentReportsService {
   async remove(userId: string, id: string): Promise<void> {
     const report = await this.findOne(userId, id);
     const beforeData = { ...report };
-    await this.reportsRepository.remove(report);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentReport).remove(report),
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "investment_report",
@@ -168,7 +174,9 @@ export class InvestmentReportsService {
       report.config.asOfDate ||
       (await this.dataService.getLatestMarketDay(userId, accountIds));
 
-    const pref = await this.prefRepository.findOne({ where: { userId } });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({ where: { userId } }),
+    );
     const baseCurrency = pref?.defaultCurrency || "CAD";
 
     // Combining duplicate securities across accounts is available everywhere
@@ -255,9 +263,11 @@ export class InvestmentReportsService {
     userId: string,
     requested: string[],
   ): Promise<string[]> {
-    const accounts = await this.accountsRepository.find({
-      where: { userId, accountType: AccountType.INVESTMENT, isClosed: false },
-    });
+    const accounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { userId, accountType: AccountType.INVESTMENT, isClosed: false },
+      }),
+    );
     const holdingsIds = accounts
       .filter(
         (a) =>

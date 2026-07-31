@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In } from "typeorm";
+import { DataSource, In } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Holding } from "../securities/entities/holding.entity";
 import { Security } from "../securities/entities/security.entity";
 import {
@@ -134,14 +134,7 @@ function applyQuantity(
 @Injectable()
 export class InvestmentReportDataService {
   constructor(
-    @InjectRepository(InvestmentTransaction)
-    private txRepository: Repository<InvestmentTransaction>,
-    @InjectRepository(Holding)
-    private holdingsRepository: Repository<Holding>,
-    @InjectRepository(Security)
-    private securitiesRepository: Repository<Security>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
+    private dataSource: DataSource,
     private exchangeRateService: ExchangeRateService,
   ) {}
 
@@ -159,8 +152,11 @@ export class InvestmentReportDataService {
     // local time and replay the wrong set of transactions.
     const today = todayYMD();
     if (accountIds.length === 0) return today;
-    const rows: { d: string | null }[] = await this.txRepository.query(
-      `SELECT MAX(sp.price_date)::text AS d
+    const rows: { d: string | null }[] = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.query(
+          `SELECT MAX(sp.price_date)::text AS d
          FROM security_prices sp
         WHERE sp.security_id IN (
           SELECT security_id FROM holdings WHERE account_id = ANY($1)
@@ -168,7 +164,8 @@ export class InvestmentReportDataService {
           SELECT security_id FROM investment_transactions
             WHERE user_id = $2 AND account_id = ANY($1) AND security_id IS NOT NULL
         )`,
-      [accountIds, userId],
+          [accountIds, userId],
+        ),
     );
     return rows[0]?.d || today;
   }
@@ -185,9 +182,11 @@ export class InvestmentReportDataService {
     const accountMap = await this.loadAccounts(accountIds);
 
     // The maintained holdings table is the authoritative current snapshot.
-    const holdings = await this.holdingsRepository.find({
-      where: { accountId: In(accountIds) },
-    });
+    const holdings = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Holding).find({
+        where: { accountId: In(accountIds) },
+      }),
+    );
     const holdingsMap = new Map<
       string,
       { quantity: number; averageCost: number }
@@ -214,10 +213,12 @@ export class InvestmentReportDataService {
     }
 
     // Replay transactions up to the as-of date, grouped by (account, security).
-    const transactions = await this.txRepository.find({
-      where: { userId, accountId: In(accountIds) },
-      order: { transactionDate: "ASC", createdAt: "ASC" },
-    });
+    const transactions = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(InvestmentTransaction).find({
+        where: { userId, accountId: In(accountIds) },
+        order: { transactionDate: "ASC", createdAt: "ASC" },
+      }),
+    );
     let groups = this.groupTransactions(transactions, asOfDate);
 
     // Holdings without any transactions (e.g. imported positions) still belong
@@ -418,10 +419,12 @@ export class InvestmentReportDataService {
   private async loadAccounts(
     accountIds: string[],
   ): Promise<Map<string, string>> {
-    const accounts = await this.accountsRepository.find({
-      where: { id: In(accountIds) },
-      select: ["id", "name"],
-    });
+    const accounts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).find({
+        where: { id: In(accountIds) },
+        select: ["id", "name"],
+      }),
+    );
     return new Map(accounts.map((a) => [a.id, a.name]));
   }
 
@@ -429,9 +432,11 @@ export class InvestmentReportDataService {
     securityIds: string[],
   ): Promise<Map<string, Security>> {
     if (securityIds.length === 0) return new Map();
-    const securities = await this.securitiesRepository.find({
-      where: { id: In(securityIds) },
-    });
+    const securities = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Security).find({
+        where: { id: In(securityIds) },
+      }),
+    );
     return new Map(securities.map((s) => [s.id, s]));
   }
 
@@ -453,13 +458,15 @@ export class InvestmentReportDataService {
       low_price: string | null;
       close_price: string;
       volume: string | null;
-    }[] = await this.txRepository.query(
-      `SELECT security_id, price_date::text AS price_date,
+    }[] = await withScopedDb(this.dataSource, (m) =>
+      m.query(
+        `SELECT security_id, price_date::text AS price_date,
               open_price, high_price, low_price, close_price, volume
          FROM security_prices
         WHERE security_id = ANY($1) AND price_date <= $2
         ORDER BY security_id, price_date ASC`,
-      [securityIds, asOfDate],
+        [securityIds, asOfDate],
+      ),
     );
     for (const row of rows) {
       let arr = result.get(row.security_id);

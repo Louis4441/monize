@@ -4,9 +4,9 @@ import {
   ConflictException,
   BadRequestException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { tr } from "../i18n/translate";
+import { withScopedDb } from "../common/db/scoped-db";
 import { LoanScenario } from "./entities/loan-scenario.entity";
 import { Account, AccountType } from "../accounts/entities/account.entity";
 import { CreateLoanScenarioDto } from "./dto/create-loan-scenario.dto";
@@ -20,19 +20,16 @@ const LOAN_ACCOUNT_TYPES = [
 
 @Injectable()
 export class LoanScenariosService {
-  constructor(
-    @InjectRepository(LoanScenario)
-    private scenariosRepository: Repository<LoanScenario>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-  ) {}
+  constructor(private dataSource: DataSource) {}
 
   async findAll(userId: string, accountId: string): Promise<LoanScenario[]> {
     await this.verifyLoanAccount(userId, accountId);
-    return this.scenariosRepository.find({
-      where: { userId, accountId },
-      order: { name: "ASC" },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(LoanScenario).find({
+        where: { userId, accountId },
+        order: { name: "ASC" },
+      }),
+    );
   }
 
   async create(
@@ -47,22 +44,26 @@ export class LoanScenariosService {
       dto.targetMonthlyPaymentEndDate ?? null,
     );
 
-    const scenario = this.scenariosRepository.create({
-      name: dto.name,
-      recurringExtraAmount: dto.recurringExtraAmount ?? null,
-      recurringExtraMode: dto.recurringExtraMode ?? null,
-      recurringExtraFrequency: dto.recurringExtraFrequency ?? null,
-      recurringExtraStartDate: dto.recurringExtraStartDate ?? null,
-      recurringExtraEndDate: dto.recurringExtraEndDate ?? null,
-      targetMonthlyPayment: dto.targetMonthlyPayment ?? null,
-      targetMonthlyPaymentMode: dto.targetMonthlyPaymentMode ?? null,
-      targetMonthlyPaymentStartDate: dto.targetMonthlyPaymentStartDate ?? null,
-      targetMonthlyPaymentEndDate: dto.targetMonthlyPaymentEndDate ?? null,
-      lumpSums: dto.lumpSums ?? [],
-      userId,
-      accountId,
+    return withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(LoanScenario);
+      const scenario = repo.create({
+        name: dto.name,
+        recurringExtraAmount: dto.recurringExtraAmount ?? null,
+        recurringExtraMode: dto.recurringExtraMode ?? null,
+        recurringExtraFrequency: dto.recurringExtraFrequency ?? null,
+        recurringExtraStartDate: dto.recurringExtraStartDate ?? null,
+        recurringExtraEndDate: dto.recurringExtraEndDate ?? null,
+        targetMonthlyPayment: dto.targetMonthlyPayment ?? null,
+        targetMonthlyPaymentMode: dto.targetMonthlyPaymentMode ?? null,
+        targetMonthlyPaymentStartDate:
+          dto.targetMonthlyPaymentStartDate ?? null,
+        targetMonthlyPaymentEndDate: dto.targetMonthlyPaymentEndDate ?? null,
+        lumpSums: dto.lumpSums ?? [],
+        userId,
+        accountId,
+      });
+      return repo.save(scenario);
     });
-    return this.scenariosRepository.save(scenario);
   }
 
   async update(
@@ -77,7 +78,9 @@ export class LoanScenariosService {
       await this.rejectDuplicateName(userId, accountId, dto.name);
     }
 
-    const updated = this.scenariosRepository.merge(scenario, {
+    return withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(LoanScenario);
+      const updated = repo.merge(scenario, {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
       ...(dto.recurringExtraAmount !== undefined
         ? { recurringExtraAmount: dto.recurringExtraAmount }
@@ -106,15 +109,16 @@ export class LoanScenariosService {
       ...(dto.targetMonthlyPaymentEndDate !== undefined
         ? { targetMonthlyPaymentEndDate: dto.targetMonthlyPaymentEndDate }
         : {}),
-      ...(dto.lumpSums !== undefined ? { lumpSums: dto.lumpSums } : {}),
+        ...(dto.lumpSums !== undefined ? { lumpSums: dto.lumpSums } : {}),
+      });
+      // Validate the merged state, so a partial update cannot invert the window
+      // that the other, unchanged date still forms.
+      this.rejectInvertedBudgetWindow(
+        updated.targetMonthlyPaymentStartDate,
+        updated.targetMonthlyPaymentEndDate,
+      );
+      return repo.save(updated);
     });
-    // Validate the merged state, so a partial update cannot invert the window
-    // that the other, unchanged date still forms.
-    this.rejectInvertedBudgetWindow(
-      updated.targetMonthlyPaymentStartDate,
-      updated.targetMonthlyPaymentEndDate,
-    );
-    return this.scenariosRepository.save(updated);
   }
 
   /**
@@ -138,7 +142,9 @@ export class LoanScenariosService {
 
   async remove(userId: string, accountId: string, id: string): Promise<void> {
     const scenario = await this.findOne(userId, accountId, id);
-    await this.scenariosRepository.remove(scenario);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(LoanScenario).remove(scenario),
+    );
   }
 
   private async findOne(
@@ -146,9 +152,11 @@ export class LoanScenariosService {
     accountId: string,
     id: string,
   ): Promise<LoanScenario> {
-    const scenario = await this.scenariosRepository.findOne({
-      where: { id, userId, accountId },
-    });
+    const scenario = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(LoanScenario).findOne({
+        where: { id, userId, accountId },
+      }),
+    );
     if (!scenario) {
       throw new NotFoundException(
         tr(
@@ -166,9 +174,11 @@ export class LoanScenariosService {
     userId: string,
     accountId: string,
   ): Promise<void> {
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId, userId },
-    });
+    const account = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Account).findOne({
+        where: { id: accountId, userId },
+      }),
+    );
     if (!account) {
       throw new NotFoundException(
         tr(
@@ -193,12 +203,15 @@ export class LoanScenariosService {
     accountId: string,
     name: string,
   ): Promise<void> {
-    const existing = await this.scenariosRepository
-      .createQueryBuilder("scenario")
-      .where("scenario.userId = :userId", { userId })
-      .andWhere("scenario.accountId = :accountId", { accountId })
-      .andWhere("LOWER(scenario.name) = LOWER(:name)", { name })
-      .getOne();
+    const existing = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(LoanScenario)
+        .createQueryBuilder("scenario")
+        .where("scenario.userId = :userId", { userId })
+        .andWhere("scenario.accountId = :accountId", { accountId })
+        .andWhere("LOWER(scenario.name) = LOWER(:name)", { name })
+        .getOne(),
+    );
     if (existing) {
       throw new ConflictException(
         tr(
