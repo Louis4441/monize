@@ -89,7 +89,7 @@ describe("mapTransactions", () => {
           transactions: transactionData({
             transactions: [
               mnyTransaction({ handle: 1 }),
-              mnyTransaction({ handle: 2 }),
+              mnyTransaction({ handle: 2, frequency: 3 }),
             ],
           }),
           bills: [mnyBill({ handle: 1, templateTransaction: 2 })],
@@ -97,6 +97,28 @@ describe("mapTransactions", () => {
       );
 
       expect(result.transactions.map((t) => t.handle)).toEqual([1]);
+    });
+
+    /**
+     * `BILL.lHtrn` points at whatever transaction the series currently holds,
+     * and once a bill is entered that is the posting. Excluding every `lHtrn`
+     * row cost the maintainer's chequing account $6,243.96 -- two 2003 expense
+     * reimbursements, dated and memoed, with `frq = -1`.
+     */
+    it("keeps a posted transaction a bill still points at", () => {
+      const result = mapTransactions(
+        input({
+          transactions: transactionData({
+            transactions: [
+              mnyTransaction({ handle: 1 }),
+              mnyTransaction({ handle: 2, amount: 3495.37 }),
+            ],
+          }),
+          bills: [mnyBill({ handle: 1, templateTransaction: 2 })],
+        }),
+      );
+
+      expect(result.transactions.map((t) => t.handle)).toEqual([1, 2]);
     });
 
     it("excludes a whole loan-payment template family, counterparts included", () => {

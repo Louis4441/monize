@@ -431,7 +431,7 @@ describe("mapInvestments", () => {
           transactions: transactionData({
             transactions: [
               invRow({ handle: 1, action: MNY_ACTION.BUY, frequency: 3 }),
-              invRow({ handle: 2, action: MNY_ACTION.BUY }),
+              invRow({ handle: 2, action: MNY_ACTION.BUY, frequency: 3 }),
               invRow({ handle: 3, action: MNY_ACTION.BUY }),
             ],
             splits: [mnySplit({ parent: 9, child: 3 })],

@@ -10,6 +10,8 @@ import {
 } from "../model/mny-import-model";
 import {
   MNY_UNCONFIRMED_ACTIONS,
+  billTemplateHandles,
+  decodeReference,
   hasInvestmentDetail,
   isRecurrenceTemplate,
   mapInvestmentAction,
@@ -113,7 +115,7 @@ function warningRow(
     date: row.date,
     amount: row.amount,
     payeeHandle: row.payee,
-    reference: row.reference,
+    reference: decodeReference(row.reference, row.flags),
     memo: row.memo,
   };
 }
@@ -157,15 +159,6 @@ function indexDetails(
     });
   }
   return byHandle;
-}
-
-/** `BILL.lHtrn` rows are recurrence templates, never postings. */
-function billTemplateHandles(bills: readonly MnyBill[]): ReadonlySet<number> {
-  return new Set(
-    bills
-      .map((bill) => bill.templateTransaction)
-      .filter((handle): handle is number => handle !== null),
-  );
 }
 
 /**
@@ -430,7 +423,10 @@ function buildContext(input: MapInvestmentsInput): Context {
 export function mapInvestments(input: MapInvestmentsInput): MappedInvestments {
   const context = buildContext(input);
   const warnings = context.warnings;
-  const templates = billTemplateHandles(input.bills);
+  const templates = billTemplateHandles(
+    input.bills,
+    input.transactions.transactions,
+  );
   const splitChildren = new Set(
     input.transactions.splits
       .map((split) => split.child)

@@ -18,6 +18,7 @@ import {
   MNY_REAL_POSTING_FREQUENCY,
   MNY_TRANSACTION_FLAG,
   MNY_UNCONFIRMED_ACTIONS,
+  decodeReference,
   hasInvestmentDetail,
   isCurrencyPseudoSecurity,
   isCurrencyQuoteSymbol,
@@ -123,6 +124,69 @@ describe("isRecurrenceTemplate", () => {
 
   it.each([[0], [3], [12]])("treats frq %p as a template", (frequency) => {
     expect(isRecurrenceTemplate(frequency)).toBe(true);
+  });
+});
+
+describe("decodeReference", () => {
+  const plain = 0;
+  const debtRow = MNY_TRANSACTION_FLAG.DEBT_ACCOUNT;
+
+  // Imported whole, `szId` put "1Debit" and "0           2" in the register.
+  it.each([
+    ["1Debit", "Debit"],
+    ["1PC Banking", "PC Banking"],
+    ["1ATM", "ATM"],
+    ["1Telebank", "Telebank"],
+    ["1EComm", "EComm"],
+    ["1US", "US"],
+  ])("reads the text %p as %p", (raw, expected) => {
+    expect(decodeReference(raw, plain)).toBe(expected);
+  });
+
+  it.each([
+    ["0         155", "155"],
+    ["0           1", "1"],
+    ["0         200", "200"],
+  ])("reads the cheque number %p as %p", (raw, expected) => {
+    expect(decodeReference(raw, plain)).toBe(expected);
+  });
+
+  it("drops the number on a loan or mortgage row", () => {
+    // There it is Money's instalment counter, not a reference the user wrote:
+    // the bank side of the transfer carries none, and Money's loan register
+    // has no Num column to show it in.
+    expect(decodeReference("0           2", debtRow)).toBeNull();
+    // The text kind is a real reference wherever it appears.
+    expect(decodeReference("1Debit", debtRow)).toBe("Debit");
+  });
+
+  it("keeps a value that does not fit either shape rather than losing it", () => {
+    // The one that matters: a cheque number a user typed as 1042 is not the
+    // text "042" behind a kind digit.
+    expect(decodeReference("1042", plain)).toBe("1042");
+    expect(decodeReference("1042", debtRow)).toBe("1042");
+    expect(decodeReference("2something", plain)).toBe("2something");
+    expect(decodeReference("0 not-a-number", plain)).toBe("0 not-a-number");
+    expect(decodeReference("7", plain)).toBe("7");
+  });
+
+  it("returns null for nothing at all", () => {
+    expect(decodeReference(null, plain)).toBeNull();
+    expect(decodeReference("", plain)).toBeNull();
+    expect(decodeReference("   ", plain)).toBeNull();
+  });
+
+  it("never leaves the packed shape in what it returns", () => {
+    // No committed fixture carries a single `szId` -- all three are null
+    // throughout -- so the shapes above come from the two Money Plus files that
+    // cannot be committed. This is the general guard: whatever the padding
+    // width, a kind digit followed by spaces never survives.
+    for (const width of [2, 5, 12, 20]) {
+      const padded = `0${"7".padStart(width, " ")}`;
+
+      expect(decodeReference(padded, plain)).toBe("7");
+      expect(decodeReference(padded, debtRow)).toBeNull();
+    }
   });
 });
 

@@ -8,6 +8,8 @@ import {
   MappedTransactions,
 } from "../model/mny-import-model";
 import {
+  billTemplateHandles,
+  decodeReference,
   isLoanPaymentTemplate,
   isRecurrenceTemplate,
   mapTransactionStatus,
@@ -97,18 +99,9 @@ function warningRow(
     date: row.date,
     amount: row.amount,
     payeeHandle: row.payee,
-    reference: row.reference,
+    reference: decodeReference(row.reference, row.flags),
     memo: row.memo,
   };
-}
-
-/** `BILL.lHtrn` rows are recurrence templates, never postings. */
-function billTemplateHandles(bills: readonly MnyBill[]): ReadonlySet<number> {
-  return new Set(
-    bills
-      .map((bill) => bill.templateTransaction)
-      .filter((handle): handle is number => handle !== null),
-  );
 }
 
 interface Indexes {
@@ -164,7 +157,10 @@ function buildIndexes(input: MapTransactionsInput): Indexes {
     byHandle,
     parentOfChild,
     childrenByParent,
-    billTemplates: billTemplateHandles(input.bills),
+    billTemplates: billTemplateHandles(
+      input.bills,
+      input.transactions.transactions,
+    ),
     transfers: indexTransfers(input.transactions.transfers, rows),
     warnings,
   };
@@ -423,7 +419,7 @@ function mapOne(
     // A split parent carries no category of its own: the legs do.
     categoryHandle: splits.length > 0 ? null : row.category,
     description: row.memo,
-    referenceNumber: row.reference,
+    referenceNumber: decodeReference(row.reference, row.flags),
     isTransfer: linkedTransactionId !== null,
     linkedTransactionId,
     splits,
