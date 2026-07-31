@@ -50,6 +50,7 @@ import {
   transactionData,
 } from "@/import/mny/__fixtures__/mny-row-builders";
 import {
+  cashKeyByAccountKey,
   mapAccounts,
   mapCategories,
   mapPayees,
@@ -474,6 +475,7 @@ describe("mny writers (integration)", () => {
         accountKeyByHandle: accounts.keyByHandle,
         currencyByHandle: accounts.currencyByHandle,
         bills: [],
+        cashKeyByAccountKey: cashKeyByAccountKey(accounts),
       });
       const categories = mapCategories(reference, null);
       const payees = mapPayees(reference.payees, null);
@@ -891,11 +893,13 @@ describe("mny writers (integration)", () => {
         accountKeyByHandle: accounts.keyByHandle,
         currencyByHandle: accounts.currencyByHandle,
         bills: bills.bills,
+        cashKeyByAccountKey: cashKeyByAccountKey(accounts),
       });
       const securities = mapSecurities({
         securities: [],
         currencyByHandle: new Map(),
         baseCurrency: "USD",
+        activeHandles: new Set<number>(),
       });
       const mappedBills = mapBills({
         bills,
