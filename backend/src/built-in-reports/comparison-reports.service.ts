@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Transaction } from "../transactions/entities/transaction.entity";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Category } from "../categories/entities/category.entity";
 import { ReportCurrencyService } from "./report-currency.service";
 import { roundMoney, sumMoney, toMoneyNumber } from "../common/round.util";
@@ -16,10 +15,7 @@ import {
 @Injectable()
 export class ComparisonReportsService {
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
+    private dataSource: DataSource,
     private currencyService: ReportCurrencyService,
   ) {}
 
@@ -64,9 +60,9 @@ export class ComparisonReportsService {
       expenses: string;
     }
 
-    const rawResults: RawYearMonth[] = await this.transactionsRepository.query(
-      query,
-      [userId, oldestYear, currentYear],
+    const rawResults: RawYearMonth[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, [userId, oldestYear, currentYear]),
     );
 
     const yearMap = new Map<number, YearData>();
@@ -166,12 +162,16 @@ export class ComparisonReportsService {
       total: string;
     }
 
-    const rawResults: RawDayCategory[] =
-      await this.transactionsRepository.query(query, params);
+    const rawResults: RawDayCategory[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, params),
+    );
 
-    const categories = await this.categoriesRepository.find({
-      where: { userId },
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId },
+      }),
+    );
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
     const dayTotals = [0, 0, 0, 0, 0, 0, 0];

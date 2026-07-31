@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Transaction } from "../transactions/entities/transaction.entity";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Category } from "../categories/entities/category.entity";
 import { ReportCurrencyService } from "./report-currency.service";
 import { roundMoney, toMoneyNumber } from "../common/round.util";
@@ -54,10 +53,7 @@ interface CategoryAccumulator {
 @Injectable()
 export class MonthlyCategoryBreakdownService {
   constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
+    private dataSource: DataSource,
     private currencyService: ReportCurrencyService,
   ) {}
 
@@ -133,12 +129,16 @@ export class MonthlyCategoryBreakdownService {
       ORDER BY month
     `;
 
-    const rawResults: RawBreakdownAggregate[] =
-      await this.transactionsRepository.query(query, params);
+    const rawResults: RawBreakdownAggregate[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, params),
+    );
 
-    const categories = await this.categoriesRepository.find({
-      where: { userId },
-    });
+    const categories = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).find({
+        where: { userId },
+      }),
+    );
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
     const accumulators = new Map<string, CategoryAccumulator>();
@@ -261,8 +261,10 @@ export class MonthlyCategoryBreakdownService {
       ORDER BY month
     `;
 
-    const rawResults: RawTransferAggregate[] =
-      await this.transactionsRepository.query(query, params);
+    const rawResults: RawTransferAggregate[] = await withScopedDb(
+      this.dataSource,
+      (m) => m.query(query, params),
+    );
 
     // Accumulate the signed flow per (account, direction) across currencies.
     const fromByAccount = new Map<

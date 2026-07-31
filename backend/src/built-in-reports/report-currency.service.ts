@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { convertWithRateLookup } from "../common/currency-conversion.util";
@@ -39,15 +39,16 @@ export class ReportCurrencyService {
   private readonly logger = new Logger(ReportCurrencyService.name);
 
   constructor(
-    @InjectRepository(UserPreference)
-    private userPreferenceRepository: Repository<UserPreference>,
+    private dataSource: DataSource,
     private exchangeRateService: ExchangeRateService,
   ) {}
 
   async getDefaultCurrency(userId: string): Promise<string> {
-    const pref = await this.userPreferenceRepository.findOne({
-      where: { userId },
-    });
+    const pref = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({
+        where: { userId },
+      }),
+    );
     return pref?.defaultCurrency || "USD";
   }
 

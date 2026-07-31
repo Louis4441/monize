@@ -1,10 +1,22 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { DataQualityReportsService } from "./data-quality-reports.service";
 import { ReportCurrencyService } from "./report-currency.service";
 import { Transaction } from "../transactions/entities/transaction.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("DataQualityReportsService", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let service: DataQualityReportsService;
   let transactionsRepository: Record<string, jest.Mock>;
   let currencyService: Record<string, jest.Mock>;
@@ -22,6 +34,9 @@ describe("DataQualityReportsService", () => {
       convertAmount: jest.fn().mockImplementation((amount) => amount),
     };
 
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([[Transaction, transactionsRepository as never]]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DataQualityReportsService,
@@ -33,6 +48,7 @@ describe("DataQualityReportsService", () => {
           provide: getRepositoryToken(Transaction),
           useValue: transactionsRepository,
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 
@@ -45,9 +61,9 @@ describe("DataQualityReportsService", () => {
   describe("getUncategorizedTransactions", () => {
     it("returns empty result when no uncategorized transactions exist", async () => {
       // First call: transaction list query
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
       // Second call: summary query
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       const result = await service.getUncategorizedTransactions(
         mockUserId,
@@ -66,7 +82,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("returns uncategorized transactions with correct fields", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -88,7 +104,7 @@ describe("DataQualityReportsService", () => {
           account_id: "acc-2",
         },
       ]);
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           currency_code: "USD",
           total_count: "2",
@@ -126,8 +142,8 @@ describe("DataQualityReportsService", () => {
         },
       );
 
-      transactionsRepository.query.mockResolvedValueOnce([]);
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([
         {
           currency_code: "USD",
           total_count: "5",
@@ -169,7 +185,7 @@ describe("DataQualityReportsService", () => {
         },
       );
 
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: "2025-05-01",
@@ -181,7 +197,7 @@ describe("DataQualityReportsService", () => {
           account_id: "acc-1",
         },
       ]);
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       const result = await service.getUncategorizedTransactions(
         mockUserId,
@@ -194,8 +210,8 @@ describe("DataQualityReportsService", () => {
     });
 
     it("includes startDate filter when provided", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([]);
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       await service.getUncategorizedTransactions(
         mockUserId,
@@ -203,16 +219,16 @@ describe("DataQualityReportsService", () => {
         "2025-12-31",
       );
 
-      const listQueryCall = transactionsRepository.query.mock.calls[0];
+      const listQueryCall = scopedManager.query.mock.calls[0];
       expect(listQueryCall[1]).toContain("2025-06-01");
 
-      const summaryQueryCall = transactionsRepository.query.mock.calls[1];
+      const summaryQueryCall = scopedManager.query.mock.calls[1];
       expect(summaryQueryCall[1]).toContain("2025-06-01");
     });
 
     it("omits startDate filter when undefined", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([]);
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       await service.getUncategorizedTransactions(
         mockUserId,
@@ -220,14 +236,14 @@ describe("DataQualityReportsService", () => {
         "2025-12-31",
       );
 
-      const listQueryCall = transactionsRepository.query.mock.calls[0];
+      const listQueryCall = scopedManager.query.mock.calls[0];
       expect(listQueryCall[0]).not.toContain("transaction_date >= $");
       expect(listQueryCall[1]).toEqual([mockUserId, "2025-12-31", 500]);
     });
 
     it("uses custom limit parameter", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([]);
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       await service.getUncategorizedTransactions(
         mockUserId,
@@ -236,13 +252,13 @@ describe("DataQualityReportsService", () => {
         100,
       );
 
-      const listQueryCall = transactionsRepository.query.mock.calls[0];
+      const listQueryCall = scopedManager.query.mock.calls[0];
       expect(listQueryCall[1]).toContain(100);
     });
 
     it("uses default limit of 500", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([]);
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       await service.getUncategorizedTransactions(
         mockUserId,
@@ -250,13 +266,13 @@ describe("DataQualityReportsService", () => {
         "2025-12-31",
       );
 
-      const listQueryCall = transactionsRepository.query.mock.calls[0];
+      const listQueryCall = scopedManager.query.mock.calls[0];
       expect(listQueryCall[1]).toContain(500);
     });
 
     it("rounds summary monetary values to 2 decimal places", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([]);
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([
         {
           currency_code: "USD",
           total_count: "2",
@@ -278,7 +294,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("formats transaction dates as YYYY-MM-DD", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([
+      scopedManager.query.mockResolvedValueOnce([
         {
           id: "tx-1",
           transaction_date: "2025-03-15T10:30:00.000Z",
@@ -290,7 +306,7 @@ describe("DataQualityReportsService", () => {
           account_id: "acc-1",
         },
       ]);
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       const result = await service.getUncategorizedTransactions(
         mockUserId,
@@ -302,8 +318,8 @@ describe("DataQualityReportsService", () => {
     });
 
     it("calls currency service with correct user id", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([]);
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       await service.getUncategorizedTransactions(
         mockUserId,
@@ -318,8 +334,8 @@ describe("DataQualityReportsService", () => {
     });
 
     it("handles both startDate and limit parameters together", async () => {
-      transactionsRepository.query.mockResolvedValueOnce([]);
-      transactionsRepository.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
+      scopedManager.query.mockResolvedValueOnce([]);
 
       await service.getUncategorizedTransactions(
         mockUserId,
@@ -328,7 +344,7 @@ describe("DataQualityReportsService", () => {
         50,
       );
 
-      const listQueryCall = transactionsRepository.query.mock.calls[0];
+      const listQueryCall = scopedManager.query.mock.calls[0];
       // Params: userId, endDate, startDate, limit
       expect(listQueryCall[1]).toEqual([
         mockUserId,
@@ -344,7 +360,7 @@ describe("DataQualityReportsService", () => {
   // ---------------------------------------------------------------------------
   describe("getDuplicateTransactions", () => {
     it("returns empty result when no transactions exist", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       const result = await service.getDuplicateTransactions(
         mockUserId,
@@ -363,7 +379,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("detects exact duplicate transactions (same date, amount, payee)", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -395,7 +411,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("detects duplicates with same date and amount but different payees", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -430,7 +446,7 @@ describe("DataQualityReportsService", () => {
 
     it("uses correct maxDaysDiff based on sensitivity", async () => {
       // Two transactions 2 days apart with same amount
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -478,7 +494,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("does not check payee with low sensitivity", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -509,7 +525,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("does not match transactions with different amounts", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -538,7 +554,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("allows amount difference up to 0.01", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -567,7 +583,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("assigns medium confidence when same payee and amount within days", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -601,7 +617,7 @@ describe("DataQualityReportsService", () => {
 
     it("assigns high confidence when same date, amount, and both payees null", async () => {
       // When both payees are null, normalized to "" which matches, so allSamePayee=true
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -632,7 +648,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("assigns medium confidence when same date and amount but different payees (low sensitivity)", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -666,7 +682,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("groups more than 2 duplicate transactions together", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -704,7 +720,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("sorts groups by confidence then by amount", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         // High confidence pair (same date, amount, payee)
         {
           id: "tx-h1",
@@ -759,7 +775,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("calculates potentialSavings correctly", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -797,7 +813,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("counts summary fields correctly", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         // High confidence group (same date, amount, payee)
         {
           id: "tx-1",
@@ -849,7 +865,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("includes startDate filter when provided", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getDuplicateTransactions(
         mockUserId,
@@ -857,13 +873,13 @@ describe("DataQualityReportsService", () => {
         "2025-12-31",
       );
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toContain("2025-06-01");
       expect(queryCall[0]).toContain("$3");
     });
 
     it("omits startDate filter when undefined", async () => {
-      transactionsRepository.query.mockResolvedValue([]);
+      scopedManager.query.mockResolvedValue([]);
 
       await service.getDuplicateTransactions(
         mockUserId,
@@ -871,12 +887,12 @@ describe("DataQualityReportsService", () => {
         "2025-12-31",
       );
 
-      const queryCall = transactionsRepository.query.mock.calls[0];
+      const queryCall = scopedManager.query.mock.calls[0];
       expect(queryCall[1]).toEqual([mockUserId, "2025-12-31"]);
     });
 
     it("uses default medium sensitivity", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -908,7 +924,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("does not create a group with only one transaction", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -929,7 +945,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("does not match a transaction with itself", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -950,7 +966,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("generates unique group keys from first transaction id and count", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-alpha",
           transaction_date: "2025-06-15",
@@ -979,7 +995,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("rounds potentialSavings to 2 decimal places", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",
@@ -1018,7 +1034,7 @@ describe("DataQualityReportsService", () => {
 
     it("breaks early when daysDiff exceeds 7 for optimization", async () => {
       // Two transactions with same amount but 10 days apart
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-01",
@@ -1049,7 +1065,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("formats transaction dates as YYYY-MM-DD in output", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15T10:00:00.000Z",
@@ -1080,7 +1096,7 @@ describe("DataQualityReportsService", () => {
     });
 
     it("handles payee name case-insensitively", async () => {
-      transactionsRepository.query.mockResolvedValue([
+      scopedManager.query.mockResolvedValue([
         {
           id: "tx-1",
           transaction_date: "2025-06-15",

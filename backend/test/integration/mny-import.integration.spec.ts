@@ -181,20 +181,12 @@ describe("mny writers (integration)", () => {
         // The real holdings rebuild -- the whole point of the investment half of
         // this suite is that the canonical fold, not an importer's private one,
         // produces the positions. It reaches the database only through the
-        // `queryRunner.manager` it is handed, so its own injected repositories
-        // and the AccountsService/SecuritiesService graph behind them are never
-        // touched by `rebuildAccountsFromTransactions`.
+        // manager it is handed, so the AccountsService/SecuritiesService graph
+        // behind it is never touched by `rebuildAccountsFromTransactions`.
         {
           provide: HoldingsService,
           useFactory: (source: DataSource) =>
-            new HoldingsService(
-              null as never,
-              null as never,
-              null as never,
-              null as never,
-              null as never,
-              source,
-            ),
+            new HoldingsService(null as never, null as never, source),
           inject: [DataSource],
         },
       ],

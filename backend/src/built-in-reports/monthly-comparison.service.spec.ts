@@ -12,6 +12,15 @@ import {
   AccountType,
   AccountSubType,
 } from "../accounts/entities/account.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 const mockUserId = "user-1";
 const mockMonth = "2026-01";
@@ -113,6 +122,8 @@ const mockTopMovers = [
 ];
 
 describe("MonthlyComparisonService", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let service: MonthlyComparisonService;
   let mockSpendingReports: Record<string, jest.Mock>;
   let mockIncomeReports: Record<string, jest.Mock>;
@@ -141,9 +152,15 @@ describe("MonthlyComparisonService", () => {
     mockAccountsRepo = {
       find: jest.fn().mockResolvedValue([]),
     };
-    mockDataSource = {
-      query: jest.fn().mockResolvedValue([]),
-    };
+    // The snapshot query now runs through the scoped transaction's manager;
+    // the spec keeps asserting against this mock.
+    mockDataSource = { query: jest.fn().mockResolvedValue([]) };
+
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([[Account, mockAccountsRepo as never]]));
+    scopedManager.query.mockImplementation((sql: string, params?: unknown[]) =>
+      mockDataSource.query(sql, params),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -154,7 +171,7 @@ describe("MonthlyComparisonService", () => {
         { provide: NetWorthService, useValue: mockNetWorthService },
         { provide: PortfolioService, useValue: mockPortfolioService },
         { provide: getRepositoryToken(Account), useValue: mockAccountsRepo },
-        { provide: DataSource, useValue: mockDataSource },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 

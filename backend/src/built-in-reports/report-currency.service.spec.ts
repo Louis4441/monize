@@ -1,10 +1,20 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ReportCurrencyService, RateMap } from "./report-currency.service";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("ReportCurrencyService", () => {
+  let scopedDataSource: DataSourceMock;
   let service: ReportCurrencyService;
   let userPreferenceRepository: Record<string, jest.Mock>;
   let exchangeRateService: Record<string, jest.Mock>;
@@ -26,6 +36,10 @@ describe("ReportCurrencyService", () => {
       getLatestRates: jest.fn().mockResolvedValue(mockExchangeRates),
     };
 
+    ({ dataSource: scopedDataSource } = createScopedDbMocks([
+      [UserPreference, userPreferenceRepository as never],
+    ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ReportCurrencyService,
@@ -37,6 +51,7 @@ describe("ReportCurrencyService", () => {
           provide: ExchangeRateService,
           useValue: exchangeRateService,
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 

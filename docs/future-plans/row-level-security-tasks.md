@@ -58,8 +58,8 @@ uses four classes:
 | R1 | Refactor: accounts, categories, payees, tags, institutions | F3, C1–C4, C6 | neutral | done |
 | R2 | Refactor: transactions, scheduled-transactions | F3, C1–C4, C6 | neutral | done |
 | R3 | Refactor: securities, investment-reports, net-worth, monte-carlo, loan-* | F3, C1–C4, C6 | neutral | done |
-| R4 | Refactor: budgets | F3, C1–C4, C6 | neutral | not started |
-| R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral | not started |
+| R4 | Refactor: budgets | F3, C1–C4, C6 | neutral | done |
+| R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral | done |
 | R6 | Refactor: ai, mcp, import, action-history, currencies, updates, notifications | F3, C1–C4, C6 | neutral | not started |
 | R7 | Refactor: auth, users, delegation, admin, emergency-access, backup, database | F3, C1–C4, C6 | neutral | not started |
 | C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral | blocked (needs M1, R7) |
@@ -607,16 +607,80 @@ Shared instructions for every R task — the per-task list only names the module
   directly and would make the ALS-propagation assertion vacuous).
 
 ### R4. budgets
-- [ ] Status: not started — ~8 service files.
+- [x] Status: done (branch `claude/rls-tasks-r3-r5-hcxbst`). All 8 service files converted
+  (`budgets`, `budget-period`, `budget-period-cron`, `budget-alert`, `budget-generator`,
+  `budget-activity-reports`, `budget-health-reports`, `budget-trend-reports`). Ratchet lowered
+  **137 → 98** `@InjectRepository` / **15 → 13** `createQueryRunner` (zero of either left in the
+  module). Full `npm run test:unit` green, build + lint clean.
+
+  **Boundary decisions:**
+  - `BudgetPeriodService.createPeriodForBudget` swapped its optional `QueryRunner` for an optional
+    `EntityManager`, so the next period still commits with the close that produced it
+    (`closePeriod` is one `withScopedDb`; `createNextPeriod` threads its manager through).
+  - `bulkUpdateCategories` keeps its single-transaction guarantee — one `withScopedDb` around the
+    loop, not one per row.
+  - **The two-query category-spending helper now shares one transaction.** `queryCategorySpending`
+    takes a Transaction repo and a TransactionSplit repo; both come from the same `EntityManager`
+    now, so a category's direct and split halves are read from one snapshot instead of two
+    autocommit statements. Same in `BudgetsService.getCachedCategoryActuals` and
+    `BudgetAlertService.computeCategoryActuals`.
+  - **Two dead injections dropped:** `budget-generator`'s `Account` repository and
+    `budget-trend-reports`' `BudgetPeriodCategory` repository were injected and never used.
+
+  **Tests:** the specs keep their `Test.createTestingModule` wiring and simply provide `DataSource`
+  from `createScopedDbMocks`, with the per-entity repository mocks routed through
+  `manager.getRepository`. (The leftover `getRepositoryToken` providers are harmless — nothing
+  injects them any more — and dropping them can ride along with L1.) Cron smoke:
+  `src/budgets/rls-context-smoke.spec.ts` runs `checkBudgetAlerts` and `closeExpiredPeriods` under
+  the **real** `withScopedDb` + C2 wrappers at `RLS_MODE=off`, plus a negative control proving an
+  unwrapped call still throws.
 
 ### R5. built-in-reports, reports
-- [ ] Status: not started — ~10 service files; read-heavy — watch that report queries stay
-  single-`withScopedDb` (no per-row transactions in loops).
+- [x] Status: done (branch `claude/rls-tasks-r3-r5-hcxbst`). All 10 service files converted
+  (built-in-reports ×9: `spending`, `income`, `comparison`, `anomaly`, `tax-recurring`,
+  `data-quality`, `monthly-comparison`, `monthly-category-breakdown`, `report-currency`; plus
+  `reports`). Ratchet lowered **98 → 78** `@InjectRepository` (`createQueryRunner` unchanged at 13 —
+  neither module had one). Full `npm run test:unit` green, build + lint clean.
+
+  **Read-heavy, as the task warned — checked explicitly.** Every report statement is a single
+  short `withScopedDb`, matching the autocommit boundary it had; a sweep for a `withScopedDb`
+  nested inside a `for`/`while` found none, so there are no per-row transactions. The one method
+  that needed more than a mechanical rewrite is `ReportsService.buildTransactionQuery`: it builds a
+  QueryBuilder, mutates it through the filter branches, then executes it. Wrapping only the
+  builder's construction would have executed it on a committed transaction's manager, so the whole
+  method body is one `withScopedDb`.
+
+  **No cron entry points in either module** (`grep @Cron` is empty), so there is no cron smoke spec
+  here; every path is request-scoped and the interceptor already seeds its context.
+
+  **Tests:** same approach as R4 — `DataSource` provided from `createScopedDbMocks`, per-entity
+  repository mocks routed through `manager.getRepository`, and the raw-SQL assertions re-pointed
+  from `transactionsRepository.query` to the transaction manager's `query` (with the same
+  default-empty behaviour the repository mock had).
+
+**Verified against a real PostgreSQL 16, not just unit mocks.** The full integration suite
+(`test/integration/*`, 15 suites / 160 tests) was run against a live PG16 instance and is green.
+It caught two things unit tests could not:
+1. `security-transfer.integration.spec.ts` called `HoldingsService.findByAccountAndSecurity`
+   straight from the test body with no ambient context — that read is now wrapped in
+   `withUserContext`, matching how the rest of that suite already calls services.
+2. `mny-import.integration.spec.ts` constructs `HoldingsService` by hand; its argument list was
+   updated for the shrunken constructor.
+(The three `test/*.e2e-spec.ts` suites fail to compile in this environment on a pre-existing
+`cookie-parser` typing issue in `test/helpers/test-database.ts`, unrelated to these tasks —
+verified by reproducing it with the branch's changes stashed.)
 
 ### R6. ai, mcp, import, action-history, currencies, updates, notifications
 - [ ] Status: not started — ~12 service files. AI relay/query SSE and MCP HTTP must hold **no**
   connection between queries (verify streaming paths call `withScopedDb` per operation, not around the
   stream).
+
+  **Inherited from R3:** `HoldingsService.rebuildAccountsFromTransactions` still accepts
+  `QueryRunner | EntityManager` because `mny-import.service.ts` passes a `{ manager }` shim. Drop
+  the union and pass the transaction's `EntityManager` directly when the importer converts. Also
+  in scope: `securities.controller.ts`'s fire-and-forget `recalculateAllInvestmentSnapshots()` is a
+  cross-user sweep running under the requesting user's context (harmless at `off`, silently
+  single-user under enforcement) — it needs a `withSystemContext` wrap before flip B.
 
 ### R7. auth, users, delegation, admin, emergency-access, backup, database
 - [ ] Status: not started — ~15 service files. The context wrapping for these modules already landed

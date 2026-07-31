@@ -4,8 +4,8 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Brackets } from "typeorm";
+import { Brackets, DataSource, Repository } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import {
   CustomReport,
   TimeframeType,
@@ -48,14 +48,7 @@ import {
 @Injectable()
 export class ReportsService {
   constructor(
-    @InjectRepository(CustomReport)
-    private reportsRepository: Repository<CustomReport>,
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
-    @InjectRepository(Payee)
-    private payeesRepository: Repository<Payee>,
+    private dataSource: DataSource,
     private budgetsService: BudgetsService,
     private actionHistoryService: ActionHistoryService,
   ) {}
@@ -78,14 +71,16 @@ export class ReportsService {
       sortDirection: dto.config?.sortDirection,
     };
 
-    const report = this.reportsRepository.create({
-      ...dto,
-      userId,
-      config,
-      filters: dto.filters || {},
+    const saved = await withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(CustomReport);
+      const report = repo.create({
+        ...dto,
+        userId,
+        config,
+        filters: dto.filters || {},
+      });
+      return repo.save(report);
     });
-
-    const saved = await this.reportsRepository.save(report);
 
     this.actionHistoryService.record(userId, {
       entityType: "custom_report",
@@ -101,16 +96,20 @@ export class ReportsService {
   }
 
   async findAll(userId: string): Promise<CustomReport[]> {
-    return this.reportsRepository.find({
-      where: { userId },
-      order: { sortOrder: "ASC", createdAt: "DESC" },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(CustomReport).find({
+        where: { userId },
+        order: { sortOrder: "ASC", createdAt: "DESC" },
+      }),
+    );
   }
 
   async findOne(userId: string, id: string): Promise<CustomReport> {
-    const report = await this.reportsRepository.findOne({
-      where: { id, userId },
-    });
+    const report = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(CustomReport).findOne({
+        where: { id, userId },
+      }),
+    );
 
     if (!report) {
       throw new NotFoundException(
@@ -159,7 +158,9 @@ export class ReportsService {
       report.filters = dto.filters as ReportFilters;
     }
 
-    const saved = await this.reportsRepository.save(report);
+    const saved = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(CustomReport).save(report),
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "custom_report",
@@ -178,7 +179,9 @@ export class ReportsService {
   async remove(userId: string, id: string): Promise<void> {
     const report = await this.findOne(userId, id);
     const beforeData = { ...report };
-    await this.reportsRepository.remove(report);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(CustomReport).remove(report),
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "custom_report",
@@ -226,12 +229,16 @@ export class ReportsService {
     const payeeMap = new Map<string, Payee>();
 
     if (report.groupBy === GroupByType.CATEGORY) {
-      const categories = await this.categoriesRepository.find({
-        where: { userId },
-      });
+      const categories = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Category).find({
+          where: { userId },
+        }),
+      );
       for (const c of categories) categoryMap.set(c.id, c);
     } else if (report.groupBy === GroupByType.PAYEE) {
-      const payees = await this.payeesRepository.find({ where: { userId } });
+      const payees = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(Payee).find({ where: { userId } }),
+      );
       for (const p of payees) payeeMap.set(p.id, p);
     }
 
@@ -373,72 +380,75 @@ export class ReportsService {
     filters: CustomReport["filters"],
     config: ReportConfig,
   ): Promise<Transaction[]> {
-    const queryBuilder = this.transactionsRepository
-      .createQueryBuilder("transaction")
-      .leftJoinAndSelect("transaction.account", "account")
-      .leftJoinAndSelect("transaction.category", "category")
-      .leftJoinAndSelect("category.parent", "categoryParent")
-      .leftJoinAndSelect("transaction.payee", "payee")
-      .leftJoinAndSelect("transaction.tags", "tags")
-      .leftJoinAndSelect("transaction.splits", "splits")
-      .leftJoinAndSelect("splits.category", "splitCategory")
-      .leftJoinAndSelect("splitCategory.parent", "splitCategoryParent")
-      .leftJoinAndSelect("splits.tags", "splitTags")
-      .where("transaction.userId = :userId", { userId })
-      .andWhere("transaction.transactionDate >= :startDate", { startDate })
-      .andWhere("transaction.transactionDate <= :endDate", { endDate })
-      .andWhere("transaction.status != 'VOID'");
+    return withScopedDb(this.dataSource, (m) => {
+      const queryBuilder = m
+        .getRepository(Transaction)
+        .createQueryBuilder("transaction")
+        .leftJoinAndSelect("transaction.account", "account")
+        .leftJoinAndSelect("transaction.category", "category")
+        .leftJoinAndSelect("category.parent", "categoryParent")
+        .leftJoinAndSelect("transaction.payee", "payee")
+        .leftJoinAndSelect("transaction.tags", "tags")
+        .leftJoinAndSelect("transaction.splits", "splits")
+        .leftJoinAndSelect("splits.category", "splitCategory")
+        .leftJoinAndSelect("splitCategory.parent", "splitCategoryParent")
+        .leftJoinAndSelect("splits.tags", "splitTags")
+        .where("transaction.userId = :userId", { userId })
+        .andWhere("transaction.transactionDate >= :startDate", { startDate })
+        .andWhere("transaction.transactionDate <= :endDate", { endDate })
+        .andWhere("transaction.status != 'VOID'");
 
-    // Advanced filter groups take precedence over legacy filters
-    if (filters.filterGroups && filters.filterGroups.length > 0) {
-      this.applyFilterGroups(queryBuilder, filters.filterGroups);
-    } else {
-      // Legacy simple filters (backward compat)
-      if (filters.accountIds && filters.accountIds.length > 0) {
-        queryBuilder.andWhere("transaction.accountId IN (:...accountIds)", {
-          accountIds: filters.accountIds,
-        });
+      // Advanced filter groups take precedence over legacy filters
+      if (filters.filterGroups && filters.filterGroups.length > 0) {
+        this.applyFilterGroups(queryBuilder, filters.filterGroups);
+      } else {
+        // Legacy simple filters (backward compat)
+        if (filters.accountIds && filters.accountIds.length > 0) {
+          queryBuilder.andWhere("transaction.accountId IN (:...accountIds)", {
+            accountIds: filters.accountIds,
+          });
+        }
+
+        if (filters.categoryIds && filters.categoryIds.length > 0) {
+          queryBuilder.andWhere(
+            "(transaction.categoryId IN (:...categoryIds) OR splits.categoryId IN (:...categoryIds))",
+            { categoryIds: filters.categoryIds },
+          );
+        }
+
+        if (filters.payeeIds && filters.payeeIds.length > 0) {
+          queryBuilder.andWhere("transaction.payeeId IN (:...payeeIds)", {
+            payeeIds: filters.payeeIds,
+          });
+        }
+
+        if (filters.searchText && filters.searchText.trim()) {
+          const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
+          queryBuilder.andWhere(
+            "(LOWER(transaction.payeeName) LIKE :searchTerm OR LOWER(transaction.description) LIKE :searchTerm)",
+            { searchTerm },
+          );
+        }
       }
 
-      if (filters.categoryIds && filters.categoryIds.length > 0) {
-        queryBuilder.andWhere(
-          "(transaction.categoryId IN (:...categoryIds) OR splits.categoryId IN (:...categoryIds))",
-          { categoryIds: filters.categoryIds },
-        );
+      // Filter by direction
+      if (config.direction === DirectionFilter.INCOME_ONLY) {
+        queryBuilder.andWhere("transaction.amount > 0");
+      } else if (config.direction === DirectionFilter.EXPENSES_ONLY) {
+        queryBuilder.andWhere("transaction.amount < 0");
       }
 
-      if (filters.payeeIds && filters.payeeIds.length > 0) {
-        queryBuilder.andWhere("transaction.payeeId IN (:...payeeIds)", {
-          payeeIds: filters.payeeIds,
-        });
+      // Filter transfers
+      if (!config.includeTransfers) {
+        queryBuilder.andWhere("transaction.isTransfer = false");
       }
 
-      if (filters.searchText && filters.searchText.trim()) {
-        const searchTerm = `%${filters.searchText.trim().toLowerCase()}%`;
-        queryBuilder.andWhere(
-          "(LOWER(transaction.payeeName) LIKE :searchTerm OR LOWER(transaction.description) LIKE :searchTerm)",
-          { searchTerm },
-        );
-      }
-    }
-
-    // Filter by direction
-    if (config.direction === DirectionFilter.INCOME_ONLY) {
-      queryBuilder.andWhere("transaction.amount > 0");
-    } else if (config.direction === DirectionFilter.EXPENSES_ONLY) {
-      queryBuilder.andWhere("transaction.amount < 0");
-    }
-
-    // Filter transfers
-    if (!config.includeTransfers) {
-      queryBuilder.andWhere("transaction.isTransfer = false");
-    }
-
-    // M29: Limit result set to prevent unbounded memory consumption
-    return queryBuilder
-      .orderBy("transaction.transactionDate", "ASC")
-      .take(50000)
-      .getMany();
+      // M29: Limit result set to prevent unbounded memory consumption
+      return queryBuilder
+        .orderBy("transaction.transactionDate", "ASC")
+        .take(50000)
+        .getMany();
+    });
   }
 
   private applyFilterGroups(
