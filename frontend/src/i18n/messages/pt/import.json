@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "Importar Transações",
-    "subtitle": "Importar transações a partir de ficheiros QIF, OFX/QFX ou CSV"
+    "subtitle": "Importar transações a partir de ficheiros QIF, OFX/QFX ou CSV, ou trazer um ficheiro completo do Microsoft Money (.mny)"
   },
   "upload": {
     "heading": "Carregar Ficheiros de Transações",
-    "instructions": "Selecione um ou mais ficheiros para importar. Formatos suportados: QIF, OFX/QFX, CSV.\nPode selecionar vários ficheiros do mesmo tipo para importação em massa.",
+    "instructions": "Selecione um ou mais ficheiros para importar. Formatos suportados: QIF, OFX/QFX, CSV e Microsoft Money (.mny).\nPode selecionar vários ficheiros do mesmo tipo para importação em massa. Importe um ficheiro do Microsoft Money de cada vez — um ficheiro .mny contém um perfil completo.",
     "importingTo": "A importar para:",
     "clickToSelect": "Clique para selecionar ficheiro(s)",
     "processing": "A processar...",
-    "acceptedFormats": "QIF, OFX, QFX ou CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV ou Microsoft Money (.mny)",
     "mnyFailedHeading": "Não foi possível abrir este ficheiro do Microsoft Money",
     "wikiNotice": {
       "title": "Antes de importar",

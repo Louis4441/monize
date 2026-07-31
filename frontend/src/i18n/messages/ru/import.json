@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "Импорт проводок",
-    "subtitle": "Импорт проводок из файлов QIF, OFX/QFX или CSV"
+    "subtitle": "Импорт проводок из файлов QIF, OFX/QFX или CSV либо перенос целого файла Microsoft Money (.mny)"
   },
   "upload": {
     "heading": "Загрузить файлы с проводками",
-    "instructions": "Выберите один или несколько файлов для импорта. Поддерживаемые форматы: QIF, OFX/QFX, CSV.\nМожно выбрать несколько файлов одного типа для массового импорта.",
+    "instructions": "Выберите один или несколько файлов для импорта. Поддерживаемые форматы: QIF, OFX/QFX, CSV и Microsoft Money (.mny).\nМожно выбрать несколько файлов одного типа для массового импорта. Файлы Microsoft Money импортируйте по одному — файл .mny содержит целый профиль.",
     "importingTo": "Импорт в:",
     "clickToSelect": "Нажмите для выбора файла(ов)",
     "processing": "Обработка...",
-    "acceptedFormats": "QIF, OFX, QFX или CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV или Microsoft Money (.mny)",
     "mnyFailedHeading": "Не удалось открыть этот файл Microsoft Money",
     "wikiNotice": {
       "title": "Перед импортом",

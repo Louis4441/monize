@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "Імпорт транзакцій",
-    "subtitle": "Імпортуйте транзакції з файлів QIF, OFX/QFX або CSV"
+    "subtitle": "Імпортуйте транзакції з файлів QIF, OFX/QFX або CSV чи перенесіть цілий файл Microsoft Money (.mny)"
   },
   "upload": {
     "heading": "Завантажити файли транзакцій",
-    "instructions": "Оберіть один або кілька файлів для імпорту. Підтримувані формати: QIF, OFX/QFX, CSV.\nМожна вибрати кілька файлів одного типу для масового імпорту.",
+    "instructions": "Оберіть один або кілька файлів для імпорту. Підтримувані формати: QIF, OFX/QFX, CSV і Microsoft Money (.mny).\nМожна вибрати кілька файлів одного типу для масового імпорту. Файли Microsoft Money імпортуйте по одному — файл .mny містить цілий профіль.",
     "importingTo": "Імпорт до:",
     "clickToSelect": "Натисніть, щоб вибрати файл(и)",
     "processing": "Обробка...",
-    "acceptedFormats": "QIF, OFX, QFX або CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV або Microsoft Money (.mny)",
     "mnyFailedHeading": "Не вдалося відкрити цей файл Microsoft Money",
     "wikiNotice": {
       "title": "Перед імпортом",

@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "İşlem İçe Aktar",
-    "subtitle": "QIF, OFX/QFX veya CSV dosyalarından işlem içe aktarın"
+    "subtitle": "QIF, OFX/QFX veya CSV dosyalarından işlem içe aktarın ya da bütün bir Microsoft Money (.mny) dosyasını aktarın"
   },
   "upload": {
     "heading": "İşlem Dosyaları Yükle",
-    "instructions": "İçe aktarmak için bir veya daha fazla dosya seçin. Desteklenen biçimler: QIF, OFX/QFX, CSV.\nToplu içe aktarma için aynı türden birden fazla dosya seçebilirsiniz.",
+    "instructions": "İçe aktarmak için bir veya daha fazla dosya seçin. Desteklenen biçimler: QIF, OFX/QFX, CSV ve Microsoft Money (.mny).\nToplu içe aktarma için aynı türden birden fazla dosya seçebilirsiniz. Microsoft Money dosyalarını tek tek içe aktarın — bir .mny dosyası bütün bir profili içerir.",
     "importingTo": "İçe aktarılıyor:",
     "clickToSelect": "Dosya(ları) seçmek için tıklayın",
     "processing": "İşleniyor...",
-    "acceptedFormats": "QIF, OFX, QFX veya CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV veya Microsoft Money (.mny)",
     "mnyFailedHeading": "Bu Microsoft Money dosyası açılamadı",
     "wikiNotice": {
       "title": "İçe aktarmadan önce",

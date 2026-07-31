@@ -34,15 +34,15 @@
   },
   "page": {
     "title": "Transacties importeren",
-    "subtitle": "Importeer transacties vanuit QIF-, OFX/QFX- of CSV-bestanden"
+    "subtitle": "Importeer transacties vanuit QIF-, OFX/QFX- of CSV-bestanden, of neem een volledig Microsoft Money-bestand (.mny) over"
   },
   "upload": {
     "heading": "Transactiebestanden uploaden",
-    "instructions": "Selecteer een of meer bestanden om te importeren. Ondersteunde indelingen: QIF, OFX/QFX, CSV.\nJe kunt meerdere bestanden van hetzelfde type selecteren voor bulkimport.",
+    "instructions": "Selecteer een of meer bestanden om te importeren. Ondersteunde indelingen: QIF, OFX/QFX, CSV en Microsoft Money (.mny).\nJe kunt meerdere bestanden van hetzelfde type selecteren voor bulkimport. Importeer Microsoft Money-bestanden één voor één — een .mny-bestand bevat een volledig profiel.",
     "importingTo": "Importeren naar:",
     "clickToSelect": "Klik om bestand(en) te selecteren",
     "processing": "Verwerken...",
-    "acceptedFormats": "QIF, OFX, QFX of CSV",
+    "acceptedFormats": "QIF, OFX, QFX, CSV of Microsoft Money (.mny)",
     "mnyFailedHeading": "Dit Microsoft Money-bestand kon niet worden geopend",
     "wikiNotice": {
       "title": "Voordat u importeert",
