@@ -222,8 +222,18 @@ export const MNY_ACTION = {
   REINVEST_ALT: 5,
   /** Reinvested distribution: opens lots, and the cash never lands. */
   REINVEST: 9,
-  /** Opens lots with `TRN.amt` set, exactly like `BUY`. */
-  BUY_ALT: 12,
+  /**
+   * Opens lots for a stated value that **no cash pays for**: units credited to a
+   * plan account from outside it. `act` 1 pairs with a cash row through
+   * `TRN_XFER` 2,015 times in 2,029 (`act` 3, 1,090 of 1,090); `act` 12 does so
+   * 0 times in 92, exactly like the `act` 9 reinvestments beside it, and 82 of
+   * those 92 sit in one employer-matched RRSP (`ACCT.fEmpMatch`).
+   *
+   * Charging its value to the cash sleeve, as `BUY` does, is what left that
+   * account $18,457.22 overdrawn where Money's own cash rows net to $91.00 --
+   * the whole discrepancy, to the cent, was this code's 74 non-zero amounts.
+   */
+  CONTRIBUTION: 12,
   /** Closes lots with no cash. */
   REMOVE_SHARES: 13,
   /** Cash corporate action. Real-world meaning unconfirmed. */
@@ -246,7 +256,9 @@ const ACTION_BY_CODE: ReadonlyMap<number, InvestmentAction> = new Map([
   [MNY_ACTION.DISTRIBUTION, InvestmentAction.DIVIDEND],
   [MNY_ACTION.REINVEST_ALT, InvestmentAction.REINVEST],
   [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
-  [MNY_ACTION.BUY_ALT, InvestmentAction.BUY],
+  // Value and quantity like a buy, cash like a reinvestment -- and REINVEST is
+  // the only Monize action that is both, so the cost basis survives.
+  [MNY_ACTION.CONTRIBUTION, InvestmentAction.REINVEST],
   [MNY_ACTION.REMOVE_SHARES, InvestmentAction.REMOVE_SHARES],
   [MNY_ACTION.CAPITAL_GAIN, InvestmentAction.CAPITAL_GAIN],
   [MNY_ACTION.ADD_SHARES, InvestmentAction.ADD_SHARES],
@@ -260,19 +272,19 @@ const ACTION_BY_CODE: ReadonlyMap<number, InvestmentAction> = new Map([
  * warning to every transaction it maps through one of these, so the
  * verification report shows the user what was assumed.
  *
- * `DISTRIBUTION` and `BUY_ALT` are here because the lots prove what they do to
- * a position but not what Money calls them: `act` 4 is some cash distribution
- * that is not the dividend `act` 3 already is, and `act` 12 opens lots with a
- * cash amount exactly as `act` 1 does. Both are mapped to their observed
- * effect and reported, which is the rule -- codes 10, 17, 18 and 20 turn up in
- * real files with no lot to explain them, so they stay unmapped and are
- * skipped with a warning rather than guessed at.
+ * `DISTRIBUTION` and `CONTRIBUTION` are here because the file proves what they
+ * do -- to a position, and to cash -- but not what Money calls them: `act` 4 is
+ * some cash distribution that is not the dividend `act` 3 already is, and `act`
+ * 12 credits units to a plan account that nothing pays for. Both are mapped to
+ * their measured effect and reported, which is the rule -- codes 10, 17, 18 and
+ * 20 turn up in real files with no lot to explain them, so they stay unmapped
+ * and are skipped with a warning rather than guessed at.
  */
 export const MNY_UNCONFIRMED_ACTIONS: ReadonlySet<number> = new Set([
   MNY_ACTION.REINVEST_ALT,
   MNY_ACTION.CAPITAL_GAIN,
   MNY_ACTION.DISTRIBUTION,
-  MNY_ACTION.BUY_ALT,
+  MNY_ACTION.CONTRIBUTION,
 ]);
 
 /**

@@ -232,21 +232,54 @@ An investment row is identified by carrying a security, not by its action code:
 
 ### The `act` field
 
-| act | Meaning | `TRN_INV` row? | Monize action |
-|-----|---------|:--------------:|---------------|
-| 0 | Buy | yes | BUY |
-| 1 | Sell | yes | SELL |
-| 3 | Reinvest | yes | REINVEST |
-| 5 | Reinvest (variant) | yes | REINVEST, noted in the description |
-| 4 | Cash dividend | **no** | DIVIDEND, amount from `TRN.amt` |
-| 14 | Cash corporate action | **no** | CAPITAL_GAIN + warning |
-| 15 | Add shares / open lots | yes | ADD_SHARES, or TRANSFER_IN when paired |
-| 16 | Remove shares / close lots | yes | REMOVE_SHARES, or TRANSFER_OUT when paired |
-| -1 | Regular non-investment transaction | no | — |
+The original's table is reproduced in the **Correction** below; this one is what
+the files measure, read off `LOT` (which transaction opened and closed each tax
+lot) and `TRN_XFER` (whether Money records a cash counterpart at all).
 
-`act` 5 and 14 have never been observed in any available file; both are listed
-in `MNY_UNCONFIRMED_ACTIONS` so every transaction mapped through them carries a
-warning rather than a silent mapping.
+| act | Meaning | `TRN_INV` row? | Cash counterpart? | Monize action |
+|-----|---------|:--------------:|:-----------------:|---------------|
+| 0 | Buy, Money 2001-era | yes | — | BUY |
+| 1 | Buy | yes | 2,015 of 2,029 | BUY |
+| 2 | Sell | yes | 165 of 180 | SELL |
+| 3 | Cash dividend | **no** | 1,090 of 1,090 | DIVIDEND, amount from `TRN.amt` |
+| 4 | Second cash distribution | **no** | — | DIVIDEND + warning |
+| 5 | Reinvest (variant) | yes | — | REINVEST + warning |
+| 9 | Reinvested distribution | yes | **0 of 1,020** | REINVEST |
+| 12 | Units credited to a plan account | yes | **0 of 92** | REINVEST + warning |
+| 13 | Remove shares / close lots | yes | — | REMOVE_SHARES |
+| 14 | Cash corporate action | **no** | — | CAPITAL_GAIN + warning |
+| 15 | Add shares / open lots | yes | — | ADD_SHARES, or TRANSFER_IN when paired |
+| 16 | Remove shares / close lots | yes | — | REMOVE_SHARES, or TRANSFER_OUT when paired |
+| 32 / 33 | Share transfer in / out | yes | — | TRANSFER_IN / TRANSFER_OUT |
+| -1 | Regular non-investment transaction | no | — | — |
+
+`act` 5 and 14 have never been observed in any available file; 4 and 12 have been
+observed but Money's own name for them has not. All four are listed in
+`MNY_UNCONFIRMED_ACTIONS`, so every transaction mapped through them carries a
+warning rather than a silent mapping. `act` 10, 17, 18 and 20 occur in real files
+but open and close no lot, so nothing says what they do to a position: they stay
+unmapped and their rows are skipped and counted.
+
+> **Correction.** The original gives `0` Buy, `1` Sell, `3` Reinvest and `5`
+> Reinvest (variant). `LOT` disagrees at the first two: `act` 1 opens 3,520 lots
+> in a real Money Plus file and closes none, and `act` 2 is the sale. Read that
+> way, every purchase imported as a sale, no cash ever left a brokerage sleeve,
+> and holdings replayed negative. `act` 3 has no `TRN_INV` row, which is a
+> dividend rather than a reinvestment; `act` 9 is the reinvestment.
+
+#### `act` 12 credits units that no cash pays for
+
+It opens lots and carries a value and a quantity, so it looks exactly like a
+buy -- and mapping it as one overdrew a cash sleeve by $18,457.22 against
+Money's own $91.00. What separates it is the cash counterpart: `act` 1 pairs
+with a cash row through `TRN_XFER` 2,015 times in 2,029 and `act` 3 does 1,090
+times in 1,090, while `act` 12 does so **zero** times in 92 -- exactly like the
+`act` 9 reinvestments. 82 of those 92 rows sit in one RRSP whose `ACCT` row has
+`fEmpMatch` set, which is what the units appear to be: an employer's side of a
+plan contribution, credited without passing through the member's cash.
+
+REINVEST is the Monize action that matches: a value and a position, no cash leg,
+cost basis preserved.
 
 #### `act` 16 closes lots; it is not a sale
 

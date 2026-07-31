@@ -592,6 +592,15 @@ of 4,524 investment transactions dropped, and five cash sleeves ended thousands 
 two cents of zero. A currency is now recognised by the `/GBPUS` symbol shape alone, which is
 where currencies actually live (`CRNC`); no `sct` code is read for meaning anywhere.
 
+**`act` 12 is a credit of units, not a purchase.** It opens lots with a value and a quantity, so
+it read as a buy — and charging the cash sleeve for it left the maintainer's Standard Life RRSP
+$18,457.22 overdrawn where Money's own cash rows for that account net to $91.00, one unspent
+contribution. The signal is `TRN_XFER`: `act` 1 has a cash counterpart 2,015 times in 2,029 and
+`act` 3 has one 1,090 times in 1,090, while `act` 12 has one **zero** times in 92, exactly like
+the `act` 9 reinvestments. 82 of the 92 sit in the one RRSP whose `ACCT` row sets `fEmpMatch`.
+Mapped to REINVEST — a value and a position, no cash leg — the sleeve lands on Money's $91.00.
+It stays in `MNY_UNCONFIRMED_ACTIONS`: the effect is measured, the name is not.
+
 **`SEC_SPLIT` ratios are not applied to positions, because Money does not apply them either.**
 Seven positions across two files prove it: the maintainer's brokerage bought 200 VTI before a 1:2
 split row and 100 after, then transferred the whole account away in a single 300-share row, and

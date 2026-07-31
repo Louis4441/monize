@@ -255,6 +255,45 @@ describe("mapInvestments", () => {
       });
     });
 
+    /**
+     * `act` 12 credits units to a plan account that no cash pays for: it never
+     * has a `TRN_XFER` cash counterpart in 92 occurrences, where `act` 1 has one
+     * 2,015 times in 2,029. Charging its value to the sleeve, as BUY does, left
+     * one employer-matched RRSP $18,457.22 overdrawn against Money's own $91.00.
+     */
+    it("gives act=12 a value and a position but no cash leg", () => {
+      const result = mapInvestments(
+        input({
+          transactions: transactionData({
+            transactions: [
+              invRow({
+                handle: 1,
+                action: MNY_ACTION.CONTRIBUTION,
+                amount: 392.99,
+              }),
+            ],
+          }),
+          investments: investmentData({
+            investmentDetails: [
+              mnyInvestmentDetail({
+                transaction: 1,
+                quantity: 37.706223,
+                price: 10.422481,
+              }),
+            ],
+          }),
+        }),
+      );
+
+      expect(result.transactions[0]).toMatchObject({
+        action: InvestmentAction.REINVEST,
+        quantity: 37.706223,
+        totalAmount: 392.99,
+        cashAmount: 0,
+        cashAccountKey: null,
+      });
+    });
+
     it("takes quantity as positive even when Money stored it signed", () => {
       const result = mapInvestments(
         input({

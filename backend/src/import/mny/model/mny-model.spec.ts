@@ -134,7 +134,7 @@ describe("mapInvestmentAction", () => {
     [MNY_ACTION.DIVIDEND, InvestmentAction.DIVIDEND],
     [MNY_ACTION.DISTRIBUTION, InvestmentAction.DIVIDEND],
     [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
-    [MNY_ACTION.BUY_ALT, InvestmentAction.BUY],
+    [MNY_ACTION.CONTRIBUTION, InvestmentAction.REINVEST],
     [MNY_ACTION.REINVEST_ALT, InvestmentAction.REINVEST],
     [MNY_ACTION.CAPITAL_GAIN, InvestmentAction.CAPITAL_GAIN],
     [MNY_ACTION.ADD_SHARES, InvestmentAction.ADD_SHARES],
@@ -179,7 +179,7 @@ describe("mapInvestmentAction", () => {
     for (const act of [
       MNY_ACTION.BUY,
       MNY_ACTION.REINVEST,
-      MNY_ACTION.BUY_ALT,
+      MNY_ACTION.CONTRIBUTION,
       MNY_ACTION.TRANSFER_IN,
     ]) {
       expect(mapInvestmentAction(act)).not.toBeNull();
@@ -210,7 +210,7 @@ describe("mapInvestmentAction", () => {
     expect([...MNY_UNCONFIRMED_ACTIONS].sort((a, b) => a - b)).toEqual([
       MNY_ACTION.DISTRIBUTION,
       MNY_ACTION.REINVEST_ALT,
-      MNY_ACTION.BUY_ALT,
+      MNY_ACTION.CONTRIBUTION,
       MNY_ACTION.CAPITAL_GAIN,
     ]);
   });

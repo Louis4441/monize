@@ -158,6 +158,11 @@ about 3,255 rows the user cannot act on is a sign the mapping is wrong, not that
   other than 1 are surfaced as `securitySplitNotApplied`, never acted on.
 - **"No date" is year 10000, not a two-digit-year pivot.** `toDate` returns null outside
   1900–2199; never parse Money dates by hand.
+- **`act` 12 credits units that no cash pays for.** It opens lots with a value and a quantity,
+  like a buy, but never has a `TRN_XFER` cash counterpart -- 0 times in 92, where `act` 1 has one
+  2,015 times in 2,029 and `act` 3 1,090 times in 1,090. Mapping it to BUY charged the sleeve and
+  left an employer-matched RRSP $18,457.22 overdrawn against Money's own $91.00. REINVEST is the
+  action that has a value and a position but no cash leg.
 - **`act` 16 removes shares; it is not a sale.** Mapping it to SELL closes lots against a
   fabricated price and corrupts average cost. Direction always comes from `act` -- `TRN_INV.qty`
   is stored positive, so a quantity sign proves nothing.
