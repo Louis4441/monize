@@ -311,35 +311,37 @@ export function hasInvestmentDetail(act: number): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Money stores currencies as pseudo-securities of this type; they must not
- * become Monize securities. **Unconfirmed** -- no fixture contains one, and
- * `sct` codes are demonstrably not stable across releases: the same Amex index
- * securities are `sct` 6 in Money 2001/2002 and the Money Plus indices are
- * `sct` 7. Pair the code test with `isCurrencyQuoteSymbol`.
- */
-export const MNY_SECURITY_TYPE_CURRENCY = 4;
-
-/**
  * True when a symbol has the shape Money uses for a currency quote --
  * `/GBPUS`, `/ARSUS`. Confirmed: every `CRNC.szSymbol` in every fixture
- * matches. Unlike `sct`, this does not shift between releases, so it is the
- * version-independent half of the currency-pseudo-security test.
+ * matches, and no `SEC` row in any of them has the shape.
  */
 export function isCurrencyQuoteSymbol(symbol: string): boolean {
   return /^\/[A-Z]{3}[A-Z]{2}$/.test(symbol);
 }
 
 /**
- * True when a `SEC` row is a currency rather than a real security, by either
- * signal.
+ * True when a `SEC` row is a currency rather than a real security.
+ *
+ * The symbol shape is the whole test, and deliberately so. This used to also
+ * exclude `sct` 4 on the theory that Money files currencies in `SEC` under a
+ * type code -- **`sct` 4 is a money-market fund**. Money Plus's own
+ * `sample.mny` files "Vanguard Money Market Fund", "Merrill Lynch Money
+ * Market", "Smith Barney Money Market" and "Woodgrove Money Market" under it,
+ * and all four of the maintainer's are money-market funds too (TD Canadian
+ * Money Market, CIBC Canadian Money Market, CIBC Canadian T-Bill, McLean
+ * Budden Money Market). Excluding the code dropped 829 of that file's 4,524
+ * investment transactions -- every money-market trade in seven brokerage
+ * accounts -- as `missingInvestmentDetail`, because the security they point at
+ * was never imported.
+ *
+ * Currencies do not live in `SEC` in any file measured: all five carry their
+ * `/GBPUS`-shaped symbols in `CRNC` alone. `sct` codes are also not stable
+ * across releases (the same Amex indices are `sct` 6 in Money 2001/2002 and
+ * `sct` 7 in Money Plus), which is why none of them is read for meaning --
+ * see the note on `mapSecurities` about `securityType` staying null.
  */
-export function isCurrencyPseudoSecurity(
-  securityType: number,
-  symbol: string,
-): boolean {
-  return (
-    securityType === MNY_SECURITY_TYPE_CURRENCY || isCurrencyQuoteSymbol(symbol)
-  );
+export function isCurrencyPseudoSecurity(symbol: string): boolean {
+  return isCurrencyQuoteSymbol(symbol);
 }
 
 // ---------------------------------------------------------------------------

@@ -435,11 +435,19 @@ for foreign ones (`GB:VOD`, `US:VT`), and empty for many funds.
 > some file, so Monize deliberately leaves `securityType` null for the user to
 > set.
 >
-> This weakens "currencies are stored as securities with `sct = 4`", which is
-> the rule for excluding currency pseudo-securities -- and no available file
-> contains one, so `sct = 4` is itself unverified. The version-independent
-> second signal is the symbol: every `CRNC.szSymbol` in every file has the shape
-> `/GBPUS`, so Monize tests the code **or** the symbol shape.
+> **`sct = 4` is a money-market fund, not a currency.** Money Plus's own
+> `sample.mny` files Vanguard, Merrill Lynch, Smith Barney and Woodgrove money
+> market funds under it; a real Money Plus file's four `sct = 4` rows are TD
+> Canadian Money Market, CIBC Canadian Money Market, CIBC Canadian T-Bill and
+> McLean Budden Money Market. Excluding the code as a currency dropped 829 of
+> that file's 4,524 investment transactions and left five brokerage cash sleeves
+> thousands of dollars out, because the money-market fund *is* the sweep account
+> the cash moves through.
+>
+> Currencies are not in `SEC` at all in any file measured -- they live in `CRNC`,
+> whose `szSymbol` always has the shape `/GBPUS`. That symbol shape is the entire
+> test Monize applies to a `SEC` row (`isCurrencyPseudoSecurity`); no `sct` code
+> is read for meaning anywhere.
 
 ## SEC_SPLIT (stock splits)
 

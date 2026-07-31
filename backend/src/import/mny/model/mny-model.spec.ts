@@ -239,12 +239,13 @@ describe("currency pseudo-securities", () => {
     },
   );
 
-  it("excludes a row by either the type code or the symbol shape", () => {
-    // sct codes shift between releases, so the symbol shape is the
-    // version-independent half of the test.
-    expect(isCurrencyPseudoSecurity(4, "anything")).toBe(true);
-    expect(isCurrencyPseudoSecurity(6, "/GBPUS")).toBe(true);
-    expect(isCurrencyPseudoSecurity(6, "$XAL.X")).toBe(false);
+  it("excludes a row by the symbol shape alone", () => {
+    // No `sct` code is read here: 4 was, on the theory that it meant currency,
+    // and it is Money's money-market fund. Nothing else distinguishes a
+    // currency row, and sct codes shift between releases besides.
+    expect(isCurrencyPseudoSecurity("/GBPUS")).toBe(true);
+    expect(isCurrencyPseudoSecurity("$XAL.X")).toBe(false);
+    expect(isCurrencyPseudoSecurity("TDB164")).toBe(false);
   });
 
   it("matches every currency quote symbol in every fixture", () => {
@@ -269,7 +270,7 @@ describe("currency pseudo-securities", () => {
 
       expect(
         securities.some((security) =>
-          isCurrencyPseudoSecurity(security.securityType, security.symbol),
+          isCurrencyPseudoSecurity(security.symbol),
         ),
       ).toBe(false);
     }

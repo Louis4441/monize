@@ -332,8 +332,7 @@ function fileCounts(tables: MnyTables): MnyFileCounts {
       (category) => category.level > 0,
     ).length,
     securities: tables.investments.securities.filter(
-      (security) =>
-        !isCurrencyPseudoSecurity(security.securityType, security.symbol),
+      (security) => !isCurrencyPseudoSecurity(security.symbol),
     ).length,
     securityPrices: tables.investments.prices.length,
     exchangeRates: tables.reference.exchangeRates.length,

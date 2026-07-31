@@ -169,10 +169,13 @@ about 3,255 rows the user cannot act on is a sign the mapping is wrong, not that
   `US:VTI` creates a second security beside the user's own `VTI` and every quote lookup 404s.
 - **`act` 3 and `act` 4 (cash distributions) have no `TRN_INV` row.** Drive the investment mapper from `TRN`;
   iterating `TRN_INV` drops every dividend.
-- **`SEC.sct` codes shift between releases** (the same index securities are `sct` 6 in Money
-  2001/2002 and `sct` 7 in Money Plus), so the `sct = 4` currency test is not enough on its own.
-  Use `isCurrencyPseudoSecurity`, which also matches the version-independent `/GBPUS` symbol
-  shape.
+- **No `SEC.sct` code means anything portable, so none is read.** The codes shift between
+  releases (the same index securities are `sct` 6 in Money 2001/2002 and `sct` 7 in Money Plus),
+  and `sct = 4` -- long assumed to mark a currency pseudo-security -- is Money's **money-market
+  fund**, which in a brokerage account is the sweep the cash moves through. Excluding it cost
+  829 investment transactions and left five cash sleeves thousands of dollars out. A currency is
+  recognised by the `/GBPUS` symbol shape alone (`isCurrencyPseudoSecurity`), and currencies
+  live in `CRNC`, not `SEC`.
 - **`CAT.lType` says income or expense directly** -- `{2, 3}` income, `{0, 1}` expense, `-1` the
   two roots. Use `isIncomeCategoryType` and fall back to the root ancestor only for the roots.
 - **A `.mny` is a snapshot, so bill activity is measured from the file, not the clock.**

@@ -9,10 +9,10 @@ import { MnyWarning } from "../model/mny-warnings";
  * Three PR #192 defects are fixed here, and each one loses data silently when it
  * is not:
  *
- * - **Currency pseudo-securities never become securities.** Money stores every
- *   currency in `SEC` as well. The `sct` code for them is not stable across
- *   releases, so `isCurrencyPseudoSecurity` also tests the `/GBPUS` symbol
- *   shape (design 6.3).
+ * - **Currency pseudo-securities never become securities**, recognised by the
+ *   `/GBPUS` symbol shape alone (design 6.3). Not by `SEC.sct`: the code that
+ *   test used to carry, 4, turned out to be Money's money-market fund -- see
+ *   `isCurrencyPseudoSecurity`.
  * - **Two securities never collapse into one.** `securities` is unique on
  *   `(user_id, symbol)`; PR #192 wrote `ON CONFLICT ... DO UPDATE`, which merged
  *   two distinct funds that happened to share a ticker. Here the second one is
@@ -170,7 +170,7 @@ export function mapSecurities(input: MapSecuritiesInput): MappedSecurities {
     }
 
     const moneySymbol = row.symbol.trim();
-    if (isCurrencyPseudoSecurity(row.securityType, moneySymbol)) {
+    if (isCurrencyPseudoSecurity(moneySymbol)) {
       // Money keeps every currency in SEC too. Importing them produces
       // securities the user never held.
       skipped += 1;

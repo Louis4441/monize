@@ -152,11 +152,31 @@ describe("mapSecurities", () => {
       expect(result.skipped).toBe(1);
     });
 
-    it("excludes rows carrying the currency security type", () => {
+    // `sct` 4 was read as "currency" and is Money's money-market fund. It
+    // skipped the security, and with it every transaction pointing at it: 829
+    // in the maintainer's file, reported as missingInvestmentDetail.
+    it("imports a money-market fund, which is what the sct 4 code means", () => {
       const result = mapHeld({
         ...base,
         securities: [
-          mnySecurity({ handle: 1, symbol: "EUR", securityType: 4 }),
+          mnySecurity({
+            handle: 1,
+            symbol: "TDB164",
+            name: "TD Canadian Money Market",
+            securityType: 4,
+          }),
+        ],
+      });
+
+      expect(result.securities.map((s) => s.symbol)).toEqual(["TDB164"]);
+      expect(result.skipped).toBe(0);
+    });
+
+    it("excludes a currency by symbol shape whatever its security type", () => {
+      const result = mapHeld({
+        ...base,
+        securities: [
+          mnySecurity({ handle: 1, symbol: "/EURUS", securityType: 6 }),
         ],
       });
 
