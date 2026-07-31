@@ -4,8 +4,8 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, In, IsNull, Repository } from "typeorm";
+import { DataSource, In, IsNull } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Budget } from "./entities/budget.entity";
 import { BudgetCategory } from "./entities/budget-category.entity";
 import {
@@ -70,22 +70,6 @@ export class BudgetsService {
   >();
 
   constructor(
-    @InjectRepository(Budget)
-    private budgetsRepository: Repository<Budget>,
-    @InjectRepository(BudgetCategory)
-    private budgetCategoriesRepository: Repository<BudgetCategory>,
-    @InjectRepository(BudgetAlert)
-    private budgetAlertsRepository: Repository<BudgetAlert>,
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(TransactionSplit)
-    private splitsRepository: Repository<TransactionSplit>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
-    @InjectRepository(ScheduledTransaction)
-    private scheduledTransactionsRepository: Repository<ScheduledTransaction>,
-    @InjectRepository(ScheduledTransactionOverride)
-    private overridesRepository: Repository<ScheduledTransactionOverride>,
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
   ) {}
@@ -94,12 +78,10 @@ export class BudgetsService {
     userId: string,
     createBudgetDto: CreateBudgetDto,
   ): Promise<Budget> {
-    const budget = this.budgetsRepository.create({
-      ...createBudgetDto,
-      userId,
+    const saved = await withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(Budget);
+      return repo.save(repo.create({ ...createBudgetDto, userId }));
     });
-
-    const saved = await this.budgetsRepository.save(budget);
 
     this.actionHistoryService.record(userId, {
       entityType: "budget",
@@ -115,23 +97,27 @@ export class BudgetsService {
   }
 
   async findAll(userId: string): Promise<Budget[]> {
-    return this.budgetsRepository.find({
-      where: { userId },
-      order: { createdAt: "DESC" },
-      relations: ["categories"],
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Budget).find({
+        where: { userId },
+        order: { createdAt: "DESC" },
+        relations: ["categories"],
+      }),
+    );
   }
 
   async findOne(userId: string, id: string): Promise<Budget> {
-    const budget = await this.budgetsRepository.findOne({
-      where: { id, userId },
-      relations: [
-        "categories",
-        "categories.category",
-        "categories.category.parent",
-        "categories.transferAccount",
-      ],
-    });
+    const budget = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Budget).findOne({
+        where: { id, userId },
+        relations: [
+          "categories",
+          "categories.category",
+          "categories.category.parent",
+          "categories.transferAccount",
+        ],
+      }),
+    );
 
     if (!budget) {
       throw new NotFoundException(
@@ -170,7 +156,9 @@ export class BudgetsService {
     if (updateBudgetDto.config !== undefined)
       budget.config = updateBudgetDto.config;
 
-    const saved = await this.budgetsRepository.save(budget);
+    const saved = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Budget).save(budget),
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "budget",
@@ -189,7 +177,9 @@ export class BudgetsService {
   async remove(userId: string, id: string): Promise<void> {
     const budget = await this.findOne(userId, id);
     const beforeData = { ...budget };
-    await this.budgetsRepository.remove(budget);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Budget).remove(budget),
+    );
 
     this.actionHistoryService.record(userId, {
       entityType: "budget",
@@ -209,9 +199,11 @@ export class BudgetsService {
   ): Promise<BudgetCategory> {
     const budget = await this.findOne(userId, budgetId);
 
-    const category = await this.categoriesRepository.findOne({
-      where: { id: dto.categoryId, userId },
-    });
+    const category = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Category).findOne({
+        where: { id: dto.categoryId, userId },
+      }),
+    );
 
     if (!category) {
       throw new NotFoundException(
@@ -223,9 +215,11 @@ export class BudgetsService {
       );
     }
 
-    const existing = await this.budgetCategoriesRepository.findOne({
-      where: { budgetId: budget.id, categoryId: dto.categoryId },
-    });
+    const existing = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetCategory).findOne({
+        where: { budgetId: budget.id, categoryId: dto.categoryId },
+      }),
+    );
 
     if (existing) {
       throw new BadRequestException(
@@ -236,12 +230,10 @@ export class BudgetsService {
       );
     }
 
-    const budgetCategory = this.budgetCategoriesRepository.create({
-      ...dto,
-      budgetId: budget.id,
+    return withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(BudgetCategory);
+      return repo.save(repo.create({ ...dto, budgetId: budget.id }));
     });
-
-    return this.budgetCategoriesRepository.save(budgetCategory);
   }
 
   async updateCategory(
@@ -252,9 +244,11 @@ export class BudgetsService {
   ): Promise<BudgetCategory> {
     await this.findOne(userId, budgetId);
 
-    const budgetCategory = await this.budgetCategoriesRepository.findOne({
-      where: { id: categoryId, budgetId },
-    });
+    const budgetCategory = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetCategory).findOne({
+        where: { id: categoryId, budgetId },
+      }),
+    );
 
     if (!budgetCategory) {
       throw new NotFoundException(
@@ -282,7 +276,9 @@ export class BudgetsService {
     if (dto.notes !== undefined) budgetCategory.notes = dto.notes;
     if (dto.sortOrder !== undefined) budgetCategory.sortOrder = dto.sortOrder;
 
-    return this.budgetCategoriesRepository.save(budgetCategory);
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetCategory).save(budgetCategory),
+    );
   }
 
   async removeCategory(
@@ -292,9 +288,11 @@ export class BudgetsService {
   ): Promise<void> {
     await this.findOne(userId, budgetId);
 
-    const budgetCategory = await this.budgetCategoriesRepository.findOne({
-      where: { id: categoryId, budgetId },
-    });
+    const budgetCategory = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetCategory).findOne({
+        where: { id: categoryId, budgetId },
+      }),
+    );
 
     if (!budgetCategory) {
       throw new NotFoundException(
@@ -306,7 +304,9 @@ export class BudgetsService {
       );
     }
 
-    await this.budgetCategoriesRepository.remove(budgetCategory);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetCategory).remove(budgetCategory),
+    );
   }
 
   async bulkUpdateCategories(
@@ -319,9 +319,11 @@ export class BudgetsService {
     // Load all targeted budget categories in a single query (avoids the prior
     // per-item N+1) and validate before any write.
     const ids = categories.map((item) => item.id);
-    const existing = await this.budgetCategoriesRepository.find({
-      where: { id: In(ids), budgetId },
-    });
+    const existing = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetCategory).find({
+        where: { id: In(ids), budgetId },
+      }),
+    );
     const byId = new Map(existing.map((bc) => [bc.id, bc]));
 
     for (const item of categories) {
@@ -338,25 +340,15 @@ export class BudgetsService {
 
     // Apply all amount changes atomically so a partial failure cannot leave
     // some categories updated and others not.
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
+    return withScopedDb(this.dataSource, async (m) => {
       const results: BudgetCategory[] = [];
       for (const item of categories) {
         const budgetCategory = byId.get(item.id)!;
         budgetCategory.amount = item.amount;
-        results.push(await queryRunner.manager.save(budgetCategory));
+        results.push(await m.save(budgetCategory));
       }
-
-      await queryRunner.commitTransaction();
       return results;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   async getSummary(
@@ -430,15 +422,18 @@ export class BudgetsService {
   ): Promise<UpcomingBill[]> {
     const todayStr = todayYMD();
 
-    const scheduledTransactions = await this.scheduledTransactionsRepository
-      .createQueryBuilder("st")
-      .where("st.user_id = :userId", { userId })
-      .andWhere("st.is_active = true")
-      .andWhere("st.amount < 0")
-      .andWhere("st.next_due_date >= :todayStr", { todayStr })
-      .andWhere("st.next_due_date <= :periodEnd", { periodEnd })
-      .orderBy("st.next_due_date", "ASC")
-      .getMany();
+    const scheduledTransactions = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(ScheduledTransaction)
+        .createQueryBuilder("st")
+        .where("st.user_id = :userId", { userId })
+        .andWhere("st.is_active = true")
+        .andWhere("st.amount < 0")
+        .andWhere("st.next_due_date >= :todayStr", { todayStr })
+        .andWhere("st.next_due_date <= :periodEnd", { periodEnd })
+        .orderBy("st.next_due_date", "ASC")
+        .getMany(),
+    );
 
     return scheduledTransactions.map((st) => ({
       id: st.id,
@@ -548,11 +543,13 @@ export class BudgetsService {
       where.isRead = false;
     }
 
-    const alerts = await this.budgetAlertsRepository.find({
-      where,
-      order: { createdAt: "DESC" },
-      take: 50,
-    });
+    const alerts = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetAlert).find({
+        where,
+        order: { createdAt: "DESC" },
+        take: 50,
+      }),
+    );
 
     return alerts;
   }
@@ -567,16 +564,19 @@ export class BudgetsService {
     horizon.setDate(horizon.getDate() + 30);
     const horizonStr = formatDateYMD(horizon);
 
-    const manualBills = await this.scheduledTransactionsRepository
-      .createQueryBuilder("st")
-      .leftJoinAndSelect("st.payee", "payee")
-      .where("st.user_id = :userId", { userId })
-      .andWhere("st.is_active = true")
-      .andWhere("st.auto_post = false")
-      .andWhere("st.next_due_date >= :todayStr", { todayStr })
-      .andWhere("st.next_due_date <= :horizonStr", { horizonStr })
-      .orderBy("st.next_due_date", "ASC")
-      .getMany();
+    const manualBills = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(ScheduledTransaction)
+        .createQueryBuilder("st")
+        .leftJoinAndSelect("st.payee", "payee")
+        .where("st.user_id = :userId", { userId })
+        .andWhere("st.is_active = true")
+        .andWhere("st.auto_post = false")
+        .andWhere("st.next_due_date >= :todayStr", { todayStr })
+        .andWhere("st.next_due_date <= :horizonStr", { horizonStr })
+        .orderBy("st.next_due_date", "ASC")
+        .getMany(),
+    );
 
     if (manualBills.length === 0) return;
 
@@ -613,11 +613,16 @@ export class BudgetsService {
     if (eligibleBills.length === 0) return;
 
     // Fetch ALL existing BILL_DUE alerts (including dismissed) to prevent re-creation
-    const existingAlerts = await this.budgetAlertsRepository
-      .createQueryBuilder("ba")
-      .where("ba.user_id = :userId", { userId })
-      .andWhere("ba.alert_type = :alertType", { alertType: AlertType.BILL_DUE })
-      .getMany();
+    const existingAlerts = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(BudgetAlert)
+        .createQueryBuilder("ba")
+        .where("ba.user_id = :userId", { userId })
+        .andWhere("ba.alert_type = :alertType", {
+          alertType: AlertType.BILL_DUE,
+        })
+        .getMany(),
+    );
 
     const existingBillKeys = new Set(
       existingAlerts.map(
@@ -627,10 +632,13 @@ export class BudgetsService {
 
     // Batch-fetch instance overrides for eligible bills
     const billIds = eligibleBills.map((b) => b.id);
-    const overrides = await this.overridesRepository
-      .createQueryBuilder("o")
-      .where("o.scheduled_transaction_id IN (:...billIds)", { billIds })
-      .getMany();
+    const overrides = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(ScheduledTransactionOverride)
+        .createQueryBuilder("o")
+        .where("o.scheduled_transaction_id IN (:...billIds)", { billIds })
+        .getMany(),
+    );
 
     const overrideMap = new Map<string, ScheduledTransactionOverride>();
     for (const o of overrides) {
@@ -681,14 +689,18 @@ export class BudgetsService {
       alert.periodStart = dueDate;
       alert.dismissedAt = null;
 
-      await this.budgetAlertsRepository.save(alert);
+      await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(BudgetAlert).save(alert),
+      );
     }
   }
 
   async markAlertRead(userId: string, alertId: string): Promise<BudgetAlert> {
-    const alert = await this.budgetAlertsRepository.findOne({
-      where: { id: alertId, userId, dismissedAt: IsNull() },
-    });
+    const alert = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetAlert).findOne({
+        where: { id: alertId, userId, dismissedAt: IsNull() },
+      }),
+    );
 
     if (!alert) {
       throw new NotFoundException(
@@ -701,13 +713,17 @@ export class BudgetsService {
     }
 
     alert.isRead = true;
-    return this.budgetAlertsRepository.save(alert);
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetAlert).save(alert),
+    );
   }
 
   async deleteAlert(userId: string, alertId: string): Promise<void> {
-    const alert = await this.budgetAlertsRepository.findOne({
-      where: { id: alertId, userId, dismissedAt: IsNull() },
-    });
+    const alert = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetAlert).findOne({
+        where: { id: alertId, userId, dismissedAt: IsNull() },
+      }),
+    );
 
     if (!alert) {
       throw new NotFoundException(
@@ -720,13 +736,19 @@ export class BudgetsService {
     }
 
     alert.dismissedAt = new Date();
-    await this.budgetAlertsRepository.save(alert);
+    await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetAlert).save(alert),
+    );
   }
 
   async markAllAlertsRead(userId: string): Promise<{ updated: number }> {
-    const result = await this.budgetAlertsRepository.update(
-      { userId, isRead: false, dismissedAt: IsNull() },
-      { isRead: true },
+    const result = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(BudgetAlert)
+        .update(
+          { userId, isRead: false, dismissedAt: IsNull() },
+          { isRead: true },
+        ),
     );
 
     return { updated: result.affected || 0 };
@@ -749,16 +771,18 @@ export class BudgetsService {
       percentUsed: number;
     }>;
   } | null> {
-    const budgets = await this.budgetsRepository.find({
-      where: { userId, isActive: true },
-      relations: [
-        "categories",
-        "categories.category",
-        "categories.category.parent",
-        "categories.transferAccount",
-      ],
-      order: { createdAt: "DESC" },
-    });
+    const budgets = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Budget).find({
+        where: { userId, isActive: true },
+        relations: [
+          "categories",
+          "categories.category",
+          "categories.category.parent",
+          "categories.transferAccount",
+        ],
+        order: { createdAt: "DESC" },
+      }),
+    );
 
     if (budgets.length === 0) {
       return null;
@@ -838,16 +862,18 @@ export class BudgetsService {
       }
     >
   > {
-    const budgets = await this.budgetsRepository.find({
-      where: { userId, isActive: true },
-      relations: [
-        "categories",
-        "categories.category",
-        "categories.category.parent",
-        "categories.transferAccount",
-      ],
-      order: { createdAt: "DESC" },
-    });
+    const budgets = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(Budget).find({
+        where: { userId, isActive: true },
+        relations: [
+          "categories",
+          "categories.category",
+          "categories.category.parent",
+          "categories.transferAccount",
+        ],
+        order: { createdAt: "DESC" },
+      }),
+    );
 
     const result = new Map<
       string,
@@ -943,30 +969,36 @@ export class BudgetsService {
     );
 
     const [directResult, splitResult] = await Promise.all([
-      this.transactionsRepository
-        .createQueryBuilder("t")
-        .select("COALESCE(SUM(t.amount), 0)", "total")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("t.category_id IN (:...incomeCategoryIds)", {
-          incomeCategoryIds,
-        })
-        .andWhere("t.transaction_date >= :periodStart", { periodStart })
-        .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
-        .andWhere("t.status != :void", { void: "VOID" })
-        .andWhere("t.is_split = false")
-        .getRawOne(),
-      this.splitsRepository
-        .createQueryBuilder("s")
-        .innerJoin("s.transaction", "t")
-        .select("COALESCE(SUM(s.amount), 0)", "total")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("s.category_id IN (:...incomeCategoryIds)", {
-          incomeCategoryIds,
-        })
-        .andWhere("t.transaction_date >= :periodStart", { periodStart })
-        .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
-        .andWhere("t.status != :void", { void: "VOID" })
-        .getRawOne(),
+      withScopedDb(this.dataSource, (m) =>
+        m
+          .getRepository(Transaction)
+          .createQueryBuilder("t")
+          .select("COALESCE(SUM(t.amount), 0)", "total")
+          .where("t.user_id = :userId", { userId })
+          .andWhere("t.category_id IN (:...incomeCategoryIds)", {
+            incomeCategoryIds,
+          })
+          .andWhere("t.transaction_date >= :periodStart", { periodStart })
+          .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
+          .andWhere("t.status != :void", { void: "VOID" })
+          .andWhere("t.is_split = false")
+          .getRawOne(),
+      ),
+      withScopedDb(this.dataSource, (m) =>
+        m
+          .getRepository(TransactionSplit)
+          .createQueryBuilder("s")
+          .innerJoin("s.transaction", "t")
+          .select("COALESCE(SUM(s.amount), 0)", "total")
+          .where("t.user_id = :userId", { userId })
+          .andWhere("s.category_id IN (:...incomeCategoryIds)", {
+            incomeCategoryIds,
+          })
+          .andWhere("t.transaction_date >= :periodStart", { periodStart })
+          .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
+          .andWhere("t.status != :void", { void: "VOID" })
+          .getRawOne(),
+      ),
     ]);
 
     return Math.max(
@@ -1011,13 +1043,19 @@ export class BudgetsService {
       );
     }
 
-    const { spendingMap, transferSpendingMap } = await queryCategorySpending(
-      this.transactionsRepository,
-      this.splitsRepository,
-      userId,
-      budgetCategories,
-      periodStart,
-      periodEnd,
+    // The two spending queries share one scoped transaction so the direct and
+    // split halves of a category's total come from the same snapshot.
+    const { spendingMap, transferSpendingMap } = await withScopedDb(
+      this.dataSource,
+      (m) =>
+        queryCategorySpending(
+          m.getRepository(Transaction),
+          m.getRepository(TransactionSplit),
+          userId,
+          budgetCategories,
+          periodStart,
+          periodEnd,
+        ),
     );
 
     return budgetCategories.map((bc) => {

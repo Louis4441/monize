@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { emailTranslator } from "../i18n/email-translator";
@@ -26,14 +26,7 @@ export class BudgetPeriodCronService {
   private readonly logger = new Logger(BudgetPeriodCronService.name);
 
   constructor(
-    @InjectRepository(Budget)
-    private budgetsRepository: Repository<Budget>,
-    @InjectRepository(BudgetPeriod)
-    private periodsRepository: Repository<BudgetPeriod>,
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    @InjectRepository(UserPreference)
-    private preferencesRepository: Repository<UserPreference>,
+    private dataSource: DataSource,
     private budgetPeriodService: BudgetPeriodService,
     private budgetReportsService: BudgetReportsService,
     private emailService: EmailService,
@@ -48,14 +41,16 @@ export class BudgetPeriodCronService {
     try {
       // RLS (task C2): cross-user fan-out over all active budgets.
       const activeBudgets = await withSystemContext(() =>
-        this.budgetsRepository.find({
-          where: { isActive: true },
-          relations: [
-            "categories",
-            "categories.category",
-            "categories.transferAccount",
-          ],
-        }),
+        withScopedDb(this.dataSource, (m) =>
+          m.getRepository(Budget).find({
+            where: { isActive: true },
+            relations: [
+              "categories",
+              "categories.category",
+              "categories.transferAccount",
+            ],
+          }),
+        ),
       );
 
       if (activeBudgets.length === 0) {
@@ -71,9 +66,11 @@ export class BudgetPeriodCronService {
         try {
           // RLS (task C2): per-user reads/writes run under the owner's context.
           const openPeriod = await withUserContext(budget.userId, () =>
-            this.periodsRepository.findOne({
-              where: { budgetId: budget.id, status: PeriodStatus.OPEN },
-            }),
+            withScopedDb(this.dataSource, (m) =>
+              m.getRepository(BudgetPeriod).findOne({
+                where: { budgetId: budget.id, status: PeriodStatus.OPEN },
+              }),
+            ),
           );
 
           if (!openPeriod) {
@@ -158,15 +155,19 @@ export class BudgetPeriodCronService {
     userId: string,
     periods: ClosedPeriodInfo[],
   ): Promise<boolean> {
-    const prefs = await this.preferencesRepository.findOne({
-      where: { userId },
-    });
+    const prefs = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(UserPreference).findOne({
+        where: { userId },
+      }),
+    );
     if (prefs && !prefs.notificationEmail) return false;
     if (prefs && prefs.budgetDigestEnabled === false) return false;
 
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-    });
+    const user = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(User).findOne({
+        where: { id: userId },
+      }),
+    );
     if (!user || !user.email) return false;
 
     const appUrl = this.configService.get<string>(

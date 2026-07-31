@@ -19,8 +19,19 @@ import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { EmailService } from "../notifications/email.service";
 import { I18nService } from "nestjs-i18n";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("Budget Period Lifecycle Integration", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let periodService: BudgetPeriodService;
   let cronService: BudgetPeriodCronService;
   let periodsRepository: Record<string, jest.Mock>;
@@ -119,29 +130,6 @@ describe("Budget Period Lifecycle Integration", () => {
     getRawMany: jest.fn().mockResolvedValue([]),
     ...overrides,
   });
-
-  const mockDataSource = {
-    createQueryRunner: jest.fn().mockReturnValue({
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      manager: {
-        save: jest.fn().mockImplementation((_entity, data) => data || _entity),
-        getRepository: jest.fn().mockReturnValue({
-          create: jest
-            .fn()
-            .mockImplementation((data) => ({ ...data, id: "new-id" })),
-          save: jest.fn().mockImplementation((data) => ({
-            ...data,
-            id: data.id || "new-id",
-          })),
-        }),
-      },
-    }),
-  };
-
   beforeEach(async () => {
     const savedPeriods: BudgetPeriod[] = [];
 
@@ -191,6 +179,20 @@ describe("Budget Period Lifecycle Integration", () => {
       find: jest.fn().mockResolvedValue([]),
     };
 
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([
+        [BudgetPeriod, periodsRepository as never],
+        [BudgetPeriodCategory, periodCategoriesRepository as never],
+        [Transaction, transactionsRepository as never],
+        [TransactionSplit, splitsRepository as never],
+        [Budget, budgetsRepository as never],
+      ]));
+    // closePeriod saves the period and its categories through the transaction's
+    // EntityManager directly (it used to be queryRunner.manager.save).
+    scopedManager.save.mockImplementation(
+      (entity: unknown, data: unknown) => data ?? entity,
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BudgetPeriodService,
@@ -212,7 +214,7 @@ describe("Budget Period Lifecycle Integration", () => {
           useValue: splitsRepository,
         },
         { provide: BudgetsService, useValue: budgetsService },
-        { provide: DataSource, useValue: mockDataSource },
+        { provide: DataSource, useValue: scopedDataSource },
         {
           provide: getRepositoryToken(Budget),
           useValue: budgetsRepository,
@@ -462,13 +464,14 @@ describe("Budget Period Lifecycle Integration", () => {
       expect(travelPc!.actualAmount).toBe(50);
       expect(travelPc!.rolloverOut).toBe(150);
 
-      // closePeriod now uses queryRunner for atomicity:
-      // 4 saves for closing period categories + 1 save for the period itself via queryRunner.manager.save
-      const qr = mockDataSource.createQueryRunner();
-      expect(qr.manager.save).toHaveBeenCalledTimes(5);
-      // 1 batch save for next period categories + 1 save for the next period via queryRunner.manager.getRepository().save
-      const repoSave = qr.manager.getRepository().save;
-      expect(repoSave).toHaveBeenCalledTimes(2);
+      // closePeriod runs in one scoped transaction: 4 direct manager saves for
+      // the closing period's categories + 1 for the period itself...
+      expect(scopedDataSource.transaction).toHaveBeenCalled();
+      expect(scopedManager.save).toHaveBeenCalledTimes(5);
+      // ...and the next period is created on the same manager: 1 save for the
+      // period + 1 batch save for its categories.
+      expect(periodsRepository.save).toHaveBeenCalledTimes(1);
+      expect(periodCategoriesRepository.save).toHaveBeenCalledTimes(1);
     });
 
     it("respects rollover cap when computing rollover", () => {

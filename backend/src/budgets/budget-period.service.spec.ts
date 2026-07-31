@@ -13,37 +13,25 @@ import { BudgetPeriod, PeriodStatus } from "./entities/budget-period.entity";
 import { BudgetPeriodCategory } from "./entities/budget-period-category.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("BudgetPeriodService", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let service: BudgetPeriodService;
   let periodsRepository: Record<string, jest.Mock>;
   let periodCategoriesRepository: Record<string, jest.Mock>;
   let transactionsRepository: Record<string, jest.Mock>;
   let splitsRepository: Record<string, jest.Mock>;
   let budgetsService: Record<string, jest.Mock>;
-
-  const mockDataSource = {
-    createQueryRunner: jest.fn().mockReturnValue({
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      manager: {
-        save: jest.fn().mockImplementation((entity, data) => data || entity),
-        getRepository: jest.fn().mockReturnValue({
-          create: jest
-            .fn()
-            .mockImplementation((data) => ({ ...data, id: "new-id" })),
-          save: jest.fn().mockImplementation((data) => ({
-            ...data,
-            id: data.id || "new-id",
-          })),
-        }),
-      },
-    }),
-  };
-
   const mockBudget: Budget = {
     id: "budget-1",
     userId: "user-1",
@@ -168,6 +156,19 @@ describe("BudgetPeriodService", () => {
       findOne: jest.fn().mockResolvedValue(mockBudget),
     };
 
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([
+        [BudgetPeriod, periodsRepository as never],
+        [BudgetPeriodCategory, periodCategoriesRepository as never],
+        [Transaction, transactionsRepository as never],
+        [TransactionSplit, splitsRepository as never],
+      ]));
+    // closePeriod saves the period and its categories through the transaction's
+    // EntityManager directly (it used to be queryRunner.manager.save).
+    scopedManager.save.mockImplementation(
+      (entity: unknown, data: unknown) => data ?? entity,
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BudgetPeriodService,
@@ -188,7 +189,7 @@ describe("BudgetPeriodService", () => {
           useValue: splitsRepository,
         },
         { provide: BudgetsService, useValue: budgetsService },
-        { provide: DataSource, useValue: mockDataSource },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 
@@ -286,10 +287,9 @@ describe("BudgetPeriodService", () => {
       const result = await service.closePeriod("user-1", "budget-1");
 
       expect(result.status).toBe(PeriodStatus.CLOSED);
-      // closePeriod now uses queryRunner.manager.save instead of direct repos
-      const qr = mockDataSource.createQueryRunner();
-      expect(qr.manager.save).toHaveBeenCalled();
-      expect(qr.commitTransaction).toHaveBeenCalled();
+      // closePeriod writes through the scoped transaction's EntityManager.
+      expect(scopedDataSource.transaction).toHaveBeenCalled();
+      expect(scopedManager.save).toHaveBeenCalled();
     });
 
     it("throws BadRequestException when no open period", async () => {

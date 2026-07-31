@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import {
@@ -14,8 +15,17 @@ import { TransactionSplit } from "../transactions/entities/transaction-split.ent
 import { Category } from "../categories/entities/category.entity";
 import { Account } from "../accounts/entities/account.entity";
 import { BudgetProfile } from "./dto/generate-budget.dto";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("BudgetGeneratorService", () => {
+  let scopedDataSource: DataSourceMock;
   let service: BudgetGeneratorService;
   let transactionsRepository: Record<string, jest.Mock>;
   let splitsRepository: Record<string, jest.Mock>;
@@ -85,6 +95,15 @@ describe("BudgetGeneratorService", () => {
       }),
     };
 
+    ({ dataSource: scopedDataSource } = createScopedDbMocks([
+      [Transaction, transactionsRepository as never],
+      [TransactionSplit, splitsRepository as never],
+      [Category, categoriesRepository as never],
+      [Account, accountsRepository as never],
+      [Budget, budgetsRepository as never],
+      [BudgetCategory, budgetCategoriesRepository as never],
+    ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BudgetGeneratorService,
@@ -112,6 +131,7 @@ describe("BudgetGeneratorService", () => {
           provide: getRepositoryToken(BudgetCategory),
           useValue: budgetCategoriesRepository,
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 

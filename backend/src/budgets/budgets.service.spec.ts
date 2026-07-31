@@ -19,8 +19,19 @@ import { Category } from "../categories/entities/category.entity";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import { ActionHistoryService } from "../action-history/action-history.service";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+  ManagerMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("BudgetsService", () => {
+  let scopedManager: ManagerMock;
+  let scopedDataSource: DataSourceMock;
   let service: BudgetsService;
   let budgetsRepository: Record<string, jest.Mock>;
   let budgetCategoriesRepository: Record<string, jest.Mock>;
@@ -30,8 +41,6 @@ describe("BudgetsService", () => {
   let categoriesRepository: Record<string, jest.Mock>;
   let scheduledTransactionsRepository: Record<string, jest.Mock>;
   let overridesRepository: Record<string, jest.Mock>;
-  let mockActionHistoryService: Record<string, jest.Mock>;
-  let mockDataSource: Record<string, jest.Mock>;
 
   const mockBudget: Budget = {
     id: "budget-1",
@@ -52,7 +61,7 @@ describe("BudgetsService", () => {
     createdAt: new Date("2026-01-01"),
     updatedAt: new Date("2026-01-01"),
   };
-
+  let mockActionHistoryService: Record<string, jest.Mock>;
   const mockCategory: Category = {
     id: "cat-1",
     userId: "user-1",
@@ -190,23 +199,25 @@ describe("BudgetsService", () => {
       record: jest.fn().mockResolvedValue(null),
     };
 
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue({
-        connect: jest.fn(),
-        startTransaction: jest.fn(),
-        commitTransaction: jest.fn(),
-        rollbackTransaction: jest.fn(),
-        release: jest.fn(),
-        manager: {
-          save: jest.fn().mockImplementation((data) => data),
-        },
-      }),
-    };
+    ({ manager: scopedManager, dataSource: scopedDataSource } =
+      createScopedDbMocks([
+        [Budget, budgetsRepository as never],
+        [BudgetCategory, budgetCategoriesRepository as never],
+        [BudgetAlert, budgetAlertsRepository as never],
+        [Transaction, transactionsRepository as never],
+        [TransactionSplit, splitsRepository as never],
+        [Category, categoriesRepository as never],
+        [ScheduledTransaction, scheduledTransactionsRepository as never],
+        [ScheduledTransactionOverride, overridesRepository as never],
+      ]));
+    // bulkUpdateCategories saves each category through the transaction's
+    // EntityManager directly (it used to be queryRunner.manager.save).
+    scopedManager.save.mockImplementation((entity: unknown) => entity);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BudgetsService,
-        { provide: DataSource, useValue: mockDataSource },
+        { provide: DataSource, useValue: scopedDataSource },
         { provide: getRepositoryToken(Budget), useValue: budgetsRepository },
         {
           provide: getRepositoryToken(BudgetCategory),

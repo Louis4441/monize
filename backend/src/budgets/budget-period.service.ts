@@ -4,8 +4,8 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Budget } from "./entities/budget.entity";
 import { RolloverType } from "./entities/budget-category.entity";
 import { BudgetPeriod, PeriodStatus } from "./entities/budget-period.entity";
@@ -19,14 +19,6 @@ import { roundMoney, sumMoney } from "../common/round.util";
 @Injectable()
 export class BudgetPeriodService {
   constructor(
-    @InjectRepository(BudgetPeriod)
-    private periodsRepository: Repository<BudgetPeriod>,
-    @InjectRepository(BudgetPeriodCategory)
-    private periodCategoriesRepository: Repository<BudgetPeriodCategory>,
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(TransactionSplit)
-    private splitsRepository: Repository<TransactionSplit>,
     private budgetsService: BudgetsService,
     private dataSource: DataSource,
   ) {}
@@ -34,10 +26,12 @@ export class BudgetPeriodService {
   async findAll(userId: string, budgetId: string): Promise<BudgetPeriod[]> {
     await this.budgetsService.findOne(userId, budgetId);
 
-    return this.periodsRepository.find({
-      where: { budgetId },
-      order: { periodStart: "DESC" },
-    });
+    return withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetPeriod).find({
+        where: { budgetId },
+        order: { periodStart: "DESC" },
+      }),
+    );
   }
 
   async findOne(
@@ -47,14 +41,16 @@ export class BudgetPeriodService {
   ): Promise<BudgetPeriod> {
     await this.budgetsService.findOne(userId, budgetId);
 
-    const period = await this.periodsRepository.findOne({
-      where: { id: periodId, budgetId },
-      relations: [
-        "periodCategories",
-        "periodCategories.budgetCategory",
-        "periodCategories.category",
-      ],
-    });
+    const period = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetPeriod).findOne({
+        where: { id: periodId, budgetId },
+        relations: [
+          "periodCategories",
+          "periodCategories.budgetCategory",
+          "periodCategories.category",
+        ],
+      }),
+    );
 
     if (!period) {
       throw new NotFoundException(
@@ -72,10 +68,12 @@ export class BudgetPeriodService {
   async closePeriod(userId: string, budgetId: string): Promise<BudgetPeriod> {
     const budget = await this.budgetsService.findOne(userId, budgetId);
 
-    const openPeriod = await this.periodsRepository.findOne({
-      where: { budgetId, status: PeriodStatus.OPEN },
-      relations: ["periodCategories"],
-    });
+    const openPeriod = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetPeriod).findOne({
+        where: { budgetId, status: PeriodStatus.OPEN },
+        relations: ["periodCategories"],
+      }),
+    );
 
     if (!openPeriod) {
       throw new BadRequestException(
@@ -90,12 +88,9 @@ export class BudgetPeriodService {
       openPeriod.periodEnd,
     );
 
-    // M26: Wrap period close in QueryRunner transaction for atomicity
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
+    // M26: the whole period close is one transaction, so a partial failure can
+    // never leave a period half-closed.
+    return withScopedDb(this.dataSource, async (manager) => {
       let totalIncome = 0;
       let totalExpenses = 0;
 
@@ -115,28 +110,19 @@ export class BudgetPeriodService {
           totalExpenses += actual;
         }
 
-        await queryRunner.manager.save(BudgetPeriodCategory, pc);
+        await manager.save(BudgetPeriodCategory, pc);
       }
 
       openPeriod.actualIncome = totalIncome;
       openPeriod.actualExpenses = totalExpenses;
       openPeriod.status = PeriodStatus.CLOSED;
 
-      const closedPeriod = await queryRunner.manager.save(
-        BudgetPeriod,
-        openPeriod,
-      );
+      const closedPeriod = await manager.save(BudgetPeriod, openPeriod);
 
-      await this.createNextPeriod(budget, openPeriod, queryRunner);
+      await this.createNextPeriod(budget, openPeriod, manager);
 
-      await queryRunner.commitTransaction();
       return closedPeriod;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   async getOrCreateCurrentPeriod(
@@ -145,10 +131,12 @@ export class BudgetPeriodService {
   ): Promise<BudgetPeriod> {
     const budget = await this.budgetsService.findOne(userId, budgetId);
 
-    const existingOpen = await this.periodsRepository.findOne({
-      where: { budgetId, status: PeriodStatus.OPEN },
-      relations: ["periodCategories"],
-    });
+    const existingOpen = await withScopedDb(this.dataSource, (m) =>
+      m.getRepository(BudgetPeriod).findOne({
+        where: { budgetId, status: PeriodStatus.OPEN },
+        relations: ["periodCategories"],
+      }),
+    );
 
     if (existingOpen) {
       return existingOpen;
@@ -157,10 +145,14 @@ export class BudgetPeriodService {
     return this.createPeriodForBudget(budget);
   }
 
+  /**
+   * @param manager the caller's transaction when the new period must commit
+   *   with the close that produced it; otherwise a scoped one is opened here.
+   */
   async createPeriodForBudget(
     budget: Budget,
     rolloverMap?: Map<string, number>,
-    queryRunner?: import("typeorm").QueryRunner,
+    manager?: EntityManager,
   ): Promise<BudgetPeriod> {
     const { periodStart, periodEnd } = getCurrentMonthPeriodDates();
 
@@ -172,45 +164,45 @@ export class BudgetPeriodService {
         .map((bc) => Number(bc.amount)),
     );
 
-    const periodsRepo = queryRunner
-      ? queryRunner.manager.getRepository(BudgetPeriod)
-      : this.periodsRepository;
-    const periodCatsRepo = queryRunner
-      ? queryRunner.manager.getRepository(BudgetPeriodCategory)
-      : this.periodCategoriesRepository;
+    const write = async (m: EntityManager): Promise<BudgetPeriod> => {
+      const periodsRepo = m.getRepository(BudgetPeriod);
+      const periodCatsRepo = m.getRepository(BudgetPeriodCategory);
 
-    const period = periodsRepo.create({
-      budgetId: budget.id,
-      periodStart,
-      periodEnd,
-      totalBudgeted,
-      status: PeriodStatus.OPEN,
-    });
-
-    const savedPeriod = await periodsRepo.save(period);
-
-    const periodCategories = budgetCategories.map((bc) => {
-      const rolloverIn = rolloverMap?.get(bc.id) || 0;
-      const budgetedAmount = Number(bc.amount);
-      const effectiveBudget = budgetedAmount + rolloverIn;
-
-      return periodCatsRepo.create({
-        budgetPeriodId: savedPeriod.id,
-        budgetCategoryId: bc.id,
-        categoryId: bc.categoryId,
-        budgetedAmount,
-        rolloverIn,
-        effectiveBudget,
-        actualAmount: 0,
-        rolloverOut: 0,
+      const period = periodsRepo.create({
+        budgetId: budget.id,
+        periodStart,
+        periodEnd,
+        totalBudgeted,
+        status: PeriodStatus.OPEN,
       });
-    });
 
-    if (periodCategories.length > 0) {
-      await periodCatsRepo.save(periodCategories);
-    }
+      const savedPeriod = await periodsRepo.save(period);
 
-    return savedPeriod;
+      const periodCategories = budgetCategories.map((bc) => {
+        const rolloverIn = rolloverMap?.get(bc.id) || 0;
+        const budgetedAmount = Number(bc.amount);
+        const effectiveBudget = budgetedAmount + rolloverIn;
+
+        return periodCatsRepo.create({
+          budgetPeriodId: savedPeriod.id,
+          budgetCategoryId: bc.id,
+          categoryId: bc.categoryId,
+          budgetedAmount,
+          rolloverIn,
+          effectiveBudget,
+          actualAmount: 0,
+          rolloverOut: 0,
+        });
+      });
+
+      if (periodCategories.length > 0) {
+        await periodCatsRepo.save(periodCategories);
+      }
+
+      return savedPeriod;
+    };
+
+    return manager ? write(manager) : withScopedDb(this.dataSource, write);
   }
 
   computeRollover(
@@ -244,7 +236,7 @@ export class BudgetPeriodService {
   private async createNextPeriod(
     budget: Budget,
     closedPeriod: BudgetPeriod,
-    queryRunner?: import("typeorm").QueryRunner,
+    manager?: EntityManager,
   ): Promise<BudgetPeriod> {
     const rolloverMap = new Map<string, number>();
 
@@ -256,7 +248,7 @@ export class BudgetPeriodService {
       }
     }
 
-    return this.createPeriodForBudget(budget, rolloverMap, queryRunner);
+    return this.createPeriodForBudget(budget, rolloverMap, manager);
   }
 
   private async computePeriodActuals(
@@ -275,35 +267,41 @@ export class BudgetPeriodService {
     const spendingByCategoryId = new Map<string, number>();
 
     if (categoryIds.length > 0) {
-      const directSpending = await this.transactionsRepository
-        .createQueryBuilder("t")
-        .select("t.category_id", "categoryId")
-        .addSelect("COALESCE(SUM(t.amount), 0)", "total")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("t.category_id IN (:...categoryIds)", { categoryIds })
-        .andWhere("t.transaction_date >= :periodStart", { periodStart })
-        .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
-        .andWhere("t.status != :void", { void: "VOID" })
-        .andWhere("t.is_split = false")
-        .groupBy("t.category_id")
-        .getRawMany();
+      const directSpending = await withScopedDb(this.dataSource, (m) =>
+        m
+          .getRepository(Transaction)
+          .createQueryBuilder("t")
+          .select("t.category_id", "categoryId")
+          .addSelect("COALESCE(SUM(t.amount), 0)", "total")
+          .where("t.user_id = :userId", { userId })
+          .andWhere("t.category_id IN (:...categoryIds)", { categoryIds })
+          .andWhere("t.transaction_date >= :periodStart", { periodStart })
+          .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
+          .andWhere("t.status != :void", { void: "VOID" })
+          .andWhere("t.is_split = false")
+          .groupBy("t.category_id")
+          .getRawMany(),
+      );
 
       for (const row of directSpending) {
         spendingByCategoryId.set(row.categoryId, parseFloat(row.total || "0"));
       }
 
-      const splitSpending = await this.splitsRepository
-        .createQueryBuilder("s")
-        .innerJoin("s.transaction", "t")
-        .select("s.category_id", "categoryId")
-        .addSelect("COALESCE(SUM(s.amount), 0)", "total")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("s.category_id IN (:...categoryIds)", { categoryIds })
-        .andWhere("t.transaction_date >= :periodStart", { periodStart })
-        .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
-        .andWhere("t.status != :void", { void: "VOID" })
-        .groupBy("s.category_id")
-        .getRawMany();
+      const splitSpending = await withScopedDb(this.dataSource, (m) =>
+        m
+          .getRepository(TransactionSplit)
+          .createQueryBuilder("s")
+          .innerJoin("s.transaction", "t")
+          .select("s.category_id", "categoryId")
+          .addSelect("COALESCE(SUM(s.amount), 0)", "total")
+          .where("t.user_id = :userId", { userId })
+          .andWhere("s.category_id IN (:...categoryIds)", { categoryIds })
+          .andWhere("t.transaction_date >= :periodStart", { periodStart })
+          .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
+          .andWhere("t.status != :void", { void: "VOID" })
+          .groupBy("s.category_id")
+          .getRawMany(),
+      );
 
       for (const row of splitSpending) {
         const existing = spendingByCategoryId.get(row.categoryId) || 0;
@@ -325,22 +323,25 @@ export class BudgetPeriodService {
         (bc) => bc.transferAccountId as string,
       );
 
-      const transferActuals = await this.transactionsRepository
-        .createQueryBuilder("t")
-        .innerJoin("t.linkedTransaction", "lt")
-        .select("lt.account_id", "destinationAccountId")
-        .addSelect("COALESCE(ABS(SUM(t.amount)), 0)", "total")
-        .where("t.user_id = :userId", { userId })
-        .andWhere("t.is_transfer = true")
-        .andWhere("t.amount < 0")
-        .andWhere("lt.account_id IN (:...transferAccountIds)", {
-          transferAccountIds,
-        })
-        .andWhere("t.transaction_date >= :periodStart", { periodStart })
-        .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
-        .andWhere("t.status != :void", { void: "VOID" })
-        .groupBy("lt.account_id")
-        .getRawMany();
+      const transferActuals = await withScopedDb(this.dataSource, (m) =>
+        m
+          .getRepository(Transaction)
+          .createQueryBuilder("t")
+          .innerJoin("t.linkedTransaction", "lt")
+          .select("lt.account_id", "destinationAccountId")
+          .addSelect("COALESCE(ABS(SUM(t.amount)), 0)", "total")
+          .where("t.user_id = :userId", { userId })
+          .andWhere("t.is_transfer = true")
+          .andWhere("t.amount < 0")
+          .andWhere("lt.account_id IN (:...transferAccountIds)", {
+            transferAccountIds,
+          })
+          .andWhere("t.transaction_date >= :periodStart", { periodStart })
+          .andWhere("t.transaction_date <= :periodEnd", { periodEnd })
+          .andWhere("t.status != :void", { void: "VOID" })
+          .groupBy("lt.account_id")
+          .getRawMany(),
+      );
 
       for (const row of transferActuals) {
         transferSpendingMap.set(

@@ -1,11 +1,10 @@
 import { Injectable, BadRequestException } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In } from "typeorm";
+import { In, DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
 import { Category } from "../categories/entities/category.entity";
-import { Account } from "../accounts/entities/account.entity";
 import { Budget } from "./entities/budget.entity";
 import { BudgetCategory } from "./entities/budget-category.entity";
 import { GenerateBudgetDto, BudgetProfile } from "./dto/generate-budget.dto";
@@ -64,20 +63,7 @@ export interface GenerateBudgetResult {
 
 @Injectable()
 export class BudgetGeneratorService {
-  constructor(
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(TransactionSplit)
-    private splitsRepository: Repository<TransactionSplit>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(Budget)
-    private budgetsRepository: Repository<Budget>,
-    @InjectRepository(BudgetCategory)
-    private budgetCategoriesRepository: Repository<BudgetCategory>,
-  ) {}
+  constructor(private dataSource: DataSource) {}
 
   async generate(
     userId: string,
@@ -177,22 +163,25 @@ export class BudgetGeneratorService {
   }
 
   async apply(userId: string, dto: ApplyGeneratedBudgetDto): Promise<Budget> {
-    const budget = this.budgetsRepository.create({
-      userId,
-      name: dto.name,
-      description: dto.description ?? null,
-      budgetType: dto.budgetType,
-      periodStart: dto.periodStart,
-      periodEnd: dto.periodEnd ?? null,
-      baseIncome: dto.baseIncome ?? null,
-      incomeLinked: dto.incomeLinked ?? false,
-      strategy: dto.strategy,
-      isActive: true,
-      currencyCode: dto.currencyCode,
-      config: dto.config ?? {},
+    const savedBudget = await withScopedDb(this.dataSource, (m) => {
+      const repo = m.getRepository(Budget);
+      return repo.save(
+        repo.create({
+          userId,
+          name: dto.name,
+          description: dto.description ?? null,
+          budgetType: dto.budgetType,
+          periodStart: dto.periodStart,
+          periodEnd: dto.periodEnd ?? null,
+          baseIncome: dto.baseIncome ?? null,
+          incomeLinked: dto.incomeLinked ?? false,
+          strategy: dto.strategy,
+          isActive: true,
+          currencyCode: dto.currencyCode,
+          config: dto.config ?? {},
+        }),
+      );
     });
-
-    const savedBudget = await this.budgetsRepository.save(budget);
 
     if (dto.categories && dto.categories.length > 0) {
       // M27: Validate that all categoryIds belong to the user
@@ -201,10 +190,12 @@ export class BudgetGeneratorService {
         .map((cat) => cat.categoryId as string);
       if (categoryIds.length > 0) {
         const uniqueIds = [...new Set(categoryIds)];
-        const ownedCategories = await this.categoriesRepository.find({
-          where: { id: In(uniqueIds), userId },
-          select: ["id"],
-        });
+        const ownedCategories = await withScopedDb(this.dataSource, (m) =>
+          m.getRepository(Category).find({
+            where: { id: In(uniqueIds), userId },
+            select: ["id"],
+          }),
+        );
         const ownedIds = new Set(ownedCategories.map((c) => c.id));
         const invalidIds = uniqueIds.filter((id) => !ownedIds.has(id));
         if (invalidIds.length > 0) {
@@ -218,36 +209,45 @@ export class BudgetGeneratorService {
         }
       }
 
-      const budgetCategories = dto.categories.map((cat) =>
-        this.budgetCategoriesRepository.create({
-          budgetId: savedBudget.id,
-          categoryId: cat.transferAccountId ? null : (cat.categoryId ?? null),
-          transferAccountId: cat.transferAccountId ?? null,
-          isTransfer: !!cat.transferAccountId,
-          amount: cat.amount,
-          isIncome: cat.isIncome ?? false,
-          categoryGroup: cat.categoryGroup ?? null,
-          rolloverType: cat.rolloverType,
-          rolloverCap: cat.rolloverCap ?? null,
-          flexGroup: cat.flexGroup ?? null,
-          alertWarnPercent: cat.alertWarnPercent ?? 80,
-          alertCriticalPercent: cat.alertCriticalPercent ?? 95,
-          notes: cat.notes ?? null,
-          sortOrder: cat.sortOrder ?? 0,
-        }),
-      );
-
-      await this.budgetCategoriesRepository.save(budgetCategories);
+      await withScopedDb(this.dataSource, (m) => {
+        const repo = m.getRepository(BudgetCategory);
+        return repo.save(
+          dto.categories!.map((cat) =>
+            repo.create({
+              budgetId: savedBudget.id,
+              categoryId: cat.transferAccountId
+                ? null
+                : (cat.categoryId ?? null),
+              transferAccountId: cat.transferAccountId ?? null,
+              isTransfer: !!cat.transferAccountId,
+              amount: cat.amount,
+              isIncome: cat.isIncome ?? false,
+              categoryGroup: cat.categoryGroup ?? null,
+              rolloverType: cat.rolloverType,
+              rolloverCap: cat.rolloverCap ?? null,
+              flexGroup: cat.flexGroup ?? null,
+              alertWarnPercent: cat.alertWarnPercent ?? 80,
+              alertCriticalPercent: cat.alertCriticalPercent ?? 95,
+              notes: cat.notes ?? null,
+              sortOrder: cat.sortOrder ?? 0,
+            }),
+          ),
+        );
+      });
     }
 
-    return this.budgetsRepository.findOne({
-      where: { id: savedBudget.id },
-      relations: [
-        "categories",
-        "categories.category",
-        "categories.transferAccount",
-      ],
-    }) as Promise<Budget>;
+    return withScopedDb(
+      this.dataSource,
+      (m) =>
+        m.getRepository(Budget).findOne({
+          where: { id: savedBudget.id },
+          relations: [
+            "categories",
+            "categories.category",
+            "categories.transferAccount",
+          ],
+        }) as Promise<Budget>,
+    );
   }
 
   private async getSpendingByCategory(
@@ -259,63 +259,69 @@ export class BudgetGeneratorService {
   ): Promise<Omit<CategoryAnalysis, "suggested">[]> {
     const amountCondition = isIncome ? "t.amount > 0" : "t.amount < 0";
 
-    const directSpending = await this.transactionsRepository
-      .createQueryBuilder("t")
-      .innerJoin("t.category", "c")
-      .leftJoin("c.parent", "p")
-      .select("t.category_id", "categoryId")
-      .addSelect(
-        "CASE WHEN p.name IS NOT NULL THEN p.name || ': ' || c.name ELSE c.name END",
-        "categoryName",
-      )
-      .addSelect("c.is_income", "isIncome")
-      .addSelect("EXTRACT(YEAR FROM t.transaction_date)::int", "year")
-      .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
-      .addSelect("ABS(SUM(t.amount))", "total")
-      .where("t.user_id = :userId", { userId })
-      .andWhere("t.transaction_date >= :startDate", { startDate })
-      .andWhere("t.transaction_date <= :endDate", { endDate })
-      .andWhere("t.status != :void", { void: "VOID" })
-      .andWhere("t.is_split = false")
-      .andWhere("t.is_transfer = false")
-      .andWhere("t.category_id IS NOT NULL")
-      .andWhere(amountCondition)
-      .groupBy("t.category_id")
-      .addGroupBy("c.name")
-      .addGroupBy("p.name")
-      .addGroupBy("c.is_income")
-      .addGroupBy("EXTRACT(YEAR FROM t.transaction_date)")
-      .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
-      .getRawMany();
+    const directSpending = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("t")
+        .innerJoin("t.category", "c")
+        .leftJoin("c.parent", "p")
+        .select("t.category_id", "categoryId")
+        .addSelect(
+          "CASE WHEN p.name IS NOT NULL THEN p.name || ': ' || c.name ELSE c.name END",
+          "categoryName",
+        )
+        .addSelect("c.is_income", "isIncome")
+        .addSelect("EXTRACT(YEAR FROM t.transaction_date)::int", "year")
+        .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
+        .addSelect("ABS(SUM(t.amount))", "total")
+        .where("t.user_id = :userId", { userId })
+        .andWhere("t.transaction_date >= :startDate", { startDate })
+        .andWhere("t.transaction_date <= :endDate", { endDate })
+        .andWhere("t.status != :void", { void: "VOID" })
+        .andWhere("t.is_split = false")
+        .andWhere("t.is_transfer = false")
+        .andWhere("t.category_id IS NOT NULL")
+        .andWhere(amountCondition)
+        .groupBy("t.category_id")
+        .addGroupBy("c.name")
+        .addGroupBy("p.name")
+        .addGroupBy("c.is_income")
+        .addGroupBy("EXTRACT(YEAR FROM t.transaction_date)")
+        .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
+        .getRawMany(),
+    );
 
-    const splitSpending = await this.splitsRepository
-      .createQueryBuilder("s")
-      .innerJoin("s.transaction", "t")
-      .innerJoin("s.category", "c")
-      .leftJoin("c.parent", "p")
-      .select("s.category_id", "categoryId")
-      .addSelect(
-        "CASE WHEN p.name IS NOT NULL THEN p.name || ': ' || c.name ELSE c.name END",
-        "categoryName",
-      )
-      .addSelect("c.is_income", "isIncome")
-      .addSelect("EXTRACT(YEAR FROM t.transaction_date)::int", "year")
-      .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
-      .addSelect("ABS(SUM(s.amount))", "total")
-      .where("t.user_id = :userId", { userId })
-      .andWhere("t.transaction_date >= :startDate", { startDate })
-      .andWhere("t.transaction_date <= :endDate", { endDate })
-      .andWhere("t.status != :void", { void: "VOID" })
-      .andWhere("t.is_transfer = false")
-      .andWhere("s.category_id IS NOT NULL")
-      .andWhere(isIncome ? "s.amount > 0" : "s.amount < 0")
-      .groupBy("s.category_id")
-      .addGroupBy("c.name")
-      .addGroupBy("p.name")
-      .addGroupBy("c.is_income")
-      .addGroupBy("EXTRACT(YEAR FROM t.transaction_date)")
-      .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
-      .getRawMany();
+    const splitSpending = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(TransactionSplit)
+        .createQueryBuilder("s")
+        .innerJoin("s.transaction", "t")
+        .innerJoin("s.category", "c")
+        .leftJoin("c.parent", "p")
+        .select("s.category_id", "categoryId")
+        .addSelect(
+          "CASE WHEN p.name IS NOT NULL THEN p.name || ': ' || c.name ELSE c.name END",
+          "categoryName",
+        )
+        .addSelect("c.is_income", "isIncome")
+        .addSelect("EXTRACT(YEAR FROM t.transaction_date)::int", "year")
+        .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
+        .addSelect("ABS(SUM(s.amount))", "total")
+        .where("t.user_id = :userId", { userId })
+        .andWhere("t.transaction_date >= :startDate", { startDate })
+        .andWhere("t.transaction_date <= :endDate", { endDate })
+        .andWhere("t.status != :void", { void: "VOID" })
+        .andWhere("t.is_transfer = false")
+        .andWhere("s.category_id IS NOT NULL")
+        .andWhere(isIncome ? "s.amount > 0" : "s.amount < 0")
+        .groupBy("s.category_id")
+        .addGroupBy("c.name")
+        .addGroupBy("p.name")
+        .addGroupBy("c.is_income")
+        .addGroupBy("EXTRACT(YEAR FROM t.transaction_date)")
+        .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
+        .getRawMany(),
+    );
 
     const categoryMap = new Map<
       string,
@@ -494,28 +500,31 @@ export class BudgetGeneratorService {
     endDate: string,
     analysisMonths: number,
   ): Promise<Omit<TransferAnalysis, "suggested">[]> {
-    const rows = await this.transactionsRepository
-      .createQueryBuilder("t")
-      .innerJoin("t.linkedTransaction", "lt")
-      .innerJoin("lt.account", "a")
-      .select("a.id", "accountId")
-      .addSelect("a.name", "accountName")
-      .addSelect("a.account_type", "accountType")
-      .addSelect("EXTRACT(YEAR FROM t.transaction_date)::int", "year")
-      .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
-      .addSelect("ABS(SUM(t.amount))", "total")
-      .where("t.user_id = :userId", { userId })
-      .andWhere("t.transaction_date >= :startDate", { startDate })
-      .andWhere("t.transaction_date <= :endDate", { endDate })
-      .andWhere("t.status != :void", { void: "VOID" })
-      .andWhere("t.is_transfer = true")
-      .andWhere("t.amount < 0")
-      .groupBy("a.id")
-      .addGroupBy("a.name")
-      .addGroupBy("a.account_type")
-      .addGroupBy("EXTRACT(YEAR FROM t.transaction_date)")
-      .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
-      .getRawMany();
+    const rows = await withScopedDb(this.dataSource, (m) =>
+      m
+        .getRepository(Transaction)
+        .createQueryBuilder("t")
+        .innerJoin("t.linkedTransaction", "lt")
+        .innerJoin("lt.account", "a")
+        .select("a.id", "accountId")
+        .addSelect("a.name", "accountName")
+        .addSelect("a.account_type", "accountType")
+        .addSelect("EXTRACT(YEAR FROM t.transaction_date)::int", "year")
+        .addSelect("EXTRACT(MONTH FROM t.transaction_date)::int", "month")
+        .addSelect("ABS(SUM(t.amount))", "total")
+        .where("t.user_id = :userId", { userId })
+        .andWhere("t.transaction_date >= :startDate", { startDate })
+        .andWhere("t.transaction_date <= :endDate", { endDate })
+        .andWhere("t.status != :void", { void: "VOID" })
+        .andWhere("t.is_transfer = true")
+        .andWhere("t.amount < 0")
+        .groupBy("a.id")
+        .addGroupBy("a.name")
+        .addGroupBy("a.account_type")
+        .addGroupBy("EXTRACT(YEAR FROM t.transaction_date)")
+        .addGroupBy("EXTRACT(MONTH FROM t.transaction_date)")
+        .getRawMany(),
+    );
 
     const accountMap = new Map<
       string,

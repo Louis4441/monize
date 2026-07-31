@@ -1,3 +1,4 @@
+import { DataSource } from "typeorm";
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -10,8 +11,17 @@ import { Budget, BudgetType, BudgetStrategy } from "./entities/budget.entity";
 import { BudgetPeriod, PeriodStatus } from "./entities/budget-period.entity";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import {
+  createScopedDbMocks,
+  DataSourceMock,
+} from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("BudgetPeriodCronService", () => {
+  let scopedDataSource: DataSourceMock;
   let service: BudgetPeriodCronService;
   let budgetsRepository: Record<string, jest.Mock>;
   let periodsRepository: Record<string, jest.Mock>;
@@ -190,6 +200,13 @@ describe("BudgetPeriodCronService", () => {
       }),
     };
 
+    ({ dataSource: scopedDataSource } = createScopedDbMocks([
+      [Budget, budgetsRepository as never],
+      [BudgetPeriod, periodsRepository as never],
+      [User, usersRepository as never],
+      [UserPreference, preferencesRepository as never],
+    ]));
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BudgetPeriodCronService,
@@ -232,6 +249,7 @@ describe("BudgetPeriodCronService", () => {
               opts?.defaultValue ?? key,
           },
         },
+        { provide: DataSource, useValue: scopedDataSource },
       ],
     }).compile();
 
