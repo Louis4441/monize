@@ -47,9 +47,9 @@ backend:
   resources:
     requests:
       cpu: 10m
-      memory: 60Mi
+      memory: 140Mi
     limits:
-      memory: 150Mi
+      memory: 400Mi
 
   # -- Microsoft Money (.mny) import
   mnyImport:
@@ -193,9 +193,9 @@ frontend:
   resources:
     requests:
       cpu: 10m
-      memory: 37Mi
+      memory: 80Mi
     limits:
-      memory: 100Mi
+      memory: 300Mi
 
   # -- Microsoft Money (.mny) import
   mnyImport:
