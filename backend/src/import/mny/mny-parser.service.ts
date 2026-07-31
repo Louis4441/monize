@@ -11,6 +11,7 @@ import {
   readMnyTables,
 } from "./tables/read-mny-tables";
 import {
+  cashKeyByAccountKey,
   currencyCodesByHandle,
   mapAccounts,
   mapCategories,
@@ -369,6 +370,7 @@ export class MnyParserService {
       accountKeyByHandle: accounts.keyByHandle,
       currencyByHandle: accounts.currencyByHandle,
       bills: tables.bills.bills,
+      cashKeyByAccountKey: cashKeyByAccountKey(accounts),
     });
 
     const currencyByHandle = currencyCodesByHandle(tables.reference);

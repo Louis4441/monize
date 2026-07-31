@@ -19,6 +19,7 @@ import {
 import { MnyBill, MnyTransaction } from "../model/mny-rows";
 import { MnyWarning, MnyWarningRow } from "../model/mny-warnings";
 import { MnyInvestmentData } from "../tables/read-investments";
+import { cashKeyByAccountKey } from "./map-reference";
 import { MnyTransactionData } from "../tables/read-transactions";
 
 /**
@@ -437,22 +438,19 @@ function synthesizeSplits(
 }
 
 function buildContext(input: MapInvestmentsInput): Context {
-  const cashKeyByAccountKey = new Map<string, string>();
   const brokerageKeys = new Set<string>();
-
   for (const account of input.accounts.accounts) {
     if (account.accountSubType === AccountSubType.INVESTMENT_BROKERAGE) {
       brokerageKeys.add(account.key);
-      if (account.linkedKey) {
-        cashKeyByAccountKey.set(account.key, account.linkedKey);
-      }
     }
   }
 
   return {
     input,
     detailByHandle: indexDetails(input.investments),
-    cashKeyByAccountKey,
+    // Shared with the transaction mapper, which routes transfers into the same
+    // sleeve this puts trade cash legs in.
+    cashKeyByAccountKey: cashKeyByAccountKey(input.accounts),
     brokerageKeys,
     warnings: [],
   };

@@ -39,6 +39,7 @@ function input(
     accountKeyByHandle: ACCOUNTS,
     currencyByHandle: CURRENCIES,
     bills: [],
+    cashKeyByAccountKey: new Map(),
     ...overrides,
   };
 }
@@ -409,6 +410,137 @@ describe("mapTransactions", () => {
           row: expect.objectContaining({ handle: 1 }),
         },
       ]);
+    });
+
+    describe("a transfer into an investment account", () => {
+      // Money stores this as a pair whose far side carries `hsec`: one row that
+      // is at once "cash arrived from chequing" and "shares were bought". The
+      // investment mapper writes the trade and its cash leg *out* of the
+      // sleeve, so nothing represented the cash coming *in* -- the bank row
+      // imported as a plain payment and the money simply vanished. Across the
+      // maintainer's file that was 2,718 top-level rows and 537 split legs, and
+      // the sleeves absorbed $553,225.57 of it.
+      const BROKERAGE = new Map([...ACCOUNTS, [5, "acct-5"]]);
+      const SLEEVE = new Map([["acct-5", "acct-5-cash"]]);
+      const investmentInput = (
+        overrides: Partial<MapTransactionsInput> = {},
+      ): MapTransactionsInput =>
+        input({
+          accountKeyByHandle: BROKERAGE,
+          currencyByHandle: new Map([...CURRENCIES, [5, "USD"]]),
+          cashKeyByAccountKey: SLEEVE,
+          ...overrides,
+        });
+
+      it("pairs the bank row with a cash-sleeve row that funds the trade", () => {
+        const result = mapTransactions(
+          investmentInput({
+            transactions: transactionData({
+              transactions: [
+                mnyTransaction({ handle: 1, account: 1, amount: -2400 }),
+                mnyTransaction({
+                  handle: 2,
+                  account: 5,
+                  amount: 2400,
+                  security: 9,
+                }),
+              ],
+              transfers: [mnyTransfer({ from: 1, to: 2 })],
+            }),
+          }),
+        );
+
+        const [bank, sleeve] = result.transactions;
+        expect(result.transactions).toHaveLength(2);
+        expect(bank).toMatchObject({
+          handle: 1,
+          accountKey: "acct-1",
+          amount: -2400,
+          isTransfer: true,
+          linkedTransactionId: sleeve.id,
+        });
+        // The cash side lands in the sleeve, not on the brokerage side where
+        // the shares are, and mirrors the bank row so the pair sums to zero.
+        expect(sleeve).toMatchObject({
+          handle: 2,
+          accountKey: "acct-5-cash",
+          amount: 2400,
+          isTransfer: true,
+          linkedTransactionId: bank.id,
+        });
+        expect(result.warnings).toEqual([]);
+        expect(result.transfersLinked).toBe(1);
+      });
+
+      it("routes a split leg into the sleeve and links it to the parent", () => {
+        const result = mapTransactions(
+          investmentInput({
+            transactions: transactionData({
+              transactions: [
+                mnyTransaction({ handle: 1, account: 1, amount: -100 }),
+                mnyTransaction({ handle: 2, account: null, amount: -100 }),
+                mnyTransaction({
+                  handle: 3,
+                  account: 5,
+                  amount: 100,
+                  security: 9,
+                }),
+              ],
+              splits: [mnySplit({ parent: 1, child: 2, position: 1 })],
+              transfers: [mnyTransfer({ from: 2, to: 3 })],
+            }),
+          }),
+        );
+
+        const parent = result.transactions.find((t) => t.handle === 1);
+        const sleeve = result.transactions.find((t) => t.handle === 3);
+        expect(parent?.splits).toEqual([
+          {
+            kind: SplitKind.TRANSFER,
+            categoryHandle: null,
+            transferAccountKey: "acct-5-cash",
+            linkedTransactionId: sleeve?.id,
+            amount: -100,
+            memo: null,
+          },
+        ]);
+        // A leg's counterpart points back at the parent payment, the same
+        // wiring an ordinary transfer split gets.
+        expect(sleeve).toMatchObject({
+          accountKey: "acct-5-cash",
+          amount: 100,
+          linkedTransactionId: parent?.id,
+        });
+        expect(result.warnings).toEqual([]);
+      });
+
+      it("still warns when the investment account has no cash sleeve", () => {
+        // Without a sleeve there is nowhere to put the cash, so the old
+        // behaviour stands and the user is told.
+        const result = mapTransactions(
+          investmentInput({
+            cashKeyByAccountKey: new Map(),
+            transactions: transactionData({
+              transactions: [
+                mnyTransaction({ handle: 1, account: 1, amount: -2400 }),
+                mnyTransaction({
+                  handle: 2,
+                  account: 5,
+                  amount: 2400,
+                  security: 9,
+                }),
+              ],
+              transfers: [mnyTransfer({ from: 1, to: 2 })],
+            }),
+          }),
+        );
+
+        expect(result.transactions).toHaveLength(1);
+        expect(result.transactions[0].isTransfer).toBe(false);
+        expect(result.warnings.map((w) => w.code)).toEqual([
+          "transferAcrossExcludedAccount",
+        ]);
+      });
     });
 
     it("drops a genuinely orphaned side whose counterpart is not in the file", () => {

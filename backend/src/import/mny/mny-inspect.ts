@@ -17,7 +17,11 @@
  * without importing anything.
  */
 import { MnyImportError } from "./mny-errors";
-import { currencyCodesByHandle, mapAccounts } from "./map/map-reference";
+import {
+  cashKeyByAccountKey,
+  currencyCodesByHandle,
+  mapAccounts,
+} from "./map/map-reference";
 import { mapTransactions } from "./map/map-transactions";
 import { mapSecurities, tradedSecurityHandles } from "./map/map-securities";
 import { mapInvestments } from "./map/map-investments";
@@ -174,6 +178,7 @@ export function mappingSummary(tables: MnyTables): string[] {
     accountKeyByHandle: accounts.keyByHandle,
     currencyByHandle: accounts.currencyByHandle,
     bills: tables.bills.bills,
+    cashKeyByAccountKey: cashKeyByAccountKey(accounts),
   });
   const securities = mapSecurities({
     securities: tables.investments.securities,

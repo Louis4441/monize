@@ -135,8 +135,10 @@ export const MAX_WARNING_SAMPLES = 5;
 /**
  * Flagged rows kept per code. A preview travels through the Next proxy and is
  * re-fetched on every wizard step, so this is a payload budget as much as a UI
- * one: the maintainer's file raises 3,265 `transferAcrossExcludedAccount`
- * warnings, and shipping all of them would cost roughly half a megabyte. Fifty
+ * one: a single code can raise thousands of warnings on a real file -- 3,255
+ * `transferAcrossExcludedAccount` before those became real transfers, and 829
+ * `missingInvestmentDetail` still -- and shipping all of them would cost
+ * roughly half a megabyte. Fifty
  * is enough to see the shape of a problem; the count still reports the whole of
  * it, and `rowsTruncated` says the list is partial rather than letting it read
  * as complete.

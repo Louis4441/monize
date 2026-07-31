@@ -593,3 +593,26 @@ export function mapPayees(
     warnings,
   };
 }
+
+/**
+ * Brokerage account key -> the cash sleeve `mapAccounts` paired it with.
+ *
+ * Both the transaction mapper and the investment mapper need this: one to route
+ * a transfer's investment side into the sleeve, the other to put a trade's cash
+ * leg there. Deriving it in one place keeps the two from disagreeing about
+ * where a brokerage's cash lives.
+ */
+export function cashKeyByAccountKey(
+  accounts: MappedAccounts,
+): ReadonlyMap<string, string> {
+  const byKey = new Map<string, string>();
+  for (const account of accounts.accounts) {
+    if (
+      account.accountSubType === AccountSubType.INVESTMENT_BROKERAGE &&
+      account.linkedKey
+    ) {
+      byKey.set(account.key, account.linkedKey);
+    }
+  }
+  return byKey;
+}

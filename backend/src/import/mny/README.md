@@ -96,6 +96,22 @@ not the cause -- see `helm/README.md` for the sizing table.
   transaction is open -- and the wizard only polls every 1500 ms, so a report per 500-row chunk
   writes a hundred-odd updates nobody reads.
 
+### A row Money does not store may still be one Monize has to write
+
+Money's model and Monize's are not the same shape, and the gaps are silent. A transfer from a
+bank account into an investment account is one Money row on each side, and the investment side is
+*both* the arriving cash and the trade. Monize splits those: the trade's cash leg comes out of the
+brokerage's cash sleeve, so something has to pay into it. Money has no row for that, so
+`buildCashCounterparts` synthesizes one.
+
+The failure mode when it does not is that money leaves an account and arrives nowhere, and no
+warning can fire because every row the file *has* was imported correctly. On the maintainer's file
+3,255 transfers were affected and the sleeves silently absorbed $553,225.57.
+
+So when a mapper is about to warn that it cannot represent something, check first whether the
+right answer is to *create* the row Monize needs rather than to report the mismatch. A warning
+about 3,255 rows the user cannot act on is a sign the mapping is wrong, not that the file is.
+
 ## Traps
 
 - **Page 0 is obfuscated.** Jet XORs bytes `0x18..0x95` of the header page with a fixed mask. The
