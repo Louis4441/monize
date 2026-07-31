@@ -91,6 +91,7 @@ const STATUS_BY_CODE: ReadonlyMap<number, TransactionStatus> = new Map([
  * | 0x40 | Split child | 100% appear in `TRN_SPLIT.htrn` |
  * | 0x80 | Row sits in a debt account | 1,239 rows, **all** in the 12 loan and mortgage accounts, and every row in those accounts has it |
  * | 0x100 | Voided | 31 rows, all `cs = 2`, half of them zero-amount, and their memos name a cancelled or never-presented cheque |
+ * | 0x4000 | Loan-payment template | 50 rows, which is **exactly** the ten account-less `ps = 5` split parents plus their legs and those legs' transfer counterparts -- set equality in both directions, and one family per loan or mortgage account |
  * | 0x200000 | Member of a scheduled series | 4,653 of 4,692 are `frq != -1` templates, and no template lacks it |
  *
  * Only the two Monize acts on are exported; the rest are documented here and in
@@ -113,6 +114,23 @@ export const MNY_TRANSACTION_FLAG = {
    * named so the 0x80-is-void mistake cannot be made again silently.
    */
   DEBT_ACCOUNT: 0x80,
+  /**
+   * The row is part of a loan-payment template -- Money's definition of the
+   * next scheduled payment for a loan or mortgage, which the register never
+   * shows.
+   *
+   * Money keeps one such family per debt account: a split parent with **no
+   * `hacct` at all**, its principal/interest legs, and the legs' transfer
+   * counterparts sitting in the loan account. `BILL.lHtrn` does not reference
+   * them, so the bill-template filter never saw them.
+   *
+   * Only the parent was being skipped, and only because a row with no account
+   * is unusable. The legs' counterparts kept their account and their date, so
+   * they imported as ordinary principal postings that no payment ever funded:
+   * twelve phantom rows adding $9,902.63 across seven of the maintainer's debt
+   * accounts. The bit catches the whole family in one test.
+   */
+  LOAN_PAYMENT_TEMPLATE: 0x4000,
 } as const;
 
 export function isVoided(flags: number): boolean {
@@ -126,6 +144,15 @@ export function isVoided(flags: number): boolean {
  */
 export function isDebtAccountRow(flags: number): boolean {
   return (flags & MNY_TRANSACTION_FLAG.DEBT_ACCOUNT) !== 0;
+}
+
+/**
+ * True for any row of a loan-payment template family -- parent, leg, or the
+ * leg's counterpart in the loan account. Every one of them is scaffolding for
+ * the *next* payment, so none is a posting.
+ */
+export function isLoanPaymentTemplate(flags: number): boolean {
+  return (flags & MNY_TRANSACTION_FLAG.LOAN_PAYMENT_TEMPLATE) !== 0;
 }
 
 /** `TRN.frq` on a real posting. Confirmed: every fixture row is -1. */

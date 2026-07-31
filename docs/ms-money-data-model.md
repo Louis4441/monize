@@ -289,9 +289,24 @@ row sits in, whether it appears in `TRN_SPLIT` or `TRN_XFER`, whether it carries
 | `0x40` | Split child | 100% appear as `TRN_SPLIT.htrn` |
 | `0x80` | Row is in a loan or mortgage account | 1,239 rows, every one of them in a debt account, and every row in those accounts has it |
 | `0x100` | Voided | 31 rows, all `cs = 2`, half zero-amount, memos naming a cancelled or never-presented cheque |
+| `0x4000` | Loan-payment template | 50 rows, exactly the ten account-less `ps = 5` split parents plus their legs and those legs' `TRN_XFER` counterparts -- set equality both ways, one family per debt account |
 | `0x200000` | Member of a scheduled series | 4,653 of 4,692 are `frq != -1` templates, and no template lacks it |
 
 `0x8000` does not occur in the file at all.
+
+### Loan-payment templates
+
+Money stores the *next* scheduled payment for each loan or mortgage as a
+transaction family the register never shows: a split parent with **no `hacct`
+at all**, its principal and interest legs, and each transfer leg's counterpart
+sitting in the loan account with a real account and a real date. Its amount
+mirrors the loan's current payment, so it reads exactly like a genuine posting.
+
+`BILL.lHtrn` does **not** reference these, so the bill-template filter misses
+them. Only the parent is self-evidently unusable (no account); the counterparts
+are not, and importing them adds principal that no payment funded -- $9,902.63
+across seven of the maintainer's debt accounts. `grftt & 0x4000` is what
+identifies the whole family, and it is the only reliable handle on it.
 
 > **Correction.** The original reference had `0x80` as "voided" and `0x8000` as
 > "auto-entered". Both are wrong, and the first one is expensive: `0x80` is the

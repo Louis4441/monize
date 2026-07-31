@@ -98,6 +98,59 @@ describe("mapTransactions", () => {
       expect(result.transactions.map((t) => t.handle)).toEqual([1]);
     });
 
+    it("excludes a whole loan-payment template family, counterparts included", () => {
+      // Money keeps one of these per debt account: a split parent with no
+      // `hacct` at all, its principal and interest legs, and the principal
+      // leg's counterpart sitting in the loan account. `BILL.lHtrn` does not
+      // reference them.
+      //
+      // Skipping the parent alone is not enough, and that is the bug this
+      // guards: the counterpart (handle 3) keeps a real account and a real
+      // date, so it imported as an ordinary principal posting that no payment
+      // funded -- twelve phantom rows worth $9,902.63 across seven of the
+      // maintainer's debt accounts. `grftt & 0x4000` marks every row of the
+      // family, and on that file it marks exactly those rows and nothing else.
+      const template = MNY_TRANSACTION_FLAG.LOAN_PAYMENT_TEMPLATE;
+      const result = mapTransactions(
+        input({
+          transactions: transactionData({
+            transactions: [
+              mnyTransaction({ handle: 1, amount: -100, account: 1 }),
+              // The parent: no account, so unusable on its own terms too.
+              mnyTransaction({
+                handle: 10,
+                amount: -750,
+                account: null,
+                flags: template | 0x20,
+              }),
+              // The principal leg, and its counterpart in the loan account.
+              mnyTransaction({
+                handle: 2,
+                amount: -375,
+                account: null,
+                memo: "Principal",
+                flags: template | 0x40,
+              }),
+              mnyTransaction({
+                handle: 3,
+                amount: 375,
+                account: 9,
+                memo: "Principal",
+                flags: template | MNY_TRANSACTION_FLAG.DEBT_ACCOUNT | 0x6,
+              }),
+            ],
+            splits: [mnySplit({ parent: 10, child: 2, position: 1 })],
+            transfers: [mnyTransfer({ from: 2, to: 3 })],
+          }),
+        }),
+      );
+
+      expect(result.transactions.map((t) => t.handle)).toEqual([1]);
+      // Nothing about the family is the user's problem to fix in Money.
+      expect(result.warnings).toEqual([]);
+      expect(result.skipped).toBe(0);
+    });
+
     it("excludes a split child from the top level", () => {
       const result = mapTransactions(
         input({
