@@ -471,6 +471,7 @@
     "unconfirmedInvestmentAction": "{count, plural, other {# giao dịch đầu tư}} dùng một thao tác Money có ý nghĩa được suy đoán chứ không được ghi nhận; hãy đối chiếu với Money.",
     "missingInvestmentDetail": "{count, plural, other {# giao dịch đầu tư}} không có chi tiết cổ phiếu trong tệp và chỉ được nhập theo số tiền mặt.",
     "investmentAccountMismatch": "{count, plural, other {# giao dịch đầu tư}} nằm trong tài khoản không phải tài khoản đầu tư và đã bị bỏ qua.",
+    "securitySplitNotApplied": "{count, plural, other {# lần chia tách cổ phiếu}} được ghi trong tệp và không được áp dụng vào số lượng cổ phiếu, vì bản thân Money cũng không áp dụng. Hãy đối chiếu các khoản nắm giữ với sao kê của bạn.",
     "holdingsMismatch": "{count, plural, other {# khoản nắm giữ}} không khớp với số cổ phiếu ghi trong tệp Money của bạn.",
     "billTemplateMissing": "{count, plural, other {# hóa đơn theo lịch}} không có giao dịch mẫu trong tệp và đã bị bỏ qua.",
     "unusableBill": "{count, plural, other {# hóa đơn theo lịch}} không có tài khoản, ngày dùng được hoặc chu kỳ nhận diện được, nên đã bị bỏ qua.",

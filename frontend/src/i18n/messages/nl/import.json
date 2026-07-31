@@ -471,6 +471,7 @@
     "unconfirmedInvestmentAction": "{count, plural, one {# beleggingstransactie gebruikte} other {# beleggingstransacties gebruikten}} een Money-actie waarvan de betekenis is afgeleid en niet gedocumenteerd; controleer ze tegen Money.",
     "missingInvestmentDetail": "{count, plural, one {# beleggingstransactie had} other {# beleggingstransacties hadden}} geen aandelengegevens in het bestand en zijn alleen op hun geldbedrag geïmporteerd.",
     "investmentAccountMismatch": "{count, plural, one {# beleggingstransactie stond} other {# beleggingstransacties stonden}} op een rekening die geen beleggingsrekening is en zijn overgeslagen.",
+    "securitySplitNotApplied": "{count, plural, one {# aandelensplitsing is vastgelegd in het bestand en is niet toegepast op de aantallen aandelen, omdat Money die ook niet toepast} other {# aandelensplitsingen zijn vastgelegd in het bestand en zijn niet toegepast op de aantallen aandelen, omdat Money die ook niet toepast}}. Controleer de posities aan de hand van uw afschriften.",
     "holdingsMismatch": "{count, plural, one {# positie komt} other {# posities komen}} niet overeen met de aandelen in uw Money-bestand.",
     "billTemplateMissing": "{count, plural, one {# geplande rekening had} other {# geplande rekeningen hadden}} geen sjabloontransactie in het bestand en zijn overgeslagen.",
     "unusableBill": "{count, plural, one {# geplande rekening had} other {# geplande rekeningen hadden}} geen rekening, geen bruikbare datum of een onbekende herhaling en zijn overgeslagen.",

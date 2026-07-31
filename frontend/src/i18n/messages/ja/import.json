@@ -471,6 +471,7 @@
     "unconfirmedInvestmentAction": "{count, plural, other {# 件の投資取引}} に、意味が文書化されておらず推定にとどまる Money のアクションが使われています。Money と照合して確認してください。",
     "missingInvestmentDetail": "{count, plural, other {# 件の投資取引}} にはファイル内に株数の明細がなかったため、現金額のみで取り込みました。",
     "investmentAccountMismatch": "{count, plural, other {# 件の投資取引}} が投資口座ではない口座にあったため、スキップしました。",
+    "securitySplitNotApplied": "{count, plural, other {# 件の株式分割}} がファイルに記録されていますが、Money 自身も適用していないため、株数には適用されていません。保有銘柄を取引報告書と照合してください。",
     "holdingsMismatch": "{count, plural, other {# 件の保有銘柄}} が Money ファイルに記録された株数と一致しません。",
     "billTemplateMissing": "{count, plural, other {# 件の予定された支払い}} にファイル内のテンプレート取引がなく、スキップしました。",
     "unusableBill": "{count, plural, other {# 件の予定された支払い}} に口座、利用可能な日付、または認識できる繰り返し設定がなく、スキップしました。",

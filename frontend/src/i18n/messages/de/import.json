@@ -471,6 +471,7 @@
     "unconfirmedInvestmentAction": "{count, plural, one {# Investitionstransaktion verwendete} other {# Investitionstransaktionen verwendeten}} eine Money-Aktion, deren Bedeutung abgeleitet und nicht dokumentiert ist; prüfen Sie sie gegen Money.",
     "missingInvestmentDetail": "{count, plural, one {# Investitionstransaktion hatte} other {# Investitionstransaktionen hatten}} keine Anteilsangaben in der Datei und wurden nur mit ihrem Geldbetrag importiert.",
     "investmentAccountMismatch": "{count, plural, one {# Investitionstransaktion lag} other {# Investitionstransaktionen lagen}} in einem Konto, das kein Depotkonto ist, und wurden übersprungen.",
+    "securitySplitNotApplied": "{count, plural, one {# Aktiensplit ist in der Datei erfasst und wurde nicht auf die Anteile angewendet, weil Money ihn ebenfalls nicht anwendet} other {# Aktiensplits sind in der Datei erfasst und wurden nicht auf die Anteile angewendet, weil Money sie ebenfalls nicht anwendet}}. Prüfen Sie die Positionen anhand Ihrer Abrechnungen.",
     "holdingsMismatch": "{count, plural, one {# Position stimmt} other {# Positionen stimmen}} nicht mit den in Ihrer Money-Datei erfassten Anteilen überein.",
     "billTemplateMissing": "{count, plural, one {# geplante Rechnung hatte} other {# geplante Rechnungen hatten}} keine Vorlagentransaktion in der Datei und wurden übersprungen.",
     "unusableBill": "{count, plural, one {# geplante Rechnung hatte} other {# geplante Rechnungen hatten}} kein Konto, kein brauchbares Datum oder eine unbekannte Wiederholung und wurden übersprungen.",

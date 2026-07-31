@@ -471,7 +471,7 @@
     "unconfirmedInvestmentAction": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} used a Money action whose meaning is inferred rather than documented; check them against Money.-XX]",
     "missingInvestmentDetail": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} had no share detail in the file and were imported for their cash amount only.-XX]",
     "investmentAccountMismatch": "[XX-{count, plural, one {# investment transaction} other {# investment transactions}} sat in an account that is not an investment account and were skipped.-XX]",
-    "securitySplitNotApplied": "[XX-{count, plural, one {# stock split is} other {# stock splits are}} recorded in the file and were not applied to share counts, because Money does not apply them either. Check the holdings against your statements.-XX]",
+    "securitySplitNotApplied": "[XX-{count, plural, one {# stock split is recorded in the file and was not applied to share counts, because Money does not apply it either} other {# stock splits are recorded in the file and were not applied to share counts, because Money does not apply them either}}. Check the holdings against your statements.-XX]",
     "holdingsMismatch": "[XX-{count, plural, one {# holding does} other {# holdings do}} not match the shares your Money file records.-XX]",
     "billTemplateMissing": "[XX-{count, plural, one {# scheduled bill} other {# scheduled bills}} had no template transaction in the file and were skipped.-XX]",
     "unusableBill": "[XX-{count, plural, one {# scheduled bill} other {# scheduled bills}} had no account, no usable date or an unrecognized recurrence, and were skipped.-XX]",

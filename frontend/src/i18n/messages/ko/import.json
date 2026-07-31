@@ -471,6 +471,7 @@
     "unconfirmedInvestmentAction": "{count, plural, other {투자 거래 #건}}이 의미가 문서화되지 않고 추정된 Money 작업을 사용했습니다. Money와 대조해 확인하세요.",
     "missingInvestmentDetail": "{count, plural, other {투자 거래 #건}}에 파일상 주식 명세가 없어 현금 금액으로만 가져왔습니다.",
     "investmentAccountMismatch": "{count, plural, other {투자 거래 #건}}이 투자 계정이 아닌 계정에 있어 건너뛰었습니다.",
+    "securitySplitNotApplied": "{count, plural, other {주식 분할 #건}}이 파일에 기록되어 있지만 Money도 적용하지 않으므로 주식수에는 적용되지 않았습니다. 보유 자산을 거래명세서와 대조해 확인하세요.",
     "holdingsMismatch": "{count, plural, other {보유 자산 #개}}가 Money 파일에 기록된 주식수와 일치하지 않습니다.",
     "billTemplateMissing": "{count, plural, other {#개 예약된 청구}}에 파일 내 템플릿 거래가 없어 건너뛰었습니다.",
     "unusableBill": "{count, plural, other {#개 예약된 청구}}에 계정, 사용 가능한 날짜 또는 인식된 반복 주기가 없어 건너뛰었습니다.",
