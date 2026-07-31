@@ -23,6 +23,22 @@ that turns up in a real file must become a warning in the verification report, n
 mapping: `mapAccountType`, `mapInvestmentAction` and `mapFrequency` all return null for codes they
 do not know, and `MNY_UNCONFIRMED_ACTIONS` names the ones whose meaning is inferred.
 
+### A bit mask cannot warn you, so measure it before you trust it
+
+That null-and-warn rule protects lookups over a *value* -- an unknown `at` or `act` has no entry,
+so it is visibly unknown. A **bit mask** has no such failure mode: a wrong mask silently matches
+some other flag and the import completes clean. `MNY_TRANSACTION_FLAG.VOID` was 0x80 for four
+phases; 0x80 is the bit every loan and mortgage row carries, so every loan payment imported VOID,
+`computeExpectedBalances` skipped them, and each debt account sat at its opening balance under a
+full register. Nothing warned, because nothing could.
+
+So a `grftt` bit is only allowed here once it has been **measured on a real file**, by
+cross-tabbing it against something the file already settles -- which account the row is in,
+whether it appears in `TRN_SPLIT` or `TRN_XFER`, whether it carries `hsec`. Each mask in
+`MNY_TRANSACTION_FLAG` records that measurement in its comment, and
+`docs/ms-money-data-model.md` carries the full table. Do not copy a new mask out of the format
+reference and ship it; the fixtures are far too small to contradict one.
+
 ## Reading tables
 
 `readMnyTables(db)` (`tables/read-mny-tables.ts`) is the last layer that knows about Jet; mappers

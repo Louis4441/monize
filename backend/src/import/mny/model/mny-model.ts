@@ -72,27 +72,60 @@ const STATUS_BY_CODE: ReadonlyMap<number, TransactionStatus> = new Map([
 ]);
 
 /**
- * Bits of the `TRN.grftt` flag word. **Unconfirmed** -- the fixture rows carry
- * only 0x2 (Money 2001/2002) and 0x10 (Money Plus), neither of which is one of
- * these. Both bits come from PR #192.
+ * Bits of the `TRN.grftt` flag word.
+ *
+ * Every bit here is **measured** against the maintainer's Money Plus file
+ * (53,079 `TRN` rows across 56 accounts) by cross-tabbing the bit against facts
+ * the file already settles -- which account a row sits in, whether it appears in
+ * `TRN_SPLIT` or `TRN_XFER`, whether it carries `hsec`, what its memo says. The
+ * committed fixtures are far too small to see any of this: their rows carry only
+ * 0x2, 0x10, 0x40 and 0x86.
+ *
+ * The bits, with the measurement that fixes each:
+ *
+ * | Mask | Meaning | Evidence |
+ * |------|---------|----------|
+ * | 0x2, 0x4 | Transfer side | 100% of both appear in `TRN_XFER` |
+ * | 0x10 | Investment row | 100% carry `hsec` |
+ * | 0x20 | Split parent | 100% appear in `TRN_SPLIT.htrnParent` |
+ * | 0x40 | Split child | 100% appear in `TRN_SPLIT.htrn` |
+ * | 0x80 | Row sits in a debt account | 1,239 rows, **all** in the 12 loan and mortgage accounts, and every row in those accounts has it |
+ * | 0x100 | Voided | 31 rows, all `cs = 2`, half of them zero-amount, and their memos name a cancelled or never-presented cheque |
+ * | 0x200000 | Member of a scheduled series | 4,653 of 4,692 are `frq != -1` templates, and no template lacks it |
+ *
+ * Only the two Monize acts on are exported; the rest are documented here and in
+ * `docs/ms-money-data-model.md` so the next reader does not have to re-measure.
  */
 export const MNY_TRANSACTION_FLAG = {
-  /** Transaction is voided. Monize imports it with status VOID. */
-  VOID: 0x80,
   /**
-   * Posted by Money's scheduler rather than typed by hand. These are **real
-   * postings** -- excluding them is what made loan accounts import empty in
-   * PR #192.
+   * Transaction is voided. Monize imports it with status VOID.
+   *
+   * PR #192's format reference called this 0x80, and 0x80 is the bit every loan
+   * and mortgage payment carries -- so **every loan payment imported as VOID**,
+   * and because `computeExpectedBalances` skips voided rows, every loan and
+   * mortgage balance sat frozen at its opening balance. 1,084 of the
+   * maintainer's 33,734 transactions came in voided; the true count is 31.
    */
-  AUTO_ENTERED: 0x8000,
+  VOID: 0x100,
+  /**
+   * The row belongs to a loan or mortgage account. Purely informational: which
+   * account a row is in already says this, and nothing keys off the bit. It is
+   * named so the 0x80-is-void mistake cannot be made again silently.
+   */
+  DEBT_ACCOUNT: 0x80,
 } as const;
 
 export function isVoided(flags: number): boolean {
   return (flags & MNY_TRANSACTION_FLAG.VOID) !== 0;
 }
 
-export function isAutoEntered(flags: number): boolean {
-  return (flags & MNY_TRANSACTION_FLAG.AUTO_ENTERED) !== 0;
+/**
+ * True for a row in a loan or mortgage account. Never a reason to skip a row --
+ * these are ordinary postings, and treating the bit as anything else is what
+ * this function exists to make obvious.
+ */
+export function isDebtAccountRow(flags: number): boolean {
+  return (flags & MNY_TRANSACTION_FLAG.DEBT_ACCOUNT) !== 0;
 }
 
 /** `TRN.frq` on a real posting. Confirmed: every fixture row is -1. */

@@ -19,9 +19,9 @@ import {
   MNY_TRANSACTION_FLAG,
   MNY_UNCONFIRMED_ACTIONS,
   hasInvestmentDetail,
-  isAutoEntered,
   isCurrencyPseudoSecurity,
   isCurrencyQuoteSymbol,
+  isDebtAccountRow,
   isIncomeCategoryType,
   isRecurrenceTemplate,
   isVoided,
@@ -80,30 +80,38 @@ describe("transaction status", () => {
     ).toBe(TransactionStatus.VOID);
   });
 
-  it("does not treat an auto-entered row as voided", () => {
-    // PR #192 excluded auto-entered rows, which emptied every loan account.
-    const flags = MNY_TRANSACTION_FLAG.AUTO_ENTERED;
+  it("does not treat a loan payment as voided", () => {
+    // 0x86 is the flag word every loan and mortgage payment in the
+    // maintainer's file carries: 0x80 (debt account) | 0x4 | 0x2 (transfer
+    // side). Reading 0x80 as void made all 1,084 of them import VOID, which
+    // then excluded them from the balance, so every loan sat at its opening
+    // balance forever.
+    const loanPayment = 0x86;
 
-    expect(isAutoEntered(flags)).toBe(true);
-    expect(isVoided(flags)).toBe(false);
-    expect(mapTransactionStatus(MNY_CLEARED_STATUS.CLEARED, flags)).toBe(
-      TransactionStatus.CLEARED,
-    );
+    expect(isDebtAccountRow(loanPayment)).toBe(true);
+    expect(isVoided(loanPayment)).toBe(false);
+    expect(
+      mapTransactionStatus(MNY_CLEARED_STATUS.RECONCILED, loanPayment),
+    ).toBe(TransactionStatus.RECONCILED);
   });
 
-  it("reads both flags out of a combined word", () => {
+  it("reads void and debt-account out of a combined word", () => {
     const flags =
-      MNY_TRANSACTION_FLAG.VOID | MNY_TRANSACTION_FLAG.AUTO_ENTERED | 0x12;
+      MNY_TRANSACTION_FLAG.VOID | MNY_TRANSACTION_FLAG.DEBT_ACCOUNT | 0x12;
 
     expect(isVoided(flags)).toBe(true);
-    expect(isAutoEntered(flags)).toBe(true);
+    expect(isDebtAccountRow(flags)).toBe(true);
   });
 
-  it("treats the fixture flag words as neither voided nor auto-entered", () => {
-    // money2001/2002 rows carry 0x2, Money Plus rows 0x10.
-    for (const flags of [0x2, 0x10]) {
+  it("treats every observed non-void flag word as not voided", () => {
+    // Every distinct grftt bit the maintainer's Money Plus file carries, minus
+    // the void bit itself: transfer sides, investment rows, split parents and
+    // children, debt-account rows and scheduled-series members. None is void.
+    for (const flags of [
+      0x2, 0x4, 0x6, 0x10, 0x12, 0x16, 0x20, 0x40, 0x42, 0x46, 0x80, 0x86, 0xa0,
+      0xc0, 0x4086, 0x200016, 0x200086, 0x240016,
+    ]) {
       expect(isVoided(flags)).toBe(false);
-      expect(isAutoEntered(flags)).toBe(false);
     }
   });
 });

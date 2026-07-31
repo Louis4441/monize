@@ -73,8 +73,9 @@ as the living format reference (now `docs/ms-money-data-model.md`, with the corr
 
 - Money account type map (`at` 0..6) and the `hacctRel` investment/cash account pairing, which
   matches Monize's linked INVESTMENT_CASH + INVESTMENT_BROKERAGE pair exactly.
-- Cleared-status map (`cs` 0/1/2 -> UNRECONCILED/CLEARED/RECONCILED) and voided detection
-  (`grftt` bit 0x80 -> VOID).
+- Cleared-status map (`cs` 0/1/2 -> UNRECONCILED/CLEARED/RECONCILED). Voided detection was
+  **not** correct: the reference's `grftt` bit 0x80 is the debt-account bit, and the void bit is
+  0x100 (measured in Phase 4 against a real Money Plus file; see `docs/ms-money-data-model.md`).
 - Phantom exclusions: bill template transactions (referenced by `BILL.lHtrn`), orphaned transfer
   sides, and split children (`TRN_SPLIT.htrn` rows) must not be imported as standalone rows.
 - Currency resolution through `CRNC.szIsoCode`; `SP` price dedup by `(hsec, dt)`; additive
@@ -384,9 +385,10 @@ an unrepresentable interval (weekly × 3, monthly × 5) still approximates.
 exercise only `act` 0, 1 and 15, so `BILL.st` (question 12.3) and the `act` 5 / 14 semantics
 (12.4) need a real file. `mny-model.ts` deliberately exports **no** `BILL.st` constant — a
 plausible-looking one would only make the guess harder to see — and lists 5 and 14 in
-`MNY_UNCONFIRMED_ACTIONS` so mappers can warn per transaction. Account types beyond `at` 0 and 5,
-and the `grftt` void/auto-entered bits, are likewise unconfirmed: the fixture rows carry `grftt`
-0x2 (Money 2001/2002) and 0x10 (Money Plus), neither of which is 0x80 or 0x8000.
+`MNY_UNCONFIRMED_ACTIONS` so mappers can warn per transaction. Account types beyond `at` 0 and 5 are likewise unconfirmed. The
+`grftt` bits **are** now settled, but only because Phase 4 measured them on a real file: the
+fixture rows carry 0x2 (Money 2001/2002) and 0x10 (Money Plus) and could never have shown that
+0x80 is the debt-account bit rather than the void bit, or that void is 0x100.
 
 `npm run mny:inspect -- file.mny --table BILL` against a real Money Plus file closes 12.3 and
 12.4 in one pass.
@@ -511,9 +513,11 @@ real mappers and, in the integration spec, the real INSERT path.
 
 - Include a `TRN` row when: it has an account, a valid date, is not a split child, not a bill
   template (`BILL.lHtrn`), not an orphaned transfer side, and `frq == -1`.
-  **Auto-entered (`grftt & 0x8000`) rows are imported** — they are real postings (loan payments,
+  **Scheduler-posted rows are imported** — they are real postings (loan payments,
   online-banking imports); excluding them was PR bug #1.
-- `grftt & 0x80` -> status VOID (imported, excluded from balances by existing logic).
+- `grftt & 0x100` -> status VOID (imported, excluded from balances by existing logic). **Not**
+  `0x80`, which marks a row in a loan or mortgage account: using it voided every loan payment
+  and left each debt account frozen at its opening balance.
 - `cs`: 0 -> UNRECONCILED, 1 -> CLEARED, 2 -> RECONCILED. `dt` -> `transaction_date`
   (`YYYY-MM-DD` string per repo DATE convention; mdb-reader decodes Jet datetimes natively, which
   should obsolete the PoC's MM/DD/YY 70-year-pivot parsing — spike confirms; day-00 null

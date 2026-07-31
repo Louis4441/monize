@@ -276,13 +276,34 @@ read as a sale.
 
 ### The `grftt` bit field
 
-| Mask | Meaning |
-|------|---------|
-| `0x80` | Voided |
-| `0x8000` | Auto-entered (scheduler, online banking) |
+Measured against a real Money Plus file (53,079 `TRN` rows over 56 accounts) by
+cross-tabbing each bit against facts the file already settles: which account a
+row sits in, whether it appears in `TRN_SPLIT` or `TRN_XFER`, whether it carries
+`hsec`, what its memo says.
 
-Neither bit appears in any committed fixture -- the rows there carry `grftt`
-`0x2` or `0x10` -- so both are unconfirmed.
+| Mask | Meaning | What fixes it |
+|------|---------|---------------|
+| `0x2`, `0x4` | Transfer side | 100% of rows carrying either appear in `TRN_XFER` |
+| `0x10` | Investment row | 100% carry `hsec` |
+| `0x20` | Split parent | 100% appear as `TRN_SPLIT.htrnParent` |
+| `0x40` | Split child | 100% appear as `TRN_SPLIT.htrn` |
+| `0x80` | Row is in a loan or mortgage account | 1,239 rows, every one of them in a debt account, and every row in those accounts has it |
+| `0x100` | Voided | 31 rows, all `cs = 2`, half zero-amount, memos naming a cancelled or never-presented cheque |
+| `0x200000` | Member of a scheduled series | 4,653 of 4,692 are `frq != -1` templates, and no template lacks it |
+
+`0x8000` does not occur in the file at all.
+
+> **Correction.** The original reference had `0x80` as "voided" and `0x8000` as
+> "auto-entered". Both are wrong, and the first one is expensive: `0x80` is the
+> bit *every loan and mortgage payment* carries, so every loan payment imported
+> with status VOID. Monize's balance logic then excluded them, and each loan and
+> mortgage sat frozen at its opening balance with a full register above it.
+> 1,084 of the file's 33,734 transactions imported voided; the real number is 31.
+>
+> The general lesson: an unconfirmed constant that maps *silently* -- as opposed
+> to `mapAccountType` and friends, which return null and warn -- has to be
+> checked against a real file before it is trusted. A wrong bit mask produces no
+> warning, no skipped row and no error; it just quietly means something else.
 
 ### Phantom transactions
 
@@ -297,17 +318,18 @@ Neither bit appears in any committed fixture -- the rows there carry `grftt`
    in the file at all.
 
 > **Correction, and the most costly one.** The original also excludes
-> auto-entered rows (`grftt & 0x8000`) and voided rows (`grftt & 0x80`). Both
-> are wrong.
+> scheduler-posted rows (which it read as `grftt & 0x8000`) and voided rows
+> (which it read as `grftt & 0x80`). Both are wrong.
 >
-> *Auto-entered rows are real postings.* Money marks scheduler-posted loan
-> payments auto-entered, so excluding them deletes the loan side of every
-> mortgage payment -- which is why loans imported with zero transactions in the
-> proof of concept. The phantom rule is `frq != -1` and nothing else.
+> *Scheduler-posted rows are real postings.* Money's scheduler posts loan
+> payments, so excluding them deletes the loan side of every mortgage payment --
+> which is why loans imported with zero transactions in the proof of concept.
+> The phantom rule is `frq != -1` and nothing else.
 >
 > *Voided rows are real rows.* They should be imported with a VOID status, which
 > Monize's balance logic already excludes from totals. Dropping them loses the
-> record that the transaction existed at all.
+> record that the transaction existed at all. The void bit is `0x100`; `0x80`
+> marks a debt-account row and voids nothing (see the `grftt` table above).
 >
 > **A counterpart in an account the user chose not to import is not orphaned
 > either.** It keeps its row as a plain transaction with a warning: dropping it
