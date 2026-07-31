@@ -17,6 +17,7 @@ import { useDateFormat } from '@/hooks/useDateFormat';
 import { useLongPress } from '@/hooks/useLongPress';
 import { RowActionSheet, type RowAction } from '@/components/ui/row-actions';
 import { getErrorMessage } from '@/lib/errors';
+import { SECURITY_PRICE_HISTORY_LIMIT } from '@/lib/constants';
 import {
   groupPricesByPeriod,
   allPriceGroupKeys,
@@ -92,7 +93,10 @@ export function SecurityPriceHistory({ security }: SecurityPriceHistoryProps) {
   const loadPrices = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await investmentsApi.getSecurityPrices(security.id, 9999);
+      const data = await investmentsApi.getSecurityPrices(
+        security.id,
+        SECURITY_PRICE_HISTORY_LIMIT,
+      );
       setPrices(data);
       // Open the newest year and month so recent prices need no click.
       setOpenGroups(
