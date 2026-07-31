@@ -121,7 +121,21 @@ not the cause -- see `helm/README.md` for the sizing table.
 - **`act` 16 removes shares; it is not a sale.** Mapping it to SELL closes lots against a
   fabricated price and corrupts average cost. Direction always comes from `act` -- `TRN_INV.qty`
   is stored positive, so a quantity sign proves nothing.
-- **`act` 4 (cash dividend) has no `TRN_INV` row.** Drive the investment mapper from `TRN`;
+- **Read `act` off `LOT`, never off a format reference.** `LOT.htrnBuy` and `LOT.htrnSell` name
+  the transactions that opened and closed each tax lot, so whatever `act` those rows carry
+  acquires and disposes *by definition*. PR #192's reference had `act` 1 as SELL; in both Money
+  Plus files available (the maintainer's, 4,616 lots, and the `sample.mny` shipped with Money
+  Plus) `act` 1 opens lots and closes none. Every purchase imported as a sale, so no cash ever
+  left a brokerage sleeve and holdings replayed negative. Money Plus uses
+  1/2/3/4/9/12/13/32/33; codes 0, 5, 14, 15 and 16 appear only in the older fixtures.
+- **Investment `TRN.amt` is signed the opposite way to a banking row.** A buy is positive and a
+  sale negative -- it is what you paid, not the effect on the sleeve. Take the magnitude from
+  `amt` and the direction from `act`, which is what `totalAmountOf`/`cashAmountOf` do.
+- **Money qualifies a symbol with its market**: `US:VTI`, and `$US:INDU` for an index, where
+  `$` is Money's index marker rather than part of the prefix. `stripMarketPrefix` removes only
+  the market segment. Left on, `writeSecurities` matches existing holdings by symbol, so
+  `US:VTI` creates a second security beside the user's own `VTI` and every quote lookup 404s.
+- **`act` 3 and `act` 4 (cash distributions) have no `TRN_INV` row.** Drive the investment mapper from `TRN`;
   iterating `TRN_INV` drops every dividend.
 - **`SEC.sct` codes shift between releases** (the same index securities are `sct` 6 in Money
   2001/2002 and `sct` 7 in Money Plus), so the `sct = 4` currency test is not enough on its own.

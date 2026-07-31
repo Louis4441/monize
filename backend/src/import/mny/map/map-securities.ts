@@ -58,6 +58,29 @@ export function placeholderSymbol(name: string): string {
 }
 
 /**
+ * Removes the market Money qualifies a symbol with: `US:VTI` is the ticker
+ * `VTI` held on a US market, and `$US:INDU` is an index, where the leading `$`
+ * is Money's own index marker rather than part of the prefix.
+ *
+ * The qualifier is Money's bookkeeping, not the ticker. Left on, it costs twice:
+ * `writeSecurities` matches existing holdings by symbol, so `US:VTI` creates a
+ * second security beside the user's own `VTI` instead of reusing it, and every
+ * price lookup for the imported one asks the quote providers for a symbol that
+ * does not exist.
+ *
+ * Only the market segment goes, so an index stays an index (`$US:INDU` ->
+ * `$INDU`) and a symbol Money never qualified is untouched. The qualifier is an
+ * ISO country code, hence exactly two letters -- `$OSPTX` keeps its shape and a
+ * ticker that merely contains a colon is not a market prefix.
+ */
+export function stripMarketPrefix(symbol: string): string {
+  const stripped = symbol.replace(/^(\$?)[A-Za-z]{2}:/, "$1");
+  // "US:" with nothing after it is not a ticker worth preferring over what
+  // Money actually stored.
+  return stripped === "" || stripped === "$" ? symbol : stripped;
+}
+
+/**
  * Makes a symbol unique within the import, staying inside the column width.
  * The base is trimmed back before suffixing so `-2` never pushes the result
  * over the limit and truncates two distinct securities back onto each other.
@@ -121,7 +144,9 @@ export function mapSecurities(input: MapSecuritiesInput): MappedSecurities {
     }
 
     const generated = moneySymbol === "";
-    const requested = generated ? placeholderSymbol(name) : moneySymbol;
+    const requested = generated
+      ? placeholderSymbol(name)
+      : stripMarketPrefix(moneySymbol);
     const { symbol, collided } = uniqueSymbol(requested, taken);
 
     if (generated) {

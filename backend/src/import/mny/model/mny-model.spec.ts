@@ -120,13 +120,18 @@ describe("isRecurrenceTemplate", () => {
 
 describe("mapInvestmentAction", () => {
   it.each([
+    [MNY_ACTION.BUY_LEGACY, InvestmentAction.BUY],
     [MNY_ACTION.BUY, InvestmentAction.BUY],
     [MNY_ACTION.SELL, InvestmentAction.SELL],
-    [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
     [MNY_ACTION.DIVIDEND, InvestmentAction.DIVIDEND],
+    [MNY_ACTION.DISTRIBUTION, InvestmentAction.DIVIDEND],
+    [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
+    [MNY_ACTION.BUY_ALT, InvestmentAction.BUY],
     [MNY_ACTION.REINVEST_ALT, InvestmentAction.REINVEST],
     [MNY_ACTION.CAPITAL_GAIN, InvestmentAction.CAPITAL_GAIN],
     [MNY_ACTION.ADD_SHARES, InvestmentAction.ADD_SHARES],
+    [MNY_ACTION.TRANSFER_IN, InvestmentAction.TRANSFER_IN],
+    [MNY_ACTION.TRANSFER_OUT, InvestmentAction.TRANSFER_OUT],
   ])("maps act %p to %s", (act, expected) => {
     expect(mapInvestmentAction(act)).toBe(expected);
   });
@@ -134,21 +139,70 @@ describe("mapInvestmentAction", () => {
   it("maps act 16 to REMOVE_SHARES, never SELL", () => {
     // Mapping it to SELL closes lots against a fabricated sale price and
     // corrupts average cost -- PR #192 issue 4.
-    expect(mapInvestmentAction(MNY_ACTION.REMOVE_SHARES)).toBe(
+    expect(mapInvestmentAction(MNY_ACTION.REMOVE_SHARES_LEGACY)).toBe(
       InvestmentAction.REMOVE_SHARES,
     );
-    expect(mapInvestmentAction(MNY_ACTION.REMOVE_SHARES)).not.toBe(
+    expect(mapInvestmentAction(MNY_ACTION.REMOVE_SHARES_LEGACY)).not.toBe(
       InvestmentAction.SELL,
     );
   });
 
-  it.each([[2], [6], [99]])("returns null for the unknown act %p", (act) => {
-    expect(mapInvestmentAction(act)).toBeNull();
+  it.each([[6], [10], [17], [18], [20], [99]])(
+    "returns null for the unknown act %p",
+    (act) => {
+      // 10, 17, 18 and 20 all occur in real Money Plus files but open and
+      // close no lot, so nothing says what they do to a position. They are
+      // skipped and warned about rather than guessed at.
+      expect(mapInvestmentAction(act)).toBeNull();
+    },
+  );
+
+  it("maps act 1 to BUY, never SELL", () => {
+    // The defect this guards: PR #192's format reference had act 1 as SELL.
+    // LOT disagrees -- act 1 opens 3,520 lots in the maintainer's file and
+    // closes none -- so every purchase imported as a sale, no cash ever left
+    // a brokerage sleeve, and holdings replayed negative.
+    expect(mapInvestmentAction(MNY_ACTION.BUY)).toBe(InvestmentAction.BUY);
+    expect(mapInvestmentAction(MNY_ACTION.BUY)).not.toBe(InvestmentAction.SELL);
+  });
+
+  it("maps the codes LOT proves acquire shares onto acquisitions", () => {
+    // Whatever act a LOT.htrnBuy row carries opens a position, by definition.
+    for (const act of [
+      MNY_ACTION.BUY,
+      MNY_ACTION.REINVEST,
+      MNY_ACTION.BUY_ALT,
+      MNY_ACTION.TRANSFER_IN,
+    ]) {
+      expect(mapInvestmentAction(act)).not.toBeNull();
+      expect([
+        InvestmentAction.BUY,
+        InvestmentAction.REINVEST,
+        InvestmentAction.TRANSFER_IN,
+        InvestmentAction.ADD_SHARES,
+      ]).toContain(mapInvestmentAction(act));
+    }
+  });
+
+  it("maps the codes LOT proves dispose of shares onto disposals", () => {
+    for (const act of [
+      MNY_ACTION.SELL,
+      MNY_ACTION.REMOVE_SHARES,
+      MNY_ACTION.TRANSFER_OUT,
+    ]) {
+      expect([
+        InvestmentAction.SELL,
+        InvestmentAction.REMOVE_SHARES,
+        InvestmentAction.TRANSFER_OUT,
+      ]).toContain(mapInvestmentAction(act));
+    }
   });
 
   it("flags the inferred action codes so mappers can warn", () => {
     expect([...MNY_UNCONFIRMED_ACTIONS].sort((a, b) => a - b)).toEqual([
+      MNY_ACTION.DISTRIBUTION,
       MNY_ACTION.REINVEST_ALT,
+      MNY_ACTION.BUY_ALT,
       MNY_ACTION.CAPITAL_GAIN,
     ]);
   });
@@ -156,7 +210,9 @@ describe("mapInvestmentAction", () => {
   it("knows that dividends carry no TRN_INV row", () => {
     // Iterating TRN_INV instead of TRN drops every cash dividend.
     expect(hasInvestmentDetail(MNY_ACTION.DIVIDEND)).toBe(false);
+    expect(hasInvestmentDetail(MNY_ACTION.DISTRIBUTION)).toBe(false);
     expect(hasInvestmentDetail(MNY_ACTION.BUY)).toBe(true);
+    expect(hasInvestmentDetail(MNY_ACTION.SELL)).toBe(true);
   });
 });
 

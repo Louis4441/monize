@@ -126,47 +126,103 @@ export function mapTransactionStatus(
 // ---------------------------------------------------------------------------
 
 /**
- * Money investment action codes. Confirmed in the fixtures: 0, 1 and 15. The
- * rest come from PR #192's format reference, corrected by this design -- most
- * importantly 16, which the proof of concept mapped to SELL and which actually
- * removes shares.
+ * Money investment action codes.
+ *
+ * These are read off `LOT`, which is Money's own record of which transaction
+ * opened and closed each tax lot and therefore settles direction without
+ * inference: whatever `act` a `LOT.htrnBuy` row carries acquires shares, and
+ * whatever `LOT.htrnSell` carries disposes of them. Two independent Money Plus
+ * files agree -- the maintainer's (4,616 lots) and the `sample.mny` shipped
+ * with Money Plus (41 lots).
+ *
+ * The previous table came from PR #192's format reference and had **`act` 1 as
+ * SELL**, which is backwards: `act` 1 opens 3,520 lots in the maintainer's file
+ * and closes none. Every purchase imported as a sale, so no cash ever left a
+ * brokerage sleeve, holdings replayed negative, and the investment half of the
+ * ledger was pure credit.
+ *
+ * `act` 0, 5, 14, 15 and 16 appear in no Money Plus file and keep their
+ * reference meanings; the fixtures are the only evidence for them (`act` 15
+ * opens all 60 of money2002's lots, which is consistent with ADD_SHARES).
+ * Where the two schemes disagree the lot evidence wins, because it is
+ * measured rather than assumed.
  */
 export const MNY_ACTION = {
-  BUY: 0,
-  SELL: 1,
-  /** Reinvested distribution. */
-  REINVEST: 3,
+  /** Money 2001-era buy. No Money Plus file uses it. */
+  BUY_LEGACY: 0,
+  /** Opens lots, `TRN.amt` positive: the money went out. */
+  BUY: 1,
+  /** Closes lots, `TRN.amt` negative: the money came in. */
+  SELL: 2,
   /** Cash dividend. Has **no** `TRN_INV` row -- the amount is on `TRN.amt`. */
-  DIVIDEND: 4,
+  DIVIDEND: 3,
+  /** A second cash distribution, also without a `TRN_INV` row. */
+  DISTRIBUTION: 4,
   /** Second reinvestment variant; the 3-versus-5 distinction is unconfirmed. */
   REINVEST_ALT: 5,
+  /** Reinvested distribution: opens lots, and the cash never lands. */
+  REINVEST: 9,
+  /** Opens lots with `TRN.amt` set, exactly like `BUY`. */
+  BUY_ALT: 12,
+  /** Closes lots with no cash. */
+  REMOVE_SHARES: 13,
   /** Cash corporate action. Real-world meaning unconfirmed. */
   CAPITAL_GAIN: 14,
   /** Opens lots without a cash leg. Half of a cross-account transfer. */
   ADD_SHARES: 15,
   /** Closes lots without a cash leg. **Never** a sale. */
-  REMOVE_SHARES: 16,
+  REMOVE_SHARES_LEGACY: 16,
+  /** Opens lots with no cash: the receiving half of a share transfer. */
+  TRANSFER_IN: 32,
+  /** Closes lots with no cash: the sending half of a share transfer. */
+  TRANSFER_OUT: 33,
 } as const;
 
 const ACTION_BY_CODE: ReadonlyMap<number, InvestmentAction> = new Map([
+  [MNY_ACTION.BUY_LEGACY, InvestmentAction.BUY],
   [MNY_ACTION.BUY, InvestmentAction.BUY],
   [MNY_ACTION.SELL, InvestmentAction.SELL],
-  [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
   [MNY_ACTION.DIVIDEND, InvestmentAction.DIVIDEND],
+  [MNY_ACTION.DISTRIBUTION, InvestmentAction.DIVIDEND],
   [MNY_ACTION.REINVEST_ALT, InvestmentAction.REINVEST],
+  [MNY_ACTION.REINVEST, InvestmentAction.REINVEST],
+  [MNY_ACTION.BUY_ALT, InvestmentAction.BUY],
+  [MNY_ACTION.REMOVE_SHARES, InvestmentAction.REMOVE_SHARES],
   [MNY_ACTION.CAPITAL_GAIN, InvestmentAction.CAPITAL_GAIN],
   [MNY_ACTION.ADD_SHARES, InvestmentAction.ADD_SHARES],
-  [MNY_ACTION.REMOVE_SHARES, InvestmentAction.REMOVE_SHARES],
+  [MNY_ACTION.REMOVE_SHARES_LEGACY, InvestmentAction.REMOVE_SHARES],
+  [MNY_ACTION.TRANSFER_IN, InvestmentAction.TRANSFER_IN],
+  [MNY_ACTION.TRANSFER_OUT, InvestmentAction.TRANSFER_OUT],
 ]);
 
 /**
  * Codes whose meaning is inferred rather than observed. A mapper must attach a
  * warning to every transaction it maps through one of these, so the
  * verification report shows the user what was assumed.
+ *
+ * `DISTRIBUTION` and `BUY_ALT` are here because the lots prove what they do to
+ * a position but not what Money calls them: `act` 4 is some cash distribution
+ * that is not the dividend `act` 3 already is, and `act` 12 opens lots with a
+ * cash amount exactly as `act` 1 does. Both are mapped to their observed
+ * effect and reported, which is the rule -- codes 10, 17, 18 and 20 turn up in
+ * real files with no lot to explain them, so they stay unmapped and are
+ * skipped with a warning rather than guessed at.
  */
 export const MNY_UNCONFIRMED_ACTIONS: ReadonlySet<number> = new Set([
   MNY_ACTION.REINVEST_ALT,
   MNY_ACTION.CAPITAL_GAIN,
+  MNY_ACTION.DISTRIBUTION,
+  MNY_ACTION.BUY_ALT,
+]);
+
+/**
+ * Codes that carry their amount on `TRN.amt` alone, with no `TRN_INV` row.
+ * Iterating `TRN_INV` instead of `TRN` drops every one of them, which is
+ * PR #192 issue 4.
+ */
+const CASH_ONLY_ACTIONS: ReadonlySet<number> = new Set([
+  MNY_ACTION.DIVIDEND,
+  MNY_ACTION.DISTRIBUTION,
 ]);
 
 /**
@@ -182,11 +238,12 @@ export function mapInvestmentAction(act: number): InvestmentAction | null {
 }
 
 /**
- * False for the one action that carries no `TRN_INV` row. Iterating `TRN_INV`
- * instead of `TRN` drops every cash dividend, which is PR #192 issue 4.
+ * False for the actions that carry no `TRN_INV` row -- the cash distributions.
+ * Both Money Plus files confirm it: every `act` 3 and `act` 4 row is absent
+ * from `TRN_INV`, and every other action has a row there.
  */
 export function hasInvestmentDetail(act: number): boolean {
-  return act !== MNY_ACTION.DIVIDEND;
+  return !CASH_ONLY_ACTIONS.has(act);
 }
 
 // ---------------------------------------------------------------------------
