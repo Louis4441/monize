@@ -532,9 +532,13 @@ export function MonteCarloReport() {
                     </div>
                   </label>
                 ) : (
+                  /* min-w-0 is what makes the `truncate` inside work: a flex item
+                     defaults to min-width:auto, so without it the button grows to
+                     the name's full width and a long scenario name pushes out of
+                     the sidebar. The select-mode branch above already does this. */
                   <button
                     onClick={() => !reordering && loadScenario(s)}
-                    className={`flex-1 text-left px-2 py-1.5 rounded text-sm ${
+                    className={`min-w-0 flex-1 text-left px-2 py-1.5 rounded text-sm ${
                       reordering ? 'cursor-default' : ''
                     } ${
                       activeId === s.id
