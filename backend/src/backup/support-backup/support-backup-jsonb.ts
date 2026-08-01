@@ -14,7 +14,8 @@ export type JsonbHandlerName =
   | "overrideSplits"
   | "lumpSums"
   | "reportFilters"
-  | "assetWeightings";
+  | "assetWeightings"
+  | "gemMomentum";
 
 type JsonbHandler = (value: unknown, multiplier: number) => unknown;
 
@@ -84,12 +85,35 @@ const assetWeightings: JsonbHandler = (value) => {
   });
 };
 
+/**
+ * `gem_strategy_signals.momentum`: trailing return in percent per strategy
+ * role. The keys are the fixed role vocabulary and the values are returns, not
+ * amounts -- nothing here is private, and a diagnosis of a wrong signal needs
+ * the exact figures the decision was taken on. Keyed by an allowlist all the
+ * same, so a role added later does not travel until it is classified.
+ */
+const gemMomentum: JsonbHandler = (value) => {
+  if (!isRecord(value)) return {};
+  const out: Record<string, unknown> = {};
+  for (const role of [
+    "US_EQUITY",
+    "EX_US_EQUITY",
+    "EM_EQUITY",
+    "SAFE",
+    "RISK_FREE",
+  ] as const) {
+    if (role in value) out[role] = value[role];
+  }
+  return out;
+};
+
 const HANDLERS: Record<JsonbHandlerName, JsonbHandler> = {
   transferRules,
   overrideSplits,
   lumpSums,
   reportFilters,
   assetWeightings,
+  gemMomentum,
 };
 
 export function applyJsonbHandler(

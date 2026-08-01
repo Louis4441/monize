@@ -90,4 +90,33 @@ describe("JSONB handlers", () => {
       payeeIds: ["p"],
     });
   });
+
+  it("gemMomentum keeps every role's return untouched and drops foreign keys", () => {
+    const out = applyJsonbHandler(
+      "gemMomentum",
+      {
+        US_EQUITY: 12.5,
+        EX_US_EQUITY: -3.25,
+        EM_EQUITY: null,
+        SAFE: 1.1,
+        RISK_FREE: 0.4,
+        NEW_ROLE: 9,
+      },
+      M,
+    ) as Record<string, unknown>;
+    // Returns in percent, not amounts -- the multiplier must not touch them,
+    // and the figures a decision was taken on must survive verbatim.
+    expect(out).toEqual({
+      US_EQUITY: 12.5,
+      EX_US_EQUITY: -3.25,
+      EM_EQUITY: null,
+      SAFE: 1.1,
+      RISK_FREE: 0.4,
+    });
+  });
+
+  it("gemMomentum returns an empty object for a non-object value", () => {
+    expect(applyJsonbHandler("gemMomentum", null, M)).toEqual({});
+    expect(applyJsonbHandler("gemMomentum", [1, 2], M)).toEqual({});
+  });
 });

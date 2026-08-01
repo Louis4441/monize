@@ -96,6 +96,10 @@ export const RESTORABLE_TABLES: ReadonlySet<string> = new Set([
   "ai_provider_configs",
   "monte_carlo_scenarios",
   "monte_carlo_cash_flows",
+  "gem_strategies",
+  "gem_strategy_accounts",
+  "gem_strategy_assets",
+  "gem_strategy_signals",
 ]);
 
 /**
@@ -171,6 +175,10 @@ interface BackupData {
   monte_carlo_scenarios: Record<string, unknown>[];
   monte_carlo_cash_flows: Record<string, unknown>[];
   ai_provider_configs: Record<string, unknown>[];
+  gem_strategies: Record<string, unknown>[];
+  gem_strategy_accounts: Record<string, unknown>[];
+  gem_strategy_assets: Record<string, unknown>[];
+  gem_strategy_signals: Record<string, unknown>[];
 }
 
 @Injectable()
@@ -525,6 +533,22 @@ export class BackupService {
               JOIN monte_carlo_scenarios mcs ON mccf.scenario_id = mcs.id
               WHERE mcs.user_id = $1`,
       },
+      {
+        key: "gem_strategies",
+        sql: "SELECT * FROM gem_strategies WHERE user_id = $1",
+      },
+      {
+        key: "gem_strategy_accounts",
+        sql: "SELECT * FROM gem_strategy_accounts WHERE user_id = $1",
+      },
+      {
+        key: "gem_strategy_assets",
+        sql: "SELECT * FROM gem_strategy_assets WHERE user_id = $1",
+      },
+      {
+        key: "gem_strategy_signals",
+        sql: "SELECT * FROM gem_strategy_signals WHERE user_id = $1",
+      },
     ];
   }
 
@@ -846,6 +870,33 @@ export class BackupService {
           data.monte_carlo_cash_flows,
           null,
         );
+        // GEM strategies last: the children reference securities and accounts,
+        // both already inserted above, and each other only through
+        // gem_strategies, which goes in first.
+        restored.gemStrategies = await this.insertRows(
+          manager,
+          "gem_strategies",
+          data.gem_strategies,
+          userId,
+        );
+        restored.gemStrategyAccounts = await this.insertRows(
+          manager,
+          "gem_strategy_accounts",
+          data.gem_strategy_accounts,
+          userId,
+        );
+        restored.gemStrategyAssets = await this.insertRows(
+          manager,
+          "gem_strategy_assets",
+          data.gem_strategy_assets,
+          userId,
+        );
+        restored.gemStrategySignals = await this.insertRows(
+          manager,
+          "gem_strategy_signals",
+          data.gem_strategy_signals,
+          userId,
+        );
 
         // Phase 3: Restore deferred FK columns that were stripped during insert
         // to avoid circular/forward reference violations.
@@ -1062,6 +1113,22 @@ export class BackupService {
     // Action history (undo/redo log) -- not included in backups, so wipe it
     // outright; restored data should not be undoable to the prior state.
     await manager.query("DELETE FROM action_history WHERE user_id = $1", [
+      userId,
+    ]);
+
+    // GEM strategies (accounts, assets and signals cascade on strategy delete,
+    // but are deleted explicitly first so the order is self-documenting)
+    await manager.query("DELETE FROM gem_strategy_signals WHERE user_id = $1", [
+      userId,
+    ]);
+    await manager.query("DELETE FROM gem_strategy_assets WHERE user_id = $1", [
+      userId,
+    ]);
+    await manager.query(
+      "DELETE FROM gem_strategy_accounts WHERE user_id = $1",
+      [userId],
+    );
+    await manager.query("DELETE FROM gem_strategies WHERE user_id = $1", [
       userId,
     ]);
 

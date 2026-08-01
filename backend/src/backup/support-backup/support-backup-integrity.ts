@@ -261,6 +261,36 @@ const REFS: Record<string, RefRule[]> = {
       onMissing: "dropRow",
     },
   ],
+  gem_strategy_accounts: [
+    {
+      column: "strategy_id",
+      refTable: "gem_strategies",
+      onMissing: "dropRow",
+    },
+    { column: "account_id", refTable: "accounts", onMissing: "dropRow" },
+  ],
+  gem_strategy_assets: [
+    {
+      column: "strategy_id",
+      refTable: "gem_strategies",
+      onMissing: "dropRow",
+    },
+    // A role whose instrument is gone is exactly what an unmapped role is, so
+    // the row survives with a null rather than disappearing.
+    { column: "security_id", refTable: "securities", onMissing: "null" },
+  ],
+  gem_strategy_signals: [
+    {
+      column: "strategy_id",
+      refTable: "gem_strategies",
+      onMissing: "dropRow",
+    },
+    {
+      column: "target_security_id",
+      refTable: "securities",
+      onMissing: "null",
+    },
+  ],
 };
 
 /**
