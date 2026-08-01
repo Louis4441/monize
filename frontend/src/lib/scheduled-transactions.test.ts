@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import apiClient from './api';
 import { scheduledTransactionsApi } from './scheduled-transactions';
+import { clearAllCache, getCached, setCache } from './apiCache';
 
 vi.mock('./api', () => ({
   default: { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() },
@@ -130,5 +131,32 @@ describe('scheduledTransactionsApi', () => {
     const result = await scheduledTransactionsApi.deleteAllOverrides('st-1');
     expect(apiClient.delete).toHaveBeenCalledWith('/scheduled-transactions/st-1/overrides');
     expect(result).toBe(3);
+  });
+
+  // Regression: posting writes a real transaction, so the cached account
+  // balances are stale the moment it returns. They were not being dropped, so
+  // the Accounts page kept showing the pre-post balance for the two-minute TTL
+  // -- navigating away and back did not help, because the page's refetch on
+  // mount was served from the same cache. Only a browser reload cleared it.
+  it('post drops the cached account and portfolio balances', async () => {
+    clearAllCache();
+    setCache('accounts:all:true', [{ id: 'a-1', currentBalance: 100 }], 120_000);
+    setCache('investments:portfolioSummary', { total: 1 }, 120_000);
+
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'st-1' } });
+    await scheduledTransactionsApi.post('st-1');
+
+    expect(getCached('accounts:all:true')).toBeUndefined();
+    expect(getCached('investments:portfolioSummary')).toBeUndefined();
+  });
+
+  it('skip leaves balance caches alone -- it writes no transaction', async () => {
+    clearAllCache();
+    setCache('accounts:all:true', [{ id: 'a-1' }], 120_000);
+
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'st-1' } });
+    await scheduledTransactionsApi.skip('st-1');
+
+    expect(getCached('accounts:all:true')).toEqual([{ id: 'a-1' }]);
   });
 });

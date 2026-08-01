@@ -40,6 +40,29 @@ npm run i18n:check         # Verify the pseudo-locale is up to date (CI gate)
 
 Feature API modules (one per feature, typed axios wrappers) live alongside `api.ts`. Use the filesystem to discover them.
 
+### A write that moves money calls `invalidateBalanceCaches()`
+
+`accountsApi.getAll` and `investmentsApi.getPortfolioSummary` are cached in
+`apiCache.ts` for two minutes, and the backend computes balances live from
+transactions -- so a write that does not drop those entries leaves the Accounts
+page showing the pre-write number. Navigating away and back does not fix it:
+the page refetches on mount and the refetch is served from the same cache, so
+only a browser reload clears it. Call `invalidateBalanceCaches()` (both
+prefixes at once) after any write that adds, removes, re-dates, re-prices or
+voids a transaction -- and note that "goes through `transactionsApi`" is not the
+test. Posting a scheduled transaction, editing splits (a split can carry a
+`transferAccountId`, so the counterpart lands in an account the parent never
+named), an investment trade hitting its INVESTMENT_CASH account, and a QIF/OFX/
+CSV/MNY import all write transaction rows from their own modules. That omission
+on `scheduledTransactionsApi.post` is the bug this rule came from;
+`src/lib/balance-cache.guard.test.ts` now scans for it.
+
+Where the write can touch anything -- undo/redo, an AI assistant action, a
+backup restore -- use `clearAllCache()` instead; no prefix is narrow enough to
+be correct. This matters most for `notifyUndoRedo`/`notifyAiAction`: they exist
+to make mounted pages refetch, and a refetch served from a stale cache makes
+the whole signal a no-op.
+
 ## Proxy (`src/proxy.ts`)
 
 This is Next.js middleware (NOT the deprecated middleware pattern from this project's conventions). It handles:

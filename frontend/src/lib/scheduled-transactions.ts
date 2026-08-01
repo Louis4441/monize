@@ -9,7 +9,7 @@ import {
   OverrideCheckResult,
   PostScheduledTransactionData,
 } from '@/types/scheduled-transaction';
-import { dedupe, invalidateCache } from './apiCache';
+import { dedupe, invalidateBalanceCaches, invalidateCache } from './apiCache';
 
 export const scheduledTransactionsApi = {
   // Create a new scheduled transaction
@@ -79,6 +79,10 @@ export const scheduledTransactionsApi = {
       data || {},
     );
     invalidateCache('scheduled:');
+    // Posting writes a real transaction, so every balance derived from it is
+    // now stale. Without this the Accounts page shows the pre-post balance for
+    // up to two minutes, including after navigating back to it.
+    invalidateBalanceCaches();
     return response.data;
   },
 

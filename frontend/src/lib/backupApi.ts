@@ -1,4 +1,5 @@
 import apiClient from './api';
+import { clearAllCache } from './apiCache';
 import { filenameFromContentDisposition } from './download';
 import { AutoBackupSettings, UpdateAutoBackupSettingsData } from '@/types/auth';
 
@@ -231,6 +232,9 @@ export const backupApi = {
       body,
       { headers, timeout: 300000 },
     );
+    // A restore replaces the whole dataset; nothing cached from before it is
+    // still true.
+    clearAllCache();
     return response.data;
   },
 
