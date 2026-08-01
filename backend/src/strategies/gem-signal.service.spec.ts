@@ -236,6 +236,23 @@ describe("GemSignalService", () => {
       expect(savedSignals).toHaveLength(0);
     });
 
+    it("keeps every period when a version bump doubles the rows", async () => {
+      // Two rows can share a date now that the unique key carries the
+      // algorithm version. A 24-*row* cap counted a superseded row against its
+      // own replacement, so the first read after a bump returned the newest
+      // twelve dates and called that the history -- and raised no legacy
+      // warning, because every date it did return had a current row.
+      const periods = 24;
+      signalRepo.find.mockImplementation(({ take }: { take?: number }) => {
+        expect(take).toBeUndefined();
+        return Promise.resolve([]);
+      });
+
+      await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+      expect(savedSignals).toHaveLength(periods);
+    });
+
     it("does not re-evaluate a period that is already stored", async () => {
       signalRepo.find.mockResolvedValue([
         {

@@ -343,10 +343,17 @@ export class GemSignalService {
       // They are filtered rather than deleted: nothing about them is wrong,
       // they answer a calendar this strategy is not on today, and switching
       // the cadence back brings them and their `executed` flags with it.
+      //
+      // No row cap: `In(calendar)` already bounds this to the 24 dates the
+      // history shows, and a period can hold more than one row now that the
+      // unique key carries the algorithm version. Taking 24 *rows* counted a
+      // superseded row against its own replacement, so the first read after a
+      // version bump returned the newest twelve dates and called that the
+      // history -- with no legacy warning, because every date it did return
+      // had a current row.
       const stored = await repo.find({
         where: { strategyId: strategy.id, evaluatedOn: In(calendar) },
         order: { evaluatedOn: "DESC" },
-        take: GEM_HISTORY_PERIODS,
       });
       // A period counts as answered only when its row was calculated under the
       // configuration in force now, by the evaluation code in force now.
@@ -651,7 +658,6 @@ export class GemSignalService {
         await repo.find({
           where: { strategyId: strategy.id, evaluatedOn: In(calendar) },
           order: { evaluatedOn: "DESC" },
-          take: GEM_HISTORY_PERIODS,
         }),
       );
     });

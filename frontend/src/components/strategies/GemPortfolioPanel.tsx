@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useTranslations } from 'next-intl';
-import { useNumberFormat } from '@/hooks/useNumberFormat';
-import { GemPosition } from '@/types/gem-strategy';
-import { compliancePercent, isKnown } from '@/lib/gem-strategy-view';
+import { useTranslations } from "next-intl";
+import { useNumberFormat } from "@/hooks/useNumberFormat";
+import { GemPosition } from "@/types/gem-strategy";
+import { compliancePercent, isKnown } from "@/lib/gem-strategy-view";
 import {
   GemAccountLinks,
   GemBadge,
@@ -12,8 +12,8 @@ import {
   GemSecurityLink,
   GemStatRow,
   GemUnknown,
-} from './GemPrimitives';
-import { useGemLabels } from './useGemLabels';
+} from "./GemPrimitives";
+import { useGemLabels } from "./useGemLabels";
 
 interface GemPortfolioPanelProps {
   position: GemPosition | null;
@@ -27,17 +27,21 @@ interface GemPortfolioPanelProps {
  * The whole portfolio is listed because that is what the strategy compares
  * against -- an instrument it never assigned still has to be moved.
  */
-export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfolioPanelProps) {
-  const t = useTranslations('strategies');
+export function GemPortfolioPanel({
+  position,
+  noAccount,
+  noPosition,
+}: GemPortfolioPanelProps) {
+  const t = useTranslations("strategies");
   const { assetFullLabel, dimensionLabel } = useGemLabels();
   const { formatCurrency, formatQuantity, formatPercent } = useNumberFormat();
 
   if (!position || noAccount) {
     return (
-      <GemCard title={t('gem.portfolioPanel.title')}>
+      <GemCard title={t("gem.portfolioPanel.title")}>
         <GemEmptyState
-          title={t('gem.portfolio.noAccountTitle')}
-          description={t('gem.portfolio.noAccountDescription')}
+          title={t("gem.portfolio.noAccountTitle")}
+          description={t("gem.portfolio.noAccountDescription")}
         />
       </GemCard>
     );
@@ -52,12 +56,14 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
     ? null
     : securities.reduce((sum, holding) => sum + (holding.marketValue ?? 0), 0);
 
-
   return (
-    <GemCard title={t('gem.portfolioPanel.title')} hint={t('gem.portfolio.hint')}>
+    <GemCard
+      title={t("gem.portfolioPanel.title")}
+      hint={t("gem.portfolio.hint")}
+    >
       <dl className="space-y-1">
         <GemStatRow
-          label={t('gem.portfolioPanel.accounts')}
+          label={t("gem.portfolioPanel.accounts")}
           value={
             position.accounts.length > 0 ? (
               <GemAccountLinks accounts={position.accounts} />
@@ -67,7 +73,7 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
           }
         />
         <GemStatRow
-          label={t('gem.portfolio.target')}
+          label={t("gem.portfolio.target")}
           value={
             position.target?.securityId ? (
               <GemSecurityLink securityId={position.target.securityId}>
@@ -79,31 +85,33 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
           }
         />
         <GemStatRow
-          label={t('gem.portfolio.exactTarget')}
+          label={t("gem.portfolio.exactTarget")}
           value={percent === null ? <GemUnknown /> : formatPercent(percent, 0)}
         />
         {/* The estimate, on its own row and never merged with the one above:
             exposure to the same market is not holding the named fund. */}
         <GemStatRow
-          label={t('gem.portfolio.marketExposure')}
+          label={t("gem.portfolio.marketExposure")}
           value={
             isKnown(position.marketExposurePercent) ? (
               formatPercent(position.marketExposurePercent, 0)
             ) : (
-              <GemUnknown label={t('gem.portfolio.marketExposureUnknown')} />
+              <GemUnknown label={t("gem.portfolio.marketExposureUnknown")} />
             )
           }
         />
         <GemStatRow
-          label={t('gem.portfolio.changeRequired')}
+          label={t("gem.portfolio.changeRequired")}
           value={
-            <GemBadge tone={position.changeRequired ? 'red' : 'green'}>
-              {position.changeRequired ? t('gem.common.yes') : t('gem.common.no')}
+            <GemBadge tone={position.changeRequired ? "red" : "green"}>
+              {position.changeRequired
+                ? t("gem.common.yes")
+                : t("gem.common.no")}
             </GemBadge>
           }
         />
         <GemStatRow
-          label={t('gem.portfolioPanel.totalValue')}
+          label={t("gem.portfolioPanel.totalValue")}
           value={
             isKnown(position.totalMarketValue) ? (
               formatCurrency(position.totalMarketValue, position.currencyCode)
@@ -117,14 +125,16 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
       {noPosition || position.holdings.length === 0 ? (
         <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
           <GemEmptyState
-            title={t('gem.portfolio.noPositionTitle')}
-            description={t('gem.portfolioPanel.noPositionHint')}
+            title={t("gem.portfolio.noPositionTitle")}
+            description={t("gem.portfolioPanel.noPositionHint")}
           />
         </div>
       ) : (
         <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
           <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {t('gem.portfolioPanel.holdings', { count: position.holdings.length })}
+            {t("gem.portfolioPanel.holdings", {
+              count: position.holdings.length,
+            })}
           </h4>
           <ul className="space-y-1">
             {position.holdings.map((holding) => {
@@ -142,7 +152,11 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                   // Cash has neither a security nor a ticker, so it is the one
                   // row both fallbacks come back null for -- the same key the
                   // working-out table below spells out.
-                  key={holding.isCash ? 'cash' : (holding.securityId ?? holding.symbol)}
+                  key={
+                    holding.isCash
+                      ? "cash"
+                      : (holding.securityId ?? holding.symbol)
+                  }
                   className="flex items-start justify-between gap-3 text-sm"
                 >
                   <span className="flex min-w-0 items-start gap-1.5">
@@ -162,30 +176,33 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                             data, and the second contradicts the note this same
                             row carries in the table below. */}
                         {holding.isCash
-                          ? t('gem.portfolioPanel.workingCashNote')
+                          ? t("gem.portfolioPanel.workingCashNote")
                           : isKnown(holding.quantity)
-                            ? t('gem.action.units', {
+                            ? t("gem.action.units", {
                                 units: formatQuantity(holding.quantity),
                               })
-                            : t('gem.common.unknown')}
+                            : t("gem.common.unknown")}
                         {isTarget && (
                           <>
                             <span aria-hidden="true"> &middot; </span>
-                            {t('gem.portfolioPanel.isTarget')}
+                            {t("gem.portfolioPanel.isTarget")}
                           </>
                         )}
                         {partial && (
                           <>
                             <span aria-hidden="true"> &middot; </span>
-                            {t('gem.portfolioPanel.partialMatch', {
-                              percent: formatPercent(holding.matchPercent as number, 0),
+                            {t("gem.portfolioPanel.partialMatch", {
+                              percent: formatPercent(
+                                holding.matchPercent as number,
+                                0,
+                              ),
                             })}
                           </>
                         )}
                         {!holding.role && !holding.isCash && (
                           <>
                             <span aria-hidden="true"> &middot; </span>
-                            {t('gem.portfolioPanel.notInStrategy')}
+                            {t("gem.portfolioPanel.notInStrategy")}
                           </>
                         )}
                       </span>
@@ -203,7 +220,7 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
             })}
           </ul>
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            {t('gem.portfolioPanel.holdingsHint')}
+            {t("gem.portfolioPanel.holdingsHint")}
           </p>
           {/* Shown whenever there is a target, priced or not. Gating it on a
               known total hid the whole working-out at the one moment it
@@ -212,23 +229,26 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
           {position.target && (
             <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
               <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('gem.portfolioPanel.workingTitle')}
+                {t("gem.portfolioPanel.workingTitle")}
               </h4>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-xs">
                   <thead>
                     <tr className="text-left text-gray-500 dark:text-gray-400">
                       <th scope="col" className="py-1 pr-3 font-medium">
-                        {t('gem.portfolioPanel.workingInstrument')}
+                        {t("gem.portfolioPanel.workingInstrument")}
                       </th>
-                      <th scope="col" className="py-1 pr-3 text-right font-medium">
-                        {t('gem.portfolioPanel.workingValue')}
+                      <th
+                        scope="col"
+                        className="py-1 pr-3 text-right font-medium"
+                      >
+                        {t("gem.portfolioPanel.workingValue")}
                       </th>
                       <th scope="col" className="py-1 pr-3 font-medium">
-                        {t('gem.portfolioPanel.workingIsTarget')}
+                        {t("gem.portfolioPanel.workingIsTarget")}
                       </th>
                       <th scope="col" className="py-1 text-right font-medium">
-                        {t('gem.portfolioPanel.workingExposure')}
+                        {t("gem.portfolioPanel.workingExposure")}
                       </th>
                     </tr>
                   </thead>
@@ -237,7 +257,7 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                       <tr
                         key={
                           holding.isCash
-                            ? 'cash'
+                            ? "cash"
                             : (holding.securityId ?? holding.symbol)
                         }
                       >
@@ -245,10 +265,10 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                           {/* Cash is a balance, not an instrument: there is
                               nothing to link to and no ticker to print. */}
                           {holding.isCash ? (
-                            t('gem.portfolioPanel.workingCash')
+                            t("gem.portfolioPanel.workingCash")
                           ) : (
                             <GemSecurityLink securityId={holding.securityId}>
-                              {holding.symbol ?? t('gem.common.unassigned')}
+                              {holding.symbol ?? t("gem.common.unassigned")}
                             </GemSecurityLink>
                           )}
                         </td>
@@ -267,10 +287,10 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                             and no amount of similar exposure changes that. */}
                         <td className="py-1 pr-3">
                           {holding.isCash
-                            ? t('gem.portfolioPanel.workingCashNote')
+                            ? t("gem.portfolioPanel.workingCashNote")
                             : holding.isTargetInstrument
-                              ? t('gem.portfolioPanel.workingIsTargetYes')
-                              : t('gem.portfolioPanel.workingIsTargetNo')}
+                              ? t("gem.portfolioPanel.workingIsTargetYes")
+                              : t("gem.portfolioPanel.workingIsTargetNo")}
                         </td>
                         {/* The estimate, beside it and clearly not the same
                             thing. Unknown stays unknown: a confident 0.00
@@ -285,21 +305,26 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                             // column of percentages reads as zero, which is the
                             // one thing this is not.
                             <span className="text-gray-500 dark:text-gray-400">
-                              {t('gem.portfolioPanel.workingNoData')}
+                              {t("gem.portfolioPanel.workingNoData")}
                             </span>
                           ) : (
-                            <span title={
-                              holding.matchedMarkets.length > 0
-                                ? holding.matchedMarkets
-                                    .map((market) =>
-                                      t('gem.portfolioPanel.workingMarket', {
-                                        name: market.name,
-                                        percent: formatPercent(market.percent, 0),
-                                      }),
-                                    )
-                                    .join(', ')
-                                : undefined
-                            }>
+                            <span
+                              title={
+                                holding.matchedMarkets.length > 0
+                                  ? holding.matchedMarkets
+                                      .map((market) =>
+                                        t("gem.portfolioPanel.workingMarket", {
+                                          name: market.name,
+                                          percent: formatPercent(
+                                            market.percent,
+                                            0,
+                                          ),
+                                        }),
+                                      )
+                                      .join(", ")
+                                  : undefined
+                              }
+                            >
                               {formatPercent(holding.matchPercent, 0)}
                             </span>
                           )}
@@ -310,7 +335,7 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                   <tfoot>
                     <tr className="border-t border-gray-200 font-medium dark:border-gray-700">
                       <td className="py-1 pr-3">
-                        {t('gem.portfolioPanel.workingTotal')}
+                        {t("gem.portfolioPanel.workingTotal")}
                       </td>
                       <td className="py-1 pr-3 text-right tabular-nums">
                         {isKnown(position.totalMarketValue) ? (
@@ -339,8 +364,8 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                   fund". */}
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {percent === null || securitiesValue === null
-                  ? t('gem.portfolioPanel.workingUnknown')
-                  : t('gem.portfolioPanel.workingSum', {
+                  ? t("gem.portfolioPanel.workingUnknown")
+                  : t("gem.portfolioPanel.workingSum", {
                       counted: formatCurrency(
                         (securitiesValue * percent) / 100,
                         position.currencyCode,
@@ -360,34 +385,43 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
           {/* What the *exposure estimate* could be built from, and what to do
               when it could not. It says nothing about compliance, which is
               exact either way: the signal names an instrument, and the accounts
-              either hold it or they do not. */}
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {position.basis === 'COMPOSITION'
-              ? t('gem.portfolioPanel.basisComposition', {
-                  dimension: dimensionLabel(position.dimension),
-                })
-              : t('gem.portfolioPanel.basisInstrument', {
-                  dimension: dimensionLabel(position.requiredDimension),
-                  target: position.target?.symbol ?? t('gem.common.unassigned'),
-                })}
-            {position.basis === 'COMPOSITION' &&
-              position.instrumentMatchedCount > 0 && (
-                <>
-                  {' '}
-                  {t('gem.portfolioPanel.basisPartialData', {
-                    count: position.instrumentMatchedCount,
+              either hold it or they do not.
+              
+              Only with a target, though. Without one the sentence was built
+              from two unknown placeholders -- "because Not assigned has no Not
+              available structure recorded" -- and then claimed compliance was
+              still being calculated exactly, which is false when there is no
+              instrument to be compliant with. */}
+          {position.target && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {position.basis === "COMPOSITION"
+                ? t("gem.portfolioPanel.basisComposition", {
+                    dimension: dimensionLabel(position.dimension),
+                  })
+                : t("gem.portfolioPanel.basisInstrument", {
+                    dimension: dimensionLabel(position.requiredDimension),
+                    target:
+                      position.target?.symbol ?? t("gem.common.unassigned"),
                   })}
+              {position.basis === "COMPOSITION" &&
+                position.instrumentMatchedCount > 0 && (
+                  <>
+                    {" "}
+                    {t("gem.portfolioPanel.basisPartialData", {
+                      count: position.instrumentMatchedCount,
+                    })}
+                  </>
+                )}
+              {position.basis === "INSTRUMENT" && (
+                <>
+                  {" "}
+                  <GemSecurityLink securityId={position.target?.securityId}>
+                    {t("gem.portfolioPanel.basisFillStructure")}
+                  </GemSecurityLink>
                 </>
               )}
-            {position.basis === 'INSTRUMENT' && (
-              <>
-                {' '}
-                <GemSecurityLink securityId={position.target?.securityId}>
-                  {t('gem.portfolioPanel.basisFillStructure')}
-                </GemSecurityLink>
-              </>
-            )}
-          </p>
+            </p>
+          )}
         </div>
       )}
     </GemCard>
