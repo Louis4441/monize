@@ -13,6 +13,7 @@ import {
   Repository,
 } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { withPreserveTimestamps } from "../common/db/with-context";
 import * as bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { createGzip, gunzipSync, gzipSync } from "zlib";
@@ -589,259 +590,271 @@ export class BackupService {
 
     // One transaction for the whole restore, exactly as the QueryRunner block
     // was: a half-applied restore would leave the account in a state that is
-    // neither the backup nor what was there before.
-    return withScopedDb(this.dataSource, async (manager) => {
-      // Phase 1: Delete all existing user data (same order as deleteData in users.service)
-      await this.deleteAllUserData(userId, manager);
+    // neither the backup nor what was there before. `preserveTimestamps` makes
+    // withScopedDb emit `app.preserve_timestamps` for this transaction (in
+    // every RLS mode), so the GUC-aware `updated_at` trigger keeps the backup's
+    // timestamps through the Phase-3 deferred-FK UPDATEs -- replacing the old
+    // trigger-disabling ALTER TABLE DDL, which the unprivileged runtime role
+    // cannot execute under enforcement (task C5).
+    return withPreserveTimestamps(() =>
+      withScopedDb(this.dataSource, async (manager) => {
+        // Phase 1: Delete all existing user data (same order as deleteData in users.service)
+        await this.deleteAllUserData(userId, manager);
 
-      // Phase 2: Insert backup data in FK-safe order.
-      // Columns that create circular or forward FK references are stripped
-      // during insert and restored in Phase 3 via UPDATE.
+        // Phase 2: Insert backup data in FK-safe order.
+        // Columns that create circular or forward FK references are stripped
+        // during insert and restored in Phase 3 via UPDATE.
 
-      // Ensure all referenced currency codes exist before restoring tables
-      // that have FK references to currencies(code).
-      await this.ensureCurrenciesExist(manager, data, userId);
+        // Ensure all referenced currency codes exist before restoring tables
+        // that have FK references to currencies(code).
+        await this.ensureCurrenciesExist(manager, data, userId);
 
-      restored.userPreferences = await this.insertRows(
-        manager,
-        "user_preferences",
-        data.user_preferences,
-        userId,
-      );
-      restored.userCurrencyPreferences = await this.insertRows(
-        manager,
-        "user_currency_preferences",
-        data.user_currency_preferences,
-        userId,
-      );
-      restored.categories = await this.insertRows(
-        manager,
-        "categories",
-        data.categories,
-        userId,
-      );
-      restored.payees = await this.insertRows(
-        manager,
-        "payees",
-        data.payees,
-        userId,
-      );
-      restored.payeeAliases = await this.insertRows(
-        manager,
-        "payee_aliases",
-        data.payee_aliases,
-        userId,
-      );
-      restored.institutions = await this.insertRows(
-        manager,
-        "institutions",
-        data.institutions,
-        userId,
-      );
-      restored.accounts = await this.insertRows(
-        manager,
-        "accounts",
-        data.accounts,
-        userId,
-      );
-      restored.tags = await this.insertRows(manager, "tags", data.tags, userId);
-      restored.scheduledTransactions = await this.insertRows(
-        manager,
-        "scheduled_transactions",
-        data.scheduled_transactions,
-        userId,
-      );
-      restored.scheduledTransactionSplits = await this.insertRows(
-        manager,
-        "scheduled_transaction_splits",
-        data.scheduled_transaction_splits,
-        null,
-      );
-      restored.scheduledTransactionOverrides = await this.insertRows(
-        manager,
-        "scheduled_transaction_overrides",
-        data.scheduled_transaction_overrides,
-        null,
-      );
-      restored.scheduledTransactionSplitTags = await this.insertRows(
-        manager,
-        "scheduled_transaction_split_tags",
-        data.scheduled_transaction_split_tags,
-        null,
-      );
-      restored.securities = await this.insertRows(
-        manager,
-        "securities",
-        data.securities,
-        userId,
-      );
-      restored.securityPrices = await this.insertRows(
-        manager,
-        "security_prices",
-        data.security_prices,
-        null,
-      );
-      restored.securityDocuments = await this.insertRows(
-        manager,
-        "security_documents",
-        data.security_documents,
-        userId,
-      );
-      restored.holdings = await this.insertRows(
-        manager,
-        "holdings",
-        data.holdings,
-        null,
-      );
-      restored.securityTags = await this.insertRows(
-        manager,
-        "security_tags",
-        data.security_tags,
-        null,
-      );
-      restored.transactions = await this.insertRows(
-        manager,
-        "transactions",
-        data.transactions,
-        userId,
-      );
-      restored.transactionSplits = await this.insertRows(
-        manager,
-        "transaction_splits",
-        data.transaction_splits,
-        null,
-      );
-      restored.transactionAttachments = await this.insertRows(
-        manager,
-        "transaction_attachments",
-        data.transaction_attachments,
-        userId,
-      );
-      // attachment_blobs has no user_id; it is scoped transitively through its
-      // FK to transaction_attachments. The base64 `data` column is decoded to
-      // bytea by insertRows (auto-detected).
-      restored.attachmentBlobs = await this.insertRows(
-        manager,
-        "attachment_blobs",
-        data.attachment_blobs,
-        null,
-      );
-      restored.transactionTags = await this.insertRows(
-        manager,
-        "transaction_tags",
-        data.transaction_tags,
-        null,
-      );
-      restored.transactionSplitTags = await this.insertRows(
-        manager,
-        "transaction_split_tags",
-        data.transaction_split_tags,
-        null,
-      );
-      restored.investmentTransactions = await this.insertRows(
-        manager,
-        "investment_transactions",
-        data.investment_transactions,
-        userId,
-      );
-      restored.loanRateChanges = await this.insertRows(
-        manager,
-        "loan_rate_changes",
-        data.loan_rate_changes,
-        userId,
-      );
-      restored.loanScenarios = await this.insertRows(
-        manager,
-        "loan_scenarios",
-        data.loan_scenarios,
-        userId,
-      );
-      restored.budgets = await this.insertRows(
-        manager,
-        "budgets",
-        data.budgets,
-        userId,
-      );
-      restored.budgetCategories = await this.insertRows(
-        manager,
-        "budget_categories",
-        data.budget_categories,
-        null,
-      );
-      restored.budgetPeriods = await this.insertRows(
-        manager,
-        "budget_periods",
-        data.budget_periods,
-        null,
-      );
-      restored.budgetPeriodCategories = await this.insertRows(
-        manager,
-        "budget_period_categories",
-        data.budget_period_categories,
-        null,
-      );
-      restored.budgetAlerts = await this.insertRows(
-        manager,
-        "budget_alerts",
-        data.budget_alerts,
-        userId,
-      );
-      restored.customReports = await this.insertRows(
-        manager,
-        "custom_reports",
-        data.custom_reports,
-        userId,
-      );
-      restored.investmentReports = await this.insertRows(
-        manager,
-        "investment_reports",
-        data.investment_reports,
-        userId,
-      );
-      restored.importColumnMappings = await this.insertRows(
-        manager,
-        "import_column_mappings",
-        data.import_column_mappings,
-        userId,
-      );
-      restored.monthlyAccountBalances = await this.insertRows(
-        manager,
-        "monthly_account_balances",
-        data.monthly_account_balances,
-        userId,
-      );
-      restored.autoBackupSettings = await this.insertRows(
-        manager,
-        "auto_backup_settings",
-        data.auto_backup_settings,
-        userId,
-      );
-      restored.aiProviderConfigs = await this.insertRows(
-        manager,
-        "ai_provider_configs",
-        data.ai_provider_configs,
-        userId,
-      );
-      restored.monteCarloScenarios = await this.insertRows(
-        manager,
-        "monte_carlo_scenarios",
-        data.monte_carlo_scenarios,
-        userId,
-      );
-      restored.monteCarloCashFlows = await this.insertRows(
-        manager,
-        "monte_carlo_cash_flows",
-        data.monte_carlo_cash_flows,
-        null,
-      );
+        restored.userPreferences = await this.insertRows(
+          manager,
+          "user_preferences",
+          data.user_preferences,
+          userId,
+        );
+        restored.userCurrencyPreferences = await this.insertRows(
+          manager,
+          "user_currency_preferences",
+          data.user_currency_preferences,
+          userId,
+        );
+        restored.categories = await this.insertRows(
+          manager,
+          "categories",
+          data.categories,
+          userId,
+        );
+        restored.payees = await this.insertRows(
+          manager,
+          "payees",
+          data.payees,
+          userId,
+        );
+        restored.payeeAliases = await this.insertRows(
+          manager,
+          "payee_aliases",
+          data.payee_aliases,
+          userId,
+        );
+        restored.institutions = await this.insertRows(
+          manager,
+          "institutions",
+          data.institutions,
+          userId,
+        );
+        restored.accounts = await this.insertRows(
+          manager,
+          "accounts",
+          data.accounts,
+          userId,
+        );
+        restored.tags = await this.insertRows(
+          manager,
+          "tags",
+          data.tags,
+          userId,
+        );
+        restored.scheduledTransactions = await this.insertRows(
+          manager,
+          "scheduled_transactions",
+          data.scheduled_transactions,
+          userId,
+        );
+        restored.scheduledTransactionSplits = await this.insertRows(
+          manager,
+          "scheduled_transaction_splits",
+          data.scheduled_transaction_splits,
+          null,
+        );
+        restored.scheduledTransactionOverrides = await this.insertRows(
+          manager,
+          "scheduled_transaction_overrides",
+          data.scheduled_transaction_overrides,
+          null,
+        );
+        restored.scheduledTransactionSplitTags = await this.insertRows(
+          manager,
+          "scheduled_transaction_split_tags",
+          data.scheduled_transaction_split_tags,
+          null,
+        );
+        restored.securities = await this.insertRows(
+          manager,
+          "securities",
+          data.securities,
+          userId,
+        );
+        restored.securityPrices = await this.insertRows(
+          manager,
+          "security_prices",
+          data.security_prices,
+          null,
+        );
+        restored.securityDocuments = await this.insertRows(
+          manager,
+          "security_documents",
+          data.security_documents,
+          userId,
+        );
+        restored.holdings = await this.insertRows(
+          manager,
+          "holdings",
+          data.holdings,
+          null,
+        );
+        restored.securityTags = await this.insertRows(
+          manager,
+          "security_tags",
+          data.security_tags,
+          null,
+        );
+        restored.transactions = await this.insertRows(
+          manager,
+          "transactions",
+          data.transactions,
+          userId,
+        );
+        restored.transactionSplits = await this.insertRows(
+          manager,
+          "transaction_splits",
+          data.transaction_splits,
+          null,
+        );
+        restored.transactionAttachments = await this.insertRows(
+          manager,
+          "transaction_attachments",
+          data.transaction_attachments,
+          userId,
+        );
+        // attachment_blobs has no user_id; it is scoped transitively through its
+        // FK to transaction_attachments. The base64 `data` column is decoded to
+        // bytea by insertRows (auto-detected).
+        restored.attachmentBlobs = await this.insertRows(
+          manager,
+          "attachment_blobs",
+          data.attachment_blobs,
+          null,
+        );
+        restored.transactionTags = await this.insertRows(
+          manager,
+          "transaction_tags",
+          data.transaction_tags,
+          null,
+        );
+        restored.transactionSplitTags = await this.insertRows(
+          manager,
+          "transaction_split_tags",
+          data.transaction_split_tags,
+          null,
+        );
+        restored.investmentTransactions = await this.insertRows(
+          manager,
+          "investment_transactions",
+          data.investment_transactions,
+          userId,
+        );
+        restored.loanRateChanges = await this.insertRows(
+          manager,
+          "loan_rate_changes",
+          data.loan_rate_changes,
+          userId,
+        );
+        restored.loanScenarios = await this.insertRows(
+          manager,
+          "loan_scenarios",
+          data.loan_scenarios,
+          userId,
+        );
+        restored.budgets = await this.insertRows(
+          manager,
+          "budgets",
+          data.budgets,
+          userId,
+        );
+        restored.budgetCategories = await this.insertRows(
+          manager,
+          "budget_categories",
+          data.budget_categories,
+          null,
+        );
+        restored.budgetPeriods = await this.insertRows(
+          manager,
+          "budget_periods",
+          data.budget_periods,
+          null,
+        );
+        restored.budgetPeriodCategories = await this.insertRows(
+          manager,
+          "budget_period_categories",
+          data.budget_period_categories,
+          null,
+        );
+        restored.budgetAlerts = await this.insertRows(
+          manager,
+          "budget_alerts",
+          data.budget_alerts,
+          userId,
+        );
+        restored.customReports = await this.insertRows(
+          manager,
+          "custom_reports",
+          data.custom_reports,
+          userId,
+        );
+        restored.investmentReports = await this.insertRows(
+          manager,
+          "investment_reports",
+          data.investment_reports,
+          userId,
+        );
+        restored.importColumnMappings = await this.insertRows(
+          manager,
+          "import_column_mappings",
+          data.import_column_mappings,
+          userId,
+        );
+        restored.monthlyAccountBalances = await this.insertRows(
+          manager,
+          "monthly_account_balances",
+          data.monthly_account_balances,
+          userId,
+        );
+        restored.autoBackupSettings = await this.insertRows(
+          manager,
+          "auto_backup_settings",
+          data.auto_backup_settings,
+          userId,
+        );
+        restored.aiProviderConfigs = await this.insertRows(
+          manager,
+          "ai_provider_configs",
+          data.ai_provider_configs,
+          userId,
+        );
+        restored.monteCarloScenarios = await this.insertRows(
+          manager,
+          "monte_carlo_scenarios",
+          data.monte_carlo_scenarios,
+          userId,
+        );
+        restored.monteCarloCashFlows = await this.insertRows(
+          manager,
+          "monte_carlo_cash_flows",
+          data.monte_carlo_cash_flows,
+          null,
+        );
 
-      // Phase 3: Restore deferred FK columns that were stripped during insert
-      // to avoid circular/forward reference violations.
-      await this.restoreDeferredFkColumns(manager, data);
+        // Phase 3: Restore deferred FK columns that were stripped during insert
+        // to avoid circular/forward reference violations.
+        await this.restoreDeferredFkColumns(manager, data);
 
-      this.logger.log(`Backup restore completed for user ${userId}`);
-      return { message: "Backup restored successfully", restored };
-    }).catch((error) => {
+        this.logger.log(`Backup restore completed for user ${userId}`);
+        return { message: "Backup restored successfully", restored };
+      }),
+    ).catch((error) => {
       this.logger.error(
         `Backup restore failed for user ${userId}: ${error.message}`,
       );
@@ -1387,56 +1400,27 @@ export class BackupService {
       },
     ];
 
-    // Tables that have a BEFORE UPDATE trigger which auto-sets updated_at.
-    // We must disable these triggers during deferred FK restoration to
-    // preserve the original timestamps from the backup.
-    const tablesWithUpdatedAtTrigger = new Set([
-      "accounts",
-      "transactions",
-      "scheduled_transactions",
-      "investment_transactions",
-    ]);
-
-    // Collect tables that will actually be updated AND have the trigger
-    const triggersToDisable = new Set<string>();
-    for (const { table, rows, column } of deferredUpdates) {
-      if (!rows || !tablesWithUpdatedAtTrigger.has(table)) continue;
-      if (rows.some((row) => row[column] != null && row.id != null)) {
-        triggersToDisable.add(table);
-      }
-    }
-
-    // Disable updated_at triggers on affected tables before running updates
-    for (const table of triggersToDisable) {
-      await manager.query(
-        `ALTER TABLE "${table}" DISABLE TRIGGER "update_${table}_updated_at"`,
-      );
-    }
-
-    try {
-      for (const {
-        table,
-        rows,
-        column,
-        requireReferencedTable,
-      } of deferredUpdates) {
-        if (!rows) continue;
-        const sql = requireReferencedTable
-          ? `UPDATE "${table}" SET "${column}" = $1 WHERE id = $2
-             AND EXISTS (SELECT 1 FROM "${requireReferencedTable}" WHERE id = $1)`
-          : `UPDATE "${table}" SET "${column}" = $1 WHERE id = $2`;
-        for (const row of rows) {
-          if (row[column] != null && row.id != null) {
-            await manager.query(sql, [row[column], row.id]);
-          }
+    // These UPDATEs run inside the restore's preserveTimestamps scope
+    // (restoreData), so the `updated_at` BEFORE UPDATE triggers see
+    // `app.preserve_timestamps = 'on'` and keep the values Phase 2 inserted
+    // from the backup instead of stamping. No trigger DDL: the old
+    // DISABLE/ENABLE pair required table ownership, which the runtime role
+    // does not have under RLS enforcement.
+    for (const {
+      table,
+      rows,
+      column,
+      requireReferencedTable,
+    } of deferredUpdates) {
+      if (!rows) continue;
+      const sql = requireReferencedTable
+        ? `UPDATE "${table}" SET "${column}" = $1 WHERE id = $2
+           AND EXISTS (SELECT 1 FROM "${requireReferencedTable}" WHERE id = $1)`
+        : `UPDATE "${table}" SET "${column}" = $1 WHERE id = $2`;
+      for (const row of rows) {
+        if (row[column] != null && row.id != null) {
+          await manager.query(sql, [row[column], row.id]);
         }
-      }
-    } finally {
-      // Re-enable the triggers regardless of whether the updates succeeded
-      for (const table of triggersToDisable) {
-        await manager.query(
-          `ALTER TABLE "${table}" ENABLE TRIGGER "update_${table}_updated_at"`,
-        );
       }
     }
   }

@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import { getRequestContext } from "../request-context";
 import {
   callSiteFromStack,
+  withPreserveTimestamps,
   withSystemContext,
   withUserContext,
 } from "./with-context";
@@ -43,6 +44,43 @@ describe("withUserContext", () => {
       // expected
     }
     expect(getRequestContext()).toBeUndefined();
+  });
+});
+
+describe("withPreserveTimestamps", () => {
+  it("extends an ambient user context, keeping its identity", () => {
+    const seen = withUserContext(VALID_UUID, () =>
+      withPreserveTimestamps(() => getRequestContext()),
+    );
+    expect(seen).toEqual({ userId: VALID_UUID, preserveTimestamps: true });
+  });
+
+  it("grants no identity of its own -- an empty ambient context stays empty", () => {
+    // withScopedDb inside the callback must still throw its missing-context
+    // error: preserving timestamps is a flag on the caller's identity, not a
+    // context by itself.
+    const seen = withPreserveTimestamps(() => getRequestContext());
+    expect(seen).toEqual({ preserveTimestamps: true });
+    expect(seen?.userId).toBeUndefined();
+    expect(seen?.system).toBeUndefined();
+  });
+
+  it("does not leak the flag outside its scope", () => {
+    withUserContext(VALID_UUID, () => {
+      withPreserveTimestamps(() => getRequestContext());
+      expect(getRequestContext()?.preserveTimestamps).toBeUndefined();
+      return 1;
+    });
+  });
+
+  it("propagates async return values within the scope", async () => {
+    await expect(
+      withUserContext(VALID_UUID, () =>
+        withPreserveTimestamps(async () => {
+          return getRequestContext()?.preserveTimestamps;
+        }),
+      ),
+    ).resolves.toBe(true);
   });
 });
 
