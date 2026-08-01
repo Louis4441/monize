@@ -305,6 +305,7 @@ export class GemPositionService {
       totalMarketValue: math.totalMarketValue,
       basis: math.basis,
       dimension: math.dimension,
+      requiredDimension: math.requiredDimension,
       instrumentMatchedCount: math.instrumentMatchedCount,
       currencyCode,
     };

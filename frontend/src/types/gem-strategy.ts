@@ -160,6 +160,8 @@ export interface GemPosition {
   basis: GemCompositionBasis;
   /** Breakdown the contents were compared on; null when tickers were used. */
   dimension: GemCompositionDimension | null;
+  /** The breakdown the target would need for a contents comparison. */
+  requiredDimension: GemCompositionDimension | null;
   /** How many holdings fell back to a ticker comparison. */
   instrumentMatchedCount: number;
   currencyCode: string;

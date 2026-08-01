@@ -97,6 +97,7 @@ export function gemPosition(overrides: Partial<GemPosition> = {}): GemPosition {
     totalMarketValue: 64643.84,
     basis: 'COMPOSITION',
     dimension: 'COUNTRY',
+    requiredDimension: 'COUNTRY',
     instrumentMatchedCount: 1,
     currencyCode: 'CAD',
     ...overrides,

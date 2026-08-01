@@ -110,6 +110,19 @@ export function hasWeightings(
 }
 
 /**
+ * The breakdown the target would have to carry for this role to be compared on
+ * contents at all -- the best one the role permits. This is what the report
+ * tells the user to fill in, and for an equity role it is country and nothing
+ * else, so naming the three columns generically would send them to fill in one
+ * that cannot help.
+ */
+export function requiredDimensionFor(
+  role: GemAssetRole | null,
+): GemCompositionDimension | null {
+  return role ? (DIMENSIONS_BY_ROLE[role][0] ?? null) : null;
+}
+
+/**
  * The breakdown the comparison runs on: the best one the target describes that
  * is sound for the role being filled (see `DIMENSIONS_BY_ROLE`). Null when the
  * target describes none of them, or when the only breakdowns it has are ones

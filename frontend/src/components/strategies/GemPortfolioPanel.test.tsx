@@ -147,13 +147,31 @@ describe('GemPortfolioPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('says when it could only compare tickers', () => {
+  it('blames the target, not a holding that is described', () => {
+    // The holding may have a full country split; when the *target* has none
+    // there is nothing to compare it with, and saying "no breakdown recorded"
+    // on the holding's row sends the reader to fix the wrong instrument.
     render(
       <GemPortfolioPanel
         position={gemPosition({
           basis: 'INSTRUMENT',
           dimension: null,
-          instrumentMatchedCount: 3,
+          requiredDimension: 'COUNTRY',
+          holdings: [
+            {
+              role: null,
+              securityId: 'sec-iusq',
+              symbol: 'IUSQ',
+              name: 'iShares MSCI ACWI UCITS ETF',
+              quantity: 51,
+              marketValue: 10000,
+              matchPercent: 0,
+              matchedByInstrument: true,
+              matchedMarkets: [],
+            },
+          ],
+          totalMarketValue: 10000,
+          compliancePercent: 0,
         })}
         noAccount={false}
         noPosition={false}
@@ -161,7 +179,32 @@ describe('GemPortfolioPanel', () => {
     );
 
     expect(
-      screen.getByText(/matched by instrument instead of by what they contain/),
+      screen.getByText('Cannot compare: the target has no breakdown'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No breakdown recorded/)).toBeNull();
+  });
+
+  it('says when it could only compare tickers', () => {
+    render(
+      <GemPortfolioPanel
+        position={gemPosition({
+          basis: 'INSTRUMENT',
+          dimension: null,
+          requiredDimension: 'COUNTRY',
+          instrumentMatchedCount: 3,
+        })}
+        noAccount={false}
+        noPosition={false}
+      />,
+    );
+
+    // The notice names the target and the exact breakdown to fill in. Saying
+    // "country, asset class or sector" would send the reader to fill in one
+    // that cannot decide an equity role.
+    expect(
+      screen.getByText(
+        /EMIM has no country breakdown recorded.*Fill in its country split/,
+      ),
     ).toBeInTheDocument();
     // The fallback notice stands alone; it must not also claim a comparison.
     expect(screen.queryByText(/compared by country/)).toBeNull();

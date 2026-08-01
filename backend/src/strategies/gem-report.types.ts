@@ -135,6 +135,12 @@ export interface GemPositionView {
   basis: GemCompositionBasis;
   /** Breakdown the contents were compared on; null when tickers were used. */
   dimension: GemCompositionDimension | null;
+  /**
+   * The breakdown the target would need for a contents comparison of this
+   * role. Naming it is the difference between "fill something in" and "fill in
+   * the country split", which for an equity role is the only one that helps.
+   */
+  requiredDimension: GemCompositionDimension | null;
   /** How many holdings fell back to a ticker comparison. */
   instrumentMatchedCount: number;
   currencyCode: string;

@@ -8,6 +8,7 @@ import {
   GemWeighting,
   dimensionFor,
   matchHolding,
+  requiredDimensionFor,
 } from "./gem-composition.util";
 
 /**
@@ -59,6 +60,11 @@ export interface GemPositionMath {
   basis: GemCompositionBasis;
   /** Breakdown the contents were compared on; null when tickers were used. */
   dimension: GemCompositionDimension | null;
+  /**
+   * The breakdown the target would need for a contents comparison of this
+   * role -- what to fill in when `basis` is INSTRUMENT. Null with no target.
+   */
+  requiredDimension: GemCompositionDimension | null;
   /** Holdings that fell back to a ticker comparison for want of a breakdown. */
   instrumentMatchedCount: number;
   /** Sum of the market values that could be valued. */
@@ -200,6 +206,7 @@ export function buildPositionMath(
     offTarget,
     basis: dimension === null ? "INSTRUMENT" : "COMPOSITION",
     dimension,
+    requiredDimension: requiredDimensionFor(targetRole),
     instrumentMatchedCount: valued.filter(
       (holding) => holding.matchedByInstrument,
     ).length,

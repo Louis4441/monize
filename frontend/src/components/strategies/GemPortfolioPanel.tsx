@@ -228,7 +228,11 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                             {/* The markets that actually overlap, named. A bare
                                 percentage says a fifth is on target; this says
                                 which fifth, so the figure can be checked. */}
-                            {isTargetRow
+                            {position.basis === 'INSTRUMENT'
+                              ? isTargetRow
+                                ? t('gem.portfolioPanel.workingExact')
+                                : t('gem.portfolioPanel.workingNoTargetData')
+                              : isTargetRow
                               ? t('gem.portfolioPanel.workingExact')
                               : holding.matchedMarkets.length > 0
                                 ? t('gem.portfolioPanel.workingDerived', {
@@ -315,7 +319,10 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
               ? t('gem.portfolioPanel.basisComposition', {
                   dimension: dimensionLabel(position.dimension),
                 })
-              : t('gem.portfolioPanel.basisInstrument')}
+              : t('gem.portfolioPanel.basisInstrument', {
+                  dimension: dimensionLabel(position.requiredDimension),
+                  target: position.target?.symbol ?? t('gem.common.unassigned'),
+                })}
             {position.basis === 'COMPOSITION' &&
               position.instrumentMatchedCount > 0 && (
                 <>
