@@ -265,10 +265,14 @@ export interface GemBacktestSummary {
    */
   hitRatePercent: number | null;
   /**
-   * True when taxes and commissions are already deducted from the figures.
-   * Always false for a truncated run (`coveragePercent` below 100).
+   * Whether the configured tax rate was deducted from the figures, and whether
+   * the configured commission was. Separate flags because the two fail
+   * independently: an absolute commission needs a known portfolio total to
+   * become a drag, a tax percentage does not. Both are false for a truncated
+   * run (`coveragePercent` below 100).
    */
-  netOfCosts: boolean;
+  taxApplied: boolean;
+  commissionApplied: boolean;
   /**
    * Share of the evaluated periods the simulation covers, 0-100. Below 100 the
    * earlier periods are excluded from the run, not held flat: the simulation

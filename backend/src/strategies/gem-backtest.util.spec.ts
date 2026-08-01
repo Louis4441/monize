@@ -45,7 +45,8 @@ describe("runBacktest", () => {
 
     expect(result).toMatchObject({ from: "2024-01-01", to: "2025-01-01" });
     expect(result?.cagrPercent).toBeCloseTo(21, 0);
-    expect(result?.netOfCosts).toBe(false);
+    expect(result?.taxApplied).toBe(false);
+    expect(result?.commissionApplied).toBe(false);
   });
 
   it("reports the worst decline inside a period, not only at its ends", () => {
@@ -98,7 +99,7 @@ describe("runBacktest", () => {
 
     // Equity 2.0 at the switch, minus 20% of the 1.0 gain = 1.8 over one year.
     expect(result?.cagrPercent).toBeCloseTo(80, 0);
-    expect(result?.netOfCosts).toBe(true);
+    expect(result?.taxApplied).toBe(true);
   });
 
   it("charges no tax on a switch out of a loss", () => {
@@ -135,7 +136,7 @@ describe("runBacktest", () => {
 
     // One trade at 1% of the notional: the run starts from 0.99.
     expect(result?.cagrPercent).toBeCloseTo(19.79, 0);
-    expect(result?.netOfCosts).toBe(true);
+    expect(result?.commissionApplied).toBe(true);
   });
 
   it("restarts the run after a period it could not price", () => {
@@ -205,7 +206,8 @@ describe("runBacktest", () => {
     );
 
     expect(taxed?.from).toBe("2024-04-01");
-    expect(taxed?.netOfCosts).toBe(false);
+    expect(taxed?.taxApplied).toBe(false);
+    expect(taxed?.commissionApplied).toBe(false);
     // The doubling reaches the end intact: no tax came off the switch.
     expect(taxed?.cagrPercent).toBe(gross?.cagrPercent);
     expect(taxed?.coveragePercent).toBeCloseTo(66.67, 1);
@@ -275,7 +277,44 @@ describe("runBacktest", () => {
     );
 
     expect(result?.cagrPercent).toBeCloseTo(21, 0);
-    expect(result?.netOfCosts).toBe(false);
+    expect(result?.taxApplied).toBe(false);
+    expect(result?.commissionApplied).toBe(false);
+  });
+
+  it("reports tax and commission separately when only one could be applied", () => {
+    // Both are configured, but the portfolio total is unknown -- which is what
+    // happens whenever a single holding cannot be priced -- so the absolute
+    // commission cannot be turned into a drag while the tax percentage still
+    // can. Under one `netOfCosts` flag this came out true, and the report then
+    // told the user the figures were net of estimated taxes *and commissions*.
+    const result = runBacktest(
+      input({
+        periods: [
+          {
+            effectiveFrom: "2024-01-01",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
+          },
+          {
+            effectiveFrom: "2024-07-01",
+            targetRole: "EM_EQUITY",
+            targetSecurityId: "sec-emim",
+          },
+        ],
+        seriesBySecurity: new Map([
+          ["sec-spy", series({ "2024-01-01": 100, "2024-07-01": 200 })],
+          ["sec-emim", series({ "2024-07-01": 10, "2025-01-01": 10 })],
+        ]),
+        taxRatePercent: 20,
+        commissionAmount: 100,
+        notional: null,
+      }),
+    );
+
+    expect(result?.taxApplied).toBe(true);
+    expect(result?.commissionApplied).toBe(false);
+    // The tax really did come off: 2.0 at the switch, less 20% of the gain.
+    expect(result?.cagrPercent).toBeCloseTo(80, 0);
   });
 
   it("counts the periods whose asset beat the safe one", () => {

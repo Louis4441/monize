@@ -11,6 +11,19 @@ interface GemBacktestPanelProps {
 }
 
 /**
+ * Which of the four cost statements the run earns. A configured cost the
+ * simulation could not apply -- an absolute commission with no known portfolio
+ * total, or anything at all on a truncated run -- is not deducted, and the copy
+ * must not say it was.
+ */
+function costsApplied(backtest: GemBacktestSummary) {
+  if (backtest.taxApplied && backtest.commissionApplied) return 'netOfCosts';
+  if (backtest.taxApplied) return 'netOfTaxOnly';
+  if (backtest.commissionApplied) return 'netOfCommissionOnly';
+  return 'grossOfCosts';
+}
+
+/**
  * "Backtest" tab: the net-of-cost simulation summary for the configured asset
  * set, when the server has one. Without it the tab explains what is missing
  * rather than showing zeroed metrics.
@@ -66,8 +79,12 @@ export function GemBacktestPanel({ backtest }: GemBacktestPanelProps) {
           }
         />
       </dl>
+      {/* Four states, not two: tax is a percentage and always applicable,
+          while an absolute commission needs a known portfolio total to become
+          a drag -- so "net of taxes and commissions" was being printed over
+          figures no commission had come off. */}
       <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-        {backtest.netOfCosts ? t('gem.backtest.netOfCosts') : t('gem.backtest.grossOfCosts')}
+        {t(`gem.backtest.${costsApplied(backtest)}`)}
       </p>
       {/* Below 100 the run is the most recent unbroken stretch of priced
           periods and everything before the last gap is outside it, so the

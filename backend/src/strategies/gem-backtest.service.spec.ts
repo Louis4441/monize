@@ -75,7 +75,8 @@ describe("GemBacktestService", () => {
     expect(result).toMatchObject({
       from: "2024-01-01",
       to: "2025-01-01",
-      netOfCosts: true,
+      taxApplied: true,
+      commissionApplied: true,
       coveragePercent: 100,
     });
   });

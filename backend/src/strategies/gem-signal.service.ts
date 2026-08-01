@@ -51,6 +51,30 @@ function windowStartFor(evaluatedOn: string, lookbackMonths: number): string {
 }
 
 /**
+ * Version of the evaluation itself, as opposed to the configuration it runs on.
+ *
+ * The fingerprint below exists to spot "the user changed something", and a
+ * stored row is trusted whenever it matches. But the code is the other half of
+ * what a signal means: version 2 stopped accepting a boundary close struck more
+ * than `BOUNDARY_LAG_DAYS` before the boundary, so a row written by version 1
+ * can carry a momentum computed from a months-old quote -- a made-up figure --
+ * under a fingerprint identical to the one this version would produce. It would
+ * be counted as answered, never recomputed, and served as the current
+ * instruction.
+ *
+ * **Bump this whenever a change can alter momentum, the ranking, the risk state
+ * or the target.** Every affected row is then outside `answered` and takes the
+ * ordinary refresh path, which recomputes it in place. Do not bump it for a
+ * change that cannot move a number -- a rename, a comment, a faster query --
+ * because every bump rewrites the whole stored history.
+ *
+ * History:
+ *   1 -- original dual-momentum evaluation.
+ *   2 -- boundary closes must be within `BOUNDARY_LAG_DAYS` of the boundary.
+ */
+export const GEM_SIGNAL_ALGORITHM_VERSION = 2;
+
+/**
  * A hash of everything about a strategy that decides what its signals say.
  *
  * A stored signal used to be treated as permanently done, but the inputs behind
@@ -65,6 +89,10 @@ function windowStartFor(evaluatedOn: string, lookbackMonths: number): string {
  * only affects presentation or cost estimates -- the tax rate, the commission,
  * the scenario's name, the accounts -- because rewriting the whole evaluation
  * history when someone corrects a commission would be worse than useless.
+ *
+ * `GEM_SIGNAL_ALGORITHM_VERSION` leads the material, so a change in the rules
+ * invalidates every stored row exactly as a change in the settings does. The
+ * configuration is only half of what a signal means.
  */
 export function gemConfigFingerprint(
   strategy: Pick<GemStrategy, "cadence" | "lookbackMonths">,
@@ -77,7 +105,9 @@ export function gemConfigFingerprint(
       return `${role}=${asset?.securityId ?? "-"}`;
     })
     .join(",");
-  const material = `${strategy.cadence}|${strategy.lookbackMonths}|${roles}`;
+  const material =
+    `${GEM_SIGNAL_ALGORITHM_VERSION}|${strategy.cadence}` +
+    `|${strategy.lookbackMonths}|${roles}`;
   return createHash("sha256").update(material).digest("hex").slice(0, 64);
 }
 
@@ -375,22 +405,27 @@ export class GemSignalService {
         // A period already stored under an older configuration is replaced in
         // place: the unique index owns (strategy, period), and a second row for
         // the same month would be a second answer to one question.
-        const outdated = staleByPeriod.get(period.evaluatedOn);
-        if (outdated) {
-          // "I have carried this out" describes an instruction. It survives a
-          // recomputation that lands on the same instrument -- the user did
-          // that trade -- and is cleared when the instruction changes, because
-          // nobody executed the new one.
+        //
+        // "I have carried this out" describes an instruction. It survives a
+        // recomputation that lands on the same instrument -- the user did that
+        // trade -- and is cleared when the instruction changes, because nobody
+        // executed the new one.
+        const replacing = (outdated: GemStrategySignal): GemStrategySignal => {
           const sameInstruction =
             outdated.targetSecurityId === targetSecurityId &&
             outdated.targetRole === outcome.targetRole;
-          const refreshed = {
+          return {
             ...outdated,
             ...signal,
             id: outdated.id,
             executed: sameInstruction ? outdated.executed : false,
             executedAt: sameInstruction ? outdated.executedAt : null,
           } as GemStrategySignal;
+        };
+
+        const outdated = staleByPeriod.get(period.evaluatedOn);
+        if (outdated) {
+          const refreshed = replacing(outdated);
           await repo.save(refreshed);
           byEvaluatedOn.set(period.evaluatedOn, refreshed);
           written.push(refreshed);
@@ -427,21 +462,33 @@ export class GemSignalService {
           // which the final re-read cannot undo. History would call it a BUY
           // for as long as the row lives.
           //
-          // Only when the winner belongs to *this* configuration. The unique
-          // key is (strategy, date), not (strategy, date, fingerprint), so the
-          // row that beat this insert may be a leftover from an earlier
-          // configuration or one written by a concurrent request carrying
-          // different settings. Seeding the chain with it is the same mistake
-          // the `answered` filter exists to prevent, arriving through a
-          // different door: a later period would be stored naming a
-          // predecessor the current rules never chose. A foreign winner leaves
-          // the slot empty, which reads as "this configuration decided nothing
-          // before" -- the truth.
+          // The unique key is (strategy, date), not (strategy, date,
+          // fingerprint), so the row that beat this insert may belong to
+          // another configuration -- a leftover, or a concurrent request
+          // carrying different settings. That row cannot go into the chain:
+          // a later period would then be stored naming a predecessor the
+          // current rules never chose, the same mistake the `answered` filter
+          // exists to prevent, arriving through a different door.
+          //
+          // Leaving the slot empty is not the answer either. This request
+          // *has* an evaluation for the period -- it just lost the key -- and
+          // a later period stored with `previousRole: null` on that basis is
+          // stored wrong permanently: once the losing period is itself
+          // refreshed to the current fingerprint, the period after it is
+          // already current and is never recomputed, so history calls it a BUY
+          // forever. Replace the foreign row with the evaluation in hand, on
+          // exactly the terms the stale-row path above uses, and chain onto
+          // that.
           const winner = await repo.findOne({
             where: { strategyId: strategy.id, evaluatedOn: period.evaluatedOn },
           });
-          if (winner && winner.configFingerprint === fingerprint) {
+          if (winner?.configFingerprint === fingerprint) {
             byEvaluatedOn.set(period.evaluatedOn, winner);
+          } else if (winner) {
+            const refreshed = replacing(winner);
+            await repo.save(refreshed);
+            byEvaluatedOn.set(period.evaluatedOn, refreshed);
+            written.push(refreshed);
           }
           this.logger.debug(
             `GEM period ${period.evaluatedOn} was materialized concurrently`,

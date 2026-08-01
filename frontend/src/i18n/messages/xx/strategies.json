@@ -279,6 +279,8 @@
       "maxDrawdown": "[XX-Maximum drawdown-XX]",
       "hitRate": "[XX-Evaluations beating the safe asset-XX]",
       "netOfCosts": "[XX-Figures are net of estimated taxes and commissions.-XX]",
+      "netOfTaxOnly": "[XX-Figures are net of estimated taxes, but not of commissions.-XX]",
+      "netOfCommissionOnly": "[XX-Figures are net of estimated commissions, but not of taxes.-XX]",
       "grossOfCosts": "[XX-Figures exclude taxes and commissions.-XX]",
       "partialCoverage": "[XX-Prices cover only the most recent {coverage} of the evaluated periods, so the simulation starts there. Everything before the last period that could not be priced is left out of the figures above, and costs are excluded because a run starting mid-strategy has no purchase price to tax.-XX]",
       "emptyTitle": "[XX-No backtest available-XX]",

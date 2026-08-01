@@ -13,8 +13,11 @@ import { PricePoint, closeAt, daysBetween } from "./gem-momentum.util";
  *
  * Costs are the ones the configuration carries. Tax is a percentage and applies
  * to any capital; commission is an absolute amount, so it can only be turned
- * into a drag when the notional the strategy actually runs is known. Whichever
- * of the two is configured is applied, and the result says which.
+ * into a drag when the notional the strategy actually runs is known. The result
+ * reports the two separately (`taxApplied`, `commissionApplied`), because a
+ * configured commission with an unknown portfolio total is a real and common
+ * case and one flag would let the report claim the figures were net of a cost
+ * nobody deducted.
  */
 
 /** One evaluated period, oldest first, as stored. */
@@ -60,8 +63,20 @@ export interface GemBacktestResult {
    * eight. A hit rate over an unstated denominator is worse than no hit rate.
    */
   hitRatePercent: number | null;
-  /** True when a configured cost was deducted from the figures. */
-  netOfCosts: boolean;
+  /**
+   * Whether the configured tax rate was actually deducted.
+   *
+   * Reported apart from the commission because the two fail independently and
+   * one flag cannot say which happened. Commission is an absolute amount and
+   * needs a known `notional` to become a drag; tax is a percentage and never
+   * does. With both configured and the portfolio total unknown -- which is the
+   * ordinary outcome of a single holding nobody could price -- one flag said
+   * "net of costs" and the report claimed the figures were net of estimated
+   * taxes *and commissions* when no commission had been charged at all.
+   */
+  taxApplied: boolean;
+  /** Whether the configured commission was actually deducted. */
+  commissionApplied: boolean;
   /**
    * Share of the evaluated periods the simulation actually covers, 0-100:
    * `simulated periods / evaluated periods`.
@@ -114,7 +129,7 @@ function growth(
  * **A truncated run is reported gross**, whatever costs are configured. The
  * simulation opening mid-strategy does not know what was held on `from` or
  * what it cost, so charging an opening commission and dating the tax basis to
- * `from` would invent both. `netOfCosts` is false and the caller says so.
+ * `from` would invent both. Both cost flags are false and the caller says so.
  *
  * Returns null when there is nothing honest to report: fewer than two
  * evaluations, or no priced period after the last gap.
@@ -258,7 +273,8 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
       comparedToSafe === run.length
         ? roundToDecimals((beatSafe / comparedToSafe) * 100, 2)
         : null,
-    netOfCosts: taxRate !== null || commissionFraction !== null,
+    taxApplied: taxRate !== null,
+    commissionApplied: commissionFraction !== null,
     coveragePercent: roundToDecimals((run.length / bounds.length) * 100, 2),
   };
 }

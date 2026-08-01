@@ -36,11 +36,37 @@ describe('GemBacktestPanel', () => {
   it('says when figures exclude costs and metrics are unknown', () => {
     render(
       <GemBacktestPanel
-        backtest={{ ...backtest, netOfCosts: false, hitRatePercent: null, cagrPercent: null }}
+        backtest={{
+          ...backtest,
+          taxApplied: false,
+          commissionApplied: false,
+          hitRatePercent: null,
+          cagrPercent: null,
+        }}
       />,
     );
     expect(screen.getByText('Figures exclude taxes and commissions.')).toBeInTheDocument();
     expect(screen.getAllByText('Not available').length).toBe(2);
+  });
+
+  it('names the cost that was actually deducted when only one could be', () => {
+    // A configured commission needs a known portfolio total to become a drag,
+    // and the total is unknown whenever a holding cannot be priced. Under one
+    // net-of-costs flag this printed "net of estimated taxes and commissions"
+    // over figures no commission had come off.
+    render(
+      <GemBacktestPanel backtest={{ ...backtest, taxApplied: true, commissionApplied: false }} />,
+    );
+    expect(
+      screen.getByText('Figures are net of estimated taxes, but not of commissions.'),
+    ).toBeInTheDocument();
+
+    render(
+      <GemBacktestPanel backtest={{ ...backtest, taxApplied: false, commissionApplied: true }} />,
+    );
+    expect(
+      screen.getByText('Figures are net of estimated commissions, but not of taxes.'),
+    ).toBeInTheDocument();
   });
 
   it('explains a missing backtest instead of showing zeroes', () => {

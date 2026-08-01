@@ -67,7 +67,18 @@ A stored period is only *answered*, though, if it was calculated under the
 configuration in force now. `config_fingerprint` (migration 129) hashes the
 cadence, the lookback and the role-to-security mapping -- everything that
 changes what a signal says, and nothing that only affects presentation or the
-cost estimates. Shorten the lookback or swap a fund and the affected periods are
+cost estimates -- led by `GEM_SIGNAL_ALGORITHM_VERSION`.
+
+That version is the other half of what a signal means. The settings say what
+question was asked; the code says how it was answered, and it changes too:
+version 2 stopped accepting a boundary close struck more than
+`BOUNDARY_LAG_DAYS` before the boundary, so a version 1 row can carry a momentum
+computed from a months-old quote under settings identical to today's. Without
+the version in the material that row is answered, never recomputed, and served
+as the instruction to act on. **Bump the constant whenever a change can alter
+momentum, the ranking, the risk state or the target** -- and not otherwise,
+because every bump rewrites the whole stored history through the ordinary
+refresh path. Shorten the lookback or swap a fund and the affected periods are
 recomputed in place on the next read: same row, because the unique index owns
 the period, with `executed` kept when the recomputed instruction is the same
 instrument and cleared when it is not. A period that cannot be recomputed (a
@@ -82,7 +93,13 @@ the entry before it, so a stale row wedged between two fresh ones would be named
 as the predecessor of a period computed against an earlier one, and the backtest
 would replay a hybrid of counterfactual and historical signals. A recomputed
 period likewise takes its `previousRole` only from another period this
-configuration produced. The rows stay in the table -- they are real decisions
+configuration produced. When a concurrent insert loses the unique key to a row
+carrying a *different* fingerprint, that row is replaced in place with the
+evaluation this request already has, and the chain continues from the
+replacement: refusing the foreign target is right, but leaving the slot empty
+would store the next period as a BUY, and nothing later repairs it -- once the
+losing period is refreshed, its successor already matches the current
+fingerprint and is never recomputed. The rows stay in the table -- they are real decisions
 with real `executed` flags -- they are simply not this configuration's history.
 And the report says so: `materialize` returns how many periods it left out, and
 `LEGACY_PERIODS` names the count, because a history that silently comes up short
@@ -239,8 +256,15 @@ contribute nothing to the return, the drawdown or the hit rate.
 carries. The simulation opening mid-strategy knows neither what was held on
 `from` nor what it cost: charging a buy commission invents a trade that never
 happened, and dating the tax basis to `from` taxes the first later switch on
-the gain since the restart instead of since the real purchase. `netOfCosts` is
-false and both the panel and `partialCoverage` say so.
+the gain since the restart instead of since the real purchase. Both cost flags
+are false and the panel says so.
+
+**Tax and commission are reported separately** (`taxApplied`,
+`commissionApplied`). They fail independently: tax is a percentage and applies
+to any capital, while an absolute commission only becomes a drag against a known
+portfolio total -- which is null whenever a holding cannot be priced. One
+`netOfCosts` boolean could not tell the four states apart and printed "net of
+estimated taxes and commissions" over figures no commission had come off.
 
 `hitRatePercent` is null unless *every* simulated period could be compared with
 the safe asset. A ratio over the periods that happened to be checkable would

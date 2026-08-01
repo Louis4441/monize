@@ -1,11 +1,16 @@
+import { createHash } from "crypto";
 import {
   GemSignalService,
   GEM_HISTORY_PERIODS,
+  GEM_SIGNAL_ALGORITHM_VERSION,
   gemConfigFingerprint,
 } from "./gem-signal.service";
 import { GemStrategySignal } from "./entities/gem-strategy-signal.entity";
 import { GemStrategy } from "./entities/gem-strategy.entity";
-import { GemStrategyAsset } from "./entities/gem-strategy-asset.entity";
+import {
+  GemStrategyAsset,
+  GEM_ASSET_ROLES,
+} from "./entities/gem-strategy-asset.entity";
 import {
   createScopedDbMocks,
   ManagerMock,
@@ -38,6 +43,27 @@ const assets = (): GemStrategyAsset[] =>
     { role: "EM_EQUITY", securityId: "sec-emim" },
     { role: "SAFE", securityId: "sec-ief" },
   ] as GemStrategyAsset[];
+
+/**
+ * The fingerprint the default fixtures produce under a given algorithm
+ * version, rebuilt here rather than taken from the code under test: a stored
+ * row written by version N-1 has to be recognisable as such, and only an
+ * independent construction can prove the version is really in the material.
+ */
+const fingerprintForVersion = (version: number): string =>
+  createHash("sha256")
+    .update(
+      `${version}|MONTHLY|12|` +
+        [...GEM_ASSET_ROLES]
+          .sort()
+          .map((role) => {
+            const asset = assets().find((candidate) => candidate.role === role);
+            return `${role}=${asset?.securityId ?? "-"}`;
+          })
+          .join(","),
+    )
+    .digest("hex")
+    .slice(0, 64);
 
 /** Straight-line price series so momentum per role is predictable. */
 function seriesFor(growthPercent: number) {
@@ -258,6 +284,31 @@ describe("GemSignalService", () => {
         );
       });
 
+      it("recomputes a row written by an earlier algorithm version", async () => {
+        // The settings are untouched -- same cadence, same lookback, same
+        // instruments -- so a fingerprint made of settings alone would match
+        // and the row would be served as current. But it was calculated by
+        // rules that no longer exist: version 1 accepted a boundary close
+        // struck months before the boundary, and the momentum on that row can
+        // be a figure this version refuses to produce.
+        storedUnder12Months({
+          configFingerprint: fingerprintForVersion(
+            GEM_SIGNAL_ALGORITHM_VERSION - 1,
+          ),
+        });
+
+        await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+        const rewritten = signalRepo.save.mock.calls
+          .map(([row]) => row)
+          .find((row) => row.evaluatedOn === "2025-07-31");
+        expect(rewritten).toBeDefined();
+        expect(rewritten.id).toBe("sig-1");
+        expect(rewritten.configFingerprint).toBe(
+          gemConfigFingerprint(strategy(), assets()),
+        );
+      });
+
       it("keeps the executed flag when the instruction is unchanged", async () => {
         // The recomputation lands on the same instrument, so the trade the
         // user reported making is still the trade this row asks for.
@@ -461,6 +512,21 @@ describe("GemSignalService", () => {
         ).not.toBe(base);
       });
 
+      it("changes with the algorithm version, not only the settings", () => {
+        // The settings are half of what a signal means; the code is the other
+        // half. Version 2 stopped accepting a boundary close struck months
+        // before the boundary, so a version 1 row can carry a momentum
+        // computed from a stale quote under settings identical to today's --
+        // and a fingerprint made only of settings would call it answered,
+        // never recompute it, and serve it as the current instruction.
+        expect(gemConfigFingerprint(strategy(), assets())).toBe(
+          fingerprintForVersion(GEM_SIGNAL_ALGORITHM_VERSION),
+        );
+        expect(gemConfigFingerprint(strategy(), assets())).not.toBe(
+          fingerprintForVersion(GEM_SIGNAL_ALGORITHM_VERSION - 1),
+        );
+      });
+
       it("ignores what cannot change a signal", () => {
         // Correcting a commission must not rewrite the evaluation history.
         const base = gemConfigFingerprint(strategy(), assets());
@@ -616,13 +682,21 @@ describe("GemSignalService", () => {
       expect(savedSignals[0]).toMatchObject({ previousRole: "US_EQUITY" });
     });
 
-    it("does not chain onto a winner from another configuration", async () => {
+    it("replaces a winner from another configuration and chains onto that", async () => {
       // The unique key is (strategy, date), not (strategy, date, fingerprint),
       // so the row that beat this insert can be a leftover from an earlier
       // configuration -- or one a concurrent request wrote under different
       // settings. Taking its target as the predecessor stores the next period
       // naming a role the current rules never chose, through the same door the
       // `answered` filter closes on the stored snapshot.
+      //
+      // Leaving the slot empty instead is just as wrong, and permanently so:
+      // this request evaluated the period, it only lost the key. Storing the
+      // period after it with `previousRole: null` is a mistake nothing later
+      // repairs -- once the losing period is refreshed to the current
+      // fingerprint, its successor already matches and is never recomputed, so
+      // the history calls it a BUY forever. The foreign row is replaced with
+      // the evaluation in hand and the chain continues from it.
       const foreignWinner = {
         id: "sig-foreign",
         evaluatedOn: "2023-08-31",
@@ -657,10 +731,23 @@ describe("GemSignalService", () => {
 
       await service.materialize(userId, strategy(), assets(), "2025-08-14");
 
-      // Null, not "US_EQUITY": this configuration has decided nothing before.
+      // The foreign row is overwritten in place -- same id, this request's
+      // evaluation, this configuration's fingerprint.
+      expect(signalRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "sig-foreign",
+          evaluatedOn: "2023-08-31",
+          targetRole: "EM_EQUITY",
+          configFingerprint: gemConfigFingerprint(strategy(), assets()),
+          // Nobody executed an instruction that has just changed.
+          executed: false,
+        }),
+      );
+      // And the next period follows the target this request calculated: not
+      // null, and not the foreign winner's US_EQUITY.
       expect(savedSignals[0]).toMatchObject({
         evaluatedOn: "2023-09-30",
-        previousRole: null,
+        previousRole: "EM_EQUITY",
       });
     });
 

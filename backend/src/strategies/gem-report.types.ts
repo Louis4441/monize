@@ -273,12 +273,16 @@ export interface GemBacktestSummaryView {
    */
   hitRatePercent: number | null;
   /**
-   * True when configured costs were deducted. False for a truncated run
-   * (`coveragePercent` below 100) whatever the configuration says: a
-   * simulation that opens mid-strategy knows neither the opening position nor
-   * its cost basis, so it reports gross rather than invent them.
+   * Whether the configured tax rate was deducted, and whether the configured
+   * commission was -- separately, because they fail independently: commission
+   * needs a known portfolio total to become a drag and tax does not, so "net
+   * of taxes and commissions" was being claimed for figures only tax had come
+   * off. Both are false for a truncated run (`coveragePercent` below 100)
+   * whatever the configuration says: a simulation that opens mid-strategy
+   * knows neither the opening position nor its cost basis.
    */
-  netOfCosts: boolean;
+  taxApplied: boolean;
+  commissionApplied: boolean;
   /**
    * Share of the evaluated periods the simulation covers, 0-100. Below 100 the
    * earlier periods are excluded, not held flat: the run is the most recent
