@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { backupApi } from '@/lib/backupApi';
 import { getErrorMessage } from '@/lib/errors';
@@ -183,11 +184,10 @@ export function AutoBackupSection() {
 
   const handleRetentionChange = (
     setter: (v: number) => void,
-    value: string,
+    value: number | undefined,
   ) => {
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 0) {
-      setter(num);
+    if (value !== undefined && value >= 0) {
+      setter(value);
       markDirty();
     }
   };
@@ -387,60 +387,42 @@ export function AutoBackupSection() {
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label
-              htmlFor="retention-daily"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              {t('retention.dailyLabel')}
-            </label>
-            <input
+            <NumericInput
               id="retention-daily"
-              type="number"
+              label={t('retention.dailyLabel')}
+              decimalPlaces={0}
               min={0}
               max={365}
               value={retentionDaily}
-              onChange={(e) => handleRetentionChange(setRetentionDaily, e.target.value)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
+              onChange={(value) => handleRetentionChange(setRetentionDaily, value)}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {t('retention.dailyHelp')}
             </p>
           </div>
           <div>
-            <label
-              htmlFor="retention-weekly"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              {t('retention.weeklyLabel')}
-            </label>
-            <input
+            <NumericInput
               id="retention-weekly"
-              type="number"
+              label={t('retention.weeklyLabel')}
+              decimalPlaces={0}
               min={0}
               max={52}
               value={retentionWeekly}
-              onChange={(e) => handleRetentionChange(setRetentionWeekly, e.target.value)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
+              onChange={(value) => handleRetentionChange(setRetentionWeekly, value)}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {t('retention.weeklyHelp')}
             </p>
           </div>
           <div>
-            <label
-              htmlFor="retention-monthly"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-            >
-              {t('retention.monthlyLabel')}
-            </label>
-            <input
+            <NumericInput
               id="retention-monthly"
-              type="number"
+              label={t('retention.monthlyLabel')}
+              decimalPlaces={0}
               min={0}
               max={120}
               value={retentionMonthly}
-              onChange={(e) => handleRetentionChange(setRetentionMonthly, e.target.value)}
-              className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
+              onChange={(value) => handleRetentionChange(setRetentionMonthly, value)}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {t('retention.monthlyHelp')}

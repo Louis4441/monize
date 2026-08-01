@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { STRATEGY_LABELS } from './utils/budget-labels';
 import { getCurrencySymbol } from '@/lib/format';
@@ -273,21 +274,21 @@ export function BudgetWizardStrategy({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('wizardStrategy.warningAt')}
-            </label>
-            <input
-              type="number"
-              min={1}
+            <NumericInput
+              label={t('wizardStrategy.warningAt')}
+              decimalPlaces={0}
               max={100}
+              suffix="%"
               value={state.alertWarnPercent}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (!isNaN(val) && val >= 1 && val <= 100) {
-                  handleAlertDefaults('alertWarnPercent', val);
+              onChange={(value) => {
+                // The threshold is a percentage of the budget, so anything
+                // outside 1-100 is discarded rather than clamped -- `max` only
+                // trims on blur, and there is no floor that could be clamped to
+                // without swallowing the leading digit of a two-digit entry.
+                if (value !== undefined && value >= 1 && value <= 100) {
+                  handleAlertDefaults('alertWarnPercent', value);
                 }
               }}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
             />
             <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
               {t('wizardStrategy.warningHint')}
@@ -295,21 +296,21 @@ export function BudgetWizardStrategy({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('wizardStrategy.criticalAt')}
-            </label>
-            <input
-              type="number"
-              min={1}
+            <NumericInput
+              label={t('wizardStrategy.criticalAt')}
+              decimalPlaces={0}
               max={100}
+              suffix="%"
               value={state.alertCriticalPercent}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (!isNaN(val) && val >= 1 && val <= 100) {
-                  handleAlertDefaults('alertCriticalPercent', val);
+              onChange={(value) => {
+                // The threshold is a percentage of the budget, so anything
+                // outside 1-100 is discarded rather than clamped -- `max` only
+                // trims on blur, and there is no floor that could be clamped to
+                // without swallowing the leading digit of a two-digit entry.
+                if (value !== undefined && value >= 1 && value <= 100) {
+                  handleAlertDefaults('alertCriticalPercent', value);
                 }
               }}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100 text-sm"
             />
             <p className="mt-1 text-xs text-red-600 dark:text-red-400">
               {t('wizardStrategy.criticalHint')}

@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useCallback, MutableRefObject } from 'react';
-import { useForm, Resolver } from 'react-hook-form';
+import { useForm, Controller, Resolver } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { CurrencyInfo, CreateCurrencyData } from '@/lib/exchange-rates';
 import { exchangeRatesApi } from '@/lib/exchange-rates';
 import { createLogger } from '@/lib/logger';
@@ -58,6 +59,7 @@ export function CurrencyForm({ currency, onSubmit, onCancel, onDirtyChange, subm
     setValue,
     getValues,
     reset,
+    control,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<CurrencyFormData>({
     resolver: zodResolver(buildCurrencySchema(t)) as Resolver<CurrencyFormData>,
@@ -216,13 +218,23 @@ export function CurrencyForm({ currency, onSubmit, onCancel, onDirtyChange, subm
         placeholder={t('form.symbolPlaceholder')}
       />
 
-      <Input
-        label={t('form.decimalPlacesLabel')}
-        type="number"
-        {...register('decimalPlaces')}
-        error={errors.decimalPlaces?.message}
-        min={0}
-        max={4}
+      <Controller
+        name="decimalPlaces"
+        control={control}
+        render={({ field }) => (
+          <NumericInput
+            label={t('form.decimalPlacesLabel')}
+            decimalPlaces={0}
+            min={0}
+            max={4}
+            error={errors.decimalPlaces?.message}
+            value={field.value}
+            onChange={field.onChange}
+            name={field.name}
+            onBlur={field.onBlur}
+            ref={field.ref}
+          />
+        )}
       />
 
       {inactiveCode && (

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Combobox } from '@/components/ui/Combobox';
 import { Modal } from '@/components/ui/Modal';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { InstitutionForm } from '@/components/institutions/InstitutionForm';
@@ -732,12 +733,24 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
             />
           )}
 
-          <Input
-            label={(isLoanAccount || isMortgageAccount) ? t('form.interestRateRequired') : t('form.interestRateOptional')}
-            type="number"
-            step="0.01"
-            error={errors.interestRate?.message}
-            {...register('interestRate', { valueAsNumber: true })}
+          <Controller
+            name="interestRate"
+            control={control}
+            render={({ field }) => (
+              <NumericInput
+                label={(isLoanAccount || isMortgageAccount) ? t('form.interestRateRequired') : t('form.interestRateOptional')}
+                decimalPlaces={2}
+                min={0}
+                max={100}
+                suffix="%"
+                error={errors.interestRate?.message}
+                value={field.value}
+                onChange={field.onChange}
+                name={field.name}
+                onBlur={field.onBlur}
+                ref={field.ref}
+              />
+            )}
           />
 
           {(isLoanAccount || isMortgageAccount) && <div />} {/* Spacer for grid alignment */}
@@ -749,34 +762,55 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
         <div className="space-y-4">
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('form.statementDates')}</h4>
           <div className="grid grid-cols-2 gap-4">
-            <Input
-              label={t('form.statementDueDay')}
-              type="number"
-              min={1}
-              max={31}
-              placeholder={t('form.statementDueDayPlaceholder')}
-              error={errors.statementDueDay?.message}
-              {...register('statementDueDay', { valueAsNumber: true })}
+            <Controller
+              name="statementDueDay"
+              control={control}
+              render={({ field }) => (
+                <NumericInput
+                  label={t('form.statementDueDay')}
+                  decimalPlaces={0}
+                  min={1}
+                  max={31}
+                  placeholder={t('form.statementDueDayPlaceholder')}
+                  error={errors.statementDueDay?.message}
+                  value={field.value}
+                  onChange={field.onChange}
+                  name={field.name}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                />
+              )}
             />
 
             <div>
               <div className="flex items-center mb-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <label
+                  htmlFor="account-statement-settlement-day"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
                   {t('form.statementSettlementDay')}
                 </label>
                 <InfoTooltip text={t('form.statementSettlementDayTooltip')} align="right" />
               </div>
-              <input
-                type="number"
-                min={1}
-                max={31}
-                placeholder={t('form.statementSettlementDayPlaceholder')}
-                className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                {...register('statementSettlementDay', { valueAsNumber: true })}
+              <Controller
+                name="statementSettlementDay"
+                control={control}
+                render={({ field }) => (
+                  <NumericInput
+                    id="account-statement-settlement-day"
+                    decimalPlaces={0}
+                    min={1}
+                    max={31}
+                    placeholder={t('form.statementSettlementDayPlaceholder')}
+                    error={errors.statementSettlementDay?.message}
+                    value={field.value}
+                    onChange={field.onChange}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
-              {errors.statementSettlementDay?.message && (
-                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.statementSettlementDay.message}</p>
-              )}
             </div>
           </div>
         </div>
@@ -789,15 +823,24 @@ export function AccountForm({ account, onSubmit, onCancel, onDirtyChange, submit
           {t('form.fxFeeTitle')}
         </h3>
         <div className="grid grid-cols-2 gap-4">
-          <Input
-            label={`${t('form.fxFeePercent')} (%)`}
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            placeholder={t('form.fxFeePercentPlaceholder')}
-            error={errors.fxFeePercent?.message}
-            {...register('fxFeePercent', { valueAsNumber: true })}
+          <Controller
+            name="fxFeePercent"
+            control={control}
+            render={({ field }) => (
+              <NumericInput
+                label={`${t('form.fxFeePercent')} (%)`}
+                decimalPlaces={2}
+                min={0}
+                max={100}
+                placeholder={t('form.fxFeePercentPlaceholder')}
+                error={errors.fxFeePercent?.message}
+                value={field.value}
+                onChange={field.onChange}
+                name={field.name}
+                onBlur={field.onBlur}
+                ref={field.ref}
+              />
+            )}
           />
         </div>
       </div>

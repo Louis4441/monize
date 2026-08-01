@@ -601,8 +601,8 @@ describe('ProviderConfigForm — form submission', () => {
 
     const inputCostInput = container.querySelector('input[name="inputCostPer1M"]') as HTMLInputElement;
     const outputCostInput = container.querySelector('input[name="outputCostPer1M"]') as HTMLInputElement;
-    expect(inputCostInput.value).toBe('3');
-    expect(outputCostInput.value).toBe('15');
+    expect(inputCostInput.value).toBe('3.0000');
+    expect(outputCostInput.value).toBe('15.0000');
   });
 
   it('does not send displayName in update when it matches the existing value', async () => {

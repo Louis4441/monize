@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { useDateFormat } from '@/hooks/useDateFormat';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
+import { getCurrencySymbol } from '@/lib/format';
 import { computePayoffScenario } from '@/lib/credit-card-payoff';
 
 interface PayoffCalculatorProps {
@@ -34,8 +36,8 @@ export function PayoffCalculator({ balance, interestRate, currencyCode }: Payoff
   const { formatDate } = useDateFormat();
 
   const owed = Math.max(0, balance);
-  const [payment, setPayment] = useState<string>(() => String(defaultPayment(owed)));
-  const paymentValue = Number(payment) || 0;
+  const [payment, setPayment] = useState<number | undefined>(() => defaultPayment(owed));
+  const paymentValue = payment ?? 0;
 
   const scenario = useMemo(
     () => computePayoffScenario(owed, interestRate, paymentValue),
@@ -62,22 +64,14 @@ export function PayoffCalculator({ balance, interestRate, currencyCode }: Payoff
       </h2>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{t('payoff.description')}</p>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow dark:shadow-gray-700/50 p-4 space-y-4">
-        <div>
-          <label
-            htmlFor="payoff-monthly-payment"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-          >
-            {t('payoff.monthlyPayment')}
-          </label>
-          <input
+        <div className="w-48">
+          <CurrencyInput
             id="payoff-monthly-payment"
-            type="number"
-            min={0}
-            step={5}
-            inputMode="decimal"
+            label={t('payoff.monthlyPayment')}
+            prefix={getCurrencySymbol(currencyCode)}
+            allowNegative={false}
             value={payment}
-            onChange={(e) => setPayment(e.target.value)}
-            className="w-40 text-sm border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            onChange={setPayment}
           />
         </div>
 
