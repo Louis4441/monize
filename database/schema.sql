@@ -1964,6 +1964,42 @@ CREATE POLICY emergency_access_contacts_isolation ON emergency_access_contacts
 -- Verification helper (run manually; not part of the migration's effect):
 --   SELECT tablename, policyname FROM pg_policies
 --    WHERE schemaname = 'public' ORDER BY tablename;
--- Expected: 52 policies -- 26 direct + 4 real-user-keyed (112),
+-- Expected: 53 policies -- 26 direct + 4 real-user-keyed (112),
 --           15 indirect (113), 5 special (114),
---           2 direct for the .mny import's staging + job tables (117).
+--           2 direct for the .mny import's staging + job tables (117),
+--           1 direct for security_documents (118).
+
+-- ---------------------------------------------------------------------------
+-- Enable row-level security (migration 123).
+--
+-- Mirrors 123_rls_enable.sql. Keep this block LAST in the RLS section: it
+-- enforces whatever is policied at the moment it runs, so a CREATE POLICY
+-- appended below it would create a policied-but-unenforced table on every fresh
+-- install.
+--
+-- Enabling RLS does not affect the table owner, and at RLS_MODE=off -- the
+-- default, and where every deployment starts -- the app connects as the owner.
+-- So this is inert for a new install and stays inert until an operator moves
+-- the app onto the unprivileged monize_app role. FORCE ROW LEVEL SECURITY is
+-- deliberately not used: it would apply policies to the owner as well and break
+-- db-init, db-migrate and backup restore.
+--
+-- Derived from pg_policies, never from a hard-coded list -- enabling RLS on a
+-- table with no policy is a deny-all outage, and the four exempt tables above
+-- have no policy and are therefore never touched. A new user-owned table must
+-- ship its policy AND its enable; see database/CLAUDE.md.
+-- ---------------------------------------------------------------------------
+
+DO $$
+DECLARE
+    t text;
+BEGIN
+    FOR t IN
+        SELECT DISTINCT tablename
+          FROM pg_policies
+         WHERE schemaname = 'public'
+         ORDER BY tablename
+    LOOP
+        EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    END LOOP;
+END $$;

@@ -55,7 +55,20 @@ export const TEST_APP_ROLE = process.env.DATABASE_APP_USER || DEFAULT_APP_USER;
  * selects exactly the RLS files today and picks up any future migration that
  * policies a new table, with no per-file registration to forget.
  */
-export function findRlsMigrations(): string[] {
+/**
+ * SQL with comments removed, for content detection only.
+ *
+ * Required, not cosmetic: the policy migrations *document* the enable step in
+ * prose ("inert until ALTER TABLE ... ENABLE ROW LEVEL SECURITY runs"), so a
+ * marker test against the raw text classifies `112`-`118` as enable migrations
+ * and drops every policy in them. That failure is silent -- the harness applies
+ * fewer files and the suite goes green with two tables unpolicied.
+ */
+function stripSqlComments(sql: string): string {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, "").replace(/--[^\n]*/g, "");
+}
+
+export function findRlsMigrations(includeEnable = false): string[] {
   if (!fs.existsSync(MIGRATIONS_DIR)) {
     throw new Error(`Migrations directory not found at ${MIGRATIONS_DIR}`);
   }
@@ -70,7 +83,17 @@ export function findRlsMigrations(): string[] {
     .sort();
 
   const rlsFiles = files.filter((f) => {
-    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, f), "utf8");
+    const sql = stripSqlComments(
+      fs.readFileSync(path.join(MIGRATIONS_DIR, f), "utf8"),
+    );
+    // The enable migration (M3) references neither helper -- it reads
+    // pg_policies -- so it is opted into separately, and applied in its
+    // filename position rather than appended. Position is what makes the
+    // "policy without its own enable" guard meaningful: M3's loop enables what
+    // is policied *when it runs*, so a later migration adding a policy without
+    // an enable leaves that table unenforced, exactly as it would on a deployed
+    // database where M3 has already been recorded in schema_migrations.
+    if (/ENABLE\s+ROW\s+LEVEL\s+SECURITY/i.test(sql)) return includeEnable;
     return /app_current_user_id|app_bypass_rls/.test(sql);
   });
 
@@ -92,7 +115,11 @@ export function findRlsMigrations(): string[] {
  * Used as a post-condition -- what was declared has to exist in `pg_policies`
  * once the files have been applied.
  */
-function declaredPolicyTables(sql: string): string[] {
+function declaredPolicyTables(rawSql: string): string[] {
+  // Comments stripped for the same reason as in the selector: these files
+  // discuss policies in prose, and a sentence naming one would become a
+  // post-condition demanding a policy nothing creates.
+  const sql = stripSqlComments(rawSql);
   const tables = new Set<string>();
 
   // `CREATE POLICY name ON table` -- deliberately not `POLICY ... ON`, which
@@ -165,8 +192,16 @@ function updatedAtTriggers(): { trigger: string; table: string }[] {
  * `synchronize: true`). Idempotent, and re-applied per suite because
  * `dropSchema: true` takes the functions, policies and triggers down with the
  * tables on every suite start.
+ *
+ * `includeEnable` opts into the M3 enable migration, which is off by default so
+ * the ordinary suites keep seeing inert policies. Note that even with it on,
+ * the *owner* still bypasses RLS -- a spec that wants to observe filtering has
+ * to `SET LOCAL ROLE` to the runtime role.
  */
-export async function applyRlsPolicies(dataSource: DataSource): Promise<void> {
+export async function applyRlsPolicies(
+  dataSource: DataSource,
+  { includeEnable = false }: { includeEnable?: boolean } = {},
+): Promise<void> {
   // 1. The role first: the grants below are meaningless without it, and a spec
   //    doing `SET LOCAL ROLE monize_app` needs it to exist. Never throws on a
   //    privilege shortfall -- it warns -- so the grant assertion below is what
@@ -190,7 +225,7 @@ export async function applyRlsPolicies(dataSource: DataSource): Promise<void> {
 
   // 2. The RLS migrations, read from disk so the harness can never drift from
   //    what ships.
-  const migrations = findRlsMigrations();
+  const migrations = findRlsMigrations(includeEnable);
   const declared = new Set<string>();
 
   for (const file of migrations) {
