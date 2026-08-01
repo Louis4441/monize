@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
@@ -12,18 +11,14 @@ import { billReminderTemplate } from "./email-templates";
 import { emailTranslator } from "../i18n/email-translator";
 import { DEFAULT_LOCALE } from "../i18n/config";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
+import { withScopedDb } from "../common/db/scoped-db";
 
 @Injectable()
 export class BillReminderService {
   private readonly logger = new Logger(BillReminderService.name);
 
   constructor(
-    @InjectRepository(ScheduledTransaction)
-    private scheduledTransactionsRepo: Repository<ScheduledTransaction>,
-    @InjectRepository(User)
-    private usersRepo: Repository<User>,
-    @InjectRepository(UserPreference)
-    private preferencesRepo: Repository<UserPreference>,
+    private dataSource: DataSource,
     private emailService: EmailService,
     private configService: ConfigService,
     private readonly i18n: I18nService,
@@ -41,10 +36,12 @@ export class BillReminderService {
     // Only manual bills (autoPost = false) that are active.
     // RLS (task C2): cross-user fan-out over every user's manual bills.
     const manualBills = await withSystemContext(() =>
-      this.scheduledTransactionsRepo.find({
-        where: { isActive: true, autoPost: false },
-        relations: ["payee", "overrides"],
-      }),
+      withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(ScheduledTransaction).find({
+          where: { isActive: true, autoPost: false },
+          relations: ["payee", "overrides"],
+        }),
+      ),
     );
 
     if (manualBills.length === 0) {
@@ -97,9 +94,11 @@ export class BillReminderService {
         // Check if user has email notifications enabled.
         // RLS (task C2): per-user reads run under the user's own context.
         const prefs = await withUserContext(userId, () =>
-          this.preferencesRepo.findOne({
-            where: { userId },
-          }),
+          withScopedDb(this.dataSource, (manager) =>
+            manager.getRepository(UserPreference).findOne({
+              where: { userId },
+            }),
+          ),
         );
         if (prefs && !prefs.notificationEmail) {
           skipCount++;
@@ -107,7 +106,9 @@ export class BillReminderService {
         }
 
         const user = await withUserContext(userId, () =>
-          this.usersRepo.findOne({ where: { id: userId } }),
+          withScopedDb(this.dataSource, (manager) =>
+            manager.getRepository(User).findOne({ where: { id: userId } }),
+          ),
         );
         if (!user || !user.email) {
           skipCount++;

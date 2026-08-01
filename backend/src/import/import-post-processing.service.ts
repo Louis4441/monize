@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, forwardRef } from "@nestjs/common";
 import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { NetWorthService } from "../net-worth/net-worth.service";
 import { SecurityPriceService } from "../securities/security-price.service";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
@@ -48,9 +49,13 @@ export class ImportPostProcessingService {
     const affectedIds = [...affectedAccountIds];
     if (affectedIds.length > 0) {
       try {
-        const balances: { account_id: string; balance: string }[] =
-          await this.dataSource.query(
-            `SELECT a.id as account_id,
+        // Read the balances and write them back in one transaction: the
+        // recomputed figures must not be applied on top of rows that changed
+        // between the SELECT and the UPDATE.
+        await withScopedDb(this.dataSource, async (manager) => {
+          const balances: { account_id: string; balance: string }[] =
+            await manager.query(
+              `SELECT a.id as account_id,
                     COALESCE(a.opening_balance, 0) + COALESCE(SUM(t.amount), 0) as balance
                FROM accounts a
                LEFT JOIN transactions t ON t.account_id = a.id
@@ -59,24 +64,25 @@ export class ImportPostProcessingService {
                  AND t.transaction_date <= CURRENT_DATE
               WHERE a.id = ANY($1)
               GROUP BY a.id, a.opening_balance`,
-            [affectedIds],
-          );
+              [affectedIds],
+            );
 
-        if (balances.length > 0) {
-          const valuesClause = balances
-            .map((_, i) => `($${i * 2 + 1}::uuid, $${i * 2 + 2}::numeric)`)
-            .join(", ");
-          const params = balances.flatMap((row) => [
-            row.account_id,
-            roundMoney(Number(row.balance)),
-          ]);
-          await this.dataSource.query(
-            `UPDATE accounts SET current_balance = v.balance
+          if (balances.length > 0) {
+            const valuesClause = balances
+              .map((_, i) => `($${i * 2 + 1}::uuid, $${i * 2 + 2}::numeric)`)
+              .join(", ");
+            const params = balances.flatMap((row) => [
+              row.account_id,
+              roundMoney(Number(row.balance)),
+            ]);
+            await manager.query(
+              `UPDATE accounts SET current_balance = v.balance
                FROM (VALUES ${valuesClause}) AS v(id, balance)
                WHERE accounts.id = v.id`,
-            params,
-          );
-        }
+              params,
+            );
+          }
+        });
       } catch (err) {
         this.logger.warn(
           `Post-import balance recalculation failed: ${err.message}`,

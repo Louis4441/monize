@@ -59,6 +59,7 @@ import { RefreshSecurityPricesDto } from "./dto/refresh-security-prices.dto";
 import { CreateSecurityPriceDto } from "./dto/create-security-price.dto";
 import { UpdateSecurityPriceDto } from "./dto/update-security-price.dto";
 import { Security } from "./entities/security.entity";
+import { withSystemContext } from "../common/db/with-context";
 
 @ApiTags("Securities")
 @ApiBearerAuth()
@@ -611,14 +612,20 @@ export class SecuritiesController {
   async refreshAllPrices(): Promise<PriceRefreshSummary> {
     const result = await this.securityPriceService.refreshAllPrices();
     if (result.updated > 0) {
-      // Fire-and-forget: recalculate investment snapshots so charts reflect new prices
-      this.netWorthService
-        .recalculateAllInvestmentSnapshots()
-        .catch((err) =>
-          this.logger.warn(
-            `Background investment snapshot recalculation failed: ${err.message}`,
-          ),
-        );
+      // Fire-and-forget: recalculate investment snapshots so charts reflect new prices.
+      //
+      // RLS (task R6): despite being triggered by one user's manual refresh,
+      // this sweeps EVERY user's investment accounts -- prices are global, so a
+      // refresh moves everyone's snapshots. Left under the requesting user's
+      // request context it would silently recalculate only their own accounts
+      // once policies are enforced, so it runs under a system context.
+      withSystemContext(() =>
+        this.netWorthService.recalculateAllInvestmentSnapshots(),
+      ).catch((err) =>
+        this.logger.warn(
+          `Background investment snapshot recalculation failed: ${err.message}`,
+        ),
+      );
     }
     return result;
   }

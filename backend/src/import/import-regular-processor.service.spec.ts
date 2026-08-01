@@ -41,6 +41,11 @@ describe("ImportRegularProcessorService", () => {
     return qb;
   };
 
+  // ctx.manager is typed as a real EntityManager; the spec drives the jest mocks
+  // behind it, so read it back through this accessor rather than casting inline.
+  const managerOf = (ctx: ImportContext): Record<string, jest.Mock> =>
+    ctx.manager as unknown as Record<string, jest.Mock>;
+
   const makeMockManager = () => ({
     save: jest.fn().mockImplementation((entity: any) => {
       if (!entity.id) {
@@ -62,9 +67,8 @@ describe("ImportRegularProcessorService", () => {
   const makeContext = (
     overrides: Partial<ImportContext> = {},
   ): ImportContext => {
-    const qr = { manager: makeMockManager() };
     return {
-      queryRunner: qr,
+      manager: makeMockManager() as any,
       userId,
       accountId,
       account: {
@@ -104,8 +108,8 @@ describe("ImportRegularProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       expect(ctx.importResult.imported).toBe(1);
-      expect(ctx.queryRunner.manager.create).toHaveBeenCalled();
-      expect(ctx.queryRunner.manager.save).toHaveBeenCalled();
+      expect(managerOf(ctx).create).toHaveBeenCalled();
+      expect(managerOf(ctx).save).toHaveBeenCalled();
     });
 
     it("should set RECONCILED status when reconciled flag is true", async () => {
@@ -118,7 +122,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].status).toBe(TransactionStatus.RECONCILED);
     });
 
@@ -132,7 +136,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].status).toBe(TransactionStatus.CLEARED);
     });
 
@@ -145,7 +149,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].status).toBe(TransactionStatus.UNRECONCILED);
     });
 
@@ -160,7 +164,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].status).toBe(TransactionStatus.RECONCILED);
     });
 
@@ -174,7 +178,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].status).toBe(TransactionStatus.VOID);
     });
 
@@ -190,14 +194,14 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].status).toBe(TransactionStatus.VOID);
     });
 
     // A transaction may be preceded by a payee create call, so locate the
     // transaction create by its transaction-only transactionDate field.
     const findTxCreate = (ctx: ImportContext) =>
-      ctx.queryRunner.manager.create.mock.calls.find(
+      managerOf(ctx).create.mock.calls.find(
         (call: any[]) => call[1].transactionDate !== undefined,
       );
 
@@ -269,7 +273,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].categoryId).toBe("cat-groceries");
     });
 
@@ -287,7 +291,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].categoryId).toBeNull();
       expect(createCall[1].isTransfer).toBe(true);
     });
@@ -315,7 +319,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].currencyCode).toBe("CAD");
     });
 
@@ -337,7 +341,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].isSplit).toBe(true);
       expect(createCall[1].categoryId).toBeNull();
     });
@@ -360,7 +364,7 @@ describe("ImportRegularProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // create should be called for the main transaction + each split
-      const createCalls = ctx.queryRunner.manager.create.mock.calls;
+      const createCalls = managerOf(ctx).create.mock.calls;
       // Main transaction + 2 splits = at least 3 create calls
       expect(createCalls.length).toBeGreaterThanOrEqual(3);
     });
@@ -376,7 +380,7 @@ describe("ImportRegularProcessorService", () => {
         splits: [{ amount: -60, category: "Food", memo: "Food" }],
       });
 
-      const splitCreate = ctx.queryRunner.manager.create.mock.calls.find(
+      const splitCreate = managerOf(ctx).create.mock.calls.find(
         (c: unknown[]) =>
           c[1] != null && typeof c[1] === "object" && "kind" in c[1],
       );
@@ -405,7 +409,7 @@ describe("ImportRegularProcessorService", () => {
         ],
       });
 
-      const splitCreate = ctx.queryRunner.manager.create.mock.calls.find(
+      const splitCreate = managerOf(ctx).create.mock.calls.find(
         (c: unknown[]) =>
           c[1] != null && typeof c[1] === "object" && "kind" in c[1],
       );
@@ -425,7 +429,7 @@ describe("ImportRegularProcessorService", () => {
 
       // Set up query builder to find existing linked transfer
       const existingTransfer = { id: "tx-existing", accountId: "acc-1" };
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(existingTransfer),
       );
 
@@ -448,7 +452,7 @@ describe("ImportRegularProcessorService", () => {
       // When isTransfer is true but transferAccount is absent,
       // the first block in isDuplicateTransfer is skipped entirely.
       // Only the second block (split-linked check) runs, which is the first QB call.
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder({ id: "tx-split-linked" }),
       );
 
@@ -494,7 +498,7 @@ describe("ImportRegularProcessorService", () => {
       //   3. matchPendingTransfer
       // So for tx2, the linked check is call 4.
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         const qb = makeMockQueryBuilder(null);
         if (qbCallCount === 4) {
@@ -504,17 +508,15 @@ describe("ImportRegularProcessorService", () => {
         return qb;
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-tangerine") {
-            return Promise.resolve({
-              id: "acc-tangerine",
-              currencyCode: "CAD",
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-tangerine") {
+          return Promise.resolve({
+            id: "acc-tangerine",
+            currencyCode: "CAD",
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const tx1 = {
         date: "2020-10-05",
@@ -548,7 +550,7 @@ describe("ImportRegularProcessorService", () => {
       const ctx = makeContext({ accountMap });
 
       // Both QIF entries find 2 existing linked transfers in the DB
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         const qb = makeMockQueryBuilder(null);
         qb.getCount.mockResolvedValue(2);
         return qb;
@@ -591,7 +593,7 @@ describe("ImportRegularProcessorService", () => {
       //   2. split-linked check (getCount)
       //   3. merged split check (getRawMany)
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         const qb = makeMockQueryBuilder(null);
         if (qbCallCount === 3) {
@@ -629,7 +631,7 @@ describe("ImportRegularProcessorService", () => {
       const ctx = makeContext({ accountMap });
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         const qb = makeMockQueryBuilder(null);
         if (qbCallCount === 3) {
@@ -646,17 +648,15 @@ describe("ImportRegularProcessorService", () => {
         return qb;
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-source") {
-            return Promise.resolve({
-              id: "acc-source",
-              currencyCode: "CAD",
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-source") {
+          return Promise.resolve({
+            id: "acc-source",
+            currencyCode: "CAD",
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -679,7 +679,7 @@ describe("ImportRegularProcessorService", () => {
       const ctx = makeContext({ accountMap });
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         const qb = makeMockQueryBuilder(null);
         if (qbCallCount === 3) {
@@ -696,17 +696,15 @@ describe("ImportRegularProcessorService", () => {
         return qb;
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-source") {
-            return Promise.resolve({
-              id: "acc-source",
-              currencyCode: "CAD",
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-source") {
+          return Promise.resolve({
+            id: "acc-source",
+            currencyCode: "CAD",
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -728,7 +726,7 @@ describe("ImportRegularProcessorService", () => {
       const ctx = makeContext({ accountMap });
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         const qb = makeMockQueryBuilder(null);
         if (qbCallCount === 3) {
@@ -780,7 +778,7 @@ describe("ImportRegularProcessorService", () => {
       const ctx = makeContext({ accountMap });
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         const qb = makeMockQueryBuilder(null);
         if (qbCallCount === 3) {
@@ -819,7 +817,7 @@ describe("ImportRegularProcessorService", () => {
       const ctx = makeContext({ accountMap });
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         const qb = makeMockQueryBuilder(null);
         if (qbCallCount === 3) {
@@ -865,30 +863,28 @@ describe("ImportRegularProcessorService", () => {
       // false on the parent). processSplitTransfer uses getOne, not getCount.
       // Return null from all query builders so no existing linked tx is found
       // (simulating a fresh import where neither TX has been stored yet).
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(null),
       );
 
       // findOne: return the target account for balance updates
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-rec") {
-            return Promise.resolve({
-              id: "acc-rec",
-              currencyCode: "CAD",
-              currentBalance: 0,
-            });
-          }
-          if (opts?.where?.id === ctx.accountId) {
-            return Promise.resolve({
-              id: ctx.accountId,
-              currencyCode: "CAD",
-              currentBalance: 0,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-rec") {
+          return Promise.resolve({
+            id: "acc-rec",
+            currencyCode: "CAD",
+            currentBalance: 0,
+          });
+        }
+        if (opts?.where?.id === ctx.accountId) {
+          return Promise.resolve({
+            id: ctx.accountId,
+            currencyCode: "CAD",
+            currentBalance: 0,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const tx1 = {
         date: "2022-06-01",
@@ -935,7 +931,7 @@ describe("ImportRegularProcessorService", () => {
 
       // Verify TX1 was not deleted: the delete mock should not have been
       // called with the ID of the transaction saved during TX1's processing.
-      const deleteCalls = ctx.queryRunner.manager.delete.mock.calls;
+      const deleteCalls = managerOf(ctx).delete.mock.calls;
       expect(deleteCalls.length).toBe(0);
     });
   });
@@ -955,7 +951,7 @@ describe("ImportRegularProcessorService", () => {
       };
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         if (qbCallCount <= 2) {
           // isDuplicateTransfer checks (no duplicates)
@@ -976,7 +972,7 @@ describe("ImportRegularProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       expect(ctx.importResult.imported).toBe(1);
-      expect(ctx.queryRunner.manager.update).toHaveBeenCalled();
+      expect(managerOf(ctx).update).toHaveBeenCalled();
     });
 
     it("should not match pending transfer for non-transfer transactions", async () => {
@@ -997,15 +993,13 @@ describe("ImportRegularProcessorService", () => {
     it("should find existing payee by name", async () => {
       const ctx = makeContext();
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Payee && opts?.where?.name === "Tim Hortons") {
-            return Promise.resolve({ id: "payee-tim", name: "Tim Hortons" });
-          }
-          // For account balance update
-          return Promise.resolve({ id: accountId, currentBalance: 500 });
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Payee && opts?.where?.name === "Tim Hortons") {
+          return Promise.resolve({ id: "payee-tim", name: "Tim Hortons" });
+        }
+        // For account balance update
+        return Promise.resolve({ id: accountId, currentBalance: 500 });
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1015,20 +1009,18 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].payeeId).toBe("payee-tim");
     });
 
     it("should create new payee when not found", async () => {
       const ctx = makeContext();
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, _opts: any) => {
-          if (entity === Payee) return Promise.resolve(null);
-          // For account balance update
-          return Promise.resolve({ id: accountId, currentBalance: 500 });
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, _opts: any) => {
+        if (entity === Payee) return Promise.resolve(null);
+        // For account balance update
+        return Promise.resolve({ id: accountId, currentBalance: 500 });
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1050,7 +1042,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].payeeId).toBeNull();
     });
   });
@@ -1075,7 +1067,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].categoryId).toBe("cat-asset");
     });
 
@@ -1084,18 +1076,16 @@ describe("ImportRegularProcessorService", () => {
       loanCategoryMap.set("Car Loan", "acc-loan");
       const ctx = makeContext({ loanCategoryMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-loan") {
-            return Promise.resolve({
-              id: "acc-loan",
-              currencyCode: "CAD",
-            });
-          }
-          // For account balance update
-          return Promise.resolve({ id: accountId, currentBalance: 500 });
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-loan") {
+          return Promise.resolve({
+            id: "acc-loan",
+            currencyCode: "CAD",
+          });
+        }
+        // For account balance update
+        return Promise.resolve({ id: accountId, currentBalance: 500 });
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1106,7 +1096,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].isTransfer).toBe(true);
       expect(createCall[1].categoryId).toBeNull();
       expect(ctx.affectedAccountIds.has("acc-loan")).toBe(true);
@@ -1123,7 +1113,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].categoryId).toBeNull();
     });
   });
@@ -1134,27 +1124,25 @@ describe("ImportRegularProcessorService", () => {
       accountMap.set("Savings", "acc-savings");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(null),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-savings") {
-            return Promise.resolve({
-              id: "acc-savings",
-              currencyCode: "CAD",
-            });
-          }
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 1000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-savings") {
+          return Promise.resolve({
+            id: "acc-savings",
+            currencyCode: "CAD",
+          });
+        }
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 1000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1170,7 +1158,7 @@ describe("ImportRegularProcessorService", () => {
       expect(ctx.importResult.imported).toBe(1);
 
       // Should have created a linked transaction in the target account
-      const createCalls = ctx.queryRunner.manager.create.mock.calls;
+      const createCalls = managerOf(ctx).create.mock.calls;
       const linkedTxCreate = createCalls.find(
         (call: any) => call[1]?.accountId === "acc-savings",
       );
@@ -1184,27 +1172,25 @@ describe("ImportRegularProcessorService", () => {
       accountMap.set("USD Account", "acc-usd");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(null),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-usd") {
-            return Promise.resolve({
-              id: "acc-usd",
-              currencyCode: "USD",
-            });
-          }
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 1000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-usd") {
+          return Promise.resolve({
+            id: "acc-usd",
+            currencyCode: "USD",
+          });
+        }
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 1000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1215,7 +1201,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCalls = ctx.queryRunner.manager.create.mock.calls;
+      const createCalls = managerOf(ctx).create.mock.calls;
       const linkedTxCreate = createCalls.find(
         (call: any) => call[1]?.accountId === "acc-usd",
       );
@@ -1228,27 +1214,25 @@ describe("ImportRegularProcessorService", () => {
       loanCategoryMap.set("Car Loan", "acc-loan");
       const ctx = makeContext({ loanCategoryMap });
 
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(null),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-loan") {
-            return Promise.resolve({
-              id: "acc-loan",
-              currencyCode: "CAD",
-            });
-          }
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 2000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-loan") {
+          return Promise.resolve({
+            id: "acc-loan",
+            currencyCode: "CAD",
+          });
+        }
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 2000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1258,7 +1242,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCalls = ctx.queryRunner.manager.create.mock.calls;
+      const createCalls = managerOf(ctx).create.mock.calls;
       const linkedTxCreate = createCalls.find(
         (call: any) => call[1]?.accountId === "acc-loan",
       );
@@ -1275,21 +1259,19 @@ describe("ImportRegularProcessorService", () => {
       categoryMap.set("Food", "cat-food");
       const ctx = makeContext({ accountMap, categoryMap });
 
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(null),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 1000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 1000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1318,21 +1300,19 @@ describe("ImportRegularProcessorService", () => {
       categoryMap.set("Interest", "cat-interest");
       const ctx = makeContext({ loanCategoryMap, categoryMap });
 
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(null),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 5000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 5000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1372,7 +1352,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].referenceNumber).toBe("CHK-1234");
     });
 
@@ -1385,7 +1365,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCall = ctx.queryRunner.manager.create.mock.calls[0];
+      const createCall = managerOf(ctx).create.mock.calls[0];
       expect(createCall[1].userId).toBe(userId);
       expect(createCall[1].accountId).toBe(accountId);
     });
@@ -1405,7 +1385,7 @@ describe("ImportRegularProcessorService", () => {
       };
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         if (qbCallCount <= 2) {
           // isDuplicateTransfer checks return null (no duplicates)
@@ -1419,17 +1399,15 @@ describe("ImportRegularProcessorService", () => {
         return makeMockQueryBuilder(existingPending);
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-usd") {
-            return Promise.resolve({
-              id: "acc-usd",
-              currencyCode: "USD",
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-usd") {
+          return Promise.resolve({
+            id: "acc-usd",
+            currencyCode: "USD",
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1444,8 +1422,8 @@ describe("ImportRegularProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
       // Should update the existing pending transfer to link it
-      expect(ctx.queryRunner.manager.update).toHaveBeenCalled();
-      const updateCalls = ctx.queryRunner.manager.update.mock.calls;
+      expect(managerOf(ctx).update).toHaveBeenCalled();
+      const updateCalls = managerOf(ctx).update.mock.calls;
       // One of the update calls should set linkedTransactionId on the pending transfer
       const pendingUpdate = updateCalls.find(
         (call: any) => call[1] === existingPending.id,
@@ -1458,21 +1436,19 @@ describe("ImportRegularProcessorService", () => {
       accountMap.set("EUR Account", "acc-eur");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(null),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-eur") {
-            return Promise.resolve({
-              id: "acc-eur",
-              currencyCode: "EUR",
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-eur") {
+          return Promise.resolve({
+            id: "acc-eur",
+            currencyCode: "EUR",
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1484,7 +1460,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const createCalls = ctx.queryRunner.manager.create.mock.calls;
+      const createCalls = managerOf(ctx).create.mock.calls;
       const linkedTxCreate = createCalls.find(
         (call: any) => call[1]?.accountId === "acc-eur",
       );
@@ -1506,21 +1482,19 @@ describe("ImportRegularProcessorService", () => {
       };
 
       // The first QB call is from processTransfer checking for existing pending transfer
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(existingPending),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-loan-usd") {
-            return Promise.resolve({
-              id: "acc-loan-usd",
-              currencyCode: "USD",
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-loan-usd") {
+          return Promise.resolve({
+            id: "acc-loan-usd",
+            currencyCode: "USD",
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1530,7 +1504,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const updateCalls = ctx.queryRunner.manager.update.mock.calls;
+      const updateCalls = managerOf(ctx).update.mock.calls;
       const pendingUpdate = updateCalls.find(
         (call: any) => call[1] === existingPending.id,
       );
@@ -1555,21 +1529,19 @@ describe("ImportRegularProcessorService", () => {
 
       // The first QB call will be from processSplitTransfer (not isDuplicateTransfer
       // since qifTx.isTransfer is not set), so return existingLinkedTx immediately
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(existingLinkedTx),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 1000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 1000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1589,7 +1561,7 @@ describe("ImportRegularProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
       // Should have updated the split to link to existing tx
-      const updateCalls = ctx.queryRunner.manager.update.mock.calls;
+      const updateCalls = managerOf(ctx).update.mock.calls;
       const splitLinkUpdate = updateCalls.find(
         (call: any) => call[2]?.linkedTransactionId === existingLinkedTx.id,
       );
@@ -1608,11 +1580,11 @@ describe("ImportRegularProcessorService", () => {
       };
 
       // The first QB call will be from processSplitTransfer, so return existingLinkedTx immediately
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(existingLinkedTx),
       );
 
-      ctx.queryRunner.manager.findOne.mockResolvedValue(null);
+      managerOf(ctx).findOne.mockResolvedValue(null);
 
       const qifTx = {
         date: "2025-01-15",
@@ -1630,7 +1602,7 @@ describe("ImportRegularProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // Should update the existing linked tx's linkedTransactionId to point to saved tx
-      const updateCalls = ctx.queryRunner.manager.update.mock.calls;
+      const updateCalls = managerOf(ctx).update.mock.calls;
       const backLinkUpdate = updateCalls.find(
         (call: any) => call[1] === existingLinkedTx.id,
       );
@@ -1657,27 +1629,25 @@ describe("ImportRegularProcessorService", () => {
       };
 
       // The first QB call will be from processSplitTransfer, so return existingLinkedTx immediately
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(existingLinkedTx),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (
-            opts?.where?.id === "tx-placeholder" &&
-            opts?.where?.accountId === accountId
-          ) {
-            return Promise.resolve(placeholderTx);
-          }
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 1000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (
+          opts?.where?.id === "tx-placeholder" &&
+          opts?.where?.accountId === accountId
+        ) {
+          return Promise.resolve(placeholderTx);
+        }
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 1000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1695,14 +1665,14 @@ describe("ImportRegularProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // Should delete the placeholder transaction
-      expect(ctx.queryRunner.manager.delete).toHaveBeenCalled();
-      const deleteCall = ctx.queryRunner.manager.delete.mock.calls.find(
+      expect(managerOf(ctx).delete).toHaveBeenCalled();
+      const deleteCall = managerOf(ctx).delete.mock.calls.find(
         (call: any) => call[1] === "tx-placeholder",
       );
       expect(deleteCall).toBeDefined();
 
       // Should nullify the linkedTransactionId on existing linked tx
-      const updateCalls = ctx.queryRunner.manager.update.mock.calls;
+      const updateCalls = managerOf(ctx).update.mock.calls;
       const nullifyLinkUpdate = updateCalls.find(
         (call: any) =>
           call[1] === existingLinkedTx.id &&
@@ -1723,7 +1693,7 @@ describe("ImportRegularProcessorService", () => {
       };
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         if (qbCallCount <= 2) {
           return makeMockQueryBuilder(null);
@@ -1732,7 +1702,7 @@ describe("ImportRegularProcessorService", () => {
       });
 
       // findOne returns null for the placeholder (not in current account)
-      ctx.queryRunner.manager.findOne.mockResolvedValue(null);
+      managerOf(ctx).findOne.mockResolvedValue(null);
 
       const qifTx = {
         date: "2025-01-15",
@@ -1750,7 +1720,7 @@ describe("ImportRegularProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // Should NOT delete any transaction since placeholder was not found
-      expect(ctx.queryRunner.manager.delete).not.toHaveBeenCalled();
+      expect(managerOf(ctx).delete).not.toHaveBeenCalled();
     });
   });
 
@@ -1769,7 +1739,7 @@ describe("ImportRegularProcessorService", () => {
       };
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         if (qbCallCount <= 2) {
           return makeMockQueryBuilder(null);
@@ -1777,17 +1747,15 @@ describe("ImportRegularProcessorService", () => {
         return makeMockQueryBuilder(pendingTransfer);
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 500,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 500,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1801,7 +1769,7 @@ describe("ImportRegularProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
       // Balance adjustment should happen for the difference (100 - 90 = 10)
-      expect(ctx.queryRunner.manager.update).toHaveBeenCalled();
+      expect(managerOf(ctx).update).toHaveBeenCalled();
     });
 
     it("should not adjust balance when pending transfer amount matches actual", async () => {
@@ -1818,7 +1786,7 @@ describe("ImportRegularProcessorService", () => {
       };
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         if (qbCallCount <= 2) {
           return makeMockQueryBuilder(null);
@@ -1838,7 +1806,7 @@ describe("ImportRegularProcessorService", () => {
       expect(ctx.importResult.imported).toBe(1);
       // The update for the pending transfer should happen, but the balance update
       // for the account should NOT happen because balanceDiff === 0
-      const updateCalls = ctx.queryRunner.manager.update.mock.calls;
+      const updateCalls = managerOf(ctx).update.mock.calls;
       // Only the pending transfer update should exist, no Account balance update
       const pendingTxUpdate = updateCalls.find(
         (call: any) => call[1] === pendingTransfer.id,
@@ -1863,7 +1831,7 @@ describe("ImportRegularProcessorService", () => {
       // 1st: check for existing linked (returns null)
       // 2nd: check for pending transfer (returns pendingSplitTransfer)
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         if (qbCallCount === 1) {
           // First QB call: existing linked check returns null
@@ -1873,23 +1841,21 @@ describe("ImportRegularProcessorService", () => {
         return makeMockQueryBuilder(pendingSplitTransfer);
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 1000,
-            });
-          }
-          if (opts?.where?.id === "acc-savings") {
-            return Promise.resolve({
-              id: "acc-savings",
-              currentBalance: 500,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 1000,
+          });
+        }
+        if (opts?.where?.id === "acc-savings") {
+          return Promise.resolve({
+            id: "acc-savings",
+            currentBalance: 500,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1909,7 +1875,7 @@ describe("ImportRegularProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
       // The pending transfer should be updated
-      const updateCalls = ctx.queryRunner.manager.update.mock.calls;
+      const updateCalls = managerOf(ctx).update.mock.calls;
       const pendingUpdate = updateCalls.find(
         (call: any) => call[1] === pendingSplitTransfer.id,
       );
@@ -1928,7 +1894,7 @@ describe("ImportRegularProcessorService", () => {
 
       // The linked transfer already exists (created by the investment processor)
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         const qb = makeMockQueryBuilder(null);
         if (qbCallCount === 1) {
@@ -1960,21 +1926,19 @@ describe("ImportRegularProcessorService", () => {
       accountMap.set("Savings", "acc-savings");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(null),
       );
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-savings") {
-            return Promise.resolve({
-              id: "acc-savings",
-              currencyCode: "CAD",
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-savings") {
+          return Promise.resolve({
+            id: "acc-savings",
+            currencyCode: "CAD",
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -1994,11 +1958,11 @@ describe("ImportRegularProcessorService", () => {
     it("should return false when transfer account is not mapped", async () => {
       const ctx = makeContext();
 
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(null),
       );
 
-      ctx.queryRunner.manager.findOne.mockResolvedValue(null);
+      managerOf(ctx).findOne.mockResolvedValue(null);
 
       const qifTx = {
         date: "2025-01-15",
@@ -2027,7 +1991,7 @@ describe("ImportRegularProcessorService", () => {
       };
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         if (qbCallCount <= 2) {
           return makeMockQueryBuilder(null);
@@ -2045,7 +2009,7 @@ describe("ImportRegularProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const updateCalls = ctx.queryRunner.manager.update.mock.calls;
+      const updateCalls = managerOf(ctx).update.mock.calls;
       const pendingUpdate = updateCalls.find(
         (call: any) => call[1] === pendingTransfer.id,
       );
@@ -2064,7 +2028,7 @@ describe("ImportRegularProcessorService", () => {
       // Track the savedTx id assigned during processTransaction
       let savedTxId: string | null = null;
       let createCallIndex = 0;
-      ctx.queryRunner.manager.create = jest
+      managerOf(ctx).create = jest
         .fn()
         .mockImplementation((_cls: any, data: any) => {
           createCallIndex++;
@@ -2084,29 +2048,27 @@ describe("ImportRegularProcessorService", () => {
       // Then for S2's processSplitTransfer:
       // 6. existingLinkedTx query -> should NOT match L1 because L1.linkedTransactionId = savedTx.id
       // 7. pendingTransfer query -> null
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         return makeMockQueryBuilder(null);
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          // Account lookup for balance updates
-          if (opts?.where?.id === "acc-savings") {
-            return Promise.resolve({
-              id: "acc-savings",
-              currentBalance: 1000,
-              currencyCode: "CAD",
-            });
-          }
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currentBalance: 500,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        // Account lookup for balance updates
+        if (opts?.where?.id === "acc-savings") {
+          return Promise.resolve({
+            id: "acc-savings",
+            currentBalance: 1000,
+            currencyCode: "CAD",
+          });
+        }
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currentBalance: 500,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -2130,7 +2092,7 @@ describe("ImportRegularProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // The current transaction should never be deleted
-      const deleteCalls = ctx.queryRunner.manager.delete.mock.calls;
+      const deleteCalls = managerOf(ctx).delete.mock.calls;
       const deletedSavedTx = deleteCalls.find(
         (call: any) => call[1] === savedTxId,
       );
@@ -2149,7 +2111,7 @@ describe("ImportRegularProcessorService", () => {
 
       let createCallIndex = 0;
       let savedTxId: string | null = null;
-      ctx.queryRunner.manager.create = jest
+      managerOf(ctx).create = jest
         .fn()
         .mockImplementation((_cls: any, data: any) => {
           createCallIndex++;
@@ -2161,7 +2123,7 @@ describe("ImportRegularProcessorService", () => {
       // For the existingLinkedTx query, we simulate finding a transaction
       // whose linkedTransactionId equals savedTx.id (created by a prior split).
       // The fix should filter this out via the andWhere condition.
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         const qb = makeMockQueryBuilder(null);
         // Track andWhere calls to verify the new filter is applied
         const andWhereCalls: string[] = [];
@@ -2173,21 +2135,19 @@ describe("ImportRegularProcessorService", () => {
         return qb;
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-savings") {
-            return Promise.resolve({
-              id: "acc-savings",
-              currentBalance: 1000,
-              currencyCode: "CAD",
-            });
-          }
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({ id: accountId, currentBalance: 500 });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-savings") {
+          return Promise.resolve({
+            id: "acc-savings",
+            currentBalance: 1000,
+            currencyCode: "CAD",
+          });
+        }
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({ id: accountId, currentBalance: 500 });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         date: "2025-01-15",
@@ -2206,14 +2166,14 @@ describe("ImportRegularProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // The main transaction must not be deleted
-      const deleteCalls = ctx.queryRunner.manager.delete.mock.calls;
+      const deleteCalls = managerOf(ctx).delete.mock.calls;
       const deletedSavedTx = deleteCalls.find(
         (call: any) => call[1] === savedTxId,
       );
       expect(deletedSavedTx).toBeUndefined();
 
       // Should have created split entries for both splits
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       expect(saveCalls.length).toBeGreaterThanOrEqual(3); // transaction + 2 splits + linked tx
       expect(ctx.importResult.imported).toBe(1);
     });

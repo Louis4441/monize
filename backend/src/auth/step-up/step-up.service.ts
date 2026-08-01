@@ -7,8 +7,8 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import { withScopedDb } from "../../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 
@@ -48,10 +48,7 @@ export class StepUpAuthService {
   >();
 
   constructor(
-    @InjectRepository(User)
-    private readonly usersRepository: Repository<User>,
-    @InjectRepository(UserPreference)
-    private readonly preferencesRepository: Repository<UserPreference>,
+    private readonly dataSource: DataSource,
     private readonly twoFactorService: TwoFactorService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
@@ -59,6 +56,21 @@ export class StepUpAuthService {
     // Forces ConfigService to be retained so step-up TTL can be tuned later
     // via env without changing the constructor signature.
     void this.configService;
+  }
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
   }
 
   async verifyAndIssue(
@@ -81,16 +93,20 @@ export class StepUpAuthService {
       );
     }
 
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user) {
       throw new NotFoundException(
         tr("errors.auth.userNotFound", "User not found"),
       );
     }
 
-    const preferences = await this.preferencesRepository.findOne({
-      where: { userId },
-    });
+    const preferences = await this.scoped(UserPreference, (repo) =>
+      repo.findOne({
+        where: { userId },
+      }),
+    );
     const twoFactorEnabled =
       !!preferences?.twoFactorEnabled && !!user.twoFactorSecret;
 

@@ -2,6 +2,15 @@ import { firstValueFrom, of } from "rxjs";
 import { RequestContextInterceptor } from "./request-context.interceptor";
 import type { RequestContext } from "../request-context";
 import { getRequestContext, requestContextStorage } from "../request-context";
+import { UserPreference } from "../../users/entities/user-preference.entity";
+import { User } from "../../users/entities/user.entity";
+import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+
+jest.mock("../db/scoped-db", () =>
+  jest
+    .requireActual("../../test-helpers/scoped-db-testing")
+    .scopedDbMockModule(),
+);
 
 describe("RequestContextInterceptor", () => {
   let preferencesRepository: { findOne: jest.Mock; update: jest.Mock };
@@ -39,10 +48,13 @@ describe("RequestContextInterceptor", () => {
     usersRepository = {
       update: jest.fn().mockResolvedValue({ affected: 1 }),
     };
-    interceptor = new RequestContextInterceptor(
-      preferencesRepository as any,
-      usersRepository as any,
-    );
+    // Both fire-and-forget writes now go through `withScopedDb`, so the
+    // repositories are reached via the scoped transaction's manager.
+    const { dataSource } = createScopedDbMocks([
+      [UserPreference, preferencesRepository as never],
+      [User, usersRepository as never],
+    ]);
+    interceptor = new RequestContextInterceptor(dataSource as never);
   });
 
   it("bypasses non-http contexts and returns next.handle() directly", async () => {

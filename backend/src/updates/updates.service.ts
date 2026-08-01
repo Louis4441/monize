@@ -1,11 +1,11 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { buildDefaultPreferences } from "../users/user-preference.factory";
 import { currentRequestLocale } from "../i18n/request-locale";
+import { withScopedDb } from "../common/db/scoped-db";
 
 // Version comes from the backend package.json at build/run time. Using require
 // keeps the read synchronous and avoids ESM import-assertion issues.
@@ -88,8 +88,7 @@ export class UpdatesService implements OnModuleInit {
   };
 
   constructor(
-    @InjectRepository(UserPreference)
-    private readonly preferencesRepository: Repository<UserPreference>,
+    private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
   ) {
     // Default enabled; disable with UPDATE_CHECK_ENABLED=false.
@@ -212,9 +211,9 @@ export class UpdatesService implements OnModuleInit {
 
     let dismissed = false;
     if (updateAvailable && latestVersion) {
-      const prefs = await this.preferencesRepository.findOne({
-        where: { userId },
-      });
+      const prefs = await withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(UserPreference).findOne({ where: { userId } }),
+      );
       dismissed = prefs?.dismissedUpdateVersion === latestVersion;
     }
 
@@ -245,20 +244,21 @@ export class UpdatesService implements OnModuleInit {
       return { dismissed: false, version: null };
     }
 
-    const prefs = await this.preferencesRepository.findOne({
-      where: { userId },
+    await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(UserPreference);
+      const prefs = await repo.findOne({ where: { userId } });
+      if (prefs) {
+        prefs.dismissedUpdateVersion = latestVersion;
+        await repo.save(prefs);
+      } else {
+        // No row yet: materialize one from the shared defaults (seeding the
+        // request locale) so this fallback doesn't create a preferences row with
+        // a different baseline than every other creation path.
+        const created = buildDefaultPreferences(userId, currentRequestLocale());
+        created.dismissedUpdateVersion = latestVersion;
+        await repo.save(created);
+      }
     });
-    if (prefs) {
-      prefs.dismissedUpdateVersion = latestVersion;
-      await this.preferencesRepository.save(prefs);
-    } else {
-      // No row yet: materialize one from the shared defaults (seeding the
-      // request locale) so this fallback doesn't create a preferences row with
-      // a different baseline than every other creation path.
-      const created = buildDefaultPreferences(userId, currentRequestLocale());
-      created.dismissedUpdateVersion = latestVersion;
-      await this.preferencesRepository.save(created);
-    }
     return { dismissed: true, version: latestVersion };
   }
 }

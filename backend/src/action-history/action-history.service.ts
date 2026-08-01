@@ -5,8 +5,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { tr } from "../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, QueryRunner } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
 import { Cron } from "@nestjs/schedule";
 import { ActionHistory } from "./entities/action-history.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
@@ -21,6 +20,7 @@ import { ScheduledTransaction } from "../scheduled-transactions/entities/schedul
 import { Budget } from "../budgets/entities/budget.entity";
 import { CustomReport } from "../reports/entities/custom-report.entity";
 import { withSystemContext } from "../common/db/with-context";
+import { withScopedDb } from "../common/db/scoped-db";
 
 export interface RecordActionParams {
   entityType: string;
@@ -224,11 +224,7 @@ const MAX_HISTORY_AGE_DAYS = 30;
 export class ActionHistoryService {
   private readonly logger = new Logger(ActionHistoryService.name);
 
-  constructor(
-    @InjectRepository(ActionHistory)
-    private actionHistoryRepository: Repository<ActionHistory>,
-    private dataSource: DataSource,
-  ) {}
+  constructor(private dataSource: DataSource) {}
 
   async record(
     userId: string,
@@ -250,26 +246,33 @@ export class ActionHistoryService {
         return null;
       }
 
-      // Clear redo stack when a new action is recorded
-      await this.actionHistoryRepository.delete({
-        userId,
-        isUndone: true,
-      });
+      // Clearing the redo stack and writing the new entry are one unit: a
+      // partially applied pair would leave a redo stack that no longer matches
+      // the head of the undo stack.
+      const saved = await withScopedDb(this.dataSource, async (manager) => {
+        const repo = manager.getRepository(ActionHistory);
 
-      const action = this.actionHistoryRepository.create({
-        userId,
-        entityType: params.entityType,
-        entityId: params.entityId,
-        action: params.action,
-        beforeData: params.beforeData ?? null,
-        afterData: params.afterData ?? null,
-        relatedEntities: params.relatedEntities ?? null,
-        description: params.description,
-        descriptionKey: params.descriptionKey ?? null,
-        descriptionParams: params.descriptionParams ?? null,
-      });
+        // Clear redo stack when a new action is recorded
+        await repo.delete({
+          userId,
+          isUndone: true,
+        });
 
-      const saved = await this.actionHistoryRepository.save(action);
+        const action = repo.create({
+          userId,
+          entityType: params.entityType,
+          entityId: params.entityId,
+          action: params.action,
+          beforeData: params.beforeData ?? null,
+          afterData: params.afterData ?? null,
+          relatedEntities: params.relatedEntities ?? null,
+          description: params.description,
+          descriptionKey: params.descriptionKey ?? null,
+          descriptionParams: params.descriptionParams ?? null,
+        });
+
+        return repo.save(action);
+      });
 
       // Prune old records beyond limit
       await this.pruneUserHistory(userId);
@@ -288,18 +291,22 @@ export class ActionHistoryService {
     userId: string,
     limit: number = 50,
   ): Promise<ActionHistory[]> {
-    return this.actionHistoryRepository.find({
-      where: { userId },
-      order: { createdAt: "DESC" },
-      take: limit,
-    });
+    return withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ActionHistory).find({
+        where: { userId },
+        order: { createdAt: "DESC" },
+        take: limit,
+      }),
+    );
   }
 
   async undo(userId: string): Promise<UndoRedoResult> {
-    const action = await this.actionHistoryRepository.findOne({
-      where: { userId, isUndone: false },
-      order: { createdAt: "DESC" },
-    });
+    const action = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ActionHistory).findOne({
+        where: { userId, isUndone: false },
+        order: { createdAt: "DESC" },
+      }),
+    );
 
     if (!action) {
       throw new NotFoundException(
@@ -307,31 +314,23 @@ export class ActionHistoryService {
       );
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      await this.executeUndo(action, queryRunner);
-      await queryRunner.manager.update(ActionHistory, action.id, {
+    await withScopedDb(this.dataSource, async (manager) => {
+      await this.executeUndo(action, manager);
+      await manager.update(ActionHistory, action.id, {
         isUndone: true,
       });
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     return { action, description: `Undone: ${action.description}` };
   }
 
   async redo(userId: string): Promise<UndoRedoResult> {
-    const action = await this.actionHistoryRepository.findOne({
-      where: { userId, isUndone: true },
-      order: { createdAt: "ASC" },
-    });
+    const action = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ActionHistory).findOne({
+        where: { userId, isUndone: true },
+        order: { createdAt: "ASC" },
+      }),
+    );
 
     if (!action) {
       throw new NotFoundException(
@@ -339,86 +338,66 @@ export class ActionHistoryService {
       );
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      await this.executeRedo(action, queryRunner);
-      await queryRunner.manager.update(ActionHistory, action.id, {
+    await withScopedDb(this.dataSource, async (manager) => {
+      await this.executeRedo(action, manager);
+      await manager.update(ActionHistory, action.id, {
         isUndone: false,
       });
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
 
     return { action, description: `Redone: ${action.description}` };
   }
 
   private async executeUndo(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     switch (action.entityType) {
       case "transaction":
-        await this.undoTransaction(action, queryRunner);
+        await this.undoTransaction(action, manager);
         break;
       case "transfer":
-        await this.undoTransfer(action, queryRunner);
+        await this.undoTransfer(action, manager);
         break;
       case "category":
-        await this.undoSimpleEntity(
-          action,
-          queryRunner,
-          Category,
-          "categories",
-        );
+        await this.undoSimpleEntity(action, manager, Category, "categories");
         break;
       case "payee":
-        await this.undoSimpleEntity(action, queryRunner, Payee, "payees");
+        await this.undoSimpleEntity(action, manager, Payee, "payees");
         break;
       case "tag":
-        await this.undoSimpleEntity(action, queryRunner, Tag, "tags");
+        await this.undoSimpleEntity(action, manager, Tag, "tags");
         break;
       case "account":
-        await this.undoSimpleEntity(action, queryRunner, Account, "accounts");
+        await this.undoSimpleEntity(action, manager, Account, "accounts");
         break;
       case "scheduled_transaction":
         await this.undoSimpleEntity(
           action,
-          queryRunner,
+          manager,
           ScheduledTransaction,
           "scheduled_transactions",
         );
         break;
       case "security":
-        await this.undoSimpleEntity(
-          action,
-          queryRunner,
-          Security,
-          "securities",
-        );
+        await this.undoSimpleEntity(action, manager, Security, "securities");
         break;
       case "investment_transaction":
-        await this.undoInvestmentTransaction(action, queryRunner);
+        await this.undoInvestmentTransaction(action, manager);
         break;
       case "budget":
-        await this.undoSimpleEntity(action, queryRunner, Budget, "budgets");
+        await this.undoSimpleEntity(action, manager, Budget, "budgets");
         break;
       case "custom_report":
         await this.undoSimpleEntity(
           action,
-          queryRunner,
+          manager,
           CustomReport,
           "custom_reports",
         );
         break;
       case "bulk_transaction":
-        await this.undoBulkTransaction(action, queryRunner);
+        await this.undoBulkTransaction(action, manager);
         break;
       default:
         throw new ConflictException(
@@ -433,7 +412,7 @@ export class ActionHistoryService {
 
   private async executeRedo(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     // Redo is the inverse of undo: swap before/after and flip the action
     const invertedAction: ActionHistory = {
@@ -442,7 +421,7 @@ export class ActionHistoryService {
       afterData: action.beforeData,
       action: this.invertAction(action.action),
     };
-    await this.executeUndo(invertedAction, queryRunner);
+    await this.executeUndo(invertedAction, manager);
   }
 
   private invertAction(action: string): string {
@@ -466,17 +445,17 @@ export class ActionHistoryService {
 
   private async undoTransaction(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     switch (action.action) {
       case "create":
-        await this.undoTransactionCreate(action, queryRunner);
+        await this.undoTransactionCreate(action, manager);
         break;
       case "update":
-        await this.undoTransactionUpdate(action, queryRunner);
+        await this.undoTransactionUpdate(action, manager);
         break;
       case "delete":
-        await this.undoTransactionDelete(action, queryRunner);
+        await this.undoTransactionDelete(action, manager);
         break;
       default:
         throw new ConflictException(
@@ -491,11 +470,11 @@ export class ActionHistoryService {
 
   private async undoTransactionCreate(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     if (!action.entityId) return;
 
-    const transaction = await queryRunner.manager.findOne(Transaction, {
+    const transaction = await manager.findOne(Transaction, {
       where: { id: action.entityId, userId: action.userId },
       relations: ["splits"],
     });
@@ -503,32 +482,32 @@ export class ActionHistoryService {
 
     // Delete splits first
     if (transaction.splits && transaction.splits.length > 0) {
-      await queryRunner.manager.delete(TransactionSplit, {
+      await manager.delete(TransactionSplit, {
         transactionId: transaction.id,
       });
     }
 
     // Delete tag associations
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM transaction_tags WHERE transaction_id = $1`,
       [transaction.id],
     );
 
     const accountId = transaction.accountId;
 
-    await queryRunner.manager.remove(transaction);
+    await manager.remove(transaction);
 
     // Reverse balance
-    await this.recalculateBalance(accountId, queryRunner);
+    await this.recalculateBalance(accountId, manager);
   }
 
   private async undoTransactionUpdate(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     if (!action.entityId || !action.beforeData) return;
 
-    const transaction = await queryRunner.manager.findOne(Transaction, {
+    const transaction = await manager.findOne(Transaction, {
       where: { id: action.entityId, userId: action.userId },
     });
     if (!transaction) {
@@ -565,22 +544,18 @@ export class ActionHistoryService {
     }
 
     if (Object.keys(updateFields).length > 0) {
-      await queryRunner.manager.update(
-        Transaction,
-        action.entityId,
-        updateFields,
-      );
+      await manager.update(Transaction, action.entityId, updateFields);
     }
 
     // Restore splits if they were captured
     if (before.splits !== undefined) {
-      await queryRunner.manager.delete(TransactionSplit, {
+      await manager.delete(TransactionSplit, {
         transactionId: action.entityId,
       });
 
       if (Array.isArray(before.splits) && before.splits.length > 0) {
         for (const splitData of before.splits) {
-          const split = queryRunner.manager.create(TransactionSplit, {
+          const split = manager.create(TransactionSplit, {
             id: splitData.id,
             transactionId: action.entityId,
             categoryId: splitData.categoryId,
@@ -589,20 +564,20 @@ export class ActionHistoryService {
             amount: splitData.amount,
             memo: splitData.memo || null,
           });
-          await queryRunner.manager.save(split);
+          await manager.save(split);
         }
       }
     }
 
     // Restore tags if captured
     if (before.tagIds !== undefined) {
-      await queryRunner.query(
+      await manager.query(
         `DELETE FROM transaction_tags WHERE transaction_id = $1`,
         [action.entityId],
       );
       if (Array.isArray(before.tagIds)) {
         for (const tagId of before.tagIds) {
-          await queryRunner.query(
+          await manager.query(
             `INSERT INTO transaction_tags (transaction_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
             [action.entityId, tagId],
           );
@@ -616,20 +591,20 @@ export class ActionHistoryService {
     accountIds.add(transaction.accountId);
 
     for (const accountId of accountIds) {
-      await this.recalculateBalance(accountId, queryRunner);
+      await this.recalculateBalance(accountId, manager);
     }
   }
 
   private async undoTransactionDelete(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     if (!action.beforeData) return;
 
     const before = action.beforeData;
 
     // Verify account still exists
-    const account = await queryRunner.manager.findOne(Account, {
+    const account = await manager.findOne(Account, {
       where: { id: before.accountId, userId: action.userId },
     });
     if (!account) {
@@ -642,7 +617,7 @@ export class ActionHistoryService {
     }
 
     // Re-insert the transaction
-    await queryRunner.query(
+    await manager.query(
       `INSERT INTO transactions (id, user_id, account_id, transaction_date, amount, currency_code, exchange_rate,
         payee_id, payee_name, category_id, description, reference_number, status, is_split,
         parent_transaction_id, is_transfer, linked_transaction_id, reconciled_date, created_at)
@@ -673,7 +648,7 @@ export class ActionHistoryService {
     // Re-insert splits
     if (Array.isArray(before.splits) && before.splits.length > 0) {
       for (const splitData of before.splits) {
-        await queryRunner.query(
+        await manager.query(
           `INSERT INTO transaction_splits (id, transaction_id, category_id, transfer_account_id, linked_transaction_id, amount, memo)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
           [
@@ -692,28 +667,28 @@ export class ActionHistoryService {
     // Re-insert tags
     if (Array.isArray(before.tagIds)) {
       for (const tagId of before.tagIds) {
-        await queryRunner.query(
+        await manager.query(
           `INSERT INTO transaction_tags (transaction_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
           [before.id, tagId],
         );
       }
     }
 
-    await this.recalculateBalance(before.accountId, queryRunner);
+    await this.recalculateBalance(before.accountId, manager);
   }
 
   // --- Transfer undo handlers ---
 
   private async undoTransfer(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     switch (action.action) {
       case "create":
-        await this.undoTransferCreate(action, queryRunner);
+        await this.undoTransferCreate(action, manager);
         break;
       case "delete":
-        await this.undoTransferDelete(action, queryRunner);
+        await this.undoTransferDelete(action, manager);
         break;
       default:
         throw new ConflictException(
@@ -728,7 +703,7 @@ export class ActionHistoryService {
 
   private async undoTransferCreate(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     if (!action.afterData) return;
 
@@ -738,16 +713,16 @@ export class ActionHistoryService {
     // Delete both linked transactions
     for (const txId of [fromTransactionId, toTransactionId]) {
       if (!txId) continue;
-      const tx = await queryRunner.manager.findOne(Transaction, {
+      const tx = await manager.findOne(Transaction, {
         where: { id: txId, userId: action.userId },
       });
       if (tx) {
-        await queryRunner.query(
+        await manager.query(
           `DELETE FROM transaction_tags WHERE transaction_id = $1`,
           [txId],
         );
         // Unlink before deleting to avoid FK constraint
-        await queryRunner.manager.update(Transaction, txId, {
+        await manager.update(Transaction, txId, {
           linkedTransactionId: null,
         });
       }
@@ -755,20 +730,20 @@ export class ActionHistoryService {
 
     for (const txId of [fromTransactionId, toTransactionId]) {
       if (!txId) continue;
-      await queryRunner.manager.delete(Transaction, { id: txId });
+      await manager.delete(Transaction, { id: txId });
     }
 
     if (fromAccountId) {
-      await this.recalculateBalance(fromAccountId, queryRunner);
+      await this.recalculateBalance(fromAccountId, manager);
     }
     if (toAccountId) {
-      await this.recalculateBalance(toAccountId, queryRunner);
+      await this.recalculateBalance(toAccountId, manager);
     }
   }
 
   private async undoTransferDelete(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     if (!action.beforeData) return;
 
@@ -777,7 +752,7 @@ export class ActionHistoryService {
 
     // Re-insert both transactions without linked IDs first
     for (const txData of [fromTransaction, toTransaction]) {
-      await queryRunner.query(
+      await manager.query(
         `INSERT INTO transactions (id, user_id, account_id, transaction_date, amount, currency_code, exchange_rate,
           payee_id, payee_name, category_id, description, reference_number, status, is_split,
           is_transfer, linked_transaction_id, created_at)
@@ -804,32 +779,32 @@ export class ActionHistoryService {
     }
 
     // Re-link the transactions
-    await queryRunner.manager.update(Transaction, fromTransaction.id, {
+    await manager.update(Transaction, fromTransaction.id, {
       linkedTransactionId: toTransaction.id,
     });
-    await queryRunner.manager.update(Transaction, toTransaction.id, {
+    await manager.update(Transaction, toTransaction.id, {
       linkedTransactionId: fromTransaction.id,
     });
 
-    await this.recalculateBalance(fromTransaction.accountId, queryRunner);
-    await this.recalculateBalance(toTransaction.accountId, queryRunner);
+    await this.recalculateBalance(fromTransaction.accountId, manager);
+    await this.recalculateBalance(toTransaction.accountId, manager);
   }
 
   // --- Investment transaction undo ---
 
   private async undoInvestmentTransaction(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     switch (action.action) {
       case "create":
-        await this.undoInvestmentCreate(action, queryRunner);
+        await this.undoInvestmentCreate(action, manager);
         break;
       case "delete":
-        await this.undoInvestmentDelete(action, queryRunner);
+        await this.undoInvestmentDelete(action, manager);
         break;
       case "update":
-        await this.undoInvestmentUpdate(action, queryRunner);
+        await this.undoInvestmentUpdate(action, manager);
         break;
       default:
         throw new ConflictException(
@@ -844,7 +819,7 @@ export class ActionHistoryService {
 
   private async undoInvestmentUpdate(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     const before = action.beforeData;
     const linkedBefore = before?.linkedTransferLeg as
@@ -868,12 +843,12 @@ export class ActionHistoryService {
     for (const legBefore of [before, linkedBefore]) {
       // Capture the leg's current (post-edit) account before we overwrite it so
       // holdings are rebuilt for both the old and the new account.
-      const current = await queryRunner.manager.findOne(InvestmentTransaction, {
+      const current = await manager.findOne(InvestmentTransaction, {
         where: { id: legBefore.id, userId: action.userId },
       });
       if (current) accountIds.add(current.accountId);
 
-      await queryRunner.manager.update(
+      await manager.update(
         InvestmentTransaction,
         { id: legBefore.id, userId: action.userId },
         {
@@ -894,17 +869,17 @@ export class ActionHistoryService {
 
     // Rebuild holdings for every account either leg moved out of or into.
     for (const accountId of accountIds) {
-      await this.rebuildHoldings(action.userId, accountId, queryRunner);
+      await this.rebuildHoldings(action.userId, accountId, manager);
     }
   }
 
   private async undoInvestmentCreate(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     if (!action.entityId) return;
 
-    const invTx = await queryRunner.manager.findOne(InvestmentTransaction, {
+    const invTx = await manager.findOne(InvestmentTransaction, {
       where: { id: action.entityId, userId: action.userId },
     });
     if (!invTx) return;
@@ -912,7 +887,7 @@ export class ActionHistoryService {
     // A security transfer is two linked legs (TRANSFER_OUT <-> TRANSFER_IN);
     // undoing the create must remove both so holdings can't be left half-moved.
     const linkedTx = invTx.linkedTransactionId
-      ? await queryRunner.manager.findOne(InvestmentTransaction, {
+      ? await manager.findOne(InvestmentTransaction, {
           where: { id: invTx.linkedTransactionId, userId: action.userId },
         })
       : null;
@@ -925,16 +900,16 @@ export class ActionHistoryService {
 
       // Delete linked cash transaction
       if (leg.transactionId) {
-        const cashTx = await queryRunner.manager.findOne(Transaction, {
+        const cashTx = await manager.findOne(Transaction, {
           where: { id: leg.transactionId },
         });
         if (cashTx) {
-          await queryRunner.query(
+          await manager.query(
             `DELETE FROM transaction_tags WHERE transaction_id = $1`,
             [cashTx.id],
           );
-          await queryRunner.manager.remove(cashTx);
-          await this.recalculateBalance(cashTx.accountId, queryRunner);
+          await manager.remove(cashTx);
+          await this.recalculateBalance(cashTx.accountId, manager);
         }
       }
     }
@@ -943,7 +918,7 @@ export class ActionHistoryService {
     // a row that is about to disappear.
     for (const leg of legs) {
       if (leg.linkedTransactionId) {
-        await queryRunner.manager.update(InvestmentTransaction, leg.id, {
+        await manager.update(InvestmentTransaction, leg.id, {
           linkedTransactionId: null,
         });
         leg.linkedTransactionId = null;
@@ -951,18 +926,18 @@ export class ActionHistoryService {
     }
 
     for (const leg of legs) {
-      await queryRunner.manager.remove(leg);
+      await manager.remove(leg);
     }
 
     // Rebuild holdings for every affected account.
     for (const accountId of accountIds) {
-      await this.rebuildHoldings(action.userId, accountId, queryRunner);
+      await this.rebuildHoldings(action.userId, accountId, manager);
     }
   }
 
   private async undoInvestmentDelete(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     if (!action.beforeData) return;
 
@@ -980,7 +955,7 @@ export class ActionHistoryService {
     // Re-insert linked cash transaction first (investment_transactions.transaction_id references it)
     if (before.linkedCashTransaction) {
       const cashTx = before.linkedCashTransaction;
-      await queryRunner.query(
+      await manager.query(
         `INSERT INTO transactions (id, user_id, account_id, transaction_date, amount, currency_code, exchange_rate,
           description, status, is_transfer, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -998,7 +973,7 @@ export class ActionHistoryService {
           cashTx.createdAt ?? new Date(),
         ],
       );
-      await this.recalculateBalance(cashTx.accountId, queryRunner);
+      await this.recalculateBalance(cashTx.accountId, manager);
     }
 
     // Re-insert the investment transaction
@@ -1008,7 +983,7 @@ export class ActionHistoryService {
       ? (before.transactionId ?? null)
       : null;
     await this.reinsertInvestmentTransaction(
-      queryRunner,
+      manager,
       action.userId,
       before,
       restoredTransactionId,
@@ -1018,15 +993,15 @@ export class ActionHistoryService {
     // The self-FK is set after both rows exist to avoid an ordering violation.
     if (linkedLeg) {
       await this.reinsertInvestmentTransaction(
-        queryRunner,
+        manager,
         action.userId,
         linkedLeg,
         null,
       );
-      await queryRunner.manager.update(InvestmentTransaction, before.id, {
+      await manager.update(InvestmentTransaction, before.id, {
         linkedTransactionId: linkedLeg.id,
       });
-      await queryRunner.manager.update(InvestmentTransaction, linkedLeg.id, {
+      await manager.update(InvestmentTransaction, linkedLeg.id, {
         linkedTransactionId: before.id,
       });
     }
@@ -1035,12 +1010,12 @@ export class ActionHistoryService {
     const accountIds = new Set<string>([before.accountId]);
     if (linkedLeg) accountIds.add(linkedLeg.accountId);
     for (const accountId of accountIds) {
-      await this.rebuildHoldings(action.userId, accountId, queryRunner);
+      await this.rebuildHoldings(action.userId, accountId, manager);
     }
   }
 
   private async reinsertInvestmentTransaction(
-    queryRunner: QueryRunner,
+    manager: EntityManager,
     userId: string,
     data: Record<string, any>,
     transactionId: string | null,
@@ -1053,7 +1028,7 @@ export class ActionHistoryService {
     // duplicate-key error. price preserves NULL (a leg with no price differs
     // from a 0-cost leg in cost-basis replays) and exchange_rate is restored so
     // undeleting a foreign-currency transaction doesn't reset its rate to 1.
-    await queryRunner.query(
+    await manager.query(
       `INSERT INTO investment_transactions (id, user_id, account_id, transaction_id, security_id,
         funding_account_id, action, transaction_date, quantity, price, commission, total_amount, exchange_rate, description, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
@@ -1082,14 +1057,14 @@ export class ActionHistoryService {
 
   private async undoBulkTransaction(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     switch (action.action) {
       case "bulk_delete":
-        await this.undoBulkDelete(action, queryRunner);
+        await this.undoBulkDelete(action, manager);
         break;
       case "bulk_update":
-        await this.undoBulkUpdate(action, queryRunner);
+        await this.undoBulkUpdate(action, manager);
         break;
       default:
         throw new ConflictException(
@@ -1104,7 +1079,7 @@ export class ActionHistoryService {
 
   private async undoBulkDelete(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     if (!action.beforeData || !Array.isArray(action.beforeData.transactions))
       return;
@@ -1112,7 +1087,7 @@ export class ActionHistoryService {
     const accountIds = new Set<string>();
 
     for (const txData of action.beforeData.transactions) {
-      await queryRunner.query(
+      await manager.query(
         `INSERT INTO transactions (id, user_id, account_id, transaction_date, amount, currency_code, exchange_rate,
           payee_id, payee_name, category_id, description, reference_number, status, is_split,
           is_transfer, linked_transaction_id, created_at)
@@ -1142,13 +1117,13 @@ export class ActionHistoryService {
     }
 
     for (const accountId of accountIds) {
-      await this.recalculateBalance(accountId, queryRunner);
+      await this.recalculateBalance(accountId, manager);
     }
   }
 
   private async undoBulkUpdate(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     if (!action.beforeData || !Array.isArray(action.beforeData.transactions))
       return;
@@ -1174,17 +1149,17 @@ export class ActionHistoryService {
       }
 
       if (Object.keys(updateFields).length > 0) {
-        await queryRunner.manager.update(Transaction, txData.id, updateFields);
+        await manager.update(Transaction, txData.id, updateFields);
       }
 
       // Restore tags if captured
       if (Array.isArray(txData.tagIds)) {
-        await queryRunner.query(
+        await manager.query(
           `DELETE FROM transaction_tags WHERE transaction_id = $1`,
           [txData.id],
         );
         for (const tagId of txData.tagIds) {
-          await queryRunner.query(
+          await manager.query(
             `INSERT INTO transaction_tags (transaction_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
             [txData.id, tagId],
           );
@@ -1195,7 +1170,7 @@ export class ActionHistoryService {
     }
 
     for (const accountId of accountIds) {
-      await this.recalculateBalance(accountId, queryRunner);
+      await this.recalculateBalance(accountId, manager);
     }
   }
 
@@ -1203,14 +1178,14 @@ export class ActionHistoryService {
 
   private async undoSimpleEntity(
     action: ActionHistory,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
     entityClass: any,
     tableName: string,
   ): Promise<void> {
     switch (action.action) {
       case "create":
         if (action.entityId) {
-          await queryRunner.manager.delete(entityClass, {
+          await manager.delete(entityClass, {
             id: action.entityId,
           });
         }
@@ -1237,11 +1212,7 @@ export class ActionHistoryService {
           }
 
           if (Object.keys(updateFields).length > 0) {
-            await queryRunner.manager.update(
-              entityClass,
-              action.entityId,
-              updateFields,
-            );
+            await manager.update(entityClass, action.entityId, updateFields);
           }
         }
         break;
@@ -1250,7 +1221,7 @@ export class ActionHistoryService {
           const data = { ...action.beforeData };
           // Ensure userId is set from the action
           data.userId = action.userId;
-          await this.reinsertEntity(queryRunner, tableName, data);
+          await this.reinsertEntity(manager, tableName, data);
         }
         break;
       default:
@@ -1268,10 +1239,10 @@ export class ActionHistoryService {
 
   private async recalculateBalance(
     accountId: string,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     // Use the same recalculation logic as AccountsService
-    const result = await queryRunner.query(
+    const result = await manager.query(
       `SELECT a.opening_balance, COALESCE(SUM(t.amount), 0) as tx_sum
        FROM accounts a
        LEFT JOIN transactions t ON t.account_id = a.id
@@ -1290,7 +1261,7 @@ export class ActionHistoryService {
             Number(result[0].tx_sum || 0)) *
             10000,
         ) / 10000;
-      await queryRunner.query(
+      await manager.query(
         `UPDATE accounts SET current_balance = $1 WHERE id = $2`,
         [balance, accountId],
       );
@@ -1300,15 +1271,15 @@ export class ActionHistoryService {
   private async rebuildHoldings(
     userId: string,
     accountId: string,
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<void> {
     // Delete existing holdings for this account
-    await queryRunner.query(`DELETE FROM holdings WHERE account_id = $1`, [
+    await manager.query(`DELETE FROM holdings WHERE account_id = $1`, [
       accountId,
     ]);
 
     // Rebuild from investment transactions
-    const invTransactions = await queryRunner.query(
+    const invTransactions = await manager.query(
       `SELECT * FROM investment_transactions
        WHERE account_id = $1 AND user_id = $2 AND transaction_date <= CURRENT_DATE
        ORDER BY transaction_date ASC, created_at ASC`,
@@ -1377,7 +1348,7 @@ export class ActionHistoryService {
           ? Math.round((data.totalCost / data.quantity) * 1000000) / 1000000
           : 0;
 
-      await queryRunner.query(
+      await manager.query(
         `INSERT INTO holdings (id, account_id, security_id, quantity, average_cost)
          VALUES (uuid_generate_v4(), $1, $2, $3, $4)
          ON CONFLICT (account_id, security_id) DO UPDATE SET quantity = $3, average_cost = $4`,
@@ -1387,7 +1358,7 @@ export class ActionHistoryService {
   }
 
   private async reinsertEntity(
-    queryRunner: QueryRunner,
+    manager: EntityManager,
     tableName: string,
     data: Record<string, any>,
   ): Promise<void> {
@@ -1426,7 +1397,7 @@ export class ActionHistoryService {
     const placeholders = columns.map((_, i) => `$${i + 1}`);
     const quotedCols = columns.map((c) => `"${c}"`);
 
-    await queryRunner.query(
+    await manager.query(
       `INSERT INTO "${tableName}" (${quotedCols.join(", ")}) VALUES (${placeholders.join(", ")}) ON CONFLICT (id) DO NOTHING`,
       values,
     );
@@ -1438,24 +1409,28 @@ export class ActionHistoryService {
 
   private async pruneUserHistory(userId: string): Promise<void> {
     try {
-      // Keep only the most recent MAX_HISTORY_PER_USER records
-      const countResult = await this.actionHistoryRepository.count({
-        where: { userId },
-      });
+      await withScopedDb(this.dataSource, async (manager) => {
+        const repo = manager.getRepository(ActionHistory);
 
-      if (countResult > MAX_HISTORY_PER_USER) {
-        const oldest = await this.actionHistoryRepository.find({
+        // Keep only the most recent MAX_HISTORY_PER_USER records
+        const countResult = await repo.count({
           where: { userId },
-          order: { createdAt: "DESC" },
-          skip: MAX_HISTORY_PER_USER,
-          select: ["id"],
         });
 
-        if (oldest.length > 0) {
-          const idsToDelete = oldest.map((a) => a.id);
-          await this.actionHistoryRepository.delete(idsToDelete);
+        if (countResult > MAX_HISTORY_PER_USER) {
+          const oldest = await repo.find({
+            where: { userId },
+            order: { createdAt: "DESC" },
+            skip: MAX_HISTORY_PER_USER,
+            select: ["id"],
+          });
+
+          if (oldest.length > 0) {
+            const idsToDelete = oldest.map((a) => a.id);
+            await repo.delete(idsToDelete);
+          }
         }
-      }
+      });
     } catch (error) {
       this.logger.warn(
         `Failed to prune action history: ${error instanceof Error ? error.message : String(error)}`,
@@ -1471,11 +1446,14 @@ export class ActionHistoryService {
 
       // RLS (task C2): cross-user bulk cleanup -- runs under a system context.
       const result = await withSystemContext(() =>
-        this.actionHistoryRepository
-          .createQueryBuilder()
-          .delete()
-          .where("created_at < :cutoff", { cutoff })
-          .execute(),
+        withScopedDb(this.dataSource, (manager) =>
+          manager
+            .getRepository(ActionHistory)
+            .createQueryBuilder()
+            .delete()
+            .where("created_at < :cutoff", { cutoff })
+            .execute(),
+        ),
       );
 
       if (result.affected && result.affected > 0) {

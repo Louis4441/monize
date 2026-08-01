@@ -1,14 +1,19 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { InsightsAggregatorService } from "./insights-aggregator.service";
 import { Transaction } from "../../transactions/entities/transaction.entity";
-import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
 import { TransactionAnalyticsService } from "../../transactions/transaction-analytics.service";
+import { createScopedDbMocks } from "../../test-helpers/scoped-db-testing";
+
+jest.mock("../../common/db/scoped-db", () =>
+  jest
+    .requireActual("../../test-helpers/scoped-db-testing")
+    .scopedDbMockModule(),
+);
 
 describe("InsightsAggregatorService", () => {
   let service: InsightsAggregatorService;
   let mockTransactionRepo: Record<string, jest.Mock>;
-  let mockScheduledTransactionRepo: Record<string, jest.Mock>;
   let mockTransactionAnalytics: Record<string, jest.Mock>;
 
   const userId = "user-1";
@@ -38,10 +43,6 @@ describe("InsightsAggregatorService", () => {
       createQueryBuilder: jest.fn().mockReturnValue(qb),
     };
 
-    mockScheduledTransactionRepo = {
-      find: jest.fn().mockResolvedValue([]),
-    };
-
     mockTransactionAnalytics = {
       getRecurringCharges: jest.fn().mockResolvedValue([]),
     };
@@ -50,12 +51,9 @@ describe("InsightsAggregatorService", () => {
       providers: [
         InsightsAggregatorService,
         {
-          provide: getRepositoryToken(Transaction),
-          useValue: mockTransactionRepo,
-        },
-        {
-          provide: getRepositoryToken(ScheduledTransaction),
-          useValue: mockScheduledTransactionRepo,
+          provide: DataSource,
+          useValue: createScopedDbMocks([[Transaction, mockTransactionRepo]])
+            .dataSource,
         },
         {
           provide: TransactionAnalyticsService,

@@ -6,7 +6,7 @@ import {
   NotFoundException,
   forwardRef,
 } from "@nestjs/common";
-import { DataSource, In, QueryRunner } from "typeorm";
+import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../../common/db/scoped-db";
 import { withUserContext } from "../../common/db/with-context";
 import { Account } from "../../accounts/entities/account.entity";
@@ -463,15 +463,14 @@ export class MnyImportService {
 
       // Holdings come only from the canonical rebuild, never from an importer's
       // private fold -- that second opinion is what left PR #192 with negative
-      // positions. The service takes a QueryRunner but only ever touches its
-      // `.manager`, so the transaction's own manager is passed through a shim
-      // rather than opening a second connection (which would deadlock).
+      // positions. It runs on this transaction's own manager, so the rebuild
+      // commits or rolls back with the rest of the import.
       const brokerageIds = [...investments.brokerageAccountIds];
       if (brokerageIds.length > 0) {
         await this.holdings.rebuildAccountsFromTransactions(
           userId,
           brokerageIds,
-          { manager } as unknown as QueryRunner,
+          manager,
         );
       }
 

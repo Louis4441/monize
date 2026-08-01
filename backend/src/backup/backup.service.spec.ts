@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import {
   UnauthorizedException,
@@ -15,6 +14,11 @@ import { OidcService } from "../auth/oidc/oidc.service";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
 import { encryptBackup } from "./backup-crypto.util";
 import * as bcrypt from "bcryptjs";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 jest.mock("bcryptjs");
 
@@ -372,31 +376,24 @@ describe("BackupService", () => {
   }
 
   beforeEach(async () => {
-    mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      query: jest.fn().mockImplementation(mockQueryHandler),
-    };
-
-    mockDataSource = {
-      query: jest.fn().mockResolvedValue([]),
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-    };
-
     mockUserRepo = {
       findOne: jest.fn(),
     };
 
+    // Export reads and the restore transaction now both run through
+    // `withScopedDb`, so the former QueryRunner is the transaction's
+    // EntityManager -- `mockQueryRunner.query` and `mockDataSource.query` are
+    // the same jest.fn the manager exposes, keeping the assertions below
+    // pointed at the same statements.
+    const scoped = createScopedDbMocks([[User, mockUserRepo as never]]);
+    scoped.manager.query.mockImplementation(mockQueryHandler);
+    scoped.dataSource.query = scoped.manager.query;
+    mockQueryRunner = { query: scoped.manager.query };
+    mockDataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BackupService,
-        {
-          provide: getRepositoryToken(User),
-          useValue: mockUserRepo,
-        },
         {
           provide: DataSource,
           useValue: mockDataSource,
@@ -744,10 +741,10 @@ describe("BackupService", () => {
       expect(result.message).toBe("Backup restored successfully");
       expect(result.restored.categories).toBe(1);
       expect(result.restored.accounts).toBe(1);
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should restore investment_reports rows and scope them to the current user", async () => {
@@ -821,6 +818,42 @@ describe("BackupService", () => {
       expect(deleteCalls[0][1]).toEqual([userId]);
     });
 
+    // Regression: the wipe used to guard the user-created-currency delete with
+    // only user_currency_preferences and accounts. `currencies.code` is
+    // referenced by nine columns across eight tables, and the one that actually
+    // bit was `exchange_rates` -- global, never cleared by a restore, and
+    // populated for every currency the FX backfill has seen. Any user who added
+    // a custom currency and let the daily rate refresh run got
+    // "violates foreign key constraint exchange_rates_to_currency_fkey" and
+    // could not restore at all.
+    it("guards the user-created-currency delete against every FK to currencies", async () => {
+      mockUserRepo.findOne.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.restoreData(userId, makeInput({ password: "test" }));
+
+      const [sql] = mockQueryRunner.query.mock.calls.find(
+        (call: unknown[]) =>
+          typeof call[0] === "string" &&
+          call[0].includes("DELETE FROM currencies"),
+      ) as [string];
+
+      for (const referrer of [
+        "exchange_rates",
+        "user_currency_preferences",
+        "accounts",
+        "transactions",
+        "securities",
+        "scheduled_transactions",
+        "budgets",
+        "user_preferences",
+      ]) {
+        expect(sql).toContain(referrer);
+      }
+      // transactions references currencies twice (paid-in currency included).
+      expect(sql).toContain("original_currency_code");
+    });
+
     it("should rollback transaction on error", async () => {
       mockUserRepo.findOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
@@ -830,8 +863,8 @@ describe("BackupService", () => {
         service.restoreData(userId, makeInput({ password: "test" })),
       ).rejects.toThrow("DB error");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("should override user_id in restored data to match current user", async () => {

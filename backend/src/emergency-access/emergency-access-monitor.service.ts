@@ -1,7 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull } from "typeorm";
+import {
+  DataSource,
+  EntityTarget,
+  IsNull,
+  ObjectLiteral,
+  Repository,
+} from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import { I18nService } from "nestjs-i18n";
@@ -30,19 +36,26 @@ export class EmergencyAccessMonitorService {
   private readonly logger = new Logger(EmergencyAccessMonitorService.name);
 
   constructor(
-    @InjectRepository(EmergencyAccessSettings)
-    private readonly settingsRepo: Repository<EmergencyAccessSettings>,
-    @InjectRepository(EmergencyAccessContact)
-    private readonly contactsRepo: Repository<EmergencyAccessContact>,
-    @InjectRepository(User)
-    private readonly usersRepo: Repository<User>,
-    @InjectRepository(UserPreference)
-    private readonly preferencesRepo: Repository<UserPreference>,
+    private readonly dataSource: DataSource,
     private readonly emailService: EmailService,
     private readonly encryption: AiEncryptionService,
     private readonly configService: ConfigService,
     private readonly i18n: I18nService,
   ) {}
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
+  }
 
   @Cron(CronExpression.EVERY_DAY_AT_9AM)
   async runDailyCheck(): Promise<void> {
@@ -61,7 +74,9 @@ export class EmergencyAccessMonitorService {
   }
 
   private async runDailyCheckWithinContext(): Promise<void> {
-    const enabled = await this.settingsRepo.find({ where: { enabled: true } });
+    const enabled = await this.scoped(EmergencyAccessSettings, (repo) =>
+      repo.find({ where: { enabled: true } }),
+    );
     if (enabled.length === 0) {
       this.logger.debug("No users with emergency access enabled");
       return;
@@ -103,9 +118,11 @@ export class EmergencyAccessMonitorService {
     settings: EmergencyAccessSettings,
     appUrl: string,
   ): Promise<"granted" | "reminded" | "skipped"> {
-    const owner = await this.usersRepo.findOne({
-      where: { id: settings.ownerUserId },
-    });
+    const owner = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: settings.ownerUserId },
+      }),
+    );
     if (!owner || !owner.isActive || !owner.email) return "skipped";
     // Prefer last_activity_at (touched by every authenticated request); fall
     // back to last_login for users who have not done anything since the
@@ -133,9 +150,11 @@ export class EmergencyAccessMonitorService {
       settings.grantedAt === null &&
       daysSinceLogin >= settings.grantAfterDays
     ) {
-      const contacts = await this.contactsRepo.find({
-        where: { ownerUserId: settings.ownerUserId },
-      });
+      const contacts = await this.scoped(EmergencyAccessContact, (repo) =>
+        repo.find({
+          where: { ownerUserId: settings.ownerUserId },
+        }),
+      );
       if (contacts.length === 0) return "skipped";
 
       const decryptedMessage = settings.messageCiphertext
@@ -156,17 +175,23 @@ export class EmergencyAccessMonitorService {
           contact.claimTokenExpiresAt = expiresAt;
           contact.claimTokenUsedAt = null;
           contact.claimVoidedReason = null;
-          await this.contactsRepo.save(contact);
+          await this.scoped(EmergencyAccessContact, (repo) =>
+            repo.save(contact),
+          );
 
           const claimUrl = `${appUrl}/emergency-access/claim?token=${rawToken}`;
           // The contact may or may not be a Monize user; localize to their own
           // account language when they have one, otherwise fall back to default.
-          const contactUser = await this.usersRepo.findOne({
-            where: { email: contact.email },
-          });
-          const lang = await resolveUserEmailLocale(
-            this.preferencesRepo,
-            contactUser?.id ?? null,
+          const contactUser = await this.scoped(User, (repo) =>
+            repo.findOne({
+              where: { email: contact.email },
+            }),
+          );
+          const lang = await withScopedDb(this.dataSource, (manager) =>
+            resolveUserEmailLocale(
+              manager.getRepository(UserPreference),
+              contactUser?.id ?? null,
+            ),
           );
           const t = emailTranslator(this.i18n, lang);
           const html = emergencyAccessGrantTemplate(
@@ -208,7 +233,7 @@ export class EmergencyAccessMonitorService {
       }
 
       settings.grantedAt = new Date(now);
-      await this.settingsRepo.save(settings);
+      await this.scoped(EmergencyAccessSettings, (repo) => repo.save(settings));
       return "granted";
     }
 
@@ -226,19 +251,23 @@ export class EmergencyAccessMonitorService {
         return "skipped";
       }
 
-      const contacts = await this.contactsRepo.find({
-        where: {
-          ownerUserId: settings.ownerUserId,
-          claimTokenUsedAt: IsNull(),
-        },
-      });
+      const contacts = await this.scoped(EmergencyAccessContact, (repo) =>
+        repo.find({
+          where: {
+            ownerUserId: settings.ownerUserId,
+            claimTokenUsedAt: IsNull(),
+          },
+        }),
+      );
       const daysUntilGrant = Math.max(
         0,
         settings.grantAfterDays - daysSinceLogin,
       );
-      const reminderLang = await resolveUserEmailLocale(
-        this.preferencesRepo,
-        settings.ownerUserId,
+      const reminderLang = await withScopedDb(this.dataSource, (manager) =>
+        resolveUserEmailLocale(
+          manager.getRepository(UserPreference),
+          settings.ownerUserId,
+        ),
       );
       const reminderT = emailTranslator(this.i18n, reminderLang);
       const html = emergencyAccessReminderTemplate(
@@ -269,7 +298,7 @@ export class EmergencyAccessMonitorService {
         html,
       );
       settings.lastReminderSentAt = new Date(now);
-      await this.settingsRepo.save(settings);
+      await this.scoped(EmergencyAccessSettings, (repo) => repo.save(settings));
       return "reminded";
     }
 
@@ -286,23 +315,25 @@ export class EmergencyAccessMonitorService {
     owner: User,
     appUrl: string,
   ): Promise<void> {
-    const result = await this.contactsRepo
-      .createQueryBuilder()
-      .update(EmergencyAccessContact)
-      .set({
-        claimTokenHash: null,
-        claimTokenExpiresAt: null,
-        claimTokenUsedAt: () => "CURRENT_TIMESTAMP",
-        claimVoidedReason: "owner_returned",
-      })
-      .where("owner_user_id = :userId", { userId: settings.ownerUserId })
-      .andWhere("claim_token_hash IS NOT NULL")
-      .andWhere("claim_token_used_at IS NULL")
-      .execute();
+    const result = await this.scoped(EmergencyAccessContact, (repo) =>
+      repo
+        .createQueryBuilder()
+        .update(EmergencyAccessContact)
+        .set({
+          claimTokenHash: null,
+          claimTokenExpiresAt: null,
+          claimTokenUsedAt: () => "CURRENT_TIMESTAMP",
+          claimVoidedReason: "owner_returned",
+        })
+        .where("owner_user_id = :userId", { userId: settings.ownerUserId })
+        .andWhere("claim_token_hash IS NOT NULL")
+        .andWhere("claim_token_used_at IS NULL")
+        .execute(),
+    );
 
     settings.grantedAt = null;
     settings.lastReminderSentAt = null;
-    await this.settingsRepo.save(settings);
+    await this.scoped(EmergencyAccessSettings, (repo) => repo.save(settings));
 
     this.logger.warn(
       `Owner ${settings.ownerUserId} active again after a grant; voided ${
@@ -312,9 +343,11 @@ export class EmergencyAccessMonitorService {
 
     if (!owner.email) return;
     try {
-      const revokedLang = await resolveUserEmailLocale(
-        this.preferencesRepo,
-        settings.ownerUserId,
+      const revokedLang = await withScopedDb(this.dataSource, (manager) =>
+        resolveUserEmailLocale(
+          manager.getRepository(UserPreference),
+          settings.ownerUserId,
+        ),
       );
       const revokedT = emailTranslator(this.i18n, revokedLang);
       const html = emergencyAccessGrantRevokedTemplate(

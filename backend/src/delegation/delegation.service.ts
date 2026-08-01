@@ -7,8 +7,15 @@ import {
   ConflictException,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, In, Not, DataSource } from "typeorm";
+import {
+  Repository,
+  In,
+  Not,
+  DataSource,
+  EntityTarget,
+  ObjectLiteral,
+} from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 
@@ -89,29 +96,27 @@ export class DelegationService {
   private readonly BCRYPT_ROUNDS = 12;
 
   constructor(
-    @InjectRepository(AccountDelegate)
-    private delegatesRepository: Repository<AccountDelegate>,
-    @InjectRepository(AccountDelegateGrant)
-    private grantsRepository: Repository<AccountDelegateGrant>,
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    @InjectRepository(UserPreference)
-    private preferencesRepository: Repository<UserPreference>,
-    @InjectRepository(RefreshToken)
-    private refreshTokensRepository: Repository<RefreshToken>,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(Transaction)
-    private transactionsRepository: Repository<Transaction>,
-    @InjectRepository(ScheduledTransaction)
-    private scheduledTransactionsRepository: Repository<ScheduledTransaction>,
-    @InjectRepository(DelegateAccountFavourite)
-    private delegateFavouritesRepository: Repository<DelegateAccountFavourite>,
     private emailService: EmailService,
     private configService: ConfigService,
     private dataSource: DataSource,
     private readonly i18n: I18nService,
   ) {}
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * equivalent of the injected repositories this service used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units
+   * (favourite upsert, reorder, the delegate-provisioning flow) use an explicit
+   * `withScopedDb` block instead so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
+  }
 
   // --- Context resolution (used by JwtStrategy and the guard) ---
 
@@ -127,9 +132,11 @@ export class DelegationService {
   }): Promise<AccountDelegate> {
     const { delegateUserId, actingAsUserId, delegationId } = args;
 
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId },
+      }),
+    );
 
     if (
       !delegation ||
@@ -145,9 +152,11 @@ export class DelegationService {
       );
     }
 
-    const owner = await this.usersRepository.findOne({
-      where: { id: actingAsUserId },
-    });
+    const owner = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: actingAsUserId },
+      }),
+    );
     if (!owner || !owner.isActive) {
       throw new UnauthorizedException(
         tr(
@@ -173,8 +182,10 @@ export class DelegationService {
     delegateUserId: string,
   ): Promise<boolean> {
     const [owner, ownerPref] = await Promise.all([
-      this.usersRepository.findOne({ where: { id: ownerUserId } }),
-      this.preferencesRepository.findOne({ where: { userId: ownerUserId } }),
+      this.scoped(User, (repo) => repo.findOne({ where: { id: ownerUserId } })),
+      this.scoped(UserPreference, (repo) =>
+        repo.findOne({ where: { userId: ownerUserId } }),
+      ),
     ]);
     const ownerRequires2FA = !!(
       ownerPref?.twoFactorEnabled && owner?.twoFactorSecret
@@ -182,8 +193,12 @@ export class DelegationService {
     if (!ownerRequires2FA) return false;
 
     const [delegate, delegatePref] = await Promise.all([
-      this.usersRepository.findOne({ where: { id: delegateUserId } }),
-      this.preferencesRepository.findOne({ where: { userId: delegateUserId } }),
+      this.scoped(User, (repo) =>
+        repo.findOne({ where: { id: delegateUserId } }),
+      ),
+      this.scoped(UserPreference, (repo) =>
+        repo.findOne({ where: { userId: delegateUserId } }),
+      ),
     ]);
     const delegateHas2FA = !!(
       delegatePref?.twoFactorEnabled && delegate?.twoFactorSecret
@@ -193,9 +208,11 @@ export class DelegationService {
 
   /** True if the user is a delegate for at least one owner. */
   async isDelegateUser(userId: string): Promise<boolean> {
-    const count = await this.delegatesRepository.count({
-      where: { delegateUserId: userId },
-    });
+    const count = await this.scoped(AccountDelegate, (repo) =>
+      repo.count({
+        where: { delegateUserId: userId },
+      }),
+    );
     return count > 0;
   }
 
@@ -203,18 +220,22 @@ export class DelegationService {
     delegationId: string,
     accountId: string,
   ): Promise<boolean> {
-    const grant = await this.grantsRepository.findOne({
-      where: { delegationId, accountId, canRead: true },
-    });
+    const grant = await this.scoped(AccountDelegateGrant, (repo) =>
+      repo.findOne({
+        where: { delegationId, accountId, canRead: true },
+      }),
+    );
     return !!grant;
   }
 
   /** The account a transaction belongs to, or null if it does not exist. */
   async accountIdForTransaction(transactionId: string): Promise<string | null> {
-    const tx = await this.transactionsRepository.findOne({
-      where: { id: transactionId },
-      select: ["accountId"],
-    });
+    const tx = await this.scoped(Transaction, (repo) =>
+      repo.findOne({
+        where: { id: transactionId },
+        select: ["accountId"],
+      }),
+    );
     return tx?.accountId ?? null;
   }
 
@@ -224,20 +245,27 @@ export class DelegationService {
    * does not exist.
    */
   async accountIdsForTransfer(transactionId: string): Promise<string[]> {
-    const tx = await this.transactionsRepository.findOne({
-      where: { id: transactionId },
-      select: ["accountId", "linkedTransactionId"],
-    });
-    if (!tx) return [];
-    const ids = new Set<string>([tx.accountId]);
-    if (tx.linkedTransactionId) {
-      const linked = await this.transactionsRepository.findOne({
-        where: { id: tx.linkedTransactionId },
-        select: ["accountId"],
+    // Both legs from one snapshot: the guard gates a write on holding the
+    // permission for every account the transfer touches, so reading the second
+    // leg from a later snapshot could miss an account that just moved.
+    return withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(Transaction);
+      const tx = await repo.findOne({
+        where: { id: transactionId },
+        select: ["accountId", "linkedTransactionId"],
       });
-      if (linked) ids.add(linked.accountId);
-    }
-    return [...ids];
+      if (!tx) return [];
+      const ids = new Set<string>([tx.accountId]);
+      const linkedId = tx.linkedTransactionId;
+      if (linkedId) {
+        const linked = await repo.findOne({
+          where: { id: linkedId },
+          select: ["accountId"],
+        });
+        if (linked) ids.add(linked.accountId);
+      }
+      return [...ids];
+    });
   }
 
   /**
@@ -246,10 +274,12 @@ export class DelegationService {
    * exist (the owner-scoped service then returns 404).
    */
   async accountIdsForScheduled(scheduledId: string): Promise<string[]> {
-    const st = await this.scheduledTransactionsRepository.findOne({
-      where: { id: scheduledId },
-      select: ["accountId", "transferAccountId", "isTransfer"],
-    });
+    const st = await this.scoped(ScheduledTransaction, (repo) =>
+      repo.findOne({
+        where: { id: scheduledId },
+        select: ["accountId", "transferAccountId", "isTransfer"],
+      }),
+    );
     if (!st) return [];
     const ids = new Set<string>([st.accountId]);
     if (st.isTransfer && st.transferAccountId) {
@@ -259,10 +289,12 @@ export class DelegationService {
   }
 
   async readableAccountIds(delegationId: string): Promise<string[]> {
-    const grants = await this.grantsRepository.find({
-      where: { delegationId, canRead: true },
-      select: ["accountId"],
-    });
+    const grants = await this.scoped(AccountDelegateGrant, (repo) =>
+      repo.find({
+        where: { delegationId, canRead: true },
+        select: ["accountId"],
+      }),
+    );
     return grants.map((g) => g.accountId);
   }
 
@@ -274,9 +306,11 @@ export class DelegationService {
   async hasTransactionalAccess(delegationId: string): Promise<boolean> {
     const readable = await this.readableAccountIds(delegationId);
     if (readable.length === 0) return false;
-    const count = await this.accountsRepository.count({
-      where: { id: In(readable), accountType: Not(AccountType.INVESTMENT) },
-    });
+    const count = await this.scoped(Account, (repo) =>
+      repo.count({
+        where: { id: In(readable), accountType: Not(AccountType.INVESTMENT) },
+      }),
+    );
     return count > 0;
   }
 
@@ -286,9 +320,11 @@ export class DelegationService {
    * investment accounts, makes the Accounts section reachable).
    */
   async hasAnyAccountAccess(delegationId: string): Promise<boolean> {
-    const count = await this.grantsRepository.count({
-      where: { delegationId, canRead: true },
-    });
+    const count = await this.scoped(AccountDelegateGrant, (repo) =>
+      repo.count({
+        where: { delegationId, canRead: true },
+      }),
+    );
     return count > 0;
   }
 
@@ -298,10 +334,12 @@ export class DelegationService {
   async getDelegateFavourites(
     delegateUserId: string,
   ): Promise<Map<string, number>> {
-    const rows = await this.delegateFavouritesRepository.find({
-      where: { delegateUserId },
-      select: ["accountId", "sortOrder"],
-    });
+    const rows = await this.scoped(DelegateAccountFavourite, (repo) =>
+      repo.find({
+        where: { delegateUserId },
+        select: ["accountId", "sortOrder"],
+      }),
+    );
     return new Map(rows.map((r) => [r.accountId, r.sortOrder]));
   }
 
@@ -311,24 +349,28 @@ export class DelegationService {
     accountId: string,
     isFavourite: boolean,
   ): Promise<void> {
-    if (!isFavourite) {
-      await this.delegateFavouritesRepository.delete({
-        delegateUserId,
-        accountId,
+    await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(DelegateAccountFavourite);
+      if (!isFavourite) {
+        await repo.delete({
+          delegateUserId,
+          accountId,
+        });
+        return;
+      }
+      // Read-modify-write: the existence check and the insert are one unit.
+      const existing = await repo.findOne({
+        where: { delegateUserId, accountId },
       });
-      return;
-    }
-    const existing = await this.delegateFavouritesRepository.findOne({
-      where: { delegateUserId, accountId },
+      if (existing) return;
+      await repo.save(
+        repo.create({
+          delegateUserId,
+          accountId,
+          sortOrder: 0,
+        }),
+      );
     });
-    if (existing) return;
-    await this.delegateFavouritesRepository.save(
-      this.delegateFavouritesRepository.create({
-        delegateUserId,
-        accountId,
-        sortOrder: 0,
-      }),
-    );
   }
 
   /**
@@ -353,24 +395,17 @@ export class DelegationService {
         ),
       );
     }
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
+    // One transaction around the whole reorder, as the QueryRunner block was:
+    // a partially applied order would leave duplicate sort positions.
+    await withScopedDb(this.dataSource, async (manager) => {
       for (let i = 0; i < accountIds.length; i++) {
-        await queryRunner.manager.update(
+        await manager.update(
           DelegateAccountFavourite,
           { delegateUserId, accountId: accountIds[i] },
           { sortOrder: i },
         );
       }
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   // --- Login / switch context ---
@@ -380,13 +415,17 @@ export class DelegationService {
    * for a normal user with no delegations (so login behaviour is unchanged).
    */
   async getAvailableContexts(userId: string): Promise<AvailableContext[]> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user) return [];
 
-    const delegations = await this.delegatesRepository.find({
-      where: { delegateUserId: user.id, status: "active" },
-      relations: ["owner"],
-    });
+    const delegations = await this.scoped(AccountDelegate, (repo) =>
+      repo.find({
+        where: { delegateUserId: user.id, status: "active" },
+        relations: ["owner"],
+      }),
+    );
 
     if (delegations.length === 0) return [];
 
@@ -398,9 +437,11 @@ export class DelegationService {
     // login. Without this, a freshly-claimed delegate who has not yet
     // created any accounts would have only the owner's context and the
     // banner would never appear.
-    const ownsData = await this.accountsRepository.exists({
-      where: { userId: user.id },
-    });
+    const ownsData = await this.scoped(Account, (repo) =>
+      repo.exists({
+        where: { userId: user.id },
+      }),
+    );
 
     const contexts: AvailableContext[] = [];
     if (ownsData || !user.isDelegateOnly) {
@@ -437,13 +478,15 @@ export class DelegationService {
     if (targetUserId === delegateUserId) {
       return null;
     }
-    const delegation = await this.delegatesRepository.findOne({
-      where: {
-        delegateUserId,
-        ownerUserId: targetUserId,
-        status: "active",
-      },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: {
+          delegateUserId,
+          ownerUserId: targetUserId,
+          status: "active",
+        },
+      }),
+    );
     if (!delegation) {
       throw new ForbiddenException(
         tr(
@@ -473,12 +516,16 @@ export class DelegationService {
    */
   async isFullAccount(userId: string): Promise<boolean> {
     const [ownsAccounts, ownsDelegations, user] = await Promise.all([
-      this.accountsRepository.count({ where: { userId } }),
-      this.delegatesRepository.count({ where: { ownerUserId: userId } }),
-      this.usersRepository.findOne({
-        where: { id: userId },
-        select: ["id", "role"],
-      }),
+      this.scoped(Account, (repo) => repo.count({ where: { userId } })),
+      this.scoped(AccountDelegate, (repo) =>
+        repo.count({ where: { ownerUserId: userId } }),
+      ),
+      this.scoped(User, (repo) =>
+        repo.findOne({
+          where: { id: userId },
+          select: ["id", "role"],
+        }),
+      ),
     ]);
     return ownsAccounts > 0 || ownsDelegations > 0 || user?.role === "admin";
   }
@@ -498,27 +545,33 @@ export class DelegationService {
   async canOwnerResetDelegatePassword(
     delegateUserId: string,
   ): Promise<boolean> {
-    const user = await this.usersRepository.findOne({
-      where: { id: delegateUserId },
-      select: ["id", "isDelegateOnly"],
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: delegateUserId },
+        select: ["id", "isDelegateOnly"],
+      }),
+    );
     if (!user || !user.isDelegateOnly) return false;
     if (await this.isFullAccount(delegateUserId)) return false;
-    const delegationCount = await this.delegatesRepository.count({
-      where: { delegateUserId },
-    });
+    const delegationCount = await this.scoped(AccountDelegate, (repo) =>
+      repo.count({
+        where: { delegateUserId },
+      }),
+    );
     return delegationCount <= 1;
   }
 
   async listDelegates(ownerUserId: string) {
-    const delegations = await this.delegatesRepository.find({
-      where: {
-        ownerUserId,
-        status: In(["active", "pending"] as DelegationStatus[]),
-      },
-      relations: ["delegate", "grants"],
-      order: { createdAt: "DESC" },
-    });
+    const delegations = await this.scoped(AccountDelegate, (repo) =>
+      repo.find({
+        where: {
+          ownerUserId,
+          status: In(["active", "pending"] as DelegationStatus[]),
+        },
+        relations: ["delegate", "grants"],
+        order: { createdAt: "DESC" },
+      }),
+    );
     return Promise.all(
       delegations.map(async (d) => ({
         id: d.id,
@@ -587,9 +640,11 @@ export class DelegationService {
     resource: DelegateResource,
     operation: DelegateCapabilityOp,
   ): Promise<boolean> {
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId, status: "active" },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, status: "active" },
+      }),
+    );
     if (!delegation) return false;
     const opKey =
       operation === "create"
@@ -603,9 +658,11 @@ export class DelegationService {
 
   /** All granular capabilities for an active delegation (all false if none). */
   async getCapabilities(delegationId: string): Promise<DelegateCapabilitySet> {
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId, status: "active" },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, status: "active" },
+      }),
+    );
     return this.toCapabilitySet(delegation);
   }
 
@@ -614,18 +671,22 @@ export class DelegationService {
     delegationId: string,
     section: DelegateSection,
   ): Promise<boolean> {
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId, status: "active" },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, status: "active" },
+      }),
+    );
     if (!delegation) return false;
     return !!delegation[SECTION_FIELD[section]];
   }
 
   /** All section grants for an active delegation (all false if none). */
   async getSections(delegationId: string): Promise<DelegateSectionSet> {
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId, status: "active" },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, status: "active" },
+      }),
+    );
     return this.toSectionSet(delegation);
   }
 
@@ -643,9 +704,11 @@ export class DelegationService {
       >
     >,
   ): Promise<void> {
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId, ownerUserId },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, ownerUserId },
+      }),
+    );
     if (!delegation) {
       throw new NotFoundException(
         tr("errors.delegation.delegateNotFound", "Delegate not found"),
@@ -656,7 +719,7 @@ export class DelegationService {
         (delegation as unknown as Record<string, boolean>)[key] = value;
       }
     }
-    await this.delegatesRepository.save(delegation);
+    await this.scoped(AccountDelegate, (repo) => repo.save(delegation));
   }
 
   async setCapabilities(
@@ -677,9 +740,11 @@ export class DelegationService {
       >
     >,
   ): Promise<void> {
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId, ownerUserId },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, ownerUserId },
+      }),
+    );
     if (!delegation) {
       throw new NotFoundException(
         tr("errors.delegation.delegateNotFound", "Delegate not found"),
@@ -690,7 +755,7 @@ export class DelegationService {
         (delegation as unknown as Record<string, boolean>)[key] = value;
       }
     }
-    await this.delegatesRepository.save(delegation);
+    await this.scoped(AccountDelegate, (repo) => repo.save(delegation));
   }
 
   /**
@@ -702,9 +767,11 @@ export class DelegationService {
     accountId: string,
     operation: DelegateOperation,
   ): Promise<boolean> {
-    const grant = await this.grantsRepository.findOne({
-      where: { delegationId, accountId, canRead: true },
-    });
+    const grant = await this.scoped(AccountDelegateGrant, (repo) =>
+      repo.findOne({
+        where: { delegationId, accountId, canRead: true },
+      }),
+    );
     if (!grant) return false;
     switch (operation) {
       case "read":
@@ -726,18 +793,22 @@ export class DelegationService {
    */
   async delegateEmailExists(email: string): Promise<boolean> {
     const normalized = email.toLowerCase().trim();
-    const user = await this.usersRepository.findOne({
-      where: { email: normalized },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { email: normalized },
+      }),
+    );
     return !!user;
   }
 
   async createDelegate(ownerUserId: string, dto: CreateDelegateDto) {
     const email = dto.email.toLowerCase().trim();
 
-    const owner = await this.usersRepository.findOne({
-      where: { id: ownerUserId },
-    });
+    const owner = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: ownerUserId },
+      }),
+    );
     if (!owner)
       throw new NotFoundException(
         tr("errors.delegation.userNotFound", "User not found"),
@@ -754,7 +825,7 @@ export class DelegationService {
     let temporaryPassword: string | undefined;
     let inviteToken: string | undefined;
 
-    return this.dataSource.transaction(async (manager) => {
+    return withScopedDb(this.dataSource, async (manager) => {
       let delegateUser = await manager.findOne(User, { where: { email } });
       const isNew = !delegateUser;
 
@@ -901,9 +972,11 @@ export class DelegationService {
           "http://localhost:3000",
         );
         const inviteUrl = `${frontendUrl}/reset-password?token=${inviteToken}`;
-        const lang = await resolveUserEmailLocale(
-          this.preferencesRepository,
-          delegateUser.id,
+        const lang = await withScopedDb(this.dataSource, (manager) =>
+          resolveUserEmailLocale(
+            manager.getRepository(UserPreference),
+            delegateUser.id,
+          ),
         );
         const t = emailTranslator(this.i18n, lang);
         this.emailService
@@ -943,9 +1016,11 @@ export class DelegationService {
     ownerUserId: string,
     delegationId: string,
   ): Promise<void> {
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId, ownerUserId },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, ownerUserId },
+      }),
+    );
     if (!delegation) {
       throw new NotFoundException(
         tr("errors.delegation.delegateNotFound", "Delegate not found"),
@@ -953,7 +1028,7 @@ export class DelegationService {
     }
     const delegateUserId = delegation.delegateUserId;
 
-    await this.dataSource.transaction(async (manager) => {
+    await withScopedDb(this.dataSource, async (manager) => {
       // Hard-delete the delegation. FK cascades remove its grants and any
       // refresh tokens scoped to it, so live delegate sessions acting via
       // this delegation are immediately invalidated.
@@ -995,9 +1070,11 @@ export class DelegationService {
     delegationId: string,
     grants: AccountGrantDto[],
   ): Promise<void> {
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId, ownerUserId },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, ownerUserId },
+      }),
+    );
     if (!delegation) {
       throw new NotFoundException(
         tr("errors.delegation.delegateNotFound", "Delegate not found"),
@@ -1021,10 +1098,12 @@ export class DelegationService {
     const accountIds = readable.map((g) => g.accountId);
 
     if (accountIds.length > 0) {
-      const owned = await this.accountsRepository.find({
-        where: { id: In(accountIds), userId: ownerUserId },
-        select: ["id"],
-      });
+      const owned = await this.scoped(Account, (repo) =>
+        repo.find({
+          where: { id: In(accountIds), userId: ownerUserId },
+          select: ["id"],
+        }),
+      );
       if (owned.length !== accountIds.length) {
         throw new ForbiddenException(
           tr(
@@ -1035,7 +1114,7 @@ export class DelegationService {
       }
     }
 
-    await this.dataSource.transaction(async (manager) => {
+    await withScopedDb(this.dataSource, async (manager) => {
       await manager.delete(AccountDelegateGrant, { delegationId });
       if (readable.length > 0) {
         const rows = readable.map((g) =>
@@ -1057,18 +1136,22 @@ export class DelegationService {
     ownerUserId: string,
     delegationId: string,
   ): Promise<{ temporaryPassword: string }> {
-    const delegation = await this.delegatesRepository.findOne({
-      where: { id: delegationId, ownerUserId, status: "active" },
-    });
+    const delegation = await this.scoped(AccountDelegate, (repo) =>
+      repo.findOne({
+        where: { id: delegationId, ownerUserId, status: "active" },
+      }),
+    );
     if (!delegation) {
       throw new NotFoundException(
         tr("errors.delegation.delegateNotFound", "Delegate not found"),
       );
     }
 
-    const delegate = await this.usersRepository.findOne({
-      where: { id: delegation.delegateUserId },
-    });
+    const delegate = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: delegation.delegateUserId },
+      }),
+    );
     if (!delegate) {
       throw new NotFoundException(
         tr("errors.delegation.delegateNotFound", "Delegate not found"),
@@ -1103,11 +1186,13 @@ export class DelegationService {
     // so a locked-out delegate can sign in with the new password.
     delegate.failedLoginAttempts = 0;
     delegate.lockedUntil = null;
-    await this.usersRepository.save(delegate);
+    await this.scoped(User, (repo) => repo.save(delegate));
 
-    await this.refreshTokensRepository.update(
-      { userId: delegate.id, isRevoked: false },
-      { isRevoked: true },
+    await this.scoped(RefreshToken, (repo) =>
+      repo.update(
+        { userId: delegate.id, isRevoked: false },
+        { isRevoked: true },
+      ),
     );
 
     return { temporaryPassword };

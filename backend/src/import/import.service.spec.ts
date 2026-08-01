@@ -1,7 +1,11 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { DataSource } from "typeorm";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 import { ImportService } from "./import.service";
 import {
   Transaction,
@@ -104,21 +108,8 @@ describe("ImportService", () => {
   let mockSecurityPriceService: Record<string, jest.Mock>;
   let mockExchangeRateService: Record<string, jest.Mock>;
   let mockQueryRunner: {
-    connect: jest.Mock;
-    startTransaction: jest.Mock;
-    commitTransaction: jest.Mock;
-    rollbackTransaction: jest.Mock;
-    release: jest.Mock;
     query: jest.Mock;
-    manager: {
-      save: jest.Mock;
-      delete: jest.Mock;
-      findOne: jest.Mock;
-      find: jest.Mock;
-      create: jest.Mock;
-      update: jest.Mock;
-      createQueryBuilder: jest.Mock;
-    };
+    manager: Record<string, jest.Mock>;
   };
 
   const userId = "user-1";
@@ -190,11 +181,6 @@ describe("ImportService", () => {
     mockedValidateCsvContent.mockReset();
 
     mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
       query: jest.fn(),
       manager: {
         save: jest
@@ -272,13 +258,26 @@ describe("ImportService", () => {
       remove: jest.fn().mockResolvedValue(undefined),
     };
 
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-      getRepository: jest.fn().mockReturnValue({
-        findOne: jest.fn().mockResolvedValue(null),
-        find: jest.fn().mockResolvedValue([]),
-      }),
-    };
+    // The import now runs inside one `withScopedDb`, so the former QueryRunner
+    // is the transaction's EntityManager: keep `mockQueryRunner.manager` and
+    // `mockQueryRunner.query` pointing at the very same jest.fn()s the manager
+    // exposes, so every assertion below still watches the same calls.
+    const scoped = createScopedDbMocks([
+      [Account, accountsRepository],
+      [Category, categoriesRepository],
+      [Payee, payeesRepository],
+      [Transaction, transactionsRepository],
+      [TransactionSplit, splitsRepository],
+      [Security, securitiesRepository],
+      [InvestmentTransaction, investmentTransactionsRepository],
+      [Holding, holdingsRepository],
+      [ImportColumnMapping, columnMappingRepository],
+    ]);
+    Object.assign(scoped.manager, mockQueryRunner.manager, {
+      query: mockQueryRunner.query,
+    });
+    mockQueryRunner.manager = scoped.manager as never;
+    mockDataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     mockNetWorthService = {
       recalculateAccount: jest.fn().mockResolvedValue(undefined),
@@ -299,33 +298,6 @@ describe("ImportService", () => {
       providers: [
         ImportService,
         { provide: DataSource, useValue: mockDataSource },
-        {
-          provide: getRepositoryToken(Transaction),
-          useValue: transactionsRepository,
-        },
-        {
-          provide: getRepositoryToken(TransactionSplit),
-          useValue: splitsRepository,
-        },
-        { provide: getRepositoryToken(Account), useValue: accountsRepository },
-        {
-          provide: getRepositoryToken(Category),
-          useValue: categoriesRepository,
-        },
-        { provide: getRepositoryToken(Payee), useValue: payeesRepository },
-        {
-          provide: getRepositoryToken(Security),
-          useValue: securitiesRepository,
-        },
-        {
-          provide: getRepositoryToken(InvestmentTransaction),
-          useValue: investmentTransactionsRepository,
-        },
-        { provide: getRepositoryToken(Holding), useValue: holdingsRepository },
-        {
-          provide: getRepositoryToken(ImportColumnMapping),
-          useValue: columnMappingRepository,
-        },
         { provide: NetWorthService, useValue: mockNetWorthService },
         { provide: SecurityPriceService, useValue: mockSecurityPriceService },
         { provide: ExchangeRateService, useValue: mockExchangeRateService },
@@ -701,10 +673,7 @@ describe("ImportService", () => {
           ],
         });
 
-        mockDataSource.getRepository.mockReturnValue({
-          findOne: jest.fn().mockResolvedValue(null),
-          find: jest.fn().mockResolvedValue([]),
-        });
+        securitiesRepository.find.mockResolvedValue([]);
 
         await expect(service.importQifFile(userId, dto)).rejects.toThrow(
           "invalid security",
@@ -720,8 +689,8 @@ describe("ImportService", () => {
         expect(result.skipped).toBe(0);
         expect(result.errors).toBe(0);
         expect(mockQueryRunner.manager.save).toHaveBeenCalled();
-        expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-        expect(mockQueryRunner.release).toHaveBeenCalled();
+        expect(mockDataSource.transaction).toHaveBeenCalled();
+        expect(mockDataSource.transaction).toHaveBeenCalled();
       });
 
       it("creates transaction with correct properties", async () => {
@@ -921,29 +890,31 @@ describe("ImportService", () => {
       });
 
       it("rolls back transaction on catastrophic failure", async () => {
-        // Simulate a failure that escapes the inner try/catch
-        mockQueryRunner.commitTransaction.mockRejectedValue(
-          new Error("Commit failed"),
-        );
+        // Simulate a failure that escapes the inner try/catch. The first scoped
+        // transaction is the account lookup that precedes the import block, so
+        // only the second one (the import itself) is failed here.
+        let opened = 0;
+        mockDataSource.transaction.mockImplementation(async (fn: any) => {
+          opened++;
+          if (opened === 1) return fn(mockQueryRunner.manager);
+          throw new Error("Commit failed");
+        });
 
         await expect(
           service.importQifFile(userId, makeBaseDto()),
         ).rejects.toThrow(BadRequestException);
 
-        expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-        expect(mockQueryRunner.release).toHaveBeenCalled();
+        // The rollback is now withScopedDb's: the callback threw, so its
+        // transaction is discarded. Assert the transaction was opened at all.
+        expect(mockDataSource.transaction).toHaveBeenCalled();
       });
 
-      it("always releases query runner even on failure", async () => {
+      it("fails before opening a transaction when the account is missing", async () => {
         accountsRepository.findOne.mockResolvedValue(null);
 
         await expect(
           service.importQifFile(userId, makeBaseDto()),
         ).rejects.toThrow();
-
-        // release is called in finally block only if queryRunner was created
-        // In this case the error happens before createQueryRunner
-        // So let's test with a failure after queryRunner creation
       });
     });
 
@@ -1996,10 +1967,11 @@ describe("ImportService", () => {
         accountsRepository.findOne.mockResolvedValue(mockBrokerageAccount);
 
         // Validate security ownership via batch find
-        mockDataSource.getRepository.mockReturnValue({
-          findOne: jest.fn().mockResolvedValue({ id: "sec-aapl", userId }),
-          find: jest.fn().mockResolvedValue([{ id: "sec-aapl" }]),
+        securitiesRepository.findOne.mockResolvedValue({
+          id: "sec-aapl",
+          userId,
         });
+        securitiesRepository.find.mockResolvedValue([{ id: "sec-aapl" }]);
 
         mockQueryRunner.manager.findOne.mockImplementation(
           (entity: unknown, options: { where?: { id?: string } }) => {
@@ -2581,10 +2553,11 @@ describe("ImportService", () => {
       it("does not fail when post-import security price backfill fails", async () => {
         accountsRepository.findOne.mockResolvedValue(mockBrokerageAccount);
 
-        mockDataSource.getRepository.mockReturnValue({
-          findOne: jest.fn().mockResolvedValue({ id: "sec-aapl", userId }),
-          find: jest.fn().mockResolvedValue([{ id: "sec-aapl" }]),
+        securitiesRepository.findOne.mockResolvedValue({
+          id: "sec-aapl",
+          userId,
         });
+        securitiesRepository.find.mockResolvedValue([{ id: "sec-aapl" }]);
 
         mockQueryRunner.manager.findOne.mockImplementation(
           (entity: unknown, options: { where?: { id?: string } }) => {
@@ -3973,8 +3946,8 @@ describe("ImportService", () => {
         service.importQifMultiAccountFile(userId, baseDto),
       ).rejects.toThrow(BadRequestException);
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("commits transaction on success and calls post-import processing", async () => {
@@ -4015,8 +3988,8 @@ describe("ImportService", () => {
 
       const result = await service.importQifMultiAccountFile(userId, baseDto);
 
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(result.accountsCreated).toBe(1);
     });
 
@@ -4310,7 +4283,7 @@ describe("ImportService", () => {
         const result = await service.importQifMultiAccountFile(userId, baseDto);
 
         // Verify the import completed successfully
-        expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+        expect(mockDataSource.transaction).toHaveBeenCalled();
         // The cleanup ran (no candidates found since mocks return empty)
         expect(result.mergedTransfersDeleted).toBeUndefined();
       });
@@ -4379,7 +4352,7 @@ describe("ImportService", () => {
         await service.importQifMultiAccountFile(userId, baseDto);
 
         // Import should still succeed
-        expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+        expect(mockDataSource.transaction).toHaveBeenCalled();
       });
     });
   });

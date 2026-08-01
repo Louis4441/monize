@@ -1,8 +1,8 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { tr } from "../../i18n/translate";
-import { InjectRepository } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
-import { Repository, LessThan } from "typeorm";
+import { DataSource, LessThan } from "typeorm";
+import { withScopedDb } from "../../common/db/scoped-db";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import {
   AiInsight,
@@ -48,10 +48,7 @@ export class AiInsightsService {
   private readonly generatingUsers = new Set<string>();
 
   constructor(
-    @InjectRepository(AiInsight)
-    private readonly insightRepo: Repository<AiInsight>,
-    @InjectRepository(UserPreference)
-    private readonly prefRepo: Repository<UserPreference>,
+    private readonly dataSource: DataSource,
     private readonly aiService: AiService,
     private readonly usageService: AiUsageService,
     private readonly aggregatorService: InsightsAggregatorService,
@@ -64,34 +61,43 @@ export class AiInsightsService {
     severity?: InsightSeverity,
     includeDismissed = false,
   ): Promise<InsightsListResponse> {
-    const qb = this.insightRepo
-      .createQueryBuilder("i")
-      .where("i.userId = :userId", { userId })
-      .andWhere("i.expiresAt > :now", { now: new Date() });
+    // The list and its "last generated" stamp are one snapshot -- a generation
+    // landing between them would report a timestamp newer than the rows shown.
+    const { insights, lastGenerated } = await withScopedDb(
+      this.dataSource,
+      async (manager) => {
+        const repo = manager.getRepository(AiInsight);
+        const qb = repo
+          .createQueryBuilder("i")
+          .where("i.userId = :userId", { userId })
+          .andWhere("i.expiresAt > :now", { now: new Date() });
 
-    if (!includeDismissed) {
-      qb.andWhere("i.isDismissed = false");
-    }
+        if (!includeDismissed) {
+          qb.andWhere("i.isDismissed = false");
+        }
 
-    if (type) {
-      qb.andWhere("i.type = :type", { type });
-    }
+        if (type) {
+          qb.andWhere("i.type = :type", { type });
+        }
 
-    if (severity) {
-      qb.andWhere("i.severity = :severity", { severity });
-    }
+        if (severity) {
+          qb.andWhere("i.severity = :severity", { severity });
+        }
 
-    qb.orderBy("i.severity", "ASC")
-      .addOrderBy("i.generatedAt", "DESC")
-      .take(MAX_INSIGHTS_PER_USER);
+        qb.orderBy("i.severity", "ASC")
+          .addOrderBy("i.generatedAt", "DESC")
+          .take(MAX_INSIGHTS_PER_USER);
 
-    const insights = await qb.getMany();
-
-    const lastGenerated = await this.insightRepo
-      .createQueryBuilder("i")
-      .select("MAX(i.generatedAt)", "lastGenerated")
-      .where("i.userId = :userId", { userId })
-      .getRawOne();
+        return {
+          insights: await qb.getMany(),
+          lastGenerated: await repo
+            .createQueryBuilder("i")
+            .select("MAX(i.generatedAt)", "lastGenerated")
+            .where("i.userId = :userId", { userId })
+            .getRawOne(),
+        };
+      },
+    );
 
     return {
       insights: insights.map((i) => this.toResponse(i)),
@@ -108,17 +114,21 @@ export class AiInsightsService {
   }
 
   async dismissInsight(userId: string, insightId: string): Promise<void> {
-    const insight = await this.insightRepo.findOne({
-      where: { id: insightId, userId },
+    // Read-modify-write: the ownership check and the flag flip are one unit.
+    await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(AiInsight);
+      const insight = await repo.findOne({
+        where: { id: insightId, userId },
+      });
+
+      if (!insight) {
+        throw new NotFoundException(
+          tr("errors.ai.insightNotFound", "Insight not found"),
+        );
+      }
+
+      await repo.update({ id: insightId }, { isDismissed: true });
     });
-
-    if (!insight) {
-      throw new NotFoundException(
-        tr("errors.ai.insightNotFound", "Insight not found"),
-      );
-    }
-
-    await this.insightRepo.update({ id: insightId }, { isDismissed: true });
   }
 
   async generateInsights(userId: string): Promise<InsightsListResponse> {
@@ -129,15 +139,18 @@ export class AiInsightsService {
       return this.getInsights(userId);
     }
 
-    const recentInsight = await this.insightRepo
-      .createQueryBuilder("i")
-      .where("i.userId = :userId", { userId })
-      .andWhere("i.generatedAt > :cutoff", {
-        cutoff: new Date(
-          Date.now() - MIN_GENERATION_INTERVAL_HOURS * 60 * 60 * 1000,
-        ),
-      })
-      .getOne();
+    const recentInsight = await withScopedDb(this.dataSource, (manager) =>
+      manager
+        .getRepository(AiInsight)
+        .createQueryBuilder("i")
+        .where("i.userId = :userId", { userId })
+        .andWhere("i.generatedAt > :cutoff", {
+          cutoff: new Date(
+            Date.now() - MIN_GENERATION_INTERVAL_HOURS * 60 * 60 * 1000,
+          ),
+        })
+        .getOne(),
+    );
 
     if (recentInsight) {
       this.logger.log(
@@ -151,9 +164,11 @@ export class AiInsightsService {
     this.logger.log(`Insights generation start user=${userId}`);
 
     try {
-      const preferences = await this.prefRepo.findOne({
-        where: { userId },
-      });
+      const preferences = await withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(UserPreference).findOne({
+          where: { userId },
+        }),
+      );
       const currency = preferences?.defaultCurrency || "USD";
 
       let aggregates: SpendingAggregates;
@@ -283,9 +298,11 @@ export class AiInsightsService {
   }
 
   private async cleanupExpiredInsights(): Promise<void> {
-    const result = await this.insightRepo.delete({
-      expiresAt: LessThan(new Date()),
-    });
+    const result = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AiInsight).delete({
+        expiresAt: LessThan(new Date()),
+      }),
+    );
 
     if (result.affected && result.affected > 0) {
       this.logger.log(`Cleaned up ${result.affected} expired insights`);
@@ -294,10 +311,12 @@ export class AiInsightsService {
     // Purge dismissed insights older than 30 days
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
-    const dismissedResult = await this.insightRepo.delete({
-      isDismissed: true,
-      createdAt: LessThan(cutoff),
-    });
+    const dismissedResult = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(AiInsight).delete({
+        isDismissed: true,
+        createdAt: LessThan(cutoff),
+      }),
+    );
 
     if (dismissedResult.affected && dismissedResult.affected > 0) {
       this.logger.log(
@@ -313,15 +332,17 @@ export class AiInsightsService {
     // served. Skip users whose only active provider is the relay instead of
     // failing their generation every day; they can still generate on demand
     // from the Insights page.
-    const userIdsWithConfig = await this.insightRepo.manager
-      .createQueryBuilder()
-      .select("DISTINCT apc.user_id", "userId")
-      .from("ai_provider_configs", "apc")
-      .where("apc.is_active = true")
-      .andWhere("apc.provider != :relayProvider", {
-        relayProvider: "mcp_relay",
-      })
-      .getRawMany();
+    const userIdsWithConfig = await withScopedDb(this.dataSource, (manager) =>
+      manager
+        .createQueryBuilder()
+        .select("DISTINCT apc.user_id", "userId")
+        .from("ai_provider_configs", "apc")
+        .where("apc.is_active = true")
+        .andWhere("apc.provider != :relayProvider", {
+          relayProvider: "mcp_relay",
+        })
+        .getRawMany(),
+    );
 
     const ids = new Set(userIdsWithConfig.map((r: any) => r.userId as string));
 
@@ -330,12 +351,14 @@ export class AiInsightsService {
     );
 
     if (hasServerDefault) {
-      const allActiveUsers = await this.insightRepo.manager
-        .createQueryBuilder()
-        .select("u.id", "userId")
-        .from("users", "u")
-        .where("u.is_active = true")
-        .getRawMany();
+      const allActiveUsers = await withScopedDb(this.dataSource, (manager) =>
+        manager
+          .createQueryBuilder()
+          .select("u.id", "userId")
+          .from("users", "u")
+          .where("u.is_active = true")
+          .getRawMany(),
+      );
 
       for (const row of allActiveUsers) {
         ids.add(row.userId as string);
@@ -634,35 +657,39 @@ export class AiInsightsService {
       now.getTime() + INSIGHT_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
     );
 
-    const insights = rawInsights.map((raw) => {
-      const insight = this.insightRepo.create({
-        userId,
-        type: raw.type as InsightType,
-        title: raw.title,
-        description: raw.description,
-        severity: raw.severity as InsightSeverity,
-        data: raw.data,
-        isDismissed: false,
-        generatedAt: now,
-        expiresAt,
-      });
-      return insight;
-    });
+    // One transaction: the save and the cap-enforcing prune are a
+    // read-modify-write over the same rows.
+    await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(AiInsight);
+      const insights = rawInsights.map((raw) =>
+        repo.create({
+          userId,
+          type: raw.type as InsightType,
+          title: raw.title,
+          description: raw.description,
+          severity: raw.severity as InsightSeverity,
+          data: raw.data,
+          isDismissed: false,
+          generatedAt: now,
+          expiresAt,
+        }),
+      );
 
-    await this.insightRepo.save(insights);
+      await repo.save(insights);
 
-    // Enforce max insights per user by removing oldest
-    const count = await this.insightRepo.count({ where: { userId } });
-    if (count > MAX_INSIGHTS_PER_USER) {
-      const toRemove = await this.insightRepo.find({
-        where: { userId },
-        order: { generatedAt: "ASC" },
-        take: count - MAX_INSIGHTS_PER_USER,
-      });
-      if (toRemove.length > 0) {
-        await this.insightRepo.remove(toRemove);
+      // Enforce max insights per user by removing oldest
+      const count = await repo.count({ where: { userId } });
+      if (count > MAX_INSIGHTS_PER_USER) {
+        const toRemove = await repo.find({
+          where: { userId },
+          order: { generatedAt: "ASC" },
+          take: count - MAX_INSIGHTS_PER_USER,
+        });
+        if (toRemove.length > 0) {
+          await repo.remove(toRemove);
+        }
       }
-    }
+    });
   }
 
   private sanitizeData(data: unknown): Record<string, unknown> {

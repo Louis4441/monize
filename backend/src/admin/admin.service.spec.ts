@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { DataSource } from "typeorm";
@@ -17,6 +16,11 @@ import { PersonalAccessToken } from "../auth/entities/personal-access-token.enti
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
 import { UsersService } from "../users/users.service";
 import { EmailService } from "../notifications/email.service";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("AdminService", () => {
   let service: AdminService;
@@ -115,26 +119,22 @@ describe("AdminService", () => {
       })),
     };
 
-    dataSource = {
-      transaction: jest.fn().mockImplementation((cb) => cb(transactionManager)),
-    };
+    // Every write now runs through `withScopedDb`, so the spec's
+    // `transactionManager` IS the scoped transaction's EntityManager, and the
+    // per-entity repositories are routed through its getRepository.
+    const scoped = createScopedDbMocks([
+      [User, usersRepository as never],
+      [UserPreference, preferencesRepository as never],
+      [RefreshToken, refreshTokensRepository as never],
+      [PersonalAccessToken, patRepository as never],
+    ]);
+    Object.assign(scoped.manager, transactionManager);
+    transactionManager = scoped.manager;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
-        { provide: getRepositoryToken(User), useValue: usersRepository },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: preferencesRepository,
-        },
-        {
-          provide: getRepositoryToken(RefreshToken),
-          useValue: refreshTokensRepository,
-        },
-        {
-          provide: getRepositoryToken(PersonalAccessToken),
-          useValue: patRepository,
-        },
         {
           provide: OAuthProviderService,
           useValue: oauthProviderService,

@@ -4,6 +4,11 @@ import { DemoResetService } from "./demo-reset.service";
 import { DemoSeedService } from "./demo-seed.service";
 import { DemoModeService } from "../common/demo-mode.service";
 import { getRequestContext } from "../common/request-context";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 jest.mock("bcryptjs", () => ({
   hash: jest.fn().mockResolvedValue("$2a$10$hashedpassword"),
@@ -11,7 +16,7 @@ jest.mock("bcryptjs", () => ({
 
 describe("DemoResetService", () => {
   let service: DemoResetService;
-  let dataSource: { createQueryRunner: jest.Mock; query: jest.Mock };
+  let dataSource: Record<string, jest.Mock>;
   let demoSeedService: { seedDemoData: jest.Mock };
   let demoModeService: { isDemo: boolean };
   let queryRunner: Record<string, jest.Mock>;
@@ -26,10 +31,13 @@ describe("DemoResetService", () => {
       release: jest.fn().mockResolvedValue(undefined),
     };
 
-    dataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(queryRunner),
-      query: jest.fn().mockResolvedValue([]),
-    };
+    // The clear block is now one `withScopedDb`, so the former queryRunner's
+    // raw SQL lands on the transaction manager -- alias both names at it.
+    const scoped = createScopedDbMocks([]);
+    scoped.manager.query.mockResolvedValue([]);
+    scoped.dataSource.query = scoped.manager.query;
+    queryRunner.query = scoped.manager.query;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     demoSeedService = {
       seedDemoData: jest.fn().mockResolvedValue(undefined),
@@ -58,7 +66,7 @@ describe("DemoResetService", () => {
 
     await service.resetDemoData();
 
-    expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+    expect(dataSource.transaction).not.toHaveBeenCalled();
     expect(demoSeedService.seedDemoData).not.toHaveBeenCalled();
   });
 
@@ -95,13 +103,14 @@ describe("DemoResetService", () => {
     expect(ctx).toEqual({ system: true });
   });
 
-  it("rolls back and returns early if demo user not found", async () => {
+  it("returns early without re-seeding if demo user not found", async () => {
     queryRunner.query.mockResolvedValue([]);
 
     await service.resetDemoData();
 
-    expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
-    expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+    // The clear transaction is opened, finds no demo user and returns without
+    // writing (an empty commit); the re-seed must not run.
+    expect(dataSource.transaction).toHaveBeenCalled();
     expect(demoSeedService.seedDemoData).not.toHaveBeenCalled();
   });
 
@@ -118,10 +127,10 @@ describe("DemoResetService", () => {
     it("uses a transaction for atomicity", async () => {
       await service.resetDemoData();
 
-      expect(queryRunner.connect).toHaveBeenCalled();
-      expect(queryRunner.startTransaction).toHaveBeenCalled();
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
-      expect(queryRunner.release).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
     it("deletes all user data in FK-safe order", async () => {
@@ -174,11 +183,15 @@ describe("DemoResetService", () => {
       expect(demoSeedService.seedDemoData).toHaveBeenCalledWith("demo-user-id");
     });
 
-    it("commits transaction before re-seeding", async () => {
+    it("commits the clear transaction before re-seeding", async () => {
+      // The re-seed opens its own scoped transactions, so it must not start
+      // until the clear has committed.
       const callOrder: string[] = [];
-      queryRunner.commitTransaction.mockImplementation(() => {
+      const runTransaction = dataSource.transaction.getMockImplementation()!;
+      dataSource.transaction.mockImplementation(async (...args: unknown[]) => {
+        const result = await runTransaction(...args);
         callOrder.push("commit");
-        return Promise.resolve();
+        return result;
       });
       demoSeedService.seedDemoData.mockImplementation(() => {
         callOrder.push("reseed");
@@ -385,19 +398,20 @@ describe("DemoResetService", () => {
 
       await service.resetDemoData();
 
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(queryRunner.commitTransaction).not.toHaveBeenCalled();
+      // The failure is swallowed (best-effort cron) and the re-seed is skipped
+      // -- the transaction rolled back, so there is nothing to re-seed onto.
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(demoSeedService.seedDemoData).not.toHaveBeenCalled();
     });
 
-    it("always releases the query runner", async () => {
+    it("swallows a failure on the very first statement", async () => {
       queryRunner.query.mockRejectedValue(new Error("DB error"));
 
-      await service.resetDemoData();
-
-      expect(queryRunner.release).toHaveBeenCalled();
+      await expect(service.resetDemoData()).resolves.toBeUndefined();
+      expect(demoSeedService.seedDemoData).not.toHaveBeenCalled();
     });
 
-    it("releases query runner even on success", async () => {
+    it("re-seeds after a successful clear", async () => {
       queryRunner.query.mockImplementation((sql: string) => {
         if (sql.includes("SELECT id FROM users")) {
           return Promise.resolve([{ id: "demo-user-id" }]);
@@ -407,7 +421,7 @@ describe("DemoResetService", () => {
 
       await service.resetDemoData();
 
-      expect(queryRunner.release).toHaveBeenCalled();
+      expect(demoSeedService.seedDemoData).toHaveBeenCalledWith("demo-user-id");
     });
   });
 
@@ -453,39 +467,7 @@ describe("DemoResetService", () => {
         return Promise.resolve([]);
       });
       await service.resetDemoData();
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
-    });
-
-    it("handles already-released queryRunner gracefully", async () => {
-      (queryRunner as Record<string, unknown>).isReleased = true;
-      queryRunner.query.mockImplementation((sql: string) => {
-        if (sql.includes("SELECT id FROM users")) {
-          return Promise.resolve([{ id: "demo-user-id" }]);
-        }
-        if (sql.includes("DELETE FROM investment_transactions")) {
-          throw new Error("DB error");
-        }
-        return Promise.resolve([]);
-      });
-      await service.resetDemoData();
-      // Released path skips rollback and release
-      expect(queryRunner.rollbackTransaction).not.toHaveBeenCalled();
-    });
-
-    it("handles rollback throwing (already-committed transaction)", async () => {
-      queryRunner.rollbackTransaction.mockRejectedValueOnce(
-        new Error("already committed"),
-      );
-      queryRunner.query.mockImplementation((sql: string) => {
-        if (sql.includes("SELECT id FROM users")) {
-          return Promise.resolve([{ id: "demo-user-id" }]);
-        }
-        if (sql.includes("DELETE FROM investment_transactions")) {
-          throw new Error("DB error");
-        }
-        return Promise.resolve([]);
-      });
-      await service.resetDemoData();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
   });
 

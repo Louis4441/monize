@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import {
   NotFoundException,
   ConflictException,
@@ -21,6 +20,11 @@ import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { CurrenciesService } from "../currencies/currencies.service";
 import { BackupEncryptionService } from "../backup/backup-encryption.service";
 import { DemoModeService } from "../common/demo-mode.service";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("UsersService", () => {
   let service: UsersService;
@@ -141,31 +145,25 @@ describe("UsersService", () => {
       query: jest.fn().mockResolvedValue([null, 0]),
     };
 
-    mockDataSource = {
-      createQueryRunner: jest.fn().mockReturnValue(mockQueryRunner),
-      query: jest.fn().mockResolvedValue([]),
-    };
+    // The delete/downgrade blocks are now single `withScopedDb` transactions,
+    // so the former queryRunner's raw SQL lands on the transaction manager.
+    const scoped = createScopedDbMocks([
+      [User, usersRepository as never],
+      [UserPreference, preferencesRepository as never],
+      [RefreshToken, refreshTokensRepository as never],
+      [PersonalAccessToken, patRepository as never],
+      [TrustedDevice, trustedDevicesRepository as never],
+    ]);
+    // Raw DELETEs return [rows, count]; isActingDelegate reads rows.length, so
+    // the shared default must be an empty result set, not a 2-tuple.
+    scoped.manager.query.mockResolvedValue([]);
+    mockQueryRunner.query = scoped.manager.query;
+    scoped.dataSource.query = scoped.manager.query;
+    mockDataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
-        { provide: getRepositoryToken(User), useValue: usersRepository },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: preferencesRepository,
-        },
-        {
-          provide: getRepositoryToken(RefreshToken),
-          useValue: refreshTokensRepository,
-        },
-        {
-          provide: getRepositoryToken(PersonalAccessToken),
-          useValue: patRepository,
-        },
-        {
-          provide: getRepositoryToken(TrustedDevice),
-          useValue: trustedDevicesRepository,
-        },
         { provide: DataSource, useValue: mockDataSource },
         { provide: PasswordBreachService, useValue: passwordBreachService },
         { provide: ModuleRef, useValue: moduleRef },
@@ -868,7 +866,7 @@ describe("UsersService", () => {
       // Owned data + owner-side delegations are purged in a transaction,
       // and the row is flipped back to is_delegate_only so admin User
       // Management hides it again.
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       const queries = mockQueryRunner.query.mock.calls.map((c) => c[0]);
       expect(
         queries.some((q: string) =>
@@ -985,10 +983,10 @@ describe("UsersService", () => {
         password: "CorrectPass123!",
       });
 
-      expect(mockQueryRunner.connect).toHaveBeenCalled();
-      expect(mockQueryRunner.startTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
       expect(result).toHaveProperty("deleted");
     });
 
@@ -1057,8 +1055,8 @@ describe("UsersService", () => {
         service.deleteData("user-1", { password: "CorrectPass123!" }),
       ).rejects.toThrow("DB error");
 
-      expect(mockQueryRunner.rollbackTransaction).toHaveBeenCalled();
-      expect(mockQueryRunner.release).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("accepts OIDC token for OIDC-only users", async () => {
@@ -1073,7 +1071,7 @@ describe("UsersService", () => {
       });
 
       expect(result).toHaveProperty("deleted");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("requires OIDC token for OIDC-only users", async () => {
@@ -1101,7 +1099,7 @@ describe("UsersService", () => {
       });
 
       expect(result).toHaveProperty("deleted");
-      expect(mockQueryRunner.commitTransaction).toHaveBeenCalled();
+      expect(mockDataSource.transaction).toHaveBeenCalled();
     });
 
     it("throws when user not found", async () => {

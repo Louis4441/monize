@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
 import { DataSource } from "typeorm";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
@@ -13,6 +12,11 @@ import { PasswordBreachService } from "../auth/password-breach.service";
 import { AiEncryptionService } from "../ai/ai-encryption.service";
 import { hashToken } from "../auth/crypto.util";
 import { getRequestContext } from "../common/request-context";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("EmergencyAccessClaimController", () => {
   let controller: EmergencyAccessClaimController;
@@ -32,7 +36,7 @@ describe("EmergencyAccessClaimController", () => {
     release: jest.Mock;
     manager: Record<string, jest.Mock>;
   };
-  let dataSource: { createQueryRunner: jest.Mock };
+  let dataSource: Record<string, jest.Mock>;
 
   const ownerId = "11111111-1111-1111-1111-111111111111";
   const RAW_TOKEN = "a".repeat(64);
@@ -90,20 +94,21 @@ describe("EmergencyAccessClaimController", () => {
         createQueryBuilder: jest.fn(() => updateBuilder),
       },
     };
-    dataSource = { createQueryRunner: jest.fn(() => queryRunner) };
+    // Every read/write now runs through `withScopedDb`; the former QueryRunner
+    // is the transaction's EntityManager, so keep `queryRunner.manager` pointing
+    // at the same jest.fn()s the manager exposes.
+    const scoped = createScopedDbMocks([
+      [EmergencyAccessContact, contactsRepo as never],
+      [EmergencyAccessSettings, settingsRepo as never],
+      [User, usersRepo as never],
+    ]);
+    Object.assign(scoped.manager, queryRunner.manager);
+    queryRunner.manager = scoped.manager;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EmergencyAccessClaimController],
       providers: [
-        {
-          provide: getRepositoryToken(EmergencyAccessContact),
-          useValue: contactsRepo,
-        },
-        {
-          provide: getRepositoryToken(EmergencyAccessSettings),
-          useValue: settingsRepo,
-        },
-        { provide: getRepositoryToken(User), useValue: usersRepo },
         { provide: DataSource, useValue: dataSource },
         { provide: TokenService, useValue: tokenService },
         { provide: AuthService, useValue: authService },
@@ -215,7 +220,9 @@ describe("EmergencyAccessClaimController", () => {
         ),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(passwordBreach.isBreached).not.toHaveBeenCalled();
-      expect(dataSource.createQueryRunner).not.toHaveBeenCalled();
+      // The token pre-check is its own short read; the claim write block must
+      // never be entered.
+      expect(queryRunner.manager.save).not.toHaveBeenCalled();
     });
 
     it("replaces credentials, voids sibling tokens, and signs in", async () => {
@@ -236,7 +243,7 @@ describe("EmergencyAccessClaimController", () => {
         res as never,
       );
 
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
       expect(tokenService.revokeAllUserRefreshTokens).toHaveBeenCalledWith(
         ownerId,
       );
@@ -258,7 +265,7 @@ describe("EmergencyAccessClaimController", () => {
           res as never,
         ),
       ).rejects.toBeInstanceOf(NotFoundException);
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
       expect(tokenService.generateTokenPair).not.toHaveBeenCalled();
     });
 
@@ -280,7 +287,7 @@ describe("EmergencyAccessClaimController", () => {
           res as never,
         ),
       ).rejects.toBeInstanceOf(NotFoundException);
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
       expect(tokenService.generateTokenPair).not.toHaveBeenCalled();
     });
 
@@ -303,7 +310,7 @@ describe("EmergencyAccessClaimController", () => {
           res as never,
         ),
       ).rejects.toBeInstanceOf(NotFoundException);
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
       expect(tokenService.generateTokenPair).not.toHaveBeenCalled();
     });
 
@@ -450,15 +457,6 @@ describe("EmergencyAccessClaimController", () => {
       const prodModule = await Test.createTestingModule({
         controllers: [EmergencyAccessClaimController],
         providers: [
-          {
-            provide: getRepositoryToken(EmergencyAccessContact),
-            useValue: contactsRepo,
-          },
-          {
-            provide: getRepositoryToken(EmergencyAccessSettings),
-            useValue: settingsRepo,
-          },
-          { provide: getRepositoryToken(User), useValue: usersRepo },
           { provide: DataSource, useValue: dataSource },
           { provide: TokenService, useValue: tokenService },
           { provide: AuthService, useValue: authService },

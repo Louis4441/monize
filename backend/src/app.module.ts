@@ -20,8 +20,6 @@ import { CsrfRefreshInterceptor } from "./common/interceptors/csrf-refresh.inter
 import { RequestContextInterceptor } from "./common/interceptors/request-context.interceptor";
 import { parseRlsMode, resolveRlsDatabaseAuth } from "./common/db/rls-config";
 import { DemoModeModule } from "./common/demo-mode.module";
-import { UserPreference } from "./users/entities/user-preference.entity";
-import { User } from "./users/entities/user.entity";
 
 import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
@@ -126,11 +124,6 @@ import { I18nModule } from "./i18n/i18n.module";
 
     // i18n (global — exception messages, validation, email content)
     I18nModule,
-
-    // UserPreference + User repos for RequestContextInterceptor (resolves the
-    // authenticated user's timezone and updates last_activity_at on every
-    // authenticated request).
-    TypeOrmModule.forFeature([UserPreference, User]),
 
     // Feature modules
     HealthModule,

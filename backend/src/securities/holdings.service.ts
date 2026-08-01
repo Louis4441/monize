@@ -13,13 +13,7 @@ import { todayInTimezone, formatDateYMDLocal } from "../common/date-utils";
 import { sumMoney } from "../common/round.util";
 import { getUsersByEffectiveTimezone } from "../common/users-by-timezone.util";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
-import {
-  EntityManager,
-  In,
-  LessThanOrEqual,
-  DataSource,
-  QueryRunner,
-} from "typeorm";
+import { EntityManager, In, LessThanOrEqual, DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { Holding } from "./entities/holding.entity";
 import {
@@ -677,8 +671,8 @@ export class HoldingsService {
    * history, operating within the caller's open transaction.
    *
    * Unlike `rebuildFromTransactions` (which opens its own transaction and
-   * rebuilds every eligible account), this participates in an existing
-   * QueryRunner so the rebuild commits or rolls back atomically with the
+   * rebuilds every eligible account), this participates in the caller's
+   * transaction so the rebuild commits or rolls back atomically with the
    * operation that triggered it. Callers that must not silently leave stale or
    * misattributed holdings (e.g. a security-transfer edit, where the
    * incremental reverse/re-apply can misattribute average cost across a zero
@@ -687,15 +681,10 @@ export class HoldingsService {
   async rebuildAccountsFromTransactions(
     userId: string,
     accountIds: string[],
-    // The `.mny` importer (R6) still hands this a QueryRunner shim; the union
-    // and the unwrap below go away once that module converts.
-    runnerOrManager: QueryRunner | EntityManager,
+    manager: EntityManager,
     asOfDate?: string,
   ): Promise<void> {
     if (accountIds.length === 0) return;
-
-    const manager =
-      "manager" in runnerOrManager ? runnerOrManager.manager : runnerOrManager;
 
     // Only brokerage / standalone investment accounts track holdings; the cash
     // sleeve of an investment account is excluded everywhere else, so it must be
@@ -766,7 +755,7 @@ export class HoldingsService {
    * Rebuild all holdings from existing investment transactions.
    * This recalculates all holdings based on transaction history,
    * useful for fixing data after imports that didn't create holdings.
-   * Wrapped in a QueryRunner transaction for atomicity.
+   * Wrapped in a single scoped transaction for atomicity.
    */
   async rebuildFromTransactions(
     userId: string,

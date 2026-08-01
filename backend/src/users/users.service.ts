@@ -7,8 +7,14 @@ import {
   ForbiddenException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, QueryRunner } from "typeorm";
+import {
+  DataSource,
+  EntityManager,
+  EntityTarget,
+  ObjectLiteral,
+  Repository,
+} from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import { tr } from "../i18n/translate";
 import { currentRequestLocale } from "../i18n/request-locale";
@@ -34,36 +40,43 @@ export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    @InjectRepository(UserPreference)
-    private preferencesRepository: Repository<UserPreference>,
-    @InjectRepository(RefreshToken)
-    private refreshTokensRepository: Repository<RefreshToken>,
-    @InjectRepository(PersonalAccessToken)
-    private patRepository: Repository<PersonalAccessToken>,
-    @InjectRepository(TrustedDevice)
-    private trustedDevicesRepository: Repository<TrustedDevice>,
     private dataSource: DataSource,
     private passwordBreachService: PasswordBreachService,
     private moduleRef: ModuleRef,
     private demoModeService: DemoModeService,
   ) {}
 
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
+  }
+
   async findById(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { id } });
+    return this.scoped(User, (repo) => repo.findOne({ where: { id } }));
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { email } });
+    return this.scoped(User, (repo) => repo.findOne({ where: { email } }));
   }
 
   async findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+    return this.scoped(User, (repo) => repo.find());
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user) {
       throw new NotFoundException(
         tr("errors.users.userNotFound", "User not found"),
@@ -101,9 +114,11 @@ export class UsersService {
           ),
         );
       }
-      const existingUser = await this.usersRepository.findOne({
-        where: { email: dto.email },
-      });
+      const existingUser = await this.scoped(User, (repo) =>
+        repo.findOne({
+          where: { email: dto.email },
+        }),
+      );
       if (existingUser) {
         throw new ConflictException(
           tr("errors.users.emailInUse", "Email already in use"),
@@ -119,7 +134,7 @@ export class UsersService {
       user.lastName = dto.lastName;
     }
 
-    const saved = await this.usersRepository.save(user);
+    const saved = await this.scoped(User, (repo) => repo.save(user));
     const {
       passwordHash,
       resetToken,
@@ -131,17 +146,20 @@ export class UsersService {
   }
 
   async getPreferences(userId: string): Promise<UserPreference> {
-    let preferences = await this.preferencesRepository.findOne({
-      where: { userId },
-    });
+    let preferences = await this.scoped(UserPreference, (repo) =>
+      repo.findOne({
+        where: { userId },
+      }),
+    );
 
     // Create default preferences if they don't exist. Seed `language` from the
     // request locale (browser-detected on first visit, forwarded by the proxy)
     // so a row first materialized here still captures the user's UI language
     // rather than defaulting everyone to English.
     if (!preferences) {
-      preferences = buildDefaultPreferences(userId, currentRequestLocale());
-      await this.preferencesRepository.save(preferences);
+      const created = buildDefaultPreferences(userId, currentRequestLocale());
+      preferences = created;
+      await this.scoped(UserPreference, (repo) => repo.save(created));
     }
 
     return preferences;
@@ -151,9 +169,11 @@ export class UsersService {
     userId: string,
     dto: UpdatePreferencesDto,
   ): Promise<UserPreference> {
-    let preferences = await this.preferencesRepository.findOne({
-      where: { userId },
-    });
+    let preferences = await this.scoped(UserPreference, (repo) =>
+      repo.findOne({
+        where: { userId },
+      }),
+    );
 
     if (!preferences) {
       // Create with defaults first
@@ -237,7 +257,9 @@ export class UsersService {
       preferences.language = dto.language;
     }
 
-    const saved = await this.preferencesRepository.save(preferences);
+    const saved = await this.scoped(UserPreference, (repo) =>
+      repo.save(preferences),
+    );
 
     // Fetch fresh exchange rates whenever the user picks a new default
     // currency so multi-currency totals (Net Worth card, account group totals)
@@ -281,7 +303,9 @@ export class UsersService {
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user) {
       throw new NotFoundException(
         tr("errors.users.userNotFound", "User not found"),
@@ -325,7 +349,7 @@ export class UsersService {
     const saltRounds = 12;
     user.passwordHash = await bcrypt.hash(dto.newPassword, saltRounds);
     user.mustChangePassword = false;
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
     // Re-sync the encrypted-backup password so the auto-backup cron keeps
     // working with the new login password. Best-effort; failures here log
@@ -342,27 +366,27 @@ export class UsersService {
     }
 
     // SECURITY: Revoke all refresh tokens to force re-login on all devices
-    await this.refreshTokensRepository.update(
-      { userId, isRevoked: false },
-      { isRevoked: true },
+    await this.scoped(RefreshToken, (repo) =>
+      repo.update({ userId, isRevoked: false }, { isRevoked: true }),
     );
 
     // SECURITY: Revoke all PATs — credential change invalidates API access
-    await this.patRepository.update(
-      { userId, isRevoked: false },
-      { isRevoked: true },
+    await this.scoped(PersonalAccessToken, (repo) =>
+      repo.update({ userId, isRevoked: false }, { isRevoked: true }),
     );
 
     // SECURITY: Revoke trusted devices so a stolen trusted-device cookie
     // cannot bypass 2FA after the user rotates their password.
-    await this.trustedDevicesRepository.delete({ userId });
+    await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
   }
 
   async deleteAccount(
     userId: string,
     dto?: { password?: string; oidcIdToken?: string },
   ): Promise<{ downgraded: boolean }> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user) {
       throw new NotFoundException(
         tr("errors.users.userNotFound", "User not found"),
@@ -399,9 +423,11 @@ export class UsersService {
     // SECURITY: Prevent the last admin from self-deleting, which would leave
     // the system with no administrator
     if (user.role === "admin") {
-      const adminCount = await this.usersRepository.count({
-        where: { role: "admin" },
-      });
+      const adminCount = await this.scoped(User, (repo) =>
+        repo.count({
+          where: { role: "admin" },
+        }),
+      );
       if (adminCount <= 1) {
         throw new ForbiddenException(
           tr(
@@ -413,13 +439,11 @@ export class UsersService {
     }
 
     // Revoke all refresh tokens and PATs (forces re-login either way).
-    await this.refreshTokensRepository.update(
-      { userId, isRevoked: false },
-      { isRevoked: true },
+    await this.scoped(RefreshToken, (repo) =>
+      repo.update({ userId, isRevoked: false }, { isRevoked: true }),
     );
-    await this.patRepository.update(
-      { userId, isRevoked: false },
-      { isRevoked: true },
+    await this.scoped(PersonalAccessToken, (repo) =>
+      repo.update({ userId, isRevoked: false }, { isRevoked: true }),
     );
 
     // A full account that is also a delegate of someone else is demoted to
@@ -437,11 +461,13 @@ export class UsersService {
     // and preferences are worthless once the account is gone either way.
     // Delegate sessions acting *as* this user go too -- the owner they point
     // at is about to disappear.
-    await this.refreshTokensRepository.delete({ userId });
-    await this.refreshTokensRepository.delete({ actingAsUserId: userId });
-    await this.patRepository.delete({ userId });
-    await this.preferencesRepository.delete({ userId });
-    await this.usersRepository.remove(user);
+    await this.scoped(RefreshToken, (repo) => repo.delete({ userId }));
+    await this.scoped(RefreshToken, (repo) =>
+      repo.delete({ actingAsUserId: userId }),
+    );
+    await this.scoped(PersonalAccessToken, (repo) => repo.delete({ userId }));
+    await this.scoped(UserPreference, (repo) => repo.delete({ userId }));
+    await this.scoped(User, (repo) => repo.remove(user));
     return { downgraded: false };
   }
 
@@ -449,7 +475,9 @@ export class UsersService {
     userId: string,
     dto: DeleteDataDto,
   ): Promise<{ deleted: Record<string, number> }> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user) {
       throw new NotFoundException(
         tr("errors.users.userNotFound", "User not found"),
@@ -485,22 +513,11 @@ export class UsersService {
       // The presence of a valid JWT session + the OIDC token confirms identity.
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const deleted = await this.runOwnedDataDeletes(userId, dto, queryRunner);
-      await queryRunner.commitTransaction();
-      this.logger.log(
-        `User ${userId} deleted data: ${JSON.stringify(deleted)}`,
-      );
-      return { deleted };
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    const deleted = await withScopedDb(this.dataSource, (manager) =>
+      this.runOwnedDataDeletes(userId, dto, manager),
+    );
+    this.logger.log(`User ${userId} deleted data: ${JSON.stringify(deleted)}`);
+    return { deleted };
   }
 
   /**
@@ -516,27 +533,27 @@ export class UsersService {
       deleteCategories?: boolean;
       deleteExchangeRates?: boolean;
     },
-    queryRunner: QueryRunner,
+    manager: EntityManager,
   ): Promise<Record<string, number>> {
     const deleted: Record<string, number> = {};
 
     // Always deleted: financial transaction data, investments, summaries, budgets
 
     // Investment data (FK-safe order)
-    let result = await queryRunner.query(
+    let result = await manager.query(
       "DELETE FROM investment_transactions WHERE user_id = $1",
       [userId],
     );
     deleted.investmentTransactions = result[1] ?? 0;
 
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM holdings WHERE account_id IN
          (SELECT id FROM accounts WHERE user_id = $1)`,
       [userId],
     );
     deleted.holdings = result[1] ?? 0;
 
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM security_prices WHERE security_id IN
          (SELECT id FROM securities WHERE user_id = $1)`,
       [userId],
@@ -544,38 +561,37 @@ export class UsersService {
     deleted.securityPrices = result[1] ?? 0;
 
     // Scheduled transactions (before securities: they reference investment_security_id)
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM scheduled_transaction_overrides WHERE scheduled_transaction_id IN
          (SELECT id FROM scheduled_transactions WHERE user_id = $1)`,
       [userId],
     );
 
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM scheduled_transaction_splits WHERE scheduled_transaction_id IN
          (SELECT id FROM scheduled_transactions WHERE user_id = $1)`,
       [userId],
     );
 
-    result = await queryRunner.query(
+    result = await manager.query(
       "DELETE FROM scheduled_transactions WHERE user_id = $1",
       [userId],
     );
     deleted.scheduledTransactions = result[1] ?? 0;
 
-    result = await queryRunner.query(
-      "DELETE FROM securities WHERE user_id = $1",
-      [userId],
-    );
+    result = await manager.query("DELETE FROM securities WHERE user_id = $1", [
+      userId,
+    ]);
     deleted.securities = result[1] ?? 0;
 
     // Budget data
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM budget_alerts WHERE user_id = $1`,
       [userId],
     );
     deleted.budgetAlerts = result[1] ?? 0;
 
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM budget_period_categories WHERE budget_period_id IN
          (SELECT bp.id FROM budget_periods bp
           JOIN budgets b ON bp.budget_id = b.id
@@ -584,27 +600,27 @@ export class UsersService {
     );
     deleted.budgetPeriodCategories = result[1] ?? 0;
 
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM budget_periods WHERE budget_id IN
          (SELECT id FROM budgets WHERE user_id = $1)`,
       [userId],
     );
     deleted.budgetPeriods = result[1] ?? 0;
 
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM budget_categories WHERE budget_id IN
          (SELECT id FROM budgets WHERE user_id = $1)`,
       [userId],
     );
     deleted.budgetCategories = result[1] ?? 0;
 
-    result = await queryRunner.query("DELETE FROM budgets WHERE user_id = $1", [
+    result = await manager.query("DELETE FROM budgets WHERE user_id = $1", [
       userId,
     ]);
     deleted.budgets = result[1] ?? 0;
 
     // Transaction tags
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM transaction_split_tags WHERE transaction_split_id IN
          (SELECT ts.id FROM transaction_splits ts
           JOIN transactions t ON ts.transaction_id = t.id
@@ -612,14 +628,14 @@ export class UsersService {
       [userId],
     );
 
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM transaction_tags WHERE transaction_id IN
          (SELECT id FROM transactions WHERE user_id = $1)`,
       [userId],
     );
 
     // Transaction splits
-    result = await queryRunner.query(
+    result = await manager.query(
       `DELETE FROM transaction_splits WHERE transaction_id IN
          (SELECT id FROM transactions WHERE user_id = $1)`,
       [userId],
@@ -627,47 +643,46 @@ export class UsersService {
     deleted.transactionSplits = result[1] ?? 0;
 
     // Transactions
-    result = await queryRunner.query(
+    result = await manager.query(
       "DELETE FROM transactions WHERE user_id = $1",
       [userId],
     );
     deleted.transactions = result[1] ?? 0;
 
     // Tags (now that transaction_tags are gone)
-    result = await queryRunner.query("DELETE FROM tags WHERE user_id = $1", [
+    result = await manager.query("DELETE FROM tags WHERE user_id = $1", [
       userId,
     ]);
     deleted.tags = result[1] ?? 0;
 
     // Monthly account balances
-    result = await queryRunner.query(
+    result = await manager.query(
       "DELETE FROM monthly_account_balances WHERE user_id = $1",
       [userId],
     );
     deleted.monthlyBalances = result[1] ?? 0;
 
     // Custom reports
-    result = await queryRunner.query(
+    result = await manager.query(
       "DELETE FROM custom_reports WHERE user_id = $1",
       [userId],
     );
     deleted.customReports = result[1] ?? 0;
 
     // Import column mappings
-    result = await queryRunner.query(
+    result = await manager.query(
       "DELETE FROM import_column_mappings WHERE user_id = $1",
       [userId],
     );
     deleted.importMappings = result[1] ?? 0;
 
     // AI data
-    result = await queryRunner.query(
-      "DELETE FROM ai_insights WHERE user_id = $1",
-      [userId],
-    );
+    result = await manager.query("DELETE FROM ai_insights WHERE user_id = $1", [
+      userId,
+    ]);
     deleted.aiInsights = result[1] ?? 0;
 
-    result = await queryRunner.query(
+    result = await manager.query(
       "DELETE FROM ai_usage_logs WHERE user_id = $1",
       [userId],
     );
@@ -675,27 +690,25 @@ export class UsersService {
     // Optional: delete payees (before accounts, since payee default_category_id
     // references categories, and accounts may reference payee-related data)
     if (opts.deletePayees) {
-      result = await queryRunner.query(
+      result = await manager.query(
         "DELETE FROM payee_aliases WHERE user_id = $1",
         [userId],
       );
-      result = await queryRunner.query(
-        "DELETE FROM payees WHERE user_id = $1",
-        [userId],
-      );
+      result = await manager.query("DELETE FROM payees WHERE user_id = $1", [
+        userId,
+      ]);
       deleted.payees = result[1] ?? 0;
     }
 
     // Optional: delete accounts (must come after transactions)
     if (opts.deleteAccounts) {
-      result = await queryRunner.query(
-        "DELETE FROM accounts WHERE user_id = $1",
-        [userId],
-      );
+      result = await manager.query("DELETE FROM accounts WHERE user_id = $1", [
+        userId,
+      ]);
       deleted.accounts = result[1] ?? 0;
     } else {
       // Reset account balances to opening balance when transactions are deleted
-      await queryRunner.query(
+      await manager.query(
         "UPDATE accounts SET current_balance = opening_balance WHERE user_id = $1",
         [userId],
       );
@@ -704,18 +717,18 @@ export class UsersService {
     // Optional: delete categories (must come after transactions and budgets)
     if (opts.deleteCategories) {
       // Clear payee default_category_id references first
-      await queryRunner.query(
+      await manager.query(
         `UPDATE payees SET default_category_id = NULL WHERE user_id = $1`,
         [userId],
       );
       // Clear account category references
-      await queryRunner.query(
+      await manager.query(
         `UPDATE accounts SET principal_category_id = NULL,
            interest_category_id = NULL, asset_category_id = NULL
            WHERE user_id = $1`,
         [userId],
       );
-      result = await queryRunner.query(
+      result = await manager.query(
         "DELETE FROM categories WHERE user_id = $1",
         [userId],
       );
@@ -724,7 +737,7 @@ export class UsersService {
 
     // Optional: delete exchange rates
     if (opts.deleteExchangeRates) {
-      result = await queryRunner.query(
+      result = await manager.query(
         "DELETE FROM user_currency_preferences WHERE user_id = $1",
         [userId],
       );
@@ -732,7 +745,7 @@ export class UsersService {
     }
 
     // Clear action history (undo/redo) -- references deleted entities
-    result = await queryRunner.query(
+    result = await manager.query(
       "DELETE FROM action_history WHERE user_id = $1",
       [userId],
     );
@@ -743,9 +756,11 @@ export class UsersService {
 
   /** True if the user is a delegate of someone else (has incoming access). */
   async isActingDelegate(userId: string): Promise<boolean> {
-    const rows = await this.dataSource.query(
-      "SELECT 1 FROM account_delegates WHERE delegate_user_id = $1 LIMIT 1",
-      [userId],
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        "SELECT 1 FROM account_delegates WHERE delegate_user_id = $1 LIMIT 1",
+        [userId],
+      ),
     );
     return rows.length > 0;
   }
@@ -759,10 +774,7 @@ export class UsersService {
    * admin User Management and no "self" context is offered.
    */
   async purgeForDowngrade(userId: string): Promise<void> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
+    await withScopedDb(this.dataSource, async (manager) => {
       await this.runOwnedDataDeletes(
         userId,
         {
@@ -771,22 +783,16 @@ export class UsersService {
           deleteCategories: true,
           deleteExchangeRates: true,
         },
-        queryRunner,
+        manager,
       );
-      await queryRunner.query(
+      await manager.query(
         "DELETE FROM account_delegates WHERE owner_user_id = $1",
         [userId],
       );
-      await queryRunner.query(
+      await manager.query(
         "UPDATE users SET is_delegate_only = true WHERE id = $1",
         [userId],
       );
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 }

@@ -5,15 +5,14 @@ import {
   ConflictException,
   Logger,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource, In, IsNull } from "typeorm";
+import { DataSource, EntityManager, In, IsNull } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import {
   Account,
   AccountType,
   AccountSubType,
 } from "../accounts/entities/account.entity";
 import { Category } from "../categories/entities/category.entity";
-import { Payee } from "../payees/entities/payee.entity";
 import { ImportColumnMapping } from "./entities/import-column-mapping.entity";
 import {
   parseQif,
@@ -54,6 +53,7 @@ import { ImportEntityCreatorService } from "./import-entity-creator.service";
 import { ImportPostProcessingService } from "./import-post-processing.service";
 import { ImportInvestmentProcessorService } from "./import-investment-processor.service";
 import { ImportRegularProcessorService } from "./import-regular-processor.service";
+import { Security } from "../securities/entities/security.entity";
 import { Tag } from "../tags/entities/tag.entity";
 import { Transaction } from "../transactions/entities/transaction.entity";
 import { TransactionSplit } from "../transactions/entities/transaction-split.entity";
@@ -65,14 +65,6 @@ export class ImportService {
 
   constructor(
     private dataSource: DataSource,
-    @InjectRepository(Account)
-    private accountsRepository: Repository<Account>,
-    @InjectRepository(Category)
-    private categoriesRepository: Repository<Category>,
-    @InjectRepository(Payee)
-    private payeesRepository: Repository<Payee>,
-    @InjectRepository(ImportColumnMapping)
-    private columnMappingRepository: Repository<ImportColumnMapping>,
     private postProcessing: ImportPostProcessingService,
     private entityCreator: ImportEntityCreatorService,
     private investmentProcessor: ImportInvestmentProcessorService,
@@ -197,10 +189,6 @@ export class ImportService {
       );
     }
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     const affectedAccountIds = new Set<string>();
     const importStartTime = new Date();
     let hasInvestment = false;
@@ -222,229 +210,226 @@ export class ImportService {
       },
     };
 
+    // One transaction for the whole multi-account import, exactly as the former
+    // QueryRunner block was: per-transaction SAVEPOINTs inside it let a single
+    // bad row roll back without discarding the rest of the file.
     try {
-      // Step 1: Create categories from !Type:Cat definitions
-      const categoryMap = new Map<string, string | null>();
-      await this.createCategoriesFromDefs(
-        queryRunner,
-        userId,
-        result.categoryDefs,
-        categoryMap,
-        importResult,
-      );
-
-      // Step 1b: Also create categories referenced in transaction L-lines
-      // that are not covered by !Type:Cat (common in Quicken exports)
-      await this.createCategoriesFromBlocks(
-        queryRunner,
-        userId,
-        result.accountBlocks,
-        categoryMap,
-        importResult,
-      );
-
-      // Step 2: Create accounts from !Account blocks
-      const accountNameToId = new Map<string, string>();
-      await this.createAccountsFromBlocks(
-        queryRunner,
-        userId,
-        result.accountBlocks,
-        dto.currencyCode,
-        accountNameToId,
-        importResult,
-      );
-
-      // Step 3: Build transfer account map from all known accounts
-      // Include both newly created and pre-existing accounts so transfers resolve correctly
-      const accountMap = new Map<string, string | null>();
-      const allUserAccounts = await queryRunner.manager.find(Account, {
-        where: { userId },
-      });
-      for (const acct of allUserAccounts) {
-        accountMap.set(acct.name, acct.id);
-      }
-      // Override with newly created/resolved accounts (may have different target IDs for investment pairs)
-      for (const [name, id] of accountNameToId) {
-        accountMap.set(name, id);
-      }
-
-      // Step 4: Resolve tags from !Type:Tag definitions and transaction blocks
-      const tagMap = new Map<string, string>();
-      await this.createTagsFromDefs(
-        queryRunner,
-        userId,
-        result.tagDefs,
-        tagMap,
-      );
-      await this.resolveMultiAccountTags(
-        queryRunner,
-        userId,
-        result.accountBlocks,
-        tagMap,
-      );
-
-      // Step 5: Build security map from user-provided security mappings
-      const { securityMap, securitiesToCreate } = this.buildSecurityMappings(
-        dto.securityMappings,
-      );
-
-      // Create any new securities that the user requested
-      if (securitiesToCreate.length > 0) {
-        // Use the first investment account as the reference for security creation
-        const firstInvestmentBlock = result.accountBlocks.find(
-          (b) => b.accountType === "INVESTMENT",
+      await withScopedDb(this.dataSource, async (manager) => {
+        // Step 1: Create categories from !Type:Cat definitions
+        const categoryMap = new Map<string, string | null>();
+        await this.createCategoriesFromDefs(
+          manager,
+          userId,
+          result.categoryDefs,
+          categoryMap,
+          importResult,
         );
-        const refAccountId = firstInvestmentBlock
-          ? accountNameToId.get(firstInvestmentBlock.accountName)
-          : undefined;
-        const refAccount = refAccountId
-          ? await queryRunner.manager.findOne(Account, {
-              where: { id: refAccountId },
-            })
-          : undefined;
 
-        if (refAccount) {
-          await this.entityCreator.createSecurities(
-            queryRunner,
-            userId,
-            securitiesToCreate,
-            securityMap,
-            refAccount,
-            importResult,
-          );
-        }
-      }
+        // Step 1b: Also create categories referenced in transaction L-lines
+        // that are not covered by !Type:Cat (common in Quicken exports)
+        await this.createCategoriesFromBlocks(
+          manager,
+          userId,
+          result.accountBlocks,
+          categoryMap,
+          importResult,
+        );
 
-      // Step 6: Import transactions per account block
-      for (const block of result.accountBlocks) {
-        let accountId = accountNameToId.get(block.accountName);
-        if (!accountId) {
-          importResult.errors += block.transactions.length;
-          importResult.errorMessages.push(
-            `Skipped ${block.transactions.length} transactions: could not resolve account "${block.accountName}"`,
-          );
-          continue;
-        }
+        // Step 2: Create accounts from !Account blocks
+        const accountNameToId = new Map<string, string>();
+        await this.createAccountsFromBlocks(
+          manager,
+          userId,
+          result.accountBlocks,
+          dto.currencyCode,
+          accountNameToId,
+          importResult,
+        );
 
-        let account = await queryRunner.manager.findOne(Account, {
-          where: { id: accountId },
+        // Step 3: Build transfer account map from all known accounts
+        // Include both newly created and pre-existing accounts so transfers resolve correctly
+        const accountMap = new Map<string, string | null>();
+        const allUserAccounts = await manager.find(Account, {
+          where: { userId },
         });
-        if (!account) {
-          importResult.errors += block.transactions.length;
-          importResult.errorMessages.push(
-            `Account "${block.accountName}" (${accountId}) not found in database`,
-          );
-          continue;
+        for (const acct of allUserAccounts) {
+          accountMap.set(acct.name, acct.id);
+        }
+        // Override with newly created/resolved accounts (may have different target IDs for investment pairs)
+        for (const [name, id] of accountNameToId) {
+          accountMap.set(name, id);
         }
 
-        const isInvestment = block.accountType === "INVESTMENT";
-        if (isInvestment) hasInvestment = true;
+        // Step 4: Resolve tags from !Type:Tag definitions and transaction blocks
+        const tagMap = new Map<string, string>();
+        await this.createTagsFromDefs(manager, userId, result.tagDefs, tagMap);
+        await this.resolveMultiAccountTags(
+          manager,
+          userId,
+          result.accountBlocks,
+          tagMap,
+        );
 
-        // For investment blocks, the accountNameToId maps to the cash account
-        // (for transfer resolution), but the investment processor needs the
-        // brokerage account so that investment transactions and holdings are
-        // recorded there, and the cash-side transaction is routed to the
-        // linked cash account.
-        if (
-          isInvestment &&
-          account.accountSubType === AccountSubType.INVESTMENT_CASH &&
-          account.linkedAccountId
-        ) {
-          const brokerageAccount = await queryRunner.manager.findOne(Account, {
-            where: { id: account.linkedAccountId },
-          });
-          if (
-            brokerageAccount &&
-            brokerageAccount.accountSubType ===
-              AccountSubType.INVESTMENT_BROKERAGE
-          ) {
-            accountId = brokerageAccount.id;
-            account = brokerageAccount;
+        // Step 5: Build security map from user-provided security mappings
+        const { securityMap, securitiesToCreate } = this.buildSecurityMappings(
+          dto.securityMappings,
+        );
+
+        // Create any new securities that the user requested
+        if (securitiesToCreate.length > 0) {
+          // Use the first investment account as the reference for security creation
+          const firstInvestmentBlock = result.accountBlocks.find(
+            (b) => b.accountType === "INVESTMENT",
+          );
+          const refAccountId = firstInvestmentBlock
+            ? accountNameToId.get(firstInvestmentBlock.accountName)
+            : undefined;
+          const refAccount = refAccountId
+            ? await manager.findOne(Account, {
+                where: { id: refAccountId },
+              })
+            : undefined;
+
+          if (refAccount) {
+            await this.entityCreator.createSecurities(
+              manager,
+              userId,
+              securitiesToCreate,
+              securityMap,
+              refAccount,
+              importResult,
+            );
           }
         }
 
-        affectedAccountIds.add(accountId);
+        // Step 6: Import transactions per account block
+        for (const block of result.accountBlocks) {
+          let accountId = accountNameToId.get(block.accountName);
+          if (!accountId) {
+            importResult.errors += block.transactions.length;
+            importResult.errorMessages.push(
+              `Skipped ${block.transactions.length} transactions: could not resolve account "${block.accountName}"`,
+            );
+            continue;
+          }
 
-        const ctx: ImportContext = {
-          queryRunner,
-          userId,
-          accountId,
-          account,
-          categoryMap,
-          accountMap,
-          loanCategoryMap: new Map(),
-          securityMap,
-          tagMap,
-          importStartTime,
-          dateCounters: new Map(),
-          affectedAccountIds,
-          importResult,
-          transferDupCounts: new Map(),
-        };
+          let account = await manager.findOne(Account, {
+            where: { id: accountId },
+          });
+          if (!account) {
+            importResult.errors += block.transactions.length;
+            importResult.errorMessages.push(
+              `Account "${block.accountName}" (${accountId}) not found in database`,
+            );
+            continue;
+          }
 
-        // Apply opening balance
-        if (block.openingBalance !== null) {
-          await this.entityCreator.applyOpeningBalance(
-            queryRunner,
+          const isInvestment = block.accountType === "INVESTMENT";
+          if (isInvestment) hasInvestment = true;
+
+          // For investment blocks, the accountNameToId maps to the cash account
+          // (for transfer resolution), but the investment processor needs the
+          // brokerage account so that investment transactions and holdings are
+          // recorded there, and the cash-side transaction is routed to the
+          // linked cash account.
+          if (
+            isInvestment &&
+            account.accountSubType === AccountSubType.INVESTMENT_CASH &&
+            account.linkedAccountId
+          ) {
+            const brokerageAccount = await manager.findOne(Account, {
+              where: { id: account.linkedAccountId },
+            });
+            if (
+              brokerageAccount &&
+              brokerageAccount.accountSubType ===
+                AccountSubType.INVESTMENT_BROKERAGE
+            ) {
+              accountId = brokerageAccount.id;
+              account = brokerageAccount;
+            }
+          }
+
+          affectedAccountIds.add(accountId);
+
+          const ctx: ImportContext = {
+            manager,
+            userId,
             accountId,
             account,
-            block.openingBalance,
-          );
-        }
+            categoryMap,
+            accountMap,
+            loanCategoryMap: new Map(),
+            securityMap,
+            tagMap,
+            importStartTime,
+            dateCounters: new Map(),
+            affectedAccountIds,
+            importResult,
+            transferDupCounts: new Map(),
+          };
 
-        // Process transactions
-        let txIndex = 0;
-        for (const qifTx of block.transactions) {
-          txIndex++;
-          try {
-            const savepointName = `tx_import_${txIndex}`;
-            await queryRunner.query(`SAVEPOINT ${savepointName}`);
-            try {
-              if (isInvestment) {
-                await this.investmentProcessor.processTransaction(ctx, qifTx);
-              } else {
-                await this.regularProcessor.processTransaction(ctx, qifTx);
-              }
-              await queryRunner.query(`RELEASE SAVEPOINT ${savepointName}`);
-            } catch (error) {
-              await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-              importResult.errors++;
-              importResult.errorMessages.push(
-                `Error importing transaction ${txIndex}/${block.transactions.length} in "${block.accountName}" on ${qifTx.date}: ${error.message}`,
-              );
-              this.logger.warn(
-                `Error importing transaction in "${block.accountName}": ${error.message}`,
-              );
-            }
-          } catch (savepointError) {
-            importResult.errors++;
-            importResult.errorMessages.push(
-              `Error importing transaction ${txIndex}/${block.transactions.length} in "${block.accountName}" on ${qifTx.date}: ${savepointError.message}`,
-            );
-            this.logger.warn(
-              `Savepoint error in "${block.accountName}": ${savepointError.message}`,
+          // Apply opening balance
+          if (block.openingBalance !== null) {
+            await this.entityCreator.applyOpeningBalance(
+              manager,
+              accountId,
+              account,
+              block.openingBalance,
             );
           }
+
+          // Process transactions
+          let txIndex = 0;
+          for (const qifTx of block.transactions) {
+            txIndex++;
+            try {
+              const savepointName = `tx_import_${txIndex}`;
+              await manager.query(`SAVEPOINT ${savepointName}`);
+              try {
+                if (isInvestment) {
+                  await this.investmentProcessor.processTransaction(ctx, qifTx);
+                } else {
+                  await this.regularProcessor.processTransaction(ctx, qifTx);
+                }
+                await manager.query(`RELEASE SAVEPOINT ${savepointName}`);
+              } catch (error) {
+                await manager.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+                importResult.errors++;
+                importResult.errorMessages.push(
+                  `Error importing transaction ${txIndex}/${block.transactions.length} in "${block.accountName}" on ${qifTx.date}: ${error.message}`,
+                );
+                this.logger.warn(
+                  `Error importing transaction in "${block.accountName}": ${error.message}`,
+                );
+              }
+            } catch (savepointError) {
+              importResult.errors++;
+              importResult.errorMessages.push(
+                `Error importing transaction ${txIndex}/${block.transactions.length} in "${block.accountName}" on ${qifTx.date}: ${savepointError.message}`,
+              );
+              this.logger.warn(
+                `Savepoint error in "${block.accountName}": ${savepointError.message}`,
+              );
+            }
+          }
         }
-      }
 
-      // Post-block cleanup: detect and remove Quicken merged split transfers
-      // that were imported before their split counterparts (reverse block order).
-      await this.cleanupMergedSplitTransfers(
-        queryRunner,
-        userId,
-        affectedAccountIds,
-        importStartTime,
-        importResult,
-      );
-
-      await queryRunner.commitTransaction();
+        // Post-block cleanup: detect and remove Quicken merged split transfers
+        // that were imported before their split counterparts (reverse block order).
+        await this.cleanupMergedSplitTransfers(
+          manager,
+          userId,
+          affectedAccountIds,
+          importStartTime,
+          importResult,
+        );
+      });
     } catch (error) {
       this.logger.error(
         `Multi-account import failed after ${importResult.imported} transactions`,
         error.stack,
       );
-      await queryRunner.rollbackTransaction();
       throw new BadRequestException(
         tr(
           "errors.import.importFailed",
@@ -452,8 +437,6 @@ export class ImportService {
           { imported: importResult.imported, message: error.message },
         ),
       );
-    } finally {
-      await queryRunner.release();
     }
 
     // Post-import processing
@@ -472,7 +455,7 @@ export class ImportService {
    * Sets isIncome based on QIF I/E flags.
    */
   private async createCategoriesFromDefs(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     categoryDefs: QifFullParseResult["categoryDefs"],
     categoryMap: Map<string, string | null>,
@@ -496,7 +479,7 @@ export class ImportService {
 
         // Find or create parent
         const parentId = await this.findOrCreateCategoryDef(
-          queryRunner,
+          manager,
           userId,
           parentName,
           null,
@@ -508,7 +491,7 @@ export class ImportService {
 
         // Find or create child
         await this.findOrCreateCategoryDef(
-          queryRunner,
+          manager,
           userId,
           childName,
           parentId,
@@ -528,7 +511,7 @@ export class ImportService {
       } else {
         // Top-level category
         const catId = await this.findOrCreateCategoryDef(
-          queryRunner,
+          manager,
           userId,
           effectiveName,
           null,
@@ -546,7 +529,7 @@ export class ImportService {
   }
 
   private async findOrCreateCategoryDef(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     name: string,
     parentId: string | null,
@@ -568,7 +551,7 @@ export class ImportService {
       whereClause.parentId = IsNull();
     }
 
-    const existing = await queryRunner.manager.findOne(Category, {
+    const existing = await manager.findOne(Category, {
       where: whereClause,
     });
 
@@ -578,13 +561,13 @@ export class ImportService {
       return existing.id;
     }
 
-    const newCategory = queryRunner.manager.create(Category, {
+    const newCategory = manager.create(Category, {
       userId,
       name,
       parentId,
       isIncome,
     });
-    const saved = await queryRunner.manager.save(newCategory);
+    const saved = await manager.save(newCategory);
     processedCategories.set(cacheKey, saved.id);
     categoryMap.set(name, saved.id);
     importResult.categoriesCreated++;
@@ -598,7 +581,7 @@ export class ImportService {
    * but missing from the !Type:Cat section.
    */
   private async createCategoriesFromBlocks(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     blocks: QifFullParseResult["accountBlocks"],
     categoryMap: Map<string, string | null>,
@@ -632,7 +615,7 @@ export class ImportService {
         const childName = parts.slice(1).join(":").trim();
 
         const parentId = await this.findOrCreateCategoryDef(
-          queryRunner,
+          manager,
           userId,
           parentName,
           null,
@@ -643,7 +626,7 @@ export class ImportService {
         );
 
         await this.findOrCreateCategoryDef(
-          queryRunner,
+          manager,
           userId,
           childName,
           parentId,
@@ -657,7 +640,7 @@ export class ImportService {
         categoryMap.set(categoryName, childId);
       } else {
         await this.findOrCreateCategoryDef(
-          queryRunner,
+          manager,
           userId,
           categoryName,
           null,
@@ -675,7 +658,7 @@ export class ImportService {
    * Uses find-or-create to avoid duplicates.
    */
   private async createAccountsFromBlocks(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     blocks: QifAccountBlock[],
     currencyCode: string,
@@ -689,13 +672,13 @@ export class ImportService {
       if (accountNameToId.has(block.accountName)) continue;
 
       // Check for existing account by name
-      let existing = await queryRunner.manager.findOne(Account, {
+      let existing = await manager.findOne(Account, {
         where: { userId, name: block.accountName },
       });
 
       // For investment accounts, also check the " - Cash" variant
       if (!existing && block.accountType === "INVESTMENT") {
-        existing = await queryRunner.manager.findOne(Account, {
+        existing = await manager.findOne(Account, {
           where: { userId, name: `${block.accountName} - Cash` },
         });
       }
@@ -716,7 +699,7 @@ export class ImportService {
 
       if (accountType === AccountType.INVESTMENT) {
         // Create investment account pair
-        const cashAccount = queryRunner.manager.create(Account, {
+        const cashAccount = manager.create(Account, {
           userId,
           name: `${block.accountName} - Cash`,
           accountType: AccountType.INVESTMENT,
@@ -725,9 +708,9 @@ export class ImportService {
           openingBalance: 0,
           currentBalance: 0,
         });
-        const savedCash = await queryRunner.manager.save(cashAccount);
+        const savedCash = await manager.save(cashAccount);
 
-        const brokerageAccount = queryRunner.manager.create(Account, {
+        const brokerageAccount = manager.create(Account, {
           userId,
           name: `${block.accountName} - Brokerage`,
           accountType: AccountType.INVESTMENT,
@@ -737,15 +720,15 @@ export class ImportService {
           currentBalance: 0,
           linkedAccountId: savedCash.id,
         });
-        const savedBrokerage = await queryRunner.manager.save(brokerageAccount);
+        const savedBrokerage = await manager.save(brokerageAccount);
 
         savedCash.linkedAccountId = savedBrokerage.id;
-        await queryRunner.manager.save(savedCash);
+        await manager.save(savedCash);
 
         accountNameToId.set(block.accountName, savedCash.id);
         importResult.accountsCreated += 2;
       } else {
-        const newAccount = queryRunner.manager.create(Account, {
+        const newAccount = manager.create(Account, {
           userId,
           name: block.accountName,
           accountType,
@@ -754,7 +737,7 @@ export class ImportService {
           currentBalance: 0,
           creditLimit: block.creditLimit ?? null,
         });
-        const saved = await queryRunner.manager.save(newAccount);
+        const saved = await manager.save(newAccount);
         accountNameToId.set(block.accountName, saved.id);
         importResult.accountsCreated++;
       }
@@ -765,14 +748,14 @@ export class ImportService {
    * Create tags from !Type:Tag definitions in QIF file.
    */
   private async createTagsFromDefs(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     tagDefs: QifFullParseResult["tagDefs"],
     tagMap: Map<string, string>,
   ): Promise<void> {
     if (tagDefs.length === 0) return;
 
-    const existingTags = await queryRunner.manager.find(Tag, {
+    const existingTags = await manager.find(Tag, {
       where: { userId },
     });
 
@@ -787,11 +770,11 @@ export class ImportService {
       if (existing) {
         tagMap.set(key, existing.id);
       } else {
-        const newTag = queryRunner.manager.create(Tag, {
+        const newTag = manager.create(Tag, {
           userId,
           name: def.name,
         });
-        const saved = await queryRunner.manager.save(newTag);
+        const saved = await manager.save(newTag);
         tagMap.set(key, saved.id);
         existingByName.set(key, saved);
       }
@@ -802,7 +785,7 @@ export class ImportService {
    * Resolve tags from all account blocks for multi-account import.
    */
   private async resolveMultiAccountTags(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     blocks: QifAccountBlock[],
     tagMap: Map<string, string>,
@@ -823,7 +806,7 @@ export class ImportService {
 
     if (tagNamesSet.size === 0) return;
 
-    const existingTags = await queryRunner.manager.find(Tag, {
+    const existingTags = await manager.find(Tag, {
       where: { userId },
     });
 
@@ -838,8 +821,8 @@ export class ImportService {
       if (existing) {
         tagMap.set(key, existing.id);
       } else {
-        const newTag = queryRunner.manager.create(Tag, { userId, name });
-        const saved = await queryRunner.manager.save(newTag);
+        const newTag = manager.create(Tag, { userId, name });
+        const saved = await manager.save(newTag);
         tagMap.set(key, saved.id);
         existingByName.set(key, saved);
       }
@@ -970,10 +953,12 @@ export class ImportService {
   // --- Column Mapping CRUD ---
 
   async getColumnMappings(userId: string): Promise<ColumnMappingResponseDto[]> {
-    const mappings = await this.columnMappingRepository.find({
-      where: { userId },
-      order: { name: "ASC" },
-    });
+    const mappings = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ImportColumnMapping).find({
+        where: { userId },
+        order: { name: "ASC" },
+      }),
+    );
     return mappings.map((m) => ({
       id: m.id,
       name: m.name,
@@ -988,39 +973,39 @@ export class ImportService {
     userId: string,
     dto: CreateColumnMappingDto,
   ): Promise<ColumnMappingResponseDto> {
-    const existing = await this.columnMappingRepository.findOne({
-      where: { userId, name: dto.name },
-    });
-    if (existing) {
-      existing.columnMappings = dto.columnMappings as unknown as Record<
-        string,
-        unknown
-      >;
-      existing.transferRules = (dto.transferRules || []) as unknown as Record<
-        string,
-        unknown
-      >[];
-      const saved = await this.columnMappingRepository.save(existing);
-      return {
-        id: saved.id,
-        name: saved.name,
-        columnMappings: saved.columnMappings,
-        transferRules: saved.transferRules,
-        createdAt: saved.createdAt,
-        updatedAt: saved.updatedAt,
-      };
-    }
+    // Upsert by name: read and write in one transaction so two concurrent
+    // saves of the same name cannot both take the insert branch.
+    const saved = await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(ImportColumnMapping);
+      const existing = await repo.findOne({
+        where: { userId, name: dto.name },
+      });
+      if (existing) {
+        existing.columnMappings = dto.columnMappings as unknown as Record<
+          string,
+          unknown
+        >;
+        existing.transferRules = (dto.transferRules || []) as unknown as Record<
+          string,
+          unknown
+        >[];
+        return repo.save(existing);
+      }
 
-    const mapping = this.columnMappingRepository.create({
-      userId,
-      name: dto.name,
-      columnMappings: dto.columnMappings as unknown as Record<string, unknown>,
-      transferRules: (dto.transferRules || []) as unknown as Record<
-        string,
-        unknown
-      >[],
+      const mapping = repo.create({
+        userId,
+        name: dto.name,
+        columnMappings: dto.columnMappings as unknown as Record<
+          string,
+          unknown
+        >,
+        transferRules: (dto.transferRules || []) as unknown as Record<
+          string,
+          unknown
+        >[],
+      });
+      return repo.save(mapping);
     });
-    const saved = await this.columnMappingRepository.save(mapping);
     return {
       id: saved.id,
       name: saved.name,
@@ -1036,45 +1021,49 @@ export class ImportService {
     id: string,
     dto: UpdateColumnMappingDto,
   ): Promise<ColumnMappingResponseDto> {
-    const mapping = await this.columnMappingRepository.findOne({
-      where: { id, userId },
-    });
-    if (!mapping) {
-      throw new NotFoundException(
-        tr("errors.import.columnMappingNotFound", "Column mapping not found"),
-      );
-    }
-
-    if (dto.name !== undefined && dto.name !== mapping.name) {
-      const duplicate = await this.columnMappingRepository.findOne({
-        where: { userId, name: dto.name },
+    // The load, the duplicate-name check and the save are one read-modify-write.
+    const saved = await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(ImportColumnMapping);
+      const mapping = await repo.findOne({
+        where: { id, userId },
       });
-      if (duplicate) {
-        throw new ConflictException(
-          tr(
-            "errors.import.columnMappingDuplicate",
-            `A column mapping named "${dto.name}" already exists`,
-            { name: dto.name },
-          ),
+      if (!mapping) {
+        throw new NotFoundException(
+          tr("errors.import.columnMappingNotFound", "Column mapping not found"),
         );
       }
-      mapping.name = dto.name;
-    }
 
-    if (dto.columnMappings !== undefined) {
-      mapping.columnMappings = dto.columnMappings as unknown as Record<
-        string,
-        unknown
-      >;
-    }
-    if (dto.transferRules !== undefined) {
-      mapping.transferRules = dto.transferRules as unknown as Record<
-        string,
-        unknown
-      >[];
-    }
+      if (dto.name !== undefined && dto.name !== mapping.name) {
+        const duplicate = await repo.findOne({
+          where: { userId, name: dto.name },
+        });
+        if (duplicate) {
+          throw new ConflictException(
+            tr(
+              "errors.import.columnMappingDuplicate",
+              `A column mapping named "${dto.name}" already exists`,
+              { name: dto.name },
+            ),
+          );
+        }
+        mapping.name = dto.name;
+      }
 
-    const saved = await this.columnMappingRepository.save(mapping);
+      if (dto.columnMappings !== undefined) {
+        mapping.columnMappings = dto.columnMappings as unknown as Record<
+          string,
+          unknown
+        >;
+      }
+      if (dto.transferRules !== undefined) {
+        mapping.transferRules = dto.transferRules as unknown as Record<
+          string,
+          unknown
+        >[];
+      }
+
+      return repo.save(mapping);
+    });
     return {
       id: saved.id,
       name: saved.name,
@@ -1086,15 +1075,18 @@ export class ImportService {
   }
 
   async deleteColumnMapping(userId: string, id: string): Promise<void> {
-    const mapping = await this.columnMappingRepository.findOne({
-      where: { id, userId },
+    await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(ImportColumnMapping);
+      const mapping = await repo.findOne({
+        where: { id, userId },
+      });
+      if (!mapping) {
+        throw new NotFoundException(
+          tr("errors.import.columnMappingNotFound", "Column mapping not found"),
+        );
+      }
+      await repo.remove(mapping);
     });
-    if (!mapping) {
-      throw new NotFoundException(
-        tr("errors.import.columnMappingNotFound", "Column mapping not found"),
-      );
-    }
-    await this.columnMappingRepository.remove(mapping);
   }
 
   // --- Shared Import Pipeline ---
@@ -1138,9 +1130,11 @@ export class ImportService {
     securityMappings?: SecurityMappingDto[],
     _dateFormat?: DateFormat,
   ): Promise<ImportResultDto> {
-    const account = await this.accountsRepository.findOne({
-      where: { id: accountId, userId },
-    });
+    const account = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(Account).findOne({
+        where: { id: accountId, userId },
+      }),
+    );
     if (!account) {
       throw new NotFoundException(
         tr("errors.import.accountNotFound", "Account not found"),
@@ -1193,11 +1187,6 @@ export class ImportService {
       securityMap,
     );
 
-    // Start transaction
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     const affectedAccountIds = new Set<string>();
     affectedAccountIds.add(accountId);
     const importStartTime = new Date();
@@ -1219,113 +1208,115 @@ export class ImportService {
       },
     };
 
-    const ctx: ImportContext = {
-      queryRunner,
-      userId,
-      accountId,
-      account,
-      categoryMap,
-      accountMap,
-      loanCategoryMap,
-      securityMap,
-      tagMap: new Map<string, string>(),
-      importStartTime,
-      dateCounters: new Map<string, number>(),
-      affectedAccountIds,
-      importResult,
-      transferDupCounts: new Map<string, number>(),
-    };
-
+    // One transaction for the whole import, exactly as the former QueryRunner
+    // block was: per-transaction SAVEPOINTs inside it let a single bad row roll
+    // back without discarding the rest of the file.
     try {
-      // Create new entities
-      await this.entityCreator.createCategories(
-        queryRunner,
-        userId,
-        categoriesToCreate,
-        categoryMap,
-        importResult,
-      );
-      await this.entityCreator.createAccounts(
-        queryRunner,
-        userId,
-        accountsToCreate,
-        accountMap,
-        account,
-        importResult,
-      );
-      await this.entityCreator.createLoanAccounts(
-        queryRunner,
-        userId,
-        loanAccountsToCreate,
-        loanCategoryMap,
-        account,
-        importResult,
-      );
-      await this.entityCreator.createSecurities(
-        queryRunner,
-        userId,
-        securitiesToCreate,
-        securityMap,
-        account,
-        importResult,
-      );
-
-      // Create or resolve tags from QIF data
-      await this.resolveImportTags(queryRunner, userId, result, ctx.tagMap);
-
-      // Apply opening balance
-      if (result.openingBalance !== null) {
-        await this.entityCreator.applyOpeningBalance(
-          queryRunner,
+      await withScopedDb(this.dataSource, async (manager) => {
+        const ctx: ImportContext = {
+          manager,
+          userId,
           accountId,
           account,
-          result.openingBalance,
-        );
-      }
+          categoryMap,
+          accountMap,
+          loanCategoryMap,
+          securityMap,
+          tagMap: new Map<string, string>(),
+          importStartTime,
+          dateCounters: new Map<string, number>(),
+          affectedAccountIds,
+          importResult,
+          transferDupCounts: new Map<string, number>(),
+        };
 
-      // Import transactions
-      let txIndex = 0;
-      const totalTransactions = result.transactions.length;
-      for (const qifTx of result.transactions) {
-        txIndex++;
-        try {
-          const savepointName = `tx_import_${txIndex}`;
-          await queryRunner.query(`SAVEPOINT ${savepointName}`);
-          try {
-            if (isInvestment) {
-              await this.investmentProcessor.processTransaction(ctx, qifTx);
-            } else {
-              await this.regularProcessor.processTransaction(ctx, qifTx);
-            }
-            await queryRunner.query(`RELEASE SAVEPOINT ${savepointName}`);
-          } catch (error) {
-            await queryRunner.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
-            importResult.errors++;
-            importResult.errorMessages.push(
-              `Error importing transaction ${txIndex}/${totalTransactions} on ${qifTx.date}: ${error.message}`,
-            );
-            this.logger.warn(
-              `Error importing transaction ${txIndex}/${totalTransactions}: ${error.message}`,
-            );
-          }
-        } catch (savepointError) {
-          importResult.errors++;
-          importResult.errorMessages.push(
-            `Error importing transaction ${txIndex}/${totalTransactions} on ${qifTx.date}: ${savepointError.message}`,
-          );
-          this.logger.warn(
-            `Savepoint error for transaction ${txIndex}/${totalTransactions}: ${savepointError.message}`,
+        // Create new entities
+        await this.entityCreator.createCategories(
+          manager,
+          userId,
+          categoriesToCreate,
+          categoryMap,
+          importResult,
+        );
+        await this.entityCreator.createAccounts(
+          manager,
+          userId,
+          accountsToCreate,
+          accountMap,
+          account,
+          importResult,
+        );
+        await this.entityCreator.createLoanAccounts(
+          manager,
+          userId,
+          loanAccountsToCreate,
+          loanCategoryMap,
+          account,
+          importResult,
+        );
+        await this.entityCreator.createSecurities(
+          manager,
+          userId,
+          securitiesToCreate,
+          securityMap,
+          account,
+          importResult,
+        );
+
+        // Create or resolve tags from QIF data
+        await this.resolveImportTags(manager, userId, result, ctx.tagMap);
+
+        // Apply opening balance
+        if (result.openingBalance !== null) {
+          await this.entityCreator.applyOpeningBalance(
+            manager,
+            accountId,
+            account,
+            result.openingBalance,
           );
         }
-      }
 
-      await queryRunner.commitTransaction();
+        // Import transactions
+        let txIndex = 0;
+        const totalTransactions = result.transactions.length;
+        for (const qifTx of result.transactions) {
+          txIndex++;
+          try {
+            const savepointName = `tx_import_${txIndex}`;
+            await manager.query(`SAVEPOINT ${savepointName}`);
+            try {
+              if (isInvestment) {
+                await this.investmentProcessor.processTransaction(ctx, qifTx);
+              } else {
+                await this.regularProcessor.processTransaction(ctx, qifTx);
+              }
+              await manager.query(`RELEASE SAVEPOINT ${savepointName}`);
+            } catch (error) {
+              await manager.query(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+              importResult.errors++;
+              importResult.errorMessages.push(
+                `Error importing transaction ${txIndex}/${totalTransactions} on ${qifTx.date}: ${error.message}`,
+              );
+              this.logger.warn(
+                `Error importing transaction ${txIndex}/${totalTransactions}: ${error.message}`,
+              );
+            }
+          } catch (savepointError) {
+            importResult.errors++;
+            importResult.errorMessages.push(
+              `Error importing transaction ${txIndex}/${totalTransactions} on ${qifTx.date}: ${savepointError.message}`,
+            );
+            this.logger.warn(
+              `Savepoint error for transaction ${txIndex}/${totalTransactions}: ${savepointError.message}`,
+            );
+          }
+        }
+      });
     } catch (error) {
       this.logger.error(
         `Import failed after ${importResult.imported} transactions`,
         error.stack,
       );
-      await queryRunner.rollbackTransaction();
       throw new BadRequestException(
         tr(
           "errors.import.importFailed",
@@ -1333,8 +1324,6 @@ export class ImportService {
           { imported: importResult.imported, message: error.message },
         ),
       );
-    } finally {
-      await queryRunner.release();
     }
 
     // Post-import processing
@@ -1441,10 +1430,12 @@ export class ImportService {
       ),
     ];
     if (mappedAccountIds.length > 0) {
-      const foundAccounts = await this.accountsRepository.find({
-        where: { id: In(mappedAccountIds), userId },
-        select: ["id"],
-      });
+      const foundAccounts = await withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(Account).find({
+          where: { id: In(mappedAccountIds), userId },
+          select: ["id"],
+        }),
+      );
       const foundAccountIdSet = new Set(foundAccounts.map((a) => a.id));
       for (const accId of mappedAccountIds) {
         if (!foundAccountIdSet.has(accId)) {
@@ -1464,10 +1455,12 @@ export class ImportService {
       ...new Set([...categoryMap.values()].filter(Boolean) as string[]),
     ];
     if (mappedCategoryIds.length > 0) {
-      const foundCategories = await this.categoriesRepository.find({
-        where: { id: In(mappedCategoryIds), userId },
-        select: ["id"],
-      });
+      const foundCategories = await withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(Category).find({
+          where: { id: In(mappedCategoryIds), userId },
+          select: ["id"],
+        }),
+      );
       const foundCategoryIdSet = new Set(foundCategories.map((c) => c.id));
       for (const catId of mappedCategoryIds) {
         if (!foundCategoryIdSet.has(catId)) {
@@ -1487,12 +1480,13 @@ export class ImportService {
       ...new Set([...securityMap.values()].filter(Boolean) as string[]),
     ];
     if (mappedSecurityIds.length > 0) {
-      const foundSecurities = await this.dataSource
-        .getRepository("Security")
-        .find({ where: { id: In(mappedSecurityIds), userId }, select: ["id"] });
-      const foundSecurityIdSet = new Set(
-        foundSecurities.map((s: { id: string }) => s.id),
+      const foundSecurities = await withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(Security).find({
+          where: { id: In(mappedSecurityIds), userId },
+          select: ["id"],
+        }),
       );
+      const foundSecurityIdSet = new Set(foundSecurities.map((sec) => sec.id));
       for (const secId of mappedSecurityIds) {
         if (!foundSecurityIdSet.has(secId)) {
           throw new BadRequestException(
@@ -1521,7 +1515,7 @@ export class ImportService {
    * handles the reverse order.
    */
   private async cleanupMergedSplitTransfers(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     affectedAccountIds: Set<string>,
     importStartTime: Date,
@@ -1540,7 +1534,7 @@ export class ImportService {
       transaction_date: string;
       account_id: string;
       linked_transaction_id: string | null;
-    }> = await queryRunner.manager
+    }> = await manager
       .createQueryBuilder(Transaction, "t")
       .leftJoin(TransactionSplit, "split", "split.linked_transaction_id = t.id")
       .where("t.user_id = :userId", { userId })
@@ -1567,7 +1561,7 @@ export class ImportService {
       // Determine which account is the transfer target (the other side)
       let transferAccountId: string | null = null;
       if (candidate.linked_transaction_id) {
-        const linkedTx = await queryRunner.manager.findOne(Transaction, {
+        const linkedTx = await manager.findOne(Transaction, {
           where: { id: candidate.linked_transaction_id },
         });
         if (linkedTx) {
@@ -1582,7 +1576,7 @@ export class ImportService {
         parentId: string;
         totalAmount: string;
         splitCount: string;
-      }> = await queryRunner.manager
+      }> = await manager
         .createQueryBuilder(Transaction, "st")
         .innerJoin(TransactionSplit, "s", "s.linked_transaction_id = st.id")
         .innerJoin(Transaction, "parent", "s.transaction_id = parent.id")
@@ -1614,26 +1608,26 @@ export class ImportService {
 
           // Reverse balance impacts
           await updateAccountBalance(
-            queryRunner,
+            manager,
             candidate.account_id,
             -Number(candidate.amount),
           );
 
           if (linkedId) {
-            const linkedTx = await queryRunner.manager.findOne(Transaction, {
+            const linkedTx = await manager.findOne(Transaction, {
               where: { id: linkedId },
             });
             if (linkedTx) {
               await updateAccountBalance(
-                queryRunner,
+                manager,
                 linkedTx.accountId,
                 -Number(linkedTx.amount),
               );
-              await queryRunner.manager.delete(Transaction, linkedId);
+              await manager.delete(Transaction, linkedId);
             }
           }
 
-          await queryRunner.manager.delete(Transaction, candidate.id);
+          await manager.delete(Transaction, candidate.id);
           mergedCount++;
           matched = true;
 
@@ -1704,9 +1698,11 @@ export class ImportService {
   > {
     if (affectedAccountIds.size === 0) return [];
 
-    const accounts = await this.accountsRepository.find({
-      where: { userId },
-    });
+    const accounts = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(Account).find({
+        where: { userId },
+      }),
+    );
 
     const loanTypes = new Set([AccountType.LOAN, AccountType.MORTGAGE]);
 
@@ -1730,7 +1726,7 @@ export class ImportService {
    * then find or create each tag. Populates tagMap with lowercase name -> tag ID.
    */
   private async resolveImportTags(
-    queryRunner: any,
+    manager: EntityManager,
     userId: string,
     result: QifParseResult,
     tagMap: Map<string, string>,
@@ -1751,7 +1747,7 @@ export class ImportService {
     if (tagNamesSet.size === 0) return;
 
     // Load existing tags for this user
-    const existingTags = await queryRunner.manager.find(Tag, {
+    const existingTags = await manager.find(Tag, {
       where: { userId },
     });
 
@@ -1768,11 +1764,11 @@ export class ImportService {
       if (existing) {
         tagMap.set(key, existing.id);
       } else {
-        const newTag = queryRunner.manager.create(Tag, {
+        const newTag = manager.create(Tag, {
           userId,
           name,
         });
-        const saved = await queryRunner.manager.save(newTag);
+        const saved = await manager.save(newTag);
         tagMap.set(key, saved.id);
         existingByName.set(key, saved);
       }
@@ -1780,16 +1776,20 @@ export class ImportService {
   }
 
   async getExistingCategories(userId: string): Promise<Category[]> {
-    return this.categoriesRepository.find({
-      where: { userId },
-      order: { name: "ASC" },
-    });
+    return withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(Category).find({
+        where: { userId },
+        order: { name: "ASC" },
+      }),
+    );
   }
 
   async getExistingAccounts(userId: string): Promise<Account[]> {
-    return this.accountsRepository.find({
-      where: { userId },
-      order: { name: "ASC" },
-    });
+    return withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(Account).find({
+        where: { userId },
+        order: { name: "ASC" },
+      }),
+    );
   }
 }

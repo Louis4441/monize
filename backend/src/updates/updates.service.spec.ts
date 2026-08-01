@@ -1,12 +1,17 @@
 import { ConfigService } from "@nestjs/config";
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
 import {
   UpdatesService,
   isNewerVersion,
   parseVersion,
 } from "./updates.service";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 // The service reads its own "current version" from backend/package.json at
 // module load time. Grab it here so assertions stay in sync if the repo
@@ -70,12 +75,16 @@ describe("UpdatesService", () => {
     };
     configGet = jest.fn().mockReturnValue(undefined);
 
+    const { dataSource } = createScopedDbMocks([
+      [UserPreference, preferencesRepo],
+    ]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UpdatesService,
         {
-          provide: getRepositoryToken(UserPreference),
-          useValue: preferencesRepo,
+          provide: DataSource,
+          useValue: dataSource,
         },
         {
           provide: ConfigService,
@@ -294,8 +303,9 @@ describe("UpdatesService", () => {
         providers: [
           UpdatesService,
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: preferencesRepo,
+            provide: DataSource,
+            useValue: createScopedDbMocks([[UserPreference, preferencesRepo]])
+              .dataSource,
           },
           {
             provide: ConfigService,
@@ -322,8 +332,9 @@ describe("UpdatesService", () => {
         providers: [
           UpdatesService,
           {
-            provide: getRepositoryToken(UserPreference),
-            useValue: preferencesRepo,
+            provide: DataSource,
+            useValue: createScopedDbMocks([[UserPreference, preferencesRepo]])
+              .dataSource,
           },
           {
             provide: ConfigService,

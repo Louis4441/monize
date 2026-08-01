@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger, forwardRef } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../../common/db/scoped-db";
 import { Transaction } from "../../transactions/entities/transaction.entity";
 import { ScheduledTransaction } from "../../scheduled-transactions/entities/scheduled-transaction.entity";
 import { AccountsService } from "../../accounts/accounts.service";
@@ -66,10 +66,7 @@ export class ForecastAggregatorService {
   private readonly logger = new Logger(ForecastAggregatorService.name);
 
   constructor(
-    @InjectRepository(Transaction)
-    private readonly transactionRepo: Repository<Transaction>,
-    @InjectRepository(ScheduledTransaction)
-    private readonly scheduledTransactionRepo: Repository<ScheduledTransaction>,
+    private readonly dataSource: DataSource,
     @Inject(forwardRef(() => AccountsService))
     private readonly accountsService: AccountsService,
     private readonly transactionAnalytics: TransactionAnalyticsService,
@@ -120,37 +117,40 @@ export class ForecastAggregatorService {
     startDate: string,
     endDate: string,
   ): Promise<MonthlyHistoryEntry[]> {
-    const rows = await this.transactionRepo
-      .createQueryBuilder("t")
-      .leftJoin("t.category", "cat")
-      .select("TO_CHAR(t.transactionDate, 'YYYY-MM')", "month")
-      .addSelect("COALESCE(cat.name, 'Uncategorized')", "categoryName")
-      .addSelect("COALESCE(cat.isIncome, false)", "isIncome")
-      .addSelect(
-        "SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END)",
-        "income",
-      )
-      .addSelect(
-        "SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END)",
-        "expenses",
-      )
-      .where("t.userId = :userId", { userId })
-      .andWhere("t.transactionDate >= :startDate", { startDate })
-      .andWhere("t.transactionDate <= :endDate", { endDate })
-      .andWhere("t.status != 'VOID'")
-      .andWhere("t.isTransfer = false")
-      .andWhere("t.parentTransactionId IS NULL")
-      // Exclude investment-linked cash transactions so BUY/SELL/DIVIDEND
-      // side-effects don't skew the historical income/expense baseline
-      // used to train the forecast.
-      .andWhere(
-        "NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = t.id)",
-      )
-      .groupBy("TO_CHAR(t.transactionDate, 'YYYY-MM')")
-      .addGroupBy("cat.name")
-      .addGroupBy("cat.isIncome")
-      .orderBy("month", "ASC")
-      .getRawMany();
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager
+        .getRepository(Transaction)
+        .createQueryBuilder("t")
+        .leftJoin("t.category", "cat")
+        .select("TO_CHAR(t.transactionDate, 'YYYY-MM')", "month")
+        .addSelect("COALESCE(cat.name, 'Uncategorized')", "categoryName")
+        .addSelect("COALESCE(cat.isIncome, false)", "isIncome")
+        .addSelect(
+          "SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END)",
+          "income",
+        )
+        .addSelect(
+          "SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END)",
+          "expenses",
+        )
+        .where("t.userId = :userId", { userId })
+        .andWhere("t.transactionDate >= :startDate", { startDate })
+        .andWhere("t.transactionDate <= :endDate", { endDate })
+        .andWhere("t.status != 'VOID'")
+        .andWhere("t.isTransfer = false")
+        .andWhere("t.parentTransactionId IS NULL")
+        // Exclude investment-linked cash transactions so BUY/SELL/DIVIDEND
+        // side-effects don't skew the historical income/expense baseline
+        // used to train the forecast.
+        .andWhere(
+          "NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = t.id)",
+        )
+        .groupBy("TO_CHAR(t.transactionDate, 'YYYY-MM')")
+        .addGroupBy("cat.name")
+        .addGroupBy("cat.isIncome")
+        .orderBy("month", "ASC")
+        .getRawMany(),
+    );
 
     const monthMap = new Map<
       string,
@@ -218,11 +218,13 @@ export class ForecastAggregatorService {
   private async getActiveScheduledTransactions(
     userId: string,
   ): Promise<ScheduledTransactionSummary[]> {
-    const scheduled = await this.scheduledTransactionRepo.find({
-      where: { userId, isActive: true },
-      relations: ["category"],
-      order: { nextDueDate: "ASC" },
-    });
+    const scheduled = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(ScheduledTransaction).find({
+        where: { userId, isActive: true },
+        relations: ["category"],
+        order: { nextDueDate: "ASC" },
+      }),
+    );
 
     return scheduled.map((st) => {
       const amount = Number(st.amount);
@@ -247,26 +249,29 @@ export class ForecastAggregatorService {
     startDate: string,
     endDate: string,
   ): Promise<IncomePatterns> {
-    const rows = await this.transactionRepo
-      .createQueryBuilder("t")
-      .select("TO_CHAR(t.transactionDate, 'YYYY-MM')", "month")
-      .addSelect("SUM(t.amount)", "total")
-      .addSelect("COUNT(DISTINCT t.payeeName)", "sourceCount")
-      .where("t.userId = :userId", { userId })
-      .andWhere("t.transactionDate >= :startDate", { startDate })
-      .andWhere("t.transactionDate <= :endDate", { endDate })
-      .andWhere("t.amount > 0")
-      .andWhere("t.status != 'VOID'")
-      .andWhere("t.isTransfer = false")
-      .andWhere("t.parentTransactionId IS NULL")
-      // Exclude investment-linked cash credits (SELL / DIVIDEND) so
-      // they don't inflate the income baseline.
-      .andWhere(
-        "NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = t.id)",
-      )
-      .groupBy("TO_CHAR(t.transactionDate, 'YYYY-MM')")
-      .orderBy("month", "ASC")
-      .getRawMany();
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager
+        .getRepository(Transaction)
+        .createQueryBuilder("t")
+        .select("TO_CHAR(t.transactionDate, 'YYYY-MM')", "month")
+        .addSelect("SUM(t.amount)", "total")
+        .addSelect("COUNT(DISTINCT t.payeeName)", "sourceCount")
+        .where("t.userId = :userId", { userId })
+        .andWhere("t.transactionDate >= :startDate", { startDate })
+        .andWhere("t.transactionDate <= :endDate", { endDate })
+        .andWhere("t.amount > 0")
+        .andWhere("t.status != 'VOID'")
+        .andWhere("t.isTransfer = false")
+        .andWhere("t.parentTransactionId IS NULL")
+        // Exclude investment-linked cash credits (SELL / DIVIDEND) so
+        // they don't inflate the income baseline.
+        .andWhere(
+          "NOT EXISTS (SELECT 1 FROM investment_transactions it WHERE it.transaction_id = t.id)",
+        )
+        .groupBy("TO_CHAR(t.transactionDate, 'YYYY-MM')")
+        .orderBy("month", "ASC")
+        .getRawMany(),
+    );
 
     const monthlyIncome = rows.map((r) => ({
       month: r.month,

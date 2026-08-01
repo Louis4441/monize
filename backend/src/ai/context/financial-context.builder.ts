@@ -1,6 +1,6 @@
 import { Injectable, Inject, forwardRef } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource } from "typeorm";
+import { withScopedDb } from "../../common/db/scoped-db";
 import { AccountsService } from "../../accounts/accounts.service";
 import { CategoriesService } from "../../categories/categories.service";
 import { UserPreference } from "../../users/entities/user-preference.entity";
@@ -22,15 +22,16 @@ export class FinancialContextBuilder {
     private readonly accountsService: AccountsService,
     @Inject(forwardRef(() => CategoriesService))
     private readonly categoriesService: CategoriesService,
-    @InjectRepository(UserPreference)
-    private readonly prefRepo: Repository<UserPreference>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async buildQueryContext(userId: string): Promise<string> {
     const [accounts, categoryTree, preferences] = await Promise.all([
       this.accountsService.findAll(userId, false),
       this.categoriesService.getTree(userId),
-      this.prefRepo.findOne({ where: { userId } }),
+      withScopedDb(this.dataSource, (manager) =>
+        manager.getRepository(UserPreference).findOne({ where: { userId } }),
+      ),
     ]);
 
     const currency = preferences?.defaultCurrency || "USD";

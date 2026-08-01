@@ -6,9 +6,10 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
 import { ConfigService } from "@nestjs/config";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, EntityManager } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
+import { withSystemContext } from "../common/db/with-context";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 import { I18nService } from "nestjs-i18n";
@@ -33,14 +34,6 @@ export class AdminService {
   private readonly BCRYPT_ROUNDS = 12;
 
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    @InjectRepository(UserPreference)
-    private preferencesRepository: Repository<UserPreference>,
-    @InjectRepository(RefreshToken)
-    private refreshTokensRepository: Repository<RefreshToken>,
-    @InjectRepository(PersonalAccessToken)
-    private patRepository: Repository<PersonalAccessToken>,
     private oauthProviderService: OAuthProviderService,
     private usersService: UsersService,
     private dataSource: DataSource,
@@ -50,6 +43,10 @@ export class AdminService {
   ) {}
 
   async findAllUsers() {
+    return withSystemContext(() => this.findAllUsersWithinContext());
+  }
+
+  private async findAllUsersWithinContext() {
     // Hide owner-managed delegate identities -- users that exist solely
     // because an account owner added them via Shared Access. Those rows
     // are managed from the owner's Shared Access page. The is_delegate_only
@@ -57,10 +54,12 @@ export class AdminService {
     // when the user upgrades into a full account via the /register claim
     // path, so a self-registered user who happens to also be a delegate
     // still shows up here.
-    const users = await this.usersRepository.find({
-      where: { isDelegateOnly: false },
-      order: { createdAt: "ASC" },
-    });
+    const users = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(User).find({
+        where: { isDelegateOnly: false },
+        order: { createdAt: "ASC" },
+      }),
+    );
     return users.map((user) => {
       const {
         passwordHash,
@@ -85,6 +84,10 @@ export class AdminService {
   }
 
   async createUser(dto: CreateUserDto) {
+    return withSystemContext(() => this.createUserWithinContext(dto));
+  }
+
+  private async createUserWithinContext(dto: CreateUserDto) {
     const email = dto.email.toLowerCase().trim();
     const role = dto.role === "admin" ? "admin" : "user";
 
@@ -108,7 +111,8 @@ export class AdminService {
     let temporaryPassword: string | undefined;
     let inviteToken: string | undefined;
 
-    const { saved, upgraded } = await this.dataSource.transaction(
+    const { saved, upgraded } = await withScopedDb(
+      this.dataSource,
       async (manager) => {
         const existing = await manager.findOne(User, { where: { email } });
 
@@ -205,9 +209,8 @@ export class AdminService {
         "http://localhost:3000",
       );
       const inviteUrl = `${frontendUrl}/reset-password?token=${inviteToken}`;
-      const lang = await resolveUserEmailLocale(
-        this.preferencesRepository,
-        saved.id,
+      const lang = await withScopedDb(this.dataSource, (manager) =>
+        resolveUserEmailLocale(manager.getRepository(UserPreference), saved.id),
       );
       const t = emailTranslator(this.i18n, lang);
       this.emailService
@@ -234,6 +237,16 @@ export class AdminService {
   }
 
   async updateUserRole(adminId: string, targetUserId: string, role: string) {
+    return withSystemContext(() =>
+      this.updateUserRoleWithinContext(adminId, targetUserId, role),
+    );
+  }
+
+  private async updateUserRoleWithinContext(
+    adminId: string,
+    targetUserId: string,
+    role: string,
+  ) {
     if (adminId === targetUserId) {
       throw new ForbiddenException(
         tr(
@@ -243,32 +256,37 @@ export class AdminService {
       );
     }
 
-    const targetUser = await this.usersRepository.findOne({
-      where: { id: targetUserId },
-    });
-    if (!targetUser) {
-      throw new NotFoundException(
-        tr("errors.admin.userNotFound", "User not found"),
-      );
-    }
-
-    // Prevent removing the last admin
-    if (targetUser.role === "admin" && role === "user") {
-      const adminCount = await this.usersRepository.count({
-        where: { role: "admin" },
+    // One transaction: the last-admin check and the demotion are a
+    // read-modify-write over the same set of rows.
+    const saved = await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(User);
+      const targetUser = await repo.findOne({
+        where: { id: targetUserId },
       });
-      if (adminCount <= 1) {
-        throw new BadRequestException(
-          tr(
-            "errors.admin.removeLastAdmin",
-            "Cannot remove the last admin. Promote another user first.",
-          ),
+      if (!targetUser) {
+        throw new NotFoundException(
+          tr("errors.admin.userNotFound", "User not found"),
         );
       }
-    }
 
-    targetUser.role = role;
-    const saved = await this.usersRepository.save(targetUser);
+      // Prevent removing the last admin
+      if (targetUser.role === "admin" && role === "user") {
+        const adminCount = await repo.count({
+          where: { role: "admin" },
+        });
+        if (adminCount <= 1) {
+          throw new BadRequestException(
+            tr(
+              "errors.admin.removeLastAdmin",
+              "Cannot remove the last admin. Promote another user first.",
+            ),
+          );
+        }
+      }
+
+      targetUser.role = role;
+      return repo.save(targetUser);
+    });
     return this.sanitizeUser(saved);
   }
 
@@ -282,6 +300,16 @@ export class AdminService {
       "passwordHash" | "resetToken" | "resetTokenExpiry" | "twoFactorSecret"
     > & { hasPassword: boolean }
   > {
+    return withSystemContext(() =>
+      this.updateUserStatusWithinContext(adminId, targetUserId, isActive),
+    );
+  }
+
+  private async updateUserStatusWithinContext(
+    adminId: string,
+    targetUserId: string,
+    isActive: boolean,
+  ) {
     if (adminId === targetUserId) {
       throw new ForbiddenException(
         tr(
@@ -291,17 +319,20 @@ export class AdminService {
       );
     }
 
-    const targetUser = await this.usersRepository.findOne({
-      where: { id: targetUserId },
-    });
-    if (!targetUser) {
-      throw new NotFoundException(
-        tr("errors.admin.userNotFound", "User not found"),
-      );
-    }
+    const saved = await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(User);
+      const targetUser = await repo.findOne({
+        where: { id: targetUserId },
+      });
+      if (!targetUser) {
+        throw new NotFoundException(
+          tr("errors.admin.userNotFound", "User not found"),
+        );
+      }
 
-    targetUser.isActive = isActive;
-    const saved = await this.usersRepository.save(targetUser);
+      targetUser.isActive = isActive;
+      return repo.save(targetUser);
+    });
 
     // SECURITY: Revoke all refresh tokens, PATs, and OIDC artifacts when
     // deactivating a user to immediately invalidate every authenticated
@@ -310,21 +341,22 @@ export class AdminService {
     // grants, sessions). Without the OIDC sweep, an MCP client could keep
     // calling tools for up to the access-token TTL even after deactivation.
     if (!isActive) {
-      await this.refreshTokensRepository.update(
-        { userId: targetUserId, isRevoked: false },
-        { isRevoked: true },
-      );
-      await this.patRepository.update(
-        { userId: targetUserId, isRevoked: false },
-        { isRevoked: true },
-      );
-      await this.oauthProviderService.revokeAllForUser(targetUserId);
+      await this.revokeSessionsAndTokens(targetUserId);
     }
 
     return this.sanitizeUser(saved);
   }
 
   async deleteUser(
+    adminId: string,
+    targetUserId: string,
+  ): Promise<{ downgraded: boolean }> {
+    return withSystemContext(() =>
+      this.deleteUserWithinContext(adminId, targetUserId),
+    );
+  }
+
+  private async deleteUserWithinContext(
     adminId: string,
     targetUserId: string,
   ): Promise<{ downgraded: boolean }> {
@@ -337,42 +369,38 @@ export class AdminService {
       );
     }
 
-    const targetUser = await this.usersRepository.findOne({
-      where: { id: targetUserId },
-    });
-    if (!targetUser) {
-      throw new NotFoundException(
-        tr("errors.admin.userNotFound", "User not found"),
-      );
-    }
-
-    // Prevent deleting the last admin
-    if (targetUser.role === "admin") {
-      const adminCount = await this.usersRepository.count({
-        where: { role: "admin" },
+    const targetUser = await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(User);
+      const found = await repo.findOne({
+        where: { id: targetUserId },
       });
-      if (adminCount <= 1) {
-        throw new BadRequestException(
-          tr(
-            "errors.admin.deleteLastAdmin",
-            "Cannot delete the last admin account.",
-          ),
+      if (!found) {
+        throw new NotFoundException(
+          tr("errors.admin.userNotFound", "User not found"),
         );
       }
-    }
+
+      // Prevent deleting the last admin
+      if (found.role === "admin") {
+        const adminCount = await repo.count({
+          where: { role: "admin" },
+        });
+        if (adminCount <= 1) {
+          throw new BadRequestException(
+            tr(
+              "errors.admin.deleteLastAdmin",
+              "Cannot delete the last admin account.",
+            ),
+          );
+        }
+      }
+      return found;
+    });
 
     // Revoke sessions/PATs and sweep OIDC artifacts (forces re-login and
     // avoids orphan oauth_payloads rows) -- needed whether the account is
     // fully removed or demoted to a delegate.
-    await this.refreshTokensRepository.update(
-      { userId: targetUserId, isRevoked: false },
-      { isRevoked: true },
-    );
-    await this.patRepository.update(
-      { userId: targetUserId, isRevoked: false },
-      { isRevoked: true },
-    );
-    await this.oauthProviderService.revokeAllForUser(targetUserId);
+    await this.revokeSessionsAndTokens(targetUserId);
 
     // A full account that is also a delegate of someone else is demoted to
     // a pure delegate instead of being removed: their own data goes, but
@@ -388,15 +416,33 @@ export class AdminService {
     // and preferences are worthless once the account is gone either way.
     // Delegate sessions acting *as* this user go too -- the owner they point
     // at is about to disappear.
-    await this.refreshTokensRepository.delete({ userId: targetUserId });
-    await this.refreshTokensRepository.delete({ actingAsUserId: targetUserId });
-    await this.patRepository.delete({ userId: targetUserId });
-    await this.preferencesRepository.delete({ userId: targetUserId });
-    await this.usersRepository.remove(targetUser);
+    // One transaction: a partially cleared account would leave live sessions
+    // pointing at a user row that is about to disappear.
+    await withScopedDb(this.dataSource, async (manager) => {
+      const refreshTokens = manager.getRepository(RefreshToken);
+      await refreshTokens.delete({ userId: targetUserId });
+      await refreshTokens.delete({ actingAsUserId: targetUserId });
+      await manager
+        .getRepository(PersonalAccessToken)
+        .delete({ userId: targetUserId });
+      await manager
+        .getRepository(UserPreference)
+        .delete({ userId: targetUserId });
+      await manager.getRepository(User).remove(targetUser);
+    });
     return { downgraded: false };
   }
 
   async resetUserPassword(
+    adminId: string,
+    targetUserId: string,
+  ): Promise<{ temporaryPassword: string }> {
+    return withSystemContext(() =>
+      this.resetUserPasswordWithinContext(adminId, targetUserId),
+    );
+  }
+
+  private async resetUserPasswordWithinContext(
     adminId: string,
     targetUserId: string,
   ): Promise<{ temporaryPassword: string }> {
@@ -409,9 +455,11 @@ export class AdminService {
       );
     }
 
-    const targetUser = await this.usersRepository.findOne({
-      where: { id: targetUserId },
-    });
+    const targetUser = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(User).findOne({
+        where: { id: targetUserId },
+      }),
+    );
     if (!targetUser) {
       throw new NotFoundException(
         tr("errors.admin.userNotFound", "User not found"),
@@ -433,20 +481,38 @@ export class AdminService {
     targetUser.mustChangePassword = true;
     targetUser.resetToken = null;
     targetUser.resetTokenExpiry = null;
-    await this.usersRepository.save(targetUser);
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(User).save(targetUser),
+    );
 
     // SECURITY: Revoke all refresh tokens, PATs, and OIDC artifacts so the
     // forced password change applies everywhere — web, CLI/API, and MCP.
-    await this.refreshTokensRepository.update(
-      { userId: targetUserId, isRevoked: false },
-      { isRevoked: true },
-    );
-    await this.patRepository.update(
-      { userId: targetUserId, isRevoked: false },
-      { isRevoked: true },
-    );
-    await this.oauthProviderService.revokeAllForUser(targetUserId);
+    await this.revokeSessionsAndTokens(targetUserId);
 
     return { temporaryPassword };
+  }
+
+  /**
+   * Revoke every authenticated surface for a user: web sessions (refresh
+   * tokens), CLI/API access (PATs) and MCP/OAuth clients. The two token
+   * revocations share one transaction so a user can never be left half
+   * revoked; the OIDC sweep runs after, as it always did.
+   */
+  private async revokeSessionsAndTokens(targetUserId: string): Promise<void> {
+    await withScopedDb(this.dataSource, async (manager: EntityManager) => {
+      await manager
+        .getRepository(RefreshToken)
+        .update(
+          { userId: targetUserId, isRevoked: false },
+          { isRevoked: true },
+        );
+      await manager
+        .getRepository(PersonalAccessToken)
+        .update(
+          { userId: targetUserId, isRevoked: false },
+          { isRevoked: true },
+        );
+    });
+    await this.oauthProviderService.revokeAllForUser(targetUserId);
   }
 }

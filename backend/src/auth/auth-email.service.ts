@@ -4,8 +4,8 @@ import {
   Logger,
   OnModuleDestroy,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 
@@ -38,10 +38,7 @@ export class AuthEmailService implements OnModuleDestroy {
   private readonly cleanupInterval: ReturnType<typeof setInterval>;
 
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    @InjectRepository(TrustedDevice)
-    private trustedDevicesRepository: Repository<TrustedDevice>,
+    private readonly dataSource: DataSource,
     private passwordBreachService: PasswordBreachService,
     private tokenService: TokenService,
   ) {
@@ -54,6 +51,21 @@ export class AuthEmailService implements OnModuleDestroy {
     if (this.cleanupInterval.unref) {
       this.cleanupInterval.unref();
     }
+  }
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
   }
 
   onModuleDestroy() {
@@ -77,9 +89,11 @@ export class AuthEmailService implements OnModuleDestroy {
   async generateResetToken(
     email: string,
   ): Promise<{ user: User; token: string } | null> {
-    const user = await this.usersRepository.findOne({
-      where: { email },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { email },
+      }),
+    );
 
     if (!user || !user.passwordHash) return null;
 
@@ -89,7 +103,7 @@ export class AuthEmailService implements OnModuleDestroy {
     // SECURITY: Store hashed token
     user.resetToken = hashToken(rawResetToken);
     user.resetTokenExpiry = resetTokenExpiry;
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
     return { user, token: rawResetToken };
   }
@@ -113,18 +127,20 @@ export class AuthEmailService implements OnModuleDestroy {
     const passwordHash = await bcrypt.hash(newPassword, saltRounds);
 
     // M11: Atomic UPDATE...WHERE to prevent TOCTOU race condition.
-    const result = await this.usersRepository
-      .createQueryBuilder()
-      .update(User)
-      .set({
-        passwordHash,
-        resetToken: null,
-        resetTokenExpiry: null,
-      })
-      .where("resetToken = :hashedToken", { hashedToken })
-      .andWhere("resetTokenExpiry > :now", { now: new Date() })
-      .returning("id")
-      .execute();
+    const result = await this.scoped(User, (repo) =>
+      repo
+        .createQueryBuilder()
+        .update(User)
+        .set({
+          passwordHash,
+          resetToken: null,
+          resetTokenExpiry: null,
+        })
+        .where("resetToken = :hashedToken", { hashedToken })
+        .andWhere("resetTokenExpiry > :now", { now: new Date() })
+        .returning("id")
+        .execute(),
+    );
 
     if (!result.affected || result.affected === 0) {
       throw new BadRequestException(
@@ -141,7 +157,7 @@ export class AuthEmailService implements OnModuleDestroy {
       await this.tokenService.revokeAllUserRefreshTokens(userId);
       // SECURITY: Revoke trusted devices so a stolen trusted-device cookie
       // cannot bypass 2FA after a password reset.
-      await this.trustedDevicesRepository.delete({ userId });
+      await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
     }
   }
 
@@ -183,9 +199,11 @@ export class AuthEmailService implements OnModuleDestroy {
     email: string,
   ): Promise<{ user: User; token: string } | null> {
     const normalizedEmail = email.toLowerCase().trim();
-    const user = await this.usersRepository.findOne({
-      where: { email: normalizedEmail },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { email: normalizedEmail },
+      }),
+    );
 
     // Nothing to do for unknown emails or accounts that are already verified.
     if (!user || user.emailVerified) return null;
@@ -195,7 +213,7 @@ export class AuthEmailService implements OnModuleDestroy {
     user.emailVerificationTokenExpiry = new Date(
       Date.now() + 24 * 60 * 60 * 1000, // 24 hours
     );
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
     return { user, token: rawToken };
   }
@@ -208,17 +226,19 @@ export class AuthEmailService implements OnModuleDestroy {
   async verifyEmail(token: string): Promise<void> {
     const hashedToken = hashToken(token);
 
-    const result = await this.usersRepository
-      .createQueryBuilder()
-      .update(User)
-      .set({
-        emailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationTokenExpiry: null,
-      })
-      .where("emailVerificationToken = :hashedToken", { hashedToken })
-      .andWhere("emailVerificationTokenExpiry > :now", { now: new Date() })
-      .execute();
+    const result = await this.scoped(User, (repo) =>
+      repo
+        .createQueryBuilder()
+        .update(User)
+        .set({
+          emailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationTokenExpiry: null,
+        })
+        .where("emailVerificationToken = :hashedToken", { hashedToken })
+        .andWhere("emailVerificationTokenExpiry > :now", { now: new Date() })
+        .execute(),
+    );
 
     if (!result.affected || result.affected === 0) {
       throw new BadRequestException(

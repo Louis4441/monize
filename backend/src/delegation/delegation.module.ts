@@ -1,18 +1,8 @@
 import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
-import { TypeOrmModule } from "@nestjs/typeorm";
 import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 
-import { AccountDelegate } from "./entities/account-delegate.entity";
-import { AccountDelegateGrant } from "./entities/account-delegate-grant.entity";
-import { DelegateAccountFavourite } from "./entities/delegate-account-favourite.entity";
-import { User } from "../users/entities/user.entity";
-import { UserPreference } from "../users/entities/user-preference.entity";
-import { RefreshToken } from "../auth/entities/refresh-token.entity";
-import { Account } from "../accounts/entities/account.entity";
-import { Transaction } from "../transactions/entities/transaction.entity";
-import { ScheduledTransaction } from "../scheduled-transactions/entities/scheduled-transaction.entity";
 import { DelegationService } from "./delegation.service";
 import { DelegationController } from "./delegation.controller";
 import { AccountDelegateGuard } from "./guards/account-delegate.guard";
@@ -27,17 +17,6 @@ import { NotificationsModule } from "../notifications/notifications.module";
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      AccountDelegate,
-      AccountDelegateGrant,
-      DelegateAccountFavourite,
-      User,
-      UserPreference,
-      RefreshToken,
-      Account,
-      Transaction,
-      ScheduledTransaction,
-    ]),
     NotificationsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

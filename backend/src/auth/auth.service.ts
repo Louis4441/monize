@@ -8,8 +8,13 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DeepPartial, DataSource } from "typeorm";
+import {
+  DataSource,
+  DeepPartial,
+  EntityTarget,
+  ObjectLiteral,
+  Repository,
+} from "typeorm";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 
@@ -17,7 +22,6 @@ import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { buildDefaultPreferences } from "../users/user-preference.factory";
 import { TrustedDevice } from "../users/entities/trusted-device.entity";
-import { RefreshToken } from "./entities/refresh-token.entity";
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
 import { derivePurposeKey, hashToken } from "./crypto.util";
@@ -32,6 +36,7 @@ import { TwoFactorService } from "./two-factor.service";
 import { AuthEmailService } from "./auth-email.service";
 import { DelegationService } from "../delegation/delegation.service";
 import { withSystemContext } from "../common/db/with-context";
+import { withScopedDb } from "../common/db/scoped-db";
 import { tr } from "../i18n/translate";
 import { currentRequestLocale } from "../i18n/request-locale";
 import { I18nService } from "nestjs-i18n";
@@ -48,14 +53,6 @@ export class AuthService {
   private readonly BASE_LOCKOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    @InjectRepository(UserPreference)
-    private preferencesRepository: Repository<UserPreference>,
-    @InjectRepository(TrustedDevice)
-    private trustedDevicesRepository: Repository<TrustedDevice>,
-    @InjectRepository(RefreshToken)
-    private refreshTokensRepository: Repository<RefreshToken>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private dataSource: DataSource,
@@ -69,6 +66,21 @@ export class AuthService {
   ) {
     this.jwtSecret = this.configService.get<string>("JWT_SECRET")!;
     this.csrfKey = derivePurposeKey(this.jwtSecret, "csrf-token");
+  }
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
   }
 
   /** Get the derived CSRF key for use by the controller */
@@ -96,9 +108,11 @@ export class AuthService {
     const normalizedEmail = email.toLowerCase().trim();
 
     // Check if user exists
-    const existingUser = await this.usersRepository.findOne({
-      where: { email: normalizedEmail },
-    });
+    const existingUser = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { email: normalizedEmail },
+      }),
+    );
 
     if (existingUser) {
       // Delegates live in the `users` table so they reuse the auth stack.
@@ -187,7 +201,9 @@ export class AuthService {
       // context in the delegate banner even before they have any
       // accounts of their own.
       existingUser.isDelegateOnly = false;
-      const upgraded = await this.usersRepository.save(existingUser);
+      const upgraded = await this.scoped(User, (repo) =>
+        repo.save(existingUser),
+      );
 
       const { accessToken, refreshToken } =
         await this.tokenService.generateTokenPair(upgraded);
@@ -230,8 +246,8 @@ export class AuthService {
     let rawVerificationToken: string | null = null;
 
     // C9: Use serializable transaction to prevent race condition on first-user admin
-    const { user, requireVerification } = await this.dataSource.transaction(
-      "SERIALIZABLE",
+    const { user, requireVerification } = await withScopedDb(
+      this.dataSource,
       async (manager) => {
         const userCount = await manager.count(User);
         const isFirstUser = userCount === 0;
@@ -262,6 +278,9 @@ export class AuthService {
         await manager.save(buildDefaultPreferences(savedUser.id, language));
         return { user: savedUser, requireVerification: needsVerification };
       },
+      // SERIALIZABLE: two concurrent first registrations must not both
+      // see an empty users table and both become admin.
+      "SERIALIZABLE",
     );
 
     if (requireVerification) {
@@ -304,9 +323,11 @@ export class AuthService {
     const { email: rawEmail, password, rememberMe } = loginDto;
     const email = rawEmail.toLowerCase().trim();
 
-    const user = await this.usersRepository.findOne({
-      where: { email },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { email },
+      }),
+    );
 
     if (!user || !user.passwordHash) {
       this.logger.warn("Login failed: no matching account");
@@ -347,9 +368,11 @@ export class AuthService {
         );
         // Fire-and-forget lockout email
         if (user.email) {
-          const lang = await resolveUserEmailLocale(
-            this.preferencesRepository,
-            user.id,
+          const lang = await withScopedDb(this.dataSource, (manager) =>
+            resolveUserEmailLocale(
+              manager.getRepository(UserPreference),
+              user.id,
+            ),
           );
           const t = emailTranslator(this.i18n, lang);
           this.emailService
@@ -363,12 +386,14 @@ export class AuthService {
             );
         }
       }
-      await this.usersRepository
-        .createQueryBuilder()
-        .update(User)
-        .set(updateFields)
-        .where("id = :id", { id: user.id })
-        .execute();
+      await this.scoped(User, (repo) =>
+        repo
+          .createQueryBuilder()
+          .update(User)
+          .set(updateFields)
+          .where("id = :id", { id: user.id })
+          .execute(),
+      );
       throw new UnauthorizedException(
         tr("errors.auth.invalidCredentials", "Invalid credentials"),
       );
@@ -383,12 +408,14 @@ export class AuthService {
 
     // Reset failed attempts on successful login
     if (user.failedLoginAttempts > 0 || user.lockedUntil) {
-      await this.usersRepository
-        .createQueryBuilder()
-        .update(User)
-        .set({ failedLoginAttempts: 0, lockedUntil: null })
-        .where("id = :id", { id: user.id })
-        .execute();
+      await this.scoped(User, (repo) =>
+        repo
+          .createQueryBuilder()
+          .update(User)
+          .set({ failedLoginAttempts: 0, lockedUntil: null })
+          .where("id = :id", { id: user.id })
+          .execute(),
+      );
     }
 
     // Hard email-verification gate: a local account that self-registered while
@@ -402,9 +429,11 @@ export class AuthService {
     }
 
     // Check if 2FA is enabled
-    const preferences = await this.preferencesRepository.findOne({
-      where: { userId: user.id },
-    });
+    const preferences = await this.scoped(UserPreference, (repo) =>
+      repo.findOne({
+        where: { userId: user.id },
+      }),
+    );
 
     if (preferences?.twoFactorEnabled && user.twoFactorSecret) {
       // Check for trusted device
@@ -416,7 +445,7 @@ export class AuthService {
         );
         if (isTrusted) {
           user.lastLogin = new Date();
-          await this.usersRepository.save(user);
+          await this.scoped(User, (repo) => repo.save(user));
           const { accessToken, refreshToken } =
             await this.tokenService.generateTokenPair(user, rememberMe);
           this.logger.log(
@@ -443,7 +472,7 @@ export class AuthService {
 
     // Update last login
     user.lastLogin = new Date();
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
     const { accessToken, refreshToken } =
       await this.tokenService.generateTokenPair(user, rememberMe);
@@ -515,9 +544,11 @@ export class AuthService {
       );
     }
 
-    let user = await this.usersRepository.findOne({
-      where: { oidcSubject: sub },
-    });
+    let user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { oidcSubject: sub },
+      }),
+    );
     // True only when this call provisions the account, so the callback can
     // send an SSO user through the same first-run preferences step local
     // registration ends on. Linking an OIDC identity to an account that
@@ -528,9 +559,11 @@ export class AuthService {
       // SECURITY: Only link to existing account if email is verified by OIDC provider
       // M6: If the existing account has a password (local account), require confirmation
       if (trustedEmail) {
-        const existingUser = await this.usersRepository.findOne({
-          where: { email: trustedEmail },
-        });
+        const existingUser = await this.scoped(User, (repo) =>
+          repo.findOne({
+            where: { email: trustedEmail },
+          }),
+        );
 
         if (existingUser) {
           if (existingUser.passwordHash && requireVerifiedEmail) {
@@ -546,7 +579,7 @@ export class AuthService {
             // the confirmation step -- merge the OIDC identity in directly.
             existingUser.oidcSubject = sub;
             existingUser.authProvider = "oidc";
-            await this.usersRepository.save(existingUser);
+            await this.scoped(User, (repo) => repo.save(existingUser));
             user = existingUser;
           }
         }
@@ -568,8 +601,8 @@ export class AuthService {
 
         // C9: Use serializable transaction for first-user admin race prevention
         try {
-          user = await this.dataSource.transaction(
-            "SERIALIZABLE",
+          user = await withScopedDb(
+            this.dataSource,
             async (manager) => {
               const userCount = await manager.count(User);
               const userData: DeepPartial<User> = {
@@ -590,14 +623,17 @@ export class AuthService {
               );
               return savedUser;
             },
+            "SERIALIZABLE",
           );
           isNewUser = true;
         } catch (err: any) {
           // Handle duplicate email: link OIDC to the existing account
           if (err.code === "23505" && trustedEmail) {
-            const existingUser = await this.usersRepository.findOne({
-              where: { email: trustedEmail },
-            });
+            const existingUser = await this.scoped(User, (repo) =>
+              repo.findOne({
+                where: { email: trustedEmail },
+              }),
+            );
             if (existingUser) {
               if (existingUser.passwordHash && requireVerifiedEmail) {
                 // SECURITY: Local account requires confirmation
@@ -615,7 +651,7 @@ export class AuthService {
                 // merge directly
                 existingUser.oidcSubject = sub;
                 existingUser.authProvider = "oidc";
-                await this.usersRepository.save(existingUser);
+                await this.scoped(User, (repo) => repo.save(existingUser));
                 user = existingUser;
               }
             } else {
@@ -651,7 +687,8 @@ export class AuthService {
       }
 
       if (needsUpdate) {
-        await this.usersRepository.save(user);
+        const toSave = user;
+        await this.scoped(User, (repo) => repo.save(toSave));
       }
     }
 
@@ -666,20 +703,24 @@ export class AuthService {
       user.backupCodes = null;
       this.logger.log(`Cleared 2FA config for SSO user ${user.id}`);
 
-      const preferences = await this.preferencesRepository.findOne({
-        where: { userId: user.id },
-      });
+      const preferences = await this.scoped(UserPreference, (repo) =>
+        repo.findOne({
+          where: { userId: user.id },
+        }),
+      );
       if (preferences && preferences.twoFactorEnabled) {
         preferences.twoFactorEnabled = false;
-        await this.preferencesRepository.save(preferences);
+        await this.scoped(UserPreference, (repo) => repo.save(preferences));
       }
 
-      await this.trustedDevicesRepository.delete({ userId: user.id });
+      await this.scoped(TrustedDevice, (repo) =>
+        repo.delete({ userId: user.id }),
+      );
     }
 
     // Update last login
     user.lastLogin = new Date();
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
     return { user, isNewUser };
   }
@@ -690,7 +731,7 @@ export class AuthService {
   }
 
   async getUserById(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { id } });
+    return this.scoped(User, (repo) => repo.findOne({ where: { id } }));
   }
 
   /**
@@ -699,9 +740,11 @@ export class AuthService {
    * authenticated user's 2FA state without exposing the secret.
    */
   async is2FAEnabled(userId: string): Promise<boolean> {
-    const prefs = await this.preferencesRepository.findOne({
-      where: { userId },
-    });
+    const prefs = await this.scoped(UserPreference, (repo) =>
+      repo.findOne({
+        where: { userId },
+      }),
+    );
     return !!prefs?.twoFactorEnabled;
   }
 
@@ -711,10 +754,12 @@ export class AuthService {
     User,
     "id" | "isActive" | "mustChangePassword" | "role"
   > | null> {
-    return this.usersRepository.findOne({
-      where: { id },
-      select: ["id", "isActive", "mustChangePassword", "role"],
-    });
+    return this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id },
+        select: ["id", "isActive", "mustChangePassword", "role"],
+      }),
+    );
   }
 
   // M6: OIDC account linking with confirmation
@@ -728,7 +773,7 @@ export class AuthService {
     existingUser.oidcLinkExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
     existingUser.oidcLinkPending = true;
     existingUser.pendingOidcSubject = oidcSubject;
-    await this.usersRepository.save(existingUser);
+    await this.scoped(User, (repo) => repo.save(existingUser));
     return linkToken;
   }
 
@@ -742,9 +787,8 @@ export class AuthService {
         this.configService.get<string>("PUBLIC_APP_URL") ||
         "http://localhost:3000";
       const confirmUrl = `${frontendUrl}/api/v1/auth/oidc/confirm-link?token=${linkToken}`;
-      const lang = await resolveUserEmailLocale(
-        this.preferencesRepository,
-        user.id,
+      const lang = await withScopedDb(this.dataSource, (manager) =>
+        resolveUserEmailLocale(manager.getRepository(UserPreference), user.id),
       );
       const t = emailTranslator(this.i18n, lang);
       const html = oidcLinkTemplate(user.firstName || "", confirmUrl, t);
@@ -769,9 +813,11 @@ export class AuthService {
   private async confirmOidcLinkWithinContext(token: string): Promise<User> {
     const hashedToken = hashToken(token);
 
-    const user = await this.usersRepository.findOne({
-      where: { oidcLinkToken: hashedToken, oidcLinkPending: true },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { oidcLinkToken: hashedToken, oidcLinkPending: true },
+      }),
+    );
 
     if (!user) {
       throw new BadRequestException(
@@ -788,7 +834,7 @@ export class AuthService {
       user.oidcLinkToken = null;
       user.oidcLinkExpiresAt = null;
       user.pendingOidcSubject = null;
-      await this.usersRepository.save(user);
+      await this.scoped(User, (repo) => repo.save(user));
       throw new BadRequestException(
         tr("errors.auth.linkTokenExpired", "Link token has expired"),
       );
@@ -801,7 +847,7 @@ export class AuthService {
     user.oidcLinkToken = null;
     user.oidcLinkExpiresAt = null;
     user.pendingOidcSubject = null;
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
     return user;
   }

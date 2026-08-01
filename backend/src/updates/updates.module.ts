@@ -1,6 +1,4 @@
 import { Module } from "@nestjs/common";
-import { TypeOrmModule } from "@nestjs/typeorm";
-import { UserPreference } from "../users/entities/user-preference.entity";
 import { UpdatesController } from "./updates.controller";
 import { UpdatesService } from "./updates.service";
 import { ReleaseNotesService } from "./release-notes.service";
@@ -11,7 +9,6 @@ import { ToursService } from "./tours.service";
 import { ToursController } from "./tours.controller";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserPreference])],
   controllers: [
     UpdatesController,
     ReleaseNotesController,

@@ -36,6 +36,46 @@ export function withUserContext<T>(userId: string, fn: () => T): T {
 }
 
 /**
+ * Seed a *delegation* context: the effective user is the owner whose data is
+ * being acted on, the authenticated user is the delegate doing the acting, so
+ * `withScopedDb` emits `app.current_user_id = owner` and
+ * `app.real_user_id = delegate`.
+ *
+ * `withUserContext` cannot express this. It seeds one id into both GUCs, which
+ * collapses a delegate request onto a single identity -- and the three special
+ * policies M2 wrote for delegation (`users`, `account_delegates`,
+ * `delegate_account_favourites`, plus the authenticated-user arm on
+ * `user_preferences` / `trusted_devices` / `refresh_tokens`) each need the two
+ * ids to differ. Seeding only the delegate hides the owner's rows; seeding only
+ * the owner hides the delegate's own. Both failures return zero rows rather than
+ * raising, inside ordinary request scope where nothing logs -- which is exactly
+ * why this has its own helper instead of a second `withUserContext` call.
+ *
+ * Callers are the two places that hold both ids before the request scope exists:
+ * `jwt.strategy`'s acting-context re-validation and `AccountDelegateGuard`.
+ */
+export function withDelegateContext<T>(
+  ownerUserId: string,
+  delegateUserId: string,
+  fn: () => T,
+): T {
+  for (const [label, id] of [
+    ["ownerUserId", ownerUserId],
+    ["delegateUserId", delegateUserId],
+  ] as const) {
+    if (!UUID_REGEX.test(id)) {
+      throw new Error(
+        `withDelegateContext requires a valid UUID ${label} (got "${id}")`,
+      );
+    }
+  }
+  return requestContextStorage.run(
+    { userId: ownerUserId, realUserId: delegateUserId },
+    fn,
+  );
+}
+
+/**
  * Seed a *system* context: `withScopedDb` will emit `app.bypass_rls` so the body
  * can read/write across users (admin, auth bootstrap, cron fan-out, seeders,
  * emergency-access claim, expiry sweeps). Each invocation is logged (rate-

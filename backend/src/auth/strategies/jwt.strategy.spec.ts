@@ -216,11 +216,12 @@ describe("JwtStrategy", () => {
       expect(delegationService.validateActingContext).not.toHaveBeenCalled();
     });
 
-    // RLS (task C1): both lookups must run inside a *user* context seeded from
-    // the verified token's `sub` -- never a system bypass (this is the
-    // highest-QPS query in the system). We assert the ambient context at the
-    // moment each downstream lookup fires.
-    it("runs both lookups under withUserContext(payload.sub)", async () => {
+    // RLS (tasks C1 + R7): the user lookup runs inside a *user* context seeded
+    // from the verified token's `sub` -- never a system bypass (this is the
+    // highest-QPS query in the system). The delegation re-validation reads the
+    // OWNER's rows as well as the delegate's, so it re-seeds both identities.
+    // We assert the ambient context at the moment each lookup fires.
+    it("seeds the delegate for the user lookup and both ids for the delegation lookup", async () => {
       const payload = {
         sub: DELEGATE_ID,
         actingAsUserId: OWNER_ID,
@@ -242,8 +243,17 @@ describe("JwtStrategy", () => {
       // Seeded from the delegate's own id (the authenticated principal), never
       // a system bypass.
       expect(ctxAtUserLookup).toEqual({ userId: DELEGATE_ID });
-      expect(ctxAtDelegationLookup).toEqual({ userId: DELEGATE_ID });
+      // The acting-context re-validation reads the owner's `users` and
+      // `user_preferences` rows (delegateMustEnrollOwn2FA) as well as the
+      // delegate's own, so current = owner and real = delegate. Seeding only
+      // the delegate here would return zero rows for the owner's half under
+      // enforcement -- silently, inside normal request scope.
+      expect(ctxAtDelegationLookup).toEqual({
+        userId: OWNER_ID,
+        realUserId: DELEGATE_ID,
+      });
       expect(ctxAtUserLookup?.system).toBeUndefined();
+      expect(ctxAtDelegationLookup?.system).toBeUndefined();
     });
 
     it("rejects a non-UUID sub before hitting the database", async () => {

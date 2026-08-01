@@ -39,6 +39,11 @@ describe("ImportInvestmentProcessorService", () => {
     return qb;
   };
 
+  // ctx.manager is typed as a real EntityManager; the spec drives the jest mocks
+  // behind it, so read it back through this accessor rather than casting inline.
+  const managerOf = (ctx: ImportContext): Record<string, jest.Mock> =>
+    ctx.manager as unknown as Record<string, jest.Mock>;
+
   const makeMockManager = () => ({
     save: jest.fn().mockImplementation((entity: any) => {
       if (!entity.id) {
@@ -52,17 +57,11 @@ describe("ImportInvestmentProcessorService", () => {
     createQueryBuilder: jest.fn().mockReturnValue(makeMockQueryBuilder()),
   });
 
-  const makeMockQueryRunner = () => {
-    const manager = makeMockManager();
-    return { manager };
-  };
-
   const makeContext = (
     overrides: Partial<ImportContext> = {},
   ): ImportContext => {
-    const qr = makeMockQueryRunner();
     return {
-      queryRunner: qr,
+      manager: makeMockManager() as any,
       userId,
       accountId,
       account: {
@@ -108,11 +107,11 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      expect(ctx.queryRunner.manager.save).toHaveBeenCalled();
+      expect(managerOf(ctx).save).toHaveBeenCalled();
       expect(ctx.importResult.imported).toBe(1);
 
       // Verify first save call is the InvestmentTransaction
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg).toBeInstanceOf(InvestmentTransaction);
       expect(firstSaveArg.action).toBe(InvestmentAction.BUY);
       expect(firstSaveArg.securityId).toBe("sec-1");
@@ -129,23 +128,21 @@ describe("ImportInvestmentProcessorService", () => {
       const ctx = makeContext({ securityMap });
 
       // Set up findOne to return security for cash transaction description
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "AAPL" });
-          }
-          // For Holding lookup
-          if (entity === Holding) {
-            return Promise.resolve({
-              accountId,
-              securityId: "sec-1",
-              quantity: 20,
-              averageCost: 140,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "AAPL" });
+        }
+        // For Holding lookup
+        if (entity === Holding) {
+          return Promise.resolve({
+            accountId,
+            securityId: "sec-1",
+            quantity: 20,
+            averageCost: 140,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Sell",
@@ -158,7 +155,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.SELL);
       // SELL: totalAmount = quantity * price - commission
       expect(firstSaveArg.totalAmount).toBe(790.01);
@@ -170,14 +167,12 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Vanguard ETF", "sec-2");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-2") {
-            return Promise.resolve({ id: "sec-2", symbol: "VTI" });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-2") {
+          return Promise.resolve({ id: "sec-2", symbol: "VTI" });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Div",
@@ -188,7 +183,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.DIVIDEND);
       expect(firstSaveArg.totalAmount).toBe(25.5);
     });
@@ -203,7 +198,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.INTEREST);
     });
 
@@ -212,7 +207,7 @@ describe("ImportInvestmentProcessorService", () => {
       const qifTx1 = { action: "CGLong", amount: 100, date: "2025-03-01" };
       await service.processTransaction(ctx, qifTx1);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.CAPITAL_GAIN);
     });
 
@@ -225,7 +220,7 @@ describe("ImportInvestmentProcessorService", () => {
       };
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.SPLIT);
     });
 
@@ -239,7 +234,7 @@ describe("ImportInvestmentProcessorService", () => {
       };
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.TRANSFER_IN);
     });
 
@@ -253,7 +248,7 @@ describe("ImportInvestmentProcessorService", () => {
       };
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.TRANSFER_OUT);
     });
 
@@ -268,7 +263,7 @@ describe("ImportInvestmentProcessorService", () => {
           date: "2025-03-01",
         };
         await service.processTransaction(ctx, qifTx);
-        const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+        const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
         expect(firstSaveArg.action).toBe(InvestmentAction.REINVEST);
       }
     });
@@ -288,7 +283,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.BUY);
     });
 
@@ -303,7 +298,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.BUY);
     });
 
@@ -313,7 +308,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.BUY);
     });
 
@@ -329,7 +324,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.description).toBe("Test memo");
     });
 
@@ -345,7 +340,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.description).toBe("Broker Inc");
     });
 
@@ -360,7 +355,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.description).toBeNull();
     });
 
@@ -370,7 +365,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.quantity).toBeNull();
       expect(firstSaveArg.price).toBeNull();
       expect(firstSaveArg.totalAmount).toBe(0);
@@ -381,15 +376,13 @@ describe("ImportInvestmentProcessorService", () => {
     it("should auto-create a security when not found in securityMap", async () => {
       const ctx = makeContext();
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, _opts: any) => {
-          if (entity === Security) {
-            return Promise.resolve(null);
-          }
+      managerOf(ctx).findOne.mockImplementation((entity: any, _opts: any) => {
+        if (entity === Security) {
           return Promise.resolve(null);
-        },
-      );
-      ctx.queryRunner.manager.save.mockImplementation((entity: any) => {
+        }
+        return Promise.resolve(null);
+      });
+      managerOf(ctx).save.mockImplementation((entity: any) => {
         if (!entity.id) entity.id = "new-sec-id";
         return Promise.resolve(entity);
       });
@@ -413,8 +406,8 @@ describe("ImportInvestmentProcessorService", () => {
       const ctx = makeContext();
 
       const savedSecurities: any[] = [];
-      ctx.queryRunner.manager.findOne.mockResolvedValue(null);
-      ctx.queryRunner.manager.save.mockImplementation((entity: any) => {
+      managerOf(ctx).findOne.mockResolvedValue(null);
+      managerOf(ctx).save.mockImplementation((entity: any) => {
         if (!entity.id) entity.id = "new-sec-id";
         savedSecurities.push({ ...entity });
         return Promise.resolve(entity);
@@ -441,8 +434,8 @@ describe("ImportInvestmentProcessorService", () => {
     it("should handle single-word security name (short symbol fallback)", async () => {
       const ctx = makeContext();
 
-      ctx.queryRunner.manager.findOne.mockResolvedValue(null);
-      ctx.queryRunner.manager.save.mockImplementation((entity: any) => {
+      managerOf(ctx).findOne.mockResolvedValue(null);
+      managerOf(ctx).save.mockImplementation((entity: any) => {
         if (!entity.id) entity.id = "new-sec-id";
         return Promise.resolve(entity);
       });
@@ -463,18 +456,16 @@ describe("ImportInvestmentProcessorService", () => {
     it("should reuse existing security with matching symbol and name", async () => {
       const ctx = makeContext();
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.symbol) {
-            return Promise.resolve({
-              id: "existing-sec-id",
-              symbol: opts.where.symbol,
-              name: "Test Fund",
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.symbol) {
+          return Promise.resolve({
+            id: "existing-sec-id",
+            symbol: opts.where.symbol,
+            name: "Test Fund",
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Buy",
@@ -494,25 +485,23 @@ describe("ImportInvestmentProcessorService", () => {
       const ctx = makeContext();
 
       let callCount = 0;
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.symbol) {
-            callCount++;
-            if (callCount === 1) {
-              // First lookup: symbol exists with different name
-              return Promise.resolve({
-                id: "other-sec",
-                symbol: opts.where.symbol,
-                name: "Different Fund",
-              });
-            }
-            // Second lookup: unique symbol not found
-            return Promise.resolve(null);
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.symbol) {
+          callCount++;
+          if (callCount === 1) {
+            // First lookup: symbol exists with different name
+            return Promise.resolve({
+              id: "other-sec",
+              symbol: opts.where.symbol,
+              name: "Different Fund",
+            });
           }
+          // Second lookup: unique symbol not found
           return Promise.resolve(null);
-        },
-      );
-      ctx.queryRunner.manager.save.mockImplementation((entity: any) => {
+        }
+        return Promise.resolve(null);
+      });
+      managerOf(ctx).save.mockImplementation((entity: any) => {
         if (!entity.id) entity.id = "new-sec-id";
         return Promise.resolve(entity);
       });
@@ -537,14 +526,12 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "TST" });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Buy",
@@ -558,7 +545,7 @@ describe("ImportInvestmentProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // Should have saved: InvestmentTransaction, cash Transaction, then updated InvestmentTransaction
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       // The cash transaction should have negative amount for BUY
       const cashTx = saveCalls.find(
         (call: any) =>
@@ -573,22 +560,20 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "TST" });
-          }
-          if (entity === Holding) {
-            return Promise.resolve({
-              accountId,
-              securityId: "sec-1",
-              quantity: 100,
-              averageCost: 90,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        if (entity === Holding) {
+          return Promise.resolve({
+            accountId,
+            securityId: "sec-1",
+            quantity: 100,
+            averageCost: 90,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Sell",
@@ -601,7 +586,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const cashTx = saveCalls.find(
         (call: any) =>
           call[0]?.currencyCode === "USD" && call[0]?.amount !== undefined,
@@ -621,7 +606,7 @@ describe("ImportInvestmentProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // Only the InvestmentTransaction should be saved (no cash transaction)
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const cashTxCall = saveCalls.find(
         (call: any) =>
           call[0]?.currencyCode === "USD" && call[0]?.amount !== undefined,
@@ -640,7 +625,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg.action).toBe(InvestmentAction.SPLIT);
       expect(firstSaveArg.totalAmount).toBe(0);
     });
@@ -657,17 +642,15 @@ describe("ImportInvestmentProcessorService", () => {
         averageCost: 150,
       };
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "AAPL" });
-          }
-          if (entity === Holding) {
-            return Promise.resolve(existingHolding);
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "AAPL" });
+        }
+        if (entity === Holding) {
+          return Promise.resolve(existingHolding);
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "StkSplit",
@@ -679,8 +662,8 @@ describe("ImportInvestmentProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // The mutated holding object is the same reference passed to save().
-      const savedHolding = ctx.queryRunner.manager.save.mock.calls
-        .map((call: any) => call[0])
+      const savedHolding = managerOf(ctx)
+        .save.mock.calls.map((call: any) => call[0])
         .find((arg: any) => arg === existingHolding);
       expect(savedHolding).toBeDefined();
       expect(savedHolding.quantity).toBe(200);
@@ -692,15 +675,13 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Apple Inc", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "AAPL" });
-          }
-          if (entity === Holding) return Promise.resolve(null);
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "AAPL" });
+        }
+        if (entity === Holding) return Promise.resolve(null);
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "StkSplit",
@@ -712,8 +693,8 @@ describe("ImportInvestmentProcessorService", () => {
       await service.processTransaction(ctx, qifTx);
 
       // No Holding-shaped object should be saved.
-      const savedHolding = ctx.queryRunner.manager.save.mock.calls
-        .map((call: any) => call[0])
+      const savedHolding = managerOf(ctx)
+        .save.mock.calls.map((call: any) => call[0])
         .find(
           (arg: any) =>
             arg &&
@@ -735,7 +716,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const cashTxCall = saveCalls.find(
         (call: any) =>
           call[0]?.currencyCode === "USD" && call[0]?.amount !== undefined,
@@ -758,21 +739,19 @@ describe("ImportInvestmentProcessorService", () => {
         } as any,
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "TST" });
-          }
-          if (opts?.where?.id === "linked-acc-1") {
-            return Promise.resolve({
-              id: "linked-acc-1",
-              currencyCode: "CAD",
-              currentBalance: 10000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        if (opts?.where?.id === "linked-acc-1") {
+          return Promise.resolve({
+            id: "linked-acc-1",
+            currencyCode: "CAD",
+            currentBalance: 10000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Buy",
@@ -787,7 +766,7 @@ describe("ImportInvestmentProcessorService", () => {
       expect(ctx.affectedAccountIds.has("linked-acc-1")).toBe(true);
 
       // Cash transaction should go to linked account
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const cashTx = saveCalls.find(
         (call: any) =>
           call[0]?.accountId === "linked-acc-1" &&
@@ -801,14 +780,12 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "TST" });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Buy",
@@ -821,7 +798,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const cashTx = saveCalls.find(
         (call: any) => call[0]?.payeeName && call[0]?.payeeName.includes("Buy"),
       );
@@ -838,17 +815,15 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "TST" });
-          }
-          if (entity === Holding) {
-            return Promise.resolve(null);
-          }
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        if (entity === Holding) {
           return Promise.resolve(null);
-        },
-      );
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Buy",
@@ -860,7 +835,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const holdingSave = saveCalls.find(
         (call: any) =>
           call[0] instanceof Holding || call[0]?.averageCost !== undefined,
@@ -875,22 +850,20 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "TST" });
-          }
-          if (entity === Holding) {
-            return Promise.resolve({
-              accountId,
-              securityId: "sec-1",
-              quantity: 10,
-              averageCost: 80,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        if (entity === Holding) {
+          return Promise.resolve({
+            accountId,
+            securityId: "sec-1",
+            quantity: 10,
+            averageCost: 80,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Buy",
@@ -902,7 +875,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const holdingSave = saveCalls.find(
         (call: any) =>
           call[0]?.securityId === "sec-1" &&
@@ -920,22 +893,20 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "TST" });
-          }
-          if (entity === Holding) {
-            return Promise.resolve({
-              accountId,
-              securityId: "sec-1",
-              quantity: 20,
-              averageCost: 100,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        if (entity === Holding) {
+          return Promise.resolve({
+            accountId,
+            securityId: "sec-1",
+            quantity: 20,
+            averageCost: 100,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Sell",
@@ -947,7 +918,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const holdingSave = saveCalls.find(
         (call: any) =>
           call[0]?.securityId === "sec-1" && call[0]?.quantity === 15,
@@ -960,14 +931,12 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, opts: any) => {
-          if (entity === Security && opts?.where?.id === "sec-1") {
-            return Promise.resolve({ id: "sec-1", symbol: "TST" });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, opts: any) => {
+        if (entity === Security && opts?.where?.id === "sec-1") {
+          return Promise.resolve({ id: "sec-1", symbol: "TST" });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Div",
@@ -978,7 +947,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const holdingSave = saveCalls.find(
         (call: any) => call[0]?.averageCost !== undefined,
       );
@@ -991,19 +960,17 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Test ETF", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, _opts: any) => {
-          if (entity === Holding) {
-            return Promise.resolve({
-              accountId,
-              securityId: "sec-1",
-              quantity: 50,
-              averageCost: 100,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, _opts: any) => {
+        if (entity === Holding) {
+          return Promise.resolve({
+            accountId,
+            securityId: "sec-1",
+            quantity: 50,
+            averageCost: 100,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "ReinvDiv",
@@ -1015,7 +982,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const holdingSave = saveCalls.find(
         (call: any) => call[0]?.quantity === 52,
       );
@@ -1027,19 +994,17 @@ describe("ImportInvestmentProcessorService", () => {
       securityMap.set("Test Stock", "sec-1");
       const ctx = makeContext({ securityMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (entity: any, _opts: any) => {
-          if (entity === Holding) {
-            return Promise.resolve({
-              accountId,
-              securityId: "sec-1",
-              quantity: 100,
-              averageCost: 50,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((entity: any, _opts: any) => {
+        if (entity === Holding) {
+          return Promise.resolve({
+            accountId,
+            securityId: "sec-1",
+            quantity: 100,
+            averageCost: 50,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "ShrsOut",
@@ -1051,7 +1016,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const holdingSave = saveCalls.find(
         (call: any) => call[0]?.quantity === 70,
       );
@@ -1079,7 +1044,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const firstSaveArg = ctx.queryRunner.manager.save.mock.calls[0][0];
+      const firstSaveArg = managerOf(ctx).save.mock.calls[0][0];
       expect(firstSaveArg).toBeInstanceOf(InvestmentTransaction);
       expect(firstSaveArg.action).toBe(expectedAction);
     };
@@ -1116,7 +1081,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const investmentTxSave = saveCalls.find(
         (call: any) => call[0] instanceof InvestmentTransaction,
       );
@@ -1134,7 +1099,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       await service.processTransaction(ctx, qifTx);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const investmentTxSave = saveCalls.find(
         (call: any) => call[0] instanceof InvestmentTransaction,
       );
@@ -1209,7 +1174,7 @@ describe("ImportInvestmentProcessorService", () => {
       expect(ctx.importResult.imported).toBe(1);
 
       // No InvestmentTransaction should be created
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const investmentTxSave = saveCalls.find(
         (call: any) => call[0] instanceof InvestmentTransaction,
       );
@@ -1221,18 +1186,16 @@ describe("ImportInvestmentProcessorService", () => {
       accountMap.set("WS Sandi TFSA", "acc-ws");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-ws") {
-            return Promise.resolve({
-              id: "acc-ws",
-              currencyCode: "CAD",
-              currentBalance: 0,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-ws") {
+          return Promise.resolve({
+            id: "acc-ws",
+            currencyCode: "CAD",
+            currentBalance: 0,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "WithdrwX",
@@ -1248,7 +1211,7 @@ describe("ImportInvestmentProcessorService", () => {
       expect(ctx.importResult.imported).toBe(1);
 
       // No InvestmentTransaction should be created
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const investmentTxSave = saveCalls.find(
         (call: any) => call[0] instanceof InvestmentTransaction,
       );
@@ -1275,18 +1238,16 @@ describe("ImportInvestmentProcessorService", () => {
       accountMap.set("EQ Sandi TFSA", "acc-eq");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-eq") {
-            return Promise.resolve({
-              id: "acc-eq",
-              currencyCode: "CAD",
-              currentBalance: 0,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-eq") {
+          return Promise.resolve({
+            id: "acc-eq",
+            currencyCode: "CAD",
+            currentBalance: 0,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "ContribX",
@@ -1302,7 +1263,7 @@ describe("ImportInvestmentProcessorService", () => {
       expect(ctx.importResult.imported).toBe(1);
 
       // No InvestmentTransaction should be created
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const investmentTxSave = saveCalls.find(
         (call: any) => call[0] instanceof InvestmentTransaction,
       );
@@ -1331,25 +1292,23 @@ describe("ImportInvestmentProcessorService", () => {
       accountMap.set("Chequing", "acc-chequing");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-chequing") {
-            return Promise.resolve({
-              id: "acc-chequing",
-              currencyCode: "USD",
-              currentBalance: 5000,
-            });
-          }
-          if (opts?.where?.id === accountId) {
-            return Promise.resolve({
-              id: accountId,
-              currencyCode: "USD",
-              currentBalance: 0,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-chequing") {
+          return Promise.resolve({
+            id: "acc-chequing",
+            currencyCode: "USD",
+            currentBalance: 5000,
+          });
+        }
+        if (opts?.where?.id === accountId) {
+          return Promise.resolve({
+            id: accountId,
+            currencyCode: "USD",
+            currentBalance: 0,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "XIn",
@@ -1368,7 +1327,7 @@ describe("ImportInvestmentProcessorService", () => {
       expect(ctx.importResult.skipped).toBe(0);
 
       // No InvestmentTransaction should be created
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const investmentTxSave = saveCalls.find(
         (call: any) => call[0] instanceof InvestmentTransaction,
       );
@@ -1395,18 +1354,16 @@ describe("ImportInvestmentProcessorService", () => {
       accountMap.set("Savings", "acc-savings");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-savings") {
-            return Promise.resolve({
-              id: "acc-savings",
-              currencyCode: "USD",
-              currentBalance: 2000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-savings") {
+          return Promise.resolve({
+            id: "acc-savings",
+            currencyCode: "USD",
+            currentBalance: 2000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "XOut",
@@ -1421,7 +1378,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const cashTxSave = saveCalls.find(
         (call: any) =>
           call[0]?.accountId === accountId && call[0]?.amount === -500,
@@ -1440,18 +1397,16 @@ describe("ImportInvestmentProcessorService", () => {
       accountMap.set("WS Joint LT", "acc-ws-joint");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-ws-joint") {
-            return Promise.resolve({
-              id: "acc-ws-joint",
-              currencyCode: "CAD",
-              currentBalance: 0,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-ws-joint") {
+          return Promise.resolve({
+            id: "acc-ws-joint",
+            currencyCode: "CAD",
+            currentBalance: 0,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "XOut",
@@ -1466,7 +1421,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       // Cash transaction should be NEGATIVE (money leaving)
       const cashTxSave = saveCalls.find(
         (call: any) =>
@@ -1505,25 +1460,23 @@ describe("ImportInvestmentProcessorService", () => {
       // Override accountId to brokerage
       (ctxEq as any).accountId = "acc-eq-gic-brokerage";
 
-      ctxEq.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-eq-gic") {
-            return Promise.resolve({
-              id: "acc-eq-gic",
-              currencyCode: "CAD",
-              currentBalance: 80000,
-            });
-          }
-          if (opts?.where?.id === "acc-ws-joint") {
-            return Promise.resolve({
-              id: "acc-ws-joint",
-              currencyCode: "CAD",
-              currentBalance: 0,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctxEq).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-eq-gic") {
+          return Promise.resolve({
+            id: "acc-eq-gic",
+            currencyCode: "CAD",
+            currentBalance: 80000,
+          });
+        }
+        if (opts?.where?.id === "acc-ws-joint") {
+          return Promise.resolve({
+            id: "acc-ws-joint",
+            currencyCode: "CAD",
+            currentBalance: 0,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const xOutTx = {
         action: "XOut",
@@ -1538,7 +1491,7 @@ describe("ImportInvestmentProcessorService", () => {
       expect(ctxEq.importResult.imported).toBe(1);
 
       // Verify: negative in source, positive in target
-      const eqSaves = ctxEq.queryRunner.manager.save.mock.calls;
+      const eqSaves = managerOf(ctxEq).save.mock.calls;
       const sourceTx = eqSaves.find(
         (call: any) =>
           call[0]?.accountId === "acc-eq-gic" && call[0]?.amount === -76180,
@@ -1565,7 +1518,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       // Duplicate detection: the XOut already created a linked transfer in
       // acc-ws-joint (amount=76180) linked to acc-eq-gic, so count=1
-      ctxWs.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctxWs).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(1),
       );
 
@@ -1599,7 +1552,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       // Only the cash TX and the balance update (via findOne/update) -- no linked TX
       const txSaves = saveCalls.filter(
         (call: any) => call[0]?.accountId === accountId,
@@ -1621,25 +1574,23 @@ describe("ImportInvestmentProcessorService", () => {
         } as any,
       });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-cash") {
-            return Promise.resolve({
-              id: "acc-cash",
-              currencyCode: "USD",
-              currentBalance: 0,
-            });
-          }
-          if (opts?.where?.id === "acc-chequing") {
-            return Promise.resolve({
-              id: "acc-chequing",
-              currencyCode: "USD",
-              currentBalance: 5000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-cash") {
+          return Promise.resolve({
+            id: "acc-cash",
+            currencyCode: "USD",
+            currentBalance: 0,
+          });
+        }
+        if (opts?.where?.id === "acc-chequing") {
+          return Promise.resolve({
+            id: "acc-chequing",
+            currencyCode: "USD",
+            currentBalance: 5000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "XIn",
@@ -1654,7 +1605,7 @@ describe("ImportInvestmentProcessorService", () => {
       expect(ctx.importResult.imported).toBe(1);
       expect(ctx.affectedAccountIds.has("acc-cash")).toBe(true);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const cashTxSave = saveCalls.find(
         (call: any) =>
           call[0]?.accountId === "acc-cash" && call[0]?.amount === 750,
@@ -1670,7 +1621,7 @@ describe("ImportInvestmentProcessorService", () => {
       const ctx = makeContext({ accountMap });
 
       // Duplicate detection query returns count=1 (already imported once)
-      ctx.queryRunner.manager.createQueryBuilder.mockReturnValue(
+      managerOf(ctx).createQueryBuilder.mockReturnValue(
         makeMockQueryBuilder(1),
       );
 
@@ -1693,18 +1644,16 @@ describe("ImportInvestmentProcessorService", () => {
       accountMap.set("WS Cash - Joint", "acc-cash-joint");
       const ctx = makeContext({ accountMap });
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-cash-joint") {
-            return Promise.resolve({
-              id: "acc-cash-joint",
-              currencyCode: "CAD",
-              currentBalance: 10000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-cash-joint") {
+          return Promise.resolve({
+            id: "acc-cash-joint",
+            currencyCode: "CAD",
+            currentBalance: 10000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "Cash",
@@ -1719,7 +1668,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
 
       // Cash transaction on the investment side
       const cashTxSave = saveCalls.find(
@@ -1754,18 +1703,16 @@ describe("ImportInvestmentProcessorService", () => {
       });
       (ctx as any).accountId = "acc-brokerage";
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-cash") {
-            return Promise.resolve({
-              id: "acc-cash",
-              currencyCode: "CAD",
-              currentBalance: 0,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-cash") {
+          return Promise.resolve({
+            id: "acc-cash",
+            currencyCode: "CAD",
+            currentBalance: 0,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "XIn",
@@ -1780,7 +1727,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       // Only one cash transaction (the deposit), no linked counterpart
       const cashTxSaves = saveCalls.filter(
         (call: any) => call[0]?.amount !== undefined,
@@ -1806,18 +1753,16 @@ describe("ImportInvestmentProcessorService", () => {
       });
       (ctx as any).accountId = "acc-brokerage";
 
-      ctx.queryRunner.manager.findOne.mockImplementation(
-        (_entity: any, opts: any) => {
-          if (opts?.where?.id === "acc-cash") {
-            return Promise.resolve({
-              id: "acc-cash",
-              currencyCode: "CAD",
-              currentBalance: 1000,
-            });
-          }
-          return Promise.resolve(null);
-        },
-      );
+      managerOf(ctx).findOne.mockImplementation((_entity: any, opts: any) => {
+        if (opts?.where?.id === "acc-cash") {
+          return Promise.resolve({
+            id: "acc-cash",
+            currencyCode: "CAD",
+            currentBalance: 1000,
+          });
+        }
+        return Promise.resolve(null);
+      });
 
       const qifTx = {
         action: "XOut",
@@ -1832,7 +1777,7 @@ describe("ImportInvestmentProcessorService", () => {
 
       expect(ctx.importResult.imported).toBe(1);
 
-      const saveCalls = ctx.queryRunner.manager.save.mock.calls;
+      const saveCalls = managerOf(ctx).save.mock.calls;
       const cashTxSaves = saveCalls.filter(
         (call: any) => call[0]?.amount !== undefined,
       );
@@ -1853,7 +1798,7 @@ describe("ImportInvestmentProcessorService", () => {
       const ctx = makeContext({ accountMap });
 
       let qbCallCount = 0;
-      ctx.queryRunner.manager.createQueryBuilder.mockImplementation(() => {
+      managerOf(ctx).createQueryBuilder.mockImplementation(() => {
         qbCallCount++;
         const qb = makeMockQueryBuilder(0);
         // 1st XIn: existingCount=0 (DB empty). Counter bumped to 1.
@@ -1865,7 +1810,7 @@ describe("ImportInvestmentProcessorService", () => {
         return qb;
       });
 
-      ctx.queryRunner.manager.findOne.mockResolvedValue({
+      managerOf(ctx).findOne.mockResolvedValue({
         id: "acc-chequing",
         currencyCode: "USD",
         currentBalance: 0,

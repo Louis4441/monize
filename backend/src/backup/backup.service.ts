@@ -5,8 +5,14 @@ import {
   BadRequestException,
   NotFoundException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, DataSource } from "typeorm";
+import {
+  DataSource,
+  EntityManager,
+  EntityTarget,
+  ObjectLiteral,
+  Repository,
+} from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { createGzip, gunzipSync, gzipSync } from "zlib";
@@ -171,11 +177,24 @@ export class BackupService {
   private readonly logger = new Logger(BackupService.name);
 
   constructor(
-    @InjectRepository(User)
-    private readonly usersRepository: Repository<User>,
     private readonly dataSource: DataSource,
     private readonly aiEncryption: AiEncryptionService,
   ) {}
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
+  }
 
   /**
    * Resolves the password the auto-backup cron should use for encryption.
@@ -530,7 +549,9 @@ export class BackupService {
     userId: string,
     input: RestoreBackupInput,
   ): Promise<{ message: string; restored: Record<string, number> }> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user) {
       throw new NotFoundException(
         tr("errors.backup.userNotFoundRestore", "User not found"),
@@ -564,15 +585,14 @@ export class BackupService {
 
     this.logger.log(`Starting backup restore for user ${userId}`);
 
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     const restored: Record<string, number> = {};
 
-    try {
+    // One transaction for the whole restore, exactly as the QueryRunner block
+    // was: a half-applied restore would leave the account in a state that is
+    // neither the backup nor what was there before.
+    return withScopedDb(this.dataSource, async (manager) => {
       // Phase 1: Delete all existing user data (same order as deleteData in users.service)
-      await this.deleteAllUserData(userId, queryRunner);
+      await this.deleteAllUserData(userId, manager);
 
       // Phase 2: Insert backup data in FK-safe order.
       // Columns that create circular or forward FK references are stripped
@@ -580,124 +600,119 @@ export class BackupService {
 
       // Ensure all referenced currency codes exist before restoring tables
       // that have FK references to currencies(code).
-      await this.ensureCurrenciesExist(queryRunner, data, userId);
+      await this.ensureCurrenciesExist(manager, data, userId);
 
       restored.userPreferences = await this.insertRows(
-        queryRunner,
+        manager,
         "user_preferences",
         data.user_preferences,
         userId,
       );
       restored.userCurrencyPreferences = await this.insertRows(
-        queryRunner,
+        manager,
         "user_currency_preferences",
         data.user_currency_preferences,
         userId,
       );
       restored.categories = await this.insertRows(
-        queryRunner,
+        manager,
         "categories",
         data.categories,
         userId,
       );
       restored.payees = await this.insertRows(
-        queryRunner,
+        manager,
         "payees",
         data.payees,
         userId,
       );
       restored.payeeAliases = await this.insertRows(
-        queryRunner,
+        manager,
         "payee_aliases",
         data.payee_aliases,
         userId,
       );
       restored.institutions = await this.insertRows(
-        queryRunner,
+        manager,
         "institutions",
         data.institutions,
         userId,
       );
       restored.accounts = await this.insertRows(
-        queryRunner,
+        manager,
         "accounts",
         data.accounts,
         userId,
       );
-      restored.tags = await this.insertRows(
-        queryRunner,
-        "tags",
-        data.tags,
-        userId,
-      );
+      restored.tags = await this.insertRows(manager, "tags", data.tags, userId);
       restored.scheduledTransactions = await this.insertRows(
-        queryRunner,
+        manager,
         "scheduled_transactions",
         data.scheduled_transactions,
         userId,
       );
       restored.scheduledTransactionSplits = await this.insertRows(
-        queryRunner,
+        manager,
         "scheduled_transaction_splits",
         data.scheduled_transaction_splits,
         null,
       );
       restored.scheduledTransactionOverrides = await this.insertRows(
-        queryRunner,
+        manager,
         "scheduled_transaction_overrides",
         data.scheduled_transaction_overrides,
         null,
       );
       restored.scheduledTransactionSplitTags = await this.insertRows(
-        queryRunner,
+        manager,
         "scheduled_transaction_split_tags",
         data.scheduled_transaction_split_tags,
         null,
       );
       restored.securities = await this.insertRows(
-        queryRunner,
+        manager,
         "securities",
         data.securities,
         userId,
       );
       restored.securityPrices = await this.insertRows(
-        queryRunner,
+        manager,
         "security_prices",
         data.security_prices,
         null,
       );
       restored.securityDocuments = await this.insertRows(
-        queryRunner,
+        manager,
         "security_documents",
         data.security_documents,
         userId,
       );
       restored.holdings = await this.insertRows(
-        queryRunner,
+        manager,
         "holdings",
         data.holdings,
         null,
       );
       restored.securityTags = await this.insertRows(
-        queryRunner,
+        manager,
         "security_tags",
         data.security_tags,
         null,
       );
       restored.transactions = await this.insertRows(
-        queryRunner,
+        manager,
         "transactions",
         data.transactions,
         userId,
       );
       restored.transactionSplits = await this.insertRows(
-        queryRunner,
+        manager,
         "transaction_splits",
         data.transaction_splits,
         null,
       );
       restored.transactionAttachments = await this.insertRows(
-        queryRunner,
+        manager,
         "transaction_attachments",
         data.transaction_attachments,
         userId,
@@ -706,115 +721,115 @@ export class BackupService {
       // FK to transaction_attachments. The base64 `data` column is decoded to
       // bytea by insertRows (auto-detected).
       restored.attachmentBlobs = await this.insertRows(
-        queryRunner,
+        manager,
         "attachment_blobs",
         data.attachment_blobs,
         null,
       );
       restored.transactionTags = await this.insertRows(
-        queryRunner,
+        manager,
         "transaction_tags",
         data.transaction_tags,
         null,
       );
       restored.transactionSplitTags = await this.insertRows(
-        queryRunner,
+        manager,
         "transaction_split_tags",
         data.transaction_split_tags,
         null,
       );
       restored.investmentTransactions = await this.insertRows(
-        queryRunner,
+        manager,
         "investment_transactions",
         data.investment_transactions,
         userId,
       );
       restored.loanRateChanges = await this.insertRows(
-        queryRunner,
+        manager,
         "loan_rate_changes",
         data.loan_rate_changes,
         userId,
       );
       restored.loanScenarios = await this.insertRows(
-        queryRunner,
+        manager,
         "loan_scenarios",
         data.loan_scenarios,
         userId,
       );
       restored.budgets = await this.insertRows(
-        queryRunner,
+        manager,
         "budgets",
         data.budgets,
         userId,
       );
       restored.budgetCategories = await this.insertRows(
-        queryRunner,
+        manager,
         "budget_categories",
         data.budget_categories,
         null,
       );
       restored.budgetPeriods = await this.insertRows(
-        queryRunner,
+        manager,
         "budget_periods",
         data.budget_periods,
         null,
       );
       restored.budgetPeriodCategories = await this.insertRows(
-        queryRunner,
+        manager,
         "budget_period_categories",
         data.budget_period_categories,
         null,
       );
       restored.budgetAlerts = await this.insertRows(
-        queryRunner,
+        manager,
         "budget_alerts",
         data.budget_alerts,
         userId,
       );
       restored.customReports = await this.insertRows(
-        queryRunner,
+        manager,
         "custom_reports",
         data.custom_reports,
         userId,
       );
       restored.investmentReports = await this.insertRows(
-        queryRunner,
+        manager,
         "investment_reports",
         data.investment_reports,
         userId,
       );
       restored.importColumnMappings = await this.insertRows(
-        queryRunner,
+        manager,
         "import_column_mappings",
         data.import_column_mappings,
         userId,
       );
       restored.monthlyAccountBalances = await this.insertRows(
-        queryRunner,
+        manager,
         "monthly_account_balances",
         data.monthly_account_balances,
         userId,
       );
       restored.autoBackupSettings = await this.insertRows(
-        queryRunner,
+        manager,
         "auto_backup_settings",
         data.auto_backup_settings,
         userId,
       );
       restored.aiProviderConfigs = await this.insertRows(
-        queryRunner,
+        manager,
         "ai_provider_configs",
         data.ai_provider_configs,
         userId,
       );
       restored.monteCarloScenarios = await this.insertRows(
-        queryRunner,
+        manager,
         "monte_carlo_scenarios",
         data.monte_carlo_scenarios,
         userId,
       );
       restored.monteCarloCashFlows = await this.insertRows(
-        queryRunner,
+        manager,
         "monte_carlo_cash_flows",
         data.monte_carlo_cash_flows,
         null,
@@ -822,27 +837,25 @@ export class BackupService {
 
       // Phase 3: Restore deferred FK columns that were stripped during insert
       // to avoid circular/forward reference violations.
-      await this.restoreDeferredFkColumns(queryRunner, data);
+      await this.restoreDeferredFkColumns(manager, data);
 
-      await queryRunner.commitTransaction();
       this.logger.log(`Backup restore completed for user ${userId}`);
       return { message: "Backup restored successfully", restored };
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
+    }).catch((error) => {
       this.logger.error(
         `Backup restore failed for user ${userId}: ${error.message}`,
       );
       throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   private async query(
     sql: string,
     params: unknown[],
   ): Promise<Record<string, unknown>[]> {
-    return this.dataSource.query(sql, params);
+    return withScopedDb(this.dataSource, (manager) =>
+      manager.query(sql, params),
+    );
   }
 
   /**
@@ -1029,115 +1042,111 @@ export class BackupService {
 
   private async deleteAllUserData(
     userId: string,
-    queryRunner: ReturnType<DataSource["createQueryRunner"]>,
+    manager: EntityManager,
   ): Promise<void> {
     // Delete in FK-safe order (reverse of insert order)
 
     // Action history (undo/redo log) -- not included in backups, so wipe it
     // outright; restored data should not be undoable to the prior state.
-    await queryRunner.query("DELETE FROM action_history WHERE user_id = $1", [
+    await manager.query("DELETE FROM action_history WHERE user_id = $1", [
       userId,
     ]);
 
     // Monte Carlo scenarios (cash flows cascade on scenario delete)
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM monte_carlo_cash_flows WHERE scenario_id IN
        (SELECT id FROM monte_carlo_scenarios WHERE user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       "DELETE FROM monte_carlo_scenarios WHERE user_id = $1",
       [userId],
     );
 
     // AI provider configs
-    await queryRunner.query(
-      "DELETE FROM ai_provider_configs WHERE user_id = $1",
-      [userId],
-    );
+    await manager.query("DELETE FROM ai_provider_configs WHERE user_id = $1", [
+      userId,
+    ]);
 
     // Investment data
-    await queryRunner.query(
+    await manager.query(
       "DELETE FROM investment_transactions WHERE user_id = $1",
       [userId],
     );
     // Security tags (join rows cascade from securities/tags, deleted here
     // explicitly before securities so the delete order is self-documenting)
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM security_tags WHERE security_id IN
        (SELECT id FROM securities WHERE user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM holdings WHERE account_id IN
        (SELECT id FROM accounts WHERE user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM security_prices WHERE security_id IN
        (SELECT id FROM securities WHERE user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
-      "DELETE FROM security_documents WHERE user_id = $1",
-      [userId],
-    );
+    await manager.query("DELETE FROM security_documents WHERE user_id = $1", [
+      userId,
+    ]);
     // Scheduled transactions and their splits reference securities via
     // investment_security_id. Clear those FKs before deleting securities; the
     // rows themselves are removed in the scheduled-transactions block below.
-    await queryRunner.query(
+    await manager.query(
       `UPDATE scheduled_transaction_splits SET investment_security_id = NULL
        WHERE scheduled_transaction_id IN
        (SELECT id FROM scheduled_transactions WHERE user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       "UPDATE scheduled_transactions SET investment_security_id = NULL WHERE user_id = $1",
       [userId],
     );
-    await queryRunner.query("DELETE FROM securities WHERE user_id = $1", [
-      userId,
-    ]);
+    await manager.query("DELETE FROM securities WHERE user_id = $1", [userId]);
 
     // Budget data
-    await queryRunner.query("DELETE FROM budget_alerts WHERE user_id = $1", [
+    await manager.query("DELETE FROM budget_alerts WHERE user_id = $1", [
       userId,
     ]);
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM budget_period_categories WHERE budget_period_id IN
        (SELECT bp.id FROM budget_periods bp
         JOIN budgets b ON bp.budget_id = b.id
         WHERE b.user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM budget_periods WHERE budget_id IN
        (SELECT id FROM budgets WHERE user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM budget_categories WHERE budget_id IN
        (SELECT id FROM budgets WHERE user_id = $1)`,
       [userId],
     );
-    await queryRunner.query("DELETE FROM budgets WHERE user_id = $1", [userId]);
+    await manager.query("DELETE FROM budgets WHERE user_id = $1", [userId]);
 
     // Transaction tags
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM transaction_split_tags WHERE transaction_split_id IN
        (SELECT ts.id FROM transaction_splits ts
         JOIN transactions t ON ts.transaction_id = t.id
         WHERE t.user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM transaction_tags WHERE transaction_id IN
        (SELECT id FROM transactions WHERE user_id = $1)`,
       [userId],
     );
 
     // Transaction splits
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM transaction_splits WHERE transaction_id IN
        (SELECT id FROM transactions WHERE user_id = $1)`,
       [userId],
@@ -1146,140 +1155,156 @@ export class BackupService {
     // Transaction attachments (bytes first, then metadata). Both would cascade
     // from the transactions delete below, but we clear them explicitly to match
     // the rest of this FK-ordered teardown.
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM attachment_blobs WHERE attachment_id IN
        (SELECT id FROM transaction_attachments WHERE user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       "DELETE FROM transaction_attachments WHERE user_id = $1",
       [userId],
     );
 
     // Transactions
-    await queryRunner.query("DELETE FROM transactions WHERE user_id = $1", [
+    await manager.query("DELETE FROM transactions WHERE user_id = $1", [
       userId,
     ]);
 
     // Tags
-    await queryRunner.query("DELETE FROM tags WHERE user_id = $1", [userId]);
+    await manager.query("DELETE FROM tags WHERE user_id = $1", [userId]);
 
     // Scheduled transactions
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM scheduled_transaction_overrides WHERE scheduled_transaction_id IN
        (SELECT id FROM scheduled_transactions WHERE user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM scheduled_transaction_split_tags WHERE scheduled_transaction_split_id IN
        (SELECT sts.id FROM scheduled_transaction_splits sts
         JOIN scheduled_transactions st ON sts.scheduled_transaction_id = st.id
         WHERE st.user_id = $1)`,
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       `DELETE FROM scheduled_transaction_splits WHERE scheduled_transaction_id IN
        (SELECT id FROM scheduled_transactions WHERE user_id = $1)`,
       [userId],
     );
     // Clear account FK references to scheduled_transactions before deleting them
-    await queryRunner.query(
+    await manager.query(
       "UPDATE accounts SET scheduled_transaction_id = NULL WHERE user_id = $1",
       [userId],
     );
-    await queryRunner.query(
+    await manager.query(
       "DELETE FROM scheduled_transactions WHERE user_id = $1",
       [userId],
     );
 
     // Monthly account balances
-    await queryRunner.query(
+    await manager.query(
       "DELETE FROM monthly_account_balances WHERE user_id = $1",
       [userId],
     );
 
     // Custom reports, import mappings
-    await queryRunner.query("DELETE FROM custom_reports WHERE user_id = $1", [
+    await manager.query("DELETE FROM custom_reports WHERE user_id = $1", [
       userId,
     ]);
-    await queryRunner.query(
-      "DELETE FROM investment_reports WHERE user_id = $1",
-      [userId],
-    );
-    await queryRunner.query(
+    await manager.query("DELETE FROM investment_reports WHERE user_id = $1", [
+      userId,
+    ]);
+    await manager.query(
       "DELETE FROM import_column_mappings WHERE user_id = $1",
       [userId],
     );
 
     // AI data
-    await queryRunner.query("DELETE FROM ai_insights WHERE user_id = $1", [
-      userId,
-    ]);
+    await manager.query("DELETE FROM ai_insights WHERE user_id = $1", [userId]);
 
     // Payees
-    await queryRunner.query("DELETE FROM payee_aliases WHERE user_id = $1", [
+    await manager.query("DELETE FROM payee_aliases WHERE user_id = $1", [
       userId,
     ]);
-    await queryRunner.query("DELETE FROM payees WHERE user_id = $1", [userId]);
+    await manager.query("DELETE FROM payees WHERE user_id = $1", [userId]);
 
     // Loan rate-change history and saved overpayment scenarios (both cascade
     // from accounts, deleted here explicitly before accounts)
-    await queryRunner.query(
-      "DELETE FROM loan_rate_changes WHERE user_id = $1",
-      [userId],
-    );
-    await queryRunner.query("DELETE FROM loan_scenarios WHERE user_id = $1", [
+    await manager.query("DELETE FROM loan_rate_changes WHERE user_id = $1", [
+      userId,
+    ]);
+    await manager.query("DELETE FROM loan_scenarios WHERE user_id = $1", [
       userId,
     ]);
 
     // Clear account FK references to categories before deleting accounts
-    await queryRunner.query(
+    await manager.query(
       "UPDATE accounts SET principal_category_id = NULL, interest_category_id = NULL, asset_category_id = NULL WHERE user_id = $1",
       [userId],
     );
 
     // Accounts
-    await queryRunner.query("DELETE FROM accounts WHERE user_id = $1", [
-      userId,
-    ]);
+    await manager.query("DELETE FROM accounts WHERE user_id = $1", [userId]);
 
     // Institutions (accounts reference these via institution_id; deleted after
     // accounts so no rows still point at them)
-    await queryRunner.query("DELETE FROM institutions WHERE user_id = $1", [
+    await manager.query("DELETE FROM institutions WHERE user_id = $1", [
       userId,
     ]);
 
     // Categories
-    await queryRunner.query("DELETE FROM categories WHERE user_id = $1", [
-      userId,
-    ]);
+    await manager.query("DELETE FROM categories WHERE user_id = $1", [userId]);
 
     // User preferences and auto-backup settings
-    await queryRunner.query(
-      "DELETE FROM auto_backup_settings WHERE user_id = $1",
-      [userId],
-    );
-    await queryRunner.query(
+    await manager.query("DELETE FROM auto_backup_settings WHERE user_id = $1", [
+      userId,
+    ]);
+    await manager.query(
       "DELETE FROM user_currency_preferences WHERE user_id = $1",
       [userId],
     );
-    await queryRunner.query("DELETE FROM user_preferences WHERE user_id = $1", [
+    await manager.query("DELETE FROM user_preferences WHERE user_id = $1", [
       userId,
     ]);
 
-    // User-created currencies (only those not referenced by other users)
-    await queryRunner.query(
-      `DELETE FROM currencies WHERE created_by_user_id = $1
-       AND code NOT IN (
-         SELECT DISTINCT currency_code FROM user_currency_preferences WHERE user_id != $1
-         UNION SELECT DISTINCT currency_code FROM accounts WHERE user_id != $1
-       )`,
+    // User-created currencies, but only ones nothing else still points at.
+    //
+    // `currencies.code` is referenced by nine columns across eight tables, and
+    // deleting a row any of them still holds aborts the whole restore with
+    // "violates foreign key constraint". Only `user_currency_preferences`
+    // cascades; every other reference blocks. Checking just preferences and
+    // accounts (as this did) misses the rest -- notably `exchange_rates`, which
+    // is global, is never cleared by a restore, and gets a row for every
+    // currency the FX backfill has ever seen. So a user who added a custom
+    // currency and let the daily rate refresh run could not restore a backup at
+    // all.
+    //
+    // This user's own accounts/transactions/securities/scheduled/budgets/prefs
+    // are already deleted above, so the surviving references are other users'
+    // (plus the global exchange_rates), which is exactly what must block.
+    await manager.query(
+      `DELETE FROM currencies c
+        WHERE c.created_by_user_id = $1
+          AND NOT EXISTS (SELECT 1 FROM exchange_rates er
+                           WHERE er.from_currency = c.code OR er.to_currency = c.code)
+          AND NOT EXISTS (SELECT 1 FROM user_currency_preferences ucp
+                           WHERE ucp.currency_code = c.code AND ucp.user_id != $1)
+          AND NOT EXISTS (SELECT 1 FROM accounts a WHERE a.currency_code = c.code)
+          AND NOT EXISTS (SELECT 1 FROM transactions t
+                           WHERE t.currency_code = c.code
+                              OR t.original_currency_code = c.code)
+          AND NOT EXISTS (SELECT 1 FROM securities s WHERE s.currency_code = c.code)
+          AND NOT EXISTS (SELECT 1 FROM scheduled_transactions st
+                           WHERE st.currency_code = c.code)
+          AND NOT EXISTS (SELECT 1 FROM budgets b WHERE b.currency_code = c.code)
+          AND NOT EXISTS (SELECT 1 FROM user_preferences up
+                           WHERE up.default_currency = c.code)`,
       [userId],
     );
   }
 
   private async restoreDeferredFkColumns(
-    queryRunner: ReturnType<DataSource["createQueryRunner"]>,
+    manager: EntityManager,
     data: BackupData,
   ): Promise<void> {
     // Each entry: [table, rows, column] -- update rows that have a non-null
@@ -1383,7 +1408,7 @@ export class BackupService {
 
     // Disable updated_at triggers on affected tables before running updates
     for (const table of triggersToDisable) {
-      await queryRunner.query(
+      await manager.query(
         `ALTER TABLE "${table}" DISABLE TRIGGER "update_${table}_updated_at"`,
       );
     }
@@ -1402,14 +1427,14 @@ export class BackupService {
           : `UPDATE "${table}" SET "${column}" = $1 WHERE id = $2`;
         for (const row of rows) {
           if (row[column] != null && row.id != null) {
-            await queryRunner.query(sql, [row[column], row.id]);
+            await manager.query(sql, [row[column], row.id]);
           }
         }
       }
     } finally {
       // Re-enable the triggers regardless of whether the updates succeeded
       for (const table of triggersToDisable) {
-        await queryRunner.query(
+        await manager.query(
           `ALTER TABLE "${table}" ENABLE TRIGGER "update_${table}_updated_at"`,
         );
       }
@@ -1417,7 +1442,7 @@ export class BackupService {
   }
 
   private async ensureCurrenciesExist(
-    queryRunner: ReturnType<DataSource["createQueryRunner"]>,
+    manager: EntityManager,
     data: BackupData,
     userId: string,
   ): Promise<void> {
@@ -1452,7 +1477,7 @@ export class BackupService {
     if (data.currencies) {
       // Validate column names against the actual currencies table schema to
       // prevent SQL injection via crafted backup data with malicious keys.
-      const currencySchemaResult = await queryRunner.query(
+      const currencySchemaResult = await manager.query(
         `SELECT column_name FROM information_schema.columns
          WHERE table_name = 'currencies' AND table_schema = 'public'`,
       );
@@ -1481,7 +1506,7 @@ export class BackupService {
 
         const columnList = columns.map((c) => `"${c}"`).join(", ");
         const placeholders = columns.map((_, i) => `$${i + 1}`).join(", ");
-        await queryRunner.query(
+        await manager.query(
           `INSERT INTO "currencies" (${columnList}) VALUES (${placeholders})
            ON CONFLICT (code) DO NOTHING`,
           values,
@@ -1491,7 +1516,7 @@ export class BackupService {
 
     // Check which codes are still missing from the currencies table
     const codeArray = Array.from(referencedCodes);
-    const existing: Array<{ code: string }> = await queryRunner.query(
+    const existing: Array<{ code: string }> = await manager.query(
       `SELECT code FROM currencies WHERE code = ANY($1)`,
       [codeArray],
     );
@@ -1505,7 +1530,7 @@ export class BackupService {
     // defaulting the symbol to the bare code.
     for (const code of missing) {
       const meta = resolveCurrencyMetadata(code);
-      await queryRunner.query(
+      await manager.query(
         `INSERT INTO "currencies" ("code", "name", "symbol", "decimal_places", "is_active", "created_by_user_id")
          VALUES ($1, $2, $3, $4, true, $5)
          ON CONFLICT (code) DO NOTHING`,
@@ -1518,7 +1543,7 @@ export class BackupService {
   }
 
   private async insertRows(
-    queryRunner: ReturnType<DataSource["createQueryRunner"]>,
+    manager: EntityManager,
     table: string,
     rows: Record<string, unknown>[] | undefined,
     userId: string | null,
@@ -1582,7 +1607,7 @@ export class BackupService {
       column_name: string;
       data_type: string;
       column_default: string | null;
-    }> = await queryRunner.query(
+    }> = await manager.query(
       `SELECT column_name, data_type, column_default FROM information_schema.columns
        WHERE table_name = $1 AND table_schema = 'public'`,
       [table],
@@ -1670,7 +1695,7 @@ export class BackupService {
         )
         .join(", ");
 
-      await queryRunner.query(
+      await manager.query(
         `INSERT INTO "${table}" (${columnList}) VALUES (${placeholders})
          ON CONFLICT DO NOTHING`,
         values,

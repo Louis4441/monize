@@ -5,8 +5,8 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { DataSource, EntityTarget, ObjectLiteral, Repository } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import { PersonalAccessToken } from "./entities/personal-access-token.entity";
 import { User } from "../users/entities/user.entity";
 import { CreatePatDto } from "./dto/create-pat.dto";
@@ -23,20 +23,32 @@ interface ValidatedToken {
 
 @Injectable()
 export class PatService {
-  constructor(
-    @InjectRepository(PersonalAccessToken)
-    private readonly patRepository: Repository<PersonalAccessToken>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-  ) {}
+  constructor(private readonly dataSource: DataSource) {}
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
+    );
+  }
 
   async create(
     userId: string,
     dto: CreatePatDto,
   ): Promise<{ token: PersonalAccessToken; rawToken: string }> {
-    const count = await this.patRepository.count({
-      where: { userId, isRevoked: false },
-    });
+    const count = await this.scoped(PersonalAccessToken, (repo) =>
+      repo.count({
+        where: { userId, isRevoked: false },
+      }),
+    );
     if (count >= MAX_TOKENS_PER_USER) {
       throw new BadRequestException(
         tr(
@@ -51,34 +63,39 @@ export class PatService {
     const tokenHash = hashToken(rawToken);
     const tokenPrefix = rawToken.substring(0, 8);
 
-    const token = this.patRepository.create({
-      userId,
-      name: dto.name,
-      tokenPrefix,
-      tokenHash,
-      scopes: dto.scopes || "read",
-      expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+    const saved = await withScopedDb(this.dataSource, (manager) => {
+      const repo = manager.getRepository(PersonalAccessToken);
+      return repo.save(
+        repo.create({
+          userId,
+          name: dto.name,
+          tokenPrefix,
+          tokenHash,
+          scopes: dto.scopes || "read",
+          expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : null,
+        }),
+      );
     });
-
-    const saved = await this.patRepository.save(token);
     return { token: saved, rawToken };
   }
 
   async findAllByUser(userId: string): Promise<PersonalAccessToken[]> {
-    return this.patRepository.find({
-      where: { userId },
-      order: { createdAt: "DESC" },
-      select: [
-        "id",
-        "name",
-        "tokenPrefix",
-        "scopes",
-        "lastUsedAt",
-        "expiresAt",
-        "isRevoked",
-        "createdAt",
-      ],
-    });
+    return this.scoped(PersonalAccessToken, (repo) =>
+      repo.find({
+        where: { userId },
+        order: { createdAt: "DESC" },
+        select: [
+          "id",
+          "name",
+          "tokenPrefix",
+          "scopes",
+          "lastUsedAt",
+          "expiresAt",
+          "isRevoked",
+          "createdAt",
+        ],
+      }),
+    );
   }
 
   async validateToken(rawToken: string): Promise<ValidatedToken> {
@@ -100,9 +117,11 @@ export class PatService {
     }
 
     const tokenHash = hashToken(rawToken);
-    const token = await this.patRepository.findOne({
-      where: { tokenHash },
-    });
+    const token = await this.scoped(PersonalAccessToken, (repo) =>
+      repo.findOne({
+        where: { tokenHash },
+      }),
+    );
 
     if (!token) {
       throw new UnauthorizedException(
@@ -123,10 +142,12 @@ export class PatService {
     }
 
     // SECURITY: Verify user account is active and not flagged for password change
-    const user = await this.userRepository.findOne({
-      where: { id: token.userId },
-      select: ["id", "isActive", "mustChangePassword"],
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: token.userId },
+        select: ["id", "isActive", "mustChangePassword"],
+      }),
+    );
     if (!user || !user.isActive) {
       throw new UnauthorizedException(
         tr("errors.auth.userAccountInactive", "User account is inactive"),
@@ -138,9 +159,11 @@ export class PatService {
       );
     }
 
-    await this.patRepository.update(token.id, {
-      lastUsedAt: new Date(),
-    });
+    await this.scoped(PersonalAccessToken, (repo) =>
+      repo.update(token.id, {
+        lastUsedAt: new Date(),
+      }),
+    );
 
     return {
       userId: token.userId,
@@ -149,9 +172,11 @@ export class PatService {
   }
 
   async revoke(userId: string, tokenId: string): Promise<void> {
-    const token = await this.patRepository.findOne({
-      where: { id: tokenId, userId },
-    });
+    const token = await this.scoped(PersonalAccessToken, (repo) =>
+      repo.findOne({
+        where: { id: tokenId, userId },
+      }),
+    );
 
     if (!token) {
       throw new NotFoundException(
@@ -159,6 +184,8 @@ export class PatService {
       );
     }
 
-    await this.patRepository.update(tokenId, { isRevoked: true });
+    await this.scoped(PersonalAccessToken, (repo) =>
+      repo.update(tokenId, { isRevoked: true }),
+    );
   }
 }

@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { I18nService } from "nestjs-i18n";
 import { BillReminderService } from "./bill-reminder.service";
@@ -8,6 +8,11 @@ import { ScheduledTransaction } from "../scheduled-transactions/entities/schedul
 import { ScheduledTransactionOverride } from "../scheduled-transactions/entities/scheduled-transaction-override.entity";
 import { User } from "../users/entities/user.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("BillReminderService", () => {
   let service: BillReminderService;
@@ -39,21 +44,16 @@ describe("BillReminderService", () => {
       get: jest.fn(),
     };
 
+    const { dataSource } = createScopedDbMocks([
+      [ScheduledTransaction, scheduledTransactionsRepo],
+      [User, usersRepo],
+      [UserPreference, preferencesRepo],
+    ]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BillReminderService,
-        {
-          provide: getRepositoryToken(ScheduledTransaction),
-          useValue: scheduledTransactionsRepo,
-        },
-        {
-          provide: getRepositoryToken(User),
-          useValue: usersRepo,
-        },
-        {
-          provide: getRepositoryToken(UserPreference),
-          useValue: preferencesRepo,
-        },
+        { provide: DataSource, useValue: dataSource },
         { provide: EmailService, useValue: emailService },
         { provide: ConfigService, useValue: configService },
         {

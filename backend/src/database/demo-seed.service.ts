@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { DataSource } from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 
 import { withSystemContext } from "../common/db/with-context";
 import { SeedService } from "./seed.service";
@@ -41,9 +42,10 @@ export class DemoSeedService {
     await this.seedService.seedAll();
 
     // Get the demo user ID (created by seedService)
-    const [demoUser] = await this.dataSource.query(
-      "SELECT id FROM users WHERE email = $1",
-      ["demo@monize.com"],
+    const [demoUser] = await withScopedDb(this.dataSource, (manager) =>
+      manager.query("SELECT id FROM users WHERE email = $1", [
+        "demo@monize.com",
+      ]),
     );
 
     if (!demoUser) {
@@ -51,61 +53,78 @@ export class DemoSeedService {
     }
 
     // Delete base seed data so we can replace with richer demo data (FK-safe order)
-    await this.dataSource.query(
-      "DELETE FROM investment_transactions WHERE user_id = $1",
-      [demoUser.id],
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM investment_transactions WHERE user_id = $1", [
+        demoUser.id,
+      ]),
     );
-    await this.dataSource.query(
-      "DELETE FROM holdings WHERE account_id IN (SELECT id FROM accounts WHERE user_id = $1)",
-      [demoUser.id],
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        "DELETE FROM holdings WHERE account_id IN (SELECT id FROM accounts WHERE user_id = $1)",
+        [demoUser.id],
+      ),
     );
-    await this.dataSource.query(
-      "DELETE FROM security_prices WHERE security_id IN (SELECT id FROM securities WHERE user_id = $1)",
-      [demoUser.id],
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        "DELETE FROM security_prices WHERE security_id IN (SELECT id FROM securities WHERE user_id = $1)",
+        [demoUser.id],
+      ),
     );
-    await this.dataSource.query("DELETE FROM securities WHERE user_id = $1", [
-      demoUser.id,
-    ]);
-    await this.dataSource.query(
-      "DELETE FROM transaction_splits WHERE transaction_id IN (SELECT id FROM transactions WHERE user_id = $1)",
-      [demoUser.id],
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM securities WHERE user_id = $1", [demoUser.id]),
     );
-    await this.dataSource.query("DELETE FROM transactions WHERE user_id = $1", [
-      demoUser.id,
-    ]);
-    await this.dataSource.query(
-      "DELETE FROM scheduled_transaction_splits WHERE scheduled_transaction_id IN (SELECT id FROM scheduled_transactions WHERE user_id = $1)",
-      [demoUser.id],
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        "DELETE FROM transaction_splits WHERE transaction_id IN (SELECT id FROM transactions WHERE user_id = $1)",
+        [demoUser.id],
+      ),
     );
-    await this.dataSource.query(
-      "DELETE FROM scheduled_transactions WHERE user_id = $1",
-      [demoUser.id],
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM transactions WHERE user_id = $1", [
+        demoUser.id,
+      ]),
     );
-    await this.dataSource.query(
-      "DELETE FROM monthly_account_balances WHERE user_id = $1",
-      [demoUser.id],
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        "DELETE FROM scheduled_transaction_splits WHERE scheduled_transaction_id IN (SELECT id FROM scheduled_transactions WHERE user_id = $1)",
+        [demoUser.id],
+      ),
     );
-    await this.dataSource.query(
-      "DELETE FROM custom_reports WHERE user_id = $1",
-      [demoUser.id],
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM scheduled_transactions WHERE user_id = $1", [
+        demoUser.id,
+      ]),
     );
-    await this.dataSource.query("DELETE FROM payees WHERE user_id = $1", [
-      demoUser.id,
-    ]);
-    await this.dataSource.query("DELETE FROM accounts WHERE user_id = $1", [
-      demoUser.id,
-    ]);
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM monthly_account_balances WHERE user_id = $1", [
+        demoUser.id,
+      ]),
+    );
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM custom_reports WHERE user_id = $1", [
+        demoUser.id,
+      ]),
+    );
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM payees WHERE user_id = $1", [demoUser.id]),
+    );
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM accounts WHERE user_id = $1", [demoUser.id]),
+    );
     // Institutions are referenced by accounts (institution_id FK); delete after
     // accounts so the re-seed recreates them without duplicates.
-    await this.dataSource.query("DELETE FROM institutions WHERE user_id = $1", [
-      demoUser.id,
-    ]);
-    await this.dataSource.query("DELETE FROM categories WHERE user_id = $1", [
-      demoUser.id,
-    ]);
-    await this.dataSource.query(
-      "DELETE FROM user_preferences WHERE user_id = $1",
-      [demoUser.id],
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM institutions WHERE user_id = $1", [
+        demoUser.id,
+      ]),
+    );
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM categories WHERE user_id = $1", [demoUser.id]),
+    );
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query("DELETE FROM user_preferences WHERE user_id = $1", [
+        demoUser.id,
+      ]),
     );
 
     await this.seedDemoData(demoUser.id);
@@ -154,10 +173,12 @@ export class DemoSeedService {
     ];
 
     for (const cat of incomeCategories) {
-      const result = await this.dataSource.query(
-        `INSERT INTO categories (user_id, name, icon, color, is_income)
+      const result = await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO categories (user_id, name, icon, color, is_income)
          VALUES ($1, $2, $3, $4, true) RETURNING id`,
-        [userId, cat.name, cat.icon, cat.color],
+          [userId, cat.name, cat.icon, cat.color],
+        ),
       );
       categoryMap.set(cat.name, result[0].id);
     }
@@ -224,19 +245,23 @@ export class DemoSeedService {
     ];
 
     for (const cat of expenseCategories) {
-      const parentResult = await this.dataSource.query(
-        `INSERT INTO categories (user_id, name, icon, color, is_income)
+      const parentResult = await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO categories (user_id, name, icon, color, is_income)
          VALUES ($1, $2, $3, $4, false) RETURNING id`,
-        [userId, cat.name, cat.icon, cat.color],
+          [userId, cat.name, cat.icon, cat.color],
+        ),
       );
       const parentId = parentResult[0].id;
       categoryMap.set(cat.name, parentId);
 
       for (const subName of cat.subs) {
-        const subResult = await this.dataSource.query(
-          `INSERT INTO categories (user_id, parent_id, name, is_income)
+        const subResult = await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO categories (user_id, parent_id, name, is_income)
            VALUES ($1, $2, $3, false) RETURNING id`,
-          [userId, parentId, subName],
+            [userId, parentId, subName],
+          ),
         );
         categoryMap.set(`${cat.name} > ${subName}`, subResult[0].id);
       }
@@ -266,22 +291,24 @@ export class DemoSeedService {
     for (let i = 0; i < demoInstitutions.length; i++) {
       const inst = demoInstitutions[i];
       const logo = logos[i];
-      const result = await this.dataSource.query(
-        `INSERT INTO institutions (
+      const result = await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO institutions (
           user_id, name, website, country,
           logo_data, logo_content_type, has_logo, logo_fetched_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING id`,
-        [
-          userId,
-          inst.name,
-          inst.website,
-          inst.country,
-          logo ? logo.data : null,
-          logo ? logo.contentType : null,
-          logo ? true : false,
-          logo ? new Date().toISOString() : null,
-        ],
+          [
+            userId,
+            inst.name,
+            inst.website,
+            inst.country,
+            logo ? logo.data : null,
+            logo ? logo.contentType : null,
+            logo ? true : false,
+            logo ? new Date().toISOString() : null,
+          ],
+        ),
       );
       institutionMap.set(inst.name, result[0].id);
     }
@@ -310,50 +337,58 @@ export class DemoSeedService {
         : null;
       if (acc.isInvestmentPair) {
         // Create investment account pair: cash + brokerage with bidirectional linking
-        const [cashAccount] = await this.dataSource.query(
-          `INSERT INTO accounts (
+        const [cashAccount] = await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO accounts (
             user_id, account_type, account_sub_type, name, description, currency_code,
             opening_balance, current_balance, institution, institution_id, is_favourite, created_at
           ) VALUES ($1, 'INVESTMENT', 'INVESTMENT_CASH', $2, $3, $4, $5, $6, $7, $8, $9, $10)
           RETURNING id`,
-          [
-            userId,
-            `${acc.name} - Cash`,
-            acc.description,
-            acc.currency,
-            acc.openingBalance,
-            acc.openingBalance,
-            acc.institution || null,
-            institutionId,
-            acc.isFavourite || false,
-            createdAtStr,
-          ],
+            [
+              userId,
+              `${acc.name} - Cash`,
+              acc.description,
+              acc.currency,
+              acc.openingBalance,
+              acc.openingBalance,
+              acc.institution || null,
+              institutionId,
+              acc.isFavourite || false,
+              createdAtStr,
+            ],
+          ),
         );
 
-        const [brokerageAccount] = await this.dataSource.query(
-          `INSERT INTO accounts (
+        const [brokerageAccount] = await withScopedDb(
+          this.dataSource,
+          (manager) =>
+            manager.query(
+              `INSERT INTO accounts (
             user_id, account_type, account_sub_type, name, description, currency_code,
             opening_balance, current_balance, institution, institution_id, is_favourite,
             linked_account_id, created_at
           ) VALUES ($1, 'INVESTMENT', 'INVESTMENT_BROKERAGE', $2, $3, $4, 0, 0, $5, $6, $7, $8, $9)
           RETURNING id`,
-          [
-            userId,
-            `${acc.name} - Brokerage`,
-            acc.description,
-            acc.currency,
-            acc.institution || null,
-            institutionId,
-            acc.isFavourite || false,
-            cashAccount.id,
-            createdAtStr,
-          ],
+              [
+                userId,
+                `${acc.name} - Brokerage`,
+                acc.description,
+                acc.currency,
+                acc.institution || null,
+                institutionId,
+                acc.isFavourite || false,
+                cashAccount.id,
+                createdAtStr,
+              ],
+            ),
         );
 
         // Link cash account back to brokerage
-        await this.dataSource.query(
-          "UPDATE accounts SET linked_account_id = $1 WHERE id = $2",
-          [brokerageAccount.id, cashAccount.id],
+        await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            "UPDATE accounts SET linked_account_id = $1 WHERE id = $2",
+            [brokerageAccount.id, cashAccount.id],
+          ),
         );
 
         // Map the key to the brokerage account (securities/holdings go here)
@@ -361,8 +396,9 @@ export class DemoSeedService {
         // Also store the cash account ID for balance updates
         accountMap.set(`${acc.key}_cash`, cashAccount.id);
       } else {
-        const result = await this.dataSource.query(
-          `INSERT INTO accounts (
+        const result = await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO accounts (
             user_id, account_type, name, description, currency_code,
             opening_balance, current_balance, credit_limit, interest_rate,
             institution, institution_id, is_favourite,
@@ -371,28 +407,29 @@ export class DemoSeedService {
             created_at
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
           RETURNING id`,
-          [
-            userId,
-            acc.type,
-            acc.name,
-            acc.description,
-            acc.currency,
-            acc.openingBalance,
-            acc.openingBalance,
-            acc.creditLimit || null,
-            acc.interestRate || null,
-            acc.institution || null,
-            institutionId,
-            acc.isFavourite || false,
-            acc.isCanadianMortgage || false,
-            acc.isVariableRate || false,
-            acc.termMonths || null,
-            acc.amortizationMonths || null,
-            acc.originalPrincipal || null,
-            acc.paymentAmount || null,
-            acc.paymentFrequency || null,
-            createdAtStr,
-          ],
+            [
+              userId,
+              acc.type,
+              acc.name,
+              acc.description,
+              acc.currency,
+              acc.openingBalance,
+              acc.openingBalance,
+              acc.creditLimit || null,
+              acc.interestRate || null,
+              acc.institution || null,
+              institutionId,
+              acc.isFavourite || false,
+              acc.isCanadianMortgage || false,
+              acc.isVariableRate || false,
+              acc.termMonths || null,
+              acc.amortizationMonths || null,
+              acc.originalPrincipal || null,
+              acc.paymentAmount || null,
+              acc.paymentFrequency || null,
+              createdAtStr,
+            ],
+          ),
         );
         accountMap.set(acc.key, result[0].id);
       }
@@ -403,9 +440,11 @@ export class DemoSeedService {
     if (mortgageId) {
       const termEnd = new Date();
       termEnd.setFullYear(termEnd.getFullYear() + 3); // 3 years remaining on 5-year term
-      await this.dataSource.query(
-        "UPDATE accounts SET term_end_date = $1 WHERE id = $2",
-        [termEnd.toISOString().split("T")[0], mortgageId],
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query("UPDATE accounts SET term_end_date = $1 WHERE id = $2", [
+          termEnd.toISOString().split("T")[0],
+          mortgageId,
+        ]),
       );
     }
 
@@ -423,12 +462,14 @@ export class DemoSeedService {
 
     for (const payee of demoPayees) {
       const categoryId = categoryMap.get(payee.categoryPath) || null;
-      const result = await this.dataSource.query(
-        `INSERT INTO payees (user_id, name, default_category_id)
+      const result = await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO payees (user_id, name, default_category_id)
          VALUES ($1, $2, $3)
          ON CONFLICT (user_id, name) DO NOTHING
          RETURNING id`,
-        [userId, payee.name, categoryId],
+          [userId, payee.name, categoryId],
+        ),
       );
       if (result.length > 0) {
         payeeMap.set(payee.name, result[0].id);
@@ -436,12 +477,14 @@ export class DemoSeedService {
     }
 
     // Add Transfer payee
-    const transferResult = await this.dataSource.query(
-      `INSERT INTO payees (user_id, name)
+    const transferResult = await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `INSERT INTO payees (user_id, name)
        VALUES ($1, $2)
        ON CONFLICT (user_id, name) DO NOTHING
        RETURNING id`,
-      [userId, "Transfer"],
+        [userId, "Transfer"],
+      ),
     );
     if (transferResult.length > 0) {
       payeeMap.set("Transfer", transferResult[0].id);
@@ -477,80 +520,90 @@ export class DemoSeedService {
         const transferAccountId = accountMap.get(tx.transferAccountKey);
         if (!transferAccountId) continue;
 
-        const [fromTx] = await this.dataSource.query(
-          `INSERT INTO transactions (
+        const [fromTx] = await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
             amount, currency_code, description, status, is_transfer
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
           RETURNING id`,
-          [
-            userId,
-            accountId,
-            tx.date,
-            payeeId,
-            tx.payeeName,
-            tx.amount,
-            currencyCode,
-            tx.description,
-            tx.status,
-          ],
+            [
+              userId,
+              accountId,
+              tx.date,
+              payeeId,
+              tx.payeeName,
+              tx.amount,
+              currencyCode,
+              tx.description,
+              tx.status,
+            ],
+          ),
         );
 
-        const [toTx] = await this.dataSource.query(
-          `INSERT INTO transactions (
+        const [toTx] = await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
             amount, currency_code, description, status,
             is_transfer, linked_transaction_id
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, $10)
           RETURNING id`,
-          [
-            userId,
-            transferAccountId,
-            tx.date,
-            payeeId,
-            tx.payeeName,
-            -tx.amount,
-            currencyCode,
-            tx.description,
-            tx.status,
-            fromTx.id,
-          ],
+            [
+              userId,
+              transferAccountId,
+              tx.date,
+              payeeId,
+              tx.payeeName,
+              -tx.amount,
+              currencyCode,
+              tx.description,
+              tx.status,
+              fromTx.id,
+            ],
+          ),
         );
 
-        await this.dataSource.query(
-          "UPDATE transactions SET linked_transaction_id = $1 WHERE id = $2",
-          [toTx.id, fromTx.id],
+        await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            "UPDATE transactions SET linked_transaction_id = $1 WHERE id = $2",
+            [toTx.id, fromTx.id],
+          ),
         );
 
         transferCount++;
         count += 2;
       } else if (tx.isSplit && tx.splits) {
         // Create split transaction
-        const [parentTx] = await this.dataSource.query(
-          `INSERT INTO transactions (
+        const [parentTx] = await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
             amount, currency_code, description, status, is_split
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true)
           RETURNING id`,
-          [
-            userId,
-            accountId,
-            tx.date,
-            payeeId,
-            tx.payeeName,
-            tx.amount,
-            currencyCode,
-            tx.description,
-            tx.status,
-          ],
+            [
+              userId,
+              accountId,
+              tx.date,
+              payeeId,
+              tx.payeeName,
+              tx.amount,
+              currencyCode,
+              tx.description,
+              tx.status,
+            ],
+          ),
         );
 
         for (const split of tx.splits) {
           const splitCategoryId = categoryMap.get(split.categoryPath) || null;
-          await this.dataSource.query(
-            `INSERT INTO transaction_splits (transaction_id, category_id, amount, memo)
+          await withScopedDb(this.dataSource, (manager) =>
+            manager.query(
+              `INSERT INTO transaction_splits (transaction_id, category_id, amount, memo)
              VALUES ($1, $2, $3, $4)`,
-            [parentTx.id, splitCategoryId, split.amount, split.memo],
+              [parentTx.id, splitCategoryId, split.amount, split.memo],
+            ),
           );
         }
 
@@ -558,23 +611,25 @@ export class DemoSeedService {
         count++;
       } else {
         // Regular transaction
-        await this.dataSource.query(
-          `INSERT INTO transactions (
+        await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO transactions (
             user_id, account_id, transaction_date, payee_id, payee_name,
             category_id, amount, currency_code, description, status
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [
-            userId,
-            accountId,
-            tx.date,
-            payeeId,
-            tx.payeeName,
-            categoryId,
-            tx.amount,
-            currencyCode,
-            tx.description,
-            tx.status,
-          ],
+            [
+              userId,
+              accountId,
+              tx.date,
+              payeeId,
+              tx.payeeName,
+              categoryId,
+              tx.amount,
+              currencyCode,
+              tx.description,
+              tx.status,
+            ],
+          ),
         );
         count++;
       }
@@ -585,16 +640,20 @@ export class DemoSeedService {
       // Skip internal keys (e.g., "rrsp_cash") — their balance is set at creation
       if (key.endsWith("_cash")) continue;
 
-      const [result] = await this.dataSource.query(
-        `SELECT COALESCE(SUM(amount), 0) as total FROM transactions
+      const [result] = await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `SELECT COALESCE(SUM(amount), 0) as total FROM transactions
          WHERE account_id = $1 AND user_id = $2`,
-        [accountId, userId],
+          [accountId, userId],
+        ),
       );
       const openingBalance =
         demoAccounts.find((a) => a.key === key)?.openingBalance || 0;
-      await this.dataSource.query(
-        "UPDATE accounts SET current_balance = $1 WHERE id = $2",
-        [openingBalance + parseFloat(result.total), accountId],
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          "UPDATE accounts SET current_balance = $1 WHERE id = $2",
+          [openingBalance + parseFloat(result.total), accountId],
+        ),
       );
     }
 
@@ -638,29 +697,31 @@ export class DemoSeedService {
       startDate.setMonth(startDate.getMonth() - 12);
       startDate.setDate(st.dueDayOfMonth);
 
-      await this.dataSource.query(
-        `INSERT INTO scheduled_transactions (
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO scheduled_transactions (
           user_id, account_id, name, payee_id, payee_name,
           category_id, amount, currency_code, frequency,
           next_due_date, start_date, is_active, auto_post,
           is_transfer, transfer_account_id
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, $12, $13, $14)`,
-        [
-          userId,
-          accountId,
-          st.name,
-          payeeId,
-          st.payeeName,
-          categoryId,
-          st.amount,
-          "CAD",
-          st.frequency,
-          nextDue.toISOString().split("T")[0],
-          startDate.toISOString().split("T")[0],
-          st.autoPost,
-          st.isTransfer || false,
-          transferAccountId,
-        ],
+          [
+            userId,
+            accountId,
+            st.name,
+            payeeId,
+            st.payeeName,
+            categoryId,
+            st.amount,
+            "CAD",
+            st.frequency,
+            nextDue.toISOString().split("T")[0],
+            startDate.toISOString().split("T")[0],
+            st.autoPost,
+            st.isTransfer || false,
+            transferAccountId,
+          ],
+        ),
       );
     }
 
@@ -683,30 +744,36 @@ export class DemoSeedService {
       if (!accountId) continue;
 
       // Create security
-      const [security] = await this.dataSource.query(
-        `INSERT INTO securities (user_id, symbol, name, security_type, exchange, currency_code)
+      const [security] = await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO securities (user_id, symbol, name, security_type, exchange, currency_code)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
-        [userId, sec.symbol, sec.name, sec.type, sec.exchange, sec.currency],
+          [userId, sec.symbol, sec.name, sec.type, sec.exchange, sec.currency],
+        ),
       );
 
       // Generate and insert price history
       const prices = generatePriceHistory(sec, now, 12);
       for (const price of prices) {
-        await this.dataSource.query(
-          `INSERT INTO security_prices (security_id, price_date, close_price, source)
+        await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO security_prices (security_id, price_date, close_price, source)
            VALUES ($1, $2, $3, 'demo-seed')
            ON CONFLICT (security_id, price_date) DO NOTHING`,
-          [security.id, price.date, price.close],
+            [security.id, price.date, price.close],
+          ),
         );
         priceCount++;
       }
 
       // Create holding
-      await this.dataSource.query(
-        `INSERT INTO holdings (account_id, security_id, quantity, average_cost)
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO holdings (account_id, security_id, quantity, average_cost)
          VALUES ($1, $2, $3, $4)`,
-        [accountId, security.id, sec.quantity, sec.averageCost],
+          [accountId, security.id, sec.quantity, sec.averageCost],
+        ),
       );
 
       // Create a few BUY investment transactions spread across the year
@@ -721,22 +788,24 @@ export class DemoSeedService {
       for (const buyDate of buyDates) {
         const qty = quantityPerBuy;
         const total = qty * sec.averageCost;
-        await this.dataSource.query(
-          `INSERT INTO investment_transactions (
+        await withScopedDb(this.dataSource, (manager) =>
+          manager.query(
+            `INSERT INTO investment_transactions (
             user_id, account_id, security_id, action, transaction_date,
             quantity, price, commission, total_amount, description
           ) VALUES ($1, $2, $3, 'BUY', $4, $5, $6, $7, $8, $9)`,
-          [
-            userId,
-            accountId,
-            security.id,
-            buyDate.toISOString().split("T")[0],
-            qty,
-            sec.averageCost,
-            9.99,
-            total + 9.99,
-            `Buy ${qty} ${sec.symbol}`,
-          ],
+            [
+              userId,
+              accountId,
+              security.id,
+              buyDate.toISOString().split("T")[0],
+              qty,
+              sec.averageCost,
+              9.99,
+              total + 9.99,
+              `Buy ${qty} ${sec.symbol}`,
+            ],
+          ),
         );
       }
 
@@ -749,21 +818,23 @@ export class DemoSeedService {
           const divAmount =
             Math.round(sec.quantity * sec.basePrice * 0.005 * 100) / 100;
 
-          await this.dataSource.query(
-            `INSERT INTO investment_transactions (
+          await withScopedDb(this.dataSource, (manager) =>
+            manager.query(
+              `INSERT INTO investment_transactions (
               user_id, account_id, security_id, action, transaction_date,
               quantity, price, total_amount, description
             ) VALUES ($1, $2, $3, 'DIVIDEND', $4, $5, $6, $7, $8)`,
-            [
-              userId,
-              accountId,
-              security.id,
-              divDate.toISOString().split("T")[0],
-              0,
-              0,
-              divAmount,
-              `Dividend - ${sec.symbol}`,
-            ],
+              [
+                userId,
+                accountId,
+                security.id,
+                divDate.toISOString().split("T")[0],
+                0,
+                0,
+                divAmount,
+                `Dividend - ${sec.symbol}`,
+              ],
+            ),
           );
         }
       }
@@ -778,26 +849,28 @@ export class DemoSeedService {
     this.logger.log("Seeding custom reports");
 
     for (const report of demoReports) {
-      await this.dataSource.query(
-        `INSERT INTO custom_reports (
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `INSERT INTO custom_reports (
           user_id, name, description, icon, background_color,
           view_type, timeframe_type, group_by, filters, config,
           is_favourite, sort_order
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-        [
-          userId,
-          report.name,
-          report.description,
-          report.icon,
-          report.backgroundColor,
-          report.viewType,
-          report.timeframeType,
-          report.groupBy,
-          JSON.stringify(report.filters),
-          JSON.stringify(report.config),
-          report.isFavourite,
-          report.sortOrder,
-        ],
+          [
+            userId,
+            report.name,
+            report.description,
+            report.icon,
+            report.backgroundColor,
+            report.viewType,
+            report.timeframeType,
+            report.groupBy,
+            JSON.stringify(report.filters),
+            JSON.stringify(report.config),
+            report.isFavourite,
+            report.sortOrder,
+          ],
+        ),
       );
     }
 
@@ -808,8 +881,9 @@ export class DemoSeedService {
     this.logger.log("Seeding user preferences");
 
     const p = demoPreferences;
-    await this.dataSource.query(
-      `INSERT INTO user_preferences (
+    await withScopedDb(this.dataSource, (manager) =>
+      manager.query(
+        `INSERT INTO user_preferences (
         user_id, default_currency, date_format, number_format, theme,
         timezone, notification_email, notification_browser,
         two_factor_enabled, getting_started_dismissed
@@ -819,18 +893,19 @@ export class DemoSeedService {
         theme = $5, timezone = $6, notification_email = $7,
         notification_browser = $8, two_factor_enabled = $9,
         getting_started_dismissed = $10`,
-      [
-        userId,
-        p.defaultCurrency,
-        p.dateFormat,
-        p.numberFormat,
-        p.theme,
-        p.timezone,
-        p.notificationEmail,
-        p.notificationBrowser,
-        p.twoFactorEnabled,
-        p.gettingStartedDismissed,
-      ],
+        [
+          userId,
+          p.defaultCurrency,
+          p.dateFormat,
+          p.numberFormat,
+          p.theme,
+          p.timezone,
+          p.notificationEmail,
+          p.notificationBrowser,
+          p.twoFactorEnabled,
+          p.gettingStartedDismissed,
+        ],
+      ),
     );
 
     this.logger.log("Seeded user preferences");

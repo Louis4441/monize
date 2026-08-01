@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
 import { BadRequestException } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
 import { AuthEmailService } from "./auth-email.service";
@@ -8,6 +8,11 @@ import { TrustedDevice } from "../users/entities/trusted-device.entity";
 import { PasswordBreachService } from "./password-breach.service";
 import { TokenService } from "./token.service";
 import { hashToken } from "./crypto.util";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("AuthEmailService", () => {
   let service: AuthEmailService;
@@ -47,15 +52,14 @@ describe("AuthEmailService", () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        {
+          provide: DataSource,
+          useValue: createScopedDbMocks([
+            [User, usersRepository as never],
+            [TrustedDevice, trustedDevicesRepository as never],
+          ]).dataSource,
+        },
         AuthEmailService,
-        {
-          provide: getRepositoryToken(User),
-          useValue: usersRepository,
-        },
-        {
-          provide: getRepositoryToken(TrustedDevice),
-          useValue: trustedDevicesRepository,
-        },
         {
           provide: PasswordBreachService,
           useValue: passwordBreachService,

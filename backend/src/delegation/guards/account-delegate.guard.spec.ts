@@ -61,7 +61,9 @@ describe("AccountDelegateGuard", () => {
   });
 
   it("allows a normal (non-delegate) token unchanged", async () => {
-    jwtService.verify.mockReturnValue({ sub: "u1" });
+    jwtService.verify.mockReturnValue({
+      sub: "11111111-1111-4111-8111-111111111111",
+    });
     const ctx = makeContext({ headers: { authorization: "Bearer x" } });
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(reflector.getAllAndOverride).not.toHaveBeenCalled();
@@ -69,8 +71,8 @@ describe("AccountDelegateGuard", () => {
 
   it("blocks a delegate on a route not annotated @AllowDelegate (fail closed)", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockReturnValue(undefined);
@@ -82,8 +84,8 @@ describe("AccountDelegateGuard", () => {
 
   it("allows a delegate on an @AllowDelegate route with no account param", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) =>
@@ -95,8 +97,8 @@ describe("AccountDelegateGuard", () => {
 
   it("blocks a delegate without READ access to the account", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -121,8 +123,8 @@ describe("AccountDelegateGuard", () => {
 
   it("allows a delegate with READ access to the account", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -141,8 +143,8 @@ describe("AccountDelegateGuard", () => {
 
   it("resolves a transaction's account and enforces the edit grant", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -172,8 +174,8 @@ describe("AccountDelegateGuard", () => {
 
   it("lets an unknown transaction fall through to the service (404)", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -192,8 +194,8 @@ describe("AccountDelegateGuard", () => {
 
   it("requires the operation on BOTH accounts of a transfer body", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -223,8 +225,8 @@ describe("AccountDelegateGuard", () => {
 
   it("allows a transfer body when both accounts are permitted", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -244,8 +246,8 @@ describe("AccountDelegateGuard", () => {
 
   it("requires the operation on both legs of a transfer-by-id", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -269,8 +271,8 @@ describe("AccountDelegateGuard", () => {
 
   it("lets an unknown transfer fall through (404)", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -289,8 +291,8 @@ describe("AccountDelegateGuard", () => {
 
   it("blocks a delegate lacking the required manage capability", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -313,8 +315,8 @@ describe("AccountDelegateGuard", () => {
 
   it("allows a delegate with the required manage capability", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -330,8 +332,8 @@ describe("AccountDelegateGuard", () => {
 
   it("requires the operation on every account of a scheduled-by-id", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -355,8 +357,8 @@ describe("AccountDelegateGuard", () => {
 
   it("lets an unknown scheduled txn fall through (404)", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -375,8 +377,8 @@ describe("AccountDelegateGuard", () => {
 
   it("READ of a scheduled transfer only gates the primary account", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -404,8 +406,8 @@ describe("AccountDelegateGuard", () => {
 
   it("blocks a delegate lacking the required section grant", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -423,8 +425,8 @@ describe("AccountDelegateGuard", () => {
 
   it("allows a delegate with the required section grant", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -438,7 +440,10 @@ describe("AccountDelegateGuard", () => {
   });
 
   it("ignores 2fa_pending tokens", async () => {
-    jwtService.verify.mockReturnValue({ sub: "u1", type: "2fa_pending" });
+    jwtService.verify.mockReturnValue({
+      sub: "11111111-1111-4111-8111-111111111111",
+      type: "2fa_pending",
+    });
     const ctx = makeContext({ headers: { authorization: "Bearer x" } });
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
   });
@@ -454,7 +459,10 @@ describe("AccountDelegateGuard", () => {
   });
 
   it("treats a token with actingAsUserId but no delegationId as non-delegate", async () => {
-    jwtService.verify.mockReturnValue({ sub: "d1", actingAsUserId: "o1" });
+    jwtService.verify.mockReturnValue({
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
+    });
     const ctx = makeContext({ headers: { authorization: "Bearer x" } });
     await expect(guard.canActivate(ctx)).resolves.toBe(true);
     expect(reflector.getAllAndOverride).not.toHaveBeenCalled();
@@ -462,8 +470,8 @@ describe("AccountDelegateGuard", () => {
 
   it("resolves the account id from the request body", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -486,8 +494,8 @@ describe("AccountDelegateGuard", () => {
 
   it("resolves the account id from the query string", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -510,8 +518,8 @@ describe("AccountDelegateGuard", () => {
 
   it("enforces the required write operation (create)", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {
@@ -537,8 +545,8 @@ describe("AccountDelegateGuard", () => {
 
   it("skips the grant check when the account id is absent", async () => {
     jwtService.verify.mockReturnValue({
-      sub: "d1",
-      actingAsUserId: "o1",
+      sub: "d1111111-1111-4111-8111-111111111111",
+      actingAsUserId: "01111111-1111-4111-8111-111111111111",
       delegationId: "g1",
     });
     reflector.getAllAndOverride.mockImplementation((key: string) => {

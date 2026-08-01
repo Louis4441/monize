@@ -1,5 +1,4 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import {
   ConflictException,
@@ -12,6 +11,11 @@ import { EmergencyAccessContact } from "./entities/emergency-access-contact.enti
 import { AiEncryptionService } from "../ai/ai-encryption.service";
 import { EmailService } from "../notifications/email.service";
 import { User } from "../users/entities/user.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 describe("EmergencyAccessService", () => {
   let service: EmergencyAccessService;
@@ -28,7 +32,7 @@ describe("EmergencyAccessService", () => {
     release: jest.Mock;
     manager: Record<string, jest.Mock>;
   };
-  let dataSource: { createQueryRunner: jest.Mock };
+  let dataSource: Record<string, jest.Mock>;
 
   const userId = "11111111-1111-1111-1111-111111111111";
 
@@ -72,20 +76,21 @@ describe("EmergencyAccessService", () => {
         createQueryBuilder: jest.fn(() => updateBuilder),
       },
     };
-    dataSource = { createQueryRunner: jest.fn(() => queryRunner) };
+    // Every read/write now runs through `withScopedDb`; the former QueryRunner
+    // is the transaction's EntityManager, so keep `queryRunner.manager` pointing
+    // at the same jest.fn()s the manager exposes.
+    const scoped = createScopedDbMocks([
+      [EmergencyAccessSettings, settingsRepo as never],
+      [EmergencyAccessContact, contactsRepo as never],
+      [User, usersRepo as never],
+    ]);
+    Object.assign(scoped.manager, queryRunner.manager);
+    queryRunner.manager = scoped.manager;
+    dataSource = scoped.dataSource as unknown as Record<string, jest.Mock>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EmergencyAccessService,
-        {
-          provide: getRepositoryToken(EmergencyAccessSettings),
-          useValue: settingsRepo,
-        },
-        {
-          provide: getRepositoryToken(EmergencyAccessContact),
-          useValue: contactsRepo,
-        },
-        { provide: getRepositoryToken(User), useValue: usersRepo },
         { provide: AiEncryptionService, useValue: encryption },
         { provide: EmailService, useValue: emailService },
         { provide: DataSource, useValue: dataSource },
@@ -208,7 +213,7 @@ describe("EmergencyAccessService", () => {
       expect(encryption.encrypt).toHaveBeenCalledWith("hello");
       const saved = queryRunner.manager.save.mock.calls[0][0];
       expect(saved.messageCiphertext).toBe("enc(hello)");
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
       expect(meta.hasMessage).toBe(true);
       expect(meta.charCount).toBe("hello".length);
     });
@@ -232,7 +237,7 @@ describe("EmergencyAccessService", () => {
       await service.updateMessage(userId, "hi");
 
       expect(queryRunner.manager.create).toHaveBeenCalled();
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
 
     it("refuses to save a non-empty message when AI_ENCRYPTION_KEY is missing", async () => {
@@ -247,7 +252,7 @@ describe("EmergencyAccessService", () => {
       await expect(service.updateMessage(userId, "hello")).rejects.toThrow(
         "boom",
       );
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
   });
 
@@ -296,7 +301,7 @@ describe("EmergencyAccessService", () => {
           reminderAfterDays: 7,
         }),
       ).rejects.toThrow("boom");
-      expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
+      expect(dataSource.transaction).toHaveBeenCalled();
     });
   });
 

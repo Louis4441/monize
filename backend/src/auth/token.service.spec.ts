@@ -1,11 +1,15 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { getRepositoryToken } from "@nestjs/typeorm";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
 import { UnauthorizedException } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { TokenService } from "./token.service";
 import { RefreshToken } from "./entities/refresh-token.entity";
+import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+
+jest.mock("../common/db/scoped-db", () =>
+  jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
+);
 
 jest.mock("crypto", () => {
   const actual = jest.requireActual("crypto");
@@ -62,17 +66,13 @@ describe("TokenService", () => {
       sign: jest.fn().mockReturnValue("mock-access-token"),
     };
 
-    dataSource = {
-      transaction: jest.fn(),
-    };
+    dataSource = createScopedDbMocks([
+      [RefreshToken, refreshTokensRepository as never],
+    ]).dataSource as unknown as Record<string, jest.Mock>;
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TokenService,
-        {
-          provide: getRepositoryToken(RefreshToken),
-          useValue: refreshTokensRepository,
-        },
         {
           provide: JwtService,
           useValue: jwtService,
@@ -534,19 +534,9 @@ describe("TokenService", () => {
 
 describe("TokenService with zero REMEMBER_ME_DAYS", () => {
   it("defaults to 30 days when REMEMBER_ME_DAYS is 0", async () => {
-    const refreshTokensRepository: Record<string, jest.Mock> = {
-      findOne: jest.fn(),
-      create: jest.fn(),
-      save: jest.fn(),
-      delete: jest.fn(),
-    };
     const module = await Test.createTestingModule({
       providers: [
         TokenService,
-        {
-          provide: getRepositoryToken(RefreshToken),
-          useValue: refreshTokensRepository,
-        },
         { provide: JwtService, useValue: { sign: jest.fn() } },
         { provide: DataSource, useValue: { createQueryRunner: jest.fn() } },
         {

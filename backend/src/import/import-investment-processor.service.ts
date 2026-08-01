@@ -127,7 +127,7 @@ export class ImportInvestmentProcessorService {
     investmentTx.totalAmount = totalAmount;
     investmentTx.description = qifTx.memo || qifTx.payee || null;
 
-    await ctx.queryRunner.manager.save(investmentTx);
+    await ctx.manager.save(investmentTx);
 
     // Handle cash transaction
     await this.processCashTransaction(
@@ -164,7 +164,7 @@ export class ImportInvestmentProcessorService {
     generatedSymbol = generatedSymbol.substring(0, 9);
     generatedSymbol = `${generatedSymbol}*`;
 
-    let existingSecurity = await ctx.queryRunner.manager.findOne(Security, {
+    let existingSecurity = await ctx.manager.findOne(Security, {
       where: { symbol: generatedSymbol, userId: ctx.userId },
     });
 
@@ -172,7 +172,7 @@ export class ImportInvestmentProcessorService {
       let counter = 2;
       let uniqueSymbol = `${generatedSymbol}${counter}`;
       while (
-        await ctx.queryRunner.manager.findOne(Security, {
+        await ctx.manager.findOne(Security, {
           where: { symbol: uniqueSymbol, userId: ctx.userId },
         })
       ) {
@@ -198,7 +198,7 @@ export class ImportInvestmentProcessorService {
     newSecurity.currencyCode = ctx.account.currencyCode;
     newSecurity.isActive = true;
     newSecurity.skipPriceUpdates = true;
-    const savedSecurity = await ctx.queryRunner.manager.save(newSecurity);
+    const savedSecurity = await ctx.manager.save(newSecurity);
 
     ctx.importResult.securitiesCreated++;
     this.logger.log(
@@ -223,7 +223,7 @@ export class ImportInvestmentProcessorService {
     ) {
       cashAccountId = ctx.account.linkedAccountId;
       ctx.affectedAccountIds.add(cashAccountId);
-      const linkedAccount = await ctx.queryRunner.manager.findOne(Account, {
+      const linkedAccount = await ctx.manager.findOne(Account, {
         where: { id: ctx.account.linkedAccountId },
       });
       if (linkedAccount) {
@@ -275,7 +275,7 @@ export class ImportInvestmentProcessorService {
     // this import block, and only skip when the seen count does not exceed
     // the existing count.
     if (transferAccountId) {
-      const existingCount = await ctx.queryRunner.manager
+      const existingCount = await ctx.manager
         .createQueryBuilder(Transaction, "t")
         .innerJoin(Transaction, "linked", "t.linked_transaction_id = linked.id")
         .where("t.user_id = :userId", { userId: ctx.userId })
@@ -302,7 +302,7 @@ export class ImportInvestmentProcessorService {
       }
     }
 
-    const cashTx = ctx.queryRunner.manager.create(Transaction, {
+    const cashTx = ctx.manager.create(Transaction, {
       userId: ctx.userId,
       accountId: cashAccountId,
       transactionDate: qifTx.date,
@@ -313,17 +313,17 @@ export class ImportInvestmentProcessorService {
       currencyCode: cashCurrencyCode,
       isTransfer: !!transferAccountId,
     });
-    const savedCashTx = await ctx.queryRunner.manager.save(cashTx);
-    await updateAccountBalance(ctx.queryRunner, cashAccountId, cashAmount);
+    const savedCashTx = await ctx.manager.save(cashTx);
+    await updateAccountBalance(ctx.manager, cashAccountId, cashAmount);
 
     if (transferAccountId) {
       ctx.affectedAccountIds.add(transferAccountId);
       const linkedAmount = -cashAmount;
-      const targetAccount = await ctx.queryRunner.manager.findOne(Account, {
+      const targetAccount = await ctx.manager.findOne(Account, {
         where: { id: transferAccountId },
       });
 
-      const linkedTx = ctx.queryRunner.manager.create(Transaction, {
+      const linkedTx = ctx.manager.create(Transaction, {
         userId: ctx.userId,
         accountId: transferAccountId,
         transactionDate: qifTx.date,
@@ -335,16 +335,12 @@ export class ImportInvestmentProcessorService {
         isTransfer: true,
         linkedTransactionId: savedCashTx.id,
       });
-      const savedLinkedTx = await ctx.queryRunner.manager.save(linkedTx);
+      const savedLinkedTx = await ctx.manager.save(linkedTx);
 
-      await ctx.queryRunner.manager.update(Transaction, savedCashTx.id, {
+      await ctx.manager.update(Transaction, savedCashTx.id, {
         linkedTransactionId: savedLinkedTx.id,
       });
-      await updateAccountBalance(
-        ctx.queryRunner,
-        transferAccountId,
-        linkedAmount,
-      );
+      await updateAccountBalance(ctx.manager, transferAccountId, linkedAmount);
     }
 
     ctx.importResult.imported++;
@@ -368,7 +364,7 @@ export class ImportInvestmentProcessorService {
     ) {
       cashAccountId = ctx.account.linkedAccountId;
       ctx.affectedAccountIds.add(cashAccountId);
-      const linkedAccount = await ctx.queryRunner.manager.findOne(Account, {
+      const linkedAccount = await ctx.manager.findOne(Account, {
         where: { id: ctx.account.linkedAccountId },
       });
       if (linkedAccount) {
@@ -394,7 +390,7 @@ export class ImportInvestmentProcessorService {
     let securitySymbol = "Unknown";
     let securityCurrency: string | null = null;
     if (securityId) {
-      const security = await ctx.queryRunner.manager.findOne(Security, {
+      const security = await ctx.manager.findOne(Security, {
         where: { id: securityId },
       });
       if (security) {
@@ -437,7 +433,7 @@ export class ImportInvestmentProcessorService {
     cashTx.status = TransactionStatus.CLEARED;
     cashTx.isTransfer = isCrossAccountTransfer;
 
-    const savedCashTx = await ctx.queryRunner.manager.save(cashTx);
+    const savedCashTx = await ctx.manager.save(cashTx);
 
     // Create linked transaction on the brokerage side so the target account
     // is visible from both sides of the transfer
@@ -456,19 +452,19 @@ export class ImportInvestmentProcessorService {
       brokerageTx.isTransfer = true;
       brokerageTx.linkedTransactionId = savedCashTx.id;
 
-      const savedBrokerageTx = await ctx.queryRunner.manager.save(brokerageTx);
+      const savedBrokerageTx = await ctx.manager.save(brokerageTx);
 
       savedCashTx.linkedTransactionId = savedBrokerageTx.id;
-      await ctx.queryRunner.manager.save(savedCashTx);
+      await ctx.manager.save(savedCashTx);
 
       investmentTx.transactionId = savedBrokerageTx.id;
     } else {
       investmentTx.transactionId = savedCashTx.id;
     }
 
-    await ctx.queryRunner.manager.save(investmentTx);
+    await ctx.manager.save(investmentTx);
 
-    await updateAccountBalance(ctx.queryRunner, cashAccountId, cashAmount);
+    await updateAccountBalance(ctx.manager, cashAccountId, cashAmount);
   }
 
   private async processHoldings(
@@ -491,7 +487,7 @@ export class ImportInvestmentProcessorService {
       return;
     }
 
-    const holding = await ctx.queryRunner.manager.findOne(Holding, {
+    const holding = await ctx.manager.findOne(Holding, {
       where: { accountId: ctx.accountId, securityId },
     });
 
@@ -505,7 +501,7 @@ export class ImportInvestmentProcessorService {
       const currentAvgCost = Number(holding.averageCost || 0);
       holding.quantity = currentQuantity * quantity;
       holding.averageCost = currentAvgCost / quantity;
-      await ctx.queryRunner.manager.save(holding);
+      await ctx.manager.save(holding);
       return;
     }
 
@@ -522,7 +518,7 @@ export class ImportInvestmentProcessorService {
       newHolding.securityId = securityId;
       newHolding.quantity = quantityChange;
       newHolding.averageCost = price || 0;
-      await ctx.queryRunner.manager.save(newHolding);
+      await ctx.manager.save(newHolding);
       return;
     }
 
@@ -538,6 +534,6 @@ export class ImportInvestmentProcessorService {
     }
 
     holding.quantity = newQuantity;
-    await ctx.queryRunner.manager.save(holding);
+    await ctx.manager.save(holding);
   }
 }

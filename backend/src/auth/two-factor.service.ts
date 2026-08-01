@@ -8,8 +8,14 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { ConfigService } from "@nestjs/config";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, LessThan, DataSource } from "typeorm";
+import {
+  DataSource,
+  EntityTarget,
+  LessThan,
+  ObjectLiteral,
+  Repository,
+} from "typeorm";
+import { withScopedDb } from "../common/db/scoped-db";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 import * as otplib from "otplib";
@@ -50,12 +56,6 @@ export class TwoFactorService {
   private readonly TOTP_CODE_REUSE_WINDOW_MS = 90 * 1000;
 
   constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-    @InjectRepository(UserPreference)
-    private preferencesRepository: Repository<UserPreference>,
-    @InjectRepository(TrustedDevice)
-    private trustedDevicesRepository: Repository<TrustedDevice>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private dataSource: DataSource,
@@ -65,6 +65,21 @@ export class TwoFactorService {
     this.totpEncryptionKey = derivePurposeKey(
       this.jwtSecret,
       "totp-encryption",
+    );
+  }
+
+  /**
+   * One repository call in its own short scoped transaction -- the RLS-era
+   * replacement for the injected repositories this class used to hold, with the
+   * same autocommit boundary each of those calls had. Multi-statement units use
+   * an explicit `withScopedDb` block so their statements share one transaction.
+   */
+  private scoped<E extends ObjectLiteral, T>(
+    entity: EntityTarget<E>,
+    fn: (repo: Repository<E>) => Promise<T>,
+  ): Promise<T> {
+    return withScopedDb(this.dataSource, (manager) =>
+      fn(manager.getRepository(entity)),
     );
   }
 
@@ -149,9 +164,11 @@ export class TwoFactorService {
       );
     }
 
-    const user = await this.usersRepository.findOne({
-      where: { id: payload.sub },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: payload.sub },
+      }),
+    );
 
     if (!user || !user.twoFactorSecret) {
       this.logger.warn(
@@ -205,12 +222,14 @@ export class TwoFactorService {
 
       // Lock account after exceeding per-user threshold
       if (newUserCount >= this.MAX_USER_2FA_ATTEMPTS) {
-        await this.usersRepository
-          .createQueryBuilder()
-          .update(User)
-          .set({ lockedUntil: new Date(Date.now() + this.BASE_LOCKOUT_MS) })
-          .where("id = :id", { id: user.id })
-          .execute();
+        await this.scoped(User, (repo) =>
+          repo
+            .createQueryBuilder()
+            .update(User)
+            .set({ lockedUntil: new Date(Date.now() + this.BASE_LOCKOUT_MS) })
+            .where("id = :id", { id: user.id })
+            .execute(),
+        );
         this.logger.warn(
           `Account locked after ${newUserCount} failed 2FA attempts for user ${user.id}`,
         );
@@ -244,7 +263,7 @@ export class TwoFactorService {
 
     // Update last login
     user.lastLogin = new Date();
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
     this.logger.log(`2FA verification successful for user ${user.id}`);
 
     const rememberMe = payload.rememberMe === true;
@@ -303,7 +322,9 @@ export class TwoFactorService {
       return false;
     }
 
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({ where: { id: userId } }),
+    );
     if (!user || !user.twoFactorSecret) {
       return false;
     }
@@ -327,16 +348,18 @@ export class TwoFactorService {
 
     if (needsReEncrypt) {
       user.twoFactorSecret = this.reEncryptTotpSecret(secret);
-      await this.usersRepository.save(user);
+      await this.scoped(User, (repo) => repo.save(user));
     }
 
     return true;
   }
 
   async setup2FA(userId: string, currentPassword: string) {
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: userId },
+      }),
+    );
 
     if (!user) {
       throw new NotFoundException(
@@ -390,15 +413,17 @@ export class TwoFactorService {
 
     // H5: Store in pending field, only commit after confirmation
     user.pendingTwoFactorSecret = encrypt(secret, this.totpEncryptionKey);
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
     return { secret, qrCodeDataUrl, otpauthUrl };
   }
 
   async confirmSetup2FA(userId: string, code: string) {
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: userId },
+      }),
+    );
 
     if (!user || !user.pendingTwoFactorSecret) {
       throw new BadRequestException(
@@ -418,19 +443,23 @@ export class TwoFactorService {
     // H5: Promote pending secret to active secret on successful confirmation
     user.twoFactorSecret = user.pendingTwoFactorSecret;
     user.pendingTwoFactorSecret = null;
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
-    // Enable 2FA in preferences
-    let preferences = await this.preferencesRepository.findOne({
-      where: { userId },
+    // Enable 2FA in preferences. Read-modify-write (materializing the row when
+    // absent), so it stays in one transaction.
+    await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(UserPreference);
+      let preferences = await repo.findOne({
+        where: { userId },
+      });
+
+      if (!preferences) {
+        preferences = repo.create({ userId });
+      }
+
+      preferences.twoFactorEnabled = true;
+      await repo.save(preferences);
     });
-
-    if (!preferences) {
-      preferences = this.preferencesRepository.create({ userId });
-    }
-
-    preferences.twoFactorEnabled = true;
-    await this.preferencesRepository.save(preferences);
 
     return { message: "Two-factor authentication enabled successfully" };
   }
@@ -448,9 +477,11 @@ export class TwoFactorService {
       );
     }
 
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: userId },
+      }),
+    );
 
     if (!user || !user.twoFactorSecret) {
       throw new BadRequestException(
@@ -469,19 +500,21 @@ export class TwoFactorService {
 
     // Clear secret and disable
     user.twoFactorSecret = null;
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
-    const preferences = await this.preferencesRepository.findOne({
-      where: { userId },
-    });
+    const preferences = await this.scoped(UserPreference, (repo) =>
+      repo.findOne({
+        where: { userId },
+      }),
+    );
 
     if (preferences) {
       preferences.twoFactorEnabled = false;
-      await this.preferencesRepository.save(preferences);
+      await this.scoped(UserPreference, (repo) => repo.save(preferences));
     }
 
     // Revoke all trusted devices
-    await this.trustedDevicesRepository.delete({ userId });
+    await this.scoped(TrustedDevice, (repo) => repo.delete({ userId }));
 
     return { message: "Two-factor authentication disabled successfully" };
   }
@@ -489,9 +522,11 @@ export class TwoFactorService {
   // L5: Backup code methods
 
   async generateBackupCodes(userId: string, code: string): Promise<string[]> {
-    const user = await this.usersRepository.findOne({
-      where: { id: userId },
-    });
+    const user = await this.scoped(User, (repo) =>
+      repo.findOne({
+        where: { id: userId },
+      }),
+    );
 
     if (!user) {
       throw new NotFoundException(
@@ -525,7 +560,7 @@ export class TwoFactorService {
       codes.map((code) => bcrypt.hash(code, 10)),
     );
     user.backupCodes = JSON.stringify(hashedCodes);
-    await this.usersRepository.save(user);
+    await this.scoped(User, (repo) => repo.save(user));
 
     return codes;
   }
@@ -546,19 +581,17 @@ export class TwoFactorService {
 
     if (matchIndex === -1) return false;
 
-    // Atomic removal: use QueryRunner with pessimistic lock to prevent
+    // Atomic removal: one transaction with a pessimistic lock to prevent
     // concurrent backup code reuse (TOCTOU race condition)
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-    try {
-      const lockedUser = await queryRunner.manager.findOne(User, {
+    return withScopedDb(this.dataSource, async (manager) => {
+      const lockedUser = await manager.findOne(User, {
         where: { id: user.id },
         lock: { mode: "pessimistic_write" },
       });
 
+      // Returning early commits an empty transaction -- nothing was written, so
+      // this is the same net effect as the old explicit rollback.
       if (!lockedUser?.backupCodes) {
-        await queryRunner.rollbackTransaction();
         return false;
       }
 
@@ -576,7 +609,6 @@ export class TwoFactorService {
 
       if (verifiedIndex === -1) {
         // Code already consumed by a concurrent request
-        await queryRunner.rollbackTransaction();
         return false;
       }
 
@@ -585,7 +617,7 @@ export class TwoFactorService {
         ...currentCodes.slice(verifiedIndex + 1),
       ];
 
-      await queryRunner.manager
+      await manager
         .createQueryBuilder()
         .update(User)
         .set({
@@ -595,28 +627,23 @@ export class TwoFactorService {
         .where("id = :id", { id: user.id })
         .execute();
 
-      await queryRunner.commitTransaction();
-
       // Keep in-memory entity consistent
       user.backupCodes =
         updatedCodes.length > 0 ? JSON.stringify(updatedCodes) : null;
 
       return true;
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    });
   }
 
   // Migrate all TOTP secrets to use purpose-derived encryption key
 
   async migrateLegacyTotpSecrets(): Promise<number> {
-    const users = await this.usersRepository
-      .createQueryBuilder("user")
-      .where("user.twoFactorSecret IS NOT NULL")
-      .getMany();
+    const users = await this.scoped(User, (repo) =>
+      repo
+        .createQueryBuilder("user")
+        .where("user.twoFactorSecret IS NOT NULL")
+        .getMany(),
+    );
 
     let migratedCount = 0;
     for (const user of users) {
@@ -626,7 +653,7 @@ export class TwoFactorService {
       );
       if (needsReEncrypt) {
         user.twoFactorSecret = this.reEncryptTotpSecret(secret);
-        await this.usersRepository.save(user);
+        await this.scoped(User, (repo) => repo.save(user));
         migratedCount++;
       }
     }
@@ -686,17 +713,20 @@ export class TwoFactorService {
     const deviceName = this.parseDeviceName(userAgent);
     const expiresAt = new Date(Date.now() + this.TRUSTED_DEVICE_EXPIRY_MS);
 
-    const trustedDevice = this.trustedDevicesRepository.create({
-      userId,
-      tokenHash,
-      deviceName,
-      ipAddress: ipAddress || null,
-      userAgentHash: this.hashUserAgent(userAgent),
-      lastUsedAt: new Date(),
-      expiresAt,
+    await withScopedDb(this.dataSource, async (manager) => {
+      const repo = manager.getRepository(TrustedDevice);
+      await repo.save(
+        repo.create({
+          userId,
+          tokenHash,
+          deviceName,
+          ipAddress: ipAddress || null,
+          userAgentHash: this.hashUserAgent(userAgent),
+          lastUsedAt: new Date(),
+          expiresAt,
+        }),
+      );
     });
-
-    await this.trustedDevicesRepository.save(trustedDevice);
     return deviceRef;
   }
 
@@ -707,14 +737,16 @@ export class TwoFactorService {
   ): Promise<boolean> {
     const tokenHash = hashToken(deviceToken);
 
-    const device = await this.trustedDevicesRepository.findOne({
-      where: { userId, tokenHash },
-    });
+    const device = await this.scoped(TrustedDevice, (repo) =>
+      repo.findOne({
+        where: { userId, tokenHash },
+      }),
+    );
 
     if (!device) return false;
 
     if (device.expiresAt < new Date()) {
-      await this.trustedDevicesRepository.remove(device);
+      await this.scoped(TrustedDevice, (repo) => repo.remove(device));
       return false;
     }
 
@@ -734,26 +766,32 @@ export class TwoFactorService {
     }
 
     device.lastUsedAt = new Date();
-    await this.trustedDevicesRepository.save(device);
+    await this.scoped(TrustedDevice, (repo) => repo.save(device));
     return true;
   }
 
   async getTrustedDevices(userId: string): Promise<TrustedDevice[]> {
-    await this.trustedDevicesRepository.delete({
-      userId,
-      expiresAt: LessThan(new Date()),
-    });
+    await this.scoped(TrustedDevice, (repo) =>
+      repo.delete({
+        userId,
+        expiresAt: LessThan(new Date()),
+      }),
+    );
 
-    return this.trustedDevicesRepository.find({
-      where: { userId },
-      order: { lastUsedAt: "DESC" },
-    });
+    return this.scoped(TrustedDevice, (repo) =>
+      repo.find({
+        where: { userId },
+        order: { lastUsedAt: "DESC" },
+      }),
+    );
   }
 
   async revokeTrustedDevice(userId: string, deviceId: string): Promise<void> {
-    const device = await this.trustedDevicesRepository.findOne({
-      where: { id: deviceId, userId },
-    });
+    const device = await this.scoped(TrustedDevice, (repo) =>
+      repo.findOne({
+        where: { id: deviceId, userId },
+      }),
+    );
 
     if (!device) {
       throw new NotFoundException(
@@ -761,11 +799,13 @@ export class TwoFactorService {
       );
     }
 
-    await this.trustedDevicesRepository.remove(device);
+    await this.scoped(TrustedDevice, (repo) => repo.remove(device));
   }
 
   async revokeAllTrustedDevices(userId: string): Promise<number> {
-    const result = await this.trustedDevicesRepository.delete({ userId });
+    const result = await this.scoped(TrustedDevice, (repo) =>
+      repo.delete({ userId }),
+    );
     return result.affected || 0;
   }
 
@@ -774,9 +814,11 @@ export class TwoFactorService {
     deviceToken: string,
   ): Promise<string | null> {
     const tokenHash = hashToken(deviceToken);
-    const device = await this.trustedDevicesRepository.findOne({
-      where: { userId, tokenHash },
-    });
+    const device = await this.scoped(TrustedDevice, (repo) =>
+      repo.findOne({
+        where: { userId, tokenHash },
+      }),
+    );
     return device?.id || null;
   }
 

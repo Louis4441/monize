@@ -21,9 +21,24 @@ import { PatService } from "../auth/pat.service";
 import { McpUserContext } from "./mcp-context";
 import { OAuthProviderService } from "../oauth/oauth-provider.service";
 import { ConfigService } from "@nestjs/config";
+import { withUserContext } from "../common/db/with-context";
 
 const SkipPasswordCheck = () => SetMetadata(SKIP_PASSWORD_CHECK_KEY, true);
 
+/**
+ * RLS: this transport is bearer-authenticated with no JWT guard, so `req.user`
+ * is never set and `RequestContextInterceptor` enters its ALS scope with an
+ * **undefined** userId. Every tool handler therefore reaches the domain services
+ * with no ambient identity, and `withScopedDb` refuses to run without one. Each
+ * `transport.handleRequest` is wrapped in `withUserContext(authResult.userId)`
+ * so the session's authenticated user is the ambient identity for the whole
+ * JSON-RPC exchange, including the tool handlers it dispatches.
+ *
+ * This is the MCP counterpart of what the interceptor does for cookie/JWT
+ * routes; the id comes from `validatePat` (PAT or OAuth access token), never
+ * from tool arguments. Individual tools may still re-seed the same id locally
+ * (see `transactions.tool.ts`) -- a nested seed of the same user is a no-op.
+ */
 @ApiExcludeController()
 @ApiTags("MCP")
 @SkipCsrf()
@@ -130,7 +145,9 @@ export class McpHttpController implements OnModuleDestroy {
         });
         return;
       }
-      await transport.handleRequest(req, res, req.body);
+      await withUserContext(authResult.userId, () =>
+        transport.handleRequest(req, res, req.body),
+      );
       return;
     }
 
@@ -167,7 +184,9 @@ export class McpHttpController implements OnModuleDestroy {
     };
     const server = this.mcpServerService.createServer(resolve);
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    await withUserContext(authResult.userId, () =>
+      transport.handleRequest(req, res, req.body),
+    );
 
     if (transport.sessionId) {
       this.transports.set(transport.sessionId, transport);
@@ -229,7 +248,9 @@ export class McpHttpController implements OnModuleDestroy {
       return;
     }
 
-    await transport.handleRequest(req, res);
+    await withUserContext(authResult.userId, () =>
+      transport.handleRequest(req, res),
+    );
   }
 
   @Delete()
@@ -281,7 +302,9 @@ export class McpHttpController implements OnModuleDestroy {
       return;
     }
 
-    await transport.handleRequest(req, res);
+    await withUserContext(authResult.userId, () =>
+      transport.handleRequest(req, res),
+    );
     this.destroySession(sessionId);
   }
 

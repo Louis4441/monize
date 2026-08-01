@@ -642,7 +642,12 @@ describe("mny writers (integration)", () => {
       const { input } = await setup(
         transactionData({
           transactions: [
-            mnyTransaction({ handle: 1, account: 1, amount: -99, flags: 0x100 }),
+            mnyTransaction({
+              handle: 1,
+              account: 1,
+              amount: -99,
+              flags: 0x100,
+            }),
           ],
         }),
       );
