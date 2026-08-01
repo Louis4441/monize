@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { CheckIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { cn } from '@/lib/utils';
 import { Security } from '@/types/investment';
@@ -85,13 +85,28 @@ export function GemInstrumentSelect({
     onPickSuggestion(suggestion);
   };
 
-  /** Symbols already held, so a suggestion is not offered twice. */
-  const heldSymbols = new Set(
-    securities.map((security) => security.symbol.toUpperCase()),
-  );
-  const offered = suggestions.filter(
-    (suggestion) => !heldSymbols.has(suggestion.symbol.toUpperCase()),
-  );
+  /**
+   * Each suggestion paired with the instrument the portfolio already holds for
+   * it, when there is one.
+   *
+   * A suggestion the user already owns used to be dropped from this group
+   * entirely, on the reasoning that it needs no creating. What that produced is
+   * the opposite of the intent: the fund this role should point at was the one
+   * fund the picker said nothing about, buried somewhere in "Your instruments"
+   * among everything else the portfolio holds, while the recommendations on
+   * offer were exactly the instruments Monize did not have yet. The advice
+   * disappeared the moment it became actionable in one click.
+   *
+   * So both stay, and `owned` decides what picking one does: select the
+   * instrument, or open the create form prefilled from the suggestion.
+   */
+  const offered = suggestions.map((suggestion) => ({
+    suggestion,
+    owned: securities.find(
+      (security) =>
+        security.symbol.toUpperCase() === suggestion.symbol.toUpperCase(),
+    ),
+  }));
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -165,7 +180,7 @@ export function GemInstrumentSelect({
               </p>
               {GEM_SUGGESTION_REGIONS.map((region) => {
                 const inRegion = offered.filter(
-                  (suggestion) => suggestion.region === region,
+                  ({ suggestion }) => suggestion.region === region,
                 );
                 if (inRegion.length === 0) return null;
                 return (
@@ -173,28 +188,50 @@ export function GemInstrumentSelect({
                     <p className="px-3 py-1 text-xs text-gray-400 dark:text-gray-500">
                       {regionLabel(region)}
                     </p>
-                    {inRegion.map((suggestion) => (
+                    {inRegion.map(({ suggestion, owned }) => (
                       <button
                         key={`${suggestion.region}-${suggestion.symbol}`}
                         type="button"
                         role="option"
-                        aria-selected={false}
-                        onClick={() => pick(suggestion)}
-                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                        aria-selected={owned ? owned.id === value : false}
+                        onClick={() =>
+                          owned ? choose(owned.id) : pick(suggestion)
+                        }
+                        className={cn(
+                          'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
+                          'hover:bg-gray-100 dark:hover:bg-gray-700',
+                          owned?.id === value && 'bg-gray-50 dark:bg-gray-700/50',
+                        )}
                       >
-                        <PlusIcon
-                          className="h-4 w-4 shrink-0 text-gray-400"
-                          aria-hidden="true"
-                        />
+                        {owned ? (
+                          <CheckIcon
+                            className={cn(
+                              'h-4 w-4 shrink-0',
+                              owned.id === value
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : 'text-gray-400',
+                            )}
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <PlusIcon
+                            className="h-4 w-4 shrink-0 text-gray-400"
+                            aria-hidden="true"
+                          />
+                        )}
                         <span className="min-w-0">
                           <span className="block truncate font-medium text-gray-900 dark:text-gray-100">
-                            {suggestion.symbol}
+                            {owned ? owned.symbol : suggestion.symbol}
                           </span>
                           <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
-                            {t('gem.settingsForm.suggestedListing', {
-                              name: suggestion.name,
-                              exchange: suggestion.exchange ?? '',
-                            })}
+                            {owned
+                              ? t('gem.settingsForm.suggestedOwned', {
+                                  name: owned.name,
+                                })
+                              : t('gem.settingsForm.suggestedListing', {
+                                  name: suggestion.name,
+                                  exchange: suggestion.exchange ?? '',
+                                })}
                           </span>
                         </span>
                       </button>

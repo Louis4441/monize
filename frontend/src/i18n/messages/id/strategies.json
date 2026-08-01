@@ -301,12 +301,14 @@
       "suggestedHeading": "Saran untuk peran ini",
       "ownedHeading": "Instrumen Anda",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · sudah ada di instrumen Anda",
       "regions": {
         "AMERICAS": "Amerika",
         "EUROPE": "Eropa (UCITS)"
       },
       "fillMissing": "{count, plural, other {Tambahkan # instrumen yang belum ada}}",
       "fillMissingBusy": "Menambahkan instrumen…",
+      "fillMissingRegion": "Pencatatan yang ditambahkan",
       "fillMissingHint": "Belum pernah membeli instrumen untuk peran ini? Tambahkan ETF yang biasa dipakai untuk GEM ({symbols}). Menyimpan konfigurasi akan memuat riwayat harganya dan menghitung sinyal pertama. Sebelum itu Anda bisa mengarahkan peran mana pun ke instrumen lain.",
       "fillMissingDone": "{count, plural, other {# instrumen ditambahkan}}. Simpan konfigurasi untuk memuat harganya dan menghitung sinyal pertama.",
       "fillMissingError": "Instrumen yang disarankan tidak dapat ditambahkan.",

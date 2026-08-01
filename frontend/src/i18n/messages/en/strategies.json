@@ -301,12 +301,14 @@
       "suggestedHeading": "Suggested for this role",
       "ownedHeading": "Your instruments",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · already in your instruments",
       "regions": {
         "AMERICAS": "Americas",
         "EUROPE": "Europe (UCITS)"
       },
       "fillMissing": "Add {count, plural, one {the missing instrument} other {the # missing instruments}}",
       "fillMissingBusy": "Adding instruments...",
+      "fillMissingRegion": "Listings to add",
       "fillMissingHint": "Never bought an instrument for these roles? Add the ETFs GEM is usually run with ({symbols}). Saving the configuration loads their price history and evaluates the first signal. You can point any role at a different instrument first.",
       "fillMissingDone": "{count, plural, one {# instrument added} other {# instruments added}}. Save the configuration to load their prices and evaluate the first signal.",
       "fillMissingError": "Could not add the suggested instruments.",

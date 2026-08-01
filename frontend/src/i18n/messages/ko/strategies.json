@@ -301,12 +301,14 @@
       "suggestedHeading": "이 역할에 추천",
       "ownedHeading": "보유 종목",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · 이미 보유 종목에 있음",
       "regions": {
         "AMERICAS": "미주",
         "EUROPE": "유럽(UCITS)"
       },
       "fillMissing": "{count, plural, other {빠진 #개 종목 추가}}",
       "fillMissingBusy": "종목을 추가하고 있습니다…",
+      "fillMissingRegion": "추가할 상장 종목",
       "fillMissingHint": "이 역할에 해당하는 종목을 한 번도 매수하지 않았나요? GEM에 흔히 쓰이는 ETF({symbols})를 추가하세요. 구성을 저장하면 가격 이력을 불러와 첫 시그널을 계산합니다. 저장 전에 어떤 역할이든 다른 종목으로 바꿀 수 있습니다.",
       "fillMissingDone": "{count, plural, other {#개 종목을 추가했습니다}}. 가격을 불러와 첫 시그널을 계산하려면 구성을 저장하세요.",
       "fillMissingError": "추천 종목을 추가할 수 없습니다.",

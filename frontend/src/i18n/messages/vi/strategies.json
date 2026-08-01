@@ -301,12 +301,14 @@
       "suggestedHeading": "Gợi ý cho vai trò này",
       "ownedHeading": "Công cụ của bạn",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · đã có trong danh mục công cụ của bạn",
       "regions": {
         "AMERICAS": "Châu Mỹ",
         "EUROPE": "Châu Âu (UCITS)"
       },
       "fillMissing": "{count, plural, other {Thêm # công cụ còn thiếu}}",
       "fillMissingBusy": "Đang thêm công cụ…",
+      "fillMissingRegion": "Niêm yết cần thêm",
       "fillMissingHint": "Chưa từng mua công cụ cho các vai trò này? Hãy thêm những ETF thường dùng để chạy GEM ({symbols}). Khi lưu cấu hình, lịch sử giá của chúng sẽ được tải và tín hiệu đầu tiên được tính. Trước đó bạn có thể trỏ bất kỳ vai trò nào sang công cụ khác.",
       "fillMissingDone": "{count, plural, other {Đã thêm # công cụ}}. Hãy lưu cấu hình để tải giá và tính tín hiệu đầu tiên.",
       "fillMissingError": "Không thể thêm các công cụ được đề xuất.",

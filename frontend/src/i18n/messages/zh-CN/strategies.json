@@ -301,12 +301,14 @@
       "suggestedHeading": "该角色的建议标的",
       "ownedHeading": "您的标的",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · 已在您的投资品中",
       "regions": {
         "AMERICAS": "美洲",
         "EUROPE": "欧洲（UCITS）"
       },
       "fillMissing": "{count, plural, other {添加缺少的 # 项标的}}",
       "fillMissingBusy": "正在添加标的…",
+      "fillMissingRegion": "要添加的上市代码",
       "fillMissingHint": "从未为这些角色买入过标的？可以添加通常用于 GEM 的 ETF（{symbols}）。保存配置时会载入它们的价格历史并计算第一个信号。保存前你可以把任意角色改为其他标的。",
       "fillMissingDone": "{count, plural, other {已添加 # 项标的}}。保存配置以载入价格并计算第一个信号。",
       "fillMissingError": "无法添加建议的标的。",

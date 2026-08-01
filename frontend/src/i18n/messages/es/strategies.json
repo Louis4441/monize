@@ -301,12 +301,14 @@
       "suggestedHeading": "Sugerencias para este rol",
       "ownedHeading": "Tus instrumentos",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · ya está en tus instrumentos",
       "regions": {
         "AMERICAS": "América",
         "EUROPE": "Europa (UCITS)"
       },
       "fillMissing": "Añadir {count, plural, one {el instrumento que falta} other {los # instrumentos que faltan}}",
       "fillMissingBusy": "Añadiendo instrumentos…",
+      "fillMissingRegion": "Cotizaciones que añadir",
       "fillMissingHint": "¿Nunca has comprado un instrumento para estos roles? Añade los ETF con los que suele aplicarse GEM ({symbols}). Al guardar la configuración se carga su historial de precios y se calcula la primera señal. Antes puedes apuntar cualquier rol a otro instrumento.",
       "fillMissingDone": "{count, plural, one {# instrumento añadido} other {# instrumentos añadidos}}. Guarda la configuración para cargar sus precios y calcular la primera señal.",
       "fillMissingError": "No se pudieron añadir los instrumentos sugeridos.",

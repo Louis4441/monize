@@ -193,13 +193,33 @@ describe('GemSettingsForm', () => {
 
     // Suggestions for this role first, one per region, then what is held.
     expect(await instrumentOptions('Emerging markets')).toEqual([
-      // Only the US listing is offered: the portfolio already holds an EMIM,
-      // so suggesting it again would create a duplicate symbol.
       'EEMiShares MSCI Emerging Markets ETF · NYSEARCA',
+      // The recommendation the portfolio already holds is still a
+      // recommendation -- picking it assigns the instrument instead of
+      // opening the create form, and it says so rather than dropping out of
+      // the group and leaving the role's own fund unmarked in the long list
+      // of everything owned.
+      'EMIMiShares MSCI EM IMI ETF · already in your instruments',
       'No instrument',
       'SPY — SPDR S&P 500 ETF',
       'EMIM — iShares MSCI EM IMI ETF',
     ]);
+  });
+
+  it('assigns an owned instrument straight from the suggestions', async () => {
+    await renderForm();
+
+    await pickInstrument('Emerging markets', 'No instrument');
+    expect(roleTrigger('Emerging markets')).toHaveTextContent('No instrument');
+
+    await pickInstrument(
+      'Emerging markets',
+      'EMIMiShares MSCI EM IMI ETF · already in your instruments',
+    );
+
+    // Assigned, not sent to the create form: the instrument exists.
+    expect(roleTrigger('Emerging markets')).toHaveTextContent('EMIM');
+    expect(mockCreateSecurity).not.toHaveBeenCalled();
   });
 
   it('saves the assignments and hands the refreshed report back', async () => {
@@ -453,6 +473,49 @@ describe('GemSettingsForm', () => {
       );
       // Nothing is saved until the user reviews the picks.
       expect(mockUpdateConfig).not.toHaveBeenCalled();
+    });
+
+    it('adds the UCITS listings when Europe is chosen', async () => {
+      // The same index is a different fund depending on the broker: the US
+      // listings the button used to add unconditionally cannot be bought at a
+      // European broker at all, which made the one-click path useless to
+      // exactly the users it exists for.
+      mockGetSecurities.mockResolvedValue([]);
+      await renderForm(unconfigured());
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Listings to add'), {
+          target: { value: 'EUROPE' },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Add the 5 missing/ }));
+      });
+
+      expect(mockCreateSecurity.mock.calls.map(([data]) => data.symbol)).toEqual([
+        'CSPX',
+        'EXUS',
+        'EMIM',
+        'AGGG',
+        'IB01',
+      ]);
+    });
+
+    it('names the listings it is about to add', async () => {
+      mockGetSecurities.mockResolvedValue([]);
+      await renderForm(unconfigured());
+
+      expect(screen.getByText(/SPY, VEU, EEM, AGG, BIL/)).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText('Listings to add'), {
+          target: { value: 'EUROPE' },
+        });
+      });
+
+      expect(
+        screen.getByText(/CSPX, EXUS, EMIM, AGGG, IB01/),
+      ).toBeInTheDocument();
     });
 
     it('leaves the roles the user already assigned alone', async () => {

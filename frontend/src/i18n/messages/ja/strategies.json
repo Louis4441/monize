@@ -301,12 +301,14 @@
       "suggestedHeading": "この役割のおすすめ",
       "ownedHeading": "保有中の銘柄",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · すでに登録済みの銘柄",
       "regions": {
         "AMERICAS": "米州",
         "EUROPE": "欧州（UCITS）"
       },
       "fillMissing": "{count, plural, other {未設定の#銘柄を追加}}",
       "fillMissingBusy": "銘柄を追加しています…",
+      "fillMissingRegion": "追加する上場銘柄",
       "fillMissingHint": "これらのロール向けの銘柄をまだ買ったことがありませんか。GEMで一般的に使われるETF（{symbols}）を追加できます。設定を保存すると価格履歴が読み込まれ、最初のシグナルが計算されます。保存前に任意のロールを別の銘柄に変更できます。",
       "fillMissingDone": "{count, plural, other {#銘柄を追加しました}}。価格を読み込んで最初のシグナルを計算するには設定を保存してください。",
       "fillMissingError": "推奨銘柄を追加できませんでした。",

@@ -30,7 +30,9 @@ import { GEM_ROLE_ORDER } from '@/lib/gem-strategy-view';
 import {
   GEM_DEFAULT_SUGGESTION_REGION,
   GEM_SUGGESTED_SECURITIES,
+  GEM_SUGGESTION_REGIONS,
   GemSuggestedSecurity,
+  GemSuggestionRegion,
   suggestionsForRole,
 } from '@/lib/gem-suggested-securities';
 import { CreateSecurityData, Security } from '@/types/investment';
@@ -182,10 +184,23 @@ export function GemSettingsForm({
   const assignedRoles = new Map(
     GEM_ROLE_ORDER.map((role, index) => [role, roleValues[index]]),
   );
+  /**
+   * Which listings the one-click fill uses.
+   *
+   * The button has to commit to one region -- the same index is a different
+   * fund in New York and in London -- and it used to commit to the US listings
+   * for everyone, silently. A European broker cannot buy any of them, so the
+   * one action that exists to spare a new user five trips through the create
+   * form left them with five instruments they cannot trade. The choice is
+   * theirs to make, defaulted to the listings the strategy's own literature is
+   * written against.
+   */
+  const [fillRegion, setFillRegion] = useState<GemSuggestionRegion>(
+    GEM_DEFAULT_SUGGESTION_REGION,
+  );
   const missingRoles = GEM_SUGGESTED_SECURITIES.filter(
     (suggestion) =>
-      suggestion.region === GEM_DEFAULT_SUGGESTION_REGION &&
-      !assignedRoles.get(suggestion.role),
+      suggestion.region === fillRegion && !assignedRoles.get(suggestion.role),
   );
 
   // Instruments the list has to offer even when they are deactivated: the one a
@@ -491,6 +506,26 @@ export function GemSettingsForm({
                     .join(', '),
                 })}
               </p>
+              {/* Which listings, before adding them: the US funds and their
+                  UCITS equivalents track the same indices, and only one of the
+                  two is buyable at any given broker. */}
+              <div className="mt-2 max-w-xs">
+                <Select
+                  label={t('gem.settingsForm.fillMissingRegion')}
+                  value={fillRegion}
+                  onChange={(event) =>
+                    setFillRegion(event.target.value as GemSuggestionRegion)
+                  }
+                  options={GEM_SUGGESTION_REGIONS.map((region) => ({
+                    value: region,
+                    label: t(
+                      `gem.settingsForm.regions.${region}` as Parameters<
+                        typeof t
+                      >[0],
+                    ),
+                  }))}
+                />
+              </div>
               <Button
                 type="button"
                 variant="outline"

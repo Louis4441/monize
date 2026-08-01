@@ -301,12 +301,14 @@
       "suggestedHeading": "Vorschläge für diese Rolle",
       "ownedHeading": "Ihre Instrumente",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · bereits in Ihren Instrumenten",
       "regions": {
         "AMERICAS": "Amerika",
         "EUROPE": "Europa (UCITS)"
       },
       "fillMissing": "{count, plural, one {Das fehlende Instrument hinzufügen} other {Die # fehlenden Instrumente hinzufügen}}",
       "fillMissingBusy": "Instrumente werden hinzugefügt …",
+      "fillMissingRegion": "Hinzuzufügende Notierungen",
       "fillMissingHint": "Nie ein Instrument für diese Rollen gekauft? Fügen Sie die ETFs hinzu, mit denen GEM üblicherweise umgesetzt wird ({symbols}). Beim Speichern der Konfiguration wird ihre Kurshistorie geladen und das erste Signal berechnet. Sie können jede Rolle vorher auf ein anderes Instrument setzen.",
       "fillMissingDone": "{count, plural, one {# Instrument hinzugefügt} other {# Instrumente hinzugefügt}}. Speichern Sie die Konfiguration, um die Kurse zu laden und das erste Signal zu berechnen.",
       "fillMissingError": "Die vorgeschlagenen Instrumente konnten nicht hinzugefügt werden.",

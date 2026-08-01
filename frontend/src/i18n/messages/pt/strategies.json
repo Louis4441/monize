@@ -301,12 +301,14 @@
       "suggestedHeading": "Sugestões para esta função",
       "ownedHeading": "Os seus instrumentos",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · já está nos seus instrumentos",
       "regions": {
         "AMERICAS": "Américas",
         "EUROPE": "Europa (UCITS)"
       },
       "fillMissing": "Adicionar {count, plural, one {o instrumento em falta} other {os # instrumentos em falta}}",
       "fillMissingBusy": "A adicionar instrumentos…",
+      "fillMissingRegion": "Cotações a adicionar",
       "fillMissingHint": "Nunca comprou um instrumento para estes papéis? Adicione os ETF com que a GEM é normalmente aplicada ({symbols}). Ao guardar a configuração, o histórico de preços é carregado e o primeiro sinal é calculado. Antes disso pode apontar qualquer papel para outro instrumento.",
       "fillMissingDone": "{count, plural, one {# instrumento adicionado} other {# instrumentos adicionados}}. Guarde a configuração para carregar os preços e calcular o primeiro sinal.",
       "fillMissingError": "Não foi possível adicionar os instrumentos sugeridos.",

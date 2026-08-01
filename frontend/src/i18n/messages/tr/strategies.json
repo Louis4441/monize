@@ -301,12 +301,14 @@
       "suggestedHeading": "Bu rol için öneriler",
       "ownedHeading": "Enstrümanlarınız",
       "suggestedListing": "{name} · {exchange}",
+      "suggestedOwned": "{name} · zaten enstrümanlarınızda",
       "regions": {
         "AMERICAS": "Amerika",
         "EUROPE": "Avrupa (UCITS)"
       },
       "fillMissing": "{count, plural, one {Eksik enstrümanı ekle} other {Eksik # enstrümanı ekle}}",
       "fillMissingBusy": "Enstrümanlar ekleniyor…",
+      "fillMissingRegion": "Eklenecek kotasyonlar",
       "fillMissingHint": "Bu roller için hiç enstrüman almadınız mı? GEM'in genelde uygulandığı ETF'leri ekleyin ({symbols}). Yapılandırmayı kaydetmek fiyat geçmişlerini yükler ve ilk sinyali hesaplar. Öncesinde herhangi bir rolü başka bir enstrümana yönlendirebilirsiniz.",
       "fillMissingDone": "{count, plural, one {# enstrüman eklendi} other {# enstrüman eklendi}}. Fiyatlarını yüklemek ve ilk sinyali hesaplamak için yapılandırmayı kaydedin.",
       "fillMissingError": "Önerilen enstrümanlar eklenemedi.",
