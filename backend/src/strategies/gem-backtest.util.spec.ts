@@ -15,11 +15,13 @@ const input = (
       effectiveFrom: "2024-01-01",
       targetRole: "US_EQUITY",
       targetSecurityId: "sec-spy",
+      previousRole: null,
     },
     {
       effectiveFrom: "2024-07-01",
       targetRole: "US_EQUITY",
       targetSecurityId: "sec-spy",
+      previousRole: "US_EQUITY",
     },
   ],
   seriesBySecurity: new Map([
@@ -82,11 +84,13 @@ describe("runBacktest", () => {
             effectiveFrom: "2024-01-01",
             targetRole: "US_EQUITY",
             targetSecurityId: "sec-spy",
+            previousRole: null,
           },
           {
             effectiveFrom: "2024-07-01",
             targetRole: "EM_EQUITY",
             targetSecurityId: "sec-emim",
+            previousRole: "US_EQUITY",
           },
         ],
         seriesBySecurity: new Map([
@@ -110,11 +114,13 @@ describe("runBacktest", () => {
             effectiveFrom: "2024-01-01",
             targetRole: "US_EQUITY",
             targetSecurityId: "sec-spy",
+            previousRole: null,
           },
           {
             effectiveFrom: "2024-07-01",
             targetRole: "EM_EQUITY",
             targetSecurityId: "sec-emim",
+            previousRole: "US_EQUITY",
           },
         ],
         seriesBySecurity: new Map([
@@ -151,11 +157,13 @@ describe("runBacktest", () => {
             effectiveFrom: "2024-01-01",
             targetRole: "US_EQUITY",
             targetSecurityId: "sec-unpriced",
+            previousRole: null,
           },
           {
             effectiveFrom: "2024-07-01",
             targetRole: "US_EQUITY",
             targetSecurityId: "sec-spy",
+            previousRole: "US_EQUITY",
           },
         ],
       }),
@@ -181,16 +189,19 @@ describe("runBacktest", () => {
         effectiveFrom: "2024-01-01",
         targetRole: "US_EQUITY",
         targetSecurityId: "sec-unpriced",
+        previousRole: null,
       },
       {
         effectiveFrom: "2024-04-01",
         targetRole: "US_EQUITY",
         targetSecurityId: "sec-spy",
+        previousRole: "US_EQUITY",
       },
       {
         effectiveFrom: "2024-07-01",
         targetRole: "EM_EQUITY",
         targetSecurityId: "sec-emim",
+        previousRole: "US_EQUITY",
       },
     ];
     const seriesBySecurity = new Map([
@@ -222,11 +233,13 @@ describe("runBacktest", () => {
               effectiveFrom: "2024-01-01",
               targetRole: "US_EQUITY",
               targetSecurityId: "sec-spy",
+              previousRole: null,
             },
             {
               effectiveFrom: "2024-07-01",
               targetRole: "US_EQUITY",
               targetSecurityId: "sec-unpriced",
+              previousRole: "US_EQUITY",
             },
           ],
         }),
@@ -294,11 +307,13 @@ describe("runBacktest", () => {
             effectiveFrom: "2024-01-01",
             targetRole: "US_EQUITY",
             targetSecurityId: "sec-spy",
+            previousRole: null,
           },
           {
             effectiveFrom: "2024-07-01",
             targetRole: "EM_EQUITY",
             targetSecurityId: "sec-emim",
+            previousRole: "US_EQUITY",
           },
         ],
         seriesBySecurity: new Map([
@@ -325,11 +340,13 @@ describe("runBacktest", () => {
             effectiveFrom: "2024-01-01",
             targetRole: "US_EQUITY",
             targetSecurityId: "sec-spy",
+            previousRole: null,
           },
           {
             effectiveFrom: "2024-07-01",
             targetRole: "US_EQUITY",
             targetSecurityId: "sec-spy",
+            previousRole: "US_EQUITY",
           },
         ],
         seriesBySecurity: new Map([
@@ -376,10 +393,70 @@ describe("runBacktest", () => {
     expect(runBacktest(input())?.hitRatePercent).toBeNull();
   });
 
-  it("has nothing to report without two evaluations or any price", () => {
+  it("simulates a single evaluation, whose period runs to asOf", () => {
+    // One signal effective in January and an `asOf` of the following January
+    // is a complete year: an entry price, an exit price and the daily path in
+    // between. Requiring a second evaluation withheld the report from a
+    // strategy that had simply not switched yet.
+    const result = runBacktest(input({ periods: [input().periods[0]] }));
+
+    expect(result).toMatchObject({ from: "2024-01-01", to: "2025-01-01" });
+    expect(result?.cagrPercent).toBeCloseTo(21, 0);
+    expect(result?.coveragePercent).toBe(100);
+  });
+
+  it("reports gross when the first period already had a predecessor", () => {
+    // The history keeps the last 24 periods, so the oldest signal in hand is
+    // usually not the strategy's first allocation. Opening a fresh position
+    // there charges a purchase commission for a trade that never happened and
+    // resets the tax basis to the edge of the visible window, so the switch
+    // below would be taxed on the gain since that reset rather than since the
+    // real purchase.
+    const periods: GemBacktestInput["periods"] = [
+      {
+        effectiveFrom: "2024-01-01",
+        targetRole: "US_EQUITY",
+        targetSecurityId: "sec-spy",
+        previousRole: "SAFE",
+      },
+      {
+        effectiveFrom: "2024-07-01",
+        targetRole: "EM_EQUITY",
+        targetSecurityId: "sec-emim",
+        previousRole: "US_EQUITY",
+      },
+    ];
+    const seriesBySecurity = new Map([
+      ["sec-spy", series({ "2024-01-01": 100, "2024-07-01": 200 })],
+      ["sec-emim", series({ "2024-07-01": 10, "2025-01-01": 10 })],
+    ]);
+
+    const withCosts = runBacktest(
+      input({
+        periods,
+        seriesBySecurity,
+        taxRatePercent: 20,
+        commissionAmount: 100,
+        notional: 10_000,
+      }),
+    );
+    const gross = runBacktest(input({ periods, seriesBySecurity }));
+
+    // Every period is priced, so coverage is full and the run is not truncated
+    // by prices -- the costs are dropped because of what came *before* it.
+    expect(withCosts?.coveragePercent).toBe(100);
+    expect(withCosts?.taxApplied).toBe(false);
+    expect(withCosts?.commissionApplied).toBe(false);
+    expect(withCosts?.cagrPercent).toBe(gross?.cagrPercent);
+  });
+
+  it("has nothing to report without an evaluation or any price", () => {
     expect(runBacktest(input({ periods: [] }))).toBeNull();
-    expect(runBacktest(input({ periods: [input().periods[0]] }))).toBeNull();
     expect(runBacktest(input({ seriesBySecurity: new Map() }))).toBeNull();
+    // A signal that became effective today has no period behind it yet.
+    expect(
+      runBacktest(input({ periods: [input().periods[0]], asOf: "2024-01-01" })),
+    ).toBeNull();
   });
 
   it("reports nothing when the gap is the last thing that happened", () => {
@@ -393,11 +470,13 @@ describe("runBacktest", () => {
             effectiveFrom: "2024-01-01",
             targetRole: "US_EQUITY",
             targetSecurityId: "sec-spy",
+            previousRole: null,
           },
           {
             effectiveFrom: "2024-07-01",
             targetRole: "EM_EQUITY",
             targetSecurityId: "sec-unpriced",
+            previousRole: "US_EQUITY",
           },
         ],
         seriesBySecurity: new Map([

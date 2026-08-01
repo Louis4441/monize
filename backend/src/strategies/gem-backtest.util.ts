@@ -25,6 +25,17 @@ export interface GemBacktestPeriod {
   effectiveFrom: string;
   targetRole: GemAssetRole | null;
   targetSecurityId: string | null;
+  /**
+   * What the strategy held going into this period, as stored on the signal.
+   *
+   * Only the first period's matters here, and only as a yes/no: null says the
+   * strategy owned nothing before it, so the simulation may open with a real
+   * first purchase. Anything else says the run begins mid-strategy -- the
+   * history is bounded to the last `GEM_HISTORY_PERIODS` periods, so the oldest
+   * retained signal is very often not the first one -- and the opening position
+   * and its cost are then unknown.
+   */
+  previousRole: GemAssetRole | null;
 }
 
 export interface GemBacktestInput {
@@ -93,8 +104,19 @@ export interface GemBacktestResult {
 
 const DAYS_PER_YEAR = 365.25;
 
-/** Two evaluations are the minimum that bound a period with an end price. */
-const MIN_PERIODS = 2;
+/**
+ * One evaluation is enough.
+ *
+ * The last period is bounded by `asOf`, not by the next signal, so a strategy
+ * that produced its first signal a month ago has a complete month to simulate:
+ * an entry price, an exit price, the daily path between them for the drawdown,
+ * and the safe asset over the same interval. Requiring a second evaluation
+ * withheld the whole report from exactly the users most likely to look at it,
+ * and contradicted the promise that a strategy configured last month reports a
+ * month. A period that has not finished, or that cannot be priced, still comes
+ * back null on its own further down.
+ */
+const MIN_PERIODS = 1;
 
 /**
  * Growth of one security between two dates, or null when either boundary has no
@@ -126,10 +148,13 @@ function growth(
  * simulated. Gaps are usually old -- an instrument younger than the history --
  * so this keeps the recent part rather than the part nobody asked about.
  *
- * **A truncated run is reported gross**, whatever costs are configured. The
- * simulation opening mid-strategy does not know what was held on `from` or
- * what it cost, so charging an opening commission and dating the tax basis to
- * `from` would invent both. Both cost flags are false and the caller says so.
+ * **A run that does not start where the strategy did is reported gross**,
+ * whatever costs are configured -- whether prices truncated it or the oldest
+ * retained signal simply had a predecessor, which is the ordinary case for any
+ * strategy older than the 24 periods the history keeps. The simulation does not
+ * know what was held on `from` or what it cost, so charging an opening
+ * commission and dating the tax basis to `from` would invent both. Both cost
+ * flags are false and the caller says so.
  *
  * Returns null when there is nothing honest to report: fewer than two
  * evaluations, or no priced period after the last gap.
@@ -172,7 +197,8 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
   if (to <= from) return null;
 
   /**
-   * True when the run had to skip history: the simulation opens mid-strategy.
+   * True when the run does not start where the strategy did: prices forced it
+   * to skip periods, or the oldest retained signal already had a predecessor.
    *
    * Costs cannot be modelled from there, so a truncated run is reported gross.
    * The strategy was already holding something on `from` -- the periods before
@@ -184,7 +210,7 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
    * different, invented number in either direction. "Net of estimated taxes
    * and commissions" would be a claim about a portfolio the user never held.
    */
-  const truncated = lastGap >= 0;
+  const truncated = lastGap >= 0 || run[0].previousRole !== null;
 
   // An absolute commission only becomes a drag against a known capital.
   const commissionFraction =

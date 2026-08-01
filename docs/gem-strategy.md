@@ -26,8 +26,12 @@ or the safe asset, e.g. missing prices -- produces **no signal**. Nothing is
 guessed from half the inputs, and the period is evaluated later once its prices
 exist.
 
-Roles: `US_EQUITY`, `EX_US_EQUITY`, `EM_EQUITY`, `SAFE`. A role with no security
-assigned is reported as unmapped (`UNMAPPED_ROLE`) rather than substituted.
+Roles: `US_EQUITY`, `EX_US_EQUITY`, `EM_EQUITY`, `SAFE` and `RISK_FREE`. The
+last is the yardstick the absolute test measures equities against; it is
+optional, and with no instrument assigned the safe asset stands in for it, which
+is how a strategy configured before the two were split keeps evaluating exactly
+as it did. A required role with no security assigned is reported as unmapped
+(`UNMAPPED_ROLE`) rather than substituted.
 
 The rules themselves are not configurable. What is: the instruments, the
 cadence, the lookback window, the strategy accounts, and the tax/commission
@@ -148,10 +152,13 @@ Warnings the report can carry: `UNMAPPED_ROLE`, `INCOMPLETE_HISTORY`,
 `LEGACY_PERIODS`, `NO_ACCOUNT`, `NO_POSITION`, `FIRST_RUN`, `STALE_PRICES`,
 `CALCULATION_FAILED`.
 
-`backtest` is always `null` for now: a trustworthy simulation needs full price
-history for every role plus a cost model the configuration does not carry, and
-an estimate built from partial data would read as fact. The field exists so the
-client's Backtest tab has a defined shape and shows its empty state.
+`backtest` is `null` only when there is nothing honest to simulate: no stored
+evaluation this configuration produced, no priced period, or a signal that
+became effective today and so has no elapsed period behind it. One evaluation is
+enough otherwise -- its period runs to `asOf`, not to the next signal, so a
+strategy configured last month reports a month. What it does report, and what it
+deliberately leaves gross, is described under "Backtest" below; the client's
+Backtest tab shows its empty state for the null.
 
 ## Portfolio comparison
 
@@ -252,12 +259,20 @@ over evaluated periods -- says how much of the evaluated history that was. The
 periods before the last gap are *excluded* from the run, not held flat: they
 contribute nothing to the return, the drawdown or the hit rate.
 
-**A truncated run is reported gross**, whatever costs the configuration
-carries. The simulation opening mid-strategy knows neither what was held on
-`from` nor what it cost: charging a buy commission invents a trade that never
-happened, and dating the tax basis to `from` taxes the first later switch on
-the gain since the restart instead of since the real purchase. Both cost flags
-are false and the panel says so.
+**A run that does not start where the strategy did is reported gross**,
+whatever costs the configuration carries -- and that covers two cases, not one:
+prices truncated the run, or the oldest retained signal already had a
+`previous_role`. The second is the ordinary case for any strategy older than the
+24 periods the history keeps, so it is not an edge case: the simulation would
+otherwise charge a purchase commission for a trade that never happened and date
+the tax basis to the edge of the visible window, taxing a later switch on the
+gain since that arbitrary reset. Both cost flags are false and the panel says
+so.
+
+One evaluation is enough to simulate, because the last period is bounded by
+`asOf` rather than by the next signal: entry price, exit price, the daily path
+between them and the safe asset over the same interval. Only a signal effective
+today, or one whose period cannot be priced, comes back with nothing.
 
 **Tax and commission are reported separately** (`taxApplied`,
 `commissionApplied`). They fail independently: tax is a percentage and applies

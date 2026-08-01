@@ -58,15 +58,24 @@ function windowStartFor(evaluatedOn: string, lookbackMonths: number): string {
  * what a signal means: version 2 stopped accepting a boundary close struck more
  * than `BOUNDARY_LAG_DAYS` before the boundary, so a row written by version 1
  * can carry a momentum computed from a months-old quote -- a made-up figure --
- * under a fingerprint identical to the one this version would produce. It would
- * be counted as answered, never recomputed, and served as the current
- * instruction.
+ * under a fingerprint identical to the one this version would produce. Without
+ * a version it would be counted as answered, never revisited, and served as the
+ * instruction to act on now.
+ *
+ * It is stored in its own column rather than folded into the hash, because the
+ * two mismatches are answered differently. A **settings** change is the user
+ * asking for a different answer, so those periods are recomputed in place. An
+ * **algorithm** change is not: the row records what the strategy actually
+ * decided and what the user executed against it, and rewriting it with today's
+ * code -- over prices that may themselves have been revised since -- would
+ * replace a real decision with a counterfactual one and quietly reset an
+ * `executed` flag that referred to a trade the user really made. Older-version
+ * rows are left alone and reported as legacy periods instead.
  *
  * **Bump this whenever a change can alter momentum, the ranking, the risk state
- * or the target.** Every affected row is then outside `answered` and takes the
- * ordinary refresh path, which recomputes it in place. Do not bump it for a
- * change that cannot move a number -- a rename, a comment, a faster query --
- * because every bump rewrites the whole stored history.
+ * or the target.** Do not bump it for a change that cannot move a number -- a
+ * rename, a comment, a faster query -- because every bump retires that much
+ * history from the current view until the 24-period window rolls past it.
  *
  * History:
  *   1 -- original dual-momentum evaluation.
@@ -90,9 +99,9 @@ export const GEM_SIGNAL_ALGORITHM_VERSION = 2;
  * the scenario's name, the accounts -- because rewriting the whole evaluation
  * history when someone corrects a commission would be worse than useless.
  *
- * `GEM_SIGNAL_ALGORITHM_VERSION` leads the material, so a change in the rules
- * invalidates every stored row exactly as a change in the settings does. The
- * configuration is only half of what a signal means.
+ * The algorithm version is deliberately *not* in here: it lives in its own
+ * column, because a rules change and a settings change call for opposite
+ * treatment (see `GEM_SIGNAL_ALGORITHM_VERSION`).
  */
 export function gemConfigFingerprint(
   strategy: Pick<GemStrategy, "cadence" | "lookbackMonths">,
@@ -105,9 +114,7 @@ export function gemConfigFingerprint(
       return `${role}=${asset?.securityId ?? "-"}`;
     })
     .join(",");
-  const material =
-    `${GEM_SIGNAL_ALGORITHM_VERSION}|${strategy.cadence}` +
-    `|${strategy.lookbackMonths}|${roles}`;
+  const material = `${strategy.cadence}|${strategy.lookbackMonths}|${roles}`;
   return createHash("sha256").update(material).digest("hex").slice(0, 64);
 }
 
@@ -244,12 +251,43 @@ export class GemSignalService {
    */
   async materialize(
     userId: string,
-    strategy: GemStrategy,
-    assets: GemStrategyAsset[],
+    requestedStrategy: GemStrategy,
+    requestedAssets: GemStrategyAsset[],
     asOf: string = todayYMD(),
   ): Promise<GemMaterialization> {
     return withScopedDb(this.dataSource, async (manager) => {
       const repo = manager.getRepository(GemStrategySignal);
+
+      // Serialize materialization per strategy, and only then read the
+      // configuration this run will write under.
+      //
+      // The caller loaded the strategy in an earlier, already-closed
+      // transaction, so by the time we write, the settings behind those objects
+      // may be several saves out of date -- and the row we would be writing is
+      // an answer to a question the user has since replaced. The lock plus the
+      // reload inside it make the stored configuration authoritative: whoever
+      // holds the lock materializes against what the database actually says,
+      // and a save committed after that reload is picked up by the next run,
+      // which sees these rows as stale by fingerprint and recomputes them.
+      //
+      // A transaction-scoped advisory lock releases itself on commit or
+      // rollback, so there is no unlock to leak. It is cluster-wide, which is
+      // what makes it work with more than one backend replica.
+      await manager.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [requestedStrategy.id],
+      );
+      const strategy =
+        (await manager.getRepository(GemStrategy).findOne({
+          where: { id: requestedStrategy.id, userId },
+        })) ?? null;
+      // Deleted while the report was being built: nothing to materialize, and
+      // nothing to report either.
+      if (!strategy) return { signals: [], legacyPeriods: 0 };
+      const assets = await manager
+        .getRepository(GemStrategyAsset)
+        .find({ where: { strategyId: strategy.id } });
+
       const periods = recentPeriods(
         asOf,
         strategy.cadence,
@@ -275,18 +313,40 @@ export class GemSignalService {
         take: GEM_HISTORY_PERIODS,
       });
       // A period counts as answered only when its row was calculated under the
-      // configuration in force now. Shorten the lookback or swap an instrument
-      // and the stored answer is to a different question, so it is recomputed
-      // in place rather than served as the current instruction.
+      // configuration in force now, by the evaluation code in force now.
+      //
+      // The two mismatches are not the same thing. A different *fingerprint*
+      // means the user changed the settings, so the period is recomputed in
+      // place: they asked for a different answer and the old one is of no
+      // further use. A different *algorithm version* means the rules changed
+      // under a row that recorded a real decision and a real `executed` flag;
+      // recomputing that with today's code, over prices that may have been
+      // revised since, would file a counterfactual as history. Those rows are
+      // left exactly as they are and reported as legacy periods.
       const fingerprint = gemConfigFingerprint(strategy, assets);
+      const isCurrentVersion = (signal: GemStrategySignal) =>
+        signal.algorithmVersion === GEM_SIGNAL_ALGORITHM_VERSION;
+      const legacyByVersion = new Set(
+        stored
+          .filter((signal) => !isCurrentVersion(signal))
+          .map((signal) => signal.evaluatedOn),
+      );
       const staleByPeriod = new Map(
         stored
-          .filter((signal) => signal.configFingerprint !== fingerprint)
+          .filter(
+            (signal) =>
+              isCurrentVersion(signal) &&
+              signal.configFingerprint !== fingerprint,
+          )
           .map((signal) => [signal.evaluatedOn, signal]),
       );
       const answered = new Set(
         stored
-          .filter((signal) => signal.configFingerprint === fingerprint)
+          .filter(
+            (signal) =>
+              isCurrentVersion(signal) &&
+              signal.configFingerprint === fingerprint,
+          )
           .map((signal) => signal.evaluatedOn),
       );
 
@@ -309,13 +369,21 @@ export class GemSignalService {
        */
       const current = (rows: GemStrategySignal[]): GemMaterialization => {
         const signals = rows.filter(
-          (signal) => signal.configFingerprint === fingerprint,
+          (signal) =>
+            isCurrentVersion(signal) &&
+            signal.configFingerprint === fingerprint,
         );
         return { signals, legacyPeriods: rows.length - signals.length };
       };
 
+      // A period an older algorithm version already answered is not "unstored":
+      // its row owns the (strategy, period) key and stays, so there is nothing
+      // to evaluate and nothing to insert. It is legacy history, which the
+      // report names rather than silently drops.
       const unstored = periods.filter(
-        (period) => !answered.has(period.evaluatedOn),
+        (period) =>
+          !answered.has(period.evaluatedOn) &&
+          !legacyByVersion.has(period.evaluatedOn),
       );
       if (unstored.length === 0 || assets.every((a) => !a.securityId)) {
         return current(stored);
@@ -367,6 +435,7 @@ export class GemSignalService {
 
       for (const period of periods) {
         if (answered.has(period.evaluatedOn)) continue;
+        if (legacyByVersion.has(period.evaluatedOn)) continue;
         if (!evaluable.has(period.evaluatedOn)) continue;
 
         const momentum = momentumSnapshot(
@@ -399,6 +468,7 @@ export class GemSignalService {
           leadPp: outcome.leadPp,
           previousRole: previous?.targetRole ?? null,
           configFingerprint: fingerprint,
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
           executed: false,
         });
 
@@ -462,37 +532,39 @@ export class GemSignalService {
           // which the final re-read cannot undo. History would call it a BUY
           // for as long as the row lives.
           //
-          // The unique key is (strategy, date), not (strategy, date,
-          // fingerprint), so the row that beat this insert may belong to
-          // another configuration -- a leftover, or a concurrent request
-          // carrying different settings. That row cannot go into the chain:
-          // a later period would then be stored naming a predecessor the
-          // current rules never chose, the same mistake the `answered` filter
-          // exists to prevent, arriving through a different door.
+          // Only a row this configuration produced can play that part. The
+          // unique key is (strategy, date), not (strategy, date, fingerprint),
+          // so the winner may carry different settings -- and here that is not
+          // a leftover to overwrite: materialization is serialized per strategy
+          // and reads the stored configuration under the lock, so a row that
+          // appeared anyway came from something this run cannot account for,
+          // and the one thing that must not happen is stamping a configuration
+          // read before the lock over a row that may well be newer.
           //
-          // Leaving the slot empty is not the answer either. This request
-          // *has* an evaluation for the period -- it just lost the key -- and
-          // a later period stored with `previousRole: null` on that basis is
-          // stored wrong permanently: once the losing period is itself
-          // refreshed to the current fingerprint, the period after it is
-          // already current and is never recomputed, so history calls it a BUY
-          // forever. Replace the foreign row with the evaluation in hand, on
-          // exactly the terms the stale-row path above uses, and chain onto
-          // that.
+          // So this run stops writing. Everything already written stands and is
+          // correct; the periods after this one are simply left for the next
+          // read, which reloads the configuration and evaluates them against
+          // whatever the database holds by then. Abandoning is the only option
+          // that neither invents a predecessor nor overwrites a stranger's row.
           const winner = await repo.findOne({
             where: { strategyId: strategy.id, evaluatedOn: period.evaluatedOn },
           });
-          if (winner?.configFingerprint === fingerprint) {
+          if (
+            winner &&
+            isCurrentVersion(winner) &&
+            winner.configFingerprint === fingerprint
+          ) {
             byEvaluatedOn.set(period.evaluatedOn, winner);
-          } else if (winner) {
-            const refreshed = replacing(winner);
-            await repo.save(refreshed);
-            byEvaluatedOn.set(period.evaluatedOn, refreshed);
-            written.push(refreshed);
+            this.logger.debug(
+              `GEM period ${period.evaluatedOn} was materialized concurrently`,
+            );
+          } else {
+            this.logger.debug(
+              `GEM period ${period.evaluatedOn} was written by another ` +
+                `configuration; abandoning the rest of this materialization`,
+            );
+            break;
           }
-          this.logger.debug(
-            `GEM period ${period.evaluatedOn} was materialized concurrently`,
-          );
         }
       }
 
@@ -524,6 +596,10 @@ export class GemSignalService {
    * longer exist as the instruction to act on now, which is precisely the thing
    * the fingerprint exists to stop. It stays in the history, where it is a
    * true record of what was decided then.
+   *
+   * The algorithm version is checked for the same reason and is never
+   * refreshed away: a row an older version wrote is a record, not an
+   * instruction, however well its settings still match.
    */
   currentSignal(
     signals: GemStrategySignal[],
@@ -536,7 +612,8 @@ export class GemSignalService {
     const signal =
       signals.find((entry) => entry.evaluatedOn === period.evaluatedOn) ?? null;
     if (!signal) return null;
-    return signal.configFingerprint === gemConfigFingerprint(strategy, assets)
+    return signal.algorithmVersion === GEM_SIGNAL_ALGORITHM_VERSION &&
+      signal.configFingerprint === gemConfigFingerprint(strategy, assets)
       ? signal
       : null;
   }

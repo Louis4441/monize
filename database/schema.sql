@@ -1555,6 +1555,11 @@ CREATE TABLE gem_strategy_signals (
     -- this row was calculated under. A period whose fingerprint no longer matches
     -- the strategy is recomputed instead of being served as the current signal.
     config_fingerprint VARCHAR(64),
+    -- Version of the evaluation code behind this row. A settings change is
+    -- recomputed in place; an algorithm change is not, because the row records
+    -- what was actually decided and executed. Older versions are legacy
+    -- periods: left untouched, and left out of the current history.
+    algorithm_version SMALLINT NOT NULL DEFAULT 1,
     executed BOOLEAN NOT NULL DEFAULT FALSE,
     executed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

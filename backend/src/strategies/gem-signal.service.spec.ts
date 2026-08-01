@@ -44,27 +44,6 @@ const assets = (): GemStrategyAsset[] =>
     { role: "SAFE", securityId: "sec-ief" },
   ] as GemStrategyAsset[];
 
-/**
- * The fingerprint the default fixtures produce under a given algorithm
- * version, rebuilt here rather than taken from the code under test: a stored
- * row written by version N-1 has to be recognisable as such, and only an
- * independent construction can prove the version is really in the material.
- */
-const fingerprintForVersion = (version: number): string =>
-  createHash("sha256")
-    .update(
-      `${version}|MONTHLY|12|` +
-        [...GEM_ASSET_ROLES]
-          .sort()
-          .map((role) => {
-            const asset = assets().find((candidate) => candidate.role === role);
-            return `${role}=${asset?.securityId ?? "-"}`;
-          })
-          .join(","),
-    )
-    .digest("hex")
-    .slice(0, 64);
-
 /** Straight-line price series so momentum per role is predictable. */
 function seriesFor(growthPercent: number) {
   const points: Array<{ date: string; close: number }> = [];
@@ -82,6 +61,9 @@ describe("GemSignalService", () => {
   let service: GemSignalService;
   let manager: ManagerMock;
   let signalRepo: Record<string, jest.Mock>;
+  /** The configuration the database holds, which materialize reloads itself. */
+  let strategyRepo: Record<string, jest.Mock>;
+  let assetRepo: Record<string, jest.Mock>;
   /** Rows the mocked insert reports back; null means "the insert won". */
   let insertedRows: Array<Record<string, unknown>> | null;
   /** Every row the loop managed to insert, in order. */
@@ -131,7 +113,18 @@ describe("GemSignalService", () => {
         return builder;
       }),
     };
-    const mocks = createScopedDbMocks([[GemStrategySignal, signalRepo]]);
+    // materialize does not trust the strategy it was handed: it takes a
+    // per-strategy advisory lock and reloads the configuration inside it, so
+    // what it writes answers what the database holds now rather than what the
+    // report read some milliseconds ago. By default the two agree; `dbHolds`
+    // is how a test makes them disagree.
+    strategyRepo = { findOne: jest.fn().mockResolvedValue(strategy()) };
+    assetRepo = { find: jest.fn().mockResolvedValue(assets()) };
+    const mocks = createScopedDbMocks([
+      [GemStrategySignal, signalRepo],
+      [GemStrategy, strategyRepo],
+      [GemStrategyAsset, assetRepo],
+    ]);
     manager = mocks.manager;
     priceService = {
       loadSeries: jest.fn().mockResolvedValue(
@@ -157,6 +150,15 @@ describe("GemSignalService", () => {
     );
   });
 
+  /** Make the stored configuration differ from the one the caller was handed. */
+  const dbHolds = (
+    stored: GemStrategy,
+    storedAssets: GemStrategyAsset[] = assets(),
+  ) => {
+    strategyRepo.findOne.mockResolvedValue(stored);
+    assetRepo.find.mockResolvedValue(storedAssets);
+  };
+
   describe("materialize", () => {
     it("evaluates and stores every missing period, newest first", async () => {
       const inserted = savedSignals;
@@ -166,6 +168,7 @@ describe("GemSignalService", () => {
           {
             id: "sig-latest",
             configFingerprint: gemConfigFingerprint(strategy(), assets()),
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
           } as GemStrategySignal,
         ]);
 
@@ -231,6 +234,7 @@ describe("GemSignalService", () => {
           evaluatedOn: "2025-07-31",
           targetRole: "EM_EQUITY",
           configFingerprint: gemConfigFingerprint(strategy(), assets()),
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
         } as GemStrategySignal,
       ]);
 
@@ -256,6 +260,7 @@ describe("GemSignalService", () => {
             executed: true,
             executedAt: new Date("2025-08-02T00:00:00Z"),
             configFingerprint: gemConfigFingerprint(strategy(), assets()),
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
             ...overrides,
           } as GemStrategySignal,
         ]);
@@ -266,6 +271,7 @@ describe("GemSignalService", () => {
         // the current instruction, with the new instruments' names on it.
         storedUnder12Months();
 
+        dbHolds(strategy({ lookbackMonths: 6 }));
         await service.materialize(
           userId,
           strategy({ lookbackMonths: 6 }),
@@ -284,29 +290,41 @@ describe("GemSignalService", () => {
         );
       });
 
-      it("recomputes a row written by an earlier algorithm version", async () => {
+      it("leaves a row written by an earlier algorithm version alone", async () => {
         // The settings are untouched -- same cadence, same lookback, same
-        // instruments -- so a fingerprint made of settings alone would match
-        // and the row would be served as current. But it was calculated by
-        // rules that no longer exist: version 1 accepted a boundary close
-        // struck months before the boundary, and the momentum on that row can
-        // be a figure this version refuses to produce.
+        // instruments -- so the fingerprint matches. The rules do not: version
+        // 1 accepted a boundary close struck months before the boundary, and
+        // the momentum on that row can be a figure this version refuses to
+        // produce. It must not be served as the current instruction, and it
+        // must not be rewritten either: it records what the strategy decided
+        // then and what the user executed against it, and recomputing it with
+        // today's code over prices revised since would file a counterfactual
+        // as history. It becomes a legacy period instead.
         storedUnder12Months({
-          configFingerprint: fingerprintForVersion(
-            GEM_SIGNAL_ALGORITHM_VERSION - 1,
-          ),
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION - 1,
+          executed: true,
         });
 
-        await service.materialize(userId, strategy(), assets(), "2025-08-14");
+        const result = await service.materialize(
+          userId,
+          strategy(),
+          assets(),
+          "2025-08-14",
+        );
 
-        const rewritten = signalRepo.save.mock.calls
+        const touched = signalRepo.save.mock.calls
           .map(([row]) => row)
           .find((row) => row.evaluatedOn === "2025-07-31");
-        expect(rewritten).toBeDefined();
-        expect(rewritten.id).toBe("sig-1");
-        expect(rewritten.configFingerprint).toBe(
-          gemConfigFingerprint(strategy(), assets()),
-        );
+        expect(touched).toBeUndefined();
+        // Nor is a second row inserted for a period whose key is taken.
+        expect(
+          savedSignals.some((row) => row.evaluatedOn === "2025-07-31"),
+        ).toBe(false);
+        // Not in the current history, and counted so the report can say so.
+        expect(
+          result.signals.some((row) => row.evaluatedOn === "2025-07-31"),
+        ).toBe(false);
+        expect(result.legacyPeriods).toBeGreaterThan(0);
       });
 
       it("keeps the executed flag when the instruction is unchanged", async () => {
@@ -314,6 +332,7 @@ describe("GemSignalService", () => {
         // user reported making is still the trade this row asks for.
         storedUnder12Months();
 
+        dbHolds(strategy({ lookbackMonths: 6 }));
         await service.materialize(
           userId,
           strategy({ lookbackMonths: 6 }),
@@ -335,6 +354,7 @@ describe("GemSignalService", () => {
           targetSecurityId: "sec-spy",
         });
 
+        dbHolds(strategy({ lookbackMonths: 6 }));
         await service.materialize(
           userId,
           strategy({ lookbackMonths: 6 }),
@@ -355,6 +375,7 @@ describe("GemSignalService", () => {
         // that are not quarter-ends are never revisited by the loop, so left
         // in the result they sat in the quarterly history as decisions from a
         // cadence the strategy no longer runs -- interleaved with its own.
+        dbHolds(strategy({ cadence: "QUARTERLY" }));
         await service.materialize(
           userId,
           strategy({ cadence: "QUARTERLY" }),
@@ -384,9 +405,11 @@ describe("GemSignalService", () => {
             targetRole: "US_EQUITY",
             targetSecurityId: "sec-spy",
             configFingerprint: "written-under-other-settings",
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
           } as GemStrategySignal,
         ]);
 
+        dbHolds(strategy({ lookbackMonths: 6 }));
         await service.materialize(
           userId,
           strategy({ lookbackMonths: 6 }),
@@ -418,6 +441,7 @@ describe("GemSignalService", () => {
             evaluatedOn: "2025-07-31",
             targetRole: "SAFE",
             configFingerprint: fingerprint,
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
           },
           {
             id: "sig-jun",
@@ -425,12 +449,14 @@ describe("GemSignalService", () => {
             targetRole: "EM_EQUITY",
             targetSecurityId: "sec-retired",
             configFingerprint: "written-under-other-settings",
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
           },
           {
             id: "sig-may",
             evaluatedOn: "2025-05-31",
             targetRole: "US_EQUITY",
             configFingerprint: fingerprint,
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
           },
         ] as GemStrategySignal[]);
         // June cannot be recomputed: the price history does not reach it.
@@ -466,6 +492,7 @@ describe("GemSignalService", () => {
           evaluatedOn: "2025-07-31",
           targetRole: "EM_EQUITY",
           configFingerprint: "written-under-other-settings",
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
         } as GemStrategySignal;
 
         expect(
@@ -477,6 +504,7 @@ describe("GemSignalService", () => {
               {
                 ...stale,
                 configFingerprint: gemConfigFingerprint(strategy(), assets()),
+                algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
               },
             ],
             strategy(),
@@ -512,18 +540,27 @@ describe("GemSignalService", () => {
         ).not.toBe(base);
       });
 
-      it("changes with the algorithm version, not only the settings", () => {
-        // The settings are half of what a signal means; the code is the other
-        // half. Version 2 stopped accepting a boundary close struck months
-        // before the boundary, so a version 1 row can carry a momentum
-        // computed from a stale quote under settings identical to today's --
-        // and a fingerprint made only of settings would call it answered,
-        // never recompute it, and serve it as the current instruction.
+      it("leaves the algorithm version out: that is a column, not a hash", () => {
+        // The two mismatches are answered differently -- settings are
+        // recomputed in place, a rules change is not -- so the fingerprint
+        // cannot be the place that carries both. It hashes the settings only,
+        // and `algorithm_version` is stored beside it.
         expect(gemConfigFingerprint(strategy(), assets())).toBe(
-          fingerprintForVersion(GEM_SIGNAL_ALGORITHM_VERSION),
-        );
-        expect(gemConfigFingerprint(strategy(), assets())).not.toBe(
-          fingerprintForVersion(GEM_SIGNAL_ALGORITHM_VERSION - 1),
+          createHash("sha256")
+            .update(
+              `MONTHLY|12|` +
+                [...GEM_ASSET_ROLES]
+                  .sort()
+                  .map((role) => {
+                    const asset = assets().find(
+                      (candidate) => candidate.role === role,
+                    );
+                    return `${role}=${asset?.securityId ?? "-"}`;
+                  })
+                  .join(","),
+            )
+            .digest("hex")
+            .slice(0, 64),
         );
       });
 
@@ -551,9 +588,11 @@ describe("GemSignalService", () => {
         {
           id: "sig-1",
           configFingerprint: gemConfigFingerprint(strategy(), unassigned),
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
         } as GemStrategySignal,
       ];
       signalRepo.find.mockResolvedValue(stored);
+      dbHolds(strategy(), unassigned);
       const result = await service.materialize(
         userId,
         strategy(),
@@ -580,6 +619,7 @@ describe("GemSignalService", () => {
         {
           id: "sig-1",
           configFingerprint: gemConfigFingerprint(strategy(), assets()),
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
         } as GemStrategySignal,
       ];
       signalRepo.find.mockResolvedValue(stored);
@@ -646,6 +686,7 @@ describe("GemSignalService", () => {
         targetRole: "US_EQUITY",
         targetSecurityId: "sec-spy",
         configFingerprint: fingerprint,
+        algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
       } as GemStrategySignal;
       // The first insert loses; every later one wins.
       let attempt = 0;
@@ -682,28 +723,28 @@ describe("GemSignalService", () => {
       expect(savedSignals[0]).toMatchObject({ previousRole: "US_EQUITY" });
     });
 
-    it("replaces a winner from another configuration and chains onto that", async () => {
-      // The unique key is (strategy, date), not (strategy, date, fingerprint),
-      // so the row that beat this insert can be a leftover from an earlier
-      // configuration -- or one a concurrent request wrote under different
-      // settings. Taking its target as the predecessor stores the next period
-      // naming a role the current rules never chose, through the same door the
-      // `answered` filter closes on the stored snapshot.
+    it("abandons the run when a row from another configuration wins the key", async () => {
+      // Two things must not happen here, and only stopping avoids both.
       //
-      // Leaving the slot empty instead is just as wrong, and permanently so:
-      // this request evaluated the period, it only lost the key. Storing the
-      // period after it with `previousRole: null` is a mistake nothing later
-      // repairs -- once the losing period is refreshed to the current
-      // fingerprint, its successor already matches and is never recomputed, so
-      // the history calls it a BUY forever. The foreign row is replaced with
-      // the evaluation in hand and the chain continues from it.
+      // The foreign row cannot go into the chain: a later period would be
+      // stored naming a predecessor the current rules never chose. And it must
+      // not be overwritten with this run's evaluation either -- materialization
+      // is serialized per strategy and reads the configuration under the lock,
+      // so a row that appeared anyway may well be newer than anything this run
+      // knows, and stamping over it would file an out-of-date decision as the
+      // current one.
+      //
+      // So the run stops. What it already wrote is correct and stays; the rest
+      // is left to the next read, which reloads the configuration first.
       const foreignWinner = {
         id: "sig-foreign",
         evaluatedOn: "2023-08-31",
         targetRole: "US_EQUITY",
         targetSecurityId: "sec-spy",
-        configFingerprint: "written-under-a-6-month-lookback",
+        configFingerprint: "written-under-other-settings",
+        algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
       } as GemStrategySignal;
+      // The very first insert -- the oldest period -- loses the key.
       let attempt = 0;
       signalRepo.createQueryBuilder.mockImplementation(() => {
         let pending: Record<string, unknown> = {};
@@ -731,24 +772,46 @@ describe("GemSignalService", () => {
 
       await service.materialize(userId, strategy(), assets(), "2025-08-14");
 
-      // The foreign row is overwritten in place -- same id, this request's
-      // evaluation, this configuration's fingerprint.
-      expect(signalRepo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: "sig-foreign",
-          evaluatedOn: "2023-08-31",
-          targetRole: "EM_EQUITY",
-          configFingerprint: gemConfigFingerprint(strategy(), assets()),
-          // Nobody executed an instruction that has just changed.
-          executed: false,
-        }),
+      // Nothing was written over the stranger's row...
+      expect(signalRepo.save).not.toHaveBeenCalled();
+      // ...and no dependent period was stored on a guess about what preceded
+      // it: the loop stopped at the conflict instead of continuing.
+      expect(savedSignals).toHaveLength(0);
+    });
+
+    it("materializes against the stored configuration, not the caller's", async () => {
+      // The report loaded the strategy in an earlier transaction and the user
+      // has saved since. Writing the caller's configuration would put an
+      // answer to a replaced question into the table -- and, on the conflict
+      // path, over a row the newer configuration had already written.
+      dbHolds(strategy({ lookbackMonths: 6 }));
+
+      await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+      const stored = gemConfigFingerprint(
+        strategy({ lookbackMonths: 6 }),
+        assets(),
       );
-      // And the next period follows the target this request calculated: not
-      // null, and not the foreign winner's US_EQUITY.
-      expect(savedSignals[0]).toMatchObject({
-        evaluatedOn: "2023-09-30",
-        previousRole: "EM_EQUITY",
-      });
+      expect(savedSignals.length).toBeGreaterThan(0);
+      for (const row of savedSignals) {
+        expect(row.configFingerprint).toBe(stored);
+        expect(row.algorithmVersion).toBe(GEM_SIGNAL_ALGORITHM_VERSION);
+      }
+      // And the lock is taken before that read, so the reload cannot race a
+      // concurrent materialization of the same strategy.
+      expect(manager.query).toHaveBeenCalledWith(
+        expect.stringContaining("pg_advisory_xact_lock"),
+        ["strategy-1"],
+      );
+    });
+
+    it("does nothing when the strategy was deleted while the report ran", async () => {
+      strategyRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.materialize(userId, strategy(), assets(), "2025-08-14"),
+      ).resolves.toEqual({ signals: [], legacyPeriods: 0 });
+      expect(savedSignals).toHaveLength(0);
     });
 
     it("re-reads after losing the race rather than serving its own snapshot", async () => {
@@ -765,6 +828,7 @@ describe("GemSignalService", () => {
             id: "sig-from-the-winner",
             evaluatedOn: "2025-07-31",
             configFingerprint: fingerprint,
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
           } as GemStrategySignal,
         ]);
 
@@ -850,13 +914,37 @@ describe("GemSignalService", () => {
     it("picks the signal governing the period the date falls in", () => {
       const fingerprint = gemConfigFingerprint(strategy(), assets());
       const signals = [
-        { evaluatedOn: "2025-07-31", configFingerprint: fingerprint },
-        { evaluatedOn: "2025-06-30", configFingerprint: fingerprint },
+        {
+          evaluatedOn: "2025-07-31",
+          configFingerprint: fingerprint,
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
+        },
+        {
+          evaluatedOn: "2025-06-30",
+          configFingerprint: fingerprint,
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
+        },
       ] as GemStrategySignal[];
       expect(
         service.currentSignal(signals, strategy(), assets(), "2025-08-14")
           ?.evaluatedOn,
       ).toBe("2025-07-31");
+    });
+
+    it("does not serve a row an older algorithm version produced", () => {
+      // Same settings, so the fingerprint matches; different rules, so the
+      // momentum on that row is one this version would refuse to compute. It
+      // remains in the history as a record of what was decided then.
+      const signals = [
+        {
+          evaluatedOn: "2025-07-31",
+          configFingerprint: gemConfigFingerprint(strategy(), assets()),
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION - 1,
+        },
+      ] as GemStrategySignal[];
+      expect(
+        service.currentSignal(signals, strategy(), assets(), "2025-08-14"),
+      ).toBeNull();
     });
 
     it("is null when the current period was never evaluated", () => {

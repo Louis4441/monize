@@ -15,11 +15,13 @@ const strategy = (overrides: Partial<GemStrategy> = {}): GemStrategy =>
 const signal = (
   effectiveFrom: string,
   targetSecurityId: string | null,
+  previousRole: string | null = null,
 ): GemStrategySignal =>
   ({
     effectiveFrom,
     targetRole: "US_EQUITY",
     targetSecurityId,
+    previousRole,
   }) as GemStrategySignal;
 
 describe("GemBacktestService", () => {
@@ -99,17 +101,54 @@ describe("GemBacktestService", () => {
     ]);
   });
 
-  it("has nothing to simulate from a single evaluation", async () => {
+  it("simulates a strategy that has produced only one evaluation", async () => {
+    // The period runs to `asOf`, not to the next signal, so one evaluation and
+    // a month of prices is a complete month. Withholding the whole backtest
+    // until a second evaluation exists kept it from precisely the users most
+    // likely to open it -- and contradicted the promise that a strategy
+    // configured last month reports a month.
     const result = await service.build({
       strategy: strategy(),
       signals: [signal("2024-01-01", "sec-spy")],
       safeSecurityId: null,
-      notional: null,
+      notional: 10_000,
       asOf: "2025-01-01",
     });
 
-    expect(result).toBeNull();
-    expect(priceService.loadSeries).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      from: "2024-01-01",
+      to: "2025-01-01",
+      coveragePercent: 100,
+      // A first allocation with nothing before it: the opening buy is real.
+      taxApplied: true,
+      commissionApplied: true,
+    });
+  });
+
+  it("reports gross when the oldest retained signal already held something", async () => {
+    // The history is bounded to the last 24 periods, so for any older strategy
+    // the oldest signal here is not its first allocation. Its `previousRole`
+    // says so, and without that the simulation charges a purchase commission
+    // for a trade that never happened and dates the tax basis to the edge of
+    // the visible window -- taxing a later switch on the gain since an
+    // arbitrary reset.
+    const result = await service.build({
+      strategy: strategy(),
+      signals: [
+        signal("2024-01-01", "sec-spy", "SAFE"),
+        signal("2024-07-01", "sec-spy", "US_EQUITY"),
+      ],
+      safeSecurityId: null,
+      notional: 10_000,
+      asOf: "2025-01-01",
+    });
+
+    expect(result).toMatchObject({
+      from: "2024-01-01",
+      coveragePercent: 100,
+      taxApplied: false,
+      commissionApplied: false,
+    });
   });
 
   it("has nothing to simulate when no period named an instrument", async () => {

@@ -175,6 +175,22 @@ export class GemStrategySignal {
   })
   configFingerprint: string | null;
 
+  /**
+   * Version of the evaluation code that produced this row.
+   *
+   * Kept apart from `configFingerprint` because the two mean different things
+   * and are handled differently. A fingerprint mismatch is the user having
+   * changed the settings, so the period is recomputed in place -- they asked
+   * for a different answer. A version mismatch is not: this row is the record
+   * of what the strategy decided and what the user executed against it, and
+   * recomputing it with today's code and today's (possibly revised) prices
+   * would put a counterfactual in its place. Older versions are legacy
+   * periods: untouched, and left out of the current history and backtest.
+   */
+  @ApiProperty()
+  @Column({ type: "smallint", name: "algorithm_version", default: 1 })
+  algorithmVersion: number;
+
   @ApiProperty()
   @Column({ type: "boolean", default: false })
   executed: boolean;

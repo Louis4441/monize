@@ -46,8 +46,17 @@ export class GemBacktestService {
         effectiveFrom: signal.effectiveFrom,
         targetRole: signal.targetRole,
         targetSecurityId: signal.targetSecurityId,
+        // Carried through so the simulation can tell its first period apart
+        // from the strategy's first allocation. The history is bounded to the
+        // last `GEM_HISTORY_PERIODS` periods, so for any older strategy the
+        // oldest signal here follows one nobody passed in -- and treating it
+        // as an opening purchase charges a commission for a trade that never
+        // happened and dates the tax basis to the edge of the visible window.
+        previousRole: signal.previousRole,
       }));
-    if (periods.length < 2) return null;
+    // One signal is enough: its period runs to `asOf`, so a strategy that
+    // produced its first signal last month has a full month to simulate.
+    if (periods.length === 0) return null;
 
     const securityIds = [
       ...new Set(
