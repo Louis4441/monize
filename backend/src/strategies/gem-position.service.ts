@@ -161,6 +161,10 @@ export class GemPositionService {
    * Only a positive balance counts. A margin debit is money owed, not an asset
    * the switch can move, and treating it as off-target value would inflate the
    * purchase by the size of the debt.
+   *
+   * Investment accounts only. The picker offers nothing else, but the API takes
+   * any account the user owns, and a chequing account attached to a strategy
+   * must not quietly become money the report tells them to invest.
    */
   private async loadCash(
     userId: string,
@@ -174,6 +178,7 @@ export class GemPositionService {
              FROM accounts a
             WHERE a.user_id = $2
               AND a.current_balance > 0
+              AND a.account_type = 'INVESTMENT'
               AND (
                     (a.id = ANY($1::uuid[]) AND a.account_sub_type IS NULL)
                  OR (a.account_sub_type = 'INVESTMENT_CASH'
@@ -413,8 +418,10 @@ export class GemPositionService {
 
     const action: GemActionView = {
       required: math.changeRequired && target !== null,
-      from: math.offTarget[0] ? held(math.offTarget[0]) : null,
-      fromCount: math.offTarget.length,
+      // The largest position the switch *sells*. Cash is off target and funds
+      // the purchase, but naming it here would ask for a trade nobody places.
+      from: math.sold[0] ? held(math.sold[0]) : null,
+      fromCount: math.sellCount,
       to: target,
       targetWeightPercent: 100,
       transferValue: math.transferValue,
@@ -426,9 +433,8 @@ export class GemPositionService {
         math.sellCount,
       ),
       estimatedTradeCount: math.sellCount + 1,
-      partialMatchCount: math.offTarget.filter(
-        (holding) => holding.overlap > 0 && !holding.isCash,
-      ).length,
+      partialMatchCount: math.sold.filter((holding) => holding.overlap > 0)
+        .length,
       accounts,
       currencyCode,
       executed,

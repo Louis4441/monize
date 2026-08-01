@@ -67,9 +67,16 @@ export interface GemPositionMath {
   current: GemMatchedHolding | null;
   /**
    * Holdings a switch sells into the target, largest first. Each is sold
-   * whole: see the note on `transferValue`.
+   * whole: see the note on `transferValue`. Cash is off target and funds the
+   * purchase, so it is in here -- use `sold` for the sell side.
    */
   offTarget: GemMatchedHolding[];
+  /**
+   * The off-target positions a switch actually sells, largest first. Cash is
+   * spent, not sold, so naming it as the thing to sell out of would ask the
+   * user to place a trade that does not exist.
+   */
+  sold: GemMatchedHolding[];
   /** Whether contents or tickers decided the comparison. */
   basis: GemCompositionBasis;
   /** Breakdown the contents were compared on; null when tickers were used. */
@@ -82,8 +89,9 @@ export interface GemPositionMath {
   /** Holdings that fell back to a ticker comparison for want of a breakdown. */
   instrumentMatchedCount: number;
   /**
-   * Trades the sell side of a switch takes. Cash is off-target and funds the
-   * purchase, but it is not sold, so it costs no commission and adds no trade.
+   * Trades the sell side of a switch takes -- `sold.length`. Cash is off-target
+   * and funds the purchase, but it is not sold, so it costs no commission and
+   * adds no trade.
    */
   sellCount: number;
   /** Sum of the market values that could be valued. */
@@ -212,6 +220,7 @@ export function buildPositionMath(
   const offTarget = targetRole
     ? valued.filter((holding) => holding.overlap < 1)
     : [];
+  const sold = offTarget.filter((holding) => !holding.isCash);
 
   // With no target there is nothing to be compliant with. Otherwise a change is
   // needed when the portfolio is not fully in the target -- and when the values
@@ -255,7 +264,8 @@ export function buildPositionMath(
     instrumentMatchedCount: valued.filter(
       (holding) => holding.matchedByInstrument,
     ).length,
-    sellCount: offTarget.filter((holding) => !holding.isCash).length,
+    sold,
+    sellCount: sold.length,
     totalMarketValue,
     compliancePercent,
     changeRequired,

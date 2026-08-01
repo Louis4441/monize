@@ -97,7 +97,10 @@ describe('GemPortfolioPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Cash')).toBeInTheDocument();
+    // Named in the positions list and again in the working table, and never
+    // as "not assigned" -- cash is not a gap in the configuration.
+    expect(screen.getAllByText('Cash')).toHaveLength(2);
+    expect(screen.queryByText(/Not assigned/)).not.toBeInTheDocument();
     expect(
       screen.getByText(/Uninvested — counts towards nothing/),
     ).toBeInTheDocument();

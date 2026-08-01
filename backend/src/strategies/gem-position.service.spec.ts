@@ -409,6 +409,48 @@ describe("GemPositionService", () => {
       expect(result.action?.estimatedTax).toBe(0);
     });
 
+    it("never names cash as the position to sell out of", async () => {
+      // Cash can easily be the largest thing in the account, and "sell out of
+      // Cash" is an instruction nobody can carry out. The switch here is a
+      // pure purchase: there is nothing to sell.
+      holdingRows = [];
+      cashRows = [{ current_balance: "5000", currency_code: "USD" }];
+
+      const result = await build();
+
+      expect(result.action?.required).toBe(true);
+      expect(result.action?.transferValue).toBe(5000);
+      expect(result.action?.from).toBeNull();
+      expect(result.action?.fromCount).toBe(0);
+      expect(result.action?.estimatedTradeCount).toBe(1);
+    });
+
+    it("names the largest sellable holding, not the larger cash balance", async () => {
+      holdingRows = [
+        {
+          security_id: "sec-spy",
+          symbol: "SPY",
+          name: "S&P 500 ETF",
+          quantity: "10",
+          cost_basis: "3000",
+          currency_code: "USD",
+        },
+      ];
+      cashRows = [{ current_balance: "9000", currency_code: "USD" }];
+      priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 400]]));
+
+      const result = await build();
+
+      // Cash is the bigger position and still not what gets sold.
+      expect(result.position?.current?.isCash).toBe(true);
+      expect(result.action?.from?.symbol).toBe("SPY");
+      expect(result.action?.fromCount).toBe(1);
+      // Both move, though: 9000 of cash plus the whole 4000 of SPY.
+      expect(result.action?.transferValue).toBe(13000);
+      // And only the sale realizes anything.
+      expect(result.action?.realizedGainLoss).toBe(1000);
+    });
+
     it("ignores a negative balance, which is a debt and not a position", async () => {
       // Filtered in SQL: a margin debit is money owed, and treating it as
       // off-target value would inflate the purchase by the size of the loan.

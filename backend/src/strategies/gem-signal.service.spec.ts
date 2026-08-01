@@ -276,7 +276,7 @@ describe("GemSignalService", () => {
         } as GemStrategySignal;
 
         expect(
-          service.currentSignal([stale], strategy(), "2025-08-14", assets()),
+          service.currentSignal([stale], strategy(), assets(), "2025-08-14"),
         ).toBeNull();
         expect(
           service.currentSignal(
@@ -287,8 +287,8 @@ describe("GemSignalService", () => {
               },
             ],
             strategy(),
-            "2025-08-14",
             assets(),
+            "2025-08-14",
           ),
         ).not.toBeNull();
       });
@@ -478,19 +478,21 @@ describe("GemSignalService", () => {
 
   describe("currentSignal", () => {
     it("picks the signal governing the period the date falls in", () => {
+      const fingerprint = gemConfigFingerprint(strategy(), assets());
       const signals = [
-        { evaluatedOn: "2025-07-31" },
-        { evaluatedOn: "2025-06-30" },
+        { evaluatedOn: "2025-07-31", configFingerprint: fingerprint },
+        { evaluatedOn: "2025-06-30", configFingerprint: fingerprint },
       ] as GemStrategySignal[];
       expect(
-        service.currentSignal(signals, strategy(), "2025-08-14")?.evaluatedOn,
+        service.currentSignal(signals, strategy(), assets(), "2025-08-14")
+          ?.evaluatedOn,
       ).toBe("2025-07-31");
     });
 
     it("is null when the current period was never evaluated", () => {
       const signals = [{ evaluatedOn: "2025-06-30" }] as GemStrategySignal[];
       expect(
-        service.currentSignal(signals, strategy(), "2025-08-14"),
+        service.currentSignal(signals, strategy(), assets(), "2025-08-14"),
       ).toBeNull();
     });
   });

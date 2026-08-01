@@ -386,16 +386,14 @@ export class GemSignalService {
   currentSignal(
     signals: GemStrategySignal[],
     strategy: GemStrategy,
+    /** The role assignments in force, which the fingerprint is checked against. */
+    assets: GemStrategyAsset[],
     asOf: string = todayYMD(),
-    assets: GemStrategyAsset[] = [],
   ): GemStrategySignal | null {
     const period = periodFor(asOf, strategy.cadence);
     const signal =
       signals.find((entry) => entry.evaluatedOn === period.evaluatedOn) ?? null;
     if (!signal) return null;
-    // No assets passed means the caller is not checking provenance (the specs
-    // that predate the fingerprint), and the stored row stands.
-    if (assets.length === 0) return signal;
     return signal.configFingerprint === gemConfigFingerprint(strategy, assets)
       ? signal
       : null;

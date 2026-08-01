@@ -33,6 +33,34 @@ describe('GemPortfolioCard', () => {
     expect(value.closest('dd')?.className).toContain('break-words');
   });
 
+  it('names cash as cash when it is the largest position', () => {
+    // Cash has no ticker and no name, so the label helper used to fall through
+    // to "not assigned" -- an account sitting mostly in cash reported its
+    // largest position as a gap in the strategy's configuration.
+    render(
+      <GemPortfolioCard
+        position={gemPosition({
+          current: {
+            role: null,
+            isCash: true,
+            securityId: null,
+            symbol: null,
+            name: null,
+            quantity: null,
+            marketValue: 9000,
+            matchPercent: 0,
+            matchedByInstrument: false,
+            matchedMarkets: [],
+          },
+        })}
+        noAccount={false}
+      />,
+    );
+
+    expect(screen.getByText(/Cash/)).toBeInTheDocument();
+    expect(screen.queryByText(/Not assigned/)).not.toBeInTheDocument();
+  });
+
   it('compares the held instrument with the target and flags the change', () => {
     render(<GemPortfolioCard position={gemPosition()} noAccount={false} />);
 

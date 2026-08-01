@@ -449,8 +449,8 @@ export class GemStrategyService {
     const current = this.signalService.currentSignal(
       signals,
       strategy,
-      asOf,
       assets,
+      asOf,
     );
 
     // Money is reported in the user's default currency: several accounts can be

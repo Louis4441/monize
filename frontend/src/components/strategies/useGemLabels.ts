@@ -13,7 +13,16 @@ import {
  * Anything the labels can name: a strategy role's instrument or a holding that
  * fills no role. Both carry a ticker and a name, which is all a label needs.
  */
-type GemNamedAsset = { symbol: string | null; name: string | null };
+type GemNamedAsset = {
+  symbol: string | null;
+  name: string | null;
+  /**
+   * Cash has neither, and is not an unassigned role either: without this both
+   * labels fall through to "not assigned", and an account sitting mostly in
+   * cash reports its largest position as a gap in the configuration.
+   */
+  isCash?: boolean;
+};
 
 /**
  * Localized labels for the GEM enumerations, resolved in one place so the cards,
@@ -52,11 +61,13 @@ export function useGemLabels() {
    */
   const assetLabel = (asset: GemNamedAsset | null | undefined): string => {
     if (!asset) return t('gem.common.unassigned');
+    if (asset.isCash) return t('gem.portfolioPanel.workingCash');
     return asset.symbol ?? t('gem.common.unassigned');
   };
 
   /** "SPY -- SPDR S&P 500 ETF" when both parts are known, otherwise the ticker. */
   const assetFullLabel = (asset: GemNamedAsset | null | undefined): string => {
+    if (asset?.isCash) return t('gem.portfolioPanel.workingCash');
     if (!asset?.symbol) return t('gem.common.unassigned');
     return asset.name ? `${asset.name} (${asset.symbol})` : asset.symbol;
   };
