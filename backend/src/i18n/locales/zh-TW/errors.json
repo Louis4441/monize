@@ -501,5 +501,11 @@
     "fileTooLarge": "檔案超過最大大小 {{ max }} 位元組",
     "unsupportedType": "不支援的檔案類型。允許的類型：{{ types }}",
     "tooMany": "此交易已達到最多 {{ max }} 個附件的上限"
+  },
+  "strategies": {
+    "accountNotFound": "找不到帳戶",
+    "securityNotFound": "找不到證券",
+    "signalNotFound": "找不到策略訊號",
+    "strategyNotFound": "找不到策略"
   }
 }

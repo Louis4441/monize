@@ -501,5 +501,11 @@
     "fileTooLarge": "Dosya, {{ max }} baytlık maksimum boyutu aşıyor",
     "unsupportedType": "Desteklenmeyen dosya türü. İzin verilen türler: {{ types }}",
     "tooMany": "Bu işlemde zaten en fazla {{ max }} ek var"
+  },
+  "strategies": {
+    "accountNotFound": "Hesap bulunamadı",
+    "securityNotFound": "Menkul kıymet bulunamadı",
+    "signalNotFound": "Strateji sinyali bulunamadı",
+    "strategyNotFound": "Strateji bulunamadı"
   }
 }

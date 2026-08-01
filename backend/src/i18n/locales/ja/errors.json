@@ -501,5 +501,11 @@
     "fileTooLarge": "ファイルが最大サイズの {{ max }} バイトを超えています",
     "unsupportedType": "サポートされていないファイル形式です。使用可能な形式: {{ types }}",
     "tooMany": "この取引にはすでに最大 {{ max }} 件の添付ファイルがあります"
+  },
+  "strategies": {
+    "accountNotFound": "口座が見つかりません",
+    "securityNotFound": "銘柄が見つかりません",
+    "signalNotFound": "戦略シグナルが見つかりません",
+    "strategyNotFound": "戦略が見つかりません"
   }
 }

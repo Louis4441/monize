@@ -501,5 +501,11 @@
     "fileTooLarge": "파일이 최대 크기 {{ max }} 바이트를 초과합니다",
     "unsupportedType": "지원되지 않는 파일 형식입니다. 허용되는 형식: {{ types }}",
     "tooMany": "이 거래에는 이미 최대 {{ max }}개의 첨부 파일이 있습니다"
+  },
+  "strategies": {
+    "accountNotFound": "계좌를 찾을 수 없습니다",
+    "securityNotFound": "종목을 찾을 수 없습니다",
+    "signalNotFound": "전략 신호를 찾을 수 없습니다",
+    "strategyNotFound": "전략을 찾을 수 없습니다"
   }
 }

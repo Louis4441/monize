@@ -501,5 +501,11 @@
     "fileTooLarge": "File melebihi ukuran maksimum {{ max }} byte",
     "unsupportedType": "Jenis file tidak didukung. Jenis yang diizinkan: {{ types }}",
     "tooMany": "Transaksi ini sudah memiliki maksimum {{ max }} lampiran"
+  },
+  "strategies": {
+    "accountNotFound": "Akun tidak ditemukan",
+    "securityNotFound": "Efek tidak ditemukan",
+    "signalNotFound": "Sinyal strategi tidak ditemukan",
+    "strategyNotFound": "Strategi tidak ditemukan"
   }
 }

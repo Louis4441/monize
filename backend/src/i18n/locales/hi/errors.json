@@ -501,5 +501,11 @@
     "fileTooLarge": "फ़ाइल {{ max }} बाइट्स की अधिकतम सीमा से अधिक है",
     "unsupportedType": "असमर्थित फ़ाइल प्रकार। अनुमत प्रकार: {{ types }}",
     "tooMany": "इस लेन-देन में पहले से ही अधिकतम {{ max }} अटैचमेंट हैं"
+  },
+  "strategies": {
+    "accountNotFound": "खाता नहीं मिला",
+    "securityNotFound": "प्रतिभूति नहीं मिली",
+    "signalNotFound": "रणनीति संकेत नहीं मिला",
+    "strategyNotFound": "रणनीति नहीं मिली"
   }
 }

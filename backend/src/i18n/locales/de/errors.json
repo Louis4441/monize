@@ -501,5 +501,11 @@
     "fileTooLarge": "Die Datei überschreitet die maximale Größe von {{ max }} Bytes",
     "unsupportedType": "Nicht unterstützter Dateityp. Erlaubte Typen: {{ types }}",
     "tooMany": "Diese Transaktion hat bereits die maximale Anzahl von {{ max }} Anhängen"
+  },
+  "strategies": {
+    "accountNotFound": "Konto nicht gefunden",
+    "securityNotFound": "Wertpapier nicht gefunden",
+    "signalNotFound": "Strategiesignal nicht gefunden",
+    "strategyNotFound": "Strategie nicht gefunden"
   }
 }

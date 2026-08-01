@@ -501,5 +501,11 @@
     "fileTooLarge": "Plik przekracza maksymalny rozmiar {{ max }} bajtów",
     "unsupportedType": "Nieobsługiwany typ pliku. Dozwolone typy: {{ types }}",
     "tooMany": "Ta transakcja ma już maksymalną liczbę {{ max }} załączników"
+  },
+  "strategies": {
+    "accountNotFound": "Nie znaleziono konta",
+    "securityNotFound": "Nie znaleziono papieru wartościowego",
+    "signalNotFound": "Nie znaleziono sygnału strategii",
+    "strategyNotFound": "Nie znaleziono strategii"
   }
 }

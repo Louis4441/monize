@@ -501,5 +501,11 @@
     "recalculateMortgageOnly": "[XX-Payment recalculation is only available for mortgage accounts-XX]",
     "insufficientData": "[XX-Not enough payments with interest details to detect rate changes-XX]",
     "frequencyMismatch": "[XX-Payment dates do not match the account's payment frequency; inferred rates may be less accurate-XX]"
+  },
+  "strategies": {
+    "accountNotFound": "[XX-Account not found-XX]",
+    "securityNotFound": "[XX-Security not found-XX]",
+    "signalNotFound": "[XX-Strategy signal not found-XX]",
+    "strategyNotFound": "[XX-Strategy not found-XX]"
   }
 }

@@ -81,6 +81,7 @@ describe("SectorWeightingService", () => {
     yahooService = {
       fetchStockSectorInfo: jest.fn().mockResolvedValue(null),
       fetchEtfSectorWeightings: jest.fn().mockResolvedValue(null),
+      fetchEtfAssetPositions: jest.fn().mockResolvedValue(null),
       getYahooSymbol: jest.fn().mockImplementation((sym) => sym),
     };
     calcService = {
@@ -128,6 +129,44 @@ describe("SectorWeightingService", () => {
       expect(sec.sector).toBe("Technology");
       expect(sec.industry).toBe("Consumer Electronics");
       expect(securityRepo.save).toHaveBeenCalledWith([sec]);
+    });
+
+    it("fills a fund's asset-class split from the provider", async () => {
+      // The GEM report compares its defensive roles on exactly this breakdown,
+      // and Yahoo has always returned it -- it was only ever read for prose.
+      const sec = {
+        ...mockEtfSecurity,
+        sectorWeightings: null,
+        assetWeightings: null,
+        sectorDataUpdatedAt: null,
+      } as Security;
+      yahooService.fetchEtfAssetPositions.mockResolvedValue([
+        { name: "Bonds", weight: 0.98 },
+      ]);
+
+      await service.ensureSectorData([sec]);
+
+      expect(sec.assetWeightings).toEqual([{ name: "Bonds", weight: 0.98 }]);
+    });
+
+    it("never overwrites an asset-class split the user recorded", async () => {
+      // The column is the allocation editor's; a fetched value is a
+      // convenience for undescribed funds, not an authority over the owner.
+      const own = [{ name: "Bonds", weight: 1 }];
+      const sec = {
+        ...mockEtfSecurity,
+        sectorWeightings: null,
+        assetWeightings: own,
+        sectorDataUpdatedAt: null,
+      } as Security;
+      yahooService.fetchEtfAssetPositions.mockResolvedValue([
+        { name: "Stocks", weight: 1 },
+      ]);
+
+      await service.ensureSectorData([sec]);
+
+      expect(sec.assetWeightings).toBe(own);
+      expect(yahooService.fetchEtfAssetPositions).not.toHaveBeenCalled();
     });
 
     it("fetches ETF weightings for ETFs missing sector_weightings", async () => {

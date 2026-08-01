@@ -53,6 +53,7 @@ import { BackupModule } from "./backup/backup.module";
 import { ActionHistoryModule } from "./action-history/action-history.module";
 import { UpdatesModule } from "./updates/updates.module";
 import { MonteCarloModule } from "./monte-carlo/monte-carlo.module";
+import { StrategiesModule } from "./strategies/strategies.module";
 import { DelegationModule } from "./delegation/delegation.module";
 import { EmergencyAccessModule } from "./emergency-access/emergency-access.module";
 import { I18nModule } from "./i18n/i18n.module";
@@ -158,6 +159,7 @@ import { I18nModule } from "./i18n/i18n.module";
     ActionHistoryModule,
     UpdatesModule,
     MonteCarloModule,
+    StrategiesModule,
     DelegationModule,
     EmergencyAccessModule,
   ],

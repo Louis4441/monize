@@ -501,5 +501,11 @@
     "fileTooLarge": "Le fichier dépasse la taille maximale de {{ max }} octets",
     "unsupportedType": "Type de fichier non pris en charge. Types autorisés : {{ types }}",
     "tooMany": "Cette transaction a déjà le maximum de {{ max }} pièces jointes"
+  },
+  "strategies": {
+    "accountNotFound": "Compte introuvable",
+    "securityNotFound": "Titre introuvable",
+    "signalNotFound": "Signal de stratégie introuvable",
+    "strategyNotFound": "Stratégie introuvable"
   }
 }

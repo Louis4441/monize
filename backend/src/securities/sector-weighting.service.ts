@@ -196,6 +196,7 @@ export class SectorWeightingService {
         if (weightings) {
           sec.sectorWeightings = weightings;
         }
+        await this.fillAssetPositions(sec);
         sec.sectorDataUpdatedAt = new Date();
         toUpdate.push(sec);
       } else if (sec.sectorDataUpdatedAt && !isFresh && (isStock || isEtf)) {
@@ -219,6 +220,7 @@ export class SectorWeightingService {
           if (weightings) {
             sec.sectorWeightings = weightings;
           }
+          await this.fillAssetPositions(sec);
         }
         sec.sectorDataUpdatedAt = new Date();
         toUpdate.push(sec);
@@ -232,6 +234,24 @@ export class SectorWeightingService {
     }
   }
 
+  /**
+   * Fill a fund's asset-class split from the provider, but only when the user
+   * has not recorded one.
+   *
+   * The column is documented as manual and the allocation editor writes it, so
+   * a fetched value must never overwrite a typed one -- the provider's split is
+   * a convenience for funds nobody has described, not a source of truth that
+   * outranks the owner. It matters to the GEM report, whose defensive roles are
+   * compared on exactly this breakdown.
+   */
+  private async fillAssetPositions(sec: Security): Promise<void> {
+    if (sec.assetWeightings?.length) return;
+    const positions = await this.yahooFinanceService.fetchEtfAssetPositions(
+      sec.symbol,
+      sec.exchange,
+    );
+    if (positions?.length) sec.assetWeightings = positions;
+  }
   /**
    * Get the latest price per security from security_prices table.
    */
