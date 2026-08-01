@@ -303,6 +303,7 @@ export function GemStrategyReport() {
           <GemNextActionCard
             action={action}
             signalUnavailable={signalUnavailable}
+            noAccount={codes.has('NO_ACCOUNT')}
             onMarkExecuted={handleMarkExecuted}
             onAddTransactions={handleAddTransactions}
             isSaving={isSaving}

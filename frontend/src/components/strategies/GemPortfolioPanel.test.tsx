@@ -175,7 +175,8 @@ describe('GemPortfolioPanel', () => {
             },
           ],
           totalMarketValue: 10000,
-          exactTargetPercent: 20,
+          // None of it is the target instrument: the 20% is exposure.
+          exactTargetPercent: 0,
         })}
         noAccount={false}
         noPosition={false}
@@ -192,11 +193,62 @@ describe('GemPortfolioPanel', () => {
       screen.getAllByText('Estimated exposure to the target market').length,
     ).toBeGreaterThan(0);
     expect(screen.getByTitle('china 12%, india 8%')).toHaveTextContent('20%');
+    // Nothing is in the target instrument, however much exposure the fund
+    // carries: the sentence sums the rows marked "Yes — kept", of which there
+    // are none.
     expect(
       screen.getByText(
-        /\$2,000\.00 of the \$10,000\.00 held in instruments is in the target instrument/,
+        /\$0\.00 of the \$10,000\.00 held in instruments is in the target instrument/,
       ),
     ).toBeInTheDocument();
+  });
+
+  it('sums what is in the target rather than rebuilding it from a percentage', () => {
+    // The percentage arrives rounded to two decimals, so reconstructing the
+    // amount from it drifts: 33.33% of 1,000,000 is 333,300, printed three
+    // lines under a row that says 333,333.33.
+    render(
+      <GemPortfolioPanel
+        position={gemPosition({
+          holdings: [
+            {
+              role: 'EM_EQUITY',
+              securityId: 'sec-emim',
+              symbol: 'EMIM',
+              name: 'EM IMI ETF',
+              quantity: 1000,
+              marketValue: 333333.33,
+              isTargetInstrument: true,
+              matchPercent: 100,
+              matchedByInstrument: false,
+              isCash: false,
+              matchedMarkets: [],
+            },
+            {
+              role: null,
+              securityId: 'sec-iusq',
+              symbol: 'IUSQ',
+              name: 'World ETF',
+              quantity: 1000,
+              marketValue: 666666.67,
+              isTargetInstrument: false,
+              matchPercent: 0,
+              matchedByInstrument: false,
+              isCash: false,
+              matchedMarkets: [],
+            },
+          ],
+          totalMarketValue: 1000000,
+          exactTargetPercent: 33.33,
+        })}
+        noAccount={false}
+        noPosition={false}
+      />,
+    );
+
+    expect(screen.getByText(/held in instruments/).textContent).toBe(
+      '$333,333.33 of the $1,000,000.00 held in instruments is in the target instrument, which is the 33% above.',
+    );
   });
 
   it('names a holding the comparison could only match by ticker', () => {

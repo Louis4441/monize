@@ -55,6 +55,20 @@ export function GemPortfolioPanel({
   )
     ? null
     : securities.reduce((sum, holding) => sum + (holding.marketValue ?? 0), 0);
+  /**
+   * What is actually in the target, summed from the same rows the table marks
+   * "Yes — kept".
+   *
+   * Not `securitiesValue * percent`: the percentage arrives rounded to two
+   * decimals, so on a million-pound portfolio that reconstruction printed a
+   * figure tens of pounds away from the row three lines above it.
+   */
+  const inTargetValue =
+    securitiesValue === null
+      ? null
+      : securities
+          .filter((holding) => holding.isTargetInstrument)
+          .reduce((sum, holding) => sum + (holding.marketValue ?? 0), 0);
 
   return (
     <GemCard
@@ -363,11 +377,13 @@ export function GemPortfolioPanel({
                   but it is not part of "how much of my equity is in the right
                   fund". */}
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {percent === null || securitiesValue === null
+                {percent === null ||
+                securitiesValue === null ||
+                inTargetValue === null
                   ? t("gem.portfolioPanel.workingUnknown")
                   : t("gem.portfolioPanel.workingSum", {
                       counted: formatCurrency(
-                        (securitiesValue * percent) / 100,
+                        inTargetValue,
                         position.currencyCode,
                       ),
                       // Named as the instruments' total on screen, because the
