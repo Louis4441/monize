@@ -176,7 +176,6 @@ export class GemPerformanceService {
       held,
       series,
       dates: orderedDates,
-      expectedStart,
       sampling,
     });
 
@@ -210,10 +209,9 @@ export class GemPerformanceService {
     held: GemSimulationHolding[];
     series: Map<string, PricePoint[]>;
     dates: string[];
-    expectedStart: string;
     sampling: "day" | "week" | "month";
   }): GemCurrentPortfolioSimulation | null {
-    const { held, series, dates, expectedStart, sampling } = params;
+    const { held, series, dates, sampling } = params;
     const empty = (
       unavailableReason: GemCurrentPortfolioSimulation["unavailableReason"],
     ): GemCurrentPortfolioSimulation => ({
@@ -293,8 +291,14 @@ export class GemPerformanceService {
     return {
       points,
       totalReturnPercent: priced[priced.length - 1]?.returnPercent ?? null,
+      // Measured against the chart's own first point, not the requested
+      // window. When the strategy's instruments are what cut the window short,
+      // every line starts there and the simulation is as complete as the chart
+      // can be -- blaming the user's holdings for it printed "at least one of
+      // the instruments you hold now has no data from the start of the period"
+      // over a holding priced from the very first day.
       completeRange:
-        startsOn <= addDays(expectedStart, COVERAGE_TOLERANCE_DAYS[sampling]),
+        startsOn <= addDays(firstPlotted, COVERAGE_TOLERANCE_DAYS[sampling]),
       startsOn,
       includedHoldings: bases.map((leg) => ({
         securityId: leg.securityId,

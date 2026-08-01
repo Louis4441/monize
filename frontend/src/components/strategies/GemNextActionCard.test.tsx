@@ -178,6 +178,27 @@ describe('GemNextActionCard', () => {
     expect(screen.getAllByText('Not available').length).toBeGreaterThan(1);
   });
 
+  it('does not call a strategy with no accounts compliant', () => {
+    // The server returns a null action both when the portfolio matches and
+    // when there is no portfolio at all, so falling through told a user with
+    // nothing assigned that there was nothing to do -- beside a portfolio card
+    // on the same row saying no account was assigned.
+    const { onMarkExecuted, onAddTransactions } = handlers();
+    render(
+      <GemNextActionCard
+        action={null}
+        noAccount
+        signalUnavailable={false}
+        onMarkExecuted={onMarkExecuted}
+        onAddTransactions={onAddTransactions}
+        isSaving={false}
+      />,
+    );
+
+    expect(screen.getByText('No account assigned')).toBeInTheDocument();
+    expect(screen.queryByText('Your portfolio matches the strategy')).toBeNull();
+  });
+
   it('says there is nothing to act on when no signal exists', () => {
     const { onMarkExecuted, onAddTransactions } = handlers();
     render(

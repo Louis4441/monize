@@ -7,7 +7,13 @@ import {
   PRICE_WINDOW_LEAD_DAYS,
   withLeadDays,
 } from "./gem-price.service";
-import { GemBacktestResult, runBacktest } from "./gem-backtest.util";
+import {
+  GemBacktestPeriod,
+  GemBacktestResult,
+  runBacktest,
+} from "./gem-backtest.util";
+import { GemCadence } from "./entities/gem-strategy.entity";
+import { addMonthsUtc, cadenceMonths, parseYmd } from "./gem-momentum.util";
 
 /**
  * Turns the stored signal history into the report's backtest summary.
@@ -18,6 +24,46 @@ import { GemBacktestResult, runBacktest } from "./gem-backtest.util";
  * That is the honest answer: re-deriving signals for years the user never ran
  * would report a rule's past, not theirs.
  */
+/**
+ * The evaluated periods with the calendar's own gaps put back.
+ *
+ * `runBacktest` bounds each period by the next one in the list, so a period
+ * missing from the list is not skipped -- it is absorbed into its predecessor.
+ * A placeholder with no instrument prices to null, which is exactly how the
+ * simulation already handles a period it cannot value: the run restarts after
+ * the last one and the coverage figure says how much was left out.
+ */
+function withMissingPeriods(
+  evaluated: GemBacktestPeriod[],
+  cadence: GemCadence,
+): GemBacktestPeriod[] {
+  const step = cadenceMonths(cadence);
+  const filled: GemBacktestPeriod[] = [];
+  for (const [index, period] of evaluated.entries()) {
+    filled.push(period);
+    const next = evaluated[index + 1];
+    if (!next) continue;
+    let expected = ymd(addMonthsUtc(parseYmd(period.effectiveFrom), step));
+    // Bounded by the next evaluated period, so a calendar change (or a
+    // cadence the dates do not line up with) cannot spin here.
+    while (expected < next.effectiveFrom) {
+      filled.push({
+        effectiveFrom: expected,
+        targetRole: null,
+        targetSecurityId: null,
+        previousRole: period.targetRole,
+      });
+      expected = ymd(addMonthsUtc(parseYmd(expected), step));
+    }
+  }
+  return filled;
+}
+
+/** ISO date of a UTC date, without the local-timezone round trip. */
+function ymd(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 @Injectable()
 export class GemBacktestService {
   constructor(private priceService: GemPriceService) {}
@@ -47,7 +93,7 @@ export class GemBacktestService {
       params;
     const asOf = params.asOf ?? todayYMD();
 
-    const periods = [...signals]
+    const evaluated = [...signals]
       .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom))
       .map((signal) => ({
         effectiveFrom: signal.effectiveFrom,
@@ -63,7 +109,21 @@ export class GemBacktestService {
       }));
     // One signal is enough: its period runs to `asOf`, so a strategy that
     // produced its first signal last month has a full month to simulate.
-    if (periods.length === 0) return null;
+    if (evaluated.length === 0) return null;
+
+    // A period this configuration could not answer for is a hole in the run,
+    // not an absence of one.
+    //
+    // The signals handed in are the ones matching the current fingerprint and
+    // algorithm version, so a month answered only by a legacy row, or not
+    // answered at all, is simply missing from the list -- and a period bounded
+    // by "the next one supplied" then swallows it, holding the previous
+    // instrument through a month the strategy decided differently, charging
+    // neither the switch's tax nor its commissions, and still reporting full
+    // coverage. Filling the hole with an unpriceable placeholder puts it back
+    // on the calendar, where the existing gap machinery restarts the run after
+    // it and `coveragePercent` counts it.
+    const periods = withMissingPeriods(evaluated, strategy.cadence);
 
     const securityIds = [
       ...new Set(

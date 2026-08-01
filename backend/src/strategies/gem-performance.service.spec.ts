@@ -452,9 +452,11 @@ describe("GemPerformanceService", () => {
         returnPercent: 0,
       });
       expect(simulation?.totalReturnPercent).toBeCloseTo(25, 4);
-      // Still an incomplete range, and truthfully so: the chart itself only
-      // reaches back to February, so neither line covers the year asked for.
-      expect(simulation?.completeRange).toBe(false);
+      // Complete as far as this chart goes: the window was cut short by the
+      // strategy's own instrument, and the simulation starts on the same point
+      // every asset line does. Saying otherwise blamed the user's holdings for
+      // a gap in someone else's data.
+      expect(simulation?.completeRange).toBe(true);
     });
 
     it("explains a holding listed after the last point the chart draws", async () => {

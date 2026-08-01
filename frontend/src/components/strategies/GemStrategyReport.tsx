@@ -230,7 +230,11 @@ export function GemStrategyReport() {
               failed={codes.has('CALCULATION_FAILED')}
             />
             <GemPortfolioCard position={position} noAccount={codes.has('NO_ACCOUNT')} />
-            <GemTransferCard action={action} signalUnavailable={signalUnavailable} />
+            <GemTransferCard
+              action={action}
+              signalUnavailable={signalUnavailable}
+              noAccount={codes.has('NO_ACCOUNT')}
+            />
             <GemAssetsCard assets={assets} winnerRole={winnerRole} />
           </div>
 
@@ -254,6 +258,7 @@ export function GemStrategyReport() {
               <GemNextActionCard
                 action={action}
                 signalUnavailable={signalUnavailable}
+                noAccount={codes.has('NO_ACCOUNT')}
                 onMarkExecuted={handleMarkExecuted}
                 onAddTransactions={handleAddTransactions}
                 isSaving={isSaving}

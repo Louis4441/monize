@@ -25,6 +25,8 @@ interface GemNextActionCardProps {
   action: GemAction | null;
   /** True when the report has no signal at all (first run, failed calculation). */
   signalUnavailable: boolean;
+  /** True when the strategy has no account, so there is no portfolio to act on. */
+  noAccount?: boolean;
   onMarkExecuted: () => void;
   onAddTransactions: () => void;
   isSaving: boolean;
@@ -39,6 +41,7 @@ interface GemNextActionCardProps {
 export function GemNextActionCard({
   action,
   signalUnavailable,
+  noAccount = false,
   onMarkExecuted,
   onAddTransactions,
   isSaving,
@@ -52,6 +55,22 @@ export function GemNextActionCard({
       <GemCard title={t('gem.action.title')} hint={t('gem.action.hint')}>
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {t('gem.action.signalUnavailable')}
+        </p>
+      </GemCard>
+    );
+  }
+
+  // No account is not compliance. `action` is null in both states, and
+  // falling through to "your portfolio matches the strategy" told a user with
+  // nothing assigned that there was nothing to do.
+  if (noAccount) {
+    return (
+      <GemCard title={t('gem.action.title')} hint={t('gem.action.hint')}>
+        <p className="font-medium text-gray-900 dark:text-gray-100">
+          {t('gem.portfolio.noAccountTitle')}
+        </p>
+        <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+          {t('gem.portfolio.noAccountDescription')}
         </p>
       </GemCard>
     );

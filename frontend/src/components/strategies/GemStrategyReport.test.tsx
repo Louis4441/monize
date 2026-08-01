@@ -232,6 +232,7 @@ describe('GemStrategyReport', () => {
 
     expect(screen.getByText('No signal yet')).toBeInTheDocument();
     expect(screen.getByText('No account assigned')).toBeInTheDocument();
+    // A missing signal is the earlier state and keeps its own copy.
     expect(screen.getByText('Nothing to transfer')).toBeInTheDocument();
     expect(
       screen.getByText('Nothing moves until the strategy produces its first signal.'),

@@ -5,7 +5,11 @@ import { GemBacktestService } from "./gem-backtest.service";
 const strategy = (overrides: Partial<GemStrategy> = {}): GemStrategy =>
   ({
     id: "strategy-1",
-    cadence: "MONTHLY",
+    // Quarterly, so the signals below sit on consecutive periods: a monthly
+    // calendar with signals six months apart is five missing periods, and the
+    // simulation is required to treat those as holes rather than hold the
+    // previous instrument through them.
+    cadence: "QUARTERLY",
     lookbackMonths: 12,
     taxRatePercent: 19,
     commissionAmount: 29.9,
@@ -39,7 +43,9 @@ describe("GemBacktestService", () => {
               // with a six-month hole is not a priced run: the same stale
               // quote would answer both ends of a period.
               { date: "2023-12-29", close: 100 },
+              { date: "2024-03-28", close: 102 },
               { date: "2024-06-28", close: 105 },
+              { date: "2024-09-27", close: 108 },
               { date: "2024-12-31", close: 110 },
             ],
           ],
@@ -53,8 +59,11 @@ describe("GemBacktestService", () => {
     const result = await service.build({
       strategy: strategy(),
       signals: [
-        signal("2024-07-01", "sec-spy"),
+        // Deliberately out of order: the service sorts them.
+        signal("2024-07-01", "sec-spy", "US_EQUITY"),
         signal("2024-01-01", "sec-spy"),
+        signal("2024-10-01", "sec-spy", "US_EQUITY"),
+        signal("2024-04-01", "sec-spy", "US_EQUITY"),
       ],
       safeSecurityId: null,
       notional: 10_000,
@@ -89,7 +98,7 @@ describe("GemBacktestService", () => {
       strategy: strategy(),
       signals: [
         signal("2024-01-01", "sec-spy"),
-        signal("2024-07-01", "sec-spy"),
+        signal("2024-04-01", "sec-spy", "US_EQUITY"),
       ],
       safeSecurityId: "sec-ief",
       notional: null,
@@ -139,7 +148,9 @@ describe("GemBacktestService", () => {
       strategy: strategy(),
       signals: [
         signal("2024-01-01", "sec-spy", "SAFE"),
+        signal("2024-04-01", "sec-spy", "US_EQUITY"),
         signal("2024-07-01", "sec-spy", "US_EQUITY"),
+        signal("2024-10-01", "sec-spy", "US_EQUITY"),
       ],
       safeSecurityId: null,
       notional: 10_000,
@@ -155,10 +166,53 @@ describe("GemBacktestService", () => {
     });
   });
 
+  it("does not hold a legacy period's instrument through its month", async () => {
+    // June is answered only by a row this configuration cannot use, so it is
+    // not in the signals handed here. Bounding May by "the next signal
+    // supplied" would run SPY through June as well -- a month the strategy
+    // decided differently -- and still report full coverage. The hole goes
+    // back on the calendar instead, and the run restarts after it.
+    priceService.loadSeries.mockResolvedValue(
+      new Map([
+        [
+          "sec-spy",
+          [
+            { date: "2026-04-30", close: 100 },
+            { date: "2026-06-30", close: 130 },
+            { date: "2026-07-31", close: 140 },
+            { date: "2026-08-31", close: 150 },
+          ],
+        ],
+      ]),
+    );
+
+    const result = await service.build({
+      strategy: strategy({ cadence: "MONTHLY" }),
+      signals: [
+        signal("2026-05-01", "sec-spy"),
+        // June is missing: only a legacy row answers for it.
+        signal("2026-07-01", "sec-spy", "US_EQUITY"),
+      ],
+      safeSecurityId: null,
+      notional: 10_000,
+      hasEarlierSignals: false,
+      asOf: "2026-09-01",
+    });
+
+    // Three periods on the calendar, one of them unpriceable, so the run is
+    // the stretch after it and the coverage figure says so.
+    expect(result?.from).toBe("2026-07-01");
+    expect(result?.coveragePercent).toBeCloseTo(33.33, 1);
+    // And a truncated run is reported gross, so the panel cannot claim the
+    // figures are net of costs that were never charged.
+    expect(result?.taxApplied).toBe(false);
+    expect(result?.commissionApplied).toBe(false);
+  });
+
   it("has nothing to simulate when no period named an instrument", async () => {
     const result = await service.build({
       strategy: strategy(),
-      signals: [signal("2024-01-01", null), signal("2024-07-01", null)],
+      signals: [signal("2024-01-01", null), signal("2024-04-01", null)],
       safeSecurityId: null,
       notional: null,
       hasEarlierSignals: false,

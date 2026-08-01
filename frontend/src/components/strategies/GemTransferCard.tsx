@@ -17,6 +17,8 @@ interface GemTransferCardProps {
   action: GemAction | null;
   /** True when the report has no signal yet, so there is nothing to compare against. */
   signalUnavailable?: boolean;
+  /** True when the strategy has no account, so there is no portfolio to move. */
+  noAccount?: boolean;
 }
 
 /**
@@ -24,7 +26,11 @@ interface GemTransferCardProps {
  * out of which account. Costs (tax, commission) are only rendered when the
  * server estimated them.
  */
-export function GemTransferCard({ action, signalUnavailable = false }: GemTransferCardProps) {
+export function GemTransferCard({
+  action,
+  signalUnavailable = false,
+  noAccount = false,
+}: GemTransferCardProps) {
   const t = useTranslations('strategies');
   const { formatCurrency } = useNumberFormat();
 
@@ -32,13 +38,22 @@ export function GemTransferCard({ action, signalUnavailable = false }: GemTransf
     return (
       <GemCard title={t('gem.transfer.title')} hint={t('gem.transfer.hint')}>
         <GemEmptyState
-          title={t('gem.transfer.noneTitle')}
+          title={
+            noAccount && !signalUnavailable
+              ? t('gem.portfolio.noAccountTitle')
+              : t('gem.transfer.noneTitle')
+          }
           description={
             // Without a signal there is no target to compare the account with,
             // so the "already holds the target" reason would be wrong.
+            // "The strategy accounts already hold the target instrument" is a
+            // claim about accounts that do not exist. The portfolio card says
+            // the same thing on the same row; this card must not contradict it.
             signalUnavailable
               ? t('gem.transfer.noSignalDescription')
-              : t('gem.transfer.noneDescription')
+              : noAccount
+                ? t('gem.portfolio.noAccountDescription')
+                : t('gem.transfer.noneDescription')
           }
         />
       </GemCard>
