@@ -138,6 +138,45 @@ describe("runBacktest", () => {
     expect(result?.netOfCosts).toBe(true);
   });
 
+  it("charges no commission for a period that holds nothing", () => {
+    // RISK-ON with no eligible instrument assigned stores a period with no
+    // target. Counting it as a trade billed a commission for holding nothing
+    // and then treated the return to the same fund as a first purchase, so a
+    // gap in the middle of the history came out cheaper than no gap at all.
+    const withGap = runBacktest(
+      input({
+        periods: [
+          {
+            effectiveFrom: "2024-01-01",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
+          },
+          {
+            effectiveFrom: "2024-07-01",
+            targetRole: null,
+            targetSecurityId: null,
+          },
+        ],
+        commissionAmount: 100,
+        notional: 10_000,
+      }),
+    );
+    const withoutGap = runBacktest(
+      input({ commissionAmount: 100, notional: 10_000 }),
+    );
+
+    // One buy in each: the empty period adds no trade of its own.
+    expect(withGap?.netOfCosts).toBe(true);
+    expect(withGap?.cagrPercent).toBeCloseTo(
+      // The gap period is held flat, so only the first half's growth compounds.
+      ((0.99 * 1.1) ** 1 - 1) * 100,
+      0,
+    );
+    expect(withoutGap?.cagrPercent).toBeGreaterThan(
+      withGap?.cagrPercent as number,
+    );
+  });
+
   it("leaves commission out when the capital it applies to is unknown", () => {
     const result = runBacktest(
       input({ commissionAmount: 100, notional: null }),

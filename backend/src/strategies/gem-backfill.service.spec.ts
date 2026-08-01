@@ -61,9 +61,10 @@ describe("GemBackfillService", () => {
       expect.objectContaining({ id: "spy" }),
       "5y",
     );
-    // The attempt is stamped so a save moments later does not refetch.
+    // The attempt is stamped so a save moments later does not refetch, and the
+    // write is scoped to the owner like every other one in this module.
     expect(securityRepo.update).toHaveBeenCalledWith(
-      { id: expect.anything() },
+      { id: expect.anything(), userId },
       { historicalBackfillAttemptedAt: expect.any(Date) },
     );
   });

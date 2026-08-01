@@ -124,7 +124,7 @@ export class GemBackfillService {
       manager
         .getRepository(Security)
         .update(
-          { id: In(due.map((security) => security.id)) },
+          { id: In(due.map((security) => security.id)), userId },
           { historicalBackfillAttemptedAt: new Date() },
         ),
     );

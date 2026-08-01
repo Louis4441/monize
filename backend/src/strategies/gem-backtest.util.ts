@@ -123,7 +123,12 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
 
     // Entering a different instrument: the old one is sold, which realizes a
     // result and costs two trades. The very first buy costs one.
-    if (securityId !== previousSecurityId) {
+    //
+    // A period with no instrument at all -- RISK-ON with nothing eligible
+    // assigned -- is not a trade. Treating it as one charged a commission for
+    // holding nothing and then billed the return to the *next* instrument as a
+    // first purchase, understating the switch that actually happened.
+    if (securityId !== null && securityId !== previousSecurityId) {
       const trades = previousSecurityId === null ? 1 : 2;
       if (taxRate !== null && previousSecurityId !== null) {
         const gain = equity - legEntryEquity;
