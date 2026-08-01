@@ -16,6 +16,7 @@ import { ScheduledTransactionOverrideService } from "@/scheduled-transactions/sc
 import { ScheduledTransactionLoanService } from "@/scheduled-transactions/scheduled-transaction-loan.service";
 import type { TypeOrmModuleOptions } from "@nestjs/typeorm";
 import * as bcrypt from "bcryptjs";
+import { applyRlsPolicies } from "./rls-setup";
 
 /**
  * Shared PostgreSQL connection options for integration suites. Specs that need
@@ -124,6 +125,12 @@ export async function createIntegrationModule(
     });
 
   const module = await moduleBuilder.compile();
+
+  // Bring the synchronize-built schema up to the real database's shape: runtime
+  // role + grants, RLS helper functions and policies, updated_at triggers (T1).
+  // Policies ship without ENABLE, so this is inert for suites that do not opt
+  // into enforcement -- see rls-setup.ts.
+  await applyRlsPolicies(module.get(DataSource));
 
   // Mock triggerDebouncedRecalc to prevent timer leaks
   const netWorthService = module.get(NetWorthService);

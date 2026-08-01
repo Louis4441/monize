@@ -1,0 +1,245 @@
+import * as fs from "fs";
+import * as path from "path";
+import { DataSource } from "typeorm";
+
+import { provisionAppRole } from "@/common/db/app-role";
+import { DEFAULT_APP_USER } from "@/common/db/rls-config";
+
+/**
+ * RLS task T1: make the integration harness look like a real database.
+ *
+ * `synchronize: true` builds the schema from entity metadata, which gives the
+ * integration suites tables and columns but **none** of the database objects
+ * that only exist in SQL: no `monize_app` role, no grants, no RLS helper
+ * functions, no policies, and no `updated_at` triggers. Every one of those is
+ * something the RLS work depends on, so without this step T2's enforcement
+ * assertions and C5's restore acceptance would pass vacuously against a
+ * database that simply has nothing to enforce.
+ *
+ * What this does NOT do is enable row-level security. The policies ship inert
+ * (M2) and the enable is its own migration (M3, flip B), so applying policies
+ * here leaves every existing suite behaving exactly as it did -- a policy on a
+ * table without `ENABLE ROW LEVEL SECURITY` is never consulted by the planner.
+ * A spec that wants enforcement opts into it explicitly.
+ */
+
+const MIGRATIONS_DIR = path.join(__dirname, "../../../database/migrations");
+const SCHEMA_SQL = path.join(__dirname, "../../../database/schema.sql");
+
+/**
+ * Password for the test-only runtime role. Not a secret: the role exists in the
+ * throwaway `monize_test` database so specs can `SET LOCAL ROLE` to a non-owner
+ * and observe policies actually filtering (the owner bypasses RLS).
+ */
+export const TEST_APP_ROLE_PASSWORD = "monize_test_app_password";
+
+/** Role name the harness provisions, matching the app's default. */
+export const TEST_APP_ROLE = process.env.DATABASE_APP_USER || DEFAULT_APP_USER;
+
+/**
+ * Selects the migrations that carry RLS objects, by **content** rather than by
+ * filename.
+ *
+ * A `*_rls_*.sql` glob is the obvious approach and it is wrong: it matches
+ * `111`-`114` and `118_security_documents_rls.sql` but misses the policies for
+ * `import_staged_files` and `import_jobs`, which live inside
+ * `117_mny_import_staging_and_jobs.sql` -- a feature migration that creates two
+ * tables and policies them in the same file. That is the *correct* pattern for
+ * a new table (the policy ships with the table that needs it), so the harness
+ * has to find policies wherever they are, not where a naming convention says
+ * they should be.
+ *
+ * Every RLS object references one of the identity helpers -- each policy
+ * predicate calls `app_current_user_id()` or `app_bypass_rls()`, and the
+ * helpers' own migration defines them -- so that reference is the marker. It
+ * selects exactly the RLS files today and picks up any future migration that
+ * policies a new table, with no per-file registration to forget.
+ */
+export function findRlsMigrations(): string[] {
+  if (!fs.existsSync(MIGRATIONS_DIR)) {
+    throw new Error(`Migrations directory not found at ${MIGRATIONS_DIR}`);
+  }
+
+  const files = fs
+    .readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith(".sql"))
+    // Filename order, which is what db-migrate uses -- note that `116_*` and
+    // `117_*` each have two files, so numeric-prefix order is ambiguous and
+    // alphabetical tie-breaking is what keeps `117_security_documents` ahead of
+    // `118_security_documents_rls`.
+    .sort();
+
+  const rlsFiles = files.filter((f) => {
+    const sql = fs.readFileSync(path.join(MIGRATIONS_DIR, f), "utf8");
+    return /app_current_user_id|app_bypass_rls/.test(sql);
+  });
+
+  if (rlsFiles.length === 0) {
+    throw new Error(
+      `No RLS migrations found in ${MIGRATIONS_DIR}. The harness applies migrations ` +
+        "by content marker (app_current_user_id / app_bypass_rls); finding none means " +
+        "either the migrations are missing or the marker changed.",
+    );
+  }
+
+  return rlsFiles.map((f) => path.join(MIGRATIONS_DIR, f));
+}
+
+/**
+ * Table names each migration file declares a policy for, in both shapes the
+ * migrations use: an explicit `CREATE POLICY x ON t`, and the `DO` block in
+ * `112` that loops a `text[]` of table names through `EXECUTE format(...)`.
+ * Used as a post-condition -- what was declared has to exist in `pg_policies`
+ * once the files have been applied.
+ */
+function declaredPolicyTables(sql: string): string[] {
+  const tables = new Set<string>();
+
+  // `CREATE POLICY name ON table` -- deliberately not `POLICY ... ON`, which
+  // would also match the `DROP POLICY IF EXISTS` that precedes each one.
+  for (const match of sql.matchAll(/CREATE\s+POLICY\s+\w+\s+ON\s+(\w+)/gi)) {
+    tables.add(match[1]);
+  }
+
+  // The looped form: a `text[] := ARRAY[...]` of table names in a file whose
+  // DO block builds a CREATE POLICY through `format()`.
+  if (/EXECUTE\s+format\(/i.test(sql) && /'CREATE POLICY/i.test(sql)) {
+    for (const arrayMatch of sql.matchAll(
+      /text\[\]\s*:=\s*ARRAY\[([^\]]*)\]/gi,
+    )) {
+      for (const name of arrayMatch[1].matchAll(/'(\w+)'/g)) {
+        tables.add(name[1]);
+      }
+    }
+  }
+
+  return [...tables];
+}
+
+/**
+ * The `updated_at` triggers, extracted from `schema.sql`.
+ *
+ * `synchronize` creates no database triggers at all -- `@UpdateDateColumn`
+ * stamps the column app-side -- and the RLS migrations only replace the trigger
+ * *function*, never attach it to a table that has no trigger yet. So without
+ * this step the GUC-aware trigger from M1 exists but fires nowhere, and any
+ * assertion about `app.preserve_timestamps` (T2) or about restore preserving
+ * timestamps (C5) would pass without testing anything.
+ *
+ * The DDL is read from `schema.sql` rather than rebuilt from a list here, so a
+ * table that gains a trigger gains it in the harness too.
+ */
+function updatedAtTriggers(): { trigger: string; table: string }[] {
+  if (!fs.existsSync(SCHEMA_SQL)) {
+    throw new Error(`Schema not found at ${SCHEMA_SQL}`);
+  }
+  const sql = fs.readFileSync(SCHEMA_SQL, "utf8");
+
+  // Whitespace-tolerant: schema.sql has these in both one-line and multi-line
+  // form, and the two are otherwise identical.
+  const pattern =
+    /CREATE\s+TRIGGER\s+(\w+)\s+BEFORE\s+UPDATE\s+ON\s+(\w+)\s+FOR\s+EACH\s+ROW\s+EXECUTE\s+(?:FUNCTION|PROCEDURE)\s+update_updated_at_column\(\)/gi;
+
+  const triggers = [...sql.matchAll(pattern)].map((m) => ({
+    trigger: m[1],
+    table: m[2],
+  }));
+
+  if (triggers.length === 0) {
+    throw new Error(
+      `No updated_at triggers found in ${SCHEMA_SQL}. The extraction pattern and the ` +
+        "schema have diverged; fix the pattern rather than skipping the triggers, or " +
+        "every timestamp assertion downstream passes vacuously.",
+    );
+  }
+
+  return triggers;
+}
+
+/**
+ * Brings a `synchronize`-built test database up to the shape the real one has:
+ * the runtime role and its grants, the RLS helper functions and policies, and
+ * the `updated_at` triggers.
+ *
+ * Call after the schema exists (i.e. after `DataSource.initialize()` with
+ * `synchronize: true`). Idempotent, and re-applied per suite because
+ * `dropSchema: true` takes the functions, policies and triggers down with the
+ * tables on every suite start.
+ */
+export async function applyRlsPolicies(dataSource: DataSource): Promise<void> {
+  // 1. The role first: the grants below are meaningless without it, and a spec
+  //    doing `SET LOCAL ROLE monize_app` needs it to exist. Never throws on a
+  //    privilege shortfall -- it warns -- so the grant assertion below is what
+  //    actually proves it worked.
+  await provisionAppRole(dataSource, {
+    appUser: TEST_APP_ROLE,
+    appPassword: TEST_APP_ROLE_PASSWORD,
+    logger: { log: () => {}, warn: () => {} },
+  });
+
+  const [{ exists: roleExists }] = await dataSource.query(
+    "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1) AS exists",
+    [TEST_APP_ROLE],
+  );
+  if (!roleExists) {
+    throw new Error(
+      `Runtime role '${TEST_APP_ROLE}' was not created. The test database owner needs ` +
+        "CREATEROLE; without the role, enforcement specs cannot switch off owner bypass.",
+    );
+  }
+
+  // 2. The RLS migrations, read from disk so the harness can never drift from
+  //    what ships.
+  const migrations = findRlsMigrations();
+  const declared = new Set<string>();
+
+  for (const file of migrations) {
+    const sql = fs.readFileSync(file, "utf8");
+    try {
+      await dataSource.query(sql);
+    } catch (err) {
+      // Name the file: a bare Postgres error in a 6-file apply is unhelpful.
+      throw new Error(
+        `Failed applying RLS migration ${path.basename(file)}: ${(err as Error).message}`,
+      );
+    }
+    for (const table of declaredPolicyTables(sql)) {
+      declared.add(table);
+    }
+  }
+
+  // 3. Post-condition: every policy the applied files declare exists in the
+  //    database. Catches a file that applied without error but whose DO block
+  //    took a branch that skipped the policies, and any future shape of
+  //    migration the extraction above does not understand.
+  const policied = new Set<string>(
+    (
+      await dataSource.query(
+        "SELECT DISTINCT tablename FROM pg_policies WHERE schemaname = 'public'",
+      )
+    ).map((r: { tablename: string }) => r.tablename),
+  );
+  const missing = [...declared].filter((t) => !policied.has(t)).sort();
+  if (missing.length > 0) {
+    throw new Error(
+      `RLS migrations declare policies for tables that have none after apply: ${missing.join(", ")}.`,
+    );
+  }
+
+  // 4. The updated_at triggers, which synchronize never creates.
+  for (const { trigger, table } of updatedAtTriggers()) {
+    // Skip a table the entities do not produce -- the harness synchronizes from
+    // entity metadata, so schema.sql can legitimately be ahead of it.
+    const [{ exists: tableExists }] = await dataSource.query(
+      "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = $1) AS exists",
+      [table],
+    );
+    if (!tableExists) continue;
+
+    await dataSource.query(`DROP TRIGGER IF EXISTS "${trigger}" ON "${table}"`);
+    await dataSource.query(
+      `CREATE TRIGGER "${trigger}" BEFORE UPDATE ON "${table}"
+       FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()`,
+    );
+  }
+}
