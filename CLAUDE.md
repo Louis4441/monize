@@ -113,6 +113,11 @@ commit/rollback/release bookkeeping to get wrong. **There are no `QueryRunner`s 
 RLS tasks R1–R7 converted every one, and lint now bans the pattern outright (L1). Helpers take an `EntityManager`,
 never a `QueryRunner`. If you find a `createQueryRunner()` in a diff, it is new and wrong.
 
+An operation that uses `INSERT ... ON CONFLICT DO NOTHING` and then returns a read model must follow a conflict
+with a fresh read of the authoritative state, inside the same transaction. Never build the response from a snapshot
+loaded before the insert attempt -- the request that lost the race would return data missing the rows the winner
+just inserted.
+
 ## Database Access & Row-Level Security (RLS lint bans — CRITICAL)
 
 **All** database access goes through `withScopedDb` (`backend/src/common/db/scoped-db.ts`) — the single RLS-compliant door to the DB. **Never add an `@InjectRepository(...)` field, a `this.dataSource.createQueryRunner()` call, or a bare `this.dataSource.query(...)`.** ESLint bans both outright (RLS task L1, `backend/eslint.config.mjs`): importing `InjectRepository` or calling `.createQueryRunner()` anywhere in `src/` (outside `scoped-db.ts`, specs and test helpers) fails "Backend Lint & Type Check". The same config restricts importing `common/db/with-context` to an explicit `WITH_CONTEXT_ALLOWLIST` — a new `withSystemContext`/`withUserContext` call site means adding the file to that allowlist in the same PR, as a reviewed decision. (R1–R7 converted the ~91 original sites; the old counting ratchet is gone.)
@@ -161,6 +166,12 @@ const rounded = Math.round(value * 10000) / 10000;
 ```
 
 Balance updates use atomic SQL: `UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2`.
+
+### Missing data: a subtotal is not a total (CRITICAL)
+
+A field named `total*`, `portfolioValue`, `transferValue`, `gain`, `tax`, or `estimated*` may only carry a value when **every** component of the calculation is known. Filtering out `null` components and summing the rest produces a subtotal, not a total -- if any component is unknown, the total is `null`, and the partial sum, if returned at all, goes in a separate explicitly named field (`knownMarketValueSubtotal`), never in the total's field. Never default an unknown price, cost basis, or rate to `0` (or an exchange rate to `1`) to keep a formula running, and never treat a missing period price as a 0% return.
+
+The full rules -- cost basis and tax truth table, cash, valuation, materialized-result versioning, stale quotes, backtests over incomplete history, and the required adversarial test matrix -- live in `docs/financial-calculation-contract.md` and `docs/time-series-contract.md`. Read both before writing or changing any financial calculation. A financial feature of any substance starts from a short approved spec (invariants, truth tables, numerical examples, missing-data policy, test matrix) before implementation, not from code.
 
 ## Environment
 
