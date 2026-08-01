@@ -57,6 +57,35 @@ describe("GemPriceService", () => {
       expect(params).toEqual([["sec-a", "sec-b"], "2025-01-01"]);
     });
 
+    it("reads adjusted closes, falling back to the raw close", async () => {
+      // Every consumer of this series measures a return over time. On raw
+      // closes a 4-for-1 split reads as a 75% loss, which flips the
+      // absolute-momentum test, and distributions vanish from the return of
+      // whichever leg pays the most -- usually the bond one the equities are
+      // measured against.
+      manager.query.mockResolvedValue([]);
+
+      await service.loadSeries(
+        ["sec-a"],
+        "2025-01-01",
+        "day",
+        manager as never,
+      );
+      expect(manager.query.mock.calls[0][0]).toContain(
+        "COALESCE(adjusted_close, close_price)",
+      );
+
+      await service.loadSeries(
+        ["sec-a"],
+        "2020-01-01",
+        "month",
+        manager as never,
+      );
+      expect(manager.query.mock.calls[1][0]).toContain(
+        "COALESCE(adjusted_close, close_price)",
+      );
+    });
+
     it("thins long ranges to one close per bucket and sorts ascending", async () => {
       manager.query.mockResolvedValue([
         { security_id: "sec-a", price_date: "2025-02-28", close_price: "12" },
@@ -108,6 +137,16 @@ describe("GemPriceService", () => {
       expect(prices.has("sec-a")).toBe(false);
     });
 
+    it("values a position on the raw close, not the adjusted one", async () => {
+      // The mirror of the rule in loadSeries: a holding is worth what its
+      // shares trade at today. The adjusted series answers a different
+      // question -- what the return has been -- and would misprice the
+      // portfolio by the whole distribution history of the fund.
+      manager.query.mockResolvedValue([]);
+      await service.latestPrices(["sec-a"], manager as never);
+      expect(manager.query.mock.calls[0][0]).not.toContain("adjusted_close");
+    });
+
     it("skips the query with no securities", async () => {
       await expect(service.latestPrices([])).resolves.toEqual(new Map());
       expect(manager.query).not.toHaveBeenCalled();
@@ -122,27 +161,37 @@ describe("GemPriceService", () => {
     });
   });
 
-  describe("latestPriceDate", () => {
-    it("returns the newest price date across the securities", async () => {
-      manager.query.mockResolvedValue([{ latest: "2025-08-02" }]);
-      await expect(
-        service.latestPriceDate(["sec-a"], manager as never),
-      ).resolves.toBe("2025-08-02");
+  describe("latestPriceDates", () => {
+    it("returns the newest price date for each security separately", async () => {
+      // Per security, not one MAX across them: an aggregate let a US quote
+      // refreshed this morning hide an ex-US one from three weeks ago.
+      manager.query.mockResolvedValue([
+        { security_id: "sec-a", latest: "2025-08-02" },
+        { security_id: "sec-b", latest: "2025-07-11" },
+      ]);
+      const dates = await service.latestPriceDates(
+        ["sec-a", "sec-b"],
+        manager as never,
+      );
+      expect(dates.get("sec-a")).toBe("2025-08-02");
+      expect(dates.get("sec-b")).toBe("2025-07-11");
+      expect(manager.query.mock.calls[0][0]).toContain("GROUP BY security_id");
     });
 
     it("opens its own scoped transaction when no manager is passed", async () => {
-      manager.query.mockResolvedValue([{ latest: "2025-08-02" }]);
-      await expect(service.latestPriceDate(["sec-a"])).resolves.toBe(
-        "2025-08-02",
-      );
+      manager.query.mockResolvedValue([
+        { security_id: "sec-a", latest: "2025-08-02" },
+      ]);
+      const dates = await service.latestPriceDates(["sec-a"]);
+      expect(dates.get("sec-a")).toBe("2025-08-02");
     });
 
-    it("is null when nothing is priced", async () => {
-      manager.query.mockResolvedValue([{ latest: null }]);
-      await expect(
-        service.latestPriceDate(["sec-a"], manager as never),
-      ).resolves.toBeNull();
-      await expect(service.latestPriceDate([])).resolves.toBeNull();
+    it("leaves a never-priced security out of the map", async () => {
+      // Absent, not stale: the caller has to be able to tell the two apart.
+      manager.query.mockResolvedValue([{ security_id: "sec-a", latest: null }]);
+      const dates = await service.latestPriceDates(["sec-a"], manager as never);
+      expect(dates.has("sec-a")).toBe(false);
+      expect((await service.latestPriceDates([])).size).toBe(0);
     });
   });
 });

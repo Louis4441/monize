@@ -109,6 +109,7 @@
       "hint": "Was die anstehende Operation bewegt und was sie realisiert.",
       "valueLabel": "Geschätzter zu übertragender Wert",
       "valueUnknown": "Übertragungswert nicht verfügbar",
+      "partialMatchNote": "{count, plural, one {Eine Position liegt bereits teilweise in den Zielmärkten und wird trotzdem vollständig verkauft: Der zielkonforme Teil lässt sich nicht behalten, ohne den Rest des Fonds zu behalten. Deshalb entspricht die Umschichtung dem vollen Wert der Position.} other {# Positionen liegen bereits teilweise in den Zielmärkten und werden trotzdem vollständig verkauft: Ihr zielkonformer Teil lässt sich nicht behalten, ohne den Rest des jeweiligen Fonds zu behalten. Deshalb entspricht die Umschichtung ihrem vollen Wert.}}",
       "realized": "Geschätztes realisiertes Ergebnis",
       "tax": "Geschätzte Steuer",
       "taxWithRate": "Geschätzte Steuer ({rate} %)",
@@ -252,6 +253,8 @@
       "workingCounts": "Zählt zum Ziel",
       "workingMarket": "{name} {percent}",
       "workingExact": "Das Zielinstrument selbst",
+      "workingCash": "Barmittel",
+      "workingCashNote": "Nicht investiert — zählt zu nichts und finanziert den Kauf",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Keine Aufteilung hinterlegt; nach Instrument verglichen",
       "workingNoTargetData": "Vergleich nicht möglich: das Ziel hat keine Aufteilung",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Dieser Strategie ist kein Anlagekonto zugeordnet.",
       "NO_POSITION": "Die Strategiekonten halten keine Instrumente.",
       "FIRST_RUN": "Diese Strategie wurde noch nicht ausgewertet – das erste Signal erscheint nach der nächsten geplanten Auswertung.",
-      "STALE_PRICES": "Die Kurse hinter diesem Bericht sind nicht aktuell, das Signal kann sich nach einer Aktualisierung ändern.",
+      "STALE_PRICES": "Einige der Kurse hinter diesem Bericht sind nicht aktuell, das Signal kann sich nach einer Aktualisierung ändern. Am ältesten oder ganz fehlend sind:",
       "CALCULATION_FAILED": "Das Signal konnte aus den verfügbaren Daten nicht berechnet werden."
     },
     "footer": {

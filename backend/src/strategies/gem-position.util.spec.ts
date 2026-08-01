@@ -178,7 +178,9 @@ describe("gem-position.util", () => {
 
     it("counts the part of a world tracker already in the target's markets", () => {
       // 10000 in a world fund that is 20% emerging markets, against an all-EM
-      // target: 2000 is already where the strategy wants it, 8000 has to move.
+      // target: 2000 is already where the strategy wants it, which is what the
+      // compliance figure reports -- and the whole 10000 still has to move,
+      // because those 2000 cannot be kept without keeping the other 8000 too.
       const math = buildPositionMath(
         [
           holding({
@@ -204,12 +206,49 @@ describe("gem-position.util", () => {
       expect(math.basis).toBe("COMPOSITION");
       expect(math.dimension).toBe("COUNTRY");
       expect(math.compliancePercent).toBe(20);
-      expect(math.transferValue).toBe(8000);
-      // Only the part that is sold realizes a result: 80% of a 4000 gain.
-      expect(math.realizedGainLoss).toBeCloseTo(3200, 4);
+      // The executable trade, not the notional off-target slice: moving only
+      // 8000 leaves the portfolio 84% emerging markets, never the 100% asked
+      // for, because 80% of the fund's own EM sleeve goes out with the sale.
+      expect(math.transferValue).toBe(10000);
+      // Selling it whole realizes the whole 4000 gain, which is what the tax
+      // estimate has to be built on.
+      expect(math.realizedGainLoss).toBeCloseTo(4000, 4);
       expect(math.holdings[0].overlap).toBeCloseTo(0.2, 6);
       expect(math.holdings[0].matchedByInstrument).toBe(false);
       expect(math.changeRequired).toBe(true);
+    });
+
+    it("sells a partially overlapping fund whole, whatever its overlap", () => {
+      // The regression this guards: overlap used to scale the sale, so a fund
+      // 90% on target moved only a tenth of itself and the report called the
+      // result compliant. Units are indivisible by market -- the sale is all
+      // or nothing, and only the compliance figure is a fraction.
+      const nearlyThere = buildPositionMath(
+        [
+          holding({
+            role: null,
+            securityId: "sec-mostly-em",
+            marketValue: 10000,
+            costBasis: 4000,
+            composition: {
+              COUNTRY: [
+                { name: "China", weight: 0.45 },
+                { name: "India", weight: 0.45 },
+                { name: "Japan", weight: 0.1 },
+              ],
+              ASSET_CLASS: null,
+              SECTOR: null,
+            },
+          }),
+        ],
+        "EM_EQUITY",
+        emergingTarget,
+      );
+
+      expect(nearlyThere.compliancePercent).toBe(90);
+      expect(nearlyThere.transferValue).toBe(10000);
+      expect(nearlyThere.realizedGainLoss).toBeCloseTo(6000, 4);
+      expect(nearlyThere.changeRequired).toBe(true);
     });
 
     it("needs no change when the contents already match, ticker aside", () => {

@@ -63,6 +63,32 @@ scheduled job, so a strategy that was just configured -- or whose prices arrived
 late -- produces its history immediately. Each period is inserted once; the
 unique index on `(strategy_id, evaluated_on)` arbitrates concurrent readers.
 
+A stored period is only *answered*, though, if it was calculated under the
+configuration in force now. `config_fingerprint` (migration 129) hashes the
+cadence, the lookback and the role-to-security mapping -- everything that
+changes what a signal says, and nothing that only affects presentation or the
+cost estimates. Shorten the lookback or swap a fund and the affected periods are
+recomputed in place on the next read: same row, because the unique index owns
+the period, with `executed` kept when the recomputed instruction is the same
+instrument and cleared when it is not. A period that cannot be recomputed (a
+lookback stretched past an instrument's first close) keeps its row in the
+history, where it is a true record of what was decided then, but
+`currentSignal` refuses to serve it as today's instruction.
+
+History renders the instrument each decision **actually named**, resolved from
+the signal's own `target_security_id`; the role's current instrument is only the
+fallback for a security since deleted. Resolving through the live mapping meant
+replacing an ETF rewrote the past.
+
+Periods whose momentum window opens before the price history does are bounded
+out with one cheap aggregate rather than re-read on every load; nothing is
+remembered, so a backfill unlocks them with no state to reset. And a RISK-ON
+period is only stored when every *assigned* equity market has a momentum:
+`rankEquities` drops an unmeasurable role, which would quietly turn "emerging
+markets could not be measured" into "emerging markets did not win" and then
+recommend a concrete switch. A role left deliberately unassigned is a
+configuration, not a gap, and still evaluates.
+
 ## API
 
 All routes are JWT-guarded and derive the user from the token.
@@ -100,23 +126,51 @@ a single position, so the comparison sees one portfolio rather than one account
 at a time, and each holding is converted into the user's default currency with
 the latest stored exchange rate.
 
+Idle cash in those accounts is a position too (`isCash`): the linked
+`INVESTMENT_CASH` balance of each brokerage account, and a standalone investment
+account's own balance. GEM wants the whole strategy portfolio in one instrument,
+so cash beside the target is exactly as off-target as the wrong fund -- an
+account holding 5,000 of the target and 5,000 in cash is half invested, not
+compliant. It is spent rather than sold, so it costs no commission, adds no
+trade to `estimatedTradeCount` and realizes nothing. A negative balance is a
+margin debt, not an asset the switch can move, and is ignored.
+
 - `holdings` is every position in the accounts, largest first, each tagged with
   the role it fills (`role: null` for one that fills none);
 - the "current" instrument is the largest holding -- what the accounts are
   effectively in;
 - compliance is the share of the accounts' whole market value already in the
-  target instrument;
-- the transfer value is everything held outside the target -- what a switch
-  moves -- and `action.fromCount` says how many instruments that spans;
+  target's markets;
+- the transfer value is the **full** value of every holding not entirely in
+  those markets, and `action.fromCount` says how many instruments that spans;
 - the realized result is that value minus its cost basis, and the tax estimate
   applies the configured rate to a gain only (a loss owes nothing).
+
+**Partial overlap is a diagnostic, never a fraction of a sale.** A fund 20% in
+the target's markets counts 20% towards compliance, and is still sold whole:
+selling four fifths of it sells four fifths of its on-target sleeve too, so a
+pro-rated sale never reaches the 100% allocation the signal asks for.
+`action.partialMatchCount` says how many of the sold holdings were in that
+position, and the transfer card explains it rather than leaving a compliance
+figure and a full-value transfer looking contradictory.
 
 When nothing can be priced the compliance share is unknown rather than zero, but
 holding an instrument other than the target still settles that a change is
 needed: what to do does not depend on being able to value it.
 
-Prices come from `security_prices` (whatever provider filled them); the report
-reports the latest price date and flags prices older than five days as stale.
+Prices come from `security_prices` (whatever provider filled them). Every
+*historical* series -- momentum, the performance chart, the backtest -- reads
+`COALESCE(adjusted_close, close_price)`, because all three measure a return over
+time: on raw closes a 4-for-1 split reads as a 75% crash and flips the absolute
+test, and distributions vanish from the return of whichever leg pays the most.
+Valuing today's holdings is the other question and keeps the raw close.
+
+Staleness is judged **per role**: `pricesAsOf` is the oldest required
+instrument's last close, not the newest, and the `STALE_PRICES` warning names
+the roles behind it. Taking the maximum let a US quote refreshed this morning
+speak for an ex-US instrument last priced three weeks ago. An assigned
+instrument with no price at all makes the date unknown rather than letting the
+others answer for it. The threshold is five days.
 `PUT /strategies/gem` tops that history up first: any assigned security whose
 prices do not reach back over the momentum window plus the 24 periods the
 history table shows is backfilled from the quote provider before the signal is

@@ -109,6 +109,7 @@
       "hint": "Giao dịch đang chờ sẽ chuyển gì và hiện thực hóa điều gì.",
       "valueLabel": "Giá trị dự kiến cần chuyển",
       "valueUnknown": "Không có giá trị cần chuyển",
+      "partialMatchNote": "{count, plural, other {# khoản nắm giữ đã nằm một phần trong các thị trường mục tiêu nhưng vẫn được bán toàn bộ: không thể giữ lại phần đúng mục tiêu mà không giữ phần còn lại của quỹ. Vì vậy giá trị chuyển đi là toàn bộ giá trị của khoản đó.}}",
       "realized": "Kết quả hiện thực hóa dự kiến",
       "tax": "Thuế dự kiến",
       "taxWithRate": "Thuế dự kiến ({rate}%)",
@@ -252,6 +253,8 @@
       "workingCounts": "Tính vào mục tiêu",
       "workingMarket": "{name} {percent}",
       "workingExact": "Chính công cụ mục tiêu",
+      "workingCash": "Tiền mặt",
+      "workingCashNote": "Chưa đầu tư — không tính vào đâu và dùng để mua",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Chưa có phân bổ; đối chiếu theo công cụ",
       "workingNoTargetData": "Không so sánh được: mục tiêu chưa có phân bổ",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Chiến lược này chưa được gán tài khoản đầu tư nào.",
       "NO_POSITION": "Các tài khoản của chiến lược không nắm giữ công cụ nào.",
       "FIRST_RUN": "Chiến lược này chưa được đánh giá – tín hiệu đầu tiên xuất hiện sau lần đánh giá đã lên lịch tiếp theo.",
-      "STALE_PRICES": "Giá đứng sau báo cáo này không còn mới, nên tín hiệu có thể đổi sau khi giá được làm mới.",
+      "STALE_PRICES": "Một số giá làm cơ sở cho báo cáo này không còn mới, nên tín hiệu có thể thay đổi sau khi cập nhật. Cũ nhất, hoặc thiếu hoàn toàn, là:",
       "CALCULATION_FAILED": "Không thể tính tín hiệu từ dữ liệu hiện có."
     },
     "footer": {

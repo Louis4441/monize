@@ -212,33 +212,141 @@ export class GemStrategyService {
     };
   }
 
+  /**
+   * The instrument a past decision actually named.
+   *
+   * History resolved every role through the *current* mapping, so replacing the
+   * ETF in a role rewrote the past: an entry from March claimed to have bought
+   * the fund the user assigned in August. The signal stores the security it
+   * chose, so that is what the row shows; the current mapping is only the
+   * fallback for a role whose security has since been deleted.
+   */
+  private storedRef(
+    role: GemAssetRole | null,
+    securityId: string | null,
+    refs: Map<GemAssetRole, GemAssetRef>,
+    securities: Map<string, { symbol: string | null; name: string | null }>,
+  ): GemAssetRef | null {
+    if (!role) return null;
+    const stored = securityId ? securities.get(securityId) : undefined;
+    if (stored) {
+      return {
+        role,
+        securityId,
+        symbol: stored.symbol,
+        name: stored.name,
+      };
+    }
+    return refs.get(role) ?? null;
+  }
+
   private toHistoryEntry(
     signal: GemStrategySignal,
     refs: Map<GemAssetRole, GemAssetRef>,
+    securities: Map<string, { symbol: string | null; name: string | null }>,
+    /** The evaluation immediately before this one, which is what it switched out of. */
+    previous: GemStrategySignal | null,
   ): GemHistoryEntryView {
     const action = historyAction(signal.targetRole, signal.previousRole);
+    const winner = this.storedRef(
+      signal.targetRole,
+      signal.targetSecurityId,
+      refs,
+      securities,
+    );
     return {
       id: signal.id,
       evaluatedOn: signal.evaluatedOn,
       effectiveFrom: signal.effectiveFrom,
-      winner: signal.targetRole ? (refs.get(signal.targetRole) ?? null) : null,
+      winner,
       state: signal.state,
       action,
       momentum: signal.momentum,
       change:
         action === "SWITCH"
           ? {
-              from: signal.previousRole
-                ? (refs.get(signal.previousRole) ?? null)
-                : null,
-              to: signal.targetRole
-                ? (refs.get(signal.targetRole) ?? null)
-                : null,
+              // What it moved out of is the previous period's own target, not
+              // whatever that role points at today.
+              from: this.storedRef(
+                signal.previousRole,
+                previous?.targetSecurityId ?? null,
+                refs,
+                securities,
+              ),
+              to: winner,
             }
           : null,
       // A HOLD asked for nothing, so "executed" does not apply to it.
       executed: action === "HOLD" ? null : signal.executed,
     };
+  }
+
+  /**
+   * How current the report's inputs are, judged per role.
+   *
+   * `pricesAsOf` is the **oldest** required instrument's last close, not the
+   * newest: a signal is only as current as the stalest number behind it, and
+   * taking the maximum let a US quote refreshed this morning stand in for an
+   * ex-US instrument last priced three weeks ago. An assigned instrument with
+   * no price at all makes the date unknown rather than letting the others
+   * answer for it.
+   *
+   * `staleRoles` names the offenders, so the warning says which instrument to
+   * go and refresh instead of leaving the user to find it.
+   */
+  private async priceFreshness(
+    securityByRole: Map<GemAssetRole, string>,
+    asOf: string,
+  ): Promise<{ pricesAsOf: string | null; staleRoles: GemAssetRole[] }> {
+    const required = [...securityByRole.entries()];
+    if (required.length === 0) return { pricesAsOf: null, staleRoles: [] };
+
+    const latest = await this.priceService.latestPriceDates(
+      required.map(([, securityId]) => securityId),
+    );
+    const cutoff = parseYmd(asOf).getTime() - STALE_PRICE_DAYS * 86_400_000;
+    const staleRoles: GemAssetRole[] = [];
+    let oldest: string | null = null;
+    let anyMissing = false;
+
+    for (const [role, securityId] of required) {
+      const date = latest.get(securityId);
+      if (!date) {
+        // Never priced: it cannot be stale, it is absent, and the report must
+        // not imply the others speak for it.
+        anyMissing = true;
+        staleRoles.push(role);
+        continue;
+      }
+      if (parseYmd(date).getTime() < cutoff) staleRoles.push(role);
+      if (oldest === null || date < oldest) oldest = date;
+    }
+
+    return { pricesAsOf: anyMissing ? null : oldest, staleRoles };
+  }
+
+  /** Symbol and name for every instrument the stored signals name. */
+  private async loadSignalSecurities(
+    userId: string,
+    signals: GemStrategySignal[],
+  ): Promise<Map<string, { symbol: string | null; name: string | null }>> {
+    const ids = [
+      ...new Set(
+        signals
+          .map((signal) => signal.targetSecurityId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    if (ids.length === 0) return new Map();
+    const rows = await withScopedDb(this.dataSource, (manager) =>
+      manager.getRepository(Security).find({
+        where: { id: In(ids), userId },
+        select: { id: true, symbol: true, name: true },
+      }),
+    );
+    return new Map(
+      rows.map((row) => [row.id, { symbol: row.symbol, name: row.name }]),
+    );
   }
 
   /**
@@ -338,7 +446,12 @@ export class GemStrategyService {
       assets,
       asOf,
     );
-    const current = this.signalService.currentSignal(signals, strategy, asOf);
+    const current = this.signalService.currentSignal(
+      signals,
+      strategy,
+      asOf,
+      assets,
+    );
 
     // Money is reported in the user's default currency: several accounts can be
     // in the strategy, in different currencies, and the totals have to add up.
@@ -359,9 +472,11 @@ export class GemStrategyService {
       asOf,
     });
 
-    const pricesAsOf = await this.priceService.latestPriceDate([
-      ...securityByRole.values(),
-    ]);
+    const { pricesAsOf, staleRoles } = await this.priceFreshness(
+      securityByRole,
+      asOf,
+    );
+    const signalSecurities = await this.loadSignalSecurities(userId, signals);
 
     // The simulation charges the configured per-trade commission against the
     // capital the strategy actually runs, so it needs the portfolio's value.
@@ -398,12 +513,8 @@ export class GemStrategyService {
     } else if (noPosition) {
       warnings.push({ code: "NO_POSITION" });
     }
-    if (
-      pricesAsOf &&
-      parseYmd(pricesAsOf).getTime() <
-        parseYmd(asOf).getTime() - STALE_PRICE_DAYS * 86_400_000
-    ) {
-      warnings.push({ code: "STALE_PRICES" });
+    if (staleRoles.length > 0) {
+      warnings.push({ code: "STALE_PRICES", roles: staleRoles });
     }
 
     return {
@@ -427,7 +538,16 @@ export class GemStrategyService {
       position,
       action,
       performance,
-      history: signals.map((signal) => this.toHistoryEntry(signal, refs)),
+      // `signals` is newest first, so the entry after each one is what it
+      // switched out of.
+      history: signals.map((signal, index) =>
+        this.toHistoryEntry(
+          signal,
+          refs,
+          signalSecurities,
+          signals[index + 1] ?? null,
+        ),
+      ),
       backtest,
       warnings,
     };

@@ -20,6 +20,7 @@ describe('GemPortfolioCard', () => {
             marketValue: 1000,
             matchPercent: 0,
             matchedByInstrument: true,
+            isCash: false,
             matchedMarkets: [],
           },
         })}

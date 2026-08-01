@@ -109,6 +109,7 @@
       "hint": "Bekleyen işlemin neyi taşıdığı ve neyi realize ettiği.",
       "valueLabel": "Aktarılacak tahmini değer",
       "valueUnknown": "Aktarılacak değer kullanılamıyor",
+      "partialMatchNote": "{count, plural, one {Bir pozisyon zaten kısmen hedef piyasalarda ama yine de tamamen satılıyor: hedefe uyan kısmı, fonun geri kalanını tutmadan elde tutulamaz. Bu yüzden aktarılan tutar pozisyonun tamamıdır.} other {# pozisyon zaten kısmen hedef piyasalarda ama yine de tamamen satılıyor: hedefe uyan kısımları, her fonun geri kalanını tutmadan elde tutulamaz. Bu yüzden aktarılan tutar bunların tamamıdır.}}",
       "realized": "Tahmini realize edilen sonuç",
       "tax": "Tahmini vergi",
       "taxWithRate": "Tahmini vergi (%{rate})",
@@ -252,6 +253,8 @@
       "workingCounts": "Hedefe sayılan",
       "workingMarket": "{name} {percent}",
       "workingExact": "Hedef enstrümanın kendisi",
+      "workingCash": "Nakit",
+      "workingCashNote": "Yatırılmamış — hiçbir şeye sayılmaz ve alımı finanse eder",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Dağılım kayıtlı değil; enstrümana göre eşleştirildi",
       "workingNoTargetData": "Karşılaştırılamıyor: hedefin dağılımı yok",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Bu stratejiye hiçbir yatırım hesabı atanmadı.",
       "NO_POSITION": "Strateji hesapları hiçbir enstrüman tutmuyor.",
       "FIRST_RUN": "Bu strateji henüz değerlendirilmedi – ilk sinyal, planlanan sonraki değerlendirmeden sonra görünecek.",
-      "STALE_PRICES": "Bu raporun dayandığı fiyatlar güncel değil, yenilendiğinde sinyal değişebilir.",
+      "STALE_PRICES": "Bu raporun dayandığı fiyatların bir kısmı güncel değil; yenilendiklerinde sinyal değişebilir. En eskiler ya da tamamen eksik olanlar:",
       "CALCULATION_FAILED": "Sinyal, mevcut verilerle hesaplanamadı."
     },
     "footer": {

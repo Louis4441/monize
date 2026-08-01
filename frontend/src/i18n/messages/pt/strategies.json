@@ -109,6 +109,7 @@
       "hint": "O que a operação pendente movimenta e o que realiza.",
       "valueLabel": "Valor estimado a transferir",
       "valueUnknown": "Valor a transferir não disponível",
+      "partialMatchNote": "{count, plural, one {Uma posição já está em parte nos mercados-alvo e mesmo assim é vendida por inteiro: a parte alinhada não pode ser mantida sem manter o resto do fundo. É por isso que a transferência corresponde ao valor total da posição.} other {# posições já estão em parte nos mercados-alvo e mesmo assim são vendidas por inteiro: a parte alinhada não pode ser mantida sem manter o resto de cada fundo. É por isso que a transferência corresponde ao seu valor total.}}",
       "realized": "Resultado realizado estimado",
       "tax": "Imposto estimado",
       "taxWithRate": "Imposto estimado ({rate}%)",
@@ -252,6 +253,8 @@
       "workingCounts": "Conta para o alvo",
       "workingMarket": "{name} {percent}",
       "workingExact": "O próprio instrumento alvo",
+      "workingCash": "Liquidez",
+      "workingCashNote": "Não investido — não conta para nada e financia a compra",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Sem repartição registada; comparado por instrumento",
       "workingNoTargetData": "Não é possível comparar: o alvo não tem repartição",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Esta estratégia não tem nenhuma conta de investimento atribuída.",
       "NO_POSITION": "As contas da estratégia não detêm nenhum instrumento.",
       "FIRST_RUN": "Esta estratégia ainda não foi avaliada – o primeiro sinal aparece após a próxima avaliação agendada.",
-      "STALE_PRICES": "Os preços por trás deste relatório não estão atuais, pelo que o sinal pode mudar depois de serem atualizados.",
+      "STALE_PRICES": "Alguns dos preços por trás deste relatório não estão atualizados, pelo que o sinal pode mudar depois de os atualizar. Os mais antigos, ou totalmente em falta, são para:",
       "CALCULATION_FAILED": "Não foi possível calcular o sinal com os dados disponíveis."
     },
     "footer": {

@@ -286,6 +286,9 @@ export function evaluate(
   const riskOn = equity > benchmark;
 
   if (!riskOn) {
+    // Equities lost the absolute test, which only involves the US leg and the
+    // benchmark. The allocation goes to the safe asset whatever the other
+    // markets did, so a gap in their history cannot change this answer.
     return {
       state: "RISK_OFF",
       targetRole: riskOffRoleFor(mappedRoles),
@@ -295,6 +298,23 @@ export function evaluate(
       ranking,
     };
   }
+
+  // RISK-ON is decided by comparing the equity markets against each other, so
+  // every market the user put in the race has to have finished it. `rankEquities`
+  // drops a role whose momentum is unknown, which quietly turns "we could not
+  // measure emerging markets" into "emerging markets did not win" -- and the
+  // report then names a concrete switch into the strongest of whatever was
+  // left. The period stays unevaluated instead, and is picked up on a later
+  // read once the prices arrive.
+  //
+  // A role with no instrument is not in `mappedRoles` and is no obstacle: a
+  // deliberate two-asset variant evaluates exactly as before.
+  const unmeasured = GEM_EQUITY_ROLES.filter(
+    (role) =>
+      mappedRoles.includes(role) &&
+      !ranking.some((entry) => entry.role === role),
+  );
+  if (unmeasured.length > 0) return null;
 
   const winner = ranking[0] ?? null;
   const runnerUp = ranking[1] ?? null;

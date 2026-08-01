@@ -109,6 +109,7 @@
       "hint": "Co przenosi oczekująca operacja i co realizuje.",
       "valueLabel": "Szacowana wartość do przeniesienia",
       "valueUnknown": "Wartość do przeniesienia niedostępna",
+      "partialMatchNote": "{count, plural, one {Jedna pozycja już częściowo znajduje się na rynkach celu, a mimo to jest sprzedawana w całości: części zgodnej z celem nie da się zatrzymać bez zatrzymania reszty funduszu. Dlatego przenoszona jest pełna wartość pozycji.} few {# pozycje już częściowo znajdują się na rynkach celu, a mimo to są sprzedawane w całości: ich części zgodnej z celem nie da się zatrzymać bez zatrzymania reszty każdego funduszu. Dlatego przenoszona jest ich pełna wartość.} many {# pozycji już częściowo znajduje się na rynkach celu, a mimo to są sprzedawane w całości: ich części zgodnej z celem nie da się zatrzymać bez zatrzymania reszty każdego funduszu. Dlatego przenoszona jest ich pełna wartość.} other {# pozycji już częściowo znajduje się na rynkach celu, a mimo to są sprzedawane w całości: ich części zgodnej z celem nie da się zatrzymać bez zatrzymania reszty każdego funduszu. Dlatego przenoszona jest ich pełna wartość.}}",
       "realized": "Szacowany wynik zrealizowany",
       "tax": "Szacowany podatek",
       "taxWithRate": "Szacowany podatek ({rate}%)",
@@ -252,6 +253,8 @@
       "workingCounts": "Liczy się do celu",
       "workingMarket": "{name} {percent}",
       "workingExact": "Sam instrument docelowy",
+      "workingCash": "Gotówka",
+      "workingCashNote": "Niezainwestowane — nie liczy się do niczego i finansuje zakup",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Brak zapisanego podziału; porównano po instrumencie",
       "workingNoTargetData": "Nie da się porównać: cel nie ma podziału",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Do tej strategii nie przypisano konta inwestycyjnego.",
       "NO_POSITION": "Konta strategii nie posiadają żadnych instrumentów.",
       "FIRST_RUN": "Ta strategia nie została jeszcze oceniona – pierwszy sygnał pojawi się po najbliższej zaplanowanej ocenie.",
-      "STALE_PRICES": "Ceny stojące za tym raportem nie są aktualne, więc sygnał może się zmienić po ich odświeżeniu.",
+      "STALE_PRICES": "Część cen stojących za tym raportem nie jest aktualna, więc sygnał może się zmienić po ich odświeżeniu. Najstarsze lub całkowicie brakujące dotyczą:",
       "CALCULATION_FAILED": "Nie udało się obliczyć sygnału z dostępnych danych."
     },
     "footer": {

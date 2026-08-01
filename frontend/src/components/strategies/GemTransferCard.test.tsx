@@ -4,6 +4,23 @@ import { GemTransferCard } from './GemTransferCard';
 import { gemAction } from '@/test/gem-fixtures';
 
 describe('GemTransferCard', () => {
+  it('says why a partly matching holding is still sold whole', () => {
+    // Compliance above zero and a transfer of the entire position look
+    // contradictory until the card explains that units cannot be split by
+    // market -- the sale takes the on-target sleeve out with everything else.
+    render(<GemTransferCard action={gemAction({ partialMatchCount: 1 })} />);
+    expect(
+      screen.getByText(/One holding is partly in the target's markets already/),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing about partial matches when there are none', () => {
+    render(<GemTransferCard action={gemAction()} />);
+    expect(
+      screen.queryByText(/partly in the target's markets/),
+    ).not.toBeInTheDocument();
+  });
+
   it('leads with the value to move and lists the estimated costs', () => {
     render(<GemTransferCard action={gemAction()} />);
 

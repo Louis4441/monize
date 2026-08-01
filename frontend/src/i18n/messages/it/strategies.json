@@ -109,6 +109,7 @@
       "hint": "Cosa muove l'operazione in attesa e cosa realizza.",
       "valueLabel": "Valore stimato da trasferire",
       "valueUnknown": "Valore da trasferire non disponibile",
+      "partialMatchNote": "{count, plural, one {Una posizione è già in parte nei mercati obiettivo e viene comunque venduta per intero: la parte allineata non può essere mantenuta senza mantenere il resto del fondo. Per questo il trasferimento è il valore pieno della posizione.} other {# posizioni sono già in parte nei mercati obiettivo e vengono comunque vendute per intero: la parte allineata non può essere mantenuta senza mantenere il resto di ciascun fondo. Per questo il trasferimento è il loro valore pieno.}}",
       "realized": "Risultato realizzato stimato",
       "tax": "Imposta stimata",
       "taxWithRate": "Imposta stimata ({rate}%)",
@@ -252,6 +253,8 @@
       "workingCounts": "Conta per l'obiettivo",
       "workingMarket": "{name} {percent}",
       "workingExact": "Lo strumento obiettivo stesso",
+      "workingCash": "Liquidità",
+      "workingCashNote": "Non investita: non conta per nulla e finanzia l’acquisto",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Nessuna ripartizione registrata; confrontato per strumento",
       "workingNoTargetData": "Confronto impossibile: l'obiettivo non ha ripartizione",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "A questa strategia non è assegnato alcun conto di investimento.",
       "NO_POSITION": "I conti della strategia non detengono alcuno strumento.",
       "FIRST_RUN": "Questa strategia non è ancora stata valutata: il primo segnale comparirà dopo la prossima valutazione pianificata.",
-      "STALE_PRICES": "I prezzi alla base di questo report non sono aggiornati, quindi il segnale può cambiare dopo l'aggiornamento.",
+      "STALE_PRICES": "Alcuni prezzi alla base di questo report non sono aggiornati, quindi il segnale può cambiare una volta aggiornati. I più vecchi, o del tutto assenti, sono per:",
       "CALCULATION_FAILED": "Non è stato possibile calcolare il segnale dai dati disponibili."
     },
     "footer": {

@@ -109,6 +109,7 @@
       "hint": "Apa yang dipindahkan oleh operasi yang tertunda, dan apa yang direalisasikan.",
       "valueLabel": "Perkiraan nilai yang dipindahkan",
       "valueUnknown": "Nilai pemindahan tidak tersedia",
+      "partialMatchNote": "{count, plural, other {# kepemilikan sudah sebagian berada di pasar target dan tetap dijual seluruhnya: bagian yang sesuai target tidak bisa dipertahankan tanpa mempertahankan sisa dananya. Karena itu nilai yang dipindahkan adalah nilai penuhnya.}}",
       "realized": "Perkiraan hasil yang direalisasikan",
       "tax": "Perkiraan pajak",
       "taxWithRate": "Perkiraan pajak ({rate}%)",
@@ -252,6 +253,8 @@
       "workingCounts": "Dihitung ke target",
       "workingMarket": "{name} {percent}",
       "workingExact": "Instrumen target itu sendiri",
+      "workingCash": "Kas",
+      "workingCashNote": "Belum diinvestasikan — tidak dihitung untuk apa pun dan mendanai pembelian",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Tidak ada rincian; dicocokkan per instrumen",
       "workingNoTargetData": "Tidak bisa dibandingkan: target belum punya rincian",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Strategi ini belum punya rekening investasi yang ditetapkan.",
       "NO_POSITION": "Rekening strategi tidak memiliki instrumen apa pun.",
       "FIRST_RUN": "Strategi ini belum dievaluasi – sinyal pertama muncul setelah evaluasi terjadwal berikutnya.",
-      "STALE_PRICES": "Harga di balik laporan ini tidak terkini, jadi sinyal bisa berubah setelah harga disegarkan.",
+      "STALE_PRICES": "Sebagian harga di balik laporan ini tidak terkini, jadi sinyalnya bisa berubah setelah diperbarui. Yang paling lama, atau sama sekali tidak ada, adalah untuk:",
       "CALCULATION_FAILED": "Sinyal tidak dapat dihitung dari data yang tersedia."
     },
     "footer": {

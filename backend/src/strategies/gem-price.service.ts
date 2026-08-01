@@ -56,6 +56,20 @@ export class GemPriceService {
    * the requested sampling. Weekly/monthly sampling keeps the last close of each
    * bucket (DISTINCT ON), which is what a period-end comparison wants.
    *
+   * **Adjusted closes**, falling back to the raw close where the provider gave
+   * none -- the same `COALESCE(adjusted_close, close_price)` the Monte Carlo
+   * report uses, and for the same reason. Everything downstream of this method
+   * measures a *return over time*: momentum, the performance chart, the
+   * backtest. On raw closes a 4-for-1 split reads as a 75% crash, which does
+   * not merely dent the chart -- it flips the absolute-momentum test and hands
+   * the signal to the safe asset -- and every distribution is silently dropped
+   * from the return of whichever instrument pays the most, which is usually the
+   * bond leg the equities are being measured against.
+   *
+   * Valuing today's holdings is the other case and stays on the raw close:
+   * `latestPrices` answers "what is this position worth", where the adjusted
+   * series is the wrong number.
+   *
    * One query for every security: the report needs four series and issuing four
    * round trips per request buys nothing.
    */
@@ -70,7 +84,8 @@ export class GemPriceService {
 
     const sql =
       sampling === "day"
-        ? `SELECT security_id, price_date::text AS price_date, close_price
+        ? `SELECT security_id, price_date::text AS price_date,
+                  COALESCE(adjusted_close, close_price) AS close_price
              FROM security_prices
             WHERE security_id = ANY($1::uuid[])
               AND price_date >= $2::date
@@ -79,7 +94,8 @@ export class GemPriceService {
         : `SELECT DISTINCT ON (security_id, bucket)
                   security_id, price_date::text AS price_date, close_price
              FROM (
-               SELECT security_id, price_date, close_price,
+               SELECT security_id, price_date,
+                      COALESCE(adjusted_close, close_price) AS close_price,
                       date_trunc($3, price_date) AS bucket
                  FROM security_prices
                 WHERE security_id = ANY($1::uuid[])
@@ -139,22 +155,34 @@ export class GemPriceService {
   }
 
   /**
-   * The most recent price date across the given securities, or null when none
-   * has a price. Drives both the report's "prices as of" line and the
-   * stale-price warning.
+   * Latest price date **per security**. A security with no price at all is
+   * absent from the map, which is what tells "never priced" apart from
+   * "priced, but a while ago".
+   *
+   * The report asks per security rather than for one aggregate because the
+   * aggregate is a maximum: a US quote refreshed this morning hid an ex-US
+   * instrument last priced three weeks ago, and hid one that had never been
+   * priced entirely. A signal is only as current as its stalest input, and
+   * naming which input that is turns the warning into something actionable.
    */
-  async latestPriceDate(
+  async latestPriceDates(
     securityIds: string[],
     manager?: EntityManager,
-  ): Promise<string | null> {
-    if (securityIds.length === 0) return null;
-    const sql = `SELECT MAX(price_date)::text AS latest
+  ): Promise<Map<string, string>> {
+    const latest = new Map<string, string>();
+    if (securityIds.length === 0) return latest;
+    const sql = `SELECT security_id, MAX(price_date)::text AS latest
                    FROM security_prices
-                  WHERE security_id = ANY($1::uuid[])`;
-    const rows: Array<{ latest: string | null }> = manager
+                  WHERE security_id = ANY($1::uuid[])
+                    AND close_price IS NOT NULL
+                  GROUP BY security_id`;
+    const rows: Array<{ security_id: string; latest: string | null }> = manager
       ? await manager.query(sql, [securityIds])
       : await withScopedDb(this.dataSource, (m) => m.query(sql, [securityIds]));
-    return rows[0]?.latest ?? null;
+    for (const row of rows) {
+      if (row.latest) latest.set(row.security_id, row.latest);
+    }
+    return latest;
   }
 
   /**

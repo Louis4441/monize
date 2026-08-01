@@ -122,6 +122,12 @@ export interface GemAccountRef {
  */
 export interface GemHeldAsset {
   role: GemAssetRole | null;
+  /**
+   * True for the accounts' cash balance. It is a position for compliance --
+   * GEM wants everything in one instrument, so idle cash is off target -- but
+   * it has no security to link to, no quantity, and is spent, not sold.
+   */
+  isCash: boolean;
   securityId: string | null;
   symbol: string | null;
   name: string | null;
@@ -190,6 +196,12 @@ export interface GemAction {
   estimatedCommission: number | null;
   /** Trades the switch takes: one sell per off-target holding, plus the buy. */
   estimatedTradeCount: number;
+  /**
+   * How many sold holdings were already partly in the target's markets. They
+   * count towards compliance but are still sold whole, so the transfer is
+   * larger than the off-target share alone suggests.
+   */
+  partialMatchCount: number;
   /** Brokerage accounts the operation spans; empty when none is assigned. */
   accounts: GemAccountRef[];
   currencyCode: string;

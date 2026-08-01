@@ -109,6 +109,7 @@
       "hint": "待执行操作会转移什么，以及会实现什么。",
       "valueLabel": "预计转移金额",
       "valueUnknown": "无法获取转移金额",
+      "partialMatchNote": "{count, plural, other {# 项持仓已有一部分落在目标市场，但仍会整笔卖出：不保留基金的其余部分，就无法只保留合乎目标的那一部分。因此转出的是该持仓的全部价值。}}",
       "realized": "预计已实现结果",
       "tax": "预计税款",
       "taxWithRate": "预计税款（{rate}%）",
@@ -252,6 +253,8 @@
       "workingCounts": "计入目标",
       "workingMarket": "{name} {percent}",
       "workingExact": "目标标的本身",
+      "workingCash": "现金",
+      "workingCashNote": "未投资——不计入任何一项，用于支付买入",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "未记录构成，按标的匹配",
       "workingNoTargetData": "无法比较：目标没有构成",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "该策略未指定任何投资账户。",
       "NO_POSITION": "策略账户中没有任何标的。",
       "FIRST_RUN": "该策略尚未评估 — 第一个信号将在下次计划评估后出现。",
-      "STALE_PRICES": "本报告依据的价格不是最新的，刷新后信号可能变化。",
+      "STALE_PRICES": "本报告依据的部分价格并非最新，刷新后信号可能改变。最旧的或完全缺失的是：",
       "CALCULATION_FAILED": "无法根据现有数据计算信号。"
     },
     "footer": {

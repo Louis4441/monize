@@ -1,8 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { createHash } from "node:crypto";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { todayYMD } from "../common/date-utils";
 import {
+  GEM_ASSET_ROLES,
   GemAssetRole,
   GemStrategyAsset,
 } from "./entities/gem-strategy-asset.entity";
@@ -38,6 +40,37 @@ function windowStartFor(evaluatedOn: string, lookbackMonths: number): string {
   return addMonthsUtc(parseYmd(evaluatedOn), -lookbackMonths)
     .toISOString()
     .slice(0, 10);
+}
+
+/**
+ * A hash of everything about a strategy that decides what its signals say.
+ *
+ * A stored signal used to be treated as permanently done, but the inputs behind
+ * it are editable: shorten the lookback, switch to quarterly, or swap the fund
+ * in a role and the same row now answers a question nobody asked. Stamping each
+ * signal with this and comparing on read is what makes "the configuration
+ * changed" visible to a table keyed only by (strategy, period).
+ *
+ * Every role is included, assigned or not: an empty role changes which markets
+ * compete in the ranking, and clearing the risk-free leg moves the absolute
+ * test onto the safe asset. What is deliberately *not* here is anything that
+ * only affects presentation or cost estimates -- the tax rate, the commission,
+ * the scenario's name, the accounts -- because rewriting the whole evaluation
+ * history when someone corrects a commission would be worse than useless.
+ */
+export function gemConfigFingerprint(
+  strategy: Pick<GemStrategy, "cadence" | "lookbackMonths">,
+  assets: GemStrategyAsset[],
+): string {
+  const roles = [...GEM_ASSET_ROLES]
+    .sort()
+    .map((role) => {
+      const asset = assets.find((candidate) => candidate.role === role);
+      return `${role}=${asset?.securityId ?? "-"}`;
+    })
+    .join(",");
+  const material = `${strategy.cadence}|${strategy.lookbackMonths}|${roles}`;
+  return createHash("sha256").update(material).digest("hex").slice(0, 64);
 }
 
 /**
@@ -183,9 +216,23 @@ export class GemSignalService {
         strategy.cadence,
         GEM_HISTORY_PERIODS,
       );
-      const known = new Set(stored.map((signal) => signal.evaluatedOn));
+      // A period counts as answered only when its row was calculated under the
+      // configuration in force now. Shorten the lookback or swap an instrument
+      // and the stored answer is to a different question, so it is recomputed
+      // in place rather than served as the current instruction.
+      const fingerprint = gemConfigFingerprint(strategy, assets);
+      const staleByPeriod = new Map(
+        stored
+          .filter((signal) => signal.configFingerprint !== fingerprint)
+          .map((signal) => [signal.evaluatedOn, signal]),
+      );
+      const answered = new Set(
+        stored
+          .filter((signal) => signal.configFingerprint === fingerprint)
+          .map((signal) => signal.evaluatedOn),
+      );
       const unstored = periods.filter(
-        (period) => !known.has(period.evaluatedOn),
+        (period) => !answered.has(period.evaluatedOn),
       );
       if (unstored.length === 0 || assets.every((a) => !a.securityId)) {
         return stored;
@@ -222,10 +269,10 @@ export class GemSignalService {
       const byEvaluatedOn = new Map(
         stored.map((signal) => [signal.evaluatedOn, signal]),
       );
-      const inserted: GemStrategySignal[] = [];
+      const written: GemStrategySignal[] = [];
 
       for (const period of periods) {
-        if (known.has(period.evaluatedOn)) continue;
+        if (answered.has(period.evaluatedOn)) continue;
         if (!evaluable.has(period.evaluatedOn)) continue;
 
         const momentum = momentumSnapshot(
@@ -240,6 +287,9 @@ export class GemSignalService {
           .filter((signal) => signal.evaluatedOn < period.evaluatedOn)
           .sort((a, b) => b.evaluatedOn.localeCompare(a.evaluatedOn))[0];
 
+        const targetSecurityId = outcome.targetRole
+          ? (securityByRole.get(outcome.targetRole) ?? null)
+          : null;
         const signal = repo.create({
           userId,
           strategyId: strategy.id,
@@ -247,17 +297,41 @@ export class GemSignalService {
           effectiveFrom: period.effectiveFrom,
           state: outcome.state,
           targetRole: outcome.targetRole,
-          targetSecurityId: outcome.targetRole
-            ? (securityByRole.get(outcome.targetRole) ?? null)
-            : null,
+          targetSecurityId,
           targetWeightPercent: 100,
           momentum,
           benchmarkRole: outcome.benchmarkRole,
           spreadPp: outcome.spreadPp,
           leadPp: outcome.leadPp,
           previousRole: previous?.targetRole ?? null,
+          configFingerprint: fingerprint,
           executed: false,
         });
+
+        // A period already stored under an older configuration is replaced in
+        // place: the unique index owns (strategy, period), and a second row for
+        // the same month would be a second answer to one question.
+        const outdated = staleByPeriod.get(period.evaluatedOn);
+        if (outdated) {
+          // "I have carried this out" describes an instruction. It survives a
+          // recomputation that lands on the same instrument -- the user did
+          // that trade -- and is cleared when the instruction changes, because
+          // nobody executed the new one.
+          const sameInstruction =
+            outdated.targetSecurityId === targetSecurityId &&
+            outdated.targetRole === outcome.targetRole;
+          const refreshed = {
+            ...outdated,
+            ...signal,
+            id: outdated.id,
+            executed: sameInstruction ? outdated.executed : false,
+            executedAt: sameInstruction ? outdated.executedAt : null,
+          } as GemStrategySignal;
+          await repo.save(refreshed);
+          byEvaluatedOn.set(period.evaluatedOn, refreshed);
+          written.push(refreshed);
+          continue;
+        }
 
         // A concurrent report request may be materializing the same period.
         // The unique index is the arbiter and the row it already inserted is
@@ -279,7 +353,7 @@ export class GemSignalService {
             ...signal,
             ...saved,
           } as GemStrategySignal);
-          inserted.push(saved);
+          written.push(saved);
         } else {
           this.logger.debug(
             `GEM period ${period.evaluatedOn} was materialized concurrently`,
@@ -287,7 +361,7 @@ export class GemSignalService {
         }
       }
 
-      if (inserted.length === 0) return stored;
+      if (written.length === 0) return stored;
 
       return repo.find({
         where: { strategyId: strategy.id },
@@ -297,17 +371,34 @@ export class GemSignalService {
     });
   }
 
-  /** The signal governing the period `asOf` falls in, or null when unevaluated. */
+  /**
+   * The signal governing the period `asOf` falls in, or null when there is
+   * none the strategy's current configuration would produce.
+   *
+   * `materialize` refreshes a period it can recompute, so a row still carrying
+   * a foreign fingerprint here is one the price history cannot reach under the
+   * new settings -- a lookback stretched past the instrument's first close, for
+   * instance. Serving it would present a decision taken under rules that no
+   * longer exist as the instruction to act on now, which is precisely the thing
+   * the fingerprint exists to stop. It stays in the history, where it is a
+   * true record of what was decided then.
+   */
   currentSignal(
     signals: GemStrategySignal[],
     strategy: GemStrategy,
     asOf: string = todayYMD(),
+    assets: GemStrategyAsset[] = [],
   ): GemStrategySignal | null {
     const period = periodFor(asOf, strategy.cadence);
-    return (
-      signals.find((signal) => signal.evaluatedOn === period.evaluatedOn) ??
-      null
-    );
+    const signal =
+      signals.find((entry) => entry.evaluatedOn === period.evaluatedOn) ?? null;
+    if (!signal) return null;
+    // No assets passed means the caller is not checking provenance (the specs
+    // that predate the fingerprint), and the stored row stands.
+    if (assets.length === 0) return signal;
+    return signal.configFingerprint === gemConfigFingerprint(strategy, assets)
+      ? signal
+      : null;
   }
 
   /** Mark a signal's operation as carried out. Returns false when unknown. */

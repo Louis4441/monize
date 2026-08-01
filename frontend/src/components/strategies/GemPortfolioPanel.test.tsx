@@ -48,6 +48,7 @@ describe('GemPortfolioPanel', () => {
               // A fifth of a world tracker is already in the EM target.
               matchPercent: 20,
               matchedByInstrument: false,
+              isCash: false,
               matchedMarkets: [],
             },
           ],
@@ -65,6 +66,47 @@ describe('GemPortfolioPanel', () => {
     );
   });
 
+  it('lists cash as a position that counts towards nothing', () => {
+    // Idle cash used to be invisible here, so an account half in cash read as
+    // fully compliant. It is a row like any other, minus a ticker to link to
+    // and a unit count it does not have.
+    render(
+      <GemPortfolioPanel
+        position={gemPosition({
+          holdings: [
+            {
+              role: null,
+              isCash: true,
+              securityId: null,
+              symbol: null,
+              name: null,
+              quantity: null,
+              marketValue: 5000,
+              matchPercent: 0,
+              matchedByInstrument: false,
+              matchedMarkets: [],
+            },
+          ],
+          totalMarketValue: 10000,
+          compliancePercent: 50,
+          // Cash is not an undescribed instrument, so it does not count here.
+          instrumentMatchedCount: 0,
+        })}
+        noAccount={false}
+        noPosition={false}
+      />,
+    );
+
+    expect(screen.getByText('Cash')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Uninvested — counts towards nothing/),
+    ).toBeInTheDocument();
+    // No instrument link, and none of the "fill in the breakdown" prompts:
+    // no breakdown would ever make cash match a market.
+    expect(screen.queryByRole('link', { name: /Cash/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/matched by instrument/i)).not.toBeInTheDocument();
+  });
+
   it('shows the arithmetic behind the compliance figure', () => {
     render(
       <GemPortfolioPanel
@@ -79,6 +121,7 @@ describe('GemPortfolioPanel', () => {
               marketValue: 10000,
               matchPercent: 20,
               matchedByInstrument: false,
+              isCash: false,
               matchedMarkets: [
                 { name: 'china', percent: 12 },
                 { name: 'india', percent: 8 },
@@ -122,6 +165,7 @@ describe('GemPortfolioPanel', () => {
               marketValue: 500,
               matchPercent: 0,
               matchedByInstrument: true,
+              isCash: false,
               matchedMarkets: [],
             },
           ],
@@ -167,6 +211,7 @@ describe('GemPortfolioPanel', () => {
               marketValue: 10000,
               matchPercent: 0,
               matchedByInstrument: true,
+              isCash: false,
               matchedMarkets: [],
             },
           ],
@@ -254,6 +299,7 @@ describe('GemPortfolioPanel', () => {
               marketValue: null,
               matchPercent: 0,
               matchedByInstrument: true,
+              isCash: false,
               matchedMarkets: [],
             },
           ],

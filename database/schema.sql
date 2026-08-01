@@ -1551,6 +1551,10 @@ CREATE TABLE gem_strategy_signals (
     spread_pp NUMERIC(12,4), -- US equity momentum minus benchmark momentum
     lead_pp NUMERIC(12,4), -- winner minus runner-up, RISK_ON only
     previous_role VARCHAR(20), -- role held before this evaluation
+    -- Hash of the signal-driving configuration (cadence, lookback, role->security)
+    -- this row was calculated under. A period whose fingerprint no longer matches
+    -- the strategy is recomputed instead of being served as the current signal.
+    config_fingerprint VARCHAR(64),
     executed BOOLEAN NOT NULL DEFAULT FALSE,
     executed_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -162,6 +162,19 @@ export class GemStrategySignal {
   })
   previousRole: GemAssetRole | null;
 
+  @ApiProperty({
+    required: false,
+    description:
+      "Hash of the configuration this signal was calculated under; NULL for rows predating the column",
+  })
+  @Column({
+    type: "varchar",
+    length: 64,
+    name: "config_fingerprint",
+    nullable: true,
+  })
+  configFingerprint: string | null;
+
   @ApiProperty()
   @Column({ type: "boolean", default: false })
   executed: boolean;

@@ -159,6 +159,77 @@ describe("gem-momentum.util", () => {
       expect(snapshot.EM_EQUITY).toBeNull();
       expect(snapshot.EX_US_EQUITY).toBeNull();
     });
+
+    it("is why the series must be adjusted closes: a split flips the signal", () => {
+      // Not a test of this function -- it is a test of what it is fed, which
+      // is `GemPriceService.loadSeries`. On raw closes a 4-for-1 split turns a
+      // 20% year into a 70% collapse, and the absolute-momentum test hands the
+      // whole allocation to the safe asset on the strength of a corporate
+      // action. The adjusted series restates the pre-split close, so the same
+      // year reads as the 20% it was.
+      const raw = momentumSnapshot(
+        {
+          US_EQUITY: series([
+            ["2024-07-31", 400], // pre-split price, unadjusted
+            ["2025-07-31", 120], // 4-for-1 split plus a 20% year
+          ]),
+          SAFE: series([
+            ["2024-07-31", 100],
+            ["2025-07-31", 104],
+          ]),
+        },
+        "2025-07-31",
+        12,
+      );
+      expect(raw.US_EQUITY).toBe(-70);
+      expect(evaluate(raw, ["US_EQUITY", "SAFE"])?.state).toBe("RISK_OFF");
+
+      const adjusted = momentumSnapshot(
+        {
+          US_EQUITY: series([
+            ["2024-07-31", 100], // 400 restated for the split
+            ["2025-07-31", 120],
+          ]),
+          SAFE: series([
+            ["2024-07-31", 100],
+            ["2025-07-31", 104],
+          ]),
+        },
+        "2025-07-31",
+        12,
+      );
+      expect(adjusted.US_EQUITY).toBe(20);
+      expect(evaluate(adjusted, ["US_EQUITY", "SAFE"])?.state).toBe("RISK_ON");
+    });
+
+    it("is why the series must be adjusted closes: a distribution is return", () => {
+      // A bond ETF paying 4% and flat in price is the benchmark equities are
+      // measured against. Ignore the distribution and it reads as 0%, which
+      // makes every mediocre equity year look like a win.
+      const priceOnly = momentumSnapshot(
+        {
+          SAFE: series([
+            ["2024-07-31", 100],
+            ["2025-07-31", 100],
+          ]),
+        },
+        "2025-07-31",
+        12,
+      );
+      expect(priceOnly.SAFE).toBe(0);
+
+      const totalReturn = momentumSnapshot(
+        {
+          SAFE: series([
+            ["2024-07-31", 96.15], // adjusted back for the distributions paid
+            ["2025-07-31", 100],
+          ]),
+        },
+        "2025-07-31",
+        12,
+      );
+      expect(totalReturn.SAFE).toBeCloseTo(4, 1);
+    });
   });
 
   describe("rankEquities", () => {
@@ -189,6 +260,52 @@ describe("gem-momentum.util", () => {
   });
 
   describe("evaluate", () => {
+    describe("when an assigned equity market has no momentum", () => {
+      it("refuses to name a winner from the markets that did report", () => {
+        // The bug: EM is assigned but unmeasurable, so it was silently dropped
+        // and the report recommended switching into the best of the other two
+        // -- a concrete monetary operation decided by which market happened to
+        // have data. The market that was missing could have won.
+        expect(
+          evaluate(
+            {
+              US_EQUITY: 15.42,
+              EX_US_EQUITY: 8.31,
+              EM_EQUITY: null,
+              SAFE: 4.21,
+            },
+            ["US_EQUITY", "EX_US_EQUITY", "EM_EQUITY", "SAFE"],
+          ),
+        ).toBeNull();
+      });
+
+      it("still evaluates RISK-OFF, which that market cannot change", () => {
+        // The absolute test is the US leg against the benchmark. Equities have
+        // lost it, so the allocation is the safe asset whatever emerging
+        // markets did -- refusing to answer here would throw away a signal
+        // that is not in doubt.
+        expect(
+          evaluate(
+            {
+              US_EQUITY: 1.2,
+              EX_US_EQUITY: 8.31,
+              EM_EQUITY: null,
+              SAFE: 4.21,
+            },
+            ["US_EQUITY", "EX_US_EQUITY", "EM_EQUITY", "SAFE"],
+          ),
+        ).toMatchObject({ state: "RISK_OFF", targetRole: "SAFE" });
+      });
+
+      it("does not block on a market the user never assigned", () => {
+        // A deliberate two-asset variant -- one equity leg and a safe asset --
+        // is a configuration, not a gap, and evaluates as it always did.
+        expect(
+          evaluate({ US_EQUITY: 15.42, SAFE: 4.21 }, ["US_EQUITY", "SAFE"]),
+        ).toMatchObject({ state: "RISK_ON", targetRole: "US_EQUITY" });
+      });
+    });
+
     it("is RISK_ON with the strongest equity market as target", () => {
       const outcome = evaluate({
         US_EQUITY: 15.42,

@@ -58,6 +58,13 @@ export interface GemAssetMomentum extends GemAssetRef {
  */
 export interface GemHeldAsset {
   role: GemAssetRole | null;
+  /**
+   * True for the accounts' cash balance, which is a position for compliance
+   * purposes -- GEM wants everything in one instrument, so idle cash is as
+   * off-target as the wrong fund -- but has no security to link to and is
+   * spent rather than sold.
+   */
+  isCash: boolean;
   securityId: string | null;
   symbol: string | null;
   name: string | null;
@@ -161,6 +168,12 @@ export interface GemActionView {
   estimatedCommission: number | null;
   /** Trades the switch takes: one sell per off-target holding, plus the buy. */
   estimatedTradeCount: number;
+  /**
+   * How many of the sold holdings were partly in the target's markets already.
+   * Those count towards compliance but are still sold whole, and a transfer
+   * larger than "everything off target" needs that said rather than inferred.
+   */
+  partialMatchCount: number;
   accounts: GemAccountRef[];
   currencyCode: string;
   executed: boolean;

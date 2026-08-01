@@ -1,4 +1,8 @@
-import { GemSignalService, GEM_HISTORY_PERIODS } from "./gem-signal.service";
+import {
+  GemSignalService,
+  GEM_HISTORY_PERIODS,
+  gemConfigFingerprint,
+} from "./gem-signal.service";
 import { GemStrategySignal } from "./entities/gem-strategy-signal.entity";
 import { GemStrategy } from "./entities/gem-strategy.entity";
 import { GemStrategyAsset } from "./entities/gem-strategy-asset.entity";
@@ -165,6 +169,7 @@ describe("GemSignalService", () => {
           id: "sig-1",
           evaluatedOn: "2025-07-31",
           targetRole: "EM_EQUITY",
+          configFingerprint: gemConfigFingerprint(strategy(), assets()),
         } as GemStrategySignal,
       ]);
 
@@ -174,6 +179,160 @@ describe("GemSignalService", () => {
         ([row]) => row.evaluatedOn as string,
       );
       expect(stored).not.toContain("2025-07-31");
+    });
+
+    describe("when the configuration behind a signal changed", () => {
+      /** One stored period, decided under a 12-month lookback. */
+      const storedUnder12Months = (overrides: Record<string, unknown> = {}) => {
+        signalRepo.find.mockResolvedValue([
+          {
+            id: "sig-1",
+            evaluatedOn: "2025-07-31",
+            effectiveFrom: "2025-08-01",
+            state: "RISK_ON",
+            targetRole: "EM_EQUITY",
+            targetSecurityId: "sec-emim",
+            executed: true,
+            executedAt: new Date("2025-08-02T00:00:00Z"),
+            configFingerprint: gemConfigFingerprint(strategy(), assets()),
+            ...overrides,
+          } as GemStrategySignal,
+        ]);
+      };
+
+      it("recomputes the period in place instead of trusting the old row", async () => {
+        // The bug: the row survived a lookback change and was still served as
+        // the current instruction, with the new instruments' names on it.
+        storedUnder12Months();
+
+        await service.materialize(
+          userId,
+          strategy({ lookbackMonths: 6 }),
+          assets(),
+          "2025-08-14",
+        );
+
+        const rewritten = signalRepo.save.mock.calls
+          .map(([row]) => row)
+          .find((row) => row.evaluatedOn === "2025-07-31");
+        expect(rewritten).toBeDefined();
+        // Same row, not a second answer for the same month.
+        expect(rewritten.id).toBe("sig-1");
+        expect(rewritten.configFingerprint).toBe(
+          gemConfigFingerprint(strategy({ lookbackMonths: 6 }), assets()),
+        );
+      });
+
+      it("keeps the executed flag when the instruction is unchanged", async () => {
+        // The recomputation lands on the same instrument, so the trade the
+        // user reported making is still the trade this row asks for.
+        storedUnder12Months();
+
+        await service.materialize(
+          userId,
+          strategy({ lookbackMonths: 6 }),
+          assets(),
+          "2025-08-14",
+        );
+
+        const rewritten = signalRepo.save.mock.calls
+          .map(([row]) => row)
+          .find((row) => row.evaluatedOn === "2025-07-31");
+        expect(rewritten.targetSecurityId).toBe("sec-emim");
+        expect(rewritten.executed).toBe(true);
+      });
+
+      it("clears the executed flag when the new instruction differs", async () => {
+        // Nobody carried out an instruction that did not exist until now.
+        storedUnder12Months({
+          targetRole: "US_EQUITY",
+          targetSecurityId: "sec-spy",
+        });
+
+        await service.materialize(
+          userId,
+          strategy({ lookbackMonths: 6 }),
+          assets(),
+          "2025-08-14",
+        );
+
+        const rewritten = signalRepo.save.mock.calls
+          .map(([row]) => row)
+          .find((row) => row.evaluatedOn === "2025-07-31");
+        expect(rewritten.targetSecurityId).toBe("sec-emim");
+        expect(rewritten.executed).toBe(false);
+        expect(rewritten.executedAt).toBeNull();
+      });
+
+      it("refuses to serve a stale row as the current signal", async () => {
+        // Recomputation is not always possible -- a lookback stretched past
+        // the instrument's first close leaves nothing to evaluate. The row
+        // stays in the history; it just cannot be today's instruction.
+        const stale = {
+          id: "sig-1",
+          evaluatedOn: "2025-07-31",
+          targetRole: "EM_EQUITY",
+          configFingerprint: "written-under-other-settings",
+        } as GemStrategySignal;
+
+        expect(
+          service.currentSignal([stale], strategy(), "2025-08-14", assets()),
+        ).toBeNull();
+        expect(
+          service.currentSignal(
+            [
+              {
+                ...stale,
+                configFingerprint: gemConfigFingerprint(strategy(), assets()),
+              },
+            ],
+            strategy(),
+            "2025-08-14",
+            assets(),
+          ),
+        ).not.toBeNull();
+      });
+    });
+
+    describe("gemConfigFingerprint", () => {
+      it("changes with every input that changes what a signal says", () => {
+        const base = gemConfigFingerprint(strategy(), assets());
+        expect(
+          gemConfigFingerprint(strategy({ lookbackMonths: 6 }), assets()),
+        ).not.toBe(base);
+        expect(
+          gemConfigFingerprint(strategy({ cadence: "QUARTERLY" }), assets()),
+        ).not.toBe(base);
+        const swapped = assets().map((asset) =>
+          asset.role === "EM_EQUITY"
+            ? ({ ...asset, securityId: "sec-eem" } as GemStrategyAsset)
+            : asset,
+        );
+        expect(gemConfigFingerprint(strategy(), swapped)).not.toBe(base);
+        // Clearing the risk-free leg moves the absolute test onto the safe
+        // asset, which is a different comparison, not a cosmetic change.
+        expect(
+          gemConfigFingerprint(strategy(), [
+            ...assets(),
+            { role: "RISK_FREE", securityId: "sec-bil" } as GemStrategyAsset,
+          ]),
+        ).not.toBe(base);
+      });
+
+      it("ignores what cannot change a signal", () => {
+        // Correcting a commission must not rewrite the evaluation history.
+        const base = gemConfigFingerprint(strategy(), assets());
+        expect(
+          gemConfigFingerprint(
+            strategy({ commissionAmount: 9.9, taxRatePercent: 23 }),
+            assets(),
+          ),
+        ).toBe(base);
+        // Nor does the order the roles happen to come back in.
+        expect(gemConfigFingerprint(strategy(), [...assets()].reverse())).toBe(
+          base,
+        );
+      });
     });
 
     it("returns the stored history untouched when no role has an instrument", async () => {

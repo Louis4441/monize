@@ -23,11 +23,20 @@ import {
  * the portfolio non-compliant and exactly what a switch has to move.
  */
 
-/** One security's holding, summed across the strategy's accounts and valued. */
+/**
+ * One position in the strategy's accounts, valued in the report currency.
+ *
+ * Usually a security summed across the accounts, but idle brokerage cash is
+ * one of these too (`isCash`). GEM asks for the whole strategy portfolio to sit
+ * in one instrument, so cash sitting beside the target is exactly as
+ * off-target as the wrong fund would be -- an account holding 5,000 of the
+ * target and 5,000 in cash is half invested, not fully compliant.
+ */
 export interface GemHolding {
   /** Strategy role the security fills, or null when it fills none. */
   role: GemAssetRole | null;
-  securityId: string;
+  /** Null for cash, which is a balance rather than an instrument. */
+  securityId: string | null;
   symbol: string | null;
   name: string | null;
   quantity: number;
@@ -37,6 +46,8 @@ export interface GemHolding {
   costBasis: number | null;
   /** The security's stored breakdowns, for the composition comparison. */
   composition?: GemSecurityComposition;
+  /** True for a cash balance rather than an instrument. */
+  isCash?: boolean;
 }
 
 /** A holding plus how much of it already sits in the target's markets. */
@@ -54,7 +65,10 @@ export interface GemPositionMath {
   holdings: GemMatchedHolding[];
   /** The largest holding: what the accounts are effectively in. */
   current: GemMatchedHolding | null;
-  /** Holdings a switch would sell into the target, largest first. */
+  /**
+   * Holdings a switch sells into the target, largest first. Each is sold
+   * whole: see the note on `transferValue`.
+   */
   offTarget: GemMatchedHolding[];
   /** Whether contents or tickers decided the comparison. */
   basis: GemCompositionBasis;
@@ -67,14 +81,30 @@ export interface GemPositionMath {
   requiredDimension: GemCompositionDimension | null;
   /** Holdings that fell back to a ticker comparison for want of a breakdown. */
   instrumentMatchedCount: number;
+  /**
+   * Trades the sell side of a switch takes. Cash is off-target and funds the
+   * purchase, but it is not sold, so it costs no commission and adds no trade.
+   */
+  sellCount: number;
   /** Sum of the market values that could be valued. */
   totalMarketValue: number | null;
-  /** Share of `totalMarketValue` already in the target role, 0-100. */
+  /**
+   * Share of `totalMarketValue` already in the target's markets, 0-100.
+   *
+   * This is a diagnostic, not a share of the portfolio that stays put. A fund
+   * counting 20% towards the target is still sold whole when the switch runs,
+   * because the 20% cannot be separated from the rest of the units.
+   */
   compliancePercent: number | null;
   changeRequired: boolean;
-  /** Value held outside the target role -- what a switch would move. */
+  /**
+   * What a switch moves: the **full** market value of every holding that is
+   * not entirely in the target's markets. Partial overlap does not reduce it --
+   * selling part of a mixed fund sells part of its on-target sleeve too, so a
+   * pro-rated sale never reaches the 100% allocation the signal asks for.
+   */
   transferValue: number | null;
-  /** Gain (positive) or loss (negative) a switch would realize. */
+  /** Gain (positive) or loss (negative) selling those positions realizes. */
   realizedGainLoss: number | null;
 }
 
@@ -111,6 +141,17 @@ export function buildPositionMath(
   // ticker, exactly as before.
   const dimension = dimensionFor(target.composition, targetRole);
   const valued: GemMatchedHolding[] = sized.map((holding) => {
+    // Cash is in no market at all, so it counts towards nothing. Saying it was
+    // "matched by instrument" would be wrong in the other direction: there is
+    // no missing breakdown to fill in, and none would help.
+    if (holding.isCash) {
+      return {
+        ...holding,
+        overlap: 0,
+        matchedByInstrument: false,
+        matchedMarkets: [],
+      };
+    }
     if (!targetRole) {
       return {
         ...holding,
@@ -159,8 +200,15 @@ export function buildPositionMath(
       ? roundToDecimals((targetValue / totalMarketValue) * 100, 2)
       : null;
 
-  // Anything not wholly inside the target's markets: a partial match is still
-  // something a switch has to sell down, just not in full.
+  // Anything not wholly inside the target's markets has to go, and go whole.
+  //
+  // The overlap explains how much of a holding is already where the strategy
+  // wants it, but it is not a fraction of the position that can be kept:
+  // selling 80% of a world tracker sells 80% of its emerging-markets sleeve
+  // along with everything else. Move only the non-overlapping 8,000 of a
+  // 10,000 fund that is 20% EM and the portfolio ends up 84% EM, not the 100%
+  // the signal asked for. GEM wants the whole allocation in one instrument, so
+  // any holding that is not entirely in the target's markets is sold in full.
   const offTarget = targetRole
     ? valued.filter((holding) => holding.overlap < 1)
     : [];
@@ -174,12 +222,9 @@ export function buildPositionMath(
       ? valued.length === 0 || offTarget.length > 0
       : compliancePercent < COMPLIANCE_TOLERANCE_PERCENT
     : false;
+  // The executable trade, therefore, is the whole of each off-target position.
   const offTargetValues = offTarget
-    .map((holding) =>
-      holding.marketValue === null
-        ? null
-        : holding.marketValue * (1 - holding.overlap),
-    )
+    .map((holding) => holding.marketValue)
     .filter((value): value is number => value !== null);
   const transferValue =
     offTargetValues.length > 0 ? sumMoney(offTargetValues) : null;
@@ -187,15 +232,15 @@ export function buildPositionMath(
   const realizable = offTarget.filter(
     (holding) => holding.marketValue !== null && holding.costBasis !== null,
   );
-  // Only the part that moves is sold, so only that part realizes a result.
+  // Selling the position whole realizes the whole result on it -- pro-rating
+  // this by the overlap understated the tax on exactly the switches where the
+  // estimate matters, since a long-held world tracker carries most of the gain.
   const realizedGainLoss =
     realizable.length > 0
       ? sumMoney(
           realizable.map(
             (holding) =>
-              ((holding.marketValue as number) -
-                (holding.costBasis as number)) *
-              (1 - holding.overlap),
+              (holding.marketValue as number) - (holding.costBasis as number),
           ),
         )
       : null;
@@ -210,6 +255,7 @@ export function buildPositionMath(
     instrumentMatchedCount: valued.filter(
       (holding) => holding.matchedByInstrument,
     ).length,
+    sellCount: offTarget.filter((holding) => !holding.isCash).length,
     totalMarketValue,
     compliancePercent,
     changeRequired,

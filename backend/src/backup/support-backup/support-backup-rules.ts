@@ -655,6 +655,10 @@ export const RULES: Record<string, TableRules> = {
     lead_pp: keep, // percentage points
     previous_role: keep,
     benchmark_role: keep,
+    // A hash of the strategy's own settings. It identifies nothing about the
+    // user, and dropping it would make every restored signal look stale and be
+    // recomputed on the first read.
+    config_fingerprint: keep,
     executed: keep,
     executed_at: keep,
     created_at: keep,

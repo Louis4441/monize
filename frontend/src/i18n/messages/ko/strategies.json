@@ -109,6 +109,7 @@
       "hint": "대기 중인 거래가 무엇을 옮기고 무엇을 실현하는지.",
       "valueLabel": "예상 이동 금액",
       "valueUnknown": "이동 금액을 가져올 수 없습니다",
+      "partialMatchNote": "{count, plural, other {# 개 보유 종목은 이미 일부가 목표 시장에 있지만 전량 매도합니다. 목표에 해당하는 부분만 남기려면 펀드의 나머지도 함께 남겨야 하기 때문입니다. 그래서 이동 금액은 해당 포지션의 전액입니다.}}",
       "realized": "예상 실현 손익",
       "tax": "예상 세금",
       "taxWithRate": "예상 세금({rate}%)",
@@ -252,6 +253,8 @@
       "workingCounts": "목표에 반영",
       "workingMarket": "{name} {percent}",
       "workingExact": "목표 종목 자체",
+      "workingCash": "현금",
+      "workingCashNote": "미투자 — 어디에도 산입되지 않으며 매수 자금이 됩니다",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "구성 미입력, 종목으로 대조",
       "workingNoTargetData": "비교 불가: 목표에 구성이 없음",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "이 전략에는 투자 계좌가 지정되지 않았습니다.",
       "NO_POSITION": "전략 계좌에 종목이 없습니다.",
       "FIRST_RUN": "이 전략은 아직 평가되지 않았습니다 – 첫 시그널은 다음 예정 평가 후에 표시됩니다.",
-      "STALE_PRICES": "이 리포트의 기준 가격이 최신이 아니므로 갱신 후 시그널이 바뀔 수 있습니다.",
+      "STALE_PRICES": "이 리포트의 근거가 되는 일부 가격이 최신이 아니므로 갱신 후 신호가 바뀔 수 있습니다. 가장 오래되었거나 아예 없는 항목:",
       "CALCULATION_FAILED": "사용 가능한 데이터로는 시그널을 계산할 수 없습니다."
     },
     "footer": {

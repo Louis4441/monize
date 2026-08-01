@@ -109,6 +109,7 @@
       "hint": "Wat de openstaande transactie verplaatst en wat ze realiseert.",
       "valueLabel": "Geschatte te verplaatsen waarde",
       "valueUnknown": "Te verplaatsen waarde niet beschikbaar",
+      "partialMatchNote": "{count, plural, one {Eén positie zit al deels in de doelmarkten en wordt toch volledig verkocht: het passende deel kan niet worden aangehouden zonder de rest van het fonds aan te houden. Daarom is de overboeking de volledige waarde van de positie.} other {# posities zitten al deels in de doelmarkten en worden toch volledig verkocht: hun passende deel kan niet worden aangehouden zonder de rest van elk fonds aan te houden. Daarom is de overboeking hun volledige waarde.}}",
       "realized": "Geschat gerealiseerd resultaat",
       "tax": "Geschatte belasting",
       "taxWithRate": "Geschatte belasting ({rate}%)",
@@ -252,6 +253,8 @@
       "workingCounts": "Telt mee voor het doel",
       "workingMarket": "{name} {percent}",
       "workingExact": "Het doelinstrument zelf",
+      "workingCash": "Contanten",
+      "workingCashNote": "Niet belegd — telt nergens voor mee en financiert de aankoop",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Geen verdeling vastgelegd; op instrument vergeleken",
       "workingNoTargetData": "Vergelijken kan niet: het doel heeft geen verdeling",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Aan deze strategie is geen beleggingsrekening toegewezen.",
       "NO_POSITION": "De strategierekeningen bezitten geen instrumenten.",
       "FIRST_RUN": "Deze strategie is nog niet geëvalueerd – het eerste signaal verschijnt na de volgende geplande evaluatie.",
-      "STALE_PRICES": "De koersen achter dit rapport zijn niet actueel, het signaal kan dus veranderen zodra ze zijn vernieuwd.",
+      "STALE_PRICES": "Sommige koersen achter dit rapport zijn niet actueel; het signaal kan veranderen zodra ze zijn ververst. Het oudst, of helemaal ontbrekend, zijn:",
       "CALCULATION_FAILED": "Het signaal kon niet uit de beschikbare gegevens worden berekend."
     },
     "footer": {

@@ -109,6 +109,7 @@
       "hint": "Ce que déplace l'opération en attente et ce qu'elle réalise.",
       "valueLabel": "Valeur estimée à transférer",
       "valueUnknown": "Valeur à transférer non disponible",
+      "partialMatchNote": "{count, plural, one {Une position se trouve déjà en partie sur les marchés cibles et est malgré tout vendue en totalité : sa part alignée ne peut être conservée sans conserver le reste du fonds. C'est pourquoi le transfert correspond à la valeur totale de la position.} other {# positions se trouvent déjà en partie sur les marchés cibles et sont malgré tout vendues en totalité : leur part alignée ne peut être conservée sans conserver le reste de chaque fonds. C'est pourquoi le transfert correspond à leur valeur totale.}}",
       "realized": "Résultat réalisé estimé",
       "tax": "Impôt estimé",
       "taxWithRate": "Impôt estimé ({rate} %)",
@@ -252,6 +253,8 @@
       "workingCounts": "Compte pour la cible",
       "workingMarket": "{name} {percent}",
       "workingExact": "L'instrument cible lui-même",
+      "workingCash": "Liquidités",
+      "workingCashNote": "Non investi — ne compte pour rien et finance l’achat",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Aucune répartition enregistrée ; comparé par instrument",
       "workingNoTargetData": "Comparaison impossible : la cible n'a aucune répartition",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Aucun compte d'investissement n'est attribué à cette stratégie.",
       "NO_POSITION": "Les comptes de la stratégie ne détiennent aucun instrument.",
       "FIRST_RUN": "Cette stratégie n'a pas encore été évaluée : le premier signal apparaîtra après la prochaine évaluation planifiée.",
-      "STALE_PRICES": "Les cours sur lesquels repose ce rapport ne sont pas à jour, le signal peut donc changer après leur actualisation.",
+      "STALE_PRICES": "Certains cours derrière ce rapport ne sont pas à jour ; le signal peut changer après leur actualisation. Les plus anciens, ou totalement absents, concernent :",
       "CALCULATION_FAILED": "Le signal n'a pas pu être calculé à partir des données disponibles."
     },
     "footer": {

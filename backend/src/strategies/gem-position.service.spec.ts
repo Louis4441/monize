@@ -82,10 +82,20 @@ describe("GemPositionService", () => {
       ...overrides,
     } as never);
 
+  /**
+   * Rows each of the service's three reads answers with. They go through one
+   * `manager.query`, so the mock dispatches on the SQL: a blanket
+   * `mockResolvedValue` would feed holding rows to the cash query, which then
+   * reads a balance out of a column that is not there.
+   */
+  let holdingRows: Array<Record<string, unknown>>;
+  let cashRows: Array<Record<string, unknown>>;
+  let compositionRows: Array<Record<string, unknown>>;
+
   beforeEach(() => {
     const mocks = createScopedDbMocks();
     manager = mocks.manager;
-    manager.query.mockResolvedValue([
+    holdingRows = [
       {
         security_id: "sec-spy",
         symbol: "SPY",
@@ -94,7 +104,14 @@ describe("GemPositionService", () => {
         cost_basis: "18281.46",
         currency_code: "USD",
       },
-    ]);
+    ];
+    cashRows = [];
+    compositionRows = [];
+    manager.query.mockImplementation((sql: string) => {
+      if (sql.includes("FROM holdings")) return Promise.resolve(holdingRows);
+      if (sql.includes("current_balance")) return Promise.resolve(cashRows);
+      return Promise.resolve(compositionRows);
+    });
     priceService = {
       latestPrices: jest
         .fn()
@@ -151,7 +168,7 @@ describe("GemPositionService", () => {
   });
 
   it("counts an instrument the strategy never assigned", async () => {
-    manager.query.mockResolvedValue([
+    holdingRows = [
       {
         security_id: "sec-spy",
         symbol: "SPY",
@@ -168,7 +185,7 @@ describe("GemPositionService", () => {
         cost_basis: "5000",
         currency_code: "USD",
       },
-    ]);
+    ];
     priceService.latestPrices.mockResolvedValue(
       new Map([
         ["sec-spy", 400],
@@ -193,7 +210,7 @@ describe("GemPositionService", () => {
   });
 
   it("sells out of the off-target holding, not the largest one", async () => {
-    manager.query.mockResolvedValue([
+    holdingRows = [
       {
         security_id: "sec-emim",
         symbol: "EMIM",
@@ -210,7 +227,7 @@ describe("GemPositionService", () => {
         cost_basis: "1500",
         currency_code: "USD",
       },
-    ]);
+    ];
     priceService.latestPrices.mockResolvedValue(
       new Map([
         ["sec-emim", 35],
@@ -231,7 +248,7 @@ describe("GemPositionService", () => {
     // The aggregate query returns NULL for the whole security when any of the
     // summed holdings has no average cost -- an understated basis would inflate
     // the realized result and the tax on it.
-    manager.query.mockResolvedValue([
+    holdingRows = [
       {
         security_id: "sec-spy",
         symbol: "SPY",
@@ -240,7 +257,7 @@ describe("GemPositionService", () => {
         cost_basis: null,
         currency_code: "USD",
       },
-    ]);
+    ];
 
     const result = await build();
 
@@ -252,7 +269,7 @@ describe("GemPositionService", () => {
   });
 
   it("converts a foreign-currency holding into the report currency", async () => {
-    manager.query.mockResolvedValue([
+    holdingRows = [
       {
         security_id: "sec-spy",
         symbol: "SPY",
@@ -261,7 +278,7 @@ describe("GemPositionService", () => {
         cost_basis: "1000",
         currency_code: "EUR",
       },
-    ]);
+    ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 200]]));
     exchangeRates.getLatestRate.mockResolvedValue(1.1);
 
@@ -274,7 +291,7 @@ describe("GemPositionService", () => {
   });
 
   it("falls back to the inverse rate, then to parity", async () => {
-    manager.query.mockResolvedValue([
+    holdingRows = [
       {
         security_id: "sec-spy",
         symbol: "SPY",
@@ -283,7 +300,7 @@ describe("GemPositionService", () => {
         cost_basis: null,
         currency_code: "EUR",
       },
-    ]);
+    ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-spy", 100]]));
     exchangeRates.getLatestRate
       .mockResolvedValueOnce(null) // EUR -> USD unknown
@@ -303,7 +320,7 @@ describe("GemPositionService", () => {
   });
 
   it("reports empty strategy accounts as having no position", async () => {
-    manager.query.mockResolvedValue([]);
+    holdingRows = [];
     const result = await build();
     expect(result.noPosition).toBe(true);
     expect(result.position?.current).toBeNull();
@@ -312,7 +329,7 @@ describe("GemPositionService", () => {
   });
 
   it("needs no operation once the accounts hold the target", async () => {
-    manager.query.mockResolvedValue([
+    holdingRows = [
       {
         security_id: "sec-emim",
         symbol: "EMIM",
@@ -321,12 +338,98 @@ describe("GemPositionService", () => {
         cost_basis: "21000",
         currency_code: "USD",
       },
-    ]);
+    ];
     priceService.latestPrices.mockResolvedValue(new Map([["sec-emim", 35]]));
 
     const result = await build();
     expect(result.position?.compliancePercent).toBe(100);
     expect(result.action?.required).toBe(false);
+  });
+
+  describe("cash in the strategy accounts", () => {
+    /** The target, held in full, plus an equal amount of idle cash. */
+    const targetPlusCash = () => {
+      holdingRows = [
+        {
+          security_id: "sec-emim",
+          symbol: "EMIM",
+          name: "EM IMI ETF",
+          quantity: "200",
+          cost_basis: "4000",
+          currency_code: "USD",
+        },
+      ];
+      cashRows = [{ current_balance: "5000", currency_code: "USD" }];
+      priceService.latestPrices.mockResolvedValue(new Map([["sec-emim", 25]]));
+    };
+
+    it("counts idle cash as off target rather than as compliance", async () => {
+      // The regression: reading only `holdings` reported this account 100%
+      // compliant with nothing to do, while half of it was uninvested.
+      targetPlusCash();
+
+      const result = await build();
+
+      expect(result.position?.totalMarketValue).toBe(10000);
+      expect(result.position?.compliancePercent).toBe(50);
+      expect(result.position?.changeRequired).toBe(true);
+      expect(result.action?.required).toBe(true);
+      // The purchase is funded by the cash, so that is what moves.
+      expect(result.action?.transferValue).toBe(5000);
+    });
+
+    it("shows cash as a position with no instrument and no quantity", async () => {
+      targetPlusCash();
+
+      const result = await build();
+      const cash = result.position?.holdings.find((held) => held.isCash);
+
+      expect(cash).toMatchObject({
+        securityId: null,
+        symbol: null,
+        quantity: null,
+        marketValue: 5000,
+        matchPercent: 0,
+        // There is no breakdown that would make cash match a market, so this
+        // is not the "fill in the data" case the ticker fallback reports.
+        matchedByInstrument: false,
+      });
+    });
+
+    it("spends cash rather than selling it, so it costs no commission", async () => {
+      targetPlusCash();
+
+      const result = await build();
+
+      // One trade: the buy. Cash is not a position anyone sells.
+      expect(result.action?.estimatedTradeCount).toBe(1);
+      expect(result.action?.estimatedCommission).toBe(29.9);
+      // And it realizes nothing, so there is no tax on putting it to work.
+      expect(result.action?.realizedGainLoss).toBe(0);
+      expect(result.action?.estimatedTax).toBe(0);
+    });
+
+    it("ignores a negative balance, which is a debt and not a position", async () => {
+      // Filtered in SQL: a margin debit is money owed, and treating it as
+      // off-target value would inflate the purchase by the size of the loan.
+      targetPlusCash();
+      cashRows = [];
+
+      const result = await build();
+
+      expect(result.position?.holdings.some((held) => held.isCash)).toBe(false);
+      expect(result.position?.compliancePercent).toBe(100);
+    });
+
+    it("asks for the linked cash account of every strategy account", async () => {
+      await build();
+      const cashCall = manager.query.mock.calls.find(([sql]) =>
+        String(sql).includes("current_balance"),
+      );
+      expect(cashCall?.[0]).toContain("INVESTMENT_CASH");
+      expect(cashCall?.[0]).toContain("linked_account_id");
+      expect(cashCall?.[1]).toEqual([["acct-1", "acct-2"], userId]);
+    });
   });
 
   it("does not require an operation without a target instrument", async () => {
@@ -336,7 +439,7 @@ describe("GemPositionService", () => {
   });
 
   it("still reports a portfolio made only of non-strategy instruments", async () => {
-    manager.query.mockResolvedValue([
+    holdingRows = [
       {
         security_id: "sec-unrelated",
         symbol: "FZD2050",
@@ -345,7 +448,7 @@ describe("GemPositionService", () => {
         cost_basis: "100",
         currency_code: "USD",
       },
-    ]);
+    ];
     const result = await build();
     // There is a position -- just none of it where the strategy wants it.
     expect(result.noPosition).toBe(false);

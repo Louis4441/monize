@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { DataSource } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
-import { roundMoney } from "../common/round.util";
+import { roundMoney, sumMoney } from "../common/round.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
 import { GemStrategy } from "./entities/gem-strategy.entity";
@@ -147,6 +147,52 @@ export class GemPositionService {
   }
 
   /**
+   * Cash sitting in the strategy's accounts, per account, in each account's own
+   * currency.
+   *
+   * Two shapes, because the app models brokerage accounts both ways: a
+   * brokerage account paired with a linked `INVESTMENT_CASH` account holding
+   * the balance, and a standalone investment account that carries its own. The
+   * strategy picker offers the brokerage and standalone accounts (never the
+   * cash half on its own), so the linked balances have to be found from the
+   * chosen side -- and the link is stored from whichever account was created
+   * second, hence both directions.
+   *
+   * Only a positive balance counts. A margin debit is money owed, not an asset
+   * the switch can move, and treating it as off-target value would inflate the
+   * purchase by the size of the debt.
+   */
+  private async loadCash(
+    userId: string,
+    accountIds: string[],
+  ): Promise<Array<{ amount: number; currencyCode: string }>> {
+    if (accountIds.length === 0) return [];
+    const rows: Array<{ current_balance: string; currency_code: string }> =
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `SELECT a.current_balance, a.currency_code
+             FROM accounts a
+            WHERE a.user_id = $2
+              AND a.current_balance > 0
+              AND (
+                    (a.id = ANY($1::uuid[]) AND a.account_sub_type IS NULL)
+                 OR (a.account_sub_type = 'INVESTMENT_CASH'
+                     AND (a.linked_account_id = ANY($1::uuid[])
+                          OR a.id IN (SELECT b.linked_account_id
+                                        FROM accounts b
+                                       WHERE b.id = ANY($1::uuid[])
+                                         AND b.linked_account_id IS NOT NULL)))
+              )`,
+          [accountIds, userId],
+        ),
+      );
+    return rows.map((row) => ({
+      amount: Number(row.current_balance),
+      currencyCode: row.currency_code,
+    }));
+  }
+
+  /**
    * The breakdowns of one security that is not held -- the signal's target
    * usually is not, which is the whole point of the switch.
    *
@@ -286,6 +332,44 @@ export class GemPositionService {
       });
     }
 
+    // Cash joins the comparison as one aggregated position. It is summed
+    // rather than listed per account because the whole report sums across the
+    // strategy's accounts, and a switch spends whatever is in them.
+    const cashRows = await this.loadCash(
+      userId,
+      accounts.map((account) => account.id),
+    );
+    const cashValue = sumMoney(
+      await Promise.all(
+        cashRows.map(async (row) =>
+          roundMoney(
+            await this.convert(
+              row.amount,
+              row.currencyCode,
+              currencyCode,
+              rateCache,
+            ),
+          ),
+        ),
+      ),
+    );
+    if (cashValue > 0) {
+      valued.push({
+        role: null,
+        securityId: null,
+        symbol: null,
+        name: null,
+        // Cash has no unit count; the amount stands in so the dust filter and
+        // the ordering treat it like any other position.
+        quantity: cashValue,
+        marketValue: cashValue,
+        // Cash is worth what it is worth: selling it realizes nothing, and a
+        // null basis here would make the whole switch's gain unknown.
+        costBasis: cashValue,
+        isCash: true,
+      });
+    }
+
     const math = buildPositionMath(valued, targetRole, {
       securityId: target?.securityId ?? null,
       composition: await this.loadComposition(
@@ -296,10 +380,13 @@ export class GemPositionService {
 
     const held = (holding: GemMatchedHolding): GemHeldAsset => ({
       role: holding.role,
+      isCash: holding.isCash === true,
       securityId: holding.securityId,
       symbol: holding.symbol,
       name: holding.name,
-      quantity: holding.quantity,
+      // A balance has no unit count, and printing its amount in the quantity
+      // column would read as shares.
+      quantity: holding.isCash ? null : holding.quantity,
       marketValue: holding.marketValue,
       matchPercent: overlapPercent(holding.overlap),
       matchedByInstrument: holding.matchedByInstrument,
@@ -336,9 +423,12 @@ export class GemPositionService {
       taxRatePercent: strategy.taxRatePercent,
       estimatedCommission: estimateCommission(
         strategy.commissionAmount,
-        math.offTarget.length,
+        math.sellCount,
       ),
-      estimatedTradeCount: math.offTarget.length + 1,
+      estimatedTradeCount: math.sellCount + 1,
+      partialMatchCount: math.offTarget.filter(
+        (holding) => holding.overlap > 0 && !holding.isCash,
+      ).length,
       accounts,
       currencyCode,
       executed,

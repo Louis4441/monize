@@ -109,6 +109,7 @@
       "hint": "待執行的操作會移動什麼，以及會實現什麼。",
       "valueLabel": "預估轉移金額",
       "valueUnknown": "無法取得轉移金額",
+      "partialMatchNote": "{count, plural, other {# 項持有已有一部分落在目標市場，但仍會整筆賣出：不保留基金的其餘部分，就無法只保留符合目標的那一部分。因此轉出的是該持有的全部價值。}}",
       "realized": "預估已實現結果",
       "tax": "預估稅金",
       "taxWithRate": "預估稅金（{rate}%）",
@@ -252,6 +253,8 @@
       "workingCounts": "計入目標",
       "workingMarket": "{name} {percent}",
       "workingExact": "目標標的本身",
+      "workingCash": "現金",
+      "workingCashNote": "未投資——不計入任何一項，用於支付買入",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "未記錄組成，依標的比對",
       "workingNoTargetData": "無法比較：目標沒有組成",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "此策略未指定任何投資帳戶。",
       "NO_POSITION": "策略帳戶中沒有任何標的。",
       "FIRST_RUN": "此策略尚未評估 — 第一個訊號會在下次排定的評估後出現。",
-      "STALE_PRICES": "本報表依據的價格不是最新的，更新後訊號可能改變。",
+      "STALE_PRICES": "本報告依據的部分價格並非最新，重新整理後訊號可能改變。最舊的或完全缺失的是：",
       "CALCULATION_FAILED": "無法以現有資料計算訊號。"
     },
     "footer": {

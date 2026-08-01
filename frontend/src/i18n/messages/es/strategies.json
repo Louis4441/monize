@@ -109,6 +109,7 @@
       "hint": "Qué mueve la operación pendiente y qué realiza.",
       "valueLabel": "Valor estimado a traspasar",
       "valueUnknown": "Valor a traspasar no disponible",
+      "partialMatchNote": "{count, plural, one {Una posición ya está en parte en los mercados objetivo y aun así se vende entera: su parte alineada no puede conservarse sin conservar el resto del fondo. Por eso el traspaso es el valor íntegro de la posición.} other {# posiciones ya están en parte en los mercados objetivo y aun así se venden enteras: su parte alineada no puede conservarse sin conservar el resto de cada fondo. Por eso el traspaso es su valor íntegro.}}",
       "realized": "Resultado realizado estimado",
       "tax": "Impuesto estimado",
       "taxWithRate": "Impuesto estimado ({rate} %)",
@@ -252,6 +253,8 @@
       "workingCounts": "Cuenta para el objetivo",
       "workingMarket": "{name} {percent}",
       "workingExact": "El propio instrumento objetivo",
+      "workingCash": "Efectivo",
+      "workingCashNote": "Sin invertir: no cuenta para nada y financia la compra",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Sin desglose registrado; comparado por instrumento",
       "workingNoTargetData": "No se puede comparar: el objetivo no tiene desglose",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Esta estrategia no tiene ninguna cuenta de inversión asignada.",
       "NO_POSITION": "Las cuentas de la estrategia no tienen ningún instrumento.",
       "FIRST_RUN": "Esta estrategia todavía no se ha evaluado: la primera señal aparecerá tras la próxima evaluación programada.",
-      "STALE_PRICES": "Los precios en los que se basa este informe no están actualizados, así que la señal puede cambiar cuando se actualicen.",
+      "STALE_PRICES": "Algunos de los precios detrás de este informe no están actualizados, así que la señal puede cambiar al refrescarlos. Los más antiguos, o directamente ausentes, son:",
       "CALCULATION_FAILED": "No se pudo calcular la señal con los datos disponibles."
     },
     "footer": {

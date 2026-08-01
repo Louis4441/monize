@@ -101,7 +101,7 @@ describe("GemStrategyService", () => {
   let signalService: Record<string, jest.Mock>;
   let positionService: { build: jest.Mock };
   let performanceService: { build: jest.Mock };
-  let priceService: { latestPriceDate: jest.Mock };
+  let priceService: { latestPriceDates: jest.Mock };
   let backfillService: { ensureHistory: jest.Mock };
   let backtestService: { build: jest.Mock };
 
@@ -133,7 +133,16 @@ describe("GemStrategyService", () => {
       findOne: jest.fn().mockResolvedValue({ id: "acct-1" }),
       find: jest.fn().mockResolvedValue([{ id: "acct-1" }]),
     };
-    securityRepo = { find: jest.fn().mockResolvedValue([{ id: "sec-emim" }]) };
+    securityRepo = {
+      // Doubles for two reads: the ownership check on save, which only looks at
+      // ids, and the history's own lookup, which needs the symbol each past
+      // decision named.
+      find: jest
+        .fn()
+        .mockResolvedValue([
+          { id: "sec-emim", symbol: "EMIM", name: "EM IMI ETF" },
+        ]),
+    };
     preferenceRepo = {
       findOne: jest.fn().mockResolvedValue({ defaultCurrency: "CAD" }),
     };
@@ -177,7 +186,13 @@ describe("GemStrategyService", () => {
       }),
     };
     priceService = {
-      latestPriceDate: jest.fn().mockResolvedValue("2025-08-13"),
+      // Every assigned instrument priced on the same recent day, so nothing
+      // is stale unless a test says otherwise.
+      latestPriceDates: jest
+        .fn()
+        .mockImplementation((ids: string[]) =>
+          Promise.resolve(new Map(ids.map((id) => [id, "2025-08-13"]))),
+        ),
     };
     backfillService = { ensureHistory: jest.fn().mockResolvedValue([]) };
     backtestService = { build: jest.fn().mockResolvedValue(null) };
@@ -247,6 +262,49 @@ describe("GemStrategyService", () => {
       expect(report.history[0].change).toEqual({
         from: expect.objectContaining({ symbol: "SPY" }),
         to: expect.objectContaining({ symbol: "EMIM" }),
+      });
+    });
+
+    it("shows the instrument a past decision named, not today's", async () => {
+      // History used to resolve every role through the current mapping, so
+      // replacing the EM fund rewrote the past: an entry from July claimed to
+      // have bought whatever was assigned in August.
+      signalService.materialize.mockResolvedValue([
+        storedSignal({ targetSecurityId: "sec-retired" }),
+      ]);
+      securityRepo.find.mockResolvedValue([
+        {
+          id: "sec-retired",
+          symbol: "EEM",
+          name: "The fund it actually bought",
+        },
+      ]);
+
+      const report = await service.getReport(userId);
+
+      expect(report.history[0].winner).toMatchObject({
+        securityId: "sec-retired",
+        symbol: "EEM",
+      });
+      // The role's current instrument is still what the settings say.
+      expect(
+        report.assets.find((asset) => asset.role === "EM_EQUITY")?.symbol,
+      ).toBe("EMIM");
+    });
+
+    it("falls back to the role's instrument when the stored one is gone", async () => {
+      // ON DELETE SET NULL leaves the signal without a security; naming the
+      // role's current fund is better than showing an empty row, and the
+      // momentum figures beside it are still what was decided on.
+      signalService.materialize.mockResolvedValue([
+        storedSignal({ targetSecurityId: null }),
+      ]);
+
+      const report = await service.getReport(userId);
+
+      expect(report.history[0].winner).toMatchObject({
+        role: "EM_EQUITY",
+        symbol: "EMIM",
       });
       // A backtest needs a cost model the configuration does not carry yet.
       expect(report.backtest).toBeNull();
@@ -446,9 +504,51 @@ describe("GemStrategyService", () => {
     });
 
     it("warns when the prices behind the report are stale", async () => {
-      priceService.latestPriceDate.mockResolvedValue("2025-07-02");
+      priceService.latestPriceDates.mockImplementation((ids: string[]) =>
+        Promise.resolve(new Map(ids.map((id) => [id, "2025-07-02"]))),
+      );
       const report = await service.getReport(userId);
       expect(report.warnings.map((w) => w.code)).toContain("STALE_PRICES");
+    });
+
+    it("does not let one fresh quote hide a stale instrument", async () => {
+      // The regression: staleness was judged on MAX(price_date) across every
+      // mapped security, so a US quote refreshed this morning spoke for an
+      // ex-US instrument last priced six weeks earlier.
+      priceService.latestPriceDates.mockResolvedValue(
+        new Map([
+          ["sec-spy", "2025-08-13"],
+          ["sec-ewa", "2025-07-02"],
+          ["sec-emim", "2025-08-13"],
+          ["sec-ief", "2025-08-13"],
+        ]),
+      );
+
+      const report = await service.getReport(userId);
+
+      const stale = report.warnings.find((w) => w.code === "STALE_PRICES");
+      expect(stale).toBeDefined();
+      // And it names the one to go and refresh.
+      expect(stale?.roles).toEqual(["EX_US_EQUITY"]);
+      // The report is only as current as its oldest input.
+      expect(report.strategy.pricesAsOf).toBe("2025-07-02");
+    });
+
+    it("reports an unpriced instrument as unknown, not as everyone else's date", async () => {
+      priceService.latestPriceDates.mockResolvedValue(
+        new Map([
+          ["sec-spy", "2025-08-13"],
+          ["sec-emim", "2025-08-13"],
+          ["sec-ief", "2025-08-13"],
+        ]),
+      );
+
+      const report = await service.getReport(userId);
+
+      expect(report.strategy.pricesAsOf).toBeNull();
+      expect(
+        report.warnings.find((w) => w.code === "STALE_PRICES")?.roles,
+      ).toEqual(["EX_US_EQUITY"]);
     });
 
     it("passes the requested range through to the performance series", async () => {

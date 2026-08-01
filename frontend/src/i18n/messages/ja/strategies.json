@@ -109,6 +109,7 @@
       "hint": "保留中の取引が何を動かし、何を確定させるか。",
       "valueLabel": "移動額の見込み",
       "valueUnknown": "移動額を取得できません",
+      "partialMatchNote": "{count, plural, other {# 件の保有はすでに一部が目標市場にありますが、それでも全量を売却します。目標に合致する部分だけを残すことはできず、ファンドの残りも一緒に残ることになるためです。したがって移動額はポジションの全額になります。}}",
       "realized": "確定損益の見込み",
       "tax": "税額の見込み",
       "taxWithRate": "税額の見込み（{rate}%）",
@@ -252,6 +253,8 @@
       "workingCounts": "目標への算入分",
       "workingMarket": "{name} {percent}",
       "workingExact": "目標の銘柄そのもの",
+      "workingCash": "現金",
+      "workingCashNote": "未投資 — どこにも算入されず、購入の原資になります",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "内訳が未登録のため銘柄で照合",
       "workingNoTargetData": "比較できません：目標に内訳がありません",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "この戦略には投資口座が割り当てられていません。",
       "NO_POSITION": "戦略口座に銘柄がありません。",
       "FIRST_RUN": "この戦略はまだ評価されていません。最初のシグナルは次回の予定評価後に表示されます。",
-      "STALE_PRICES": "このレポートの基になる価格が最新ではないため、更新後にシグナルが変わる可能性があります。",
+      "STALE_PRICES": "このレポートの基となる価格の一部が最新ではないため、更新後に判定が変わる可能性があります。最も古い、または欠落しているのは次の銘柄です:",
       "CALCULATION_FAILED": "利用可能なデータではシグナルを計算できませんでした。"
     },
     "footer": {

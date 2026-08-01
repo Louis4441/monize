@@ -109,6 +109,7 @@
       "hint": "O que a operação pendente movimenta e o que ela realiza.",
       "valueLabel": "Valor estimado a transferir",
       "valueUnknown": "Valor a transferir não disponível",
+      "partialMatchNote": "{count, plural, one {Uma posição já está em parte nos mercados-alvo e ainda assim é vendida por inteiro: a parte alinhada não pode ser mantida sem manter o resto do fundo. Por isso a transferência corresponde ao valor total da posição.} other {# posições já estão em parte nos mercados-alvo e ainda assim são vendidas por inteiro: a parte alinhada não pode ser mantida sem manter o resto de cada fundo. Por isso a transferência corresponde ao valor total delas.}}",
       "realized": "Resultado realizado estimado",
       "tax": "Imposto estimado",
       "taxWithRate": "Imposto estimado ({rate}%)",
@@ -252,6 +253,8 @@
       "workingCounts": "Conta para o alvo",
       "workingMarket": "{name} {percent}",
       "workingExact": "O próprio instrumento alvo",
+      "workingCash": "Caixa",
+      "workingCashNote": "Não investido — não conta para nada e financia a compra",
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Sem composição registrada; comparado por instrumento",
       "workingNoTargetData": "Não dá para comparar: o alvo não tem composição",
@@ -332,7 +335,7 @@
       "NO_ACCOUNT": "Esta estratégia não tem nenhuma conta de investimento atribuída.",
       "NO_POSITION": "As contas da estratégia não têm nenhum instrumento.",
       "FIRST_RUN": "Esta estratégia ainda não foi avaliada – o primeiro sinal aparece após a próxima avaliação agendada.",
-      "STALE_PRICES": "Os preços por trás deste relatório não estão atuais, então o sinal pode mudar depois que forem atualizados.",
+      "STALE_PRICES": "Alguns dos preços por trás deste relatório não estão atualizados, então o sinal pode mudar depois de atualizá-los. Os mais antigos, ou totalmente ausentes, são para:",
       "CALCULATION_FAILED": "Não foi possível calcular o sinal com os dados disponíveis."
     },
     "footer": {

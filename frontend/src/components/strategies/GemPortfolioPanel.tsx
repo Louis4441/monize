@@ -211,11 +211,17 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                         ? holding.marketValue * share
                         : null;
                       return (
-                        <tr key={holding.securityId ?? holding.symbol}>
+                        <tr key={holding.isCash ? 'cash' : holding.securityId ?? holding.symbol}>
                           <td className="py-1 pr-3">
-                            <GemSecurityLink securityId={holding.securityId}>
-                              {holding.symbol ?? t('gem.common.unassigned')}
-                            </GemSecurityLink>
+                            {/* Cash is a balance, not an instrument: there is
+                                nothing to link to and no ticker to print. */}
+                            {holding.isCash ? (
+                              t('gem.portfolioPanel.workingCash')
+                            ) : (
+                              <GemSecurityLink securityId={holding.securityId}>
+                                {holding.symbol ?? t('gem.common.unassigned')}
+                              </GemSecurityLink>
+                            )}
                           </td>
                           <td className="py-1 pr-3 text-right tabular-nums">
                             {isKnown(holding.marketValue) ? (
@@ -228,7 +234,9 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                             {/* The markets that actually overlap, named. A bare
                                 percentage says a fifth is on target; this says
                                 which fifth, so the figure can be checked. */}
-                            {position.basis === 'INSTRUMENT'
+                            {holding.isCash
+                              ? t('gem.portfolioPanel.workingCashNote')
+                              : position.basis === 'INSTRUMENT'
                               ? isTargetRow
                                 ? t('gem.portfolioPanel.workingExact')
                                 : t('gem.portfolioPanel.workingNoTargetData')

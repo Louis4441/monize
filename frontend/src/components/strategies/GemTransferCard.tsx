@@ -60,6 +60,17 @@ export function GemTransferCard({ action, signalUnavailable = false }: GemTransf
         )}
       </p>
 
+      {/* Compliance can be well above zero while the whole position still
+          moves: a fund's on-target sleeve cannot be kept without keeping the
+          rest of it, so the sale is all or nothing. */}
+      {action.partialMatchCount > 0 && (
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {t('gem.transfer.partialMatchNote', {
+            count: action.partialMatchCount,
+          })}
+        </p>
+      )}
+
       <dl className="mt-3 space-y-1">
         <GemStatRow
           label={t('gem.transfer.realized')}
