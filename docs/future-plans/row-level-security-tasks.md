@@ -52,7 +52,7 @@ uses four classes:
 | M2 | Migrations: direct + indirect + special (users/delegation/emergency) policies (no enable) | M1 | inert | done |
 | M3 | Migration: `ENABLE ROW LEVEL SECURITY` (authored, **not deployed**) | M2 | **DO NOT DEPLOY** | done (authored; ships only after flip A soaks) |
 | T1 | Integration harness applies real RLS migrations + role/grants + `updated_at` triggers | M2, F1 | none | done |
-| T2 | Catalog-driven `rls-enforcement` integration spec (4 buckets) | T1, M3 | none | unblocked (T1 + M3 done) |
+| T2 | Catalog-driven `rls-enforcement` integration spec (4 buckets) | T1, M3 | none | done |
 | C1 | Auth wrapping: `jwt.strategy` under `withUserContext(sub)`; PAT + password-reset + OAuth under `withSystemContext`; public-route audit | F2 | inert | done |
 | C2 | Cron jobs: system fan-out + per-user bodies wrapped | F2 | inert | done |
 | C3 | Seeders + demo reset under `withSystemContext` | F2 | inert | done |
@@ -65,9 +65,9 @@ uses four classes:
 | R5 | Refactor: built-in-reports, reports | F3, C1–C4, C6 | neutral | done |
 | R6 | Refactor: ai, mcp, import, action-history, currencies, updates, notifications | F3, C1–C4, C6 | neutral | done |
 | R7 | Refactor: auth, users, delegation, admin, emergency-access, backup, database | F3, C1–C4, C6 | neutral | done |
-| C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral | unblocked (R7 done) |
-| L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none | unblocked (ratchet at 0) |
-| D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none | not started |
+| C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral | done |
+| L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none | done |
+| D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none | not started — **the only task left**; all code tasks are done |
 
 **Why context wrapping (C1–C4, C6) comes BEFORE the refactors (R1–R7), not after.** `withScopedDb` throws
 on missing ambient context in every mode, including `off`. `jwt.strategy` runs in the guard phase —
@@ -512,21 +512,43 @@ or unreadable (no silent skip); a raw `UPDATE` on a trigger-covered table in the
 
 ### T2. Catalog-driven `rls-enforcement` spec
 
-- [ ] Status: not started, but **fully unblocked** — T1 and M3 are both done. Build the spec's own
-  DataSource and call `applyRlsPolicies(ds, { includeEnable: true })` from
-  `test/helpers/rls-setup.ts` (it is not wired into raw-DataSource suites automatically, and the
-  enable is opt-in so the ordinary suites keep seeing inert policies).
-  `rls-enable.integration.spec.ts` is the working example, including an `asAppRole(gucs, fn)` helper
-  that runs a body under `SET LOCAL ROLE` with transaction-local GUCs — the shape T2 needs per
-  table. The four-bucket map must cover the tables that postdate M2: `import_staged_files`,
-  `import_jobs` and `security_documents` are all direct `user_id`, so the `user_id`-column bucket
-  picks them up with no map entry, but a hard-coded table count will not match.
+- [x] Status: done (branch `claude/rls-tasks-next-steps-2ra6rr`). Shipped as
+  `backend/test/integration/rls-enforcement.integration.spec.ts` (18 tests) plus
+  `backend/test/helpers/rls-catalog.ts`, a catalog loader + **generic row seeder** driven by the live
+  database (`information_schema` + `pg_catalog`): one row per (table, owner) is generated from column
+  metadata, with ownership expressed through foreign keys (any `users(id)` reference gets the owner,
+  any other NOT NULL FK gets the owner's already-seeded parent via topological order, `currencies`
+  resolves to USD). A future table is therefore seeded, bucketed and asserted on with **no
+  registration step**; a column type the generator does not understand throws naming the column.
 
-  M3's spec already covers, for `accounts` and `transaction_splits` only, the visibility /
-  zero-rows / bypass / `WITH CHECK` / non-owner assertions. T2's job is to make that catalog-driven
-  across **every** table and to add what M3 does not touch: the 22P02 garbage-GUC assertion, the
-  `app.preserve_timestamps` trigger case, the delegation semantics (both identity GUCs), and the
-  post-commit GUC-scope check.
+  - **Buckets are exactly as specced** — `user_id` column (detected from the schema, so
+    `import_staged_files`/`import_jobs`/`security_documents` needed no map entry), the owner-column
+    map, the indirect map (15 tables), and the 4-entry exemption list. A table in none or several
+    buckets fails, as does a covered table missing its policy or its `ENABLE`.
+  - **Per-table sweeps as the runtime role** (via `asAppRole` + both identity GUCs, matching what
+    `withUserContext` emits): exact per-user visibility compared **by primary key against the seeded
+    rows** (not counts), zero rows on unset *and* empty-string GUCs, 22P02 on a garbage GUC asserted
+    as an error, `WITH CHECK` rejection of a freshly generated cross-user row, bypass parity with the
+    owner's row count.
+  - **Delegation semantics** (current=owner, real=delegate): owner's accounts visible while acting;
+    both `users` rows; the delegation row from all three perspectives; grants through the parent's
+    real arm in the delegate's own session; favourites readable/insertable via the real arm only;
+    owner-alone blindness to the delegate's favourites; delegate-own-session blindness to owner data.
+  - **GUC scope**: a real `withUserContext` + `withScopedDb` (`RLS_MODE=enforce`) on a
+    single-connection pool connected as `monize_app`; after commit both identity GUCs read empty on
+    the same connection and a raw `SELECT` returns zero rows.
+  - **Two seeder facts worth knowing:** several ownership/parent columns have **no FK constraint** in
+    the synchronize-built schema (`auto_backup_settings.user_id`, `security_documents.user_id`,
+    `user_currency_preferences.user_id`, `delegate_account_favourites.{delegate_user_id,account_id}`,
+    `attachment_blobs.attachment_id`, `account_delegate_grants.account_id`) — the seeder resolves
+    them by naming convention plus a small explicit map, and a future FK-less column fails loudly
+    (random uuid → policy hides the row → visibility sweep names the table). And TypeORM's raw
+    `query()` returns `[records, affectedCount]` for UPDATE, unlike INSERT.
+  - **Negative controls verified in scratch runs:** dropping one policy fails 7 tests; an unbucketed
+    fake table fails 6, named; stripping the real arms from the three special policies fails 4
+    delegation tests.
+
+  Full integration run against a real PostgreSQL 16: 18 suites / 206 tests green.
 
 **Scope:** new `backend/test/integration/rls-enforcement.integration.spec.ts`.
 
@@ -1091,12 +1113,23 @@ grantee-side audit result in the PR description.
 
 ### C5. Backup restore
 
-- [ ] Status: not started, but **unblocked**. Unlike C1-C4/C6 (which only depend on F2), C5 also
-  depends on **M1** (the GUC-aware `update_updated_at_column()` trigger must be in the DB) and **R7**
-  (the restore path must already be on `withScopedDb` to carry the `preserveTimestamps` flag). Both
-  have now landed: M1 shipped as migration `111`, and R7 put the whole restore block in one
-  `withScopedDb` -- the `DISABLE TRIGGER` / `ENABLE TRIGGER` pair around it is deliberately untouched
-  and is exactly what C5 replaces.
+- [x] Status: done (branch `claude/rls-tasks-next-steps-2ra6rr`). The trigger DDL pair and its
+  table bookkeeping are deleted from `restoreDeferredFkColumns`; the whole restore transaction now
+  runs under a new **`withPreserveTimestamps(fn)`** helper (`common/db/with-context.ts`) that extends
+  the ambient context with the flag — identity is inherited, not granted, so an unwrapped call path
+  still throws and the restore keeps running as the requesting user (no system bypass).
+  - The wrapper-usage unit test asserts the user lookup runs unflagged, the restore transaction
+    flagged, and the deferred UPDATE runs with **no trigger DDL**; a source-scan guard test fails if
+    `DISABLE TRIGGER`/`ENABLE TRIGGER` ever reappear in `backup.service.ts` (the
+    `ui-conventions.test.ts` pattern).
+  - `backup-restore.integration.spec.ts` previously **recreated the pre-M1 trigger function by
+    hand**, which would have made every timestamp assertion test a function that no longer ships. It
+    now applies the real RLS migrations via T1's `applyRlsPolicies`, and the round-trip asserts a
+    backdated `updated_at` survives export → restore → Phase-3 deferred-FK UPDATE **at
+    `RLS_MODE=off`** (the acceptance case: the GUC path is now the only preservation mechanism).
+    Negative control verified: removing the wrapper fails that assertion with a freshly stamped
+    timestamp.
+  - Full unit suite (10,176) + integration suite (18/206) green against a real PostgreSQL 16.
 
 **Scope:** `backend/src/backup/backup.service.ts` (restore path, ~line 1317).
 
@@ -1148,18 +1181,29 @@ behavior unchanged; no context-throw in dev smoke once R7 lands (verified again 
 
 ### L1. Lint bans
 
-- [ ] Status: not started, but **unblocked** — R1–R7 are done and both ratchet counts are 0
-  (`backend/scripts/rls-ratchet-baseline.json`). The now-unused `TypeOrmModule.forFeature`
-  registrations R1–R5 left behind were removed in R6/R7, so that L1 clean-up is already done.
+- [x] Status: done (branch `claude/rls-tasks-next-steps-2ra6rr`). All three rules live in
+  `backend/eslint.config.mjs`:
+  - `no-restricted-imports` bans `InjectRepository` from `@nestjs/typeorm` and
+    `no-restricted-syntax` bans any `.createQueryRunner()` call across `src/`, excluding specs,
+    `src/test-helpers/**` and `scoped-db.ts`.
+  - `common/db/with-context` imports are allowed only from `WITH_CONTEXT_ALLOWLIST` — **36 files,
+    derived from the tree as instructed** (C5 added `backup/backup.service.ts` for
+    `withPreserveTimestamps` on top of the 35 the note below counted). Flat-config subtlety: the
+    allowlist override must **restate** the `InjectRepository` paths ban, because a later block
+    replaces a rule's whole options object — verified by injecting `InjectRepository` into an
+    allowlisted file and watching it still fail.
+  - The F3 ratchet is removed (script, self-test, baseline, npm scripts, both CI steps); the lint
+    rules are the permanent replacement, still enforced by the same "Backend Lint & Type Check" job
+    via `npm run lint`.
+  - Verified: clean on the real tree; a synthetic file violating all three bans produces all three
+    errors.
 
-  **Derive the allowlist from the tree, not from this list.** As of 2026-08, **35 non-spec files**
-  import `common/db/with-context`, which is more than the C1 note ("admin, auth bootstrap, emergency
-  access, cron/jobs, seeders, backup") or the R6/R7 additions describe. Beyond those, it now includes
-  `backend/src/import/mny/**` (3 files) and `backend/src/mcp/tools/transactions.tool.ts`, both of
-  which postdate R7. Run
-  `grep -rl "db/with-context" backend/src --include=*.ts | grep -v spec` when writing the rule and
-  justify each entry, rather than trusting any enumeration written here — the point of the ban is
-  that a *new* importer is a deliberate decision, so the allowlist must start at today's real set.
+  The original unblock note is kept for the audit trail: as of 2026-08 (pre-C5), **35 non-spec
+  files** imported `common/db/with-context` — more than the C1 note or the R6/R7 additions describe,
+  including `backend/src/import/mny/**` (3 files) and `backend/src/mcp/tools/transactions.tool.ts`,
+  which postdate R7. The allowlist was derived with
+  `grep -rl "db/with-context" backend/src --include=*.ts | grep -v spec`, not from any enumeration
+  in this document.
 
 **Do:** ESLint `no-restricted-imports`: `with-context.ts` importable only from the allowlist (admin,
 auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepository` and
@@ -1169,7 +1213,10 @@ auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepos
 
 ### D1. Docs
 
-- [ ] Status: not started
+- [ ] Status: not started. Note: L1 already made the one root-`CLAUDE.md` correction it forced (the
+  ratchet paragraph now describes the lint bans + `WITH_CONTEXT_ALLOWLIST`); the rest of the docs
+  pass below is untouched. `withPreserveTimestamps` (added by C5) should be mentioned wherever the
+  context helpers are documented.
 
 **Do:** update root `CLAUDE.md` (QueryRunner section now points at `withScopedDb` as the required pattern)
 and `database/CLAUDE.md` (RLS migration conventions, "adding a new table" policy step — four buckets,

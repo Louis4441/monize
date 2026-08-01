@@ -110,12 +110,12 @@ async createSomething(userId: string, dto: CreateDto) {
 
 `withScopedDb` commits when the callback returns and rolls back when it throws, so there is no
 commit/rollback/release bookkeeping to get wrong. **There are no `QueryRunner`s left in `src/`** —
-RLS tasks R1–R7 converted every one, and both ratchet counts are 0. Helpers take an `EntityManager`,
+RLS tasks R1–R7 converted every one, and lint now bans the pattern outright (L1). Helpers take an `EntityManager`,
 never a `QueryRunner`. If you find a `createQueryRunner()` in a diff, it is new and wrong.
 
-## Database Access & Row-Level Security (RLS ratchet — CRITICAL)
+## Database Access & Row-Level Security (RLS lint bans — CRITICAL)
 
-**All** database access goes through `withScopedDb` (`backend/src/common/db/scoped-db.ts`) — the single RLS-compliant door to the DB. **Never add an `@InjectRepository(...)` field, a `this.dataSource.createQueryRunner()` call, or a bare `this.dataSource.query(...)`.** A CI ratchet (`backend/scripts/rls-ratchet.mjs`, baseline `backend/scripts/rls-ratchet-baseline.json`) counts every `@InjectRepository(` and `createQueryRunner(` site under `src/`; **both baselines are 0** (RLS tasks R1–R7 converted the ~91 original sites), so adding either fails "Backend Lint & Type Check".
+**All** database access goes through `withScopedDb` (`backend/src/common/db/scoped-db.ts`) — the single RLS-compliant door to the DB. **Never add an `@InjectRepository(...)` field, a `this.dataSource.createQueryRunner()` call, or a bare `this.dataSource.query(...)`.** ESLint bans both outright (RLS task L1, `backend/eslint.config.mjs`): importing `InjectRepository` or calling `.createQueryRunner()` anywhere in `src/` (outside `scoped-db.ts`, specs and test helpers) fails "Backend Lint & Type Check". The same config restricts importing `common/db/with-context` to an explicit `WITH_CONTEXT_ALLOWLIST` — a new `withSystemContext`/`withUserContext` call site means adding the file to that allowlist in the same PR, as a reviewed decision. (R1–R7 converted the ~91 original sites; the old counting ratchet is gone.)
 
 ```typescript
 // Read: one short tenant transaction, identical to today's autocommit read.
