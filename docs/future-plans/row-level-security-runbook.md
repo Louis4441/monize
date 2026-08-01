@@ -1,12 +1,19 @@
 # Row-Level Security (RLS) Runbook
 
-> **Status: planned / not yet enforced.** This runbook documents the operational model for the database-enforced Row-Level Security feature described in [`row-level-security.md`](./row-level-security.md). It is the operator reference for enabling, verifying, and rolling back RLS once the implementation lands. When the feature ships, move this file to `docs/rls.md`. Until the runtime is switched to the `monize_app` role (see Rollout), RLS policies are inert even if present, because the app connects as the cluster superuser, which bypasses RLS.
+> **Status: implemented, not yet enforced.** Every code and migration task in
+> [`row-level-security-tasks.md`](./row-level-security-tasks.md) has landed: `withScopedDb` is the
+> only door to the database, every out-of-request path is context-wrapped, the policies are deployed
+> **inert**, and the enable migration (`123_rls_enable.sql`) is authored — it is flip B and must not
+> reach production until flip A has soaked (see Rollout). What remains is purely operational: the
+> flips below, executed by an operator. When enforcement ships, move this file to `docs/rls.md`.
+> Until the runtime is switched to the `monize_app` role, RLS policies are inert even where enabled,
+> because the app connects as the owner role, which bypasses policies on tables it owns.
 
 ## What RLS does here
 
 Monize enforces multi-tenancy in application code: every service filters by `userId` derived from the JWT. RLS adds a **second wall inside PostgreSQL** so that, even if a query forgets its `WHERE user_id` clause, the database returns only the current user's rows. It is defense in depth, not a replacement for the app-level filtering.
 
-The mechanism: every database operation runs inside a transaction (opened by the `withScopedDb()` helper) whose first statements set **transaction-local** variables (`app.current_user_id` = the effective user, `app.real_user_id` = the authenticated identity -- they differ only when a delegate acts for an owner; via `set_config(..., true)` = `SET LOCAL` semantics); table policies compare each row's owner against them. Postgres reverts the variables at COMMIT/ROLLBACK, so they can never leak onto a pooled connection. A nested `withScopedDb` call joins the ambient transaction (the active EntityManager is carried in the request context) rather than opening a second connection. Privileged work (migrations, admin, cron jobs, seeders, pre-identity auth) runs either as the owner role (which bypasses RLS) or with an explicit transaction-local `app.bypass_rls = 'on'` marker.
+The mechanism: every database operation runs inside a transaction (opened by the `withScopedDb()` helper) whose first statements set **transaction-local** variables (`app.current_user_id` = the effective user, `app.real_user_id` = the authenticated identity -- they differ only when a delegate acts for an owner; via `set_config(..., true)` = `SET LOCAL` semantics); table policies compare each row's owner against them. Postgres reverts the variables at COMMIT/ROLLBACK, so they can never leak onto a pooled connection. A nested `withScopedDb` call joins the ambient transaction (the active EntityManager is carried in its own AsyncLocalStorage scope) rather than opening a second connection. Privileged work (migrations, admin, cron jobs, seeders, pre-identity auth) runs either as the owner role (which bypasses RLS) or with an explicit transaction-local `app.bypass_rls = 'on'` marker.
 
 ## Roles and connections
 
@@ -96,7 +103,7 @@ Fail-loud helper: `withScopedDb()` **throws** (`DB access outside request/user/s
 
 This table is descriptive, not exhaustive-by-construction: the implementation includes an audit of every route reachable without `req.user`. If you add such a route later, it needs explicit context.
 
-**Do not "fix" a zero-rows or context-error bug by adding `withSystemContext`.** That widens the RLS bypass. ESLint restricts importing `with-context.ts` to an allowlist of modules (admin, auth bootstrap, emergency access, jobs, seeders, backup); if the lint blocks you, the almost-always-correct fix is propagating the *user* context (`withUserContext` or the request scope), and widening the allowlist is a deliberate, reviewed decision. `withSystemContext` invocations are logged with their call site so bypass usage stays auditable in production.
+**Do not "fix" a zero-rows or context-error bug by adding `withSystemContext`.** That widens the RLS bypass. ESLint restricts importing `with-context.ts` to `WITH_CONTEXT_ALLOWLIST` in `backend/eslint.config.mjs` (guards/strategies, cron entry points, seeders, bootstrap hooks, admin, backup, the MCP transport, the request-context interceptor); if the lint blocks you, the almost-always-correct fix is propagating the *user* context (`withUserContext` or the request scope), and adding a file to the allowlist is a deliberate, reviewed decision made in the same PR. `withSystemContext` invocations are logged with their call site so bypass usage stays auditable in production.
 
 ## Rollout (enabling RLS safely)
 
@@ -106,7 +113,7 @@ Each step is independently revertible. Do not skip the soak phases. The structur
 2. **Shadow soak** — `RLS_MODE=shadow` in production. GUCs emitted per transaction, runtime still the owner (policies bypassed). Land the helper/trigger + policy migrations — policies without `ENABLE ROW LEVEL SECURITY` are inert, and no migration references the app role (grants live in db-init). Soak for **weeks, not days**: the transaction wrapping proves itself (endpoint latency, error rates) while RLS itself is still off.
 3. **Staging, fully enforced — not the demo alone.** The demo cannot verify the riskiest paths: `DEMO_MODE=true` makes backup **restore** and the emergency-access **claim** `@DemoRestricted` (403 before any service code). Stand up a non-demo staging stack — the prod compose with `DEMO_MODE=false` and a **pinned pre-release image tag** — at `RLS_MODE=enforce` *with* the enable migration deployed. Enable Postgres `log_statement`. Run the full e2e + integration suites, plus the four paths most likely to break: a backup **restore**, an emergency-access **claim**, an MCP request authenticated by PAT, and **delegate-acting flows** (switch account, favourite, delegate's own password change). The demo may run enforce in parallel for general-traffic soak. Image discipline for the whole rollout: prod must run a pinned release tag, **not `:latest`** — demo and prod share the same image reference today, so an unpinned prod would pull flip-B the moment it is published anywhere. Watch the monitoring signals below.
 4. **Production flip A: privilege drop** — set `RLS_MODE=enforce` while the enable migration is **not** yet deployed to prod. The runtime becomes `monize_app`; no table has RLS enabled, so row visibility is unchanged. Only privilege bugs can surface (loud `permission denied` errors, e.g. a missed grant or a DDL path). Soak. Revert: `RLS_MODE=shadow`.
-5. **Production flip B: enable RLS** — deploy the release containing the enable migration (`0NN+4_rls_enable.sql`). RLS is now live; only context bugs can surface. Keep watching the signals through at least one daily-cron cycle (scheduled-transaction auto-post, demo reset). Emergency revert is unchanged and instant: `RLS_MODE=shadow` — the owner role bypasses RLS even on enabled tables.
+5. **Production flip B: enable RLS** — deploy the release containing the enable migration (`123_rls_enable.sql`, which derives its targets from `pg_policies` so tables policied after M2 are included automatically). RLS is now live; only context bugs can surface. Keep watching the signals through at least one daily-cron cycle (scheduled-transaction auto-post, demo reset). Emergency revert is unchanged and instant: `RLS_MODE=shadow` — the owner role bypasses RLS even on enabled tables.
 
 ### Monitoring signals during soak and after enforcement
 
@@ -159,7 +166,7 @@ FROM pg_class WHERE relkind = 'r' AND relrowsecurity ORDER BY relname;
    SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = 'monize_app';
    ```
    (Requires superuser, `pg_signal_backend` membership, or being the same role — on CNPG run it as the `postgres` superuser via the operator, since the app owner may lack it.)
-3. Run the down-SQL as the owner. Drop policies keyed on **`pg_policies`, not on which tables have RLS enabled** — the rollout deliberately creates a state where policies exist on ~46 tables while zero are enabled (pre-flip-B), and `DROP FUNCTION` fails with a dependency error while any policy still references the helpers:
+3. Run the down-SQL as the owner. Drop policies keyed on **`pg_policies`, not on which tables have RLS enabled** — the rollout deliberately creates a state where policies exist on every user-owned table (53 when M3 shipped) while zero are enabled (pre-flip-B), and `DROP FUNCTION` fails with a dependency error while any policy still references the helpers:
    ```sql
    -- Generate and run a DROP POLICY for every row of:
    SELECT format('DROP POLICY IF EXISTS %I ON %I;', policyname, tablename) FROM pg_policies;

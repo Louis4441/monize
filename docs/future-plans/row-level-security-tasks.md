@@ -67,7 +67,7 @@ uses four classes:
 | R7 | Refactor: auth, users, delegation, admin, emergency-access, backup, database | F3, C1–C4, C6 | neutral | done |
 | C5 | Backup restore: `preserveTimestamps` flag replaces `DISABLE TRIGGER` DDL | F2, M1, R7 | neutral | done |
 | L1 | Lint bans: `with-context.ts` import allowlist; `@InjectRepository`/`createQueryRunner` ban | R1–R7 | none | done |
-| D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none | not started — **the only task left**; all code tasks are done |
+| D1 | Docs: CLAUDE.md updates (incl. stale scheduler claim), `.env.example` + helm/k8s finalization, runbook promotion prep | all above | none | done — **every task in this list is complete**; what remains is operator-only (runbook flips) |
 
 **Why context wrapping (C1–C4, C6) comes BEFORE the refactors (R1–R7), not after.** `withScopedDb` throws
 on missing ambient context in every mode, including `off`. `jwt.strategy` runs in the guard phase —
@@ -1213,10 +1213,38 @@ auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepos
 
 ### D1. Docs
 
-- [ ] Status: not started. Note: L1 already made the one root-`CLAUDE.md` correction it forced (the
-  ratchet paragraph now describes the lint bans + `WITH_CONTEXT_ALLOWLIST`); the rest of the docs
-  pass below is untouched. `withPreserveTimestamps` (added by C5) should be mentioned wherever the
-  context helpers are documented.
+- [x] Status: done (branch `claude/rls-tasks-next-steps-2ra6rr`). **This closes the task list** —
+  everything left in the RLS effort is operator-only (the runbook's shadow soak, staging enforce,
+  flip A, flip B).
+  - **Root `CLAUDE.md`:** the QueryRunner/ratchet sections were already current (L1 corrected the
+    ratchet paragraph when it removed the script); added `withPreserveTimestamps` to the context-
+    helper list, including the "trigger DDL must never come back" guard-test pointer.
+  - **`database/CLAUDE.md`:** new "Row-Level Security conventions (hard rules)" section — the
+    new-table rule (policy ships in the same migration; any migration numbered after `123` also
+    ships its own `ENABLE`, because `123` derives from `pg_policies` at the moment it runs and
+    never runs again on a deployed DB), the four buckets with their spec-map obligations, the
+    initplan form, and the no-role/no-grant rule with db-init/CNPG as the provisioning paths. The
+    new-migration checklist gained the policy step, and its hard-coded "current latest" migration
+    number (stale at `079`) was replaced with "read the max from the directory".
+  - **`backend/CLAUDE.md` + `docs/cron-jobs.md`:** the stale separate-scheduler claim is gone —
+    crons run in the API process (`ScheduleModule.forRoot()`), every k8s replica fires every cron,
+    and new `@Cron` handlers must seed their own context (C2 pattern, `rls-context-smoke.spec.ts`
+    as the proof shape). The dead `start:scheduler` script was deleted from `package.json`.
+    Also fixed backend/CLAUDE.md's stale 13-locale list to point at `SUPPORTED_LOCALE_CODES`.
+  - **`.env.example` / helm / CNPG:** verified already final from F1 — `RLS_MODE` tri-state,
+    `DATABASE_APP_USER`/`DATABASE_APP_PASSWORD` (incl. the `log_statement` caveat) are documented
+    in `.env.example`; `helm/values.yaml` + `configmap-backend.yaml` carry the keys and
+    `helm/README.md` documents the CNPG `DatabaseRole`/`managed.roles` requirement. No changes
+    needed.
+  - **Runbook:** verified against the implemented reality and corrected where it had drifted —
+    status header now says implemented-not-enforced with the flip-B warning, the enable migration
+    is named concretely (`123_rls_enable.sql`, pg_policies-derived), the allowlist paragraph points
+    at `WITH_CONTEXT_ALLOWLIST` in `eslint.config.mjs`, the ambient-manager wording matches
+    `scoped-db.ts` (own ALS scope, not the request context), and the policy count in the removal
+    section is exact (53). The move-to-`docs/rls.md`-at-ship-time note was already present.
+  - **Acceptance:** `npm run i18n:check` clean (no strings changed); design doc Verification items
+    1–2 are runnable as written and were run green in this session (build + lint clean; unit
+    10,176 and integration 206 tests green, including the `rls-enforcement` spec).
 
 **Do:** update root `CLAUDE.md` (QueryRunner section now points at `withScopedDb` as the required pattern)
 and `database/CLAUDE.md` (RLS migration conventions, "adding a new table" policy step — four buckets,

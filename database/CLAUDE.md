@@ -27,10 +27,11 @@ Credentials are in the root `.env` file (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGR
 ## Creating a New Migration
 
 1. **Create the migration file** in `database/migrations/` with the next sequential number prefix:
-   - Current latest: `079_securities_is_favourite.sql`
-   - Next file: `080_<descriptive_name>.sql`
+   - **Read the current max from the directory** (`ls database/migrations | tail`) — do not trust a
+     number written in any document, including this one; they go stale (the RLS task list learned
+     this three times).
    - **The numeric prefix must be unique** — `ls database/migrations | awk -F_ '{print $1}' | sort | uniq -d` should print nothing.
-     Migrations are applied in filename order; duplicate prefixes (we have a few historical pairs at `022`, `068`, `075`) leave the apply order ambiguous and rely on alphabetical tie-breaking, which is brittle.
+     Migrations are applied in filename order; duplicate prefixes (we have a few historical pairs at `022`, `068`, `075`, `116`, `117`) leave the apply order ambiguous and rely on alphabetical tie-breaking, which is brittle.
    - Use `IF NOT EXISTS` / `IF EXISTS` to make migrations idempotent
 
 2. **Update `schema.sql`** to reflect the same change (so fresh installs match migrated databases)
@@ -55,7 +56,51 @@ Credentials are in the root `.env` file (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGR
    `securities.website` and `securities.msn_instrument_id` are all dropped. Use
    `const` instead of `drop` when the column is NOT NULL.
 
-7. **Restart the backend** — migrations will be applied automatically on startup
+7. **Ship the table's RLS policy in the same migration** if the table is user-owned — see
+   "Row-Level Security conventions" below. This is a hard convention, not a suggestion.
+
+8. **Restart the backend** — migrations will be applied automatically on startup
+
+## Row-Level Security conventions (hard rules)
+
+Every user-owned table carries a row-level-security policy; the app emits per-transaction identity
+GUCs through `withScopedDb` and the policies compare each row's owner against them (see
+`docs/future-plans/row-level-security.md` and the runbook). Two rules bind every migration:
+
+1. **A migration that creates a user-owned table ships its `CREATE POLICY` in the same file** —
+   `117_mny_import_staging_and_jobs.sql` and `118_security_documents_rls.sql` are the worked
+   examples. And because `123_rls_enable.sql` derives its `ENABLE ROW LEVEL SECURITY` targets from
+   `pg_policies` *at the moment it runs*, any migration numbered **after** `123` must also ship its
+   own `ALTER TABLE <t> ENABLE ROW LEVEL SECURITY;` — on a deployed database `123` has already been
+   recorded in `schema_migrations` and will never run again, so a later policy without its own
+   enable leaves that table as the single unprotected one under enforcement. (Enabling is inert
+   while the app connects as the table owner, i.e. at `RLS_MODE=off`/`shadow`, so shipping it does
+   not change behavior before the operator flips modes.)
+
+   Every table must land in exactly one of **four buckets**, and the catalog-driven
+   `backend/test/integration/rls-enforcement.integration.spec.ts` fails the moment a table is in
+   none (or several):
+   - **Direct**: the table has a `user_id` column → the uniform policy
+     (`user_id = (SELECT app_current_user_id()) OR (SELECT app_bypass_rls())`), picked up with no
+     spec change. Tables keyed by the *authenticated* user additionally OR in
+     `user_id = (SELECT app_real_user_id())` — see `112_rls_policies_direct.sql` Group B.
+   - **Owner-column**: a bespoke owner column (`owner_user_id`, `delegate_user_id`, `users.id`) →
+     bespoke policy (`114_rls_policies_special.sql`), plus an entry in the spec's owner-column map.
+   - **Indirect**: no owner column → an `EXISTS` back to the owning parent
+     (`113_rls_policies_indirect.sql`), plus an entry in the spec's indirect map.
+   - **Exempt**: global reference data with a documented rationale in the migration comment
+     (`currencies`, `exchange_rates`, `oauth_payloads`, `schema_migrations`), plus the spec's
+     exemption list.
+
+   Keep the `(SELECT app_current_user_id())` initplan form — a bare function call relies on
+   SQL-function inlining and evaluates per row on sequential scans.
+
+2. **No migration may contain a role or grant statement.** `GRANT ... TO monize_app` (or any
+   `CREATE/ALTER/DROP ROLE`) in a migration crash-loops every deployment where the role does not
+   exist. The role and its grants are provisioned idempotently by db-init on every startup
+   (`backend/src/common/db/app-role.ts`); on CNPG the role comes from the `Cluster` manifest
+   (`managed.roles`) instead. New tables created by the owner get their grants automatically via
+   `ALTER DEFAULT PRIVILEGES`.
 
 ## Migration File Conventions
 - Numbered prefix for ordering: `NNN_description.sql` (e.g., `079_securities_is_favourite.sql`)
