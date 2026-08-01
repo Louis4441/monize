@@ -7,11 +7,11 @@
 - **One task per session/PR.** Each task lists its files. Touching files outside the task's scope is a scope violation -- stop and leave a note instead.
 - **The governing invariant applies to every task:** same-owner transfers behave byte-identically after your change. Every new branch is entered only when the two accounts (or legs) have different owners. If your change alters same-owner behavior, the task is wrong -- stop.
 - **Definition of done for every task** (in addition to per-task acceptance):
-  - `cd backend && npm run build && npm run lint` clean (lint includes the RLS ratchet: no new `@InjectRepository(` or `createQueryRunner(` sites -- new DB access uses `withScopedDb`).
+  - `cd backend && npm run build && npm run lint` clean (lint bans `@InjectRepository(` and `createQueryRunner(` outright and restricts `common/db/with-context` imports to `WITH_CONTEXT_ALLOWLIST` in `eslint.config.mjs` -- new DB access uses `withScopedDb`, and a new `withSystemContext` call site means an allowlist entry in the same PR, as a reviewed decision).
   - `TZ=UTC npm run test:unit` green; new code covered (95% global / 85% per-file thresholds).
   - Any migration mirrored into `database/schema.sql` in the same PR; `npm run migration:lint` and `scripts/verify-schema.sh` clean.
   - New user-facing strings: English catalogs only (`en/*`), then `npm run i18n:pseudo`. The full-locale pass is task Q3, once, at acceptance -- do not translate early. Parity-test failures on a WIP branch are expected until Q3.
-- **Terminology:** "the design doc" = `cross-owner-transfers.md`. Phase references point there. The migration number in D1 was unassigned when this was written (max was `120_securities_websites.sql`) -- **verify with `ls database/migrations` and use the actual next number.** Line numbers cited in the design doc were accurate at writing time; re-locate by symbol, not line.
+- **Terminology:** "the design doc" = `cross-owner-transfers.md`. Phase references point there. The migration number in D1 was unassigned when this was written (max was `123_rls_enable.sql` at the last review) -- **verify with `ls database/migrations` and use the actual next number**, keeping the numeric prefix unique. Line numbers cited in the design doc were accurate at writing time; re-locate by symbol, not line.
 
 ## Deployment safety
 
@@ -36,10 +36,12 @@ Every task is safe to merge and deploy in any order that respects the dependency
 | M2 | CSV export masking + AI/MCP read masking | M1 | neutral | [ ] |
 | F1 | `GET /accounts/transfer-candidates` endpoint | A1 | inert | [ ] |
 | F2 | Frontend: transfer form candidate groups, grant-filtered options, frozen-lock UI | F1, T1, T2 | inert | [ ] |
-| D1 | Migration: delegate-read policy arm on `transactions` + `idx_adg_account` index | -- | inert | [ ] |
+| D1 | Migration: delegate-read policy arm on `transactions` + `idx_adg_account` index | -- | inert* | [ ] |
 | Q1 | Integration suite: `cross-owner-transfers.integration.spec.ts` (incl. stateless reshare-reconnect proof) | T1-T3, M1-M2 | none | [ ] |
 | Q2 | Playwright e2e journey in `delegation.spec.ts` (share -> transfer -> unshare -> mask -> reshare -> reconnect) | F2, Q1 | none | [ ] |
 | Q3 | Full-locale i18n pass (acceptance, final commit) | all above | none | [ ] |
+
+*D1 is inert at `RLS_MODE=off`/`shadow` (the app connects as the table owner, so policies are not consulted); on an enforcing deployment its read arm is live on deploy -- read-only widening gated on an active `can_read` grant, matching the delegated access the app layer already grants. See the D1 task details.
 
 **Why A2 (guard + plumbing) precedes the T tasks:** the transfer service methods gain an optional actor parameter with a same-owner default; landing the plumbing first means each T task changes service internals against an already-stable signature, and the guard relaxation is inert until a service accepts a cross-owner request (which only T1/T2 introduce).
 
@@ -49,15 +51,15 @@ Every task is safe to merge and deploy in any order that respects the dependency
 
 ### A1 -- CrossOwnerAccessService
 
-**Files:** `backend/src/delegation/cross-owner-access.service.ts` (new), `cross-owner-access.service.spec.ts` (new), `backend/src/delegation/delegation.module.ts` (provider + export).
+**Files:** `backend/src/delegation/cross-owner-access.service.ts` (new), `cross-owner-access.service.spec.ts` (new), `backend/src/delegation/delegation.module.ts` (provider + export), `backend/eslint.config.mjs` (`WITH_CONTEXT_ALLOWLIST` entry for the new service).
 
-Implement per Phase 1 of the design doc. Inject `DataSource` only; all reads via `withScopedDb`; cross-tenant owner lookups (reading a foreign `accounts` row to learn its owner) wrapped in `withSystemContext` with a comment marking them authorization-decision reads.
+Implement per Phase 1 of the design doc. Inject `DataSource` only; all reads via `withScopedDb`; cross-tenant owner lookups (reading a foreign `accounts` row to learn its owner) wrapped in `withSystemContext` with a comment marking them authorization-decision reads. Importing `common/db/with-context` is lint-restricted (RLS task L1), so the allowlist entry is part of this task, not an afterthought.
 
 - `accountAccessFor(realUserId, accountId, op: 'read'|'create'|'edit'|'delete')` -> `{ account, ownerUserId, via: 'own'|'delegation' }`. Order of decisions: account exists -> owned by realUserId -> `via: 'own'`; else active delegation from account owner to realUserId with `can_read` grant row -> op flag check -> `via: 'delegation'` or Forbidden (`errors.delegation.accountOperationNotGranted`); else NotFound (never confirm existence).
 - `readableAccountIdSetFor(realUserId)` -> `Set<string>`: own account ids + `can_read`-granted ids across all active delegations where realUserId is the delegate.
 - `isAccountOwnedBy(accountId, userId)`.
 
-**Acceptance:** unit spec covers the full grant matrix (own / granted-with-op / granted-read-only -> 403 / no-grant -> 404 / nonexistent -> 404 / revoked delegation -> 404 / pending delegation -> 404). Nothing calls the service yet (inert). Ratchet unchanged.
+**Acceptance:** unit spec covers the full grant matrix (own / granted-with-op / granted-read-only -> 403 / no-grant -> 404 / nonexistent -> 404 / revoked delegation -> 404 / pending delegation -> 404). Nothing calls the service yet (inert). Lint clean, with the allowlist entry as the only eslint change.
 
 ### A2 -- Guard relaxation + actor plumbing
 
@@ -126,11 +128,11 @@ Per Phase 4: fetch candidates alongside the account list; grouped dropdown entri
 
 ### D1 -- Migration + index
 
-**Files:** `database/migrations/<next>_cross_owner_transfer_rls.sql` (new), `database/schema.sql`.
+**Files:** `database/migrations/<next>_cross_owner_transfer_rls.sql` (new), `database/schema.sql`, `backend/test/integration/rls-enforcement.integration.spec.ts`.
 
-Per Phase 5: dedicated `transactions_isolation` policy with the delegate-read arm (WITH CHECK stays owner-only); `idx_adg_account` on `account_delegate_grants(account_id)`; `transactions` removed from the direct-ownership policy loop in `schema.sql`. Fully idempotent (`DROP POLICY IF EXISTS`, `CREATE INDEX IF NOT EXISTS`).
+Per Phase 5: dedicated `transactions_isolation` policy with the delegate-read arm (WITH CHECK stays owner-only); `idx_adg_account` on `account_delegate_grants(account_id)`; `transactions` removed from the direct-ownership policy loop in `schema.sql`. Fully idempotent (`DROP POLICY IF EXISTS`, `CREATE INDEX IF NOT EXISTS`). No `ENABLE ROW LEVEL SECURITY` statement: `transactions` is already enabled (`123_rls_enable.sql` on migrated databases, `schema.sql`'s dynamic enable loop on fresh installs); the post-`123` "ship your own ENABLE" rule in `database/CLAUDE.md` covers newly created tables only. Extend the enforcement spec for the new arm: positive case (active `can_read` grant exposes the granted account's transactions to the delegate's own session), negative case (absent or revoked grant hides them), and keep the per-table sweep + delegation-semantics block green. The T1 integration harness needs no registration -- its content-based selector picks up any migration referencing the policy helper functions.
 
-**Acceptance:** `npm run migration:lint` + `scripts/verify-schema.sh` clean. Inert: policies are not ENABLEd (only the RLS plan's M3 does that).
+**Acceptance:** `npm run migration:lint` + `scripts/verify-schema.sh` + `rls-enforcement.integration.spec.ts` clean. Behavior-neutral at `RLS_MODE=off`/`shadow` (app connects as the table owner); under `enforce` the read arm is live on deploy -- read-only widening gated on an active `can_read` grant, matching the app-layer delegated access that already exists.
 
 ### Q1 -- Integration suite
 
