@@ -1,6 +1,6 @@
 # Cron Jobs
 
-Cron jobs use the `@Cron()` decorator from `@nestjs/schedule`. They run in a separate process (`npm run start:scheduler` from `backend/`).
+Cron jobs use the `@Cron()` decorator from `@nestjs/schedule`. They run in the API process (`ScheduleModule.forRoot()` in `backend/src/app.module.ts`); there is no separate scheduler process, and on k8s with more than one backend replica every replica fires every cron.
 
 | Service | Schedule | Purpose |
 |---------|----------|---------|

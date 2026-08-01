@@ -13,6 +13,7 @@ import { User } from "@/users/entities/user.entity";
 import { OidcService } from "@/auth/oidc/oidc.service";
 import { AiEncryptionService } from "@/ai/ai-encryption.service";
 import { createTestUserDirect } from "../helpers/integration-setup";
+import { applyRlsPolicies } from "../helpers/rls-setup";
 import { withUserContext } from "@/common/db/with-context";
 
 /**
@@ -24,8 +25,11 @@ import { withUserContext } from "@/common/db/with-context";
  * gzipped buffer, then restores that buffer into a separate user B on the SAME
  * database and verifies the data survives intact. That round-trip catches
  * things mocks cannot -- FK-safe insert ordering, deferred-FK (Phase 3) UPDATEs,
- * primary-key remapping, user_id rescoping, and the updated_at trigger
- * disable/enable dance.
+ * primary-key remapping, user_id rescoping, and timestamp preservation through
+ * the `app.preserve_timestamps` GUC (task C5): the restore holds no trigger DDL
+ * any more, so the GUC-aware `updated_at` trigger from migration M1 is the only
+ * thing keeping restored timestamps -- at RLS_MODE=off included, which is what
+ * this suite runs under.
  */
 describe("Backup export/restore round-trip (integration)", () => {
   let module: TestingModule;
@@ -86,31 +90,14 @@ describe("Backup export/restore round-trip (integration)", () => {
     service = module.get(BackupService);
     dataSource = module.get(DataSource);
 
-    // synchronize:true builds the schema from entity metadata, which does NOT
-    // include the updated_at triggers defined in database/schema.sql. The
-    // restore disables and re-enables these by name during Phase 3, so they
-    // must exist or ALTER TABLE ... DISABLE TRIGGER would fail.
-    await dataSource.query(`
-      CREATE OR REPLACE FUNCTION update_updated_at_column()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.updated_at = CURRENT_TIMESTAMP;
-        RETURN NEW;
-      END;
-      $$ language 'plpgsql';
-    `);
-    for (const table of [
-      "accounts",
-      "transactions",
-      "scheduled_transactions",
-      "investment_transactions",
-    ]) {
-      await dataSource.query(
-        `CREATE OR REPLACE TRIGGER update_${table}_updated_at
-         BEFORE UPDATE ON ${table}
-         FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();`,
-      );
-    }
+    // synchronize:true builds the schema from entity metadata, which includes
+    // neither the updated_at triggers nor the GUC-aware trigger function from
+    // migration M1. The restore preserves backup timestamps solely through the
+    // app.preserve_timestamps GUC that function honours, so apply the real RLS
+    // migrations (T1's harness) rather than a hand-rolled trigger -- a local
+    // copy of the pre-M1 function here would make every timestamp assertion
+    // test a function that no longer ships.
+    await applyRlsPolicies(dataSource);
   });
 
   afterAll(async () => {
@@ -336,6 +323,20 @@ describe("Backup export/restore round-trip (integration)", () => {
     });
     const seeded = await seedUserData(userA.id);
 
+    // Backdate the Checking account's updated_at so preservation is
+    // distinguishable from re-stamping: its institution_id is restored by a
+    // Phase-3 UPDATE, which fires the updated_at trigger -- only the
+    // app.preserve_timestamps GUC the restore transaction emits keeps this
+    // value (there is no trigger DDL left to fall back on).
+    const BACKDATED = "2020-03-04 05:06:07";
+    await dataSource.transaction(async (m) => {
+      await m.query("SELECT set_config('app.preserve_timestamps', 'on', true)");
+      await m.query(`UPDATE accounts SET updated_at = $1 WHERE id = $2`, [
+        BACKDATED,
+        seeded.accountId,
+      ]);
+    });
+
     const buffer = await withUserContext(userA.id, () =>
       service.exportToBuffer(userA.id),
     );
@@ -423,6 +424,17 @@ describe("Backup export/restore round-trip (integration)", () => {
     )[0];
     expect(account.inst_user_id).toBe(userB.id);
     expect(account.inst_name).toBe("My Bank");
+
+    // Timestamp preservation (task C5): B's restored Checking account keeps
+    // A's backdated updated_at even though the Phase-3 institution_id UPDATE
+    // ran through the updated_at trigger. At RLS_MODE=off -- this suite -- the
+    // preserve GUC is the only mechanism doing this.
+    const [restoredChecking] = await dataSource.query(
+      `SELECT to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS ts
+       FROM accounts WHERE user_id = $1 AND name = 'Checking'`,
+      [userB.id],
+    );
+    expect(restoredChecking.ts).toBe(BACKDATED);
 
     // Deferred FK: the transfer pair's linked_transaction_id points at the
     // paired transaction, both owned by B.

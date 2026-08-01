@@ -6,7 +6,6 @@ NestJS API server. All commands run from this directory.
 
 ```bash
 npm run start:dev          # Dev server with HMR
-npm run start:scheduler    # Cron job process (separate from main server)
 npm run build              # Production build
 npm run lint               # ESLint --fix
 npm run test               # All tests (unit + E2E)
@@ -109,8 +108,10 @@ Mock repositories use `Record<string, jest.Mock>`; tests use `Test.createTesting
 
 ## Internationalization (i18n)
 
-Server-rendered strings (exception messages, email copy) are localized via `nestjs-i18n`. Wrap exception messages in `tr(key, fallback, args)` (`src/i18n/translate.ts`), which resolves against the request locale and returns the English `fallback` outside an HTTP context (jobs, schedulers, tests). Render emails with an `EmailT` translator (`emailTranslator(i18n, recipientLang)` from `src/i18n/email-translator.ts`) so copy matches the recipient's stored locale rather than the request's. Catalogs live in `src/i18n/locales/{locale}/*.json` (locales `de`, `en`, `en-US`, `en-CA`, `en-GB`, `es`, `fr`, `it`, `nl`, `pl`, `pt`, `pt-BR`, `xx`); keep the locale list in `src/i18n/config.ts` in sync with the frontend. The `en-*` entries are lean regional variants (declared in `LOCALE_BASES`): they hold only the keys that differ from `en` and fall back to it per key. Adding or changing a string means updating every locale -- the parity test `src/i18n/locales.parity.spec.ts` fails otherwise -- then regenerating the pseudo-locale with `npm run i18n:pseudo`. Full contributor flow: `src/i18n/README.md`.
+Server-rendered strings (exception messages, email copy) are localized via `nestjs-i18n`. Wrap exception messages in `tr(key, fallback, args)` (`src/i18n/translate.ts`), which resolves against the request locale and returns the English `fallback` outside an HTTP context (jobs, schedulers, tests). Render emails with an `EmailT` translator (`emailTranslator(i18n, recipientLang)` from `src/i18n/email-translator.ts`) so copy matches the recipient's stored locale rather than the request's. Catalogs live in `src/i18n/locales/{locale}/*.json`, one folder per supported locale; the authoritative locale list is `SUPPORTED_LOCALE_CODES` in `src/i18n/config.ts` (root `CLAUDE.md` enumerates them) -- keep it in sync with the frontend's. The `en-*` entries are lean regional variants (declared in `LOCALE_BASES`): they hold only the keys that differ from `en` and fall back to it per key. Adding or changing a string means updating every locale -- the parity test `src/i18n/locales.parity.spec.ts` fails otherwise -- then regenerating the pseudo-locale with `npm run i18n:pseudo`. Full contributor flow: `src/i18n/README.md`.
 
 ## Cron Jobs
 
-Cron jobs use `@Cron()` from `@nestjs/schedule` and run in a separate process (`npm run start:scheduler`). For the full schedule, see `docs/cron-jobs.md` or grep `@Cron(`.
+Cron jobs use `@Cron()` from `@nestjs/schedule` and run **in the API process** -- `ScheduleModule.forRoot()` is registered in `app.module.ts`; there is no separate scheduler process (on k8s with more than one backend replica, every replica fires every cron). For the full schedule, see `docs/cron-jobs.md` or grep `@Cron(`.
+
+Every `@Cron` handler is an out-of-request entry point, so its body must seed its own RLS context (tasks C2-C4): the cross-user fan-out under `withSystemContext`, each per-user body under `withUserContext(userId)`. A handler that reaches the DB with no ambient context throws `DB access outside request/user/system context` in every `RLS_MODE`, including `off` -- the per-module `rls-context-smoke.spec.ts` specs are the pattern for proving a cron runs clean.

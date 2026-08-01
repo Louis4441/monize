@@ -8,6 +8,9 @@ import {
 import { gzipSync, gunzipSync } from "zlib";
 import { PassThrough } from "stream";
 import { randomUUID } from "crypto";
+import * as fs from "fs";
+import * as path from "path";
+import { getRequestContext } from "../common/request-context";
 import { BackupService, RestoreBackupInput } from "./backup.service";
 import { User } from "../users/entities/user.entity";
 import { OidcService } from "../auth/oidc/oidc.service";
@@ -1770,7 +1773,7 @@ describe("BackupService", () => {
       expect(txnInsert![1]).toContain("2024-07-02T09:00:00.000Z");
     });
 
-    it("should disable updated_at triggers during deferred FK restoration", async () => {
+    it("runs the restore transaction under preserveTimestamps and issues no trigger DDL", async () => {
       mockUserRepo.findOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
@@ -1794,36 +1797,59 @@ describe("BackupService", () => {
         ],
       };
 
+      // Capture the ambient preserveTimestamps flag at each transaction open --
+      // that flag is what the real withScopedDb turns into the
+      // app.preserve_timestamps GUC the updated_at trigger honours.
+      const flagsSeen: (boolean | undefined)[] = [];
+      const originalTransaction =
+        mockDataSource.transaction.getMockImplementation()!;
+      mockDataSource.transaction.mockImplementation((...args: unknown[]) => {
+        flagsSeen.push(getRequestContext()?.preserveTimestamps);
+        return originalTransaction(...(args as [never]));
+      });
+
       await service.restoreData(
         userId,
         makeInput({ password: "test", data: backupWithFks }),
       );
 
+      // The user lookup runs under the caller's plain context; the restore
+      // transaction itself carries the flag.
+      expect(flagsSeen[0]).toBeUndefined();
+      expect(flagsSeen[flagsSeen.length - 1]).toBe(true);
+
       const allCalls = mockQueryRunner.query.mock.calls.map(
         (call: unknown[]) => call[0] as string,
       );
 
-      // Verify trigger was disabled before the UPDATE and re-enabled after
-      const disableIdx = allCalls.findIndex(
-        (sql) =>
-          sql.includes("DISABLE TRIGGER") &&
-          sql.includes("update_accounts_updated_at"),
-      );
+      // The deferred-FK UPDATE still runs -- with no trigger DDL around it.
+      // The old DISABLE/ENABLE pair required table ownership, which the
+      // runtime role does not have under RLS enforcement.
       const updateIdx = allCalls.findIndex(
         (sql) =>
           sql.includes("UPDATE") &&
           sql.includes('"accounts"') &&
           sql.includes('"linked_account_id"'),
       );
-      const enableIdx = allCalls.findIndex(
-        (sql) =>
-          sql.includes("ENABLE TRIGGER") &&
-          sql.includes("update_accounts_updated_at"),
-      );
+      expect(updateIdx).toBeGreaterThan(-1);
+      expect(
+        allCalls.some(
+          (sql) =>
+            sql.includes("DISABLE TRIGGER") || sql.includes("ENABLE TRIGGER"),
+        ),
+      ).toBe(false);
+    });
 
-      expect(disableIdx).toBeGreaterThan(-1);
-      expect(updateIdx).toBeGreaterThan(disableIdx);
-      expect(enableIdx).toBeGreaterThan(updateIdx);
+    it("keeps trigger DDL out of the restore path (source guard)", () => {
+      // Regression guard for task C5: the mechanism for preserving restored
+      // timestamps is the app.preserve_timestamps GUC, never ALTER TABLE
+      // trigger DDL -- any reappearance is a bug wherever it is.
+      const source = fs.readFileSync(
+        path.join(__dirname, "backup.service.ts"),
+        "utf8",
+      );
+      expect(source).not.toMatch(/DISABLE TRIGGER/);
+      expect(source).not.toMatch(/ENABLE TRIGGER/);
     });
 
     it("accepts the session-confirmed sentinel for OIDC users (soft re-auth)", async () => {

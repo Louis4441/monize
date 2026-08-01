@@ -1,5 +1,5 @@
 import { Logger } from "@nestjs/common";
-import { requestContextStorage } from "../request-context";
+import { getRequestContext, requestContextStorage } from "../request-context";
 import { UUID_REGEX } from "../query-param-utils";
 
 /**
@@ -71,6 +71,26 @@ export function withDelegateContext<T>(
   }
   return requestContextStorage.run(
     { userId: ownerUserId, realUserId: delegateUserId },
+    fn,
+  );
+}
+
+/**
+ * Extend the ambient context with `preserveTimestamps`, so every transaction
+ * `withScopedDb` opens inside `fn` emits `app.preserve_timestamps` and the
+ * GUC-aware `updated_at` trigger (migration M1) keeps supplied values instead
+ * of stamping. This is the backup restore's replacement for the old
+ * `ALTER TABLE ... DISABLE TRIGGER` DDL (task C5): a plain flag on the caller's
+ * own identity, no system bypass, and it works in every RLS mode -- the GUC
+ * emission is deliberately not mode-gated (see scoped-db.ts).
+ *
+ * Identity is inherited, not granted: with no ambient user/system context,
+ * `withScopedDb` inside `fn` still throws exactly as it would without this
+ * wrapper.
+ */
+export function withPreserveTimestamps<T>(fn: () => T): T {
+  return requestContextStorage.run(
+    { ...getRequestContext(), preserveTimestamps: true },
     fn,
   );
 }
