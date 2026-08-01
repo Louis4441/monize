@@ -100,8 +100,11 @@ export function GemNextActionCard({
             {t('gem.action.sellLabel', { count: action.sellPositions.length })}
           </p>
           {action.sellPositions.length === 0 ? (
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              <GemUnknown label={t('gem.action.nothingToSell')} />
+            // Spelled out, not dashed: a cash-funded purchase sells nothing,
+            // which is a fact about the operation and not a value the server
+            // failed to supply.
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {t('gem.action.nothingToSell')}
             </p>
           ) : (
             <ul className="scrollbar-slim max-h-32 space-y-1 overflow-y-auto pr-1">

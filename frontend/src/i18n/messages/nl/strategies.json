@@ -278,7 +278,7 @@
       "workingIsTargetNo": "Nee — wordt verkocht",
       "workingExposure": "Geschatte blootstelling aan de doelmarkt",
       "workingNoData": "Geen gegevens",
-      "workingSum": "{counted} van {total} zit in het doelinstrument, dat is de {percent} hierboven.",
+      "workingSum": "{counted} van de {total} in instrumenten zit in het doelinstrument, dat is de {percent} hierboven.",
       "basisFillStructure": "Vul de geografische structuur van het instrument aan"
     },
     "backtest": {

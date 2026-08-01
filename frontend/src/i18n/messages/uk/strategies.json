@@ -278,7 +278,7 @@
       "workingIsTargetNo": "Ні — продається",
       "workingExposure": "Оцінена експозиція на цільовий ринок",
       "workingNoData": "Немає даних",
-      "workingSum": "{counted} із {total} перебуває в цільовому інструменті, це і є {percent} вище.",
+      "workingSum": "{counted} із {total}, вкладених в інструменти, перебуває в цільовому інструменті, це і є {percent} вище.",
       "basisFillStructure": "Заповніть географічну структуру інструмента"
     },
     "backtest": {

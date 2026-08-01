@@ -278,7 +278,7 @@
       "workingIsTargetNo": "नहीं — बेचा जाएगा",
       "workingExposure": "लक्ष्य बाज़ार में अनुमानित एक्सपोज़र",
       "workingNoData": "डेटा नहीं",
-      "workingSum": "{total} में से {counted} लक्ष्य इंस्ट्रूमेंट में है, जो ऊपर दिया {percent} है।",
+      "workingSum": "इंस्ट्रूमेंट में रखे {total} में से {counted} लक्ष्य इंस्ट्रूमेंट में है, जो ऊपर दिया {percent} है।",
       "basisFillStructure": "इंस्ट्रूमेंट की भौगोलिक संरचना भरें"
     },
     "backtest": {

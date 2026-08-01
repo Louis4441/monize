@@ -278,7 +278,7 @@
       "workingIsTargetNo": "Không — bán ra",
       "workingExposure": "Mức tiếp xúc ước tính với thị trường mục tiêu",
       "workingNoData": "Không có dữ liệu",
-      "workingSum": "{counted} trên {total} nằm ở công cụ mục tiêu, tức {percent} ở trên.",
+      "workingSum": "{counted} trong {total} nắm giữ ở các công cụ nằm ở công cụ mục tiêu, tức {percent} ở trên.",
       "basisFillStructure": "Bổ sung cơ cấu địa lý của công cụ"
     },
     "backtest": {

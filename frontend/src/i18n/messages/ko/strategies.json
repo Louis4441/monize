@@ -278,7 +278,7 @@
       "workingIsTargetNo": "아니요 — 매도",
       "workingExposure": "목표 시장에 대한 추정 익스포저",
       "workingNoData": "데이터 없음",
-      "workingSum": "{total} 중 {counted}이(가) 목표 종목에 있으며, 이는 위의 {percent}입니다.",
+      "workingSum": "종목으로 보유한 {total} 중 {counted}이(가) 목표 종목에 있으며, 이는 위의 {percent}입니다.",
       "basisFillStructure": "종목의 지역 구성을 입력하세요"
     },
     "backtest": {

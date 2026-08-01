@@ -278,7 +278,7 @@
       "workingIsTargetNo": "Tidak — dijual",
       "workingExposure": "Perkiraan eksposur ke pasar target",
       "workingNoData": "Tidak ada data",
-      "workingSum": "{counted} dari {total} ada di instrumen target, yaitu {percent} di atas.",
+      "workingSum": "{counted} dari {total} yang ada di instrumen berada di instrumen target, yaitu {percent} di atas.",
       "basisFillStructure": "Lengkapi struktur geografis instrumen"
     },
     "backtest": {

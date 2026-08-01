@@ -278,7 +278,7 @@
       "workingIsTargetNo": "[XX-No — sold-XX]",
       "workingExposure": "[XX-Estimated exposure to the target market-XX]",
       "workingNoData": "[XX-No data-XX]",
-      "workingSum": "[XX-{counted} of {total} is held in the target instrument, which is the {percent} above.-XX]",
+      "workingSum": "[XX-{counted} of the {total} held in instruments is in the target instrument, which is the {percent} above.-XX]",
       "basisFillStructure": "[XX-Fill in the instrument’s geographic structure-XX]"
     },
     "backtest": {

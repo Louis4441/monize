@@ -278,7 +278,7 @@
       "workingIsTargetNo": "否 — 卖出",
       "workingExposure": "對目標市場的估計曝險",
       "workingNoData": "無資料",
-      "workingSum": "{total} 中有 {counted} 持有目標標的，即上方的 {percent}。",
+      "workingSum": "持有的標的共 {total}，其中 {counted} 在目標標的，即上方的 {percent}。",
       "basisFillStructure": "補充該標的的地域結構"
     },
     "backtest": {

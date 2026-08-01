@@ -278,7 +278,7 @@
       "workingIsTargetNo": "No — se vende",
       "workingExposure": "Exposición estimada al mercado objetivo",
       "workingNoData": "Sin datos",
-      "workingSum": "{counted} de {total} está en el instrumento objetivo, que es el {percent} de arriba.",
+      "workingSum": "{counted} de los {total} en instrumentos está en el instrumento objetivo, que es el {percent} de arriba.",
       "basisFillStructure": "Completa la estructura geográfica del instrumento"
     },
     "backtest": {

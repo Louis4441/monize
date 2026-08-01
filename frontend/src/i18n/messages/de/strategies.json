@@ -278,7 +278,7 @@
       "workingIsTargetNo": "Nein — wird verkauft",
       "workingExposure": "Geschätztes Engagement im Zielmarkt",
       "workingNoData": "Keine Daten",
-      "workingSum": "{counted} von {total} liegen im Zielinstrument, das sind die {percent} oben.",
+      "workingSum": "{counted} der in Instrumenten gehaltenen {total} liegen im Zielinstrument, das sind die {percent} oben.",
       "basisFillStructure": "Geografische Struktur des Instruments ergänzen"
     },
     "backtest": {

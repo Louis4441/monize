@@ -103,9 +103,12 @@ describe('GemPortfolioPanel', () => {
     // as "not assigned" -- cash is not a gap in the configuration.
     expect(screen.getAllByText('Cash')).toHaveLength(2);
     expect(screen.queryByText(/Not assigned/)).not.toBeInTheDocument();
+    // The same note in both places, and never the unknown marker or "not part
+    // of the strategy": cash has no unit count and no role by design.
     expect(
-      screen.getByText(/Uninvested — counts towards nothing/),
-    ).toBeInTheDocument();
+      screen.getAllByText(/Uninvested — counts towards nothing/),
+    ).toHaveLength(2);
+    expect(screen.queryByText(/not part of the strategy/)).toBeNull();
     // No instrument link, and none of the "fill in the breakdown" prompts:
     // no breakdown would ever make cash match a market.
     expect(screen.queryByRole('link', { name: /Cash/ })).not.toBeInTheDocument();
@@ -190,7 +193,9 @@ describe('GemPortfolioPanel', () => {
     ).toBeGreaterThan(0);
     expect(screen.getByTitle('china 12%, india 8%')).toHaveTextContent('20%');
     expect(
-      screen.getByText(/\$2,000\.00 of \$10,000\.00 is held in the target instrument/),
+      screen.getByText(
+        /\$2,000\.00 of the \$10,000\.00 held in instruments is in the target instrument/,
+      ),
     ).toBeInTheDocument();
   });
 

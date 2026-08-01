@@ -156,11 +156,18 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                         </GemSecurityLink>
                       </span>
                       <span className="block text-xs text-gray-500 dark:text-gray-400">
-                        {isKnown(holding.quantity)
-                          ? t('gem.action.units', {
-                              units: formatQuantity(holding.quantity),
-                            })
-                          : t('gem.common.unknown')}
+                        {/* Cash has no unit count and no role by design, so
+                            neither the unknown marker nor "not part of the
+                            strategy" belongs on it: both read as a gap in the
+                            data, and the second contradicts the note this same
+                            row carries in the table below. */}
+                        {holding.isCash
+                          ? t('gem.portfolioPanel.workingCashNote')
+                          : isKnown(holding.quantity)
+                            ? t('gem.action.units', {
+                                units: formatQuantity(holding.quantity),
+                              })
+                            : t('gem.common.unknown')}
                         {isTarget && (
                           <>
                             <span aria-hidden="true"> &middot; </span>
@@ -175,7 +182,7 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                             })}
                           </>
                         )}
-                        {!holding.role && (
+                        {!holding.role && !holding.isCash && (
                           <>
                             <span aria-hidden="true"> &middot; </span>
                             {t('gem.portfolioPanel.notInStrategy')}
@@ -316,15 +323,12 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                         )}
                       </td>
                       <td className="py-1 pr-3" />
-                      <td className="py-1 text-right tabular-nums">
-                        {isKnown(position.marketExposurePercent) ? (
-                          formatPercent(position.marketExposurePercent, 0)
-                        ) : (
-                          <span className="text-gray-500 dark:text-gray-400">
-                            {t('gem.portfolioPanel.workingNoData')}
-                          </span>
-                        )}
-                      </td>
+                      {/* No total for the exposure column. The Value cell
+                          beside it includes cash and the estimate does not, so
+                          a percentage here would not be the weighted average of
+                          the column it foots. The portfolio-level figure is on
+                          the card above, measured over the securities. */}
+                      <td className="py-1" />
                     </tr>
                   </tfoot>
                 </table>
@@ -341,6 +345,8 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                         (securitiesValue * percent) / 100,
                         position.currencyCode,
                       ),
+                      // Named as the instruments' total on screen, because the
+                      // table's own Total row above it includes cash.
                       total: formatCurrency(
                         securitiesValue,
                         position.currencyCode,

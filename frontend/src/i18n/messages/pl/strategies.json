@@ -278,7 +278,7 @@
       "workingIsTargetNo": "Nie — do sprzedaży",
       "workingExposure": "Szacowana ekspozycja na rynek docelowy",
       "workingNoData": "Brak danych",
-      "workingSum": "{counted} z {total} jest w docelowym instrumencie, co daje {percent} powyżej.",
+      "workingSum": "{counted} z {total} ulokowanych w instrumentach jest w instrumencie docelowym, co daje {percent} powyżej.",
       "basisFillStructure": "Uzupełnij strukturę geograficzną instrumentu"
     },
     "backtest": {

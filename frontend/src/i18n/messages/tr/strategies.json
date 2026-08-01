@@ -278,7 +278,7 @@
       "workingIsTargetNo": "Hayır — satılıyor",
       "workingExposure": "Hedef piyasaya tahmini maruziyet",
       "workingNoData": "Veri yok",
-      "workingSum": "{total} tutarın {counted} kadarı hedef enstrümanda, bu da yukarıdaki {percent} değeridir.",
+      "workingSum": "Enstrümanlarda tutulan {total} tutarın {counted} kadarı hedef enstrümanda, bu da yukarıdaki {percent} değeridir.",
       "basisFillStructure": "Enstrümanın coğrafi yapısını tamamlayın"
     },
     "backtest": {

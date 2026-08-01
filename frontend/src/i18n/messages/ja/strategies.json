@@ -278,7 +278,7 @@
       "workingIsTargetNo": "いいえ — 売却",
       "workingExposure": "目標市場への推定エクスポージャー",
       "workingNoData": "データなし",
-      "workingSum": "{total}のうち{counted}が目標銘柄で、これが上の{percent}です。",
+      "workingSum": "銘柄で保有する{total}のうち{counted}が目標銘柄で、これが上の{percent}です。",
       "basisFillStructure": "銘柄の地域構成を入力する"
     },
     "backtest": {

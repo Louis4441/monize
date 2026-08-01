@@ -278,7 +278,7 @@
       "workingIsTargetNo": "Нет — продаётся",
       "workingExposure": "Оценочная экспозиция на целевой рынок",
       "workingNoData": "Нет данных",
-      "workingSum": "{counted} из {total} находится в целевом инструменте, это и есть {percent} выше.",
+      "workingSum": "{counted} из {total}, вложенных в инструменты, находится в целевом инструменте, это и есть {percent} выше.",
       "basisFillStructure": "Заполните географическую структуру инструмента"
     },
     "backtest": {
