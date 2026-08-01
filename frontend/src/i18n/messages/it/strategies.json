@@ -174,7 +174,7 @@
       "andMore": "e {count, plural, one {# altro strumento} other {# altri strumenti}}",
       "markExecuted": "Segna come eseguita",
       "addTransactions": "Aggiungi transazioni",
-      "alreadyExecuted": "Segnata come eseguita.",
+      "executedButChanged": "Hai contrassegnato questa operazione come eseguita, ma questi conti continuano a non corrispondere al segnale: o le operazioni non sono ancora state registrate, o qualcosa è cambiato nel frattempo. Registrale per riallineare i due.",
       "markExecutedSuccess": "Operazione segnata come eseguita.",
       "markExecutedError": "Non è stato possibile segnare l'operazione come eseguita.",
       "compliantTitle": "Il tuo portafoglio corrisponde alla strategia",

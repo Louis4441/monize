@@ -174,7 +174,7 @@
       "andMore": "dan {count, plural, other {# instrumen lainnya}}",
       "markExecuted": "Tandai sudah dilakukan",
       "addTransactions": "Tambahkan transaksi",
-      "alreadyExecuted": "Ditandai sudah dilakukan.",
+      "executedButChanged": "Anda menandai ini sebagai selesai, tetapi akun-akun ini masih tidak cocok dengan sinyalnya — entah transaksinya belum dicatat, atau ada yang berubah sejak itu. Catat transaksinya agar keduanya selaras kembali.",
       "markExecutedSuccess": "Operasi ditandai sudah dilakukan.",
       "markExecutedError": "Operasi tidak dapat ditandai sudah dilakukan.",
       "compliantTitle": "Portofolio Anda sesuai dengan strategi",

@@ -174,7 +174,7 @@
       "andMore": "e {count, plural, one {# outro instrumento} other {# outros instrumentos}}",
       "markExecuted": "Marcar como executada",
       "addTransactions": "Adicionar transações",
-      "alreadyExecuted": "Marcada como executada.",
+      "executedButChanged": "Marcou isto como feito, mas estas contas continuam a não corresponder ao sinal — ou as operações ainda não foram registadas, ou algo mudou entretanto. Registe-as para voltar a alinhar as duas coisas.",
       "markExecutedSuccess": "Operação marcada como executada.",
       "markExecutedError": "Não foi possível marcar a operação como executada.",
       "compliantTitle": "A sua carteira corresponde à estratégia",

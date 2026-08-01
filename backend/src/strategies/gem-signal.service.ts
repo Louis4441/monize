@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { createHash } from "node:crypto";
-import { DataSource, EntityManager } from "typeorm";
+import { DataSource, EntityManager, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { todayYMD } from "../common/date-utils";
 import {
@@ -205,17 +205,30 @@ export class GemSignalService {
   ): Promise<GemStrategySignal[]> {
     return withScopedDb(this.dataSource, async (manager) => {
       const repo = manager.getRepository(GemStrategySignal);
-      const stored = await repo.find({
-        where: { strategyId: strategy.id },
-        order: { evaluatedOn: "DESC" },
-        take: GEM_HISTORY_PERIODS,
-      });
-
       const periods = recentPeriods(
         asOf,
         strategy.cadence,
         GEM_HISTORY_PERIODS,
       );
+      const calendar = periods.map((period) => period.evaluatedOn);
+
+      // Only the dates this strategy's calendar evaluates on.
+      //
+      // A cadence change replaces the calendar: switch from monthly to
+      // quarterly and 31 March is still an evaluation date while 30 April is
+      // not. Reading the newest 24 rows regardless left the April, May, July
+      // rows in place -- stale, never revisited, because the loop below only
+      // walks the current periods -- and the quarterly report then showed
+      // monthly decisions interleaved with its own.
+      //
+      // They are filtered rather than deleted: nothing about them is wrong,
+      // they answer a calendar this strategy is not on today, and switching
+      // the cadence back brings them and their `executed` flags with it.
+      const stored = await repo.find({
+        where: { strategyId: strategy.id, evaluatedOn: In(calendar) },
+        order: { evaluatedOn: "DESC" },
+        take: GEM_HISTORY_PERIODS,
+      });
       // A period counts as answered only when its row was calculated under the
       // configuration in force now. Shorten the lookback or swap an instrument
       // and the stored answer is to a different question, so it is recomputed
@@ -265,9 +278,18 @@ export class GemSignalService {
       const securityByRole = this.securityByRole(assets);
 
       // Chronological order matters: each period's "previous role" is the target
-      // of the newest evaluation before it, including ones inserted in this loop.
+      // of the newest evaluation before it, including ones written in this loop.
+      //
+      // Seeded with the answered rows only. A stale row is an answer to a
+      // different question, so letting one stand in as the predecessor would
+      // stamp the old configuration's target onto a freshly computed period --
+      // and `previousRole` is what the history table renders as "switched out
+      // of". A period with no answered predecessor gets null, which is the
+      // truth: this configuration has decided nothing before it.
       const byEvaluatedOn = new Map(
-        stored.map((signal) => [signal.evaluatedOn, signal]),
+        stored
+          .filter((signal) => answered.has(signal.evaluatedOn))
+          .map((signal) => [signal.evaluatedOn, signal]),
       );
       const written: GemStrategySignal[] = [];
 
@@ -364,7 +386,7 @@ export class GemSignalService {
       if (written.length === 0) return stored;
 
       return repo.find({
-        where: { strategyId: strategy.id },
+        where: { strategyId: strategy.id, evaluatedOn: In(calendar) },
         order: { evaluatedOn: "DESC" },
         take: GEM_HISTORY_PERIODS,
       });

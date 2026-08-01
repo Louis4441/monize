@@ -124,7 +124,11 @@ describe('GemStrategyReport', () => {
     // The call answers with the refreshed report, so there is nothing left to
     // fetch -- re-reading it was a round trip that could only return the same.
     expect(mockGetReport).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Marked as executed.')).toBeInTheDocument();
+    // The fixture's accounts still hold the wrong instrument, so the card
+    // reports both facts rather than hiding the live instruction behind a tick.
+    expect(
+      screen.getByText(/You marked this as done, but these accounts still do not match/),
+    ).toBeInTheDocument();
   });
 
   it('surfaces a failure to mark the operation as executed', async () => {

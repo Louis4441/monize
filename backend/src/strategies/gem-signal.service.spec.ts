@@ -76,6 +76,10 @@ describe("GemSignalService", () => {
     signalRepo = {
       find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
+      // Present so a test can prove nothing is deleted; the service should
+      // never reach for either.
+      remove: jest.fn(),
+      delete: jest.fn(),
       create: jest.fn((row) => ({ ...row })),
       save: jest.fn((row) =>
         Promise.resolve({ id: `sig-${row.evaluatedOn}`, ...row }),
@@ -262,6 +266,59 @@ describe("GemSignalService", () => {
         expect(rewritten.targetSecurityId).toBe("sec-emim");
         expect(rewritten.executed).toBe(false);
         expect(rewritten.executedAt).toBeNull();
+      });
+
+      it("reads and returns only the dates the current calendar evaluates on", async () => {
+        // Switching monthly to quarterly replaces the calendar. The months
+        // that are not quarter-ends are never revisited by the loop, so left
+        // in the result they sat in the quarterly history as decisions from a
+        // cadence the strategy no longer runs -- interleaved with its own.
+        await service.materialize(
+          userId,
+          strategy({ cadence: "QUARTERLY" }),
+          assets(),
+          "2025-08-14",
+        );
+
+        const [where] = signalRepo.find.mock.calls[0];
+        const dates = where.where.evaluatedOn._value as string[];
+        expect(dates).toContain("2025-06-30");
+        expect(dates).not.toContain("2025-07-31");
+        // Filtered, not deleted: switching the cadence back has to bring the
+        // monthly rows and their executed flags with it.
+        expect(signalRepo.remove).not.toHaveBeenCalled();
+        expect(signalRepo.delete).not.toHaveBeenCalled();
+      });
+
+      it("never takes previousRole from a row the old configuration wrote", async () => {
+        // A stale row answers a different question, so letting it stand in as
+        // the predecessor stamps the old target onto a freshly computed
+        // period -- and previousRole is what history renders as "switched out
+        // of". With no answered predecessor the honest answer is null.
+        signalRepo.find.mockResolvedValue([
+          {
+            id: "sig-old",
+            evaluatedOn: "2025-06-30",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
+            configFingerprint: "written-under-other-settings",
+          } as GemStrategySignal,
+        ]);
+
+        await service.materialize(
+          userId,
+          strategy({ lookbackMonths: 6 }),
+          assets(),
+          "2025-08-14",
+        );
+
+        // Every period is recomputed here, so the oldest one has nothing
+        // before it and each later one follows the row just written.
+        const written = savedSignals.concat(
+          signalRepo.save.mock.calls.map(([row]) => row),
+        );
+        const june = written.find((row) => row.evaluatedOn === "2025-06-30");
+        expect(june?.previousRole).not.toBe("US_EQUITY");
       });
 
       it("refuses to serve a stale row as the current signal", async () => {

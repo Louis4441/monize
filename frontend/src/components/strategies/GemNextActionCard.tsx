@@ -198,11 +198,25 @@ export function GemNextActionCard({
         />
       </dl>
 
+      {/* Reaching here means an operation is required. "Executed" is recorded
+          against the signal, but what has to be done is recomputed from the
+          accounts every time, so the two can disagree: the trades may not have
+          settled yet, or money may have arrived since. Saying only "marked as
+          executed" hid a live instruction behind a tick; both facts are shown
+          instead, with the way to resolve either of them. */}
       {action.executed ? (
-        <p className="mt-3 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-          <CheckCircleIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
-          {t('gem.action.alreadyExecuted')}
-        </p>
+        <>
+          <p className="mt-3 flex items-start gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+            <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {t('gem.action.executedButChanged')}
+          </p>
+          <div className="mt-3">
+            <Button variant="outline" onClick={onAddTransactions}>
+              <PlusIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              {t('gem.action.addTransactions')}
+            </Button>
+          </div>
+        </>
       ) : (
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           <Button onClick={onMarkExecuted} isLoading={isSaving}>

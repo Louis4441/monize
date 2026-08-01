@@ -174,7 +174,7 @@
       "andMore": "y {count, plural, one {# instrumento más} other {# instrumentos más}}",
       "markExecuted": "Marcar como ejecutada",
       "addTransactions": "Añadir transacciones",
-      "alreadyExecuted": "Marcada como ejecutada.",
+      "executedButChanged": "Marcó esto como hecho, pero estas cuentas siguen sin coincidir con la señal: o bien las operaciones aún no se han registrado, o algo ha cambiado desde entonces. Regístrelas para volver a alinear ambas cosas.",
       "markExecutedSuccess": "Operación marcada como ejecutada.",
       "markExecutedError": "No se pudo marcar la operación como ejecutada.",
       "compliantTitle": "Tu cartera coincide con la estrategia",

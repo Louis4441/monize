@@ -174,7 +174,7 @@
       "andMore": "以及{count, plural, other {另外 # 项标的}}",
       "markExecuted": "标记为已执行",
       "addTransactions": "添加交易",
-      "alreadyExecuted": "已标记为已执行。",
+      "executedButChanged": "您已将其标记为完成，但这些账户仍与信号不符——要么交易尚未记录，要么此后发生了变化。请记录交易，让两者重新一致。",
       "markExecutedSuccess": "操作已标记为已执行。",
       "markExecutedError": "无法将操作标记为已执行。",
       "compliantTitle": "你的组合与策略一致",

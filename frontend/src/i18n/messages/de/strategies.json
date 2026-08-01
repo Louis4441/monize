@@ -174,7 +174,7 @@
       "andMore": "und {count, plural, one {# weiteres Instrument} other {# weitere Instrumente}}",
       "markExecuted": "Als ausgeführt markieren",
       "addTransactions": "Transaktionen hinzufügen",
-      "alreadyExecuted": "Als ausgeführt markiert.",
+      "executedButChanged": "Sie haben dies als erledigt markiert, aber diese Konten entsprechen dem Signal weiterhin nicht — entweder sind die Trades noch nicht erfasst, oder es hat sich seither etwas geändert. Erfassen Sie sie, um beides wieder in Einklang zu bringen.",
       "markExecutedSuccess": "Operation als ausgeführt markiert.",
       "markExecutedError": "Operation konnte nicht als ausgeführt markiert werden.",
       "compliantTitle": "Ihr Portfolio entspricht der Strategie",

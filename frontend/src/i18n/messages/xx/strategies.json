@@ -174,7 +174,7 @@
       "andMore": "[XX-and {count, plural, one {# more instrument} other {# more instruments}}-XX]",
       "markExecuted": "[XX-Mark as executed-XX]",
       "addTransactions": "[XX-Add transactions-XX]",
-      "alreadyExecuted": "[XX-Marked as executed.-XX]",
+      "executedButChanged": "[XX-You marked this as done, but these accounts still do not match the signal — either the trades have not been recorded yet, or something has changed since. Record them to bring the two back in step.-XX]",
       "markExecutedSuccess": "[XX-Operation marked as executed.-XX]",
       "markExecutedError": "[XX-Could not mark the operation as executed.-XX]",
       "compliantTitle": "[XX-Your portfolio matches the strategy-XX]",

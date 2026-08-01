@@ -73,7 +73,19 @@ the period, with `executed` kept when the recomputed instruction is the same
 instrument and cleared when it is not. A period that cannot be recomputed (a
 lookback stretched past an instrument's first close) keeps its row in the
 history, where it is a true record of what was decided then, but
-`currentSignal` refuses to serve it as today's instruction.
+`currentSignal` refuses to serve it as today's instruction. A recomputed period
+takes its `previousRole` only from another period this configuration produced;
+a stale row is an answer to a different question and cannot stand in as the
+predecessor.
+
+A **cadence change replaces the calendar** rather than editing it: on quarterly,
+31 March is still an evaluation date and 30 April is not. Both the read and the
+result are therefore filtered to the dates the current cadence evaluates on --
+without that, the months in between stayed stored, were never revisited (the
+loop only walks current periods), and the quarterly history showed monthly
+decisions interleaved with its own. They are filtered, not deleted: they answer
+a calendar this strategy is not on today, and switching the cadence back brings
+them and their `executed` flags with it.
 
 History renders the instrument each decision **actually named**, resolved from
 the signal's own `target_security_id`; the role's current instrument is only the
@@ -145,6 +157,14 @@ margin debt, not an asset the switch can move, and is ignored.
   those markets, and `action.fromCount` says how many instruments that spans;
 - the realized result is that value minus its cost basis, and the tax estimate
   applies the configured rate to a gain only (a loss owes nothing).
+
+**"Executed" is recorded against the signal; the operation is recomputed from
+the accounts.** The two can therefore disagree, and the report says so instead
+of collapsing them: when a change is required *and* the signal is marked
+executed, the card reports both -- either the trades have not been recorded yet,
+or money has arrived since. Showing only the tick hid a live instruction behind
+it, so an account that received a deposit after a completed switch read as done
+with nothing to do.
 
 **Partial overlap is a diagnostic, never a fraction of a sale.** A fund 20% in
 the target's markets counts 20% towards compliance, and is still sold whole:

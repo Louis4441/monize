@@ -56,7 +56,11 @@ describe('GemNextActionCard', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('replaces the buttons once the operation is marked executed', () => {
+  it('says so when the accounts still do not match a signal marked as done', () => {
+    // "Executed" is recorded against the signal; what has to be done is
+    // recomputed from the accounts. Deposit cash after a completed switch and
+    // both are true at once -- the card used to show only the tick, hiding a
+    // live instruction behind it.
     const { onMarkExecuted, onAddTransactions } = handlers();
     render(
       <GemNextActionCard
@@ -67,8 +71,27 @@ describe('GemNextActionCard', () => {
         isSaving={false}
       />,
     );
-    expect(screen.getByText('Marked as executed.')).toBeInTheDocument();
+    expect(
+      screen.getByText(/You marked this as done, but these accounts still do not match/),
+    ).toBeInTheDocument();
+    // Marking it again would do nothing; recording the trades is the way out.
     expect(screen.queryByRole('button', { name: /Mark as executed/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add transactions/ })).toBeInTheDocument();
+  });
+
+  it('says nothing about a mismatch once the accounts match again', () => {
+    const { onMarkExecuted, onAddTransactions } = handlers();
+    render(
+      <GemNextActionCard
+        action={gemAction({ executed: true, required: false })}
+        signalUnavailable={false}
+        onMarkExecuted={onMarkExecuted}
+        onAddTransactions={onAddTransactions}
+        isSaving={false}
+      />,
+    );
+    expect(screen.getByText('Your portfolio matches the strategy')).toBeInTheDocument();
+    expect(screen.queryByText(/still do not match/)).not.toBeInTheDocument();
   });
 
   it('says how many other instruments the switch sells out of', () => {

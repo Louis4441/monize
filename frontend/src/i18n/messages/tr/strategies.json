@@ -174,7 +174,7 @@
       "andMore": "ve {count, plural, one {# enstrüman daha} other {# enstrüman daha}}",
       "markExecuted": "Yapıldı olarak işaretle",
       "addTransactions": "İşlem ekle",
-      "alreadyExecuted": "Yapıldı olarak işaretlendi.",
+      "executedButChanged": "Bunu yapıldı olarak işaretlediniz, ancak bu hesaplar hâlâ sinyalle uyuşmuyor — ya işlemler henüz kaydedilmedi ya da o zamandan beri bir şey değişti. İkisini yeniden hizalamak için işlemleri kaydedin.",
       "markExecutedSuccess": "İşlem yapıldı olarak işaretlendi.",
       "markExecutedError": "İşlem yapıldı olarak işaretlenemedi.",
       "compliantTitle": "Portföyünüz stratejiye uyuyor",

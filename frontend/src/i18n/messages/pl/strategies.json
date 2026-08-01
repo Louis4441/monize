@@ -174,7 +174,7 @@
       "andMore": "oraz {count, plural, one {# kolejny instrument} few {# kolejne instrumenty} many {# kolejnych instrumentów} other {# kolejnego instrumentu}}",
       "markExecuted": "Oznacz jako wykonane",
       "addTransactions": "Dodaj transakcje",
-      "alreadyExecuted": "Oznaczono jako wykonane.",
+      "executedButChanged": "Oznaczono to jako wykonane, ale te konta nadal nie zgadzają się z sygnałem — albo transakcje nie zostały jeszcze zapisane, albo coś się od tego czasu zmieniło. Zapisz je, aby ponownie zgrać jedno z drugim.",
       "markExecutedSuccess": "Operacja oznaczona jako wykonana.",
       "markExecutedError": "Nie udało się oznaczyć operacji jako wykonanej.",
       "compliantTitle": "Twój portfel jest zgodny ze strategią",

@@ -174,7 +174,7 @@
       "andMore": "ほか{count, plural, other {#銘柄}}",
       "markExecuted": "実行済みにする",
       "addTransactions": "取引を追加",
-      "alreadyExecuted": "実行済みにしました。",
+      "executedButChanged": "実行済みとしてマークされていますが、これらの口座はまだシグナルと一致していません。取引がまだ記録されていないか、その後に何かが変わったかのどちらかです。取引を記録して両者を揃えてください。",
       "markExecutedSuccess": "取引を実行済みにしました。",
       "markExecutedError": "取引を実行済みにできませんでした。",
       "compliantTitle": "ポートフォリオは戦略と一致しています",

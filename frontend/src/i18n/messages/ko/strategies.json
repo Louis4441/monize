@@ -174,7 +174,7 @@
       "andMore": "그리고 {count, plural, other {다른 #개 종목}}",
       "markExecuted": "실행 완료로 표시",
       "addTransactions": "거래 추가",
-      "alreadyExecuted": "실행 완료로 표시되었습니다.",
+      "executedButChanged": "완료로 표시했지만 이 계좌들은 아직 신호와 일치하지 않습니다. 거래가 아직 기록되지 않았거나, 그 사이에 무언가 바뀌었습니다. 거래를 기록해 둘을 다시 맞추세요.",
       "markExecutedSuccess": "거래를 실행 완료로 표시했습니다.",
       "markExecutedError": "거래를 실행 완료로 표시할 수 없습니다.",
       "compliantTitle": "포트폴리오가 전략과 일치합니다",

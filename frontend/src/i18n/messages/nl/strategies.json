@@ -174,7 +174,7 @@
       "andMore": "en {count, plural, one {# ander instrument} other {# andere instrumenten}}",
       "markExecuted": "Markeren als uitgevoerd",
       "addTransactions": "Transacties toevoegen",
-      "alreadyExecuted": "Gemarkeerd als uitgevoerd.",
+      "executedButChanged": "U hebt dit als gedaan gemarkeerd, maar deze rekeningen komen nog steeds niet overeen met het signaal — de transacties zijn nog niet vastgelegd, of er is sindsdien iets veranderd. Leg ze vast om beide weer gelijk te trekken.",
       "markExecutedSuccess": "Transactie gemarkeerd als uitgevoerd.",
       "markExecutedError": "De transactie kon niet als uitgevoerd worden gemarkeerd.",
       "compliantTitle": "Je portefeuille komt overeen met de strategie",

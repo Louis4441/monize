@@ -174,7 +174,7 @@
       "andMore": "và {count, plural, other {# công cụ khác}}",
       "markExecuted": "Đánh dấu đã thực hiện",
       "addTransactions": "Thêm giao dịch",
-      "alreadyExecuted": "Đã đánh dấu là đã thực hiện.",
+      "executedButChanged": "Bạn đã đánh dấu việc này là đã xong, nhưng các tài khoản này vẫn chưa khớp với tín hiệu — hoặc các giao dịch chưa được ghi nhận, hoặc đã có thay đổi kể từ đó. Hãy ghi nhận chúng để hai bên khớp trở lại.",
       "markExecutedSuccess": "Đã đánh dấu giao dịch là đã thực hiện.",
       "markExecutedError": "Không thể đánh dấu giao dịch là đã thực hiện.",
       "compliantTitle": "Danh mục của bạn khớp với chiến lược",
