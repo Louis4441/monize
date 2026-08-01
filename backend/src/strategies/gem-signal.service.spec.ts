@@ -734,7 +734,14 @@ describe("GemSignalService", () => {
       signalRepo.save.mockRejectedValue({ code: "23505" });
       await expect(
         service.materialize(userId, strategy(), assets(), "2025-08-14"),
-      ).resolves.toEqual({ signals: [], legacyPeriods: 0 });
+      ).resolves.toEqual({
+        signals: [],
+        legacyPeriods: 0,
+        // The settings the caller was handed are the ones in the table: the
+        // duplicate came from another request materializing the same
+        // configuration, not from a save landing mid-flight.
+        configChanged: false,
+      });
     });
 
     it("chains the next period onto the row that won the race", async () => {
@@ -873,7 +880,14 @@ describe("GemSignalService", () => {
 
       await expect(
         service.materialize(userId, strategy(), assets(), "2025-08-14"),
-      ).resolves.toEqual({ signals: [], legacyPeriods: 0 });
+      ).resolves.toEqual({
+        signals: [],
+        legacyPeriods: 0,
+        // A strategy that is gone is not the configuration the caller is
+        // building a report from, so the caller starts over rather than
+        // rendering the snapshot it still holds.
+        configChanged: true,
+      });
       expect(savedSignals).toHaveLength(0);
     });
 
