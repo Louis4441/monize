@@ -247,12 +247,26 @@ export class GemPerformanceService {
       return empty("MISSING_PRICE_HISTORY");
     }
 
-    // The simulation opens on the first date every leg can be priced on. A
-    // holding listed halfway through the window does not get carried backwards
-    // at its own first close, which would show a flat stretch nobody held.
+    // The simulation opens on the first date every leg can be priced on, and
+    // never before the chart's own first point.
+    //
+    // Both bounds matter. A holding listed halfway through the window must not
+    // be carried backwards at its own first close, which would draw a flat
+    // stretch nobody held. And a holding whose history runs *deeper* than the
+    // plotted window must not set the base off-chart: rebasing to 1976 while
+    // the chart starts in 1993 opens the dashed line at +700% instead of 0%,
+    // reports the wrong window's return, and stretches the y-axis until every
+    // asset line beside it is flat.
+    const firstPlotted = dates[0];
+    const lastPlotted = dates[dates.length - 1];
+    if (!firstPlotted) return empty("MISSING_PRICE_HISTORY");
     const startsOn = legs
       .map((leg) => leg.prices[0].date)
-      .reduce((latest, date) => (date > latest ? date : latest));
+      .reduce((latest, date) => (date > latest ? date : latest), firstPlotted);
+    // Listed after the last point the chart draws: there is no segment to
+    // show, and saying so is the difference between an explained absence and a
+    // legend entry for a line that is not there.
+    if (startsOn > lastPlotted) return empty("MISSING_PRICE_HISTORY");
     const bases = legs.map((leg) => ({
       ...leg,
       base: priceAsOf(leg.prices, startsOn) as number,

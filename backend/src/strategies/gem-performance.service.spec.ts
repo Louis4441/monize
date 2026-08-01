@@ -406,6 +406,90 @@ describe("GemPerformanceService", () => {
       expect(simulation?.totalReturnPercent).toBeNull();
     });
 
+    it("never bases the line off-chart when a holding is older than the window", async () => {
+      // The regression: rebasing to the holding's own first close, which can
+      // predate every point the chart draws. The line then opens hundreds of
+      // percent above zero, reports a different window's return, and stretches
+      // the y-axis until the asset lines beside it are flat.
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          [
+            "sec-spy",
+            [
+              { date: "2025-02-03", close: 100 },
+              { date: "2025-08-14", close: 110 },
+            ],
+          ],
+          [
+            "sec-old",
+            [
+              { date: "2024-08-14", close: 50 },
+              { date: "2025-02-03", close: 60 },
+              { date: "2025-08-14", close: 75 },
+            ],
+          ],
+        ]),
+      );
+
+      const simulation = (
+        await build({
+          holdings: [
+            {
+              securityId: "sec-old",
+              symbol: "OLD",
+              marketValue: 5000,
+              isCash: false,
+            },
+          ],
+        })
+      )?.currentPortfolio;
+
+      // The chart starts at 2025-02-03, so the base is 60 and the window
+      // return is 75/60 = 25%, not 75/50 = 50%.
+      expect(simulation?.startsOn).toBe("2025-02-03");
+      expect(simulation?.points[0]).toEqual({
+        date: "2025-02-03",
+        returnPercent: 0,
+      });
+      expect(simulation?.totalReturnPercent).toBeCloseTo(25, 4);
+      // Still an incomplete range, and truthfully so: the chart itself only
+      // reaches back to February, so neither line covers the year asked for.
+      expect(simulation?.completeRange).toBe(false);
+    });
+
+    it("explains a holding listed after the last point the chart draws", async () => {
+      // Every point would be null, which renders as a legend entry and a
+      // footnote for a line with no segment. It is an absence, and it says so.
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          [
+            "sec-spy",
+            [
+              { date: "2024-08-14", close: 100 },
+              { date: "2025-07-01", close: 120 },
+            ],
+          ],
+          ["sec-ipo", [{ date: "2025-07-15", close: 10 }]],
+        ]),
+      );
+
+      const simulation = (
+        await build({
+          holdings: [
+            {
+              securityId: "sec-ipo",
+              symbol: "IPO",
+              marketValue: 5000,
+              isCash: false,
+            },
+          ],
+        })
+      )?.currentPortfolio;
+
+      expect(simulation?.unavailableReason).toBe("MISSING_PRICE_HISTORY");
+      expect(simulation?.points).toEqual([]);
+    });
+
     it("says there is nothing to simulate for empty accounts", async () => {
       twoHoldings();
       const simulation = (await build({ holdings: [] }))?.currentPortfolio;
