@@ -20,8 +20,11 @@
     must go through `tr()` + English catalogs, then `npm run i18n:pseudo`).
 - **Terminology:** "the design doc" = `row-level-security.md`. Section references (e.g. "Phase 2b")
   point there. Migration numbers below were written when the max was `102_*` and are now stale:
-  M1/M2 actually shipped as `111`–`114`. **Verify with `ls database/migrations` and renumber from the
-  actual max before writing files.**
+  M1/M2 actually shipped as `111`–`114`, and unrelated feature migrations have since carried the max
+  to `122`. **Verify with `ls database/migrations` and renumber from the actual max before writing
+  files** — do not trust any number in this document. Note that `116_*` and `117_*` each have two
+  files: the directory is applied in **filename sort order**, not by numeric prefix, which is what
+  keeps `117_security_documents` ahead of `118_security_documents_rls`.
 
 ## Deployment safety
 
@@ -47,9 +50,9 @@ uses four classes:
 | F3 | CI ratchet on `@InjectRepository` / `createQueryRunner` counts | F2 | none | done |
 | M1 | Migration: helper functions + GUC-aware trigger (**no grants — they live in db-init, F1**) | — | inert | done |
 | M2 | Migrations: direct + indirect + special (users/delegation/emergency) policies (no enable) | M1 | inert | done |
-| M3 | Migration: `ENABLE ROW LEVEL SECURITY` (authored, **not deployed**) | M2 | **DO NOT DEPLOY** | not started |
-| T1 | Integration harness applies real RLS migrations + role/grants + `updated_at` triggers | M2, F1 | none | not started |
-| T2 | Catalog-driven `rls-enforcement` integration spec (4 buckets) | T1, M3 | none | not started |
+| M3 | Migration: `ENABLE ROW LEVEL SECURITY` (authored, **not deployed**) | M2 | **DO NOT DEPLOY** | done (authored; ships only after flip A soaks) |
+| T1 | Integration harness applies real RLS migrations + role/grants + `updated_at` triggers | M2, F1 | none | done |
+| T2 | Catalog-driven `rls-enforcement` integration spec (4 buckets) | T1, M3 | none | unblocked (T1 + M3 done) |
 | C1 | Auth wrapping: `jwt.strategy` under `withUserContext(sub)`; PAT + password-reset + OAuth under `withSystemContext`; public-route audit | F2 | inert | done |
 | C2 | Cron jobs: system fan-out + per-user bodies wrapped | F2 | inert | done |
 | C3 | Seeders + demo reset under `withSystemContext` | F2 | inert | done |
@@ -373,20 +376,62 @@ without enable); schema.sql mirrored.
 
 ### M3. Enable migration — authored, not deployed
 
-- [ ] Status: not started. **Renumber: M2 ended at `114`, so this is `115_rls_enable.sql`.** The
-  exact target list is the 50 tables policied by migrations `112`–`114`; derive it from
-  `SELECT DISTINCT tablename FROM pg_policies WHERE schemaname = 'public'` rather than retyping it.
-  M2 already dry-ran this enable in a scratch database and verified every policy behaves correctly
-  under it (see M2's status note), so M3 is expected to be mechanical.
+- [x] Status: **authored, NOT deployed** (branch `claude/rls-task-list-next-72ikal`). Shipped as
+  `database/migrations/123_rls_enable.sql` (the max was `122`; the `115` and `107` earlier revisions
+  of this note assumed were both stale), mirrored into `database/schema.sql`. Acceptance spec
+  `backend/test/integration/rls-enable.integration.spec.ts` (16 tests). **This file is flip B — it
+  must not reach production until flip A has soaked. Tag the PR `do-not-deploy-before-flip-A`.**
 
-**Scope:** new `database/migrations/107_rls_enable.sql`, `database/schema.sql`.
+  **53 tables enabled, derived from `pg_policies` rather than a hard-coded list.** A `DO` loop over
+  `SELECT DISTINCT tablename FROM pg_policies WHERE schemaname = 'public'` closes both failure modes
+  a static list has: it cannot go stale between authoring and flip B (three tables already postdate
+  M2 — `import_staged_files`, `import_jobs`, `security_documents`), and it cannot enable a table
+  that has no policy, which would be a deny-all outage rather than a safe default. Both are asserted
+  as tests, in both directions.
 
-**Do:** `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` for exactly the tables policied in M2. **This file
-is flip B.** It ships to prod only in its own release after flip A soaks (runbook). Land it on a branch
-CI can validate but tag the PR clearly: `do-not-deploy-before-flip-A`.
+  **Why mirroring it into `schema.sql` does not make flip B happen on fresh installs.** Enabling RLS
+  does not affect the table **owner**, and at `RLS_MODE=off` — the default, and where every
+  deployment starts — the app connects as the owner. So a fresh install gets the enable and observes
+  nothing. `FORCE ROW LEVEL SECURITY` is deliberately not used anywhere: it would apply policies to
+  the owner too, break db-init/db-migrate/backup-restore, and turn this file into a live behaviour
+  change at `off`. A test asserts `relforcerowsecurity` is false everywhere. The "do not deploy"
+  constraint is therefore about *release sequencing on existing deployments*, not about the SQL
+  being unsafe on its own.
 
-**Accept:** applies cleanly in a scratch DB; `pg_class.relrowsecurity` true for every policied table;
-integration suite (T2) passes against it.
+  **Verified against a real PostgreSQL 16, not by review.** The "Schema vs Migrations Drift" job was
+  reproduced locally (Docker is unavailable in the agent container, so the same steps were run
+  against a local PG16 cluster): `schema.sql` applied to one database, `schema.sql` + all 112
+  migrations replayed **twice** to another, `pg_dump` normalized and diffed — identical, 53 tables
+  with RLS enabled on both sides. `npm run migration:lint` clean. Behaviour under enforcement,
+  proved with a real non-owner role: owner sees both users' rows (this is `RLS_MODE=off` and it is
+  unchanged); `monize_app` with no GUC sees **zero**; with `app.current_user_id` sees only that
+  user's rows, on a direct table *and* through an indirect `EXISTS`-to-parent policy; with
+  `app.bypass_rls` sees everything; a cross-user INSERT is rejected by `WITH CHECK`; and
+  `monize_app` cannot `ALTER TABLE ... DISABLE ROW LEVEL SECURITY` (`must be owner of table`).
+
+  **The D1 convention now has a test, not just a rule.** T1's harness applies the enable **in its
+  filename position** rather than last (`applyRlsPolicies(ds, { includeEnable: true })`), which
+  reproduces a deployed database where `123` is already recorded in `schema_migrations`. A later
+  migration that adds a policy without its own `ENABLE` therefore leaves that table unenforced and
+  fails the "enables RLS on every policied table" assertion. A negative-control test policies a
+  table after the fact and confirms the guard reports it.
+
+  **One bug found in T1's helper while wiring this up**, caught by the full suite and not by the
+  spec in isolation: the enable-marker regex matched the phrase `ENABLE ROW LEVEL SECURITY` where
+  the *policy* migrations discuss it **in comments**, so `112`–`118` were classified as enable
+  migrations and their policies silently went unapplied. Marker detection now strips SQL comments
+  first. The lesson generalizes — content markers over SQL must ignore comments, because these files
+  document the thing they are being matched for.
+
+**Scope:** `database/migrations/123_rls_enable.sql`, `database/schema.sql`.
+
+**Do:** `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` for every policied table, derived dynamically as
+above. **This file is flip B.** It ships to prod only in its own release after flip A soaks (runbook).
+Land it on a branch CI can validate but tag the PR clearly: `do-not-deploy-before-flip-A`.
+
+**Accept:** applies cleanly in a scratch DB; `pg_class.relrowsecurity` true for every policied table
+and false for the four exempt ones; a table policied but not enabled fails the check; integration
+suite (T2) passes against it.
 
 ---
 
@@ -394,14 +439,66 @@ integration suite (T2) passes against it.
 
 ### T1. Integration harness applies real migrations
 
-- [ ] Status: not started
+- [x] Status: done (branch `claude/rls-task-list-next-72ikal`). New helper
+  `backend/test/helpers/rls-setup.ts` exporting `applyRlsPolicies(dataSource)`, called from
+  `createIntegrationModule` after compile. Acceptance spec
+  `backend/test/integration/rls-harness.integration.spec.ts` (12 tests). Full integration run against
+  a real PostgreSQL 16: **16 suites / 172 tests green** (was 15/160 before the task), build + lint +
+  ratchet clean.
+
+  **The migration selector is content-based, and that is the whole point of the task.** It selects
+  files whose SQL references `app_current_user_id` / `app_bypass_rls`, which today is
+  `111`–`114`, `117_mny_import_staging_and_jobs.sql` and `118_security_documents_rls.sql`. The
+  `*_rls_*` glob the task text originally specified silently drops `117`, so `import_staged_files`
+  and `import_jobs` would have looked unpolicied to T2 — a green, meaningless suite. Every policy
+  predicate calls one of the helpers, so the marker cannot miss a policy file no matter what it is
+  named, and it picks up future feature migrations that policy their own new table (the correct
+  pattern) with nothing to register by hand.
+
+  **Every assertion has a verified negative control** — each was run against a deliberately broken
+  harness, not just reviewed:
+  - Narrowing the selector back to the `*_rls_*` glob fails 3 tests, including the guard test
+    "selects every migration file that declares a policy", which calls the **real** selector and
+    compares it against every file containing a `CREATE POLICY`. That guard fails for any future
+    policy file the selector would miss, wherever it appears — the `ui-conventions.test.ts` pattern.
+  - Skipping trigger creation fails all 3 trigger tests. The `app.preserve_timestamps` test
+    initially passed without triggers (with nothing to overwrite the supplied timestamp, preserving
+    it is trivially true), so it now asserts the trigger is attached before exercising the GUC.
+
+  **Boundary decisions:**
+  - `applyRlsPolicies` applies policies but **not** `ENABLE ROW LEVEL SECURITY`. Policies ship inert
+    (M2) and the enable is M3/flip B, so the other 15 suites see exactly what they saw before — a
+    policy on a table without enable is never consulted by the planner. A test asserts zero tables
+    have `relrowsecurity`, so an accidental enable here would surface as a failure rather than as a
+    baffling regression elsewhere. T2 opts into enforcement itself.
+  - Role and grants come from `provisionAppRole` in `src/common/db/app-role.ts` (F1 exported the SQL
+    for exactly this), not from duplicated grant SQL. Note the task text says the grants live in
+    `db-init.ts`; F1 actually put them in `app-role.ts`, which db-init calls.
+  - The `updated_at` trigger DDL is extracted from `schema.sql` with a whitespace-tolerant pattern
+    (the file has both one-line and multi-line forms) and applied only for tables `synchronize`
+    actually built, so schema.sql being ahead of the entities is not a failure. 24 triggers today.
+  - A post-condition compares the policies the applied files *declare* (both shapes: explicit
+    `CREATE POLICY`, and `112`'s `text[]` looped through `EXECUTE format`) against `pg_policies`
+    after apply, so a file that applies without error but takes a branch skipping its policies fails
+    loudly instead of silently under-applying.
+  - **The four suites that build their own `DataSource`** (`mny-import`, `mny-import-job`,
+    `mny-staging`, `support-backup`) are **not** wired to the harness — they opt in by calling
+    `applyRlsPolicies` themselves, as the T1 acceptance spec does. None of them tests RLS, and
+    attaching triggers under `support-backup`'s golden comparison is a change T1 has no reason to
+    make. T2 will call it explicitly.
 
 **Scope:** `backend/test/helpers/integration-setup.ts` (+ a new helper file if cleaner).
 
 **Do:** after `synchronize`, run `applyRlsPolicies(dataSource)`:
 1. Create `monize_app` in the test DB **before** anything references it, and apply the F1 grants
    (reuse/share db-init's grant SQL — the migrations no longer contain grants).
-2. Execute the actual `database/migrations/1NN_rls_*.sql` files read from disk (never duplicated SQL).
+2. Execute the actual RLS migration files read from disk (never duplicated SQL). **A `*_rls_*` glob
+   is wrong and will silently under-apply.** It matches `111`–`114` and `118_security_documents_rls`
+   but misses the `CREATE POLICY` statements for `import_staged_files` and `import_jobs`, which live
+   inside `117_mny_import_staging_and_jobs.sql` — a feature migration that creates the tables and
+   policies them in the same file (the right pattern; see M3). Two tables would then look unpolicied
+   to T2. Apply the whole migrations directory in **filename sort order**, or enumerate the policy
+   sources explicitly and assert the enumerated set still covers every table T2 buckets.
 3. Create the `update_updated_at_column()` **triggers** for the tables the trigger tests touch,
    extracting their `CREATE TRIGGER` DDL from `database/schema.sql` — `synchronize` builds from
    entities and creates **no** DB triggers (`@UpdateDateColumn` stamps app-side), and the RLS
@@ -415,7 +512,21 @@ or unreadable (no silent skip); a raw `UPDATE` on a trigger-covered table in the
 
 ### T2. Catalog-driven `rls-enforcement` spec
 
-- [ ] Status: not started
+- [ ] Status: not started, but **fully unblocked** — T1 and M3 are both done. Build the spec's own
+  DataSource and call `applyRlsPolicies(ds, { includeEnable: true })` from
+  `test/helpers/rls-setup.ts` (it is not wired into raw-DataSource suites automatically, and the
+  enable is opt-in so the ordinary suites keep seeing inert policies).
+  `rls-enable.integration.spec.ts` is the working example, including an `asAppRole(gucs, fn)` helper
+  that runs a body under `SET LOCAL ROLE` with transaction-local GUCs — the shape T2 needs per
+  table. The four-bucket map must cover the tables that postdate M2: `import_staged_files`,
+  `import_jobs` and `security_documents` are all direct `user_id`, so the `user_id`-column bucket
+  picks them up with no map entry, but a hard-coded table count will not match.
+
+  M3's spec already covers, for `accounts` and `transaction_splits` only, the visibility /
+  zero-rows / bypass / `WITH CHECK` / non-owner assertions. T2's job is to make that catalog-driven
+  across **every** table and to add what M3 does not touch: the 22P02 garbage-GUC assertion, the
+  `app.preserve_timestamps` trigger case, the delegation semantics (both identity GUCs), and the
+  post-commit GUC-scope check.
 
 **Scope:** new `backend/test/integration/rls-enforcement.integration.spec.ts`.
 
@@ -1038,11 +1149,17 @@ behavior unchanged; no context-throw in dev smoke once R7 lands (verified again 
 ### L1. Lint bans
 
 - [ ] Status: not started, but **unblocked** — R1–R7 are done and both ratchet counts are 0
-  (`backend/scripts/rls-ratchet-baseline.json`). L1's note from C1 still applies: the
-  `with-context.ts` allowlist must include `backend/src/oauth/**`, and R6/R7 added imports in
-  `backend/src/mcp/**`, `backend/src/currencies/**`, `backend/src/securities/securities.controller.ts`
-  and `backend/src/delegation/guards/**` as well. The now-unused `TypeOrmModule.forFeature`
+  (`backend/scripts/rls-ratchet-baseline.json`). The now-unused `TypeOrmModule.forFeature`
   registrations R1–R5 left behind were removed in R6/R7, so that L1 clean-up is already done.
+
+  **Derive the allowlist from the tree, not from this list.** As of 2026-08, **35 non-spec files**
+  import `common/db/with-context`, which is more than the C1 note ("admin, auth bootstrap, emergency
+  access, cron/jobs, seeders, backup") or the R6/R7 additions describe. Beyond those, it now includes
+  `backend/src/import/mny/**` (3 files) and `backend/src/mcp/tools/transactions.tool.ts`, both of
+  which postdate R7. Run
+  `grep -rl "db/with-context" backend/src --include=*.ts | grep -v spec` when writing the rule and
+  justify each entry, rather than trusting any enumeration written here — the point of the ban is
+  that a *new* importer is a deliberate decision, so the allowlist must start at today's real set.
 
 **Do:** ESLint `no-restricted-imports`: `with-context.ts` importable only from the allowlist (admin,
 auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepository` and
@@ -1056,7 +1173,11 @@ auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepos
 
 **Do:** update root `CLAUDE.md` (QueryRunner section now points at `withScopedDb` as the required pattern)
 and `database/CLAUDE.md` (RLS migration conventions, "adding a new table" policy step — four buckets,
-no role/grants in migrations); fix `backend/CLAUDE.md`'s **stale scheduler claim** (crons run in the
+no role/grants in migrations). **Write the new-table rule as a hard convention:** a migration creating
+a user-owned table ships its `CREATE POLICY` in the same file, and — once M3 has shipped — its
+`ENABLE ROW LEVEL SECURITY` too. `117_mny_import_staging_and_jobs.sql` and
+`118_security_documents_rls.sql` already do the policy half by hand; the rule is what keeps the next
+one from being the single unprotected table under enforcement. Then fix `backend/CLAUDE.md`'s **stale scheduler claim** (crons run in the
 API process; there is no separate scheduler — delete or fix the dead `start:scheduler` script
 reference); finalize `.env.example` comments; verify the helm chart values/ConfigMap and the CNPG
 `managed.roles` requirement are documented for k8s operators; verify the runbook matches the
