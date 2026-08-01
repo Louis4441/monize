@@ -20,8 +20,11 @@
     must go through `tr()` + English catalogs, then `npm run i18n:pseudo`).
 - **Terminology:** "the design doc" = `row-level-security.md`. Section references (e.g. "Phase 2b")
   point there. Migration numbers below were written when the max was `102_*` and are now stale:
-  M1/M2 actually shipped as `111`–`114`. **Verify with `ls database/migrations` and renumber from the
-  actual max before writing files.**
+  M1/M2 actually shipped as `111`–`114`, and unrelated feature migrations have since carried the max
+  to `122`. **Verify with `ls database/migrations` and renumber from the actual max before writing
+  files** — do not trust any number in this document. Note that `116_*` and `117_*` each have two
+  files: the directory is applied in **filename sort order**, not by numeric prefix, which is what
+  keeps `117_security_documents` ahead of `118_security_documents_rls`.
 
 ## Deployment safety
 
@@ -373,20 +376,36 @@ without enable); schema.sql mirrored.
 
 ### M3. Enable migration — authored, not deployed
 
-- [ ] Status: not started. **Renumber: M2 ended at `114`, so this is `115_rls_enable.sql`.** The
-  exact target list is the 50 tables policied by migrations `112`–`114`; derive it from
-  `SELECT DISTINCT tablename FROM pg_policies WHERE schemaname = 'public'` rather than retyping it.
+- [ ] Status: not started. **Renumber: the max is now `122`, so this is `123_rls_enable.sql`** — not
+  the `115` an earlier revision of this note assumed, and not the `107` in the Scope line below.
   M2 already dry-ran this enable in a scratch database and verified every policy behaves correctly
   under it (see M2's status note), so M3 is expected to be mechanical.
 
-**Scope:** new `database/migrations/107_rls_enable.sql`, `database/schema.sql`.
+  **The target is 53 tables, not the 50 M2 shipped.** Three policied tables postdate M2, each
+  correctly carrying its own policy in the migration that created it: `import_staged_files` and
+  `import_jobs` (in `117_mny_import_staging_and_jobs.sql`, not in a file matching `*_rls_*`) and
+  `security_documents` (in `118_security_documents_rls.sql`). Audited 2026-08 against
+  `database/schema.sql`: **57 tables, 53 policied, 4 exempt** — `currencies`, `exchange_rates`,
+  `oauth_payloads`, `schema_migrations`, exactly M2's exemption list, with no unpolicied table
+  outside it and no policy naming a table that does not exist.
 
-**Do:** `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` for exactly the tables policied in M2. **This file
-is flip B.** It ships to prod only in its own release after flip A soaks (runbook). Land it on a branch
-CI can validate but tag the PR clearly: `do-not-deploy-before-flip-A`.
+  **Do not hard-code the list.** Between authoring M3 and deploying it (flip B is a separate release
+  after flip A soaks) more tables will land, and a frozen list silently leaves each of them
+  unprotected — which is how the "50" above went stale. Write the enable as a `DO` loop over
+  `SELECT DISTINCT tablename FROM pg_policies WHERE schemaname = 'public'`, so it enables whatever is
+  policied at apply time. Pair it with the D1 convention: after M3 exists, a migration creating a
+  user-owned table ships its policy **and** its `ENABLE`.
 
-**Accept:** applies cleanly in a scratch DB; `pg_class.relrowsecurity` true for every policied table;
-integration suite (T2) passes against it.
+**Scope:** new `database/migrations/123_rls_enable.sql` (verify against `ls database/migrations`),
+`database/schema.sql`.
+
+**Do:** `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` for every policied table, derived dynamically as
+above. **This file is flip B.** It ships to prod only in its own release after flip A soaks (runbook).
+Land it on a branch CI can validate but tag the PR clearly: `do-not-deploy-before-flip-A`.
+
+**Accept:** applies cleanly in a scratch DB; `pg_class.relrowsecurity` true for every policied table
+and false for the four exempt ones; a table policied but not enabled fails the check; integration
+suite (T2) passes against it.
 
 ---
 
@@ -401,7 +420,13 @@ integration suite (T2) passes against it.
 **Do:** after `synchronize`, run `applyRlsPolicies(dataSource)`:
 1. Create `monize_app` in the test DB **before** anything references it, and apply the F1 grants
    (reuse/share db-init's grant SQL — the migrations no longer contain grants).
-2. Execute the actual `database/migrations/1NN_rls_*.sql` files read from disk (never duplicated SQL).
+2. Execute the actual RLS migration files read from disk (never duplicated SQL). **A `*_rls_*` glob
+   is wrong and will silently under-apply.** It matches `111`–`114` and `118_security_documents_rls`
+   but misses the `CREATE POLICY` statements for `import_staged_files` and `import_jobs`, which live
+   inside `117_mny_import_staging_and_jobs.sql` — a feature migration that creates the tables and
+   policies them in the same file (the right pattern; see M3). Two tables would then look unpolicied
+   to T2. Apply the whole migrations directory in **filename sort order**, or enumerate the policy
+   sources explicitly and assert the enumerated set still covers every table T2 buckets.
 3. Create the `update_updated_at_column()` **triggers** for the tables the trigger tests touch,
    extracting their `CREATE TRIGGER` DDL from `database/schema.sql` — `synchronize` builds from
    entities and creates **no** DB triggers (`@UpdateDateColumn` stamps app-side), and the RLS
@@ -1038,11 +1063,17 @@ behavior unchanged; no context-throw in dev smoke once R7 lands (verified again 
 ### L1. Lint bans
 
 - [ ] Status: not started, but **unblocked** — R1–R7 are done and both ratchet counts are 0
-  (`backend/scripts/rls-ratchet-baseline.json`). L1's note from C1 still applies: the
-  `with-context.ts` allowlist must include `backend/src/oauth/**`, and R6/R7 added imports in
-  `backend/src/mcp/**`, `backend/src/currencies/**`, `backend/src/securities/securities.controller.ts`
-  and `backend/src/delegation/guards/**` as well. The now-unused `TypeOrmModule.forFeature`
+  (`backend/scripts/rls-ratchet-baseline.json`). The now-unused `TypeOrmModule.forFeature`
   registrations R1–R5 left behind were removed in R6/R7, so that L1 clean-up is already done.
+
+  **Derive the allowlist from the tree, not from this list.** As of 2026-08, **35 non-spec files**
+  import `common/db/with-context`, which is more than the C1 note ("admin, auth bootstrap, emergency
+  access, cron/jobs, seeders, backup") or the R6/R7 additions describe. Beyond those, it now includes
+  `backend/src/import/mny/**` (3 files) and `backend/src/mcp/tools/transactions.tool.ts`, both of
+  which postdate R7. Run
+  `grep -rl "db/with-context" backend/src --include=*.ts | grep -v spec` when writing the rule and
+  justify each entry, rather than trusting any enumeration written here — the point of the ban is
+  that a *new* importer is a deliberate decision, so the allowlist must start at today's real set.
 
 **Do:** ESLint `no-restricted-imports`: `with-context.ts` importable only from the allowlist (admin,
 auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepository` and
@@ -1056,7 +1087,11 @@ auth bootstrap, emergency access, cron/jobs, seeders, backup). Ban `@InjectRepos
 
 **Do:** update root `CLAUDE.md` (QueryRunner section now points at `withScopedDb` as the required pattern)
 and `database/CLAUDE.md` (RLS migration conventions, "adding a new table" policy step — four buckets,
-no role/grants in migrations); fix `backend/CLAUDE.md`'s **stale scheduler claim** (crons run in the
+no role/grants in migrations). **Write the new-table rule as a hard convention:** a migration creating
+a user-owned table ships its `CREATE POLICY` in the same file, and — once M3 has shipped — its
+`ENABLE ROW LEVEL SECURITY` too. `117_mny_import_staging_and_jobs.sql` and
+`118_security_documents_rls.sql` already do the policy half by hand; the rule is what keeps the next
+one from being the single unprotected table under enforcement. Then fix `backend/CLAUDE.md`'s **stale scheduler claim** (crons run in the
 API process; there is no separate scheduler — delete or fix the dead `start:scheduler` script
 reference); finalize `.env.example` comments; verify the helm chart values/ConfigMap and the CNPG
 `managed.roles` requirement are documented for k8s operators; verify the runbook matches the
