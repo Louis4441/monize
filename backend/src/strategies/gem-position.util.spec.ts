@@ -470,7 +470,10 @@ describe("gem-position.util", () => {
       },
     };
     /** The same target, with nothing recorded about what it holds. */
-    const undescribed = { securityId: "sec-emim", composition: EMPTY_COMPOSITION };
+    const undescribed = {
+      securityId: "sec-emim",
+      composition: EMPTY_COMPOSITION,
+    };
 
     const worldish = (symbol: string, marketValue: number) =>
       holding({
@@ -491,10 +494,30 @@ describe("gem-position.util", () => {
     it("A: none of the target held and no way to estimate exposure", () => {
       const math = buildPositionMath(
         [
-          holding({ role: null, securityId: "sec-iusq", symbol: "IUSQ", marketValue: 4000 }),
-          holding({ role: null, securityId: "sec-vwra", symbol: "VWRA", marketValue: 3000 }),
-          holding({ role: null, securityId: "sec-wtai", symbol: "WTAI", marketValue: 2000 }),
-          holding({ role: null, securityId: "sec-aggg", symbol: "AGGG", marketValue: 1000 }),
+          holding({
+            role: null,
+            securityId: "sec-iusq",
+            symbol: "IUSQ",
+            marketValue: 4000,
+          }),
+          holding({
+            role: null,
+            securityId: "sec-vwra",
+            symbol: "VWRA",
+            marketValue: 3000,
+          }),
+          holding({
+            role: null,
+            securityId: "sec-wtai",
+            symbol: "WTAI",
+            marketValue: 2000,
+          }),
+          holding({
+            role: null,
+            securityId: "sec-aggg",
+            symbol: "AGGG",
+            marketValue: 1000,
+          }),
         ],
         "EM_EQUITY",
         undescribed,

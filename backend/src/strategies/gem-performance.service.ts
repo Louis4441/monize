@@ -241,7 +241,9 @@ export class GemPerformanceService {
       weight: (holding.marketValue as number) / total,
       prices: series.get(holding.securityId as string) ?? [],
     }));
-    if (legs.some((leg) => leg.prices.length === 0 || !(leg.prices[0].close > 0))) {
+    if (
+      legs.some((leg) => leg.prices.length === 0 || !(leg.prices[0].close > 0))
+    ) {
       return empty("MISSING_PRICE_HISTORY");
     }
 

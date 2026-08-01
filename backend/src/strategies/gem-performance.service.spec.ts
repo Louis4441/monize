@@ -425,5 +425,4 @@ describe("GemPerformanceService", () => {
       expect([...ids].sort()).toEqual(["sec-emim", "sec-spy"]);
     });
   });
-
 });

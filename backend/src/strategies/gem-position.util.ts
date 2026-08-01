@@ -200,8 +200,7 @@ export function buildPositionMath(
     !holding.isCash &&
     targetRole !== null &&
     (holding.role === targetRole ||
-      (target.securityId !== null &&
-        holding.securityId === target.securityId));
+      (target.securityId !== null && holding.securityId === target.securityId));
 
   const valued: GemMatchedHolding[] = sized.map((holding) => {
     // Cash is in no market at all: an exposure of zero here is a fact, not a
