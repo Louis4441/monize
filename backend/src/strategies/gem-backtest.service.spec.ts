@@ -120,7 +120,9 @@ describe("GemBacktestService", () => {
     // configured last month reports a month.
     const result = await service.build({
       strategy: strategy(),
-      signals: [signal("2024-01-01", "sec-spy")],
+      // One quarter old: a strategy configured last quarter, not one that has
+      // been silent for a year -- those would be three unanswered periods.
+      signals: [signal("2024-10-01", "sec-spy")],
       safeSecurityId: null,
       notional: 10_000,
       hasEarlierSignals: false,
@@ -128,7 +130,7 @@ describe("GemBacktestService", () => {
     });
 
     expect(result).toMatchObject({
-      from: "2024-01-01",
+      from: "2024-10-01",
       to: "2025-01-01",
       coveragePercent: 100,
       // A first allocation with nothing before it: the opening buy is real.
@@ -196,7 +198,8 @@ describe("GemBacktestService", () => {
       safeSecurityId: null,
       notional: 10_000,
       hasEarlierSignals: false,
-      asOf: "2026-09-01",
+      // Inside the July period, so the tail is not a hole of its own.
+      asOf: "2026-07-31",
     });
 
     // Three periods on the calendar, one of them unpriceable, so the run is

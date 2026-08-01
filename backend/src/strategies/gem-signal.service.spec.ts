@@ -116,7 +116,17 @@ describe("GemSignalService", () => {
               { id: `sig-${pending.evaluatedOn as string}`, ...pending },
             ];
             savedSignals.push(...rows);
-            return { generatedMaps: rows, raw: rows, identifiers: rows };
+            // What the real driver returns on ON CONFLICT DO NOTHING: `raw`
+            // is empty because nothing was written, but `generatedMaps` is
+            // built from the value sets and still holds an object. A spec
+            // that returns an empty `generatedMaps` describes a database
+            // TypeORM does not have, and the branch it was meant to cover
+            // could never run in production.
+            return {
+              generatedMaps: rows.length > 0 ? rows : [{}],
+              raw: rows,
+              identifiers: rows,
+            };
           }),
         };
         return builder;
@@ -794,7 +804,11 @@ describe("GemSignalService", () => {
                 ? []
                 : [{ id: `sig-${pending.evaluatedOn as string}`, ...pending }];
             savedSignals.push(...rows);
-            return { generatedMaps: rows, raw: rows, identifiers: rows };
+            return {
+              generatedMaps: rows.length > 0 ? rows : [{}],
+              raw: rows,
+              identifiers: rows,
+            };
           }),
         };
         return builder;
@@ -850,7 +864,11 @@ describe("GemSignalService", () => {
                 ? []
                 : [{ id: `sig-${pending.evaluatedOn as string}`, ...pending }];
             savedSignals.push(...rows);
-            return { generatedMaps: rows, raw: rows, identifiers: rows };
+            return {
+              generatedMaps: rows.length > 0 ? rows : [{}],
+              raw: rows,
+              identifiers: rows,
+            };
           }),
         };
         return builder;

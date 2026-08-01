@@ -201,9 +201,21 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
     );
   }
 
+  // A period that has not started yet is not a period.
+  //
+  // On the first day of a new one, `effectiveFrom` and `endsOn` are both
+  // today: growth is exactly 1, which loses the hit-rate comparison against a
+  // safe asset that also did nothing, so the ratio dropped the morning a
+  // period opened and climbed back over the month. Nothing about the strategy
+  // changed; there was simply no elapsed time to judge.
+  const elapsed = bounds.filter(
+    (period) => period.endsOn > period.effectiveFrom,
+  );
+  if (elapsed.length === 0) return null;
+
   // Everything after the last period that could not be priced.
-  const lastGap = bounds.map((period) => period.growth).lastIndexOf(null);
-  const run = bounds.slice(lastGap + 1);
+  const lastGap = elapsed.map((period) => period.growth).lastIndexOf(null);
+  const run = elapsed.slice(lastGap + 1);
   if (run.length === 0) return null;
 
   const from = run[0].effectiveFrom;
@@ -317,6 +329,6 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
         : null,
     taxApplied: taxRate !== null,
     commissionApplied: commissionFraction !== null,
-    coveragePercent: roundToDecimals((run.length / bounds.length) * 100, 2),
+    coveragePercent: roundToDecimals((run.length / elapsed.length) * 100, 2),
   };
 }

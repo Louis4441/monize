@@ -594,8 +594,24 @@ export class GemSignalService {
           .orIgnore()
           .returning("*")
           .execute();
-        const saved = (result.generatedMaps[0] ??
-          null) as GemStrategySignal | null;
+        // `raw` decides whether the row went in, not `generatedMaps`.
+        //
+        // TypeORM builds `generatedMaps` from the *value sets* it was handed,
+        // not from what the database returned, so a conflict-ignored insert
+        // still yields `[{}]` -- truthy. Every branch below this one was
+        // therefore dead: a lost race was recorded as a successful write, the
+        // winner was never read, and the abandon path never ran. With
+        // `.returning("*")`, `raw` is the rows Postgres actually wrote, and it
+        // is empty exactly when the insert was skipped.
+        const inserted = Array.isArray(result.raw)
+          ? result.raw.length > 0
+          : true;
+        const saved = inserted
+          ? ({
+              ...signal,
+              ...(result.generatedMaps[0] ?? {}),
+            } as GemStrategySignal)
+          : null;
         if (saved) {
           byEvaluatedOn.set(period.evaluatedOn, {
             ...signal,

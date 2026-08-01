@@ -495,6 +495,54 @@ describe("runBacktest", () => {
     );
   });
 
+  it("ignores a period that opened today and has not elapsed", () => {
+    // On the morning a period opens, its start and end are the same date: it
+    // grows by exactly 1, which loses a hit-rate comparison against a safe
+    // asset that also did nothing. The ratio dropped overnight and climbed
+    // back over the month, with nothing about the strategy having changed.
+    const periods: GemBacktestInput["periods"] = [
+      {
+        effectiveFrom: "2024-01-01",
+        targetRole: "US_EQUITY",
+        targetSecurityId: "sec-spy",
+        previousRole: null,
+      },
+      {
+        effectiveFrom: "2024-07-01",
+        targetRole: "US_EQUITY",
+        targetSecurityId: "sec-spy",
+        previousRole: "US_EQUITY",
+      },
+      // Materialized this morning: asOf is its own effectiveFrom.
+      {
+        effectiveFrom: "2025-01-01",
+        targetRole: "US_EQUITY",
+        targetSecurityId: "sec-spy",
+        previousRole: "US_EQUITY",
+      },
+    ];
+    const seriesBySecurity = new Map([
+      [
+        "sec-spy",
+        series({ "2024-01-01": 100, "2024-07-01": 110, "2025-01-01": 121 }),
+      ],
+      [
+        "sec-ief",
+        series({ "2024-01-01": 100, "2024-07-01": 100, "2025-01-01": 100 }),
+      ],
+    ]);
+
+    const result = runBacktest(
+      input({ periods, seriesBySecurity, safeSecurityId: "sec-ief" }),
+    );
+
+    // Two elapsed periods, both won, and the empty one counts for nothing --
+    // neither against the hit rate nor against coverage.
+    expect(result?.hitRatePercent).toBe(100);
+    expect(result?.coveragePercent).toBe(100);
+    expect(result?.to).toBe("2025-01-01");
+  });
+
   it("has nothing to report without an evaluation or any price", () => {
     expect(runBacktest(input({ periods: [] }))).toBeNull();
     expect(runBacktest(input({ seriesBySecurity: new Map() }))).toBeNull();

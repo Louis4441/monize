@@ -265,7 +265,7 @@ describe("gem-composition.util", () => {
       expect(match).toEqual({
         overlap: 1,
         byInstrument: false,
-        matched: [{ name: "china", weight: 0.7 }],
+        matched: [{ name: "China", weight: 0.7 }],
       });
     });
   });
@@ -284,10 +284,23 @@ describe("gem-composition.util", () => {
             { name: "India", weight: 0.5 },
           ],
         ),
+        // The holding's own spelling, not the comparison key: the canonical
+        // form is lowercased and folds synonyms, so pushing it out renamed the
+        // market on screen ("united states" for "United States", and "USA" for
+        // a target that said so).
       ).toEqual([
-        { name: "india", weight: 0.3 },
-        { name: "china", weight: 0.1 },
+        { name: "India", weight: 0.3 },
+        { name: "China", weight: 0.1 },
       ]);
+    });
+
+    it("keeps the holding's spelling even when the target's differs", () => {
+      expect(
+        overlapContributions(
+          [{ name: "United States", weight: 0.6 }],
+          [{ name: "USA", weight: 1 }],
+        ),
+      ).toEqual([{ name: "United States", weight: 0.6 }]);
     });
 
     it("caps each market at the target's own weight in it", () => {
@@ -298,7 +311,7 @@ describe("gem-composition.util", () => {
           [{ name: "China", weight: 0.8 }],
           [{ name: "China", weight: 0.5 }],
         ),
-      ).toEqual([{ name: "china", weight: 0.5 }]);
+      ).toEqual([{ name: "China", weight: 0.5 }]);
     });
 
     it("is empty when the markets do not meet", () => {

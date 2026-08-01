@@ -36,13 +36,18 @@ import { addMonthsUtc, cadenceMonths, parseYmd } from "./gem-momentum.util";
 function withMissingPeriods(
   evaluated: GemBacktestPeriod[],
   cadence: GemCadence,
+  asOf: string,
 ): GemBacktestPeriod[] {
   const step = cadenceMonths(cadence);
   const filled: GemBacktestPeriod[] = [];
   for (const [index, period] of evaluated.entries()) {
     filled.push(period);
-    const next = evaluated[index + 1];
-    if (!next) continue;
+    // The tail counts too. A calendar period after the last evaluated one --
+    // an evaluation this configuration cannot answer for, or one whose prices
+    // went stale -- is otherwise absorbed into its predecessor, which then
+    // runs its instrument through a month the strategy decided differently and
+    // still reports full coverage.
+    const next = evaluated[index + 1] ?? { effectiveFrom: asOf };
     let expected = ymd(addMonthsUtc(parseYmd(period.effectiveFrom), step));
     // Bounded by the next evaluated period, so a calendar change (or a
     // cadence the dates do not line up with) cannot spin here.
@@ -123,7 +128,7 @@ export class GemBacktestService {
     // coverage. Filling the hole with an unpriceable placeholder puts it back
     // on the calendar, where the existing gap machinery restarts the run after
     // it and `coveragePercent` counts it.
-    const periods = withMissingPeriods(evaluated, strategy.cadence);
+    const periods = withMissingPeriods(evaluated, strategy.cadence, asOf);
 
     const securityIds = [
       ...new Set(

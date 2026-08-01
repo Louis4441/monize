@@ -224,11 +224,24 @@ export function overlapContributions(
   const holdingWeights = weightsByName(holding);
   const targetWeights = weightsByName(target);
   if (holdingWeights.size === 0 || targetWeights.size === 0) return [];
+  // Names are matched on the canonical key -- lowercased, with synonyms folded
+  // together -- but that key is a comparison device, not a label. Pushing it
+  // out put "united states 60%" on screen for a holding that says "United
+  // States", and for a target that says "USA" it renamed the market entirely.
+  const displayNames = new Map<string, string>();
+  for (const entry of holding ?? []) {
+    if (!entry?.name) continue;
+    const key = canonicalName(entry.name);
+    if (key && !displayNames.has(key)) displayNames.set(key, entry.name);
+  }
   const contributions: GemWeighting[] = [];
   for (const [name, weight] of holdingWeights) {
     const targetWeight = targetWeights.get(name);
     if (targetWeight === undefined) continue;
-    contributions.push({ name, weight: Math.min(weight, targetWeight) });
+    contributions.push({
+      name: displayNames.get(name) ?? name,
+      weight: Math.min(weight, targetWeight),
+    });
   }
   return contributions.sort((a, b) => b.weight - a.weight);
 }
