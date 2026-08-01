@@ -240,6 +240,9 @@ export const RULES: Record<string, TableRules> = {
     category_id: keep,
     amount: scale,
     currency_code: keep,
+    original_amount: scale, // private money magnitude, in foreign currency
+    original_currency_code: keep, // public reference value
+    exchange_rate: keep, // public FX rate
     description: drop,
     frequency: keep,
     next_due_date: keep,

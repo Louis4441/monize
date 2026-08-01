@@ -260,6 +260,7 @@ vi.mock('@/hooks/useNumberFormat', () => ({
 }));
 
 vi.mock('@/lib/format', () => ({
+  FX_RATE_DISPLAY_DECIMALS: 6,
   getCurrencySymbol: () => '$',
   getDecimalPlacesForCurrency: () => 2,
   roundToCents: (v: number) => Math.round(v * 100) / 100,
@@ -3609,7 +3610,9 @@ describe('TransactionForm', () => {
       // The rate caption renders the rate through the number formatter (4 dp)
       // and the date through the user's date formatter.
       await waitFor(() =>
-        expect(screen.getByText(/1 EUR = 1\.5000 CAD/)).toBeInTheDocument(),
+        // Six decimals, matching what a bank statement quotes -- see
+        // FX_RATE_DISPLAY_DECIMALS.
+        expect(screen.getByText(/1 EUR = 1\.500000 CAD/)).toBeInTheDocument(),
       );
     });
 

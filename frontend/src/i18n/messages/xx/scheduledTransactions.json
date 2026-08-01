@@ -61,7 +61,8 @@
       "postFailed": "[XX-Failed to post transaction-XX]",
       "skipFailed": "[XX-Failed to skip occurrence-XX]",
       "deleteFailed": "[XX-Failed to delete-XX]"
-    }
+    },
+    "foreignAmountTitle": "[XX-The amount the biller charges, in its own currency-XX]"
   },
   "filters": {
     "label": "[XX-Filters-XX]",
@@ -111,13 +112,20 @@
       "priceRequired": "[XX-Price must be greater than zero-XX]",
       "totalAmountRequired": "[XX-Total amount is required-XX]",
       "splitsMinimum": "[XX-Split transactions require at least 2 splits-XX]",
-      "splitsTotal": "[XX-Split amounts must equal the transaction amount-XX]"
+      "splitsTotal": "[XX-Split amounts must equal the transaction amount-XX]",
+      "fxRateUnavailable": "[XX-No exchange rate is available for {from} to {to} on this date.-XX]"
     },
     "latestPlaceholder": "[XX-Latest: {price}-XX]",
     "descriptionPlaceholder": "[XX-Description...-XX]",
     "amountLabel": "[XX-Amount-XX]",
     "selectCategoryPlaceholder": "[XX-Select category...-XX]",
-    "referencePlaceholder": "[XX-Cheque #, confirmation #...-XX]"
+    "referencePlaceholder": "[XX-Cheque #, confirmation #...-XX]",
+    "fx": {
+      "amountInCurrency": "[XX-Amount in {currency}-XX]",
+      "rateCaption": "[XX-Posts as {total} at 1 {from} = {rate} {to} on {date}.-XX]",
+      "noRateWarning": "[XX-No exchange rate found for {from} to {to} on {date}. Pick another date, or refresh rates.-XX]",
+      "feeCaption": "[XX-Includes a {percent}% foreign transaction fee ({fee}).-XX]"
+    }
   },
   "occurrencePicker": {
     "title": "[XX-Select Occurrence Date-XX]",
@@ -253,7 +261,14 @@
       "securityRequired": "[XX-This investment action requires a security-XX]",
       "quantityRequired": "[XX-Quantity must be greater than zero-XX]",
       "priceRequired": "[XX-Price must be greater than zero-XX]",
-      "totalAmountRequired": "[XX-Total amount is required for this action-XX]"
+      "totalAmountRequired": "[XX-Total amount is required for this action-XX]",
+      "fxRateRequired": "[XX-Enter an amount in the chosen currency before saving. No exchange rate is available yet.-XX]"
+    },
+    "fx": {
+      "amountInCurrency": "[XX-Amount in {currency}-XX]",
+      "estimateCaption": "[XX-About {total} at 1 {from} = {rate} {to}. Updated daily; the rate on the posting date is used when it posts.-XX]",
+      "noRateWarning": "[XX-No exchange rate found for {from} to {to}. Pick another currency, or enter the amount in {to}.-XX]",
+      "feeCaption": "[XX-Includes a {percent}% foreign transaction fee ({fee}).-XX]"
     }
   },
   "postTransaction": {

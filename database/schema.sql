@@ -438,6 +438,14 @@ CREATE TABLE scheduled_transactions (
     category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
     amount NUMERIC(20, 4) NOT NULL,
     currency_code VARCHAR(3) NOT NULL REFERENCES currencies(code),
+    -- Foreign-currency entry (mirrors the same trio on transactions). When set,
+    -- original_amount is the fixed amount the biller charges in
+    -- original_currency_code, and `amount` is the account-currency estimate
+    -- derived from it at exchange_rate -- refreshed daily from the latest rate,
+    -- and re-derived for the posting date when the occurrence is posted.
+    original_amount NUMERIC(20, 4),
+    original_currency_code VARCHAR(3) REFERENCES currencies(code),
+    exchange_rate NUMERIC(20, 10) NOT NULL DEFAULT 1,
     description TEXT,
     -- 'ONCE', 'DAILY', 'WEEKLY', 'BIWEEKLY', 'EVERY4WEEKS', 'SEMIMONTHLY',
     -- 'MONTHLY', 'EVERY2MONTHS', 'QUARTERLY', 'SEMIANNUAL', 'YEARLY'

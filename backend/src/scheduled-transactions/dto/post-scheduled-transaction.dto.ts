@@ -72,6 +72,25 @@ export class PostScheduledTransactionDto {
   amount?: number;
 
   @ApiPropertyOptional({
+    description:
+      "Override foreign amount for this posting only, in the schedule's entry currency. Ignored unless the schedule carries a foreign currency; the account-currency amount is derived from it at the rate for the posting date.",
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 4 })
+  @Min(-999999999999)
+  @Max(999999999999)
+  originalAmount?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Override exchange rate for this posting only (account-currency units per 1 unit of the entry currency). Defaults to the stored rate for the posting date.",
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 10 })
+  @Min(0.000001)
+  exchangeRate?: number;
+
+  @ApiPropertyOptional({
     description: "Override category ID for this posting only",
   })
   @IsOptional()

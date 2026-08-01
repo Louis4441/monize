@@ -11,6 +11,7 @@ import { getErrorMessage } from '@/lib/errors';
 import { useDateFormat } from '@/hooks/useDateFormat';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { computeInvestmentCashImpact } from '@/lib/investmentCashImpact';
+import { formatAmountWithCommas, getDecimalPlacesForCurrency } from '@/lib/format';
 import { InvestmentAction } from '@/types/investment';
 import { useLongPress, type LongPressRowHandlers } from '@/hooks/useLongPress';
 import { RowActions } from '@/components/ui/row-actions/RowActions';
@@ -284,6 +285,22 @@ const ScheduledTransactionRow = memo(function ScheduledTransactionRow({
             overrideAmount != null &&
             baseAmount != null &&
             Number(overrideAmount) !== Number(baseAmount);
+          // A foreign-currency schedule shows the fixed amount the biller
+          // charges under the converted estimate, the same way a
+          // foreign-entered transaction row does.
+          const foreignLine =
+            transaction.originalCurrencyCode && transaction.originalAmount != null ? (
+              <div
+                className="text-xs font-normal text-gray-500 dark:text-gray-400"
+                title={t('list.foreignAmountTitle')}
+              >
+                {transaction.originalCurrencyCode}{' '}
+                {formatAmountWithCommas(
+                  Math.abs(Number(transaction.originalAmount)),
+                  getDecimalPlacesForCurrency(transaction.originalCurrencyCode),
+                )}
+              </div>
+            ) : null;
           if (isModified) {
             return (
               <div className="flex flex-col items-end">
@@ -293,10 +310,16 @@ const ScheduledTransactionRow = memo(function ScheduledTransactionRow({
                 <span title={t('list.modifiedAmountTitle')}>
                   {formatAmount(overrideAmount, transaction.currencyCode)}
                 </span>
+                {foreignLine}
               </div>
             );
           }
-          return formatAmount(baseAmount, transaction.currencyCode);
+          return (
+            <>
+              {formatAmount(baseAmount, transaction.currencyCode)}
+              {foreignLine}
+            </>
+          );
         })()}
       </td>
 

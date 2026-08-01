@@ -1062,3 +1062,30 @@ describe('ScheduledTransactionList', () => {
     expect(badge.title).toContain('2 upcoming occurrences modified');
   });
 });
+
+describe('ScheduledTransactionList - foreign currency', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows the biller amount in its own currency under the converted estimate', () => {
+    const transactions = [
+      createTransaction({
+        amount: -54.61,
+        currencyCode: 'CAD',
+        originalAmount: -40,
+        originalCurrencyCode: 'USD',
+        exchangeRate: 1.365234,
+      }),
+    ];
+    render(<ScheduledTransactionList transactions={transactions} />);
+
+    expect(screen.getByText('-$54.61')).toBeInTheDocument();
+    expect(screen.getByText('USD 40.00')).toBeInTheDocument();
+  });
+
+  it('shows no second line for an ordinary schedule', () => {
+    render(<ScheduledTransactionList transactions={[createTransaction()]} />);
+    expect(screen.queryByText(/USD/)).not.toBeInTheDocument();
+  });
+});

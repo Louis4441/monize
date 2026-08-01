@@ -16,7 +16,12 @@ import { TOUR_ANCHORS, tourAnchor } from '@/lib/tours/anchors';
 import { useDisableTransactionSplit } from '@/store/tourStore';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { exchangeRatesApi } from '@/lib/exchange-rates';
-import { getCurrencySymbol, roundToCents, roundToDecimals } from '@/lib/format';
+import {
+  FX_RATE_DISPLAY_DECIMALS,
+  getCurrencySymbol,
+  roundToCents,
+  roundToDecimals,
+} from '@/lib/format';
 import {
   getRememberedTransactionCurrency,
   rememberTransactionCurrency,
@@ -1218,7 +1223,7 @@ export function TransactionForm({ transaction, duplicateFrom, defaultAccountId, 
         <span>
           {t('form.fx.rateCaption', {
             from: entryCurrency,
-            rate: formatNumber(fxRate, 4),
+            rate: formatNumber(fxRate, FX_RATE_DISPLAY_DECIMALS),
             to: accountCurrency,
             date: watchedDate ? formatDate(watchedDate) : watchedDate,
           })}

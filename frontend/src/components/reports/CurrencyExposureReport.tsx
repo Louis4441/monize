@@ -23,6 +23,7 @@ import { useSortableTable, compareValues } from '@/hooks/useSortableTable';
 import { useReportData } from '@/hooks/useReportData';
 import { usePersistedAccountFilter } from '@/hooks/usePersistedAccountFilter';
 import { ReportError } from '@/components/reports/ReportError';
+import { FX_RATE_DISPLAY_DECIMALS } from '@/lib/format';
 import { CHART_SERIES } from '@/lib/chart-colors';
 import { createLogger } from '@/lib/logger';
 import { useTranslations } from 'next-intl';
@@ -204,7 +205,11 @@ export function CurrencyExposureReport() {
     const rows = allocationData.map(item => [
       item.currency,
       formatCurrencyFull(item.nativeValue, item.currency),
-      item.currency === defaultCurrency ? '1.0000' : item.rate !== null ? item.rate.toFixed(4) : '-',
+      item.currency === defaultCurrency
+        ? (1).toFixed(FX_RATE_DISPLAY_DECIMALS)
+        : item.rate !== null
+          ? item.rate.toFixed(FX_RATE_DISPLAY_DECIMALS)
+          : '-',
       formatCurrencyFull(item.convertedValue, defaultCurrency),
       `${item.percentage.toFixed(1)}%`,
       String(item.count),
@@ -416,9 +421,9 @@ export function CurrencyExposureReport() {
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-gray-500 dark:text-gray-400">
                     {item.currency === defaultCurrency
-                      ? '1.0000'
+                      ? (1).toFixed(FX_RATE_DISPLAY_DECIMALS)
                       : item.rate !== null
-                        ? item.rate.toFixed(4)
+                        ? item.rate.toFixed(FX_RATE_DISPLAY_DECIMALS)
                         : '-'}
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-gray-100">

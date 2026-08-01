@@ -18,7 +18,7 @@ import { Currency } from "./entities/currency.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { YahooFinanceService } from "../securities/yahoo-finance.service";
 import { mapWithConcurrency } from "../common/concurrency.util";
-import { roundMoney } from "../common/round.util";
+import { roundFxRate } from "../common/fx-entry.util";
 import { withScopedDb } from "../common/db/scoped-db";
 import { withSystemContext, withUserContext } from "../common/db/with-context";
 
@@ -216,8 +216,11 @@ export class ExchangeRateService implements OnModuleInit {
     return withScopedDb(this.dataSource, async (manager) => {
       const result = await this.saveOneDirection(manager, from, to, rate, date);
 
-      // Also save the inverse rate so both directions stay current
-      const inverseRate = roundMoney(1 / rate);
+      // Also save the inverse rate so both directions stay current. Rounded at
+      // the rate column's own precision, not money precision: 1/1.3652 rounded
+      // to 4dp is 0.7325, which converts USD->CAD back to 1.3661 -- an error a
+      // bank statement quoting six decimals would show up immediately.
+      const inverseRate = roundFxRate(1 / rate);
       await this.saveOneDirection(manager, to, from, inverseRate, date);
 
       return result;

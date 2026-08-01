@@ -36,6 +36,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 vi.mock('@/lib/format', () => ({
+  FX_RATE_DISPLAY_DECIMALS: 6,
   getCurrencySymbol: () => '$',
   getDecimalPlacesForCurrency: () => 2,
   roundToCents: (v: number) => Math.round(v * 100) / 100,
@@ -46,6 +47,14 @@ vi.mock('@/lib/format', () => ({
   filterCalculatorInput: (v: string) => v,
   hasCalculatorOperators: () => false,
   evaluateExpression: (v: string) => parseFloat(v) || 0,
+}));
+
+const mockGetRateForDate = vi.fn().mockResolvedValue(null);
+
+vi.mock('@/lib/exchange-rates', () => ({
+  exchangeRatesApi: {
+    getRateForDate: (...args: any[]) => mockGetRateForDate(...args),
+  },
 }));
 
 vi.mock('@/lib/errors', () => ({
@@ -1702,5 +1711,124 @@ describe('PostTransactionDialog', () => {
         }));
       });
     });
+  });
+});
+
+// ============================================================
+// Foreign-currency posting: the rate is resolved for the date being
+// posted, not the estimate the bills list shows.
+// ============================================================
+describe('PostTransactionDialog - foreign currency', () => {
+  const foreignSchedule = {
+    id: 's-fx',
+    name: 'Netflix',
+    amount: -54.61,
+    currencyCode: 'CAD',
+    originalAmount: -40,
+    originalCurrencyCode: 'USD',
+    exchangeRate: 1.365234,
+    accountId: 'a1',
+    categoryId: 'c1',
+    description: '',
+    nextDueDate: '2026-03-01T00:00:00Z',
+    isTransfer: false,
+    isSplit: false,
+    account: { name: 'Checking' },
+  } as any;
+
+  const props = {
+    isOpen: true,
+    scheduledTransaction: foreignSchedule,
+    categories: [{ id: 'c1', name: 'Entertainment', parentId: null }] as any[],
+    accounts: [{ id: 'a1', name: 'Checking', currentBalance: 5000, fxFeePercent: null }] as any[],
+    scheduledTransactions: [] as any[],
+    futureTransactions: [] as any[],
+    onClose: vi.fn(),
+    onPosted: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetRateForDate.mockResolvedValue(1.4);
+  });
+
+  const renderDialog = async (overrides: any = {}) => {
+    let result: ReturnType<typeof render>;
+    await act(async () => {
+      result = render(<PostTransactionDialog {...props} {...overrides} />);
+    });
+    return result!;
+  };
+
+  it('labels the amount in the entry currency and looks up the posting-date rate', async () => {
+    await renderDialog();
+
+    await waitFor(() => {
+      expect(mockGetRateForDate).toHaveBeenCalledWith('USD', 'CAD', '2026-03-01');
+    });
+    expect(screen.getByLabelText('Amount in USD')).toBeInTheDocument();
+  });
+
+  it('re-fetches the rate when the posting date changes', async () => {
+    await renderDialog();
+    await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+
+    const dateInput = screen.getByLabelText('Transaction Date');
+    await act(async () => {
+      fireEvent.change(dateInput, { target: { value: '2026-03-15' } });
+    });
+
+    await waitFor(() => {
+      expect(mockGetRateForDate).toHaveBeenCalledWith('USD', 'CAD', '2026-03-15');
+    });
+  });
+
+  it('posts the foreign amount and rate rather than an account-currency total', async () => {
+    await renderDialog();
+    await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+
+    await act(async () => {
+      const buttons = screen.getAllByText('Post Transaction');
+      fireEvent.click(buttons[buttons.length - 1]);
+    });
+
+    await waitFor(() => {
+      expect(mockPostApi).toHaveBeenCalledWith(
+        's-fx',
+        expect.objectContaining({
+          originalAmount: -40,
+          exchangeRate: 1.4,
+        }),
+      );
+    });
+    expect(mockPostApi.mock.calls[0][1].amount).toBeUndefined();
+  });
+
+  it('refuses to post when no rate is available for the date', async () => {
+    mockGetRateForDate.mockResolvedValue(null);
+    await renderDialog();
+    await waitFor(() => expect(mockGetRateForDate).toHaveBeenCalled());
+
+    await act(async () => {
+      const buttons = screen.getAllByText('Post Transaction');
+      fireEvent.click(buttons[buttons.length - 1]);
+    });
+
+    expect(mockPostApi).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('leaves an ordinary schedule on the account-currency amount', async () => {
+    await renderDialog({
+      scheduledTransaction: {
+        ...foreignSchedule,
+        originalAmount: null,
+        originalCurrencyCode: null,
+        exchangeRate: 1,
+      },
+    });
+
+    expect(mockGetRateForDate).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Amount')).toBeInTheDocument();
   });
 });

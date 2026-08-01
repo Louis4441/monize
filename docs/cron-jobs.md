@@ -10,6 +10,7 @@ Cron jobs use the `@Cron()` decorator from `@nestjs/schedule`. They run in the A
 | `auth.service` | Daily 3 AM | Expired token cleanup |
 | `scheduled-transactions.service` | Every 5 min past hour | Post due recurring transactions |
 | `exchange-rate.service` | 5:05 PM ET weekdays | Fetch exchange rates (staggered after price refresh) |
+| `scheduled-transactions.service` | 5:25 PM ET weekdays | Re-derive the account-currency estimate on foreign-currency schedules from the rates the 5:05 PM refresh just stored |
 | `accounts.service` | Midnight daily | Account maintenance |
 | `mortgage-reminder.service` | Daily 8 AM | Mortgage payment reminders |
 | `bill-reminder.service` | Daily 8 AM | Bill payment reminders |

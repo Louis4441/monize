@@ -12,6 +12,7 @@ import { ScheduledTransactionsController } from "./scheduled-transactions.contro
 import { AccountsModule } from "../accounts/accounts.module";
 import { TransactionsModule } from "../transactions/transactions.module";
 import { SecuritiesModule } from "../securities/securities.module";
+import { CurrenciesModule } from "../currencies/currencies.module";
 import { ActionHistoryModule } from "../action-history/action-history.module";
 import { DelegationModule } from "../delegation/delegation.module";
 
@@ -27,6 +28,7 @@ import { DelegationModule } from "../delegation/delegation.module";
     forwardRef(() => AccountsModule),
     TransactionsModule,
     forwardRef(() => SecuritiesModule),
+    forwardRef(() => CurrenciesModule),
     ActionHistoryModule,
     DelegationModule,
   ],

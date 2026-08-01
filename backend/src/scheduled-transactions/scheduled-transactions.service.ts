@@ -42,6 +42,12 @@ import { withSystemContext, withUserContext } from "../common/db/with-context";
 import { withScopedDb } from "../common/db/scoped-db";
 import { validateSplitAmountSum } from "../common/split-amount.util";
 import { roundMoney, sumMoney } from "../common/round.util";
+import {
+  applyFxConversion,
+  normalizeFxEntry,
+  roundFxRate,
+} from "../common/fx-entry.util";
+import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { tr } from "../i18n/translate";
 
 export type LlmScheduledKind = "bill" | "deposit" | "transfer" | "investment";
@@ -139,6 +145,8 @@ export class ScheduledTransactionsService {
     private loanService: ScheduledTransactionLoanService,
     private dataSource: DataSource,
     private actionHistoryService: ActionHistoryService,
+    @Inject(forwardRef(() => ExchangeRateService))
+    private exchangeRateService: ExchangeRateService,
   ) {}
 
   @Cron("5 * * * *")
@@ -249,6 +257,104 @@ export class ScheduledTransactionsService {
     }
   }
 
+  /**
+   * Re-derive the account-currency estimate held in `amount` for every
+   * foreign-currency schedule, from the latest stored rate.
+   *
+   * A scheduled transaction is by definition future-dated, so there is no rate
+   * for its due date yet -- the best available answer is today's. Everything
+   * that reads `amount` (the bills list, the cash-flow forecast chart, budgets,
+   * the upcoming-bills widgets) therefore shows a figure that tracks the market
+   * instead of the rate that happened to apply the day the schedule was
+   * created. The rate actually used is looked up again for the posting date
+   * when the occurrence posts, so this estimate never decides what is booked.
+   *
+   * Runs 20 minutes past the exchange-rate refresh (5:05 PM New York,
+   * Monday-Friday) so it reads rates the same run just stored; on a day the
+   * markets are shut it simply does not fire.
+   */
+  @Cron("25 17 * * 1-5", { timeZone: "America/New_York" })
+  async refreshForeignCurrencyEstimates(): Promise<void> {
+    // RLS: the sweep spans every user, so the discovery read runs under a
+    // system context and each per-user write re-enters that user's context.
+    await withSystemContext(() =>
+      this.refreshForeignCurrencyEstimatesWithinContext(),
+    );
+  }
+
+  private async refreshForeignCurrencyEstimatesWithinContext(): Promise<void> {
+    try {
+      const rows = await withScopedDb(this.dataSource, (m) =>
+        m.getRepository(ScheduledTransaction).find({
+          where: { isActive: true },
+          relations: ["account"],
+        }),
+      );
+      const foreign = rows.filter(
+        (r) => r.originalCurrencyCode && r.originalAmount !== null,
+      );
+      if (foreign.length === 0) return;
+
+      // One lookup per currency pair, not per schedule -- a user with a dozen
+      // USD subscriptions on the same card needs exactly one.
+      const rateCache = new Map<string, number | null>();
+      let updated = 0;
+
+      for (const row of foreign) {
+        const pair = `${row.originalCurrencyCode}->${row.currencyCode}`;
+        if (!rateCache.has(pair)) {
+          rateCache.set(
+            pair,
+            await this.exchangeRateService.getLatestRate(
+              row.originalCurrencyCode as string,
+              row.currencyCode,
+            ),
+          );
+        }
+        const rate = rateCache.get(pair);
+        if (rate === null || rate === undefined || !(rate > 0)) continue;
+
+        const converted = applyFxConversion(
+          Number(row.originalAmount),
+          rate,
+          row.account?.fxFeePercent ?? null,
+        );
+        const nextRate = roundFxRate(rate);
+        if (
+          converted.amount === roundMoney(Number(row.amount)) &&
+          nextRate === roundFxRate(Number(row.exchangeRate))
+        ) {
+          continue;
+        }
+
+        try {
+          await withUserContext(row.userId, () =>
+            withScopedDb(this.dataSource, (m) =>
+              m.update(ScheduledTransaction, row.id, {
+                amount: converted.amount,
+                exchangeRate: nextRate,
+              }),
+            ),
+          );
+          updated++;
+        } catch (error) {
+          this.logger.error(
+            `Failed to refresh the ${pair} estimate for "${row.name}" (ID: ${row.id}): ${error.message}`,
+          );
+        }
+      }
+
+      this.logger.log(
+        `Foreign-currency schedule estimates refreshed: ${updated} of ${foreign.length} updated`,
+      );
+    } catch (error) {
+      this.logger.error(
+        "Foreign-currency schedule estimate refresh failed",
+        error.stack,
+      );
+    }
+  }
+
   private async findPostponedIds(
     candidateIds: string[],
     today: string,
@@ -334,6 +440,12 @@ export class ScheduledTransactionsService {
       this.validateSplits(splits, createDto.amount);
     }
 
+    const fx = this.resolveScheduleFx(createDto, account.currencyCode, {
+      isSplit: !!(hasSplits && !isTransfer),
+      isTransfer: !!isTransfer,
+      isInvestment: !!isInvestment,
+    });
+
     const saved = await withScopedDb(this.dataSource, async (m) => {
       const repo = m.getRepository(ScheduledTransaction);
       const scheduledTransaction = repo.create({
@@ -347,6 +459,9 @@ export class ScheduledTransactionsService {
         // lives on each split) and investments null it out here.
         categoryId:
           hasSplits || isInvestment ? null : transactionData.categoryId,
+        originalAmount: fx.originalAmount,
+        originalCurrencyCode: fx.originalCurrencyCode,
+        exchangeRate: fx.exchangeRate,
         isSplit: hasSplits && !isTransfer,
         isTransfer: isTransfer || false,
         transferAccountId: isTransfer ? transferAccountId : null,
@@ -404,6 +519,61 @@ export class ScheduledTransactionsService {
     });
 
     return result;
+  }
+
+  /**
+   * Normalize the foreign-currency entry on a create/update payload against the
+   * account currency, and return the trio to persist alongside `amount`.
+   *
+   * Foreign-currency entry is offered on a plain scheduled transaction only.
+   * A transfer already has its own cross-currency handling (each leg is in its
+   * own account's currency), an investment carries its own
+   * `investmentExchangeRate`, and a split stores per-split amounts in the
+   * account currency that could not be re-derived when the rate moves -- so
+   * each of those rejects the fields rather than silently dropping them.
+   */
+  private resolveScheduleFx(
+    dto: {
+      amount?: number;
+      originalAmount?: number | null;
+      originalCurrencyCode?: string | null;
+      exchangeRate?: number | null;
+    },
+    accountCurrencyCode: string,
+    kind: { isSplit: boolean; isTransfer: boolean; isInvestment: boolean },
+  ): {
+    originalAmount: number | null;
+    originalCurrencyCode: string | null;
+    exchangeRate: number;
+  } {
+    const fx = normalizeFxEntry(
+      {
+        originalAmount: dto.originalAmount,
+        originalCurrencyCode: dto.originalCurrencyCode,
+        exchangeRate: dto.exchangeRate,
+        amount: Number(dto.amount ?? 0),
+      },
+      accountCurrencyCode,
+    );
+
+    if (
+      fx.originalCurrencyCode &&
+      (kind.isSplit || kind.isTransfer || kind.isInvestment)
+    ) {
+      throw new BadRequestException(
+        tr(
+          "errors.scheduled.fxPlainOnly",
+          "A different currency can only be used on a plain scheduled transaction, not a split, transfer or investment",
+        ),
+      );
+    }
+
+    return {
+      ...fx,
+      exchangeRate: fx.originalCurrencyCode
+        ? roundFxRate(Number(dto.exchangeRate))
+        : 1,
+    };
   }
 
   private validateInvestmentFields(dto: {
@@ -863,8 +1033,13 @@ export class ScheduledTransactionsService {
       );
     }
 
+    let accountCurrencyCode = scheduled.currencyCode;
     if (updateDto.accountId && updateDto.accountId !== scheduled.accountId) {
-      await this.accountsService.findOne(userId, updateDto.accountId);
+      const nextAccount = await this.accountsService.findOne(
+        userId,
+        updateDto.accountId,
+      );
+      accountCurrencyCode = nextAccount.currencyCode;
     }
 
     if (updateDto.isTransfer && updateDto.transferAccountId) {
@@ -944,6 +1119,56 @@ export class ScheduledTransactionsService {
       fieldsToUpdate.amount = updateData.amount;
     if (updateData.currencyCode !== undefined)
       fieldsToUpdate.currencyCode = updateData.currencyCode;
+
+    // Foreign-currency entry. Only a plain schedule can carry one, so switching
+    // an existing foreign-currency schedule to split/transfer/investment clears
+    // the trio rather than leaving an amount nothing re-derives.
+    const effectiveIsSplit =
+      splits !== undefined
+        ? Array.isArray(splits) && splits.length > 0 && !effectiveIsTransfer
+        : scheduled.isSplit;
+    const fxKind = {
+      isSplit: effectiveIsSplit,
+      isTransfer: effectiveIsTransfer,
+      isInvestment: effectiveIsInvestment,
+    };
+
+    if (effectiveIsSplit || effectiveIsTransfer || effectiveIsInvestment) {
+      // Throws when the payload actually supplied a foreign entry.
+      this.resolveScheduleFx(updateData, accountCurrencyCode, fxKind);
+      if (scheduled.originalCurrencyCode) {
+        fieldsToUpdate.originalAmount = null;
+        fieldsToUpdate.originalCurrencyCode = null;
+        fieldsToUpdate.exchangeRate = 1;
+      }
+    } else if (
+      updateData.originalAmount !== undefined ||
+      updateData.originalCurrencyCode !== undefined ||
+      updateData.exchangeRate !== undefined
+    ) {
+      const fx = this.resolveScheduleFx(
+        {
+          amount: updateData.amount ?? Number(scheduled.amount),
+          originalAmount:
+            updateData.originalAmount !== undefined
+              ? updateData.originalAmount
+              : scheduled.originalAmount,
+          originalCurrencyCode:
+            updateData.originalCurrencyCode !== undefined
+              ? updateData.originalCurrencyCode
+              : scheduled.originalCurrencyCode,
+          exchangeRate:
+            updateData.exchangeRate !== undefined
+              ? updateData.exchangeRate
+              : scheduled.exchangeRate,
+        },
+        accountCurrencyCode,
+        fxKind,
+      );
+      fieldsToUpdate.originalAmount = fx.originalAmount;
+      fieldsToUpdate.originalCurrencyCode = fx.originalCurrencyCode;
+      fieldsToUpdate.exchangeRate = fx.exchangeRate;
+    }
     if (updateData.description !== undefined)
       fieldsToUpdate.description = updateData.description || null;
     if (updateData.frequency !== undefined)
@@ -1140,6 +1365,102 @@ export class ScheduledTransactionsService {
     return this.findOne(userId, id);
   }
 
+  /**
+   * Work out the foreign amount, rate and account-currency total for one
+   * posting of a foreign-currency schedule. Returns null for an ordinary
+   * schedule, leaving the existing amount precedence untouched.
+   *
+   * Precedence, highest first:
+   *   1. `postDto.amount`, else the occurrence override's amount -- both are
+   *      account-currency totals. An override deliberately stays in the account
+   *      currency (it means "this month the bank actually took $X"), which is
+   *      also what every reader of `override.amount` already assumes: the bills
+   *      list, the forecast, the budget and dashboard widgets. The fee is
+   *      backed out and the rate derived from the base so the posted row still
+   *      round-trips (originalAmount x exchangeRate ~ base).
+   *   2. `postDto.exchangeRate` -- an explicit rate for this posting.
+   *   3. The stored rate for the posting date (`getRateForDate`, which
+   *      carry-forwards over weekends and backfills from the quote provider).
+   *
+   * The foreign amount comes from `postDto.originalAmount`, else the schedule's
+   * own `originalAmount`.
+   */
+  private async resolveFxForPosting(
+    scheduled: ScheduledTransaction,
+    postDto: PostScheduledTransactionDto | undefined,
+    context: { postDate: string; overrideAmount: number | null },
+  ): Promise<{
+    originalAmount: number;
+    exchangeRate: number;
+    amount: number;
+  } | null> {
+    if (!scheduled.originalCurrencyCode || scheduled.originalAmount === null) {
+      return null;
+    }
+
+    const originalAmount =
+      postDto?.originalAmount !== undefined && postDto?.originalAmount !== null
+        ? Number(postDto.originalAmount)
+        : Number(scheduled.originalAmount);
+
+    const fxFeePercent = scheduled.account?.fxFeePercent ?? null;
+
+    // 1. An explicit account-currency total wins; derive the rate from it.
+    const pinnedTotal =
+      postDto?.amount !== undefined && postDto?.amount !== null
+        ? Number(postDto.amount)
+        : context.overrideAmount !== null
+          ? Number(context.overrideAmount)
+          : null;
+    if (pinnedTotal !== null) {
+      let base = pinnedTotal;
+      if (fxFeePercent && fxFeePercent > 0) {
+        // total = base - |base| x p; solve for base by its (matching) sign.
+        const p = fxFeePercent / 100;
+        base = roundMoney(
+          pinnedTotal >= 0 ? pinnedTotal / (1 - p) : pinnedTotal / (1 + p),
+        );
+      }
+      return {
+        originalAmount,
+        exchangeRate:
+          originalAmount === 0 ? 1 : roundFxRate(base / originalAmount),
+        amount: roundMoney(pinnedTotal),
+      };
+    }
+
+    // 2/3. An explicit rate, else the rate that applied on the posting date.
+    const rate =
+      postDto?.exchangeRate !== undefined && postDto?.exchangeRate !== null
+        ? Number(postDto.exchangeRate)
+        : await this.exchangeRateService.getRateForDate(
+            scheduled.originalCurrencyCode,
+            scheduled.currencyCode,
+            context.postDate,
+          );
+
+    if (rate === null || !isFinite(rate) || rate <= 0) {
+      throw new BadRequestException(
+        tr(
+          "errors.scheduled.fxRateUnavailable",
+          `No exchange rate is available for ${scheduled.originalCurrencyCode} to ${scheduled.currencyCode} on ${context.postDate}. Enter the amount in ${scheduled.currencyCode} to post it.`,
+          {
+            from: scheduled.originalCurrencyCode,
+            to: scheduled.currencyCode,
+            date: context.postDate,
+          },
+        ),
+      );
+    }
+
+    const converted = applyFxConversion(originalAmount, rate, fxFeePercent);
+    return {
+      originalAmount,
+      exchangeRate: roundFxRate(rate),
+      amount: converted.amount,
+    };
+  }
+
   async post(
     userId: string,
     id: string,
@@ -1171,11 +1492,25 @@ export class ScheduledTransactionsService {
       postDto?.isSplit !== undefined && postDto?.isSplit !== null;
     const hasInlineSplits = postDto?.splits && postDto.splits.length > 0;
 
-    const finalAmount = hasInlineAmount
-      ? Number(postDto.amount)
-      : storedOverride?.amount !== null && storedOverride?.amount !== undefined
-        ? Number(storedOverride.amount)
-        : Number(scheduled.amount);
+    // A foreign-currency schedule holds its fixed amount in the entry currency,
+    // so every per-occurrence amount -- the schedule's own, a stored override,
+    // an inline `originalAmount` -- is read in that currency and converted at
+    // the rate for the posting date. That is what makes a back-dated or
+    // future-dated posting use that day's rate rather than the estimate the
+    // bills list was showing.
+    const fx = await this.resolveFxForPosting(scheduled, postDto, {
+      postDate,
+      overrideAmount: storedOverride?.amount ?? null,
+    });
+
+    const finalAmount = fx
+      ? fx.amount
+      : hasInlineAmount
+        ? Number(postDto.amount)
+        : storedOverride?.amount !== null &&
+            storedOverride?.amount !== undefined
+          ? Number(storedOverride.amount)
+          : Number(scheduled.amount);
 
     const finalDescription = hasInlineDescription
       ? postDto.description
@@ -1198,6 +1533,13 @@ export class ScheduledTransactionsService {
         scheduled.tagIds && scheduled.tagIds.length > 0
           ? scheduled.tagIds
           : undefined,
+      ...(fx
+        ? {
+            originalAmount: fx.originalAmount,
+            originalCurrencyCode: scheduled.originalCurrencyCode,
+            exchangeRate: fx.exchangeRate,
+          }
+        : {}),
     };
 
     const useSplits = hasInlineIsSplit

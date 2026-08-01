@@ -64,6 +64,27 @@ export class CreateScheduledTransactionDto {
   @IsCurrencyCode()
   currencyCode: string;
 
+  /**
+   * Foreign-currency entry. `originalAmount` is the fixed amount the biller
+   * charges in `originalCurrencyCode`; `amount` stays the account-currency
+   * estimate derived from it at `exchangeRate`. Same contract as
+   * CreateTransactionDto -- the two are validated by one shared helper.
+   */
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 10 })
+  @Min(0.000001)
+  exchangeRate?: number;
+
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 4 })
+  @Min(-999999999999)
+  @Max(999999999999)
+  originalAmount?: number | null;
+
+  @IsOptional()
+  @IsCurrencyCode()
+  originalCurrencyCode?: string | null;
+
   @IsOptional()
   @IsString()
   @MaxLength(500)

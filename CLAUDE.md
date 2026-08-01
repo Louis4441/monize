@@ -162,6 +162,12 @@ const rounded = Math.round(value * 10000) / 10000;
 
 Balance updates use atomic SQL: `UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2`.
 
+### An exchange rate is not money -- never round one to 4dp
+
+Money is `decimal(20,4)`; an exchange rate is `NUMERIC(20,10)` (`exchange_rates.rate` and every `exchange_rate` column that mirrors it). Reaching for `roundMoney` on a rate looks harmless and is not: `roundMoney(1 / 1.3652)` stored `0.7325`, which inverts back to `1.3661` -- and a bank quoting USD/CAD to six decimals reconciles cents off on a four-figure amount. Round rates with `roundFxRate` (`backend/src/common/fx-entry.util.ts`, 10dp) and display them at `FX_RATE_DISPLAY_DECIMALS` (`frontend/src/lib/format.ts`, 6dp) -- never `toFixed(4)`.
+
+Convert with `applyFxConversion` (backend) so the account's `fxFeePercent` is folded in the same way the transaction form does; validate a foreign-currency payload with `normalizeFxEntry`, which transactions and scheduled transactions share so both accept and reject exactly the same shapes.
+
 ## Environment
 
 Key env vars (see `.env.example` for full list):

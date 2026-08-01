@@ -343,6 +343,8 @@
     "sameSourceAndDestination": "Source and destination accounts must be different",
     "requiresBrokerageAccount": "Scheduled investment transactions require a brokerage account",
     "notFound": "Scheduled transaction with ID {{ id }} not found",
+    "fxPlainOnly": "A different currency can only be used on a plain scheduled transaction, not a split, transfer or investment",
+    "fxRateUnavailable": "No exchange rate is available for {{ from }} to {{ to }} on {{ date }}. Enter the amount in {{ to }} to post it.",
     "investmentActionRequired": "Investment action is required for scheduled investment transactions",
     "actionRequiresSecurity": "Action {{ action }} requires a security",
     "actionRequiresPositiveQuantity": "Action {{ action }} requires a positive quantity",

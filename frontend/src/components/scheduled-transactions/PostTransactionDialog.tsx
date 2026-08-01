@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import toast from 'react-hot-toast';
 import { ClipboardDocumentIcon, CheckIcon } from '@heroicons/react/24/outline';
@@ -20,7 +20,13 @@ import { scheduledTransactionsApi } from '@/lib/scheduled-transactions';
 import { investmentsApi } from '@/lib/investments';
 import { getLocalDateString } from '@/lib/utils';
 import { buildCategoryTree } from '@/lib/categoryUtils';
-import { roundToCents, getCurrencySymbol, formatAmount } from '@/lib/format';
+import {
+  roundToCents,
+  getCurrencySymbol,
+  formatAmount,
+  FX_RATE_DISPLAY_DECIMALS,
+} from '@/lib/format';
+import { exchangeRatesApi } from '@/lib/exchange-rates';
 import { getErrorMessage } from '@/lib/errors';
 import { createLogger } from '@/lib/logger';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
@@ -149,6 +155,83 @@ export function PostTransactionDialog({
     ? accounts.find(a => a.id === scheduledTransaction.transferAccountId) ?? scheduledTransaction.transferAccount
     : null;
 
+  // ── Foreign-currency posting ──────────────────────────────────────────────
+  //
+  // A foreign-currency schedule fixes the amount the biller charges, not what
+  // the account is debited. The rate is therefore looked up for the date being
+  // posted -- not the estimate the bills list shows -- so moving the date here
+  // re-converts, and a back-dated posting uses that day's rate.
+  const isForeignPosting =
+    !isInvestmentKind &&
+    !!scheduledTransaction.originalCurrencyCode &&
+    scheduledTransaction.originalAmount != null;
+  const entryCurrency = scheduledTransaction.originalCurrencyCode ?? '';
+  const [foreignAmount, setForeignAmount] = useState<number>(0);
+  const [postFxRate, setPostFxRate] = useState<number | null>(null);
+  const [postFxRateLoading, setPostFxRateLoading] = useState(false);
+
+  const postingAccount = useMemo(
+    () => accounts.find((a) => a.id === scheduledTransaction.accountId) ?? null,
+    [accounts, scheduledTransaction.accountId],
+  );
+  const postFxFeePercent = postingAccount?.fxFeePercent ?? undefined;
+
+  // Convert at the posting-date rate, folding in the account's foreign
+  // transaction fee. Mirrors `applyFxConversion` on the backend, which is what
+  // actually books the row.
+  const convertForeign = useCallback(
+    (foreign: number, rate: number) => {
+      const base = roundToCents(foreign * rate);
+      const fee =
+        postFxFeePercent && postFxFeePercent > 0
+          ? -roundToCents((Math.abs(base) * postFxFeePercent) / 100)
+          : 0;
+      return { base, fee, total: roundToCents(base + fee) };
+    },
+    [postFxFeePercent],
+  );
+
+  // Re-fetch the rate whenever the posting date changes, and re-derive the
+  // account-currency amount from it.
+  useEffect(() => {
+    if (!isOpen || !isForeignPosting || !transactionDate) return;
+    let cancelled = false;
+    setPostFxRateLoading(true);
+    exchangeRatesApi
+      .getRateForDate(entryCurrency, scheduledTransaction.currencyCode, transactionDate)
+      .then((rate) => {
+        if (cancelled) return;
+        setPostFxRate(rate);
+        setPostFxRateLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPostFxRate(null);
+        setPostFxRateLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isOpen,
+    isForeignPosting,
+    entryCurrency,
+    scheduledTransaction.currencyCode,
+    transactionDate,
+  ]);
+
+  // Keep the account-currency amount (what the balance preview and the split
+  // editor work in) in step with the foreign amount and the fetched rate.
+  useEffect(() => {
+    if (!isForeignPosting || postFxRate == null) return;
+    setAmount(convertForeign(foreignAmount, postFxRate).total);
+  }, [isForeignPosting, foreignAmount, postFxRate, convertForeign]);
+
+  const foreignConversion =
+    isForeignPosting && postFxRate != null
+      ? convertForeign(foreignAmount, postFxRate)
+      : null;
+
   // The cash impact that will actually post -- reflects per-occurrence edits
   // the user makes here, not just the base scheduled transaction's amount.
   // For investments we re-derive from the current quantity / price / total so
@@ -210,6 +293,16 @@ export function PostTransactionDialog({
         nextOverride?.amount ?? scheduledTransaction.amount
       );
       setAmount(amt);
+      // Foreign-currency schedule: the field the user edits is the biller's
+      // amount in its own currency. An occurrence override deliberately stays
+      // an account-currency figure (see resolveFxForPosting on the backend), so
+      // it does not seed this.
+      setForeignAmount(
+        scheduledTransaction.originalAmount != null
+          ? roundToCents(Number(scheduledTransaction.originalAmount))
+          : 0,
+      );
+      setPostFxRate(null);
       setCategoryId(nextOverride?.categoryId ?? scheduledTransaction.categoryId ?? '');
       setDescription(nextOverride?.description ?? scheduledTransaction.description ?? '');
       setIsSplit(nextOverride?.isSplit ?? scheduledTransaction.isSplit);
@@ -403,6 +496,17 @@ export function PostTransactionDialog({
   }, [categories]);
 
   const handlePost = async () => {
+    // Without a rate for the posting date there is nothing to convert the
+    // biller's amount with -- posting would book an arbitrary figure.
+    if (isForeignPosting && postFxRate == null) {
+      toast.error(
+        t('postDialog.toasts.fxRateUnavailable', {
+          from: entryCurrency,
+          to: scheduledTransaction.currencyCode,
+        }),
+      );
+      return;
+    }
     if (isInvestmentKind) {
       if (isInvestmentQuantityPrice || isInvestmentQuantityOnly) {
         if (investmentQuantity === '' || Number(investmentQuantity) <= 0) {
@@ -450,7 +554,13 @@ export function PostTransactionDialog({
           }
         : {
             transactionDate,
-            amount,
+            // For a foreign-currency schedule the biller's amount and the rate
+            // for the posting date are sent instead of an account-currency
+            // total, so the backend -- not this dialog -- decides what is
+            // booked. Sending `amount` would pin it and override the lookup.
+            ...(isForeignPosting
+              ? { originalAmount: foreignAmount, exchangeRate: postFxRate }
+              : { amount }),
             categoryId: isSplit ? null : (categoryId || null),
             description: description || null,
             referenceNumber: referenceNumber || undefined,
@@ -720,12 +830,63 @@ export function PostTransactionDialog({
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <CurrencyInput
-              label={t('postDialog.amountLabel')}
-              prefix={getCurrencySymbol(scheduledTransaction.currencyCode)}
-              value={amount}
-              onChange={(value) => setAmount(value ?? 0)}
+              label={
+                isForeignPosting
+                  ? t('postDialog.fx.amountInCurrency', { currency: entryCurrency })
+                  : t('postDialog.amountLabel')
+              }
+              prefix={getCurrencySymbol(
+                isForeignPosting ? entryCurrency : scheduledTransaction.currencyCode,
+              )}
+              value={isForeignPosting ? foreignAmount : amount}
+              onChange={(value) =>
+                isForeignPosting
+                  ? setForeignAmount(roundToCents(value ?? 0))
+                  : setAmount(value ?? 0)
+              }
               allowSignToggle
             />
+            {isForeignPosting && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {foreignConversion ? (
+                  <span>
+                    {t('postDialog.fx.rateCaption', {
+                      total: formatCurrency(
+                        foreignConversion.total,
+                        scheduledTransaction.currencyCode,
+                      ),
+                      from: entryCurrency,
+                      rate: formatNumber(
+                        postFxRate as number,
+                        FX_RATE_DISPLAY_DECIMALS,
+                      ),
+                      to: scheduledTransaction.currencyCode,
+                      date: transactionDate,
+                    })}
+                  </span>
+                ) : !postFxRateLoading ? (
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {t('postDialog.fx.noRateWarning', {
+                      from: entryCurrency,
+                      to: scheduledTransaction.currencyCode,
+                      date: transactionDate,
+                    })}
+                  </span>
+                ) : null}
+                {foreignConversion && foreignConversion.fee !== 0 && (
+                  <span>
+                    {' '}
+                    {t('postDialog.fx.feeCaption', {
+                      percent: formatNumber(postFxFeePercent as number, 2),
+                      fee: formatCurrency(
+                        Math.abs(foreignConversion.fee),
+                        scheduledTransaction.currencyCode,
+                      ),
+                    })}
+                  </span>
+                )}
+              </p>
+            )}
           </div>
           <button
             type="button"

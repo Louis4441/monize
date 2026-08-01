@@ -6,6 +6,7 @@ import { Currency } from "./entities/currency.entity";
 import { UserPreference } from "../users/entities/user-preference.entity";
 import { YahooFinanceService } from "../securities/yahoo-finance.service";
 import { createScopedDbMocks } from "../test-helpers/scoped-db-testing";
+import { roundFxRate } from "../common/fx-entry.util";
 
 jest.mock("../common/db/scoped-db", () =>
   jest.requireActual("../test-helpers/scoped-db-testing").scopedDbMockModule(),
@@ -278,12 +279,20 @@ describe("ExchangeRateService", () => {
       expect(exchangeRateRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ rate: 1.4, source: "yahoo_finance" }),
       );
+      // The inverse is stored at the rate column's ten decimal places, not at
+      // money precision: rounding it to four (0.7143) inverts back to 1.39997,
+      // which a statement quoting six decimals reconciles against by cents.
       expect(exchangeRateRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({
-          rate: Math.round((1 / 1.4) * 10000) / 10000,
+          rate: roundFxRate(1 / 1.4),
           source: "yahoo_finance",
         }),
       );
+      const inverseSave = exchangeRateRepository.save.mock.calls
+        .map((call) => call[0])
+        .find((row) => row.rate !== 1.4);
+      expect(inverseSave.rate).not.toBe(0.7143);
+      expect(roundFxRate(1 / inverseSave.rate)).toBeCloseTo(1.4, 6);
     });
 
     it("handles saveRate failure gracefully", async () => {

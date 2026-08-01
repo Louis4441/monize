@@ -62,6 +62,11 @@ import {
   bulkSkipReason,
 } from "../common/bulk-create.types";
 import { withScopedDb } from "../common/db/scoped-db";
+import {
+  normalizeFxEntry,
+  type FxEntry,
+  type FxEntryInput,
+} from "../common/fx-entry.util";
 
 export interface TransactionWithInvestmentLink extends Transaction {
   linkedInvestmentTransactionId?: string | null;
@@ -230,73 +235,15 @@ export class TransactionsService {
 
   /**
    * Validate and normalize the foreign-currency entry fields against the
-   * account currency. Returns the values to persist:
-   * - Both fields null when no foreign entry is present.
-   * - Both stripped to null when the entered currency equals the account
-   *   currency (tolerant: an ordinary transaction, not an error).
-   * - Otherwise both retained, after checking the pair is complete, the rate is
-   *   positive, and the original amount matches the sign of the (account
-   *   currency) amount.
-   * The account-currency `amount` and `currencyCode` are never modified here.
+   * account currency. Thin wrapper over the shared `normalizeFxEntry`, which
+   * scheduled transactions use too so both surfaces accept and reject exactly
+   * the same payloads.
    */
   private normalizeFxEntry(
-    input: {
-      originalAmount?: number | null;
-      originalCurrencyCode?: string | null;
-      exchangeRate?: number | null;
-      amount: number;
-    },
+    input: FxEntryInput,
     accountCurrencyCode: string,
-  ): { originalAmount: number | null; originalCurrencyCode: string | null } {
-    const hasAmount =
-      input.originalAmount !== undefined && input.originalAmount !== null;
-    const hasCode =
-      typeof input.originalCurrencyCode === "string" &&
-      input.originalCurrencyCode.length > 0;
-
-    if (!hasAmount && !hasCode) {
-      return { originalAmount: null, originalCurrencyCode: null };
-    }
-
-    if (hasAmount !== hasCode) {
-      throw new BadRequestException(
-        tr(
-          "errors.transactions.fxFieldsIncomplete",
-          "originalAmount and originalCurrencyCode must be provided together",
-        ),
-      );
-    }
-
-    const code = (input.originalCurrencyCode as string).toUpperCase();
-
-    // Entered in the account currency after all -- treat as an ordinary
-    // transaction and strip the foreign metadata.
-    if (code === accountCurrencyCode.toUpperCase()) {
-      return { originalAmount: null, originalCurrencyCode: null };
-    }
-
-    const rate = input.exchangeRate;
-    if (rate === undefined || rate === null || Number(rate) <= 0) {
-      throw new BadRequestException(
-        tr(
-          "errors.transactions.fxRateRequired",
-          "A positive exchange rate is required for a foreign-currency transaction",
-        ),
-      );
-    }
-
-    const original = Number(input.originalAmount);
-    const amount = Number(input.amount);
-    if (original > 0 !== amount > 0 && original !== 0 && amount !== 0) {
-      throw new BadRequestException(
-        tr(
-          "errors.transactions.fxSignMismatch",
-          "originalAmount and amount must have the same sign",
-        ),
-      );
-    }
-
-    return { originalAmount: original, originalCurrencyCode: code };
+  ): FxEntry {
+    return normalizeFxEntry(input, accountCurrencyCode);
   }
 
   async create(

@@ -65,6 +65,13 @@ export interface ScheduledTransaction {
   category: Category | null;
   amount: number;
   currencyCode: string;
+  // Foreign-currency entry. When originalCurrencyCode is set, originalAmount is
+  // the fixed amount the biller charges in that currency and `amount` is the
+  // account-currency estimate derived from it at exchangeRate -- refreshed
+  // daily from the latest rate, and re-derived for the posting date on posting.
+  originalAmount: number | null;
+  originalCurrencyCode: string | null;
+  exchangeRate: number;
   description: string | null;
   frequency: FrequencyType;
   nextDueDate: string;
@@ -118,6 +125,9 @@ export interface CreateScheduledTransactionData {
   categoryId?: string;
   amount: number;
   currencyCode: string;
+  originalAmount?: number | null;
+  originalCurrencyCode?: string | null;
+  exchangeRate?: number;
   description?: string;
   frequency: FrequencyType;
   nextDueDate: string;
@@ -205,6 +215,11 @@ export interface OverrideCheckResult {
 export interface PostScheduledTransactionData {
   transactionDate?: string;
   amount?: number | null;
+  // Foreign-currency schedules only: the amount in the entry currency for this
+  // posting, and the rate to convert it at (defaults to the rate stored for the
+  // posting date).
+  originalAmount?: number | null;
+  exchangeRate?: number | null;
   categoryId?: string | null;
   description?: string | null;
   referenceNumber?: string;
