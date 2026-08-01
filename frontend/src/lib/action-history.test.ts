@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import apiClient from './api';
 import { actionHistoryApi } from './action-history';
+import { getCached, setCache } from './apiCache';
 
 vi.mock('./api', () => ({
   default: { get: vi.fn(), post: vi.fn() },
@@ -59,5 +60,21 @@ describe('actionHistoryApi', () => {
     const result = await actionHistoryApi.redo();
     expect(apiClient.post).toHaveBeenCalledWith('/action-history/redo');
     expect(result.description).toBe('redid create');
+  });
+
+  // Regression: `notifyUndoRedo` tells every mounted page to refetch, but the
+  // refetch goes through `dedupe`, so without dropping the cache first the
+  // subscriber is handed back the values the undo just reversed.
+  it.each(['undo', 'redo'] as const)('%s empties the API cache', async (op) => {
+    setCache('accounts:all:true', [{ id: 'a-1' }], 120_000);
+    setCache('payees:all', [{ id: 'p-1' }], 120_000);
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { action: { id: 'h-1' }, description: 'reversed' },
+    });
+
+    await actionHistoryApi[op]();
+
+    expect(getCached('accounts:all:true')).toBeUndefined();
+    expect(getCached('payees:all')).toBeUndefined();
   });
 });

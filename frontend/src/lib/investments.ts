@@ -25,7 +25,7 @@ import {
   SecurityDetail,
 } from '@/types/investment';
 import { IntradayBreakdown } from '@/types/net-worth';
-import { getCached, setCache, invalidateCache } from './apiCache';
+import { getCached, setCache, invalidateBalanceCaches, invalidateCache } from './apiCache';
 
 export const investmentsApi = {
   // Get portfolio summary
@@ -279,7 +279,7 @@ export const investmentsApi = {
       '/investment-transactions',
       data,
     );
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -302,7 +302,7 @@ export const investmentsApi = {
       transferOut: InvestmentTransaction;
       transferIn: InvestmentTransaction;
     }>('/investment-transactions/transfer-security', data);
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -319,7 +319,7 @@ export const investmentsApi = {
       `/investment-transactions/${id}`,
       data,
     );
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -345,7 +345,7 @@ export const investmentsApi = {
   // Delete investment transaction
   deleteTransaction: async (id: string): Promise<void> => {
     await apiClient.delete(`/investment-transactions/${id}`);
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
   },
 
   // Get all securities

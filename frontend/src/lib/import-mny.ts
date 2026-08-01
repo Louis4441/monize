@@ -1,4 +1,5 @@
 import apiClient from './api';
+import { invalidateBalanceCaches } from './apiCache';
 import { AccountType } from '@/types/account';
 
 /**
@@ -314,6 +315,12 @@ export const mnyImportApi = {
       `/import/mny/jobs/${id}`,
       { timeout: POLL_TIMEOUT_MS },
     );
+    // The import runs server-side after `start` returns, so the write lands
+    // here rather than at a mutation call. A failed job can still have written
+    // rows before it stopped, so both terminal states invalidate.
+    if (response.data.status === 'completed' || response.data.status === 'failed') {
+      invalidateBalanceCaches();
+    }
     return response.data;
   },
 

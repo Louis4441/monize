@@ -1,4 +1,5 @@
 import apiClient from './api';
+import { clearAllCache } from './apiCache';
 
 export interface ActionHistoryItem {
   id: string;
@@ -30,13 +31,19 @@ export const actionHistoryApi = {
     return data;
   },
 
+  // Undo/redo can reverse a write to any entity, so there is no prefix narrow
+  // enough to be correct. Clearing everything also keeps the promise made by
+  // `notifyUndoRedo`: subscribers refetch, and without this the refetch is
+  // served from the cache that the reversed write left behind.
   undo: async (): Promise<UndoRedoResult> => {
     const { data } = await apiClient.post<UndoRedoResult>('/action-history/undo');
+    clearAllCache();
     return data;
   },
 
   redo: async (): Promise<UndoRedoResult> => {
     const { data } = await apiClient.post<UndoRedoResult>('/action-history/redo');
+    clearAllCache();
     return data;
   },
 };

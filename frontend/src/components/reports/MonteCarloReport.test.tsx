@@ -929,6 +929,20 @@ describe('MonteCarloReport', () => {
       ).toBeInTheDocument();
     });
 
+    it('keeps a long scenario name inside the sidebar', async () => {
+      // Regression: the name sits in a `truncate` div inside a `flex-1`
+      // button. A flex item defaults to min-width:auto, so without `min-w-0`
+      // the button grew to the full name and pushed out of the card -- the
+      // select-mode branch beside it already had `min-w-0`.
+      const longName = 'Aggressive thirty year retirement plan with every option enabled';
+      mockApi.list.mockResolvedValueOnce([scenario({ id: 'long-1', name: longName })]);
+      await renderReport();
+
+      const item = await screen.findByRole('button', { name: new RegExp(longName, 'i') });
+      expect(item.className).toContain('min-w-0');
+      expect(item.querySelector('.truncate')).toHaveTextContent(longName);
+    });
+
     it('clicking New clears active scenario and form fields', async () => {
       mockApi.list.mockResolvedValueOnce([scenario({ name: 'Old plan' })]);
       await renderReport();

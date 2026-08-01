@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { aiApi } from '@/lib/ai';
 import { notifyAiAction } from '@/lib/aiActionSignal';
+import { clearAllCache } from '@/lib/apiCache';
 import type {
   ChartPayload,
   PendingAction,
@@ -752,7 +753,10 @@ export const useAiChatStore = create<AiChatState>()(
           // The write landed server-side; tell any mounted list page to reload
           // so the new/edited record shows up without a manual refresh (e.g. a
           // transaction created from the chat bubble while on the Transactions
-          // page).
+          // page). Drop the cache first -- the assistant can write any entity,
+          // and a subscriber's refetch would otherwise be served the values
+          // this action just replaced.
+          clearAllCache();
           notifyAiAction();
         } catch (err) {
           const errorMessage =

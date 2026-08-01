@@ -21,7 +21,7 @@ import {
   GroupedTotal,
   RecurringChargeInfo,
 } from '@/types/transaction';
-import { invalidateCache } from './apiCache';
+import { invalidateBalanceCaches } from './apiCache';
 
 /** Convert array filter params to comma-separated strings for the API. */
 function buildFilterParams(params?: {
@@ -98,8 +98,7 @@ export const transactionsApi = {
   // Create a new transaction
   create: async (data: CreateTransactionData): Promise<Transaction> => {
     const response = await apiClient.post<Transaction>('/transactions', data);
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -191,16 +190,14 @@ export const transactionsApi = {
   // Update transaction
   update: async (id: string, data: UpdateTransactionData): Promise<Transaction> => {
     const response = await apiClient.patch<Transaction>(`/transactions/${id}`, data);
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
   // Delete transaction
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/transactions/${id}`);
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
   },
 
   // Mark transaction as cleared/uncleared
@@ -228,8 +225,7 @@ export const transactionsApi = {
     const response = await apiClient.patch<Transaction>(`/transactions/${id}/status`, {
       status,
     });
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -411,6 +407,10 @@ export const transactionsApi = {
       `/transactions/${transactionId}/splits`,
       splits,
     );
+    // A split can carry a transferAccountId, and the backend writes the
+    // counterpart transaction into that other account -- so editing splits
+    // moves balances the parent transaction never named.
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -423,12 +423,14 @@ export const transactionsApi = {
       `/transactions/${transactionId}/splits`,
       split,
     );
+    invalidateBalanceCaches();
     return response.data;
   },
 
   // Remove a split from a transaction
   deleteSplit: async (transactionId: string, splitId: string): Promise<void> => {
     await apiClient.delete(`/transactions/${transactionId}/splits/${splitId}`);
+    invalidateBalanceCaches();
   },
 
   // ==================== Transfer Methods ====================
@@ -436,8 +438,7 @@ export const transactionsApi = {
   // Create a transfer between two accounts
   createTransfer: async (data: CreateTransferData): Promise<TransferResult> => {
     const response = await apiClient.post<TransferResult>('/transactions/transfer', data);
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -452,8 +453,7 @@ export const transactionsApi = {
   // Delete a transfer (deletes both linked transactions)
   deleteTransfer: async (transactionId: string): Promise<void> => {
     await apiClient.delete(`/transactions/${transactionId}/transfer`);
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
   },
 
   // Update a transfer (updates both linked transactions)
@@ -465,8 +465,7 @@ export const transactionsApi = {
       `/transactions/${transactionId}/transfer`,
       data,
     );
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -497,8 +496,7 @@ export const transactionsApi = {
       `/transactions/reconcile/${accountId}`,
       { transactionIds, reconciledDate },
     );
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -508,8 +506,7 @@ export const transactionsApi = {
       '/transactions/bulk-update',
       data,
     );
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 
@@ -519,8 +516,7 @@ export const transactionsApi = {
       '/transactions/bulk-delete',
       data,
     );
-    invalidateCache('accounts:');
-    invalidateCache('investments:');
+    invalidateBalanceCaches();
     return response.data;
   },
 };
