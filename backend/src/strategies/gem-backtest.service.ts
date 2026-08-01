@@ -2,7 +2,11 @@ import { Injectable } from "@nestjs/common";
 import { todayYMD } from "../common/date-utils";
 import { GemStrategySignal } from "./entities/gem-strategy-signal.entity";
 import { GemStrategy } from "./entities/gem-strategy.entity";
-import { GemPriceService } from "./gem-price.service";
+import {
+  GemPriceService,
+  PRICE_WINDOW_LEAD_DAYS,
+  withLeadDays,
+} from "./gem-price.service";
 import { GemBacktestResult, runBacktest } from "./gem-backtest.util";
 
 /**
@@ -55,11 +59,14 @@ export class GemBacktestService {
     ];
     if (securityIds.length === 0) return null;
 
-    // Daily closes from the first period start: the drawdown is measured inside
-    // the periods, not only at their boundaries.
+    // Daily closes from a lead window before the first period start: the
+    // drawdown is measured inside the periods, not only at their boundaries,
+    // and a period opening on a weekend or a holiday is priced by the close
+    // before it -- which a series starting exactly on the boundary omits, so
+    // the first period read as unpriced while its price sat in the database.
     const seriesBySecurity = await this.priceService.loadSeries(
       securityIds,
-      periods[0].effectiveFrom,
+      withLeadDays(periods[0].effectiveFrom, PRICE_WINDOW_LEAD_DAYS),
       "day",
     );
 

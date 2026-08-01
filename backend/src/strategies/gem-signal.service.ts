@@ -10,7 +10,11 @@ import {
 } from "./entities/gem-strategy-asset.entity";
 import { GemStrategySignal } from "./entities/gem-strategy-signal.entity";
 import { GemStrategy } from "./entities/gem-strategy.entity";
-import { GemPriceService, PricesByRole } from "./gem-price.service";
+import {
+  GemPriceService,
+  PRICE_WINDOW_LEAD_DAYS,
+  PricesByRole,
+} from "./gem-price.service";
 import {
   addMonthsUtc,
   benchmarkRoleFor,
@@ -27,13 +31,6 @@ import {
  * the first read of a strategy into a long backfill.
  */
 export const GEM_HISTORY_PERIODS = 24;
-
-/**
- * Extra days of prices loaded before the momentum window starts, so the base
- * close can be found when the window start is not a trading day. Two weeks
- * covers a weekend plus the longest exchange holiday closures.
- */
-const PRICE_WINDOW_LEAD_DAYS = 14;
 
 /** What one materialization produced for the report to render. */
 export interface GemMaterialization {
@@ -423,6 +420,16 @@ export class GemSignalService {
           written.push(saved);
         } else {
           lostRaces += 1;
+          // Read the winner's row into the chain before moving on. Later
+          // periods take their `previousRole` from this map, so skipping the
+          // one that lost leaves the next period believing nothing preceded
+          // it -- and that period is then *stored* with the wrong predecessor,
+          // which the final re-read cannot undo. History would call it a BUY
+          // for as long as the row lives.
+          const winner = await repo.findOne({
+            where: { strategyId: strategy.id, evaluatedOn: period.evaluatedOn },
+          });
+          if (winner) byEvaluatedOn.set(period.evaluatedOn, winner);
           this.logger.debug(
             `GEM period ${period.evaluatedOn} was materialized concurrently`,
           );

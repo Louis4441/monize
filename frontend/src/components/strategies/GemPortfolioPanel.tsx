@@ -176,7 +176,11 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             {t('gem.portfolioPanel.holdingsHint')}
           </p>
-          {isKnown(position.totalMarketValue) && position.target && (
+          {/* Shown whenever there is a target, priced or not. Gating it on a
+              known total hid the whole working-out at the one moment it
+              matters most: an unpriced holding makes the total unknown, and
+              this table is where the row responsible is named. */}
+          {position.target && (
             <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
               <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 {t('gem.portfolioPanel.workingTitle')}
@@ -281,14 +285,19 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                         {t('gem.portfolioPanel.workingTotal')}
                       </td>
                       <td className="py-1 pr-3 text-right tabular-nums">
-                        {formatCurrency(
-                          position.totalMarketValue,
-                          position.currencyCode,
+                        {isKnown(position.totalMarketValue) ? (
+                          formatCurrency(
+                            position.totalMarketValue,
+                            position.currencyCode,
+                          )
+                        ) : (
+                          <GemUnknown />
                         )}
                       </td>
                       <td className="py-1 pr-3" />
                       <td className="py-1 text-right tabular-nums">
-                        {percent === null ? (
+                        {percent === null ||
+                        !isKnown(position.totalMarketValue) ? (
                           <GemUnknown />
                         ) : (
                           formatCurrency(
@@ -307,7 +316,7 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                 {t('gem.portfolioPanel.workingDerivedNote')}
               </p>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {percent === null
+                {percent === null || !isKnown(position.totalMarketValue)
                   ? t('gem.portfolioPanel.workingUnknown')
                   : t('gem.portfolioPanel.workingSum', {
                       counted: formatCurrency(

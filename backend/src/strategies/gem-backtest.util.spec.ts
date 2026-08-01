@@ -138,43 +138,91 @@ describe("runBacktest", () => {
     expect(result?.netOfCosts).toBe(true);
   });
 
-  it("charges no commission for a period that holds nothing", () => {
-    // RISK-ON with no eligible instrument assigned stores a period with no
-    // target. Counting it as a trade billed a commission for holding nothing
-    // and then treated the return to the same fund as a first purchase, so a
-    // gap in the middle of the history came out cheaper than no gap at all.
-    const withGap = runBacktest(
+  it("restarts the run after a period it could not price", () => {
+    // Holding a gap flat is not a simplification: the switch out of it would
+    // realize nothing, so no tax comes off, and every later period compounds
+    // from a balance the simulation invented. The run therefore begins after
+    // the last gap, and `from` says so.
+    const result = runBacktest(
       input({
         periods: [
           {
             effectiveFrom: "2024-01-01",
             targetRole: "US_EQUITY",
-            targetSecurityId: "sec-spy",
+            targetSecurityId: "sec-unpriced",
           },
           {
             effectiveFrom: "2024-07-01",
-            targetRole: null,
-            targetSecurityId: null,
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-spy",
           },
         ],
-        commissionAmount: 100,
-        notional: 10_000,
       }),
     );
-    const withoutGap = runBacktest(
-      input({ commissionAmount: 100, notional: 10_000 }),
+
+    expect(result?.from).toBe("2024-07-01");
+    expect(result?.to).toBe("2025-01-01");
+    expect(result?.coveragePercent).toBe(50);
+    // 110 -> 121 over half a year: ~21% annualised, and nothing from the gap.
+    expect(result?.cagrPercent).toBeCloseTo(21, 0);
+  });
+
+  it("has nothing to report when the most recent period is unpriced", () => {
+    expect(
+      runBacktest(
+        input({
+          periods: [
+            {
+              effectiveFrom: "2024-01-01",
+              targetRole: "US_EQUITY",
+              targetSecurityId: "sec-spy",
+            },
+            {
+              effectiveFrom: "2024-07-01",
+              targetRole: "US_EQUITY",
+              targetSecurityId: "sec-unpriced",
+            },
+          ],
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("does not let one stale quote price both ends of a period", () => {
+    // A security last quoted in January answers a lookup for July and one for
+    // January the following year with the same number. That is not a period
+    // that opened and closed level -- it is a period nobody priced, and it used
+    // to count towards full coverage with a confident 0% return.
+    const result = runBacktest(
+      input({
+        seriesBySecurity: new Map([["sec-spy", series({ "2024-01-01": 100 })]]),
+      }),
     );
 
-    // One buy in each: the empty period adds no trade of its own, so the run
-    // with a gap keeps more of its return than a second commission would leave.
-    expect(withGap?.netOfCosts).toBe(true);
-    expect(withGap?.coveragePercent).toBe(50);
-    expect(withoutGap?.coveragePercent).toBe(100);
-    // Both start from 0.99 after the single buy; the full run compounds the
-    // second half's growth on top, so it ends ahead.
-    expect(withoutGap?.cagrPercent).toBeGreaterThan(
-      withGap?.cagrPercent as number,
+    expect(result).toBeNull();
+  });
+
+  it("prices a period that opens on a day the market was shut", () => {
+    // The 1st is regularly a weekend or a holiday, so the close that prices it
+    // is the one a few days earlier. Within a fortnight it stands for the
+    // boundary; older than that it does not.
+    const result = runBacktest(
+      input({
+        seriesBySecurity: new Map([
+          [
+            "sec-spy",
+            series({
+              "2023-12-28": 100, // last trading day before the period opens
+              "2024-06-28": 110,
+              "2024-12-30": 121,
+            }),
+          ],
+        ]),
+      }),
     );
+
+    expect(result?.coveragePercent).toBe(100);
+    expect(result?.cagrPercent).toBeCloseTo(21, 0);
   });
 
   it("leaves commission out when the capital it applies to is unknown", () => {
@@ -225,9 +273,10 @@ describe("runBacktest", () => {
     expect(runBacktest(input({ seriesBySecurity: new Map() }))).toBeNull();
   });
 
-  it("holds an unpriced period flat rather than compressing the timeline", () => {
-    // The second leg has no prices at all. Its period still spans the calendar,
-    // so the annualized figure is diluted by it instead of ignoring the time.
+  it("reports nothing when the gap is the last thing that happened", () => {
+    // The second leg has no prices at all, so there is no unbroken stretch
+    // ending at today. Reporting the first half as though it were the run
+    // would date the figures to a window that has since moved on.
     const result = runBacktest(
       input({
         periods: [
@@ -248,13 +297,6 @@ describe("runBacktest", () => {
       }),
     );
 
-    // The window is still the whole year -- the timeline does not compress --
-    // but the annualisation counts only the half it could price. Spreading the
-    // compounded 10% across twelve months would report the unpriced half as
-    // six months at zero, which is a number nobody measured.
-    expect(result?.to).toBe("2025-01-01");
-    expect(result?.cagrPercent).toBeCloseTo(21, 0);
-    // And the gap is stated rather than absorbed.
-    expect(result?.coveragePercent).toBe(50);
+    expect(result).toBeNull();
   });
 });

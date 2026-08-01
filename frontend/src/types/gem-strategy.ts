@@ -60,8 +60,6 @@ export interface GemWarning {
   roles?: GemAssetRole[];
   /** How many things the warning is about, when the number is the point. */
   count?: number;
-  /** Server-supplied detail (e.g. the stale price date), already localized. */
-  detail?: string | null;
 }
 
 /** An instrument bound to a strategy role. `symbol`/`name` are null when the role has no ETF yet. */

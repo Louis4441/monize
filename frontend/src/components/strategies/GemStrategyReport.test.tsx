@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, fireEvent, waitFor } from '@/test/render';
+import { render, screen, act, fireEvent, waitFor, within } from '@/test/render';
 import { GemStrategyReport } from './GemStrategyReport';
 import { gemAction, gemHistory, gemReport } from '@/test/gem-fixtures';
 
@@ -242,7 +242,7 @@ describe('GemStrategyReport', () => {
     mockGetReport.mockResolvedValue(
       gemReport({
         warnings: [
-          { code: 'STALE_PRICES', detail: 'Last price: 2025-07-02' },
+          { code: 'STALE_PRICES', roles: ['EX_US_EQUITY'] },
           { code: 'UNMAPPED_ROLE', roles: ['SAFE'] },
         ],
       }),
@@ -250,7 +250,12 @@ describe('GemStrategyReport', () => {
     await renderReport();
 
     expect(screen.getByText(/prices behind this report are not current/)).toBeInTheDocument();
-    expect(screen.getByText('Last price: 2025-07-02')).toBeInTheDocument();
+    // The warning names the instrument whose price is behind, not a date the
+    // user then has to match to a role themselves. Scoped to the banner: the
+    // role is named again by the assets card further down the page.
+    expect(
+      within(screen.getAllByRole('status')[0]).getByText(/Developed markets ex-US/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/No instrument is assigned to:/)).toBeInTheDocument();
   });
 });

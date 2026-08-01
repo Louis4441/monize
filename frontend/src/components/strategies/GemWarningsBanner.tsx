@@ -99,7 +99,6 @@ export function GemWarningsBanner({
                   {roles.map((role) => roleLabel(role)).join(', ')}
                 </span>
               )}
-              {warning.detail && <span className="block opacity-80">{warning.detail}</span>}
             </p>
           </div>
         );

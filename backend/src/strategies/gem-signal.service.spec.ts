@@ -544,6 +544,54 @@ describe("GemSignalService", () => {
       ).resolves.toEqual({ signals: [], legacyPeriods: 0 });
     });
 
+    it("chains the next period onto the row that won the race", async () => {
+      // Losing one period and winning the next is the dangerous interleaving:
+      // without the winner's row in hand, the period after it is *stored*
+      // believing nothing preceded it, and the final re-read cannot undo that.
+      // History would call it a BUY for as long as the row lives.
+      const fingerprint = gemConfigFingerprint(strategy(), assets());
+      const winner = {
+        id: "sig-winner",
+        evaluatedOn: "2023-08-31",
+        targetRole: "US_EQUITY",
+        targetSecurityId: "sec-spy",
+        configFingerprint: fingerprint,
+      } as GemStrategySignal;
+      // The first insert loses; every later one wins.
+      let attempt = 0;
+      signalRepo.createQueryBuilder.mockImplementation(() => {
+        let pending: Record<string, unknown> = {};
+        const builder = {
+          insert: () => builder,
+          values: (row: Record<string, unknown>) => {
+            pending = row;
+            return builder;
+          },
+          orIgnore: () => builder,
+          returning: () => builder,
+          execute: jest.fn(async () => {
+            attempt += 1;
+            const rows =
+              attempt === 1
+                ? []
+                : [{ id: `sig-${pending.evaluatedOn as string}`, ...pending }];
+            savedSignals.push(...rows);
+            return { generatedMaps: rows, raw: rows, identifiers: rows };
+          }),
+        };
+        return builder;
+      });
+      signalRepo.findOne.mockResolvedValue(winner);
+
+      await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+      // The row the loop skipped is fetched, and the next period follows it.
+      expect(signalRepo.findOne).toHaveBeenCalledWith({
+        where: { strategyId: "strategy-1", evaluatedOn: "2023-08-31" },
+      });
+      expect(savedSignals[0]).toMatchObject({ previousRole: "US_EQUITY" });
+    });
+
     it("re-reads after losing the race rather than serving its own snapshot", async () => {
       // Losing is not the same as having nothing to do: the winner's rows
       // exist and this request's snapshot predates them. Returning the

@@ -29,18 +29,19 @@ describe('GemWarningsBanner', () => {
     );
   });
 
-  it('names the roles missing an instrument and shows server detail', () => {
+  it('names the roles a warning is about, in strategy order', () => {
     render(
       <GemWarningsBanner
         warnings={[
           { code: 'UNMAPPED_ROLE', roles: ['SAFE', 'EM_EQUITY'] },
-          { code: 'STALE_PRICES', detail: 'Last price: 2025-07-02' },
+          { code: 'STALE_PRICES', roles: ['EX_US_EQUITY'] },
         ]}
         lookbackMonths={12}
       />,
     );
     expect(screen.getByText(/Emerging markets, Safe asset/)).toBeInTheDocument();
-    expect(screen.getByText('Last price: 2025-07-02')).toBeInTheDocument();
+    // The stale-price warning names the instrument to go and refresh.
+    expect(screen.getByText(/Developed markets ex-US/)).toBeInTheDocument();
   });
 
   it('leaves the in-place empty states to explain account and position gaps', () => {

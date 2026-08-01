@@ -193,12 +193,10 @@ reads the total, and the backtest sizes its commission drag against it too. The
 realized result and the tax follow the same rule over the *sold* positions --
 one without a cost basis makes the estimate unknown, and cash never answers for
 it, because its cost equals its value and would turn an unknowable gain into a
-confident zero.
-
- A
-share of a total nobody knows is not a share, and the error runs in the
-dangerous direction: an unpriced holding dropped from the denominator while
-counting as zero in the numerator turned 10,000 in the target plus one
+confident zero. A share of a total nobody knows is not a share, and the error
+runs in the dangerous direction: an unpriced holding dropped from the
+denominator while counting as zero in the numerator turned 10,000 in the target
+plus one
 unpriceable position into exactly 100% compliant, with `changeRequired` false --
 the report saying there was nothing to do about a position it could not see.
 Unknown says so, and holding an instrument other than the target still settles
@@ -218,11 +216,18 @@ speak for an ex-US instrument last priced three weeks ago. An assigned
 instrument with no price at all makes the date unknown rather than letting the
 others answer for it. The threshold is five days.
 
-The **backtest** holds an unpriced period flat so the timeline does not
-compress -- but flat is a return of zero, which nobody measured. The
-annualisation therefore counts only the days it could price, and
-`coveragePercent` reports how much of the run that was, so a partially priced
-history cannot be read as a full one.
+The **backtest simulates the most recent unbroken stretch of priced periods**,
+not the whole history. Holding a gap flat looked like a simplification and was
+not: flat means the switch out of that period realizes nothing, so no tax comes
+off, and every later period compounds from a balance the simulation invented --
+while the drawdown misses whatever happened inside the gap and "net of estimated
+taxes and commissions" stops being true. A discontinuous equity path cannot be
+summarised into one CAGR, so the run restarts after the last gap, `from`/`to`
+report what was actually simulated, and `coveragePercent` says how much of the
+evaluated history that was. A boundary close counts only when it was struck
+within a fortnight of the boundary: a security last quoted months ago would
+otherwise answer both ends of a period with the same number and read as a flat
+period rather than an unpriced one.
 `PUT /strategies/gem` tops that history up first: any assigned security whose
 prices do not reach back over the momentum window plus the 24 periods the
 history table shows is backfilled from the quote provider before the signal is

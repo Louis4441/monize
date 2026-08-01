@@ -29,6 +29,25 @@ const RANGE_SAMPLING: Record<GemRange, "day" | "week" | "month"> = {
   MAX: "month",
 };
 
+/**
+ * Days of prices to load *before* a window opens.
+ *
+ * Every boundary this module's callers care about -- a momentum window's start,
+ * a GEM period's first day -- lands on the 1st or the last of a month, which is
+ * regularly a weekend or a holiday. The close that prices it is then the one a
+ * few days earlier, and a series loaded from exactly the boundary does not
+ * contain it: `price_date >= from` excludes it, and a lookup can only search
+ * backwards. Two weeks covers a weekend plus the longest exchange closures.
+ */
+export const PRICE_WINDOW_LEAD_DAYS = 14;
+
+/** ISO date `days` before `date`. */
+export function withLeadDays(date: string, days: number): string {
+  const shifted = new Date(`${date}T00:00:00Z`);
+  shifted.setUTCDate(shifted.getUTCDate() - days);
+  return shifted.toISOString().slice(0, 10);
+}
+
 /** A security's close prices, oldest first. */
 export type PriceSeries = PricePoint[];
 

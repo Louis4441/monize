@@ -218,7 +218,8 @@ export function buildPositionMath(
       )
     : 0;
 
-  // A share of a total nobody knows is not a share.
+  // A share of a total nobody knows is not a share -- which `totalMarketValue`
+  // being null above already settles, since it is null for exactly that reason.
   //
   // An unpriced holding used to be dropped from the denominator while counting
   // as zero in the numerator, which does not merely blur the figure -- it moves
@@ -229,10 +230,7 @@ export function buildPositionMath(
   // unknown path settles what to do from what is held rather than from a
   // percentage.
   const compliancePercent =
-    targetRole &&
-    unpricedCount === 0 &&
-    totalMarketValue !== null &&
-    totalMarketValue > 0
+    targetRole && totalMarketValue !== null && totalMarketValue > 0
       ? roundToDecimals((targetValue / totalMarketValue) * 100, 2)
       : null;
 

@@ -135,13 +135,28 @@ export function recentPeriods(
  * substituted zero.
  */
 export function priceAsOf(prices: PricePoint[], date: string): number | null {
+  return pointAsOf(prices, date)?.close ?? null;
+}
+
+/**
+ * The observation `priceAsOf` would return, with the date it was struck on.
+ *
+ * A caller that needs to know *how old* the answer is cannot use the close
+ * alone: a security last quoted in March satisfies a lookup for September and
+ * one for October with the same number, which reads as a period that opened
+ * and closed at the same price rather than as a period nobody priced.
+ */
+export function pointAsOf(
+  prices: PricePoint[],
+  date: string,
+): PricePoint | null {
   let low = 0;
   let high = prices.length - 1;
-  let found: number | null = null;
+  let found: PricePoint | null = null;
   while (low <= high) {
     const mid = (low + high) >> 1;
     if (prices[mid].date <= date) {
-      found = prices[mid].close;
+      found = prices[mid];
       low = mid + 1;
     } else {
       high = mid - 1;

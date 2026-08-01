@@ -1,6 +1,6 @@
 import { roundToDecimals } from "../common/round.util";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
-import { PricePoint, priceAsOf } from "./gem-momentum.util";
+import { PricePoint, pointAsOf } from "./gem-momentum.util";
 
 /**
  * Replays the strategy's own stored evaluations against real prices.
@@ -70,15 +70,47 @@ const DAYS_PER_YEAR = 365.25;
 /** Two evaluations are the minimum that bound a period with an end price. */
 const MIN_PERIODS = 2;
 
-/** Growth of one security between two dates, or null when either price is missing. */
+/**
+ * How stale a boundary observation may be and still stand for that boundary.
+ *
+ * A period opens on the 1st, which is regularly a weekend or a holiday, so the
+ * close that prices it is the one a few days earlier -- the same reason the
+ * signal path loads a lead window. What this must not do is accept *any* older
+ * quote: a security last traded in March answers a lookup for September and one
+ * for October with the same number, and the period then reads as opening and
+ * closing at the same price rather than as one nobody priced.
+ */
+const BOUNDARY_LAG_DAYS = 14;
+
+/** Whole days between two ISO dates. */
+function daysBetween(from: string, to: string): number {
+  return (
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
+    86_400_000
+  );
+}
+
+/** The close standing for `date`, or null when the nearest one is too old. */
+function closeAt(series: PricePoint[], date: string): number | null {
+  const point = pointAsOf(series, date);
+  if (!point) return null;
+  return daysBetween(point.date, date) <= BOUNDARY_LAG_DAYS
+    ? point.close
+    : null;
+}
+
+/**
+ * Growth of one security between two dates, or null when either boundary has no
+ * close close enough in time to stand for it.
+ */
 function growth(
   series: PricePoint[] | undefined,
   from: string,
   to: string,
 ): number | null {
   if (!series?.length) return null;
-  const entry = priceAsOf(series, from);
-  const exit = priceAsOf(series, to);
+  const entry = closeAt(series, from);
+  const exit = closeAt(series, to);
   if (entry === null || exit === null || entry <= 0) return null;
   return exit / entry;
 }
@@ -86,13 +118,19 @@ function growth(
 /**
  * Simulate the stored signals and summarise the run.
  *
+ * **The simulated window is the most recent unbroken stretch of priced
+ * periods**, not the whole history. Holding an unpriced period flat looked like
+ * a modest simplification and was not: flat means the switch out of it realizes
+ * nothing, so no tax is deducted, and every later period then compounds from a
+ * balance the simulation invented. The drawdown misses whatever happened inside
+ * the gap as well, and "net of estimated taxes and commissions" stops being
+ * true. A discontinuous equity path cannot be summarised into one CAGR, so the
+ * run restarts after the last gap and `from`/`to` say what was actually
+ * simulated. Gaps are usually old -- an instrument younger than the history --
+ * so this keeps the recent part rather than the part nobody asked about.
+ *
  * Returns null when there is nothing honest to report: fewer than two
- * evaluations, or no period whose prices could be found. A partially priced
- * history is simulated over the periods that can be priced -- the unpriced ones
- * are held flat rather than dropped, so the timeline does not silently
- * compress. Flat is a return of zero, though, which nobody measured, so the
- * annualisation counts only the priced span and `coveragePercent` reports how
- * much of the run that was.
+ * evaluations, or no priced period after the last gap.
  */
 export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
   const {
@@ -110,9 +148,25 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
   const bounds = periods.map((period, index) => ({
     ...period,
     endsOn: periods[index + 1]?.effectiveFrom ?? asOf,
+    growth: null as number | null,
   }));
-  const from = bounds[0].effectiveFrom;
-  const to = bounds[bounds.length - 1].endsOn;
+  for (const period of bounds) {
+    period.growth = growth(
+      period.targetSecurityId
+        ? seriesBySecurity.get(period.targetSecurityId)
+        : undefined,
+      period.effectiveFrom,
+      period.endsOn,
+    );
+  }
+
+  // Everything after the last period that could not be priced.
+  const lastGap = bounds.map((period) => period.growth).lastIndexOf(null);
+  const run = bounds.slice(lastGap + 1);
+  if (run.length === 0) return null;
+
+  const from = run[0].effectiveFrom;
+  const to = run[run.length - 1].endsOn;
   if (to <= from) return null;
 
   // An absolute commission only becomes a drag against a known capital.
@@ -128,23 +182,17 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
   /** Equity when the current instrument was bought, for the realized gain. */
   let legEntryEquity = 1;
   let previousSecurityId: string | null = null;
-  let pricedPeriods = 0;
-  /** Days the simulation actually priced, which is what it can annualise over. */
-  let pricedDays = 0;
   let beatSafe = 0;
   let comparedToSafe = 0;
 
-  for (const period of bounds) {
-    const securityId = period.targetSecurityId;
+  for (const period of run) {
+    const securityId = period.targetSecurityId as string;
+    const series = seriesBySecurity.get(securityId) as PricePoint[];
+    const periodGrowth = period.growth as number;
 
     // Entering a different instrument: the old one is sold, which realizes a
     // result and costs two trades. The very first buy costs one.
-    //
-    // A period with no instrument at all -- RISK-ON with nothing eligible
-    // assigned -- is not a trade. Treating it as one charged a commission for
-    // holding nothing and then billed the return to the *next* instrument as a
-    // first purchase, understating the switch that actually happened.
-    if (securityId !== null && securityId !== previousSecurityId) {
+    if (securityId !== previousSecurityId) {
       const trades = previousSecurityId === null ? 1 : 2;
       if (taxRate !== null && previousSecurityId !== null) {
         const gain = equity - legEntryEquity;
@@ -157,30 +205,20 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
       previousSecurityId = securityId;
     }
 
-    const series = securityId ? seriesBySecurity.get(securityId) : undefined;
-    const periodGrowth = growth(series, period.effectiveFrom, period.endsOn);
-
-    if (periodGrowth !== null && series) {
-      pricedPeriods += 1;
-      pricedDays +=
-        (Date.parse(`${period.endsOn}T00:00:00Z`) -
-          Date.parse(`${period.effectiveFrom}T00:00:00Z`)) /
-        86_400_000;
-      const entryPrice = priceAsOf(series, period.effectiveFrom) as number;
-      // Walk the daily closes inside the period so the drawdown reflects what
-      // the run actually went through, not only its period-end marks.
-      for (const point of series) {
-        if (point.date < period.effectiveFrom || point.date > period.endsOn) {
-          continue;
-        }
-        const value = equity * (point.close / entryPrice);
-        if (value > peak) peak = value;
-        const drawdown = value / peak - 1;
-        if (drawdown < maxDrawdown) maxDrawdown = drawdown;
+    const entryPrice = closeAt(series, period.effectiveFrom) as number;
+    // Walk the daily closes inside the period so the drawdown reflects what
+    // the run actually went through, not only its period-end marks.
+    for (const point of series) {
+      if (point.date < period.effectiveFrom || point.date > period.endsOn) {
+        continue;
       }
-      equity *= periodGrowth;
-      if (equity > peak) peak = equity;
+      const value = equity * (point.close / entryPrice);
+      if (value > peak) peak = value;
+      const drawdown = value / peak - 1;
+      if (drawdown < maxDrawdown) maxDrawdown = drawdown;
     }
+    equity *= periodGrowth;
+    if (equity > peak) peak = equity;
 
     // Did following the signal beat sitting in the safe asset this period?
     const safeGrowth =
@@ -191,23 +229,16 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
             period.endsOn,
           )
         : null;
-    if (periodGrowth !== null && safeGrowth !== null) {
+    if (safeGrowth !== null) {
       comparedToSafe += 1;
       if (periodGrowth > safeGrowth) beatSafe += 1;
-    } else if (periodGrowth !== null && safeSecurityId === securityId) {
+    } else if (safeSecurityId === securityId) {
       // Holding the safe asset ties with itself; a tie is not a win.
       comparedToSafe += 1;
     }
   }
 
-  if (pricedPeriods === 0) return null;
-
-  // Annualise over the span the simulation could price, not over the calendar.
-  // An unpriced stretch is held flat, and dividing the compounded result by the
-  // whole window would spread that flatness across it as though the strategy
-  // had earned nothing -- turning "we could not price six months" into a
-  // reported six months at zero. `coveragePercent` says how much is missing.
-  const years = pricedDays / DAYS_PER_YEAR;
+  const years = daysBetween(from, to) / DAYS_PER_YEAR;
   const cagrPercent =
     years > 0 && equity > 0
       ? roundToDecimals((Math.pow(equity, 1 / years) - 1) * 100, 2)
@@ -223,6 +254,6 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
         ? roundToDecimals((beatSafe / comparedToSafe) * 100, 2)
         : null,
     netOfCosts: taxRate !== null || commissionFraction !== null,
-    coveragePercent: roundToDecimals((pricedPeriods / bounds.length) * 100, 2),
+    coveragePercent: roundToDecimals((run.length / bounds.length) * 100, 2),
   };
 }

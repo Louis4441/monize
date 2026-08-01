@@ -110,6 +110,44 @@ describe('GemPortfolioPanel', () => {
     expect(screen.queryByText(/matched by instrument/i)).not.toBeInTheDocument();
   });
 
+  it('still shows the working-out when the total cannot be priced', () => {
+    // One unpriced holding makes the total unknown -- and the working table is
+    // exactly where the row responsible is named, so hiding it there left the
+    // user with an unexplained blank.
+    render(
+      <GemPortfolioPanel
+        position={gemPosition({
+          holdings: [
+            {
+              role: null,
+              isCash: false,
+              securityId: 'sec-unpriced',
+              symbol: 'ZZZ',
+              name: 'A fund with no price',
+              quantity: 10,
+              marketValue: null,
+              matchPercent: 0,
+              matchedByInstrument: true,
+              matchedMarkets: [],
+            },
+          ],
+          totalMarketValue: null,
+          compliancePercent: null,
+        })}
+        noAccount={false}
+        noPosition={false}
+      />,
+    );
+
+    expect(
+      screen.getByText('How the compliance figure is worked out'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('ZZZ')).toBeInTheDocument();
+    expect(
+      screen.getByText(/The share cannot be worked out until the holdings can be priced/),
+    ).toBeInTheDocument();
+  });
+
   it('shows the arithmetic behind the compliance figure', () => {
     render(
       <GemPortfolioPanel
