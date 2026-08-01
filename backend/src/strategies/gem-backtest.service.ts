@@ -35,9 +35,16 @@ export class GemBacktestService {
     /** The risk-off instrument, for the "beat the safe asset" comparison. */
     safeSecurityId: string | null;
     notional: number | null;
+    /**
+     * Whether the strategy evaluated anything before the oldest signal here.
+     * Answered from the table by the caller, because the signals in hand are
+     * bounded to the last `GEM_HISTORY_PERIODS` periods and cannot say.
+     */
+    hasEarlierSignals: boolean;
     asOf?: string;
   }): Promise<GemBacktestResult | null> {
-    const { strategy, signals, safeSecurityId, notional } = params;
+    const { strategy, signals, safeSecurityId, notional, hasEarlierSignals } =
+      params;
     const asOf = params.asOf ?? todayYMD();
 
     const periods = [...signals]
@@ -81,6 +88,7 @@ export class GemBacktestService {
 
     return runBacktest({
       periods,
+      hasEarlierSignals,
       seriesBySecurity,
       safeSecurityId,
       taxRatePercent: strategy.taxRatePercent,

@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Posisi strategi",
       "accounts": "Rekening",
-      "units": "Unit yang dimiliki",
-      "marketValue": "Nilai pasar",
       "totalValue": "Total nilai pasar",
       "holdings": "{count, plural, other {Kepemilikan (#)}}",
       "holdingsHint": "Semua yang ada di rekening ini ikut dihitung: strategi ingin seluruhnya berada di instrumen target, jadi kepemilikan di luar strategi juga harus dipindahkan.",

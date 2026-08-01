@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "策略持仓",
       "accounts": "账户",
-      "units": "持有份数",
-      "marketValue": "市值",
       "totalValue": "总市值",
       "holdings": "{count, plural, other {持仓（#）}}",
       "holdingsHint": "这些账户里的所有持仓都计入：策略要求全部集中在目标标的，因此策略之外的持仓也必须转移。",

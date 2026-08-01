@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "전략 포지션",
       "accounts": "계좌",
-      "units": "보유 수량",
-      "marketValue": "시장가치",
       "totalValue": "총 시장가치",
       "holdings": "{count, plural, other {보유 종목(#)}}",
       "holdingsHint": "이 계좌에 있는 모든 것이 포함됩니다. 전략은 전액을 목표 종목에 두려 하므로 전략 밖의 보유도 옮겨야 합니다.",

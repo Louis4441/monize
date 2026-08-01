@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Pozycja strategii",
       "accounts": "Konta",
-      "units": "Posiadane jednostki",
-      "marketValue": "Wartość rynkowa",
       "totalValue": "Łączna wartość rynkowa",
       "holdings": "{count, plural, one {Pozycja} few {Pozycje (#)} many {Pozycje (#)} other {Pozycje (#)}}",
       "holdingsHint": "Liczy się wszystko, co leży na tych kontach: strategia chce całości w instrumencie docelowym, więc pozycję spoza strategii też trzeba przenieść.",

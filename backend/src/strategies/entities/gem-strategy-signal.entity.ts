@@ -40,11 +40,14 @@ export type GemMomentumSnapshot = Partial<Record<GemAssetRole, number | null>>;
  * if prices are later revised or an instrument is re-assigned -- and so the
  * user's "executed" flag has a stable row to hang on.
  *
- * One row per (strategy, evaluation date); re-evaluating an already stored
- * period is a no-op rather than an update.
+ * One row per (strategy, evaluation date, algorithm version); re-evaluating an
+ * already stored period is a no-op rather than an update. The version is in the
+ * key so a row an older release wrote -- a record of a real decision, and of
+ * the user's execution of it -- neither gets rewritten nor blocks the current
+ * release from evaluating the same period.
  */
 @Entity("gem_strategy_signals")
-@Unique(["strategyId", "evaluatedOn"])
+@Unique(["strategyId", "evaluatedOn", "algorithmVersion"])
 export class GemStrategySignal {
   @ApiProperty()
   @PrimaryGeneratedColumn("uuid")

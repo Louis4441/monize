@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "策略部位",
       "accounts": "帳戶",
-      "units": "持有單位",
-      "marketValue": "市值",
       "totalValue": "總市值",
       "holdings": "{count, plural, other {持有（#）}}",
       "holdingsHint": "這些帳戶裡的所有持有都會計入：策略要求全部集中在目標標的，因此策略之外的持有也必須轉移。",

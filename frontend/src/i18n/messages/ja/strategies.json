@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "戦略のポジション",
       "accounts": "口座",
-      "units": "保有口数",
-      "marketValue": "時価",
       "totalValue": "時価総額",
       "holdings": "{count, plural, other {保有銘柄（#）}}",
       "holdingsHint": "これらの口座にあるものはすべて対象です。戦略は全額を目標銘柄に置くことを求めるため、戦略外の保有も移す必要があります。",

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { createHash } from "node:crypto";
-import { DataSource, EntityManager, In } from "typeorm";
+import { DataSource, EntityManager, In, LessThan } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { todayYMD } from "../common/date-utils";
 import {
@@ -37,10 +37,48 @@ export interface GemMaterialization {
   /** Evaluations under the configuration in force now, newest first. */
   signals: GemStrategySignal[];
   /**
-   * Periods on the current calendar that only an earlier configuration could
-   * answer for, and so are not in `signals`. Zero in the ordinary case.
+   * Periods on the current calendar that only an earlier configuration or an
+   * earlier evaluation version could answer for, and so are not in `signals`.
+   * Zero in the ordinary case.
    */
   legacyPeriods: number;
+  /**
+   * True when the configuration read under the lock was not the one the caller
+   * was handed -- the user saved, or deleted the strategy, between the report's
+   * read and this write.
+   *
+   * The signals below then answer a configuration the caller does not have, and
+   * everything else it is about to build -- the role references, the position,
+   * the safe asset, the cost assumptions, the metadata it returns -- still
+   * comes from the stale one. A report assembled from both halves is not a
+   * report of anything; the caller starts over instead.
+   */
+  configChanged: boolean;
+}
+
+/**
+ * Serialize everything that writes a strategy's signals, or the settings those
+ * signals answer, against everything else that does.
+ *
+ * Materialization reloads the configuration and then writes rows stamped with
+ * its fingerprint; a settings save changes what that fingerprint should be.
+ * With only the materializers locking, a save could commit in the window
+ * between one's reload and its first insert, leaving rows in the table that
+ * answer a configuration the database no longer holds -- repaired only by some
+ * later read happening to run, which is not a guarantee. Taking the same lock
+ * on the save closes that window: whichever gets there first finishes, and the
+ * other sees a settled world.
+ *
+ * Transaction-scoped, so it releases on commit or rollback with no unlock to
+ * leak, and cluster-wide, so it holds across backend replicas.
+ */
+export async function lockGemStrategy(
+  manager: EntityManager,
+  strategyId: string,
+): Promise<void> {
+  await manager.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+    strategyId,
+  ]);
 }
 
 /** The date a period's momentum window opens: one lookback before evaluation. */
@@ -273,17 +311,15 @@ export class GemSignalService {
       // A transaction-scoped advisory lock releases itself on commit or
       // rollback, so there is no unlock to leak. It is cluster-wide, which is
       // what makes it work with more than one backend replica.
-      await manager.query(
-        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
-        [requestedStrategy.id],
-      );
+      await lockGemStrategy(manager, requestedStrategy.id);
       const strategy =
         (await manager.getRepository(GemStrategy).findOne({
           where: { id: requestedStrategy.id, userId },
         })) ?? null;
       // Deleted while the report was being built: nothing to materialize, and
       // nothing to report either.
-      if (!strategy) return { signals: [], legacyPeriods: 0 };
+      if (!strategy)
+        return { signals: [], legacyPeriods: 0, configChanged: true };
       const assets = await manager
         .getRepository(GemStrategyAsset)
         .find({ where: { strategyId: strategy.id } });
@@ -324,12 +360,31 @@ export class GemSignalService {
       // revised since, would file a counterfactual as history. Those rows are
       // left exactly as they are and reported as legacy periods.
       const fingerprint = gemConfigFingerprint(strategy, assets);
+      // What the caller was handed, against what the database turned out to
+      // hold. Same settings is the ordinary case and costs one hash.
+      const configChanged =
+        fingerprint !==
+        gemConfigFingerprint(requestedStrategy, requestedAssets);
       const isCurrentVersion = (signal: GemStrategySignal) =>
         signal.algorithmVersion === GEM_SIGNAL_ALGORITHM_VERSION;
-      const legacyByVersion = new Set(
+      /**
+       * Rows an older version wrote, by period.
+       *
+       * They are not obstacles: the unique key carries the version, so this
+       * version evaluates the same period and stores its answer beside the old
+       * one. Blocking instead would have cost the user the signal governing
+       * today on the day a release shipped, with a quarterly strategy waiting
+       * out the quarter for an instruction it was owed at once.
+       *
+       * What they are is a record -- of a decision and of the trade the user
+       * says they made against it -- so the superseding row inherits `executed`
+       * when it asks for the same instrument. Nobody has to re-confirm a trade
+       * the new rules agree with.
+       */
+      const supersededByPeriod = new Map(
         stored
           .filter((signal) => !isCurrentVersion(signal))
-          .map((signal) => signal.evaluatedOn),
+          .map((signal) => [signal.evaluatedOn, signal]),
       );
       const staleByPeriod = new Map(
         stored
@@ -373,17 +428,22 @@ export class GemSignalService {
             isCurrentVersion(signal) &&
             signal.configFingerprint === fingerprint,
         );
-        return { signals, legacyPeriods: rows.length - signals.length };
+        // Counted by *period*, not by row. A period can hold a superseded row
+        // and its replacement at once, and the replacement being present is
+        // exactly the case where nothing is missing from the history.
+        const answeredDates = new Set(
+          signals.map((signal) => signal.evaluatedOn),
+        );
+        const unanswered = new Set(
+          rows
+            .map((signal) => signal.evaluatedOn)
+            .filter((date) => !answeredDates.has(date)),
+        );
+        return { signals, legacyPeriods: unanswered.size, configChanged };
       };
 
-      // A period an older algorithm version already answered is not "unstored":
-      // its row owns the (strategy, period) key and stays, so there is nothing
-      // to evaluate and nothing to insert. It is legacy history, which the
-      // report names rather than silently drops.
       const unstored = periods.filter(
-        (period) =>
-          !answered.has(period.evaluatedOn) &&
-          !legacyByVersion.has(period.evaluatedOn),
+        (period) => !answered.has(period.evaluatedOn),
       );
       if (unstored.length === 0 || assets.every((a) => !a.securityId)) {
         return current(stored);
@@ -435,7 +495,6 @@ export class GemSignalService {
 
       for (const period of periods) {
         if (answered.has(period.evaluatedOn)) continue;
-        if (legacyByVersion.has(period.evaluatedOn)) continue;
         if (!evaluable.has(period.evaluatedOn)) continue;
 
         const momentum = momentumSnapshot(
@@ -471,6 +530,19 @@ export class GemSignalService {
           algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
           executed: false,
         });
+
+        // Superseding an older version's row for this period: the old row is
+        // left untouched, but the trade the user reported making against it
+        // carries over when this version asks for the same instrument.
+        const superseded = supersededByPeriod.get(period.evaluatedOn);
+        if (
+          superseded?.executed &&
+          superseded.targetSecurityId === targetSecurityId &&
+          superseded.targetRole === outcome.targetRole
+        ) {
+          signal.executed = true;
+          signal.executedAt = superseded.executedAt;
+        }
 
         // A period already stored under an older configuration is replaced in
         // place: the unique index owns (strategy, period), and a second row for
@@ -616,6 +688,36 @@ export class GemSignalService {
       signal.configFingerprint === gemConfigFingerprint(strategy, assets)
       ? signal
       : null;
+  }
+
+  /**
+   * Whether the strategy evaluated anything before `evaluatedOn` -- under any
+   * configuration and any algorithm version.
+   *
+   * The backtest needs this to know whether its first period is the strategy's
+   * first allocation. `previousRole` cannot answer it: materialization sets
+   * that from the *current* chain, so it is null whenever the predecessor was
+   * written by another configuration, by an older version, or simply fell out
+   * of the 24-period window -- none of which mean the strategy started there.
+   * Reading it as "nothing came before" charges an opening commission for a
+   * trade that never happened and dates the tax basis to the edge of the
+   * visible history.
+   */
+  async hasSignalsBefore(
+    userId: string,
+    strategyId: string,
+    evaluatedOn: string,
+  ): Promise<boolean> {
+    return withScopedDb(this.dataSource, async (manager) => {
+      const count = await manager.getRepository(GemStrategySignal).count({
+        where: {
+          userId,
+          strategyId,
+          evaluatedOn: LessThan(evaluatedOn),
+        },
+      });
+      return count > 0;
+    });
   }
 
   /** Mark a signal's operation as carried out. Returns false when unknown. */

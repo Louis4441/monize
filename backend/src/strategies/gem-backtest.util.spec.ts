@@ -34,6 +34,7 @@ const input = (
   taxRatePercent: null,
   commissionAmount: null,
   notional: null,
+  hasEarlierSignals: false,
   asOf: "2025-01-01",
   ...overrides,
 });

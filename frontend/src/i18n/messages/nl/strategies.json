@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Strategiepositie",
       "accounts": "Rekeningen",
-      "units": "Stukken in bezit",
-      "marketValue": "Marktwaarde",
       "totalValue": "Totale marktwaarde",
       "holdings": "{count, plural, one {Positie} other {Posities (#)}}",
       "holdingsHint": "Alles op deze rekeningen telt mee: de strategie wil alles in het doelinstrument, dus ook een positie buiten de strategie moet worden verplaatst.",

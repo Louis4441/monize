@@ -58,6 +58,7 @@ describe("GemBacktestService", () => {
       ],
       safeSecurityId: null,
       notional: 10_000,
+      hasEarlierSignals: false,
       asOf: "2025-01-01",
     });
 
@@ -92,6 +93,7 @@ describe("GemBacktestService", () => {
       ],
       safeSecurityId: "sec-ief",
       notional: null,
+      hasEarlierSignals: false,
       asOf: "2025-01-01",
     });
 
@@ -112,6 +114,7 @@ describe("GemBacktestService", () => {
       signals: [signal("2024-01-01", "sec-spy")],
       safeSecurityId: null,
       notional: 10_000,
+      hasEarlierSignals: false,
       asOf: "2025-01-01",
     });
 
@@ -140,6 +143,7 @@ describe("GemBacktestService", () => {
       ],
       safeSecurityId: null,
       notional: 10_000,
+      hasEarlierSignals: false,
       asOf: "2025-01-01",
     });
 
@@ -157,6 +161,7 @@ describe("GemBacktestService", () => {
       signals: [signal("2024-01-01", null), signal("2024-07-01", null)],
       safeSecurityId: null,
       notional: null,
+      hasEarlierSignals: false,
       asOf: "2025-01-01",
     });
 

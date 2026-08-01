@@ -81,8 +81,31 @@ computed from a months-old quote under settings identical to today's. Without
 the version in the material that row is answered, never recomputed, and served
 as the instruction to act on. **Bump the constant whenever a change can alter
 momentum, the ranking, the risk state or the target** -- and not otherwise,
-because every bump rewrites the whole stored history through the ordinary
-refresh path. Shorten the lookback or swap a fund and the affected periods are
+because every bump makes the current window's rows history-of-record and
+evaluates the whole window again.
+
+The version is a column, not part of the hash, and it is in the unique key
+(`strategy_id, evaluated_on, algorithm_version`) rather than replacing the row.
+Both facts follow from the same distinction. A settings change is the user
+asking for a different answer, so the period is recomputed in place. A rules
+change is not: that row records a decision the strategy really took and a trade
+the user really made against it, and rewriting it with today's code over prices
+revised since would file a counterfactual as history. So the old row stays,
+untouched, and the current version writes its own row beside it -- which is also
+what stops an upgrade from costing the user the signal governing today. Blocking
+instead left a quarterly strategy waiting out the quarter for an instruction it
+was owed immediately. The superseding row inherits `executed` when it asks for
+the same instrument, because that trade was made.
+
+Writes are serialized per strategy by a transaction-scoped advisory lock
+(`lockGemStrategy`), taken both by materialization and by the settings save.
+Materialization reloads the configuration under it, so what it writes answers
+what the database holds; the save takes it too, so a commit cannot slip between
+that reload and the first insert. When the reload finds a configuration other
+than the one the caller was handed, `materialize` reports `configChanged` and
+`getReport` builds the whole report again from scratch: the alternative is a
+response whose metadata, position and costs describe one configuration while
+its history describes another. Shorten the lookback or swap a fund and the affected periods are
 recomputed in place on the next read: same row, because the unique index owns
 the period, with `executed` kept when the recomputed instruction is the same
 instrument and cleared when it is not. A period that cannot be recomputed (a
@@ -261,8 +284,10 @@ contribute nothing to the return, the drawdown or the hit rate.
 
 **A run that does not start where the strategy did is reported gross**,
 whatever costs the configuration carries -- and that covers two cases, not one:
-prices truncated the run, or the oldest retained signal already had a
-`previous_role`. The second is the ordinary case for any strategy older than the
+prices truncated the run, or the strategy had already evaluated something
+before the oldest period in hand (`hasSignalsBefore`, asked of the table rather
+than read off `previous_role`, which is null whenever the predecessor belonged
+to another configuration or version). The second is the ordinary case for any strategy older than the
 24 periods the history keeps, so it is not an edge case: the simulation would
 otherwise charge a purchase commission for a trade that never happened and date
 the tax basis to the edge of the visible window, taxing a later switch on the

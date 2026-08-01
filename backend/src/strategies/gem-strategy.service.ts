@@ -30,7 +30,7 @@ import { GemBacktestService } from "./gem-backtest.service";
 import { GemPerformanceService } from "./gem-performance.service";
 import { GemPositionService } from "./gem-position.service";
 import { GemPriceService } from "./gem-price.service";
-import { GemSignalService } from "./gem-signal.service";
+import { GemSignalService, lockGemStrategy } from "./gem-signal.service";
 import {
   GemAccountRef,
   GemAssetMomentum,
@@ -53,6 +53,18 @@ const DEFAULT_CURRENCY = "CAD";
 const DEFAULT_LOOKBACK_MONTHS = 12;
 
 /** Name a scenario gets when its creator did not supply one. */
+/**
+ * Name a scenario gets before the user renames it, and the title of the report
+ * shown to someone who has never saved one.
+ *
+ * Deliberately not translated. It is the strategy's own name -- the acronym of
+ * Global Equities Momentum, the published rule set this report implements --
+ * and it is also seeded into `gem_strategies.name`, a column the user edits, so
+ * a localized default would mean the stored name depended on the locale of
+ * whoever created it. It went through `tr()` once, against a `strategies`
+ * catalog the backend does not ship: a key that could never resolve and always
+ * returned this literal anyway.
+ */
 const DEFAULT_STRATEGY_NAME = "GEM";
 
 /**
@@ -415,18 +427,36 @@ export class GemStrategyService {
     };
   }
 
+  /**
+   * The report, assembled from one configuration.
+   *
+   * `attempt` guards the one race that can split it in two. Everything below --
+   * the role references, the position, the safe asset, the cost assumptions,
+   * the metadata handed back to the client -- is built from the strategy this
+   * method loads, while `materialize` deliberately reloads the stored
+   * configuration under a lock before it writes. If the user saved in between,
+   * those two are different configurations and pasting their halves together
+   * produces a report of neither: signals filtered against a fingerprint the
+   * metadata does not describe, a backtest replaying one configuration's
+   * decisions with another's safe asset and costs, a current signal that comes
+   * back null although materialization just produced it.
+   *
+   * So the report is built again from the top, which re-reads everything --
+   * accounts included -- and materializes nothing new the second time. Once,
+   * not in a loop: a user saving faster than the report can be built twice is
+   * not a state worth spinning on, and the second attempt's answer is coherent
+   * whichever configuration it belongs to.
+   */
   async getReport(
     userId: string,
     range: GemRange = "1Y",
     strategyId?: string,
+    attempt = 0,
   ): Promise<GemStrategyReportView> {
     const asOf = todayYMD();
     const loaded = await this.loadStrategy(userId, strategyId);
     if (!loaded) {
-      return this.emptyReport(
-        this.buildAssetRefs([]),
-        tr("strategies.gem.defaultName", DEFAULT_STRATEGY_NAME),
-      );
+      return this.emptyReport(this.buildAssetRefs([]), DEFAULT_STRATEGY_NAME);
     }
 
     const { strategy, assets, accounts } = loaded;
@@ -440,12 +470,11 @@ export class GemStrategyService {
       (role) => !securityByRole.has(role) && !GEM_OPTIONAL_ROLES.includes(role),
     );
 
-    const { signals, legacyPeriods } = await this.signalService.materialize(
-      userId,
-      strategy,
-      assets,
-      asOf,
-    );
+    const { signals, legacyPeriods, configChanged } =
+      await this.signalService.materialize(userId, strategy, assets, asOf);
+    if (configChanged && attempt === 0) {
+      return this.getReport(userId, range, strategyId, attempt + 1);
+    }
     const current = this.signalService.currentSignal(
       signals,
       strategy,
@@ -480,11 +509,24 @@ export class GemStrategyService {
 
     // The simulation charges the configured per-trade commission against the
     // capital the strategy actually runs, so it needs the portfolio's value.
+    // Whether anything preceded the oldest signal in hand decides whether the
+    // simulation may open with a real purchase, and the 24 periods it holds
+    // cannot answer that for a strategy older than they are.
+    const oldestEvaluatedOn = signals[signals.length - 1]?.evaluatedOn ?? null;
+    const hasEarlierSignals =
+      strategy.id && oldestEvaluatedOn
+        ? await this.signalService.hasSignalsBefore(
+            userId,
+            strategy.id,
+            oldestEvaluatedOn,
+          )
+        : false;
     const backtest = await this.backtestService.build({
       strategy,
       signals,
       safeSecurityId: securityByRole.get("SAFE") ?? null,
       notional: position?.totalMarketValue ?? null,
+      hasEarlierSignals,
       asOf,
     });
     const next = this.nextEvaluation(strategy, asOf);
@@ -493,7 +535,7 @@ export class GemStrategyService {
     if (unmappedRoles.length > 0) {
       warnings.push({ code: "UNMAPPED_ROLE", roles: unmappedRoles });
     }
-    if (signals.length === 0) {
+    if (signals.length === 0 && legacyPeriods === 0) {
       warnings.push({ code: "FIRST_RUN" });
     } else if (!current) {
       // History exists but the period governing today could not be evaluated --
@@ -571,6 +613,16 @@ export class GemStrategyService {
     strategyId?: string,
   ): Promise<GemStrategyReportView> {
     const configured = await withScopedDb(this.dataSource, async (manager) => {
+      // Whatever this save changes, a materialization already in flight is
+      // writing signals against the settings it read. Take its lock first so
+      // the two cannot interleave: without it a save committing between that
+      // reload and its first insert leaves rows answering a configuration the
+      // database no longer holds, and nothing repairs them until some later
+      // read happens to run.
+      //
+      // The id is known only for a named scenario; a save that has to look the
+      // strategy up locks below, once it knows which one it is editing.
+      if (strategyId) await lockGemStrategy(manager, strategyId);
       if (dto.accountIds && dto.accountIds.length > 0) {
         const wanted = [...new Set(dto.accountIds)];
         const owned = await manager.getRepository(Account).find({
@@ -606,6 +658,11 @@ export class GemStrategyService {
         where: strategyId ? { id: strategyId, userId } : { userId },
         order: { createdAt: "ASC" },
       });
+      // The unnamed case: now that the row is known, take the lock and re-read
+      // under it, so a concurrent materializer is either finished or waiting.
+      if (!strategyId && existing) {
+        await lockGemStrategy(manager, existing.id);
+      }
       if (strategyId && !existing) {
         throw new NotFoundException(
           tr("errors.strategies.strategyNotFound", "Strategy not found"),

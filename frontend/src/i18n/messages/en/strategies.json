@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Strategy position",
       "accounts": "Accounts",
-      "units": "Units held",
-      "marketValue": "Market value",
       "totalValue": "Total market value",
       "holdings": "{count, plural, one {Holding} other {Holdings (#)}}",
       "holdingsHint": "Everything held in these accounts counts: the strategy wants all of it in the target instrument, so a holding outside the strategy has to be moved too.",

@@ -120,7 +120,10 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                 holding.matchPercent < 100;
               return (
                 <li
-                  key={holding.securityId ?? holding.symbol}
+                  // Cash has neither a security nor a ticker, so it is the one
+                  // row both fallbacks come back null for -- the same key the
+                  // working-out table below spells out.
+                  key={holding.isCash ? 'cash' : (holding.securityId ?? holding.symbol)}
                   className="flex items-start justify-between gap-3 text-sm"
                 >
                   <span className="flex min-w-0 items-start gap-1.5">

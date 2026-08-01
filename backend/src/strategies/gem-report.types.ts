@@ -258,7 +258,8 @@ export interface GemStrategyMetaView {
 /**
  * Net-of-cost backtest summary: the stored evaluations replayed against real
  * prices (see `gem-backtest.util`). Null when there is nothing honest to
- * simulate -- fewer than two evaluated periods, or no prices for any of them --
+ * simulate -- no evaluated period this configuration produced, no prices for
+ * any of them, or a single period that has not elapsed yet --
  * and the client shows its empty state for that.
  */
 export interface GemBacktestSummaryView {

@@ -44,10 +44,19 @@ const assets = (): GemStrategyAsset[] =>
     { role: "SAFE", securityId: "sec-ief" },
   ] as GemStrategyAsset[];
 
-/** Straight-line price series so momentum per role is predictable. */
+/**
+ * Straight-line price series so momentum per role is predictable.
+ *
+ * It has to reach the newest period these specs evaluate. Since algorithm
+ * version 2 a boundary close only counts within `BOUNDARY_LAG_DAYS` of the
+ * boundary, so a series stopping short leaves the last periods unpriced and
+ * unevaluated -- which reads as a bug in the service rather than in the
+ * fixture. 42 months from January 2022 is 2025-07-28, three days before the
+ * 2025-07-31 evaluation the specs' `asOf` of 2025-08-14 falls after.
+ */
 function seriesFor(growthPercent: number) {
   const points: Array<{ date: string; close: number }> = [];
-  for (let month = 0; month <= 40; month += 1) {
+  for (let month = 0; month <= 42; month += 1) {
     const date = new Date(Date.UTC(2022, month, 28));
     points.push({
       date: date.toISOString().slice(0, 10),
@@ -290,41 +299,95 @@ describe("GemSignalService", () => {
         );
       });
 
-      it("leaves a row written by an earlier algorithm version alone", async () => {
+      it("supersedes a row from an earlier algorithm version, leaving it intact", async () => {
         // The settings are untouched -- same cadence, same lookback, same
         // instruments -- so the fingerprint matches. The rules do not: version
         // 1 accepted a boundary close struck months before the boundary, and
         // the momentum on that row can be a figure this version refuses to
         // produce. It must not be served as the current instruction, and it
         // must not be rewritten either: it records what the strategy decided
-        // then and what the user executed against it, and recomputing it with
-        // today's code over prices revised since would file a counterfactual
-        // as history. It becomes a legacy period instead.
+        // then and what the user executed against it.
+        //
+        // So this version writes its own row for the period, beside the old
+        // one -- the unique key carries the version. Blocking instead cost the
+        // user the signal governing today on the day a release shipped, with a
+        // quarterly strategy waiting out the quarter for it.
         storedUnder12Months({
           algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION - 1,
           executed: true,
         });
 
-        const result = await service.materialize(
+        await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+        // The old row is not touched.
+        expect(signalRepo.save).not.toHaveBeenCalled();
+        // A new one is written for the same period, under this version.
+        const replacement = savedSignals.find(
+          (row) => row.evaluatedOn === "2025-07-31",
+        );
+        expect(replacement).toMatchObject({
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION,
+          configFingerprint: gemConfigFingerprint(strategy(), assets()),
+          targetRole: "EM_EQUITY",
+        });
+        // And the trade the user reported making carries over, because this
+        // version asks for the same instrument. Nobody re-confirms a trade the
+        // new rules agree with.
+        expect(replacement?.executed).toBe(true);
+      });
+
+      it("gives a quarterly strategy a signal the day after an upgrade", async () => {
+        // The reviewer's case: a release ships one day after an evaluation. If
+        // the version-1 row for the active period blocked this version, the
+        // report would have no actionable signal for the rest of the quarter.
+        signalRepo.find.mockResolvedValue([
+          {
+            id: "sig-q",
+            evaluatedOn: "2025-06-30",
+            effectiveFrom: "2025-07-01",
+            state: "RISK_ON",
+            targetRole: "EM_EQUITY",
+            targetSecurityId: "sec-emim",
+            configFingerprint: gemConfigFingerprint(
+              strategy({ cadence: "QUARTERLY" }),
+              assets(),
+            ),
+            algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION - 1,
+          } as GemStrategySignal,
+        ]);
+        dbHolds(strategy({ cadence: "QUARTERLY" }));
+
+        await service.materialize(
           userId,
-          strategy(),
+          strategy({ cadence: "QUARTERLY" }),
           assets(),
-          "2025-08-14",
+          "2025-07-01",
         );
 
-        const touched = signalRepo.save.mock.calls
-          .map(([row]) => row)
-          .find((row) => row.evaluatedOn === "2025-07-31");
-        expect(touched).toBeUndefined();
-        // Nor is a second row inserted for a period whose key is taken.
+        // The period governing today is evaluated again under this version,
+        // rather than waiting three months for the next one.
         expect(
-          savedSignals.some((row) => row.evaluatedOn === "2025-07-31"),
-        ).toBe(false);
-        // Not in the current history, and counted so the report can say so.
-        expect(
-          result.signals.some((row) => row.evaluatedOn === "2025-07-31"),
-        ).toBe(false);
-        expect(result.legacyPeriods).toBeGreaterThan(0);
+          savedSignals.find((row) => row.evaluatedOn === "2025-06-30"),
+        ).toMatchObject({ algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION });
+      });
+
+      it("does not inherit executed when the new rules ask for something else", async () => {
+        storedUnder12Months({
+          algorithmVersion: GEM_SIGNAL_ALGORITHM_VERSION - 1,
+          executed: true,
+          targetRole: "US_EQUITY",
+          targetSecurityId: "sec-spy",
+        });
+
+        await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+        const replacement = savedSignals.find(
+          (row) => row.evaluatedOn === "2025-07-31",
+        );
+        expect(replacement).toMatchObject({
+          targetRole: "EM_EQUITY",
+          executed: false,
+        });
       });
 
       it("keeps the executed flag when the instruction is unchanged", async () => {
@@ -952,6 +1015,26 @@ describe("GemSignalService", () => {
       expect(
         service.currentSignal(signals, strategy(), assets(), "2025-08-14"),
       ).toBeNull();
+    });
+  });
+
+  describe("hasSignalsBefore", () => {
+    it("asks the table, not the chain in hand", async () => {
+      // `previousRole` is null whenever the predecessor belonged to another
+      // configuration or version, or fell out of the 24-period window -- none
+      // of which mean the strategy started there. Only the table knows.
+      signalRepo.count = jest.fn().mockResolvedValue(3);
+
+      await expect(
+        service.hasSignalsBefore(userId, "strategy-1", "2023-08-31"),
+      ).resolves.toBe(true);
+      const [{ where }] = signalRepo.count.mock.calls[0];
+      expect(where).toMatchObject({ userId, strategyId: "strategy-1" });
+
+      signalRepo.count.mockResolvedValue(0);
+      await expect(
+        service.hasSignalsBefore(userId, "strategy-1", "2023-08-31"),
+      ).resolves.toBe(false);
     });
   });
 

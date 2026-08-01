@@ -1565,7 +1565,10 @@ CREATE TABLE gem_strategy_signals (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX idx_gem_strategy_signals_period ON gem_strategy_signals(strategy_id, evaluated_on);
+-- One row per period *per evaluation version*: an older version's row is an
+-- immutable record of what was decided and executed, and must not stop the
+-- current version from answering the same period.
+CREATE UNIQUE INDEX idx_gem_strategy_signals_period ON gem_strategy_signals(strategy_id, evaluated_on, algorithm_version);
 CREATE INDEX idx_gem_strategy_signals_user ON gem_strategy_signals(user_id);
 
 

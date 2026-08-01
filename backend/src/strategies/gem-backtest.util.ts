@@ -54,6 +54,18 @@ export interface GemBacktestInput {
   notional: number | null;
   /** Last day of the simulation: the final period runs up to it. */
   asOf: string;
+  /**
+   * Whether the strategy evaluated anything before the oldest period supplied.
+   *
+   * Answered from the database, not inferred from the first period's
+   * `previousRole`: that is set from the current configuration's chain, so it
+   * is null whenever the predecessor belonged to another configuration, to an
+   * older algorithm version, or simply fell out of the 24-period window. A
+   * strategy running for years can present a first period with no predecessor
+   * of its own, and reading that as "this is where it began" is what lets the
+   * simulation invent an opening trade.
+   */
+  hasEarlierSignals: boolean;
 }
 
 export interface GemBacktestResult {
@@ -156,8 +168,9 @@ function growth(
  * commission and dating the tax basis to `from` would invent both. Both cost
  * flags are false and the caller says so.
  *
- * Returns null when there is nothing honest to report: fewer than two
- * evaluations, or no priced period after the last gap.
+ * Returns null when there is nothing honest to report: no evaluation at all, no
+ * priced period after the last gap, or a single evaluation whose period has not
+ * elapsed yet (`to <= from`).
  */
 export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
   const {
@@ -168,6 +181,7 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
     commissionAmount,
     notional,
     asOf,
+    hasEarlierSignals,
   } = input;
 
   if (periods.length < MIN_PERIODS) return null;
@@ -198,7 +212,8 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
 
   /**
    * True when the run does not start where the strategy did: prices forced it
-   * to skip periods, or the oldest retained signal already had a predecessor.
+   * to skip periods, the strategy had already evaluated something before the
+   * oldest period in hand, or that period names a predecessor.
    *
    * Costs cannot be modelled from there, so a truncated run is reported gross.
    * The strategy was already holding something on `from` -- the periods before
@@ -210,7 +225,8 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
    * different, invented number in either direction. "Net of estimated taxes
    * and commissions" would be a claim about a portfolio the user never held.
    */
-  const truncated = lastGap >= 0 || run[0].previousRole !== null;
+  const truncated =
+    lastGap >= 0 || hasEarlierSignals || run[0].previousRole !== null;
 
   // An absolute commission only becomes a drag against a known capital.
   const commissionFraction =

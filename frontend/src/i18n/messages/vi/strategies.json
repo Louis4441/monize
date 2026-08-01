@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Vị thế của chiến lược",
       "accounts": "Tài khoản",
-      "units": "Số đơn vị đang giữ",
-      "marketValue": "Giá trị thị trường",
       "totalValue": "Tổng giá trị thị trường",
       "holdings": "{count, plural, other {Khoản nắm giữ (#)}}",
       "holdingsHint": "Mọi thứ trong các tài khoản này đều được tính: chiến lược muốn toàn bộ nằm ở công cụ mục tiêu, nên khoản nắm giữ ngoài chiến lược cũng phải chuyển.",

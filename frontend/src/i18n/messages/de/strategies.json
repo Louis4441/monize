@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Strategieposition",
       "accounts": "Konten",
-      "units": "Gehaltene Anteile",
-      "marketValue": "Marktwert",
       "totalValue": "Gesamter Marktwert",
       "holdings": "{count, plural, one {Bestand} other {Bestände (#)}}",
       "holdingsHint": "Alles in diesen Konten zählt mit: die Strategie will alles im Zielinstrument, daher muss auch ein Bestand außerhalb der Strategie bewegt werden.",

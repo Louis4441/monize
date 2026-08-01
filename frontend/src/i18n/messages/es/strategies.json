@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Posición de la estrategia",
       "accounts": "Cuentas",
-      "units": "Participaciones en cartera",
-      "marketValue": "Valor de mercado",
       "totalValue": "Valor de mercado total",
       "holdings": "{count, plural, one {Posición} other {Posiciones (#)}}",
       "holdingsHint": "Todo lo que hay en estas cuentas cuenta: la estrategia quiere que esté todo en el instrumento objetivo, así que una posición ajena a la estrategia también hay que moverla.",

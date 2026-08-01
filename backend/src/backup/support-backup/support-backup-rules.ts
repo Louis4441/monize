@@ -659,6 +659,11 @@ export const RULES: Record<string, TableRules> = {
     // user, and dropping it would make every restored signal look stale and be
     // recomputed on the first read.
     config_fingerprint: keep,
+    // Which version of the evaluation code wrote the row. Structural, says
+    // nothing about the user, and dropping it defaulted every restored signal
+    // to version 1 -- which the reader then files as legacy history and leaves
+    // out of the report entirely.
+    algorithm_version: keep,
     executed: keep,
     executed_at: keep,
     created_at: keep,

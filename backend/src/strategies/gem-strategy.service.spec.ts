@@ -163,6 +163,7 @@ describe("GemStrategyService", () => {
         .mockResolvedValue({ signals: [storedSignal()], legacyPeriods: 0 }),
       currentSignal: jest.fn().mockReturnValue(storedSignal()),
       markExecuted: jest.fn().mockResolvedValue(true),
+      hasSignalsBefore: jest.fn().mockResolvedValue(false),
     };
     positionService = {
       build: jest.fn().mockResolvedValue({
@@ -526,6 +527,61 @@ describe("GemStrategyService", () => {
       expect(report.warnings.map((w) => w.code)).not.toContain(
         "CALCULATION_FAILED",
       );
+    });
+
+    it("does not call a strategy with legacy history a first run", async () => {
+      // Every period in the window was decided by an earlier configuration or
+      // an earlier algorithm version, so `signals` is empty -- but the
+      // strategy has been running for years, and "this strategy has not been
+      // evaluated yet" is simply false. `LEGACY_PERIODS` says what happened.
+      signalService.materialize.mockResolvedValue({
+        signals: [],
+        legacyPeriods: 24,
+      });
+      signalService.currentSignal.mockReturnValue(null);
+
+      const report = await service.getReport(userId);
+
+      expect(report.warnings.map((w) => w.code)).not.toContain("FIRST_RUN");
+      expect(report.warnings.map((w) => w.code)).toContain("LEGACY_PERIODS");
+    });
+
+    it("rebuilds the report when the configuration changed under it", async () => {
+      // materialize reloads the stored configuration under its lock. If that
+      // is not the one this report was built from, the halves describe
+      // different strategies: signals filtered against a fingerprint the
+      // metadata does not match, a backtest replaying one configuration's
+      // decisions with another's safe asset and costs. Start again.
+      signalService.materialize
+        .mockResolvedValueOnce({
+          signals: [],
+          legacyPeriods: 0,
+          configChanged: true,
+        })
+        .mockResolvedValueOnce({
+          signals: [storedSignal()],
+          legacyPeriods: 0,
+          configChanged: false,
+        });
+
+      const report = await service.getReport(userId);
+
+      expect(signalService.materialize).toHaveBeenCalledTimes(2);
+      expect(report.history).toHaveLength(1);
+    });
+
+    it("gives up rebuilding after one restart", async () => {
+      // A user saving faster than the report can be built twice is not a state
+      // worth spinning on, and the second attempt is coherent either way.
+      signalService.materialize.mockResolvedValue({
+        signals: [storedSignal()],
+        legacyPeriods: 0,
+        configChanged: true,
+      });
+
+      await service.getReport(userId);
+
+      expect(signalService.materialize).toHaveBeenCalledTimes(2);
     });
 
     it("warns about incomplete history when a role has no momentum", async () => {

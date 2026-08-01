@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Posição da estratégia",
       "accounts": "Contas",
-      "units": "Unidades detidas",
-      "marketValue": "Valor de mercado",
       "totalValue": "Valor de mercado total",
       "holdings": "{count, plural, one {Posição} other {Posições (#)}}",
       "holdingsHint": "Tudo o que está nestas contas conta: a estratégia quer tudo no instrumento alvo, por isso uma posição fora da estratégia também tem de ser movida.",

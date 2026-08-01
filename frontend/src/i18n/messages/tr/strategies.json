@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Strateji pozisyonu",
       "accounts": "Hesaplar",
-      "units": "Elde tutulan adet",
-      "marketValue": "Piyasa değeri",
       "totalValue": "Toplam piyasa değeri",
       "holdings": "{count, plural, one {Pozisyon} other {Pozisyonlar (#)}}",
       "holdingsHint": "Bu hesaplardaki her şey sayılır: strateji tamamının hedef enstrümanda olmasını ister, bu yüzden strateji dışındaki bir pozisyonun da taşınması gerekir.",

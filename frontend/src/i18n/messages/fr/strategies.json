@@ -241,8 +241,6 @@
     "portfolioPanel": {
       "title": "Position de la stratégie",
       "accounts": "Comptes",
-      "units": "Parts détenues",
-      "marketValue": "Valeur de marché",
       "totalValue": "Valeur de marché totale",
       "holdings": "{count, plural, one {Position} other {Positions (#)}}",
       "holdingsHint": "Tout ce que contiennent ces comptes compte : la stratégie veut la totalité sur l'instrument cible, donc une position extérieure à la stratégie doit aussi être déplacée.",
