@@ -451,6 +451,50 @@ describe("runBacktest", () => {
     expect(withCosts?.cagrPercent).toBe(gross?.cagrPercent);
   });
 
+  it("reports gross when the strategy evaluated before the oldest period held", () => {
+    // The dangerous shape: the first period in hand has *no* predecessor of its
+    // own -- the row before it was written by another configuration or an older
+    // algorithm version, so materialization gave it `previousRole: null` -- and
+    // yet the strategy has been running for years. Reading that null as "this
+    // is where it began" invents a purchase at the boundary price and, with the
+    // real basis far lower, understates the tax on every later switch.
+    const periods: GemBacktestInput["periods"] = [
+      {
+        effectiveFrom: "2024-01-01",
+        targetRole: "US_EQUITY",
+        targetSecurityId: "sec-spy",
+        previousRole: null,
+      },
+      {
+        effectiveFrom: "2024-07-01",
+        targetRole: "EM_EQUITY",
+        targetSecurityId: "sec-emim",
+        previousRole: "US_EQUITY",
+      },
+    ];
+    const seriesBySecurity = new Map([
+      ["sec-spy", series({ "2024-01-01": 100, "2024-07-01": 200 })],
+      ["sec-emim", series({ "2024-07-01": 10, "2025-01-01": 10 })],
+    ]);
+
+    const result = runBacktest(
+      input({
+        periods,
+        seriesBySecurity,
+        hasEarlierSignals: true,
+        taxRatePercent: 20,
+        commissionAmount: 100,
+        notional: 10_000,
+      }),
+    );
+
+    expect(result?.taxApplied).toBe(false);
+    expect(result?.commissionApplied).toBe(false);
+    expect(result?.cagrPercent).toBe(
+      runBacktest(input({ periods, seriesBySecurity }))?.cagrPercent,
+    );
+  });
+
   it("has nothing to report without an evaluation or any price", () => {
     expect(runBacktest(input({ periods: [] }))).toBeNull();
     expect(runBacktest(input({ seriesBySecurity: new Map() }))).toBeNull();

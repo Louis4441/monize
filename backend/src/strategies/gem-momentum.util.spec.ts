@@ -1,4 +1,5 @@
 import {
+  BOUNDARY_LAG_DAYS,
   addMonthsUtc,
   cadenceMonths,
   evaluate,
@@ -15,6 +16,12 @@ import {
 
 const series = (points: Array<[string, number]>): PricePoint[] =>
   points.map(([date, close]) => ({ date, close }));
+
+/** ISO date `days` before `date`, for pinning the boundary-lag rule. */
+const ymdBefore = (date: string, days: number): string =>
+  new Date(Date.parse(`${date}T00:00:00Z`) - days * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
 
 describe("gem-momentum.util", () => {
   describe("date helpers", () => {
@@ -132,6 +139,37 @@ describe("gem-momentum.util", () => {
           "2025-07-31",
         ),
       ).toBe(15.42);
+    });
+
+    it("draws the line at BOUNDARY_LAG_DAYS, to the day", () => {
+      // The rule the whole report hangs on, pinned from both sides so a change
+      // to the constant fails here rather than quietly re-pricing history: a
+      // close exactly `BOUNDARY_LAG_DAYS` before the boundary stands for it,
+      // one day older does not.
+      const boundary = "2025-07-31";
+      const justInside = ymdBefore(boundary, BOUNDARY_LAG_DAYS);
+      const justOutside = ymdBefore(boundary, BOUNDARY_LAG_DAYS + 1);
+
+      expect(
+        trailingReturnPercent(
+          series([
+            ["2024-07-31", 100],
+            [justInside, 115.42],
+          ]),
+          "2024-07-31",
+          boundary,
+        ),
+      ).toBe(15.42);
+      expect(
+        trailingReturnPercent(
+          series([
+            ["2024-07-31", 100],
+            [justOutside, 115.42],
+          ]),
+          "2024-07-31",
+          boundary,
+        ),
+      ).toBeNull();
     });
 
     it("refuses a boundary whose nearest close is months old", () => {

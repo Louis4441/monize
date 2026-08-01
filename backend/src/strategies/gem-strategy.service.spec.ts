@@ -570,6 +570,24 @@ describe("GemStrategyService", () => {
       expect(report.history).toHaveLength(1);
     });
 
+    it("does not report a strategy that was deleted under it", async () => {
+      // materialize finds the row gone, says the configuration is not the one
+      // it was handed, and the rebuild reads a world without it -- rather than
+      // dressing a deleted snapshot up as a report.
+      signalService.materialize.mockResolvedValue({
+        signals: [],
+        legacyPeriods: 0,
+        configChanged: true,
+      });
+      strategyRepo.findOne.mockResolvedValueOnce(storedStrategy()); // first load
+      strategyRepo.findOne.mockResolvedValueOnce(null); // gone on the rebuild
+
+      const report = await service.getReport(userId);
+
+      expect(report.strategy.id).toBeNull();
+      expect(report.warnings.map((w) => w.code)).toContain("FIRST_RUN");
+    });
+
     it("gives up rebuilding after one restart", async () => {
       // A user saving faster than the report can be built twice is not a state
       // worth spinning on, and the second attempt is coherent either way.
