@@ -61,7 +61,8 @@
       "postFailed": "İşlem kaydedilemedi",
       "skipFailed": "Tekrar atlanamadı",
       "deleteFailed": "Silinemedi"
-    }
+    },
+    "foreignAmountTitle": "Alacaklının tahsil ettiği tutar, kendi para biriminde"
   },
   "filters": {
     "label": "Filtreler",
@@ -111,13 +112,20 @@
       "priceRequired": "Fiyat sıfırdan büyük olmalıdır",
       "totalAmountRequired": "Toplam tutar zorunludur",
       "splitsMinimum": "Bölünmüş işlemler için en az 2 bölüm gereklidir",
-      "splitsTotal": "Bölüm tutarları işlem tutarına eşit olmalıdır"
+      "splitsTotal": "Bölüm tutarları işlem tutarına eşit olmalıdır",
+      "fxRateUnavailable": "Bu tarih için {from} biriminden {to} birimine döviz kuru yok."
     },
     "latestPlaceholder": "En güncel: {price}",
     "descriptionPlaceholder": "Açıklama...",
     "amountLabel": "Miktar",
     "selectCategoryPlaceholder": "Kategori seçin...",
-    "referencePlaceholder": "Çek #, onay #..."
+    "referencePlaceholder": "Çek #, onay #...",
+    "fx": {
+      "amountInCurrency": "{currency} cinsinden tutar",
+      "rateCaption": "{date} tarihindeki 1 {from} = {rate} {to} kurundan {total} olarak kaydedilecek.",
+      "noRateWarning": "{date} tarihinde {from} biriminden {to} birimine döviz kuru bulunamadı. Başka bir tarih seçin veya kurları yenileyin.",
+      "feeCaption": "%{percent} yurt dışı işlem ücreti ({fee}) içerir."
+    }
   },
   "occurrencePicker": {
     "title": "Tekrar Tarihi Seçin",
@@ -253,7 +261,14 @@
       "securityRequired": "Bu yatırım işlemi için menkul kıymet gereklidir",
       "quantityRequired": "Miktar sıfırdan büyük olmalıdır",
       "priceRequired": "Fiyat sıfırdan büyük olmalıdır",
-      "totalAmountRequired": "Bu işlem için toplam tutar zorunludur"
+      "totalAmountRequired": "Bu işlem için toplam tutar zorunludur",
+      "fxRateRequired": "Kaydetmeden önce seçilen para biriminde bir tutar girin. Henüz kullanılabilir bir döviz kuru yok."
+    },
+    "fx": {
+      "amountInCurrency": "{currency} cinsinden tutar",
+      "estimateCaption": "Yaklaşık {total}, 1 {from} = {rate} {to} kurundan. Günlük güncellenir; kaydedilirken kayıt tarihindeki kur kullanılır.",
+      "noRateWarning": "{from} biriminden {to} birimine döviz kuru bulunamadı. Başka bir para birimi seçin veya tutarı {to} cinsinden girin.",
+      "feeCaption": "%{percent} yurt dışı işlem ücreti ({fee}) içerir."
     }
   },
   "postTransaction": {

@@ -61,7 +61,8 @@
       "postFailed": "Не вдалося провести транзакцію",
       "skipFailed": "Не вдалося пропустити повторення",
       "deleteFailed": "Не вдалося видалити"
-    }
+    },
+    "foreignAmountTitle": "Сума, яку виставляє одержувач, у його власній валюті"
   },
   "filters": {
     "label": "Фільтри",
@@ -111,13 +112,20 @@
       "priceRequired": "Ціна має бути більше нуля",
       "totalAmountRequired": "Загальна сума обов'язкова",
       "splitsMinimum": "Розділені транзакції вимагають щонайменше 2 частини",
-      "splitsTotal": "Суми частин мають дорівнювати сумі транзакції"
+      "splitsTotal": "Суми частин мають дорівнювати сумі транзакції",
+      "fxRateUnavailable": "На цю дату курс обміну {from} на {to} недоступний."
     },
     "latestPlaceholder": "Остання: {price}",
     "descriptionPlaceholder": "Опис...",
     "amountLabel": "Сума",
     "selectCategoryPlaceholder": "Оберіть категорію...",
-    "referencePlaceholder": "Номер чеку, підтвердження..."
+    "referencePlaceholder": "Номер чеку, підтвердження...",
+    "fx": {
+      "amountInCurrency": "Сума в {currency}",
+      "rateCaption": "Буде проведено як {total} за курсом 1 {from} = {rate} {to} на {date}.",
+      "noRateWarning": "Не знайдено курс обміну {from} на {to} на {date}. Виберіть іншу дату або оновіть курси.",
+      "feeCaption": "Включає комісію за закордонну операцію {percent}% ({fee})."
+    }
   },
   "occurrencePicker": {
     "title": "Оберіть дату повторення",
@@ -253,7 +261,14 @@
       "securityRequired": "Для цієї інвестиційної дії потрібен цінний папір",
       "quantityRequired": "Кількість має бути більше нуля",
       "priceRequired": "Ціна має бути більше нуля",
-      "totalAmountRequired": "Для цієї дії потрібна загальна сума"
+      "totalAmountRequired": "Для цієї дії потрібна загальна сума",
+      "fxRateRequired": "Перед збереженням введіть суму у вибраній валюті. Курс обміну поки недоступний."
+    },
+    "fx": {
+      "amountInCurrency": "Сума в {currency}",
+      "estimateCaption": "Приблизно {total} за курсом 1 {from} = {rate} {to}. Оновлюється щодня; під час проведення застосовується курс на дату проведення.",
+      "noRateWarning": "Не знайдено курс обміну {from} на {to}. Виберіть іншу валюту або введіть суму в {to}.",
+      "feeCaption": "Включає комісію за закордонну операцію {percent}% ({fee})."
     }
   },
   "postTransaction": {

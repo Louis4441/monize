@@ -61,7 +61,8 @@
       "postFailed": "Не удалось провести проводку",
       "skipFailed": "Не удалось пропустить вхождение",
       "deleteFailed": "Не удалось удалить"
-    }
+    },
+    "foreignAmountTitle": "Сумма, которую выставляет получатель, в его собственной валюте"
   },
   "filters": {
     "label": "Фильтры",
@@ -111,13 +112,20 @@
       "priceRequired": "Цена должна быть больше нуля",
       "totalAmountRequired": "Общая сумма обязательна",
       "splitsMinimum": "Для разделённых проводок требуется не менее 2 частей",
-      "splitsTotal": "Суммы частей должны соответствовать сумме проводки"
+      "splitsTotal": "Суммы частей должны соответствовать сумме проводки",
+      "fxRateUnavailable": "На эту дату курс обмена {from} в {to} недоступен."
     },
     "latestPlaceholder": "Последняя: {price}",
     "descriptionPlaceholder": "Описание...",
     "amountLabel": "Сумма",
     "selectCategoryPlaceholder": "Выберите категорию...",
-    "referencePlaceholder": "Номер чека, подтверждения..."
+    "referencePlaceholder": "Номер чека, подтверждения...",
+    "fx": {
+      "amountInCurrency": "Сумма в {currency}",
+      "rateCaption": "Будет проведено как {total} по курсу 1 {from} = {rate} {to} на {date}.",
+      "noRateWarning": "Не найден курс обмена {from} в {to} на {date}. Выберите другую дату или обновите курсы.",
+      "feeCaption": "Включает комиссию за зарубежную операцию {percent}% ({fee})."
+    }
   },
   "occurrencePicker": {
     "title": "Выберите дату вхождения",
@@ -253,7 +261,14 @@
       "securityRequired": "Эта инвестиционная операция требует ценную бумагу",
       "quantityRequired": "Количество должно быть больше нуля",
       "priceRequired": "Цена должна быть больше нуля",
-      "totalAmountRequired": "Общая сумма обязательна для этой операции"
+      "totalAmountRequired": "Общая сумма обязательна для этой операции",
+      "fxRateRequired": "Перед сохранением введите сумму в выбранной валюте. Курс обмена пока недоступен."
+    },
+    "fx": {
+      "amountInCurrency": "Сумма в {currency}",
+      "estimateCaption": "Примерно {total} по курсу 1 {from} = {rate} {to}. Обновляется ежедневно; при проведении применяется курс на дату проводки.",
+      "noRateWarning": "Не найден курс обмена {from} в {to}. Выберите другую валюту или введите сумму в {to}.",
+      "feeCaption": "Включает комиссию за зарубежную операцию {percent}% ({fee})."
     }
   },
   "postTransaction": {

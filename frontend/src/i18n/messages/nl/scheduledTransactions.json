@@ -61,7 +61,8 @@
       "postFailed": "Transactie boeken mislukt",
       "skipFailed": "Herhaling overslaan mislukt",
       "deleteFailed": "Verwijderen mislukt"
-    }
+    },
+    "foreignAmountTitle": "Het bedrag dat de begunstigde in rekening brengt, in de eigen valuta"
   },
   "filters": {
     "label": "Filters",
@@ -111,13 +112,20 @@
       "priceRequired": "Koers moet groter zijn dan nul",
       "totalAmountRequired": "Totaalbedrag is verplicht",
       "splitsMinimum": "Gesplitste transacties vereisen minimaal 2 splitsingen",
-      "splitsTotal": "Splitsingsbedragen moeten gelijk zijn aan het transactiebedrag"
+      "splitsTotal": "Splitsingsbedragen moeten gelijk zijn aan het transactiebedrag",
+      "fxRateUnavailable": "Er is voor deze datum geen wisselkoers beschikbaar voor {from} naar {to}."
     },
     "latestPlaceholder": "Laatste: {price}",
     "descriptionPlaceholder": "Beschrijving...",
     "amountLabel": "Bedrag",
     "selectCategoryPlaceholder": "Selecteer categorie...",
-    "referencePlaceholder": "Cheque #, bevestiging #..."
+    "referencePlaceholder": "Cheque #, bevestiging #...",
+    "fx": {
+      "amountInCurrency": "Bedrag in {currency}",
+      "rateCaption": "Wordt geboekt als {total} tegen 1 {from} = {rate} {to} op {date}.",
+      "noRateWarning": "Geen wisselkoers gevonden voor {from} naar {to} op {date}. Kies een andere datum of vernieuw de koersen.",
+      "feeCaption": "Inclusief {percent}% kosten voor buitenlandse transactie ({fee})."
+    }
   },
   "occurrencePicker": {
     "title": "Herhalingsdatum selecteren",
@@ -253,7 +261,14 @@
       "securityRequired": "Deze investeringsactie vereist een waardepapier",
       "quantityRequired": "Hoeveelheid moet groter zijn dan nul",
       "priceRequired": "Koers moet groter zijn dan nul",
-      "totalAmountRequired": "Totaalbedrag is verplicht voor deze actie"
+      "totalAmountRequired": "Totaalbedrag is verplicht voor deze actie",
+      "fxRateRequired": "Voer een bedrag in de gekozen valuta in voordat je opslaat. Er is nog geen wisselkoers beschikbaar."
+    },
+    "fx": {
+      "amountInCurrency": "Bedrag in {currency}",
+      "estimateCaption": "Ongeveer {total} bij 1 {from} = {rate} {to}. Dagelijks bijgewerkt; bij het boeken geldt de koers van de boekingsdatum.",
+      "noRateWarning": "Geen wisselkoers gevonden voor {from} naar {to}. Kies een andere valuta of voer het bedrag in {to} in.",
+      "feeCaption": "Inclusief {percent}% kosten voor buitenlandse transactie ({fee})."
     }
   },
   "postTransaction": {

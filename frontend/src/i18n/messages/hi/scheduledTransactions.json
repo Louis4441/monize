@@ -61,7 +61,8 @@
       "postFailed": "लेन-देन पोस्ट करने में विफल",
       "skipFailed": "घटना छोड़ने में विफल",
       "deleteFailed": "हटाने में विफल"
-    }
+    },
+    "foreignAmountTitle": "प्राप्तकर्ता जो राशि लेता है, उसकी अपनी मुद्रा में"
   },
   "filters": {
     "label": "फ़िल्टर",
@@ -111,13 +112,20 @@
       "priceRequired": "मूल्य शून्य से अधिक होना चाहिए",
       "totalAmountRequired": "कुल राशि आवश्यक है",
       "splitsMinimum": "विभाजित लेन-देन में कम से कम 2 विभाजन आवश्यक हैं",
-      "splitsTotal": "विभाजन की राशियाँ लेन-देन की राशि के बराबर होनी चाहिए"
+      "splitsTotal": "विभाजन की राशियाँ लेन-देन की राशि के बराबर होनी चाहिए",
+      "fxRateUnavailable": "इस तिथि को {from} से {to} के लिए कोई विनिमय दर उपलब्ध नहीं है।"
     },
     "latestPlaceholder": "नवीनतम: {price}",
     "descriptionPlaceholder": "विवरण...",
     "amountLabel": "राशि",
     "selectCategoryPlaceholder": "श्रेणी चुनें...",
-    "referencePlaceholder": "चेक #, पुष्टि #..."
+    "referencePlaceholder": "चेक #, पुष्टि #...",
+    "fx": {
+      "amountInCurrency": "{currency} में राशि",
+      "rateCaption": "{date} की दर 1 {from} = {rate} {to} पर यह {total} के रूप में पोस्ट होगा।",
+      "noRateWarning": "{date} को {from} से {to} के लिए कोई विनिमय दर नहीं मिली। दूसरी तिथि चुनें या दरें ताज़ा करें।",
+      "feeCaption": "इसमें {percent}% विदेशी लेनदेन शुल्क ({fee}) शामिल है।"
+    }
   },
   "occurrencePicker": {
     "title": "घटना तिथि चुनें",
@@ -253,7 +261,14 @@
       "securityRequired": "इस निवेश क्रिया के लिए प्रतिभूति आवश्यक है",
       "quantityRequired": "मात्रा शून्य से अधिक होनी चाहिए",
       "priceRequired": "मूल्य शून्य से अधिक होना चाहिए",
-      "totalAmountRequired": "इस क्रिया के लिए कुल राशि आवश्यक है"
+      "totalAmountRequired": "इस क्रिया के लिए कुल राशि आवश्यक है",
+      "fxRateRequired": "सहेजने से पहले चुनी गई मुद्रा में राशि दर्ज करें। अभी कोई विनिमय दर उपलब्ध नहीं है।"
+    },
+    "fx": {
+      "amountInCurrency": "{currency} में राशि",
+      "estimateCaption": "लगभग {total}, दर 1 {from} = {rate} {to} पर। यह रोज़ अपडेट होता है; पोस्ट करते समय पोस्टिंग तिथि की दर लागू होती है।",
+      "noRateWarning": "{from} से {to} के लिए कोई विनिमय दर नहीं मिली। दूसरी मुद्रा चुनें या राशि {to} में दर्ज करें।",
+      "feeCaption": "इसमें {percent}% विदेशी लेनदेन शुल्क ({fee}) शामिल है।"
     }
   },
   "postTransaction": {

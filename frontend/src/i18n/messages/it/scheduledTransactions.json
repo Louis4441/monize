@@ -61,7 +61,8 @@
       "postFailed": "Registrazione della transazione non riuscita",
       "skipFailed": "Impossibile saltare l'occorrenza",
       "deleteFailed": "Eliminazione non riuscita"
-    }
+    },
+    "foreignAmountTitle": "L'importo addebitato dal beneficiario, nella sua valuta"
   },
   "filters": {
     "label": "Filtri",
@@ -111,13 +112,20 @@
       "priceRequired": "Il prezzo deve essere maggiore di zero",
       "totalAmountRequired": "L'importo totale è obbligatorio",
       "splitsMinimum": "Le transazioni suddivise richiedono almeno 2 suddivisioni",
-      "splitsTotal": "Gli importi delle suddivisioni devono corrispondere all'importo della transazione"
+      "splitsTotal": "Gli importi delle suddivisioni devono corrispondere all'importo della transazione",
+      "fxRateUnavailable": "Non è disponibile alcun tasso di cambio da {from} a {to} per questa data."
     },
     "latestPlaceholder": "Più recente: {price}",
     "descriptionPlaceholder": "Descrizione...",
     "amountLabel": "Importo",
     "selectCategoryPlaceholder": "Seleziona categoria...",
-    "referencePlaceholder": "N° assegno, N° conferma..."
+    "referencePlaceholder": "N° assegno, N° conferma...",
+    "fx": {
+      "amountInCurrency": "Importo in {currency}",
+      "rateCaption": "Verrà registrata come {total} al tasso 1 {from} = {rate} {to} del {date}.",
+      "noRateWarning": "Nessun tasso di cambio trovato da {from} a {to} il {date}. Scegli un'altra data oppure aggiorna i tassi.",
+      "feeCaption": "Include una commissione per transazione estera del {percent}% ({fee})."
+    }
   },
   "occurrencePicker": {
     "title": "Seleziona data occorrenza",
@@ -253,7 +261,14 @@
       "securityRequired": "Questa azione di investimento richiede un titolo",
       "quantityRequired": "La quantità deve essere maggiore di zero",
       "priceRequired": "Il prezzo deve essere maggiore di zero",
-      "totalAmountRequired": "L'importo totale è obbligatorio per questa azione"
+      "totalAmountRequired": "L'importo totale è obbligatorio per questa azione",
+      "fxRateRequired": "Inserisci un importo nella valuta scelta prima di salvare. Non è ancora disponibile un tasso di cambio."
+    },
+    "fx": {
+      "amountInCurrency": "Importo in {currency}",
+      "estimateCaption": "Circa {total} al tasso 1 {from} = {rate} {to}. Aggiornato ogni giorno; alla registrazione si usa il tasso della data di registrazione.",
+      "noRateWarning": "Nessun tasso di cambio trovato da {from} a {to}. Scegli un'altra valuta oppure inserisci l'importo in {to}.",
+      "feeCaption": "Include una commissione per transazione estera del {percent}% ({fee})."
     }
   },
   "postTransaction": {

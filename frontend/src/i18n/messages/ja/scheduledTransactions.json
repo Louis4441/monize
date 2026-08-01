@@ -61,7 +61,8 @@
       "postFailed": "取引の投稿に失敗しました",
       "skipFailed": "発生のスキップに失敗しました",
       "deleteFailed": "削除に失敗しました"
-    }
+    },
+    "foreignAmountTitle": "支払先が請求する金額（支払先の通貨）"
   },
   "filters": {
     "label": "フィルター",
@@ -111,13 +112,20 @@
       "priceRequired": "価格はゼロより大きい必要があります",
       "totalAmountRequired": "合計金額は必須です",
       "splitsMinimum": "分割取引には少なくとも2つの分割が必要です",
-      "splitsTotal": "分割金額の合計は取引金額と一致する必要があります"
+      "splitsTotal": "分割金額の合計は取引金額と一致する必要があります",
+      "fxRateUnavailable": "この日付では {from} から {to} への為替レートが利用できません。"
     },
     "latestPlaceholder": "最新: {price}",
     "descriptionPlaceholder": "説明...",
     "amountLabel": "金額",
     "selectCategoryPlaceholder": "カテゴリを選択...",
-    "referencePlaceholder": "小切手番号、確認番号..."
+    "referencePlaceholder": "小切手番号、確認番号...",
+    "fx": {
+      "amountInCurrency": "{currency} での金額",
+      "rateCaption": "{date} のレート 1 {from} = {rate} {to} で {total} として投稿されます。",
+      "noRateWarning": "{date} の {from} から {to} への為替レートが見つかりません。別の日付を選ぶか、レートを更新してください。",
+      "feeCaption": "{percent}% の外貨取引手数料（{fee}）が含まれます。"
+    }
   },
   "occurrencePicker": {
     "title": "発生日を選択",
@@ -253,7 +261,14 @@
       "securityRequired": "この投資アクションには証券が必要です",
       "quantityRequired": "数量はゼロより大きい必要があります",
       "priceRequired": "価格はゼロより大きい必要があります",
-      "totalAmountRequired": "このアクションには合計金額が必要です"
+      "totalAmountRequired": "このアクションには合計金額が必要です",
+      "fxRateRequired": "保存する前に、選択した通貨で金額を入力してください。まだ為替レートを取得できていません。"
+    },
+    "fx": {
+      "amountInCurrency": "{currency} での金額",
+      "estimateCaption": "約 {total}（1 {from} = {rate} {to}）。毎日更新されます。投稿時には投稿日のレートが使われます。",
+      "noRateWarning": "{from} から {to} への為替レートが見つかりません。別の通貨を選ぶか、金額を {to} で入力してください。",
+      "feeCaption": "{percent}% の外貨取引手数料（{fee}）が含まれます。"
     }
   },
   "postTransaction": {

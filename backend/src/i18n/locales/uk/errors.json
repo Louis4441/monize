@@ -345,7 +345,9 @@
     "splitOverrideRequiresAmount": "Для створення заміни розбиття необхідна сума",
     "overrideNotFound": "Заміну з ідентифікатором {{ overrideId }} не знайдено",
     "updateSplitOverrideRequiresAmount": "Для заміни розбиття необхідна сума",
-    "dateMustBeYMD": "Дата має бути у форматі YYYY-MM-DD"
+    "dateMustBeYMD": "Дата має бути у форматі YYYY-MM-DD",
+    "fxPlainOnly": "Іншу валюту можна використати лише у звичайній запланованій операції, але не в розбитті, переказі чи інвестиції",
+    "fxRateUnavailable": "На {{ date }} курс обміну {{ from }} на {{ to }} недоступний. Введіть суму в {{ to }}, щоб провести її."
   },
   "securities": {
     "exchangeRateUnavailable": "Не вдалося визначити обмінний курс для {{ from }} -> {{ to }} на дату транзакції. Вкажіть явний exchangeRate, щоб проведення за грошовим рахунком було коректним.",

@@ -61,7 +61,8 @@
       "postFailed": "過帳交易失敗",
       "skipFailed": "跳過付款失敗",
       "deleteFailed": "刪除失敗"
-    }
+    },
+    "foreignAmountTitle": "收款人收取的金額，以其自身貨幣計"
   },
   "filters": {
     "label": "篩選",
@@ -111,13 +112,20 @@
       "priceRequired": "價格必須大於零",
       "totalAmountRequired": "總金額為必填",
       "splitsMinimum": "分割交易至少需要 2 筆分割",
-      "splitsTotal": "分割金額總計必須等於交易金額"
+      "splitsTotal": "分割金額總計必須等於交易金額",
+      "fxRateUnavailable": "該日期沒有從 {from} 到 {to} 的可用匯率。"
     },
     "latestPlaceholder": "最新：{price}",
     "descriptionPlaceholder": "描述...",
     "amountLabel": "金額",
     "selectCategoryPlaceholder": "選擇類別...",
-    "referencePlaceholder": "支票號碼、確認號碼..."
+    "referencePlaceholder": "支票號碼、確認號碼...",
+    "fx": {
+      "amountInCurrency": "以 {currency} 計的金額",
+      "rateCaption": "將按 {date} 的匯率 1 {from} = {rate} {to} 過帳為 {total}。",
+      "noRateWarning": "找不到 {date} 從 {from} 到 {to} 的匯率。請選擇其他日期，或重新整理匯率。",
+      "feeCaption": "包含 {percent}% 境外交易手續費（{fee}）。"
+    }
   },
   "occurrencePicker": {
     "title": "選擇付款日期",
@@ -253,7 +261,14 @@
       "securityRequired": "此投資操作需要證券",
       "quantityRequired": "數量必須大於零",
       "priceRequired": "價格必須大於零",
-      "totalAmountRequired": "此操作需要總金額"
+      "totalAmountRequired": "此操作需要總金額",
+      "fxRateRequired": "儲存前請以所選貨幣輸入金額。目前還沒有可用的匯率。"
+    },
+    "fx": {
+      "amountInCurrency": "以 {currency} 計的金額",
+      "estimateCaption": "約 {total}，按 1 {from} = {rate} {to} 計。每日更新；過帳時使用過帳日期的匯率。",
+      "noRateWarning": "找不到從 {from} 到 {to} 的匯率。請選擇其他貨幣，或以 {to} 輸入金額。",
+      "feeCaption": "包含 {percent}% 境外交易手續費（{fee}）。"
     }
   },
   "postTransaction": {
