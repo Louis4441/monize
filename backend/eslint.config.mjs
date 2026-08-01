@@ -2,6 +2,79 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
 
+/**
+ * RLS task L1: files allowed to import `common/db/with-context`.
+ *
+ * `withSystemContext` bypasses row-level security, so a new importer is a
+ * reviewed decision, not a drive-by fix: add the file here, in the same PR,
+ * with a justification in the PR description. The list was derived from the
+ * real tree when the R1-R7 refactors finished (guards/strategies, cron
+ * entry points, seeders, bootstrap hooks, admin, backup, the MCP transport,
+ * and the interceptor that seeds request scope) -- every entry wraps an
+ * out-of-request call path or a genuinely cross-user sweep documented in
+ * docs/future-plans/row-level-security-tasks.md (C1-C4, C6, R6/R7).
+ */
+const WITH_CONTEXT_ALLOWLIST = [
+  "src/accounts/accounts.service.ts",
+  "src/accounts/mortgage-reminder.service.ts",
+  "src/action-history/action-history.service.ts",
+  "src/admin/admin.service.ts",
+  "src/ai/ai-usage.service.ts",
+  "src/ai/insights/ai-insights.service.ts",
+  "src/auth/auth.controller.ts",
+  "src/auth/auth.service.ts",
+  "src/auth/pat.service.ts",
+  "src/auth/strategies/jwt.strategy.ts",
+  "src/auth/token.service.ts",
+  "src/backup/auto-backup.service.ts",
+  "src/backup/backup.service.ts",
+  "src/budgets/budget-alert.service.ts",
+  "src/budgets/budget-period-cron.service.ts",
+  "src/common/interceptors/request-context.interceptor.ts",
+  "src/currencies/currencies.service.ts",
+  "src/currencies/exchange-rate.service.ts",
+  "src/database/demo-reset.service.ts",
+  "src/database/demo-seed.service.ts",
+  "src/database/seed.service.ts",
+  "src/delegation/guards/account-delegate.guard.ts",
+  "src/emergency-access/emergency-access-claim.controller.ts",
+  "src/emergency-access/emergency-access-monitor.service.ts",
+  "src/import/mny/mny-import-job.service.ts",
+  "src/import/mny/mny-import.service.ts",
+  "src/import/mny/mny-staging.service.ts",
+  "src/mcp/mcp-http.controller.ts",
+  "src/mcp/tools/transactions.tool.ts",
+  "src/notifications/bill-reminder.service.ts",
+  "src/oauth/oauth-interaction.controller.ts",
+  "src/oauth/oauth-provider.service.ts",
+  "src/scheduled-transactions/scheduled-transactions.service.ts",
+  "src/securities/holdings.service.ts",
+  "src/securities/securities.controller.ts",
+  "src/securities/security-price.service.ts",
+];
+
+/**
+ * `no-restricted-imports` entry banning repository injection. Shared by the
+ * general block and the allowlist override below -- flat config replaces a
+ * rule's whole options object per block, so the override must restate this ban
+ * or silently drop it.
+ */
+const BAN_INJECT_REPOSITORY = {
+  name: "@nestjs/typeorm",
+  importNames: ["InjectRepository"],
+  message:
+    "All data access goes through withScopedDb (src/common/db/scoped-db.ts) -- " +
+    "get repositories from the transaction's EntityManager instead of injecting them (RLS task L1).",
+};
+
+const BAN_WITH_CONTEXT = {
+  group: ["**/db/with-context", "./with-context"],
+  message:
+    "common/db/with-context is import-restricted: withSystemContext bypasses row-level " +
+    "security, so a new importer must be added to WITH_CONTEXT_ALLOWLIST in eslint.config.mjs " +
+    "as a reviewed decision (RLS task L1).",
+};
+
 export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -24,6 +97,40 @@ export default tseslint.config(
           ignoreRestSiblings: true,
         },
       ],
+    },
+  },
+  {
+    // RLS task L1: production src/ never injects repositories, never opens a
+    // manual QueryRunner, and imports the context helpers only from the
+    // allowlist. Specs and the test harness stay exempt (they mock these), as
+    // does scoped-db.ts -- the one sanctioned door to the database.
+    files: ["src/**/*.ts"],
+    ignores: [
+      "src/**/*.spec.ts",
+      "src/test-helpers/**",
+      "src/common/db/scoped-db.ts",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { paths: [BAN_INJECT_REPOSITORY], patterns: [BAN_WITH_CONTEXT] },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: 'CallExpression[callee.property.name="createQueryRunner"]',
+          message:
+            "Manual QueryRunners bypass withScopedDb's transaction + identity GUCs -- use " +
+            "withScopedDb(this.dataSource, async (m) => { ... }) instead (RLS task L1).",
+        },
+      ],
+    },
+  },
+  {
+    // The allowlisted with-context importers keep every other ban.
+    files: WITH_CONTEXT_ALLOWLIST,
+    rules: {
+      "no-restricted-imports": ["error", { paths: [BAN_INJECT_REPOSITORY] }],
     },
   },
   {
