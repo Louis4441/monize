@@ -120,6 +120,7 @@
     "typeLabel": "種類",
     "exchangeLabel": "取引所",
     "currencyLabel": "通貨",
+    "currencyNotConfigured": "{code} — 登録した通貨にありません",
     "quoteProviderLabel": "株価プロバイダー",
     "msnIdLabel": "MSN 銘柄 ID（上級者向け）",
     "lookupProviderAriaLabel": "プロバイダーを検索",

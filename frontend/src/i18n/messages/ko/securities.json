@@ -120,6 +120,7 @@
     "typeLabel": "유형",
     "exchangeLabel": "거래소",
     "currencyLabel": "통화",
+    "currencyNotConfigured": "{code} — 등록한 통화에 없음",
     "quoteProviderLabel": "시세 제공자",
     "msnIdLabel": "MSN 금융 상품 ID (고급)",
     "lookupProviderAriaLabel": "제공자 조회",

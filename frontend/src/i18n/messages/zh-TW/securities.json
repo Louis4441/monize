@@ -120,6 +120,7 @@
     "typeLabel": "類型",
     "exchangeLabel": "交易所",
     "currencyLabel": "貨幣",
+    "currencyNotConfigured": "{code} — 不在你的貨幣清單中",
     "quoteProviderLabel": "報價提供者",
     "msnIdLabel": "MSN 金融商品 ID（進階）",
     "lookupProviderAriaLabel": "查找提供者",

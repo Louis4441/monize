@@ -120,6 +120,7 @@
     "typeLabel": "[XX-Type-XX]",
     "exchangeLabel": "[XX-Exchange-XX]",
     "currencyLabel": "[XX-Currency-XX]",
+    "currencyNotConfigured": "[XX-{code} — not in your currencies-XX]",
     "quoteProviderLabel": "[XX-Quote Provider-XX]",
     "msnIdLabel": "[XX-MSN Instrument ID (advanced)-XX]",
     "lookupProviderAriaLabel": "[XX-Lookup provider-XX]",
@@ -184,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "[XX-Asset Allocation-XX]",
-      "help": "[XX-Price providers don't supply asset-class exposure for ETFs and funds. Add it manually as percentages -- type any class name you like and it is offered on your other securities afterwards. Anything under 100% is shown as \"Other\".-XX]",
+      "help": "[XX-Price providers don't supply asset-class exposure for ETFs and funds. Add it manually as percentages — type any class name you like and it is offered on your other securities afterwards. Anything under 100% is shown as \"Other\".-XX]",
       "placeholder": "[XX-Select or type an asset class-XX]",
       "addRow": "[XX-Add asset class-XX]",
       "nameAriaLabel": "[XX-Asset class-XX]",

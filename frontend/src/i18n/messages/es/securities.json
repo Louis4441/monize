@@ -120,6 +120,7 @@
     "typeLabel": "Tipo",
     "exchangeLabel": "Bolsa",
     "currencyLabel": "Divisa",
+    "currencyNotConfigured": "{code} — no está en tus divisas",
     "quoteProviderLabel": "Proveedor de cotizaciones",
     "msnIdLabel": "ID de instrumento MSN (avanzado)",
     "lookupProviderAriaLabel": "Buscar proveedor",

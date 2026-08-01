@@ -120,6 +120,7 @@
     "typeLabel": "Type",
     "exchangeLabel": "Marché",
     "currencyLabel": "Devise",
+    "currencyNotConfigured": "{code} — absente de vos devises",
     "quoteProviderLabel": "Fournisseur de cours",
     "msnIdLabel": "Identifiant instrument MSN (avancé)",
     "lookupProviderAriaLabel": "Rechercher le fournisseur",

@@ -240,3 +240,27 @@ describe('a control sitting beside an input is the height of that input', () => 
     expect(offenders).toEqual([]);
   });
 });
+
+describe('the GEM report links through its shared wrappers', () => {
+  /**
+   * Every account and instrument the report names is a way into that account
+   * or instrument, and they all have to look the same doing it. A hand-rolled
+   * `<Link>` in one card gets its own colour and its own hover, which is how
+   * the report ended up with permanently blue anchors in one tab and plain
+   * text everywhere else. `GemSecurityLink` / `GemAccountLink` in
+   * `GemPrimitives.tsx` are the only place that markup lives.
+   */
+  const WRAPPERS = '/src/components/strategies/GemPrimitives.tsx';
+
+  it('has no ad-hoc security or account link in a strategy component', () => {
+    const offenders = productionSources()
+      .filter(
+        ([path]) =>
+          path.startsWith('/src/components/strategies/') && path !== WRAPPERS,
+      )
+      .filter(([, source]) => /href={`\/(securities|accounts)\//.test(source))
+      .map(([path]) => path);
+
+    expect(offenders).toEqual([]);
+  });
+});

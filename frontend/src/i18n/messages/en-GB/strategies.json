@@ -1,0 +1,14 @@
+{
+  "gem": {
+    "transfer": {
+      "hint": "What the pending operation moves, and what it realises.",
+      "realized": "Estimated realised result"
+    },
+    "action": {
+      "realized": "Estimated realised result"
+    },
+    "backtest": {
+      "cagr": "Annualised return"
+    }
+  }
+}

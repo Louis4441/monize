@@ -120,6 +120,7 @@
     "typeLabel": "Loại",
     "exchangeLabel": "Sàn giao dịch",
     "currencyLabel": "Tiền tệ",
+    "currencyNotConfigured": "{code} — không có trong tiền tệ của bạn",
     "quoteProviderLabel": "Nhà cung cấp báo giá",
     "msnIdLabel": "ID công cụ MSN (nâng cao)",
     "lookupProviderAriaLabel": "Tra cứu nhà cung cấp",
@@ -184,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Phân bổ theo loại tài sản",
-      "help": "Các nhà cung cấp giá không cung cấp mức phân bổ theo loại tài sản cho ETF và quỹ. Hãy nhập thủ công theo tỷ lệ phần trăm -- gõ tên bất kỳ và tên đó sẽ dùng được cho các chứng khoán khác của bạn. Phần còn thiếu so với 100% được hiển thị là \"Khác\".",
+      "help": "Các nhà cung cấp giá không cung cấp mức phân bổ theo loại tài sản cho ETF và quỹ. Hãy nhập thủ công theo tỷ lệ phần trăm — gõ tên bất kỳ và tên đó sẽ dùng được cho các chứng khoán khác của bạn. Phần còn thiếu so với 100% được hiển thị là \"Khác\".",
       "placeholder": "Chọn hoặc nhập loại tài sản",
       "addRow": "Thêm loại tài sản",
       "nameAriaLabel": "Loại tài sản",

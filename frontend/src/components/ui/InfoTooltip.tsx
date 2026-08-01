@@ -35,6 +35,9 @@ const VIEWPORT_MARGIN = 8;
  * breakpoint because a hover popover can't be triggered on touch. The text
  * is exposed via aria-label for screen readers; no native title attribute
  * is used so the browser tooltip doesn't duplicate the styled popover.
+ *
+ * The icon is focusable and shows the same popover on keyboard focus, so the
+ * help text is reachable without a pointer.
  */
 export function InfoTooltip({
   text,
@@ -67,9 +70,12 @@ export function InfoTooltip({
       <span
         ref={iconRef}
         aria-label={text}
+        tabIndex={0}
         onMouseEnter={showPortal}
         onMouseLeave={hidePortal}
-        className="relative hidden md:inline-flex items-center align-middle ml-1 text-gray-400 hover:text-blue-500 transition-colors cursor-help"
+        onFocus={showPortal}
+        onBlur={hidePortal}
+        className="relative hidden md:inline-flex items-center align-middle ml-1 text-gray-400 hover:text-blue-500 focus-visible:text-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded transition-colors cursor-help"
       >
         <QuestionMarkCircleIcon className={iconClassName} />
         {portalPos &&
@@ -106,12 +112,13 @@ export function InfoTooltip({
   return (
     <span
       aria-label={text}
-      className="relative hidden md:inline-flex items-center align-middle ml-1 group/tip text-gray-400 hover:text-blue-500 transition-colors cursor-help"
+      tabIndex={0}
+      className="relative hidden md:inline-flex items-center align-middle ml-1 group/tip text-gray-400 hover:text-blue-500 focus-visible:text-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded transition-colors cursor-help"
     >
       <QuestionMarkCircleIcon className={iconClassName} />
       <span
         role="tooltip"
-        className={`pointer-events-none hidden md:group-hover/tip:block absolute z-20 w-64 whitespace-normal rounded-md bg-gray-900 dark:bg-gray-700 px-2.5 py-2 text-xs font-normal leading-snug text-white shadow-lg ${popoverClasses}`}
+        className={`pointer-events-none hidden md:group-hover/tip:block md:group-focus/tip:block absolute z-20 w-64 whitespace-normal rounded-md bg-gray-900 dark:bg-gray-700 px-2.5 py-2 text-xs font-normal leading-snug text-white shadow-lg ${popoverClasses}`}
       >
         {text}
       </span>

@@ -1,0 +1,121 @@
+'use client';
+
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { CalendarDaysIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/Button';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { useDateFormat } from '@/hooks/useDateFormat';
+import { GemCadence, GemStrategyRef } from '@/types/gem-strategy';
+import { isKnown } from '@/lib/gem-strategy-view';
+import { useGemLabels } from './useGemLabels';
+import { GemScenarioSwitcher } from './GemScenarioSwitcher';
+
+interface GemStrategyHeaderProps {
+  /** The scenario on screen, and every saved one, for the switcher. */
+  strategyId: string;
+  strategyName: string;
+  scenarios: readonly GemStrategyRef[];
+  onSelectScenario: (id: string) => void;
+  onCreateScenario: (name: string) => Promise<void>;
+  onDeleteScenario: (id: string) => Promise<void>;
+  scenarioBusy: boolean;
+  cadence: GemCadence;
+  nextEvaluationOn: string | null;
+  daysUntilNextEvaluation: number | null;
+  onEditSettings: () => void;
+}
+
+/**
+ * Page header: breadcrumb, title with the strategy explainer, and the
+ * evaluation cadence block. The cadence/next-evaluation pair lives here so the
+ * summary cards below do not repeat it.
+ */
+export function GemStrategyHeader({
+  strategyId,
+  strategyName,
+  scenarios,
+  onSelectScenario,
+  onCreateScenario,
+  onDeleteScenario,
+  scenarioBusy,
+  cadence,
+  nextEvaluationOn,
+  daysUntilNextEvaluation,
+  onEditSettings,
+}: GemStrategyHeaderProps) {
+  const t = useTranslations('strategies');
+  const { cadenceLabel } = useGemLabels();
+  const { formatDate } = useDateFormat();
+
+  return (
+    <header className="mb-4">
+      <nav aria-label={t('gem.header.breadcrumbAriaLabel')} className="mb-1">
+        <ol className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+          <li>
+            <Link
+              href="/reports"
+              className="rounded hover:text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-blue-400"
+            >
+              {t('gem.header.breadcrumbRoot')}
+            </Link>
+          </li>
+          <li aria-hidden="true">/</li>
+          <li className="text-gray-700 dark:text-gray-300" aria-current="page">
+            {t('gem.header.title')}
+          </li>
+        </ol>
+      </nav>
+
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex items-center gap-1">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              {strategyName}
+            </h1>
+            <InfoTooltip text={t('gem.header.explainer')} usePortal />
+            <GemScenarioSwitcher
+              currentId={strategyId}
+              currentName={strategyName}
+              scenarios={scenarios}
+              onSelect={onSelectScenario}
+              onCreate={onCreateScenario}
+              onDelete={onDeleteScenario}
+              busy={scenarioBusy}
+            />
+          </div>
+          <p className="text-gray-500 dark:text-gray-400">{t('gem.header.subtitle')}</p>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
+          <div className="flex items-start gap-2 text-sm">
+            <CalendarDaysIcon
+              className="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
+              aria-hidden="true"
+            />
+            <div>
+              <p className="text-gray-600 dark:text-gray-300">
+                {t('gem.header.cadence', { cadence: cadenceLabel(cadence) })}
+              </p>
+              <p className="text-gray-500 dark:text-gray-400">
+                {nextEvaluationOn
+                  ? isKnown(daysUntilNextEvaluation)
+                    ? t('gem.header.nextEvaluationWithDays', {
+                        date: formatDate(nextEvaluationOn),
+                        days: daysUntilNextEvaluation,
+                      })
+                    : t('gem.header.nextEvaluation', { date: formatDate(nextEvaluationOn) })
+                  : t('gem.header.nextEvaluationUnknown')}
+              </p>
+            </div>
+          </div>
+
+          <Button variant="outline" onClick={onEditSettings} className="shrink-0">
+            <PencilSquareIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+            {t('gem.header.editSettings')}
+          </Button>
+        </div>
+      </div>
+    </header>
+  );
+}

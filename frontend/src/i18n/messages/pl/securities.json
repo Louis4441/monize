@@ -120,6 +120,7 @@
     "typeLabel": "Typ",
     "exchangeLabel": "Giełda",
     "currencyLabel": "Waluta",
+    "currencyNotConfigured": "{code} — brak w Twoich walutach",
     "quoteProviderLabel": "Dostawca notowań",
     "msnIdLabel": "Identyfikator instrumentu MSN (zaawansowane)",
     "lookupProviderAriaLabel": "Dostawca wyszukiwania",
@@ -184,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Alokacja klas aktywów",
-      "help": "Dostawcy notowań nie udostępniają ekspozycji na klasy aktywów dla ETF-ów i funduszy. Dodaj ją ręcznie w procentach -- wpisz dowolną nazwę, a potem będzie dostępna przy pozostałych papierach. Wszystko poniżej 100% jest wyświetlane jako „Pozostałe”.",
+      "help": "Dostawcy notowań nie udostępniają ekspozycji na klasy aktywów dla ETF-ów i funduszy. Dodaj ją ręcznie w procentach — wpisz dowolną nazwę, a potem będzie dostępna przy pozostałych papierach. Wszystko poniżej 100% jest wyświetlane jako „Pozostałe”.",
       "placeholder": "Wybierz lub wpisz klasę aktywów",
       "addRow": "Dodaj klasę aktywów",
       "nameAriaLabel": "Klasa aktywów",

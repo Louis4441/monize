@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@/test/render';
+import { render, screen, fireEvent } from '@/test/render';
 import { InfoTooltip } from './InfoTooltip';
 
 describe('InfoTooltip', () => {
@@ -44,5 +44,24 @@ describe('InfoTooltip', () => {
   it('applies custom icon className', () => {
     const { container } = render(<InfoTooltip text="Tooltip" iconClassName="h-6 w-6" />);
     expect(container.querySelector('.h-6.w-6')).toBeInTheDocument();
+  });
+
+  it('is reachable by keyboard and reveals the popover on focus', () => {
+    render(<InfoTooltip text="Keyboard help" />);
+    const trigger = screen.getByLabelText('Keyboard help');
+    expect(trigger).toHaveAttribute('tabindex', '0');
+    expect(screen.getByRole('tooltip').className).toContain('group-focus/tip:block');
+  });
+
+  it('opens and closes the portal popover on focus and blur', () => {
+    render(<InfoTooltip text="Portal help" usePortal />);
+    const trigger = screen.getByLabelText('Portal help');
+    expect(trigger).toHaveAttribute('tabindex', '0');
+
+    fireEvent.focus(trigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Portal help');
+
+    fireEvent.blur(trigger);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 });

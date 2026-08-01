@@ -1,0 +1,147 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { EntitySwitcher, type EntitySwitcherItem } from '@/components/ui/EntitySwitcher';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Modal } from '@/components/ui/Modal';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
+import type { GemStrategyRef } from '@/types/gem-strategy';
+
+interface GemScenarioSwitcherProps {
+  /** The scenario on screen; it is not offered as a destination. */
+  currentId: string;
+  currentName: string;
+  scenarios: readonly GemStrategyRef[];
+  onSelect: (id: string) => void;
+  onCreate: (name: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  /** True while a scenario call is in flight, to stop a double submit. */
+  busy?: boolean;
+}
+
+/**
+ * The scenario controls beside the report title: switch to another saved
+ * strategy, start one, or delete this one.
+ *
+ * Switching is `EntitySwitcher`, the same caret the security, payee and account
+ * detail pages use, so the menu, filter and keyboard behaviour are defined once.
+ * Creating and deleting sit next to it because a scenario is only useful
+ * alongside another one to compare it with.
+ *
+ * Deleting takes the evaluation history with it, which is the part that cannot
+ * be rebuilt -- the confirmation says so rather than asking a generic "are you
+ * sure".
+ */
+export function GemScenarioSwitcher({
+  currentId,
+  currentName,
+  scenarios,
+  onSelect,
+  onCreate,
+  onDelete,
+  busy = false,
+}: GemScenarioSwitcherProps) {
+  const t = useTranslations('strategies');
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const items = useMemo<EntitySwitcherItem[]>(
+    () => scenarios.map((scenario) => ({ id: scenario.id, primary: scenario.name })),
+    [scenarios],
+  );
+
+  const submitCreate = async () => {
+    await onCreate(newName.trim());
+    setNewName('');
+    setCreating(false);
+  };
+
+  return (
+    <>
+      <span className="flex items-center gap-0.5">
+        {items.length > 1 && (
+          <EntitySwitcher
+            currentId={currentId}
+            items={items}
+            onSelect={onSelect}
+            triggerLabel={t('gem.scenarios.switch')}
+            filterPlaceholder={t('gem.scenarios.filterPlaceholder')}
+            noMatchesLabel={t('gem.scenarios.noMatches')}
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          disabled={busy}
+          title={t('gem.scenarios.create')}
+          aria-label={t('gem.scenarios.create')}
+          className="rounded p-1 text-gray-400 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 dark:hover:text-blue-400"
+        >
+          <PlusIcon className="h-4 w-4" aria-hidden="true" />
+        </button>
+        {/* Deleting the only scenario would leave nothing to report on, and the
+            unconfigured report is reachable by clearing it instead. */}
+        {scenarios.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            disabled={busy}
+            title={t('gem.scenarios.delete')}
+            aria-label={t('gem.scenarios.delete')}
+            className="rounded p-1 text-gray-400 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:opacity-50 dark:hover:text-red-400"
+          >
+            <TrashIcon className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+      </span>
+
+      <Modal
+        isOpen={creating}
+        onClose={() => setCreating(false)}
+        maxWidth="sm"
+        pushHistory
+        className="p-6"
+      >
+        <h2 className="mb-1 text-xl font-bold text-gray-900 dark:text-gray-100">
+          {t('gem.scenarios.createTitle')}
+        </h2>
+        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+          {t('gem.scenarios.createHint')}
+        </p>
+        <Input
+          label={t('gem.scenarios.nameLabel')}
+          value={newName}
+          onChange={(event) => setNewName(event.target.value)}
+          placeholder={t('gem.scenarios.namePlaceholder')}
+          maxLength={100}
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={() => setCreating(false)}>
+            {t('gem.scenarios.cancel')}
+          </Button>
+          <Button type="button" onClick={submitCreate} disabled={busy}>
+            {t('gem.scenarios.createConfirm')}
+          </Button>
+        </div>
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={confirmingDelete}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={async () => {
+          await onDelete(currentId);
+          setConfirmingDelete(false);
+        }}
+        pushHistory
+        title={t('gem.scenarios.deleteTitle')}
+        message={t('gem.scenarios.deleteMessage', { name: currentName })}
+        confirmLabel={t('gem.scenarios.delete')}
+        variant="danger"
+      />
+    </>
+  );
+}

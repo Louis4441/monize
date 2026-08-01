@@ -1,0 +1,585 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { useTranslations } from 'next-intl';
+import { useForm, Resolver } from 'react-hook-form';
+import '@/lib/zodConfig';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import toast from 'react-hot-toast';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
+import { MultiSelect } from '@/components/ui/MultiSelect';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { FormActions } from '@/components/ui/FormActions';
+import { Skeleton } from '@/components/ui/LoadingSkeleton';
+import { SecurityForm } from '@/components/securities/SecurityForm';
+import { PlusIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { useReportData } from '@/hooks/useReportData';
+import { useDateFormat } from '@/hooks/useDateFormat';
+import { accountsApi } from '@/lib/accounts';
+import { investmentsApi } from '@/lib/investments';
+import { gemStrategyApi } from '@/lib/gem-strategy';
+import { getErrorMessage } from '@/lib/errors';
+import { createLogger } from '@/lib/logger';
+import { GEM_ROLE_ORDER } from '@/lib/gem-strategy-view';
+import {
+  GEM_DEFAULT_SUGGESTION_REGION,
+  GEM_SUGGESTED_SECURITIES,
+  GemSuggestedSecurity,
+  suggestionsForRole,
+} from '@/lib/gem-suggested-securities';
+import { CreateSecurityData, Security } from '@/types/investment';
+import {
+  GemAssetRef,
+  GemAssetRole,
+  GemRange,
+  GemStrategyMeta,
+  GemStrategyReport,
+} from '@/types/gem-strategy';
+import { GemCard, GemStatRow, GemUnknown } from './GemPrimitives';
+import { GemInstrumentSelect } from './GemInstrumentSelect';
+import { useGemLabels } from './useGemLabels';
+
+const logger = createLogger('GemSettingsForm');
+
+/**
+ * Empty-string selects and blank number fields mean "not set", which the API
+ * expresses as null. Numbers stay optional so clearing a cost assumption is
+ * possible without inventing a zero.
+ */
+const configSchema = z.object({
+  accountIds: z.array(z.string()),
+  cadence: z.enum(['MONTHLY', 'QUARTERLY']),
+  lookbackMonths: z.coerce.number().int().min(1).max(60),
+  taxRatePercent: z.union([z.literal(''), z.coerce.number().min(0).max(100)]),
+  commissionAmount: z.union([z.literal(''), z.coerce.number().min(0)]),
+  rulesSourceUrl: z.string().max(500),
+  rulesSourceLabel: z.string().max(100),
+  US_EQUITY: z.string(),
+  EX_US_EQUITY: z.string(),
+  EM_EQUITY: z.string(),
+  SAFE: z.string(),
+  RISK_FREE: z.string(),
+});
+
+type ConfigFormValues = z.infer<typeof configSchema>;
+
+/** Blank number field -> null (unknown), a filled one -> the number. */
+function optionalNumber(value: number | '' | undefined): number | null {
+  return value === '' || value === undefined ? null : Number(value);
+}
+
+function optionalText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+interface GemSettingsFormProps {
+  strategy: GemStrategyMeta;
+  /** Current role assignments, in strategy order. */
+  assets: GemAssetRef[];
+  /** Range the page is showing, so the refreshed report comes back matching. */
+  range: GemRange;
+  /** Receives the refreshed report the save returns. */
+  onSaved: (report: GemStrategyReport) => void;
+}
+
+/**
+ * "Settings" tab: the strategy configuration, editable. Assigning an instrument
+ * to each role is what turns the report from its unconfigured state into a live
+ * signal, so this is the form that gets a new strategy running.
+ */
+export function GemSettingsForm({
+  strategy,
+  assets,
+  range,
+  onSaved,
+}: GemSettingsFormProps) {
+  const t = useTranslations('strategies');
+  const { roleLabel, roleDescription } = useGemLabels();
+  const { formatDate } = useDateFormat();
+  const [isSaving, setIsSaving] = useState(false);
+  // Role whose "add instrument" modal is open, and the securities created
+  // through it -- appended locally so the new one can be picked straight away
+  // without re-fetching the whole list.
+  const [creatingFor, setCreatingFor] = useState<{
+    role: GemAssetRole;
+    suggestion?: GemSuggestedSecurity;
+  } | null>(null);
+  const [isFillingRoles, setIsFillingRoles] = useState(false);
+  const [createdSecurities, setCreatedSecurities] = useState<Security[]>([]);
+
+  // Investment accounts and securities are the two pick-lists the form needs.
+  const { data, isLoading } = useReportData(
+    async () => {
+      const [accounts, securities] = await Promise.all([
+        accountsApi.getAll(),
+        investmentsApi.getSecurities(),
+      ]);
+      return { accounts, securities };
+    },
+    [],
+  );
+
+  const assetBySecurity = useMemo(
+    () => new Map(assets.map((asset) => [asset.role, asset.securityId ?? ''])),
+    [assets],
+  );
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<ConfigFormValues>({
+    // The coercing schema's input and output types differ; the project's
+    // convention is to type the resolver by the form's value shape.
+    resolver: zodResolver(configSchema) as Resolver<ConfigFormValues>,
+    defaultValues: {
+      accountIds: strategy.accounts.map((account) => account.id),
+      cadence: strategy.cadence,
+      lookbackMonths: strategy.lookbackMonths,
+      taxRatePercent: strategy.taxRatePercent ?? '',
+      commissionAmount: strategy.commissionAmount ?? '',
+      rulesSourceUrl: strategy.rulesSourceUrl ?? '',
+      rulesSourceLabel: strategy.rulesSourceLabel ?? '',
+      US_EQUITY: assetBySecurity.get('US_EQUITY') ?? '',
+      EX_US_EQUITY: assetBySecurity.get('EX_US_EQUITY') ?? '',
+      EM_EQUITY: assetBySecurity.get('EM_EQUITY') ?? '',
+      SAFE: assetBySecurity.get('SAFE') ?? '',
+      RISK_FREE: assetBySecurity.get('RISK_FREE') ?? '',
+    },
+  });
+
+  const accountOptions = useMemo(() => {
+    const investmentAccounts = (data?.accounts ?? []).filter(
+      (account) =>
+        account.accountType === 'INVESTMENT' &&
+        // The cash half of a brokerage pair holds no securities.
+        account.accountSubType !== 'INVESTMENT_CASH',
+    );
+    return investmentAccounts.map((account) => ({
+      value: account.id,
+      label: `${account.name} (${account.currencyCode})`,
+    }));
+  }, [data?.accounts]);
+
+  // MultiSelect is controlled, so the registered array is read back through
+  // the form state rather than a DOM value.
+  const selectedAccountIds = watch('accountIds');
+
+  // Watching the role selects keeps the "fill the missing roles" prompt in step
+  // with what is still unassigned, including roles just filled in.
+  const roleValues = watch([...GEM_ROLE_ORDER]);
+  const assignedRoles = new Map(
+    GEM_ROLE_ORDER.map((role, index) => [role, roleValues[index]]),
+  );
+  const missingRoles = GEM_SUGGESTED_SECURITIES.filter(
+    (suggestion) =>
+      suggestion.region === GEM_DEFAULT_SUGGESTION_REGION &&
+      !assignedRoles.get(suggestion.role),
+  );
+
+  // Instruments the list has to offer even when they are deactivated: the one a
+  // role already points at (dropping it would silently clear the role on save)
+  // and anything picked during this session. Everything else is active-only.
+  const pickableInactiveIds = useMemo(
+    () =>
+      new Set(
+        [
+          ...assets.map((asset) => asset.securityId),
+          ...createdSecurities.map((security) => security.id),
+        ].filter((id): id is string => !!id),
+      ),
+    [assets, createdSecurities],
+  );
+
+  const pickableSecurities = useMemo(() => {
+    const byId = new Map<string, Security>();
+    for (const security of [...(data?.securities ?? []), ...createdSecurities]) {
+      byId.set(security.id, security);
+    }
+    return [...byId.values()].filter(
+      (security) =>
+        security.isActive !== false || pickableInactiveIds.has(security.id),
+    );
+  }, [data?.securities, createdSecurities, pickableInactiveIds]);
+
+  /**
+   * Currencies the assigned instruments are priced in. More than one means the
+   * strategy converts on every switch, which the roles card warns about: the
+   * conversion is a real cost the momentum figures do not carry.
+   */
+  const currencyById = new Map(
+    pickableSecurities.map((security) => [security.id, security.currencyCode]),
+  );
+  const assignedCurrencies = [
+    ...new Set(
+      GEM_ROLE_ORDER.map((role) => assignedRoles.get(role))
+        .filter((id): id is string => !!id)
+        .map((id) => currencyById.get(id))
+        .filter((code): code is string => !!code),
+    ),
+  ].sort();
+
+  /**
+   * Create a security from the role's "add instrument" modal and assign it to
+   * that role. Nothing else on the page changes until the configuration is
+   * saved, so the user can still review the pick.
+   */
+  const handleSecurityCreated = async (values: CreateSecurityData) => {
+    const role = creatingFor?.role;
+    if (!role) return;
+    try {
+      const created = await investmentsApi.createSecurity(values);
+      // The picker renders the assignment by looking the id up in this list, so
+      // the new instrument has to be in it before the value is written.
+      flushSync(() => setCreatedSecurities((previous) => [...previous, created]));
+      setValue(role, created.id, { shouldDirty: true });
+      setCreatingFor(null);
+      toast.success(t('gem.settingsForm.instrumentCreated', { symbol: created.symbol }));
+    } catch (error) {
+      logger.error('Failed to create a security for a GEM role:', error);
+      toast.error(
+        getErrorMessage(error, t('gem.settingsForm.instrumentCreateError')),
+      );
+      throw error;
+    }
+  };
+
+  /**
+   * One click for a portfolio that has never held a GEM instrument: fill every
+   * unassigned role with its suggested ETF. A security the user already owns is
+   * reused rather than duplicated, and nothing is saved until the user reviews
+   * the picks and submits the form.
+   */
+  const handleFillMissingRoles = async () => {
+    const owned = new Map(
+      [...(data?.securities ?? []), ...createdSecurities].map((security) => [
+        security.symbol.toUpperCase(),
+        security,
+      ]),
+    );
+    const missing = missingRoles;
+    if (missing.length === 0) return;
+
+    setIsFillingRoles(true);
+    const filled: Array<{ role: GemAssetRole; security: Security }> = [];
+    // Instruments the pick-list does not offer yet: the ones just created, and
+    // any deactivated one being reused (the symbol is taken, so creating it
+    // again would be rejected -- it has to become selectable instead).
+    const pickable: Security[] = [];
+    try {
+      for (const { role, region: _region, ...values } of missing) {
+        const existing = owned.get(values.symbol.toUpperCase());
+        const security = existing ?? (await investmentsApi.createSecurity(values));
+        if (!existing || security.isActive === false) pickable.push(security);
+        filled.push({ role, security });
+      }
+      toast.success(
+        t('gem.settingsForm.fillMissingDone', { count: filled.length }),
+      );
+    } catch (error) {
+      logger.error('Failed to add the suggested GEM instruments:', error);
+      toast.error(getErrorMessage(error, t('gem.settingsForm.fillMissingError')));
+    } finally {
+      // Whatever was created before a failure is already on the server, so
+      // assign it: retrying then reuses those instruments instead of adding
+      // the same symbol a second time.
+      if (pickable.length > 0) {
+        // Same reason as the single-role modal: the <option> has to exist
+        // before the registered select can be given its value.
+        flushSync(() =>
+          setCreatedSecurities((previous) => [...previous, ...pickable]),
+        );
+      }
+      for (const { role, security } of filled) {
+        setValue(role, security.id, { shouldDirty: true });
+      }
+      setIsFillingRoles(false);
+    }
+  };
+
+  const onSubmit = async (values: ConfigFormValues) => {
+    setIsSaving(true);
+    try {
+      const report = await gemStrategyApi.updateConfig(
+        {
+          accountIds: values.accountIds,
+          cadence: values.cadence,
+          lookbackMonths: Number(values.lookbackMonths),
+          taxRatePercent: optionalNumber(values.taxRatePercent),
+          commissionAmount: optionalNumber(values.commissionAmount),
+          rulesSourceUrl: optionalText(values.rulesSourceUrl),
+          rulesSourceLabel: optionalText(values.rulesSourceLabel),
+          assets: GEM_ROLE_ORDER.map((role) => ({
+            role,
+            securityId: values[role as keyof ConfigFormValues]
+              ? String(values[role as keyof ConfigFormValues])
+              : null,
+          })),
+        },
+        range,
+        // Naming the scenario is what keeps the save on the one being edited:
+        // omitted, the server falls back to the user's oldest.
+        strategy.id,
+      );
+      toast.success(t('gem.settingsForm.saved'));
+      onSaved(report);
+    } catch (error) {
+      logger.error('Failed to save the GEM strategy configuration:', error);
+      toast.error(getErrorMessage(error, t('gem.settingsForm.saveError')));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Skeleton className="h-72 w-full" />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <GemCard title={t('gem.settings.generalTitle')}>
+          <div className="space-y-3">
+            <div>
+              <MultiSelect
+                label={t('gem.settings.accounts')}
+                // The visible label is not tied to the trigger button, so name
+                // it explicitly for screen readers and keyboard users.
+                ariaLabel={t('gem.settings.accounts')}
+                options={accountOptions}
+                value={selectedAccountIds}
+                onChange={(ids) =>
+                  setValue('accountIds', ids, { shouldDirty: true })
+                }
+                placeholder={t('gem.settingsForm.noAccount')}
+                error={errors.accountIds?.message}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {t('gem.settingsForm.accountsHint')}
+              </p>
+            </div>
+            <Select
+              label={t('gem.settings.cadence')}
+              options={[
+                { value: 'MONTHLY', label: t('gem.cadences.MONTHLY') },
+                { value: 'QUARTERLY', label: t('gem.cadences.QUARTERLY') },
+              ]}
+              error={errors.cadence?.message}
+              {...register('cadence')}
+            />
+            <Input
+              type="number"
+              label={t('gem.settingsForm.lookbackMonths')}
+              min={1}
+              max={60}
+              step={1}
+              error={errors.lookbackMonths?.message}
+              {...register('lookbackMonths')}
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Input
+                type="number"
+                label={t('gem.settingsForm.taxRatePercent')}
+                min={0}
+                max={100}
+                step="0.01"
+                placeholder={t('gem.settingsForm.optional')}
+                error={errors.taxRatePercent?.message}
+                {...register('taxRatePercent')}
+              />
+              <Input
+                type="number"
+                label={t('gem.settingsForm.commissionAmount')}
+                min={0}
+                step="0.01"
+                placeholder={t('gem.settingsForm.optional')}
+                error={errors.commissionAmount?.message}
+                {...register('commissionAmount')}
+              />
+            </div>
+            <Input
+              label={t('gem.settingsForm.rulesSourceUrl')}
+              placeholder={t('gem.settingsForm.rulesSourceUrlPlaceholder')}
+              error={errors.rulesSourceUrl?.message}
+              {...register('rulesSourceUrl')}
+            />
+            <Input
+              label={t('gem.settingsForm.rulesSourceLabel')}
+              placeholder={t('gem.settingsForm.rulesSourceLabelPlaceholder')}
+              error={errors.rulesSourceLabel?.message}
+              {...register('rulesSourceLabel')}
+            />
+          </div>
+          {/* The field name read as though it wanted a machine-readable rule
+              definition. It is a plain bookmark shown in the footer. */}
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {t('gem.settingsForm.rulesSourceHint')}
+          </p>
+
+          {/* Read-only facts about the configuration, not inputs. */}
+          <dl className="mt-4 space-y-1 border-t border-gray-200 pt-3 dark:border-gray-700">
+            <GemStatRow
+              label={t('gem.settings.nextEvaluation')}
+              value={
+                strategy.nextEvaluationOn ? (
+                  formatDate(strategy.nextEvaluationOn)
+                ) : (
+                  <GemUnknown />
+                )
+              }
+            />
+            <GemStatRow
+              label={t('gem.settings.pricesAsOf')}
+              value={
+                strategy.pricesAsOf ? formatDate(strategy.pricesAsOf) : <GemUnknown />
+              }
+            />
+          </dl>
+        </GemCard>
+
+        <GemCard title={t('gem.settings.assetsTitle')}>
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+            {t('gem.settingsForm.assetsHint', {
+              months: Number(watch('lookbackMonths')) || strategy.lookbackMonths,
+            })}
+          </p>
+          {/* A portfolio that has never held a GEM instrument can be filled in
+              one click rather than four trips through the create form. */}
+          {missingRoles.length > 0 && (
+            <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+              <p className="text-xs text-gray-600 dark:text-gray-300">
+                {t('gem.settingsForm.fillMissingHint', {
+                  symbols: missingRoles
+                    .map((suggestion) => suggestion.symbol)
+                    .join(', '),
+                })}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={handleFillMissingRoles}
+                disabled={isFillingRoles}
+              >
+                <SparklesIcon className="mr-1 h-4 w-4" aria-hidden="true" />
+                {isFillingRoles
+                  ? t('gem.settingsForm.fillMissingBusy')
+                  : t('gem.settingsForm.fillMissing', {
+                      count: missingRoles.length,
+                    })}
+              </Button>
+            </div>
+          )}
+          <div className="space-y-3">
+            {GEM_ROLE_ORDER.map((role) => (
+              <div key={role}>
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1">
+                    <GemInstrumentSelect
+                      role={role}
+                      label={roleLabel(role)}
+                      value={String(assignedRoles.get(role) ?? '')}
+                      securities={pickableSecurities}
+                      suggestions={suggestionsForRole(role)}
+                      onChange={(securityId) =>
+                        setValue(role, securityId, { shouldDirty: true })
+                      }
+                      onPickSuggestion={(suggestion) =>
+                        setCreatingFor({ role, suggestion })
+                      }
+                      error={errors[role as keyof ConfigFormValues]?.message}
+                    />
+                  </div>
+                  {/* An instrument the suggestions do not cover is added from
+                      here, with nothing prefilled. */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setCreatingFor({ role })}
+                    aria-label={t('gem.settingsForm.addInstrumentFor', {
+                      role: roleLabel(role),
+                    })}
+                  >
+                    <PlusIcon className="h-4 w-4" aria-hidden="true" />
+                    <span className="ml-1 hidden sm:inline">
+                      {t('gem.settingsForm.addInstrument')}
+                    </span>
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {roleDescription(role)}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <p
+            className={
+              assignedCurrencies.length > 1
+                ? 'mt-3 rounded-md border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200'
+                : 'mt-3 text-xs text-gray-500 dark:text-gray-400'
+            }
+          >
+            {assignedCurrencies.length > 1
+              ? t('gem.settingsForm.currencyMixed', {
+                  currencies: assignedCurrencies.join(', '),
+                })
+              : t('gem.settingsForm.currencyHint')}
+          </p>
+
+          <div className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-700">
+            <FormActions
+              submitLabel={t('gem.settingsForm.save')}
+              isSubmitting={isSaving}
+            />
+          </div>
+        </GemCard>
+      </div>
+    </form>
+
+      <Modal
+        isOpen={creatingFor !== null}
+        onClose={() => setCreatingFor(null)}
+        maxWidth="lg"
+        className="p-6"
+      >
+        <h2 className="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
+          {creatingFor
+            ? t('gem.settingsForm.addInstrumentFor', {
+                role: roleLabel(creatingFor.role),
+              })
+            : ''}
+        </h2>
+        {/* Prefilled from a suggestion, the exchange and currency are still the
+            investor's to correct: the same fund lists on several venues. */}
+        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+          {creatingFor?.suggestion
+            ? t('gem.settingsForm.addInstrumentPrefilled')
+            : t('gem.settingsForm.currencyHint')}
+        </p>
+        <SecurityForm
+          key={creatingFor?.suggestion?.symbol ?? 'blank'}
+          defaults={creatingFor?.suggestion}
+          onSubmit={handleSecurityCreated}
+          onCancel={() => setCreatingFor(null)}
+        />
+      </Modal>
+    </>
+  );
+}

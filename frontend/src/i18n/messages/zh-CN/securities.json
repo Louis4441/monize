@@ -120,6 +120,7 @@
     "typeLabel": "类型",
     "exchangeLabel": "交易所",
     "currencyLabel": "货币",
+    "currencyNotConfigured": "{code} — 不在你的货币列表中",
     "quoteProviderLabel": "行情提供商",
     "msnIdLabel": "MSN 工具 ID（高级）",
     "lookupProviderAriaLabel": "查询提供商",
