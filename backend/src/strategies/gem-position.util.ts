@@ -192,6 +192,7 @@ export function buildPositionMath(
     .filter((value): value is number => value !== null);
   const totalMarketValue =
     knownValues.length > 0 ? sumMoney(knownValues) : null;
+  const unpricedCount = valued.length - knownValues.length;
 
   const current = valued[0] ?? null;
 
@@ -203,8 +204,21 @@ export function buildPositionMath(
       )
     : 0;
 
+  // A share of a total nobody knows is not a share.
+  //
+  // An unpriced holding used to be dropped from the denominator while counting
+  // as zero in the numerator, which does not merely blur the figure -- it moves
+  // it in the dangerous direction. A portfolio of 10,000 in the target plus one
+  // off-target holding with no price came out at exactly 100% compliant, and
+  // `changeRequired` then read false: the report said there was nothing to do
+  // about a position it could not see. Unknown says so, and the existing
+  // unknown path settles what to do from what is held rather than from a
+  // percentage.
   const compliancePercent =
-    targetRole && totalMarketValue !== null && totalMarketValue > 0
+    targetRole &&
+    unpricedCount === 0 &&
+    totalMarketValue !== null &&
+    totalMarketValue > 0
       ? roundToDecimals((targetValue / totalMarketValue) * 100, 2)
       : null;
 

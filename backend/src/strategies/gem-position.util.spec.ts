@@ -218,6 +218,38 @@ describe("gem-position.util", () => {
       expect(math.changeRequired).toBe(true);
     });
 
+    it("will not call a portfolio compliant while a holding has no price", () => {
+      // The regression: an unpriced holding was dropped from the denominator
+      // but counted as zero in the numerator, so 10,000 in the target plus one
+      // off-target holding nobody could value came out at exactly 100% -- and
+      // `changeRequired` false. The report said there was nothing to do about
+      // a position it could not see.
+      const math = buildPositionMath(
+        [
+          holding({
+            role: "EM_EQUITY",
+            securityId: "sec-emim",
+            marketValue: 10000,
+            costBasis: 8000,
+          }),
+          holding({
+            role: null,
+            securityId: "sec-unpriced",
+            marketValue: null,
+            costBasis: null,
+          }),
+        ],
+        "EM_EQUITY",
+        emergingTarget,
+      );
+
+      expect(math.compliancePercent).toBeNull();
+      expect(math.changeRequired).toBe(true);
+      expect(math.sold.map((entry) => entry.securityId)).toEqual([
+        "sec-unpriced",
+      ]);
+    });
+
     it("sells a partially overlapping fund whole, whatever its overlap", () => {
       // The regression this guards: overlap used to scale the sale, so a fund
       // 90% on target moved only a tenth of itself and the report called the

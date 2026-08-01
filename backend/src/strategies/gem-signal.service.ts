@@ -244,11 +244,32 @@ export class GemSignalService {
           .filter((signal) => signal.configFingerprint === fingerprint)
           .map((signal) => signal.evaluatedOn),
       );
+
+      /**
+       * What this strategy, as configured now, has decided -- and nothing else.
+       *
+       * Filtering the *dates* was not enough. A period that cannot be
+       * recomputed keeps its old row on a date the current calendar does use,
+       * and returning it mixed a counterfactual history with a real one: the
+       * caller cannot tell which rows the current rules produced, the backtest
+       * replays a run that never existed under one configuration, and the
+       * history's "switched out of" is resolved by position in this array, so
+       * a stale row wedged between two fresh ones is named as the predecessor
+       * of a period that was computed against an earlier one.
+       *
+       * The rows stay in the table -- deleting them would throw away real
+       * decisions and their `executed` flags -- they are simply not this
+       * configuration's history. A period it cannot answer for is absent from
+       * the report rather than answered by an earlier set of rules.
+       */
+      const current = (rows: GemStrategySignal[]): GemStrategySignal[] =>
+        rows.filter((signal) => signal.configFingerprint === fingerprint);
+
       const unstored = periods.filter(
         (period) => !answered.has(period.evaluatedOn),
       );
       if (unstored.length === 0 || assets.every((a) => !a.securityId)) {
-        return stored;
+        return current(stored);
       }
 
       // Drop the periods whose momentum window opens before the price history
@@ -259,13 +280,13 @@ export class GemSignalService {
         assets,
         manager,
       );
-      if (earliestWindowStart === null) return stored;
+      if (earliestWindowStart === null) return current(stored);
       const missing = unstored.filter(
         (period) =>
           windowStartFor(period.evaluatedOn, strategy.lookbackMonths) >=
           earliestWindowStart,
       );
-      if (missing.length === 0) return stored;
+      if (missing.length === 0) return current(stored);
 
       const prices = await this.loadEvaluationPrices(
         assets,
@@ -383,13 +404,15 @@ export class GemSignalService {
         }
       }
 
-      if (written.length === 0) return stored;
+      if (written.length === 0) return current(stored);
 
-      return repo.find({
-        where: { strategyId: strategy.id, evaluatedOn: In(calendar) },
-        order: { evaluatedOn: "DESC" },
-        take: GEM_HISTORY_PERIODS,
-      });
+      return current(
+        await repo.find({
+          where: { strategyId: strategy.id, evaluatedOn: In(calendar) },
+          order: { evaluatedOn: "DESC" },
+          take: GEM_HISTORY_PERIODS,
+        }),
+      );
     });
   }
 

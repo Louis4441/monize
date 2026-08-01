@@ -72,11 +72,18 @@ recomputed in place on the next read: same row, because the unique index owns
 the period, with `executed` kept when the recomputed instruction is the same
 instrument and cleared when it is not. A period that cannot be recomputed (a
 lookback stretched past an instrument's first close) keeps its row in the
-history, where it is a true record of what was decided then, but
-`currentSignal` refuses to serve it as today's instruction. A recomputed period
-takes its `previousRole` only from another period this configuration produced;
-a stale row is an answer to a different question and cannot stand in as the
-predecessor.
+table, but it is left out of what `materialize` returns.
+
+That last part matters more than it sounds. **Everything the report shows comes
+from one configuration or it is not shown at all**: the history, the predecessor
+chain and the backtest all read the same array, and mixing fingerprints in it
+produces a run that never happened. The history resolves "switched out of" from
+the entry before it, so a stale row wedged between two fresh ones would be named
+as the predecessor of a period computed against an earlier one, and the backtest
+would replay a hybrid of counterfactual and historical signals. A recomputed
+period likewise takes its `previousRole` only from another period this
+configuration produced. The rows stay in the table -- they are real decisions
+with real `executed` flags -- they are simply not this configuration's history.
 
 A **cadence change replaces the calendar** rather than editing it: on quarterly,
 31 March is still an evaluation date and 30 April is not. Both the read and the
@@ -174,9 +181,14 @@ pro-rated sale never reaches the 100% allocation the signal asks for.
 position, and the transfer card explains it rather than leaving a compliance
 figure and a full-value transfer looking contradictory.
 
-When nothing can be priced the compliance share is unknown rather than zero, but
-holding an instrument other than the target still settles that a change is
-needed: what to do does not depend on being able to value it.
+**One unpriced holding makes the compliance share unknown, not approximate.** A
+share of a total nobody knows is not a share, and the error runs in the
+dangerous direction: an unpriced holding dropped from the denominator while
+counting as zero in the numerator turned 10,000 in the target plus one
+unpriceable position into exactly 100% compliant, with `changeRequired` false --
+the report saying there was nothing to do about a position it could not see.
+Unknown says so, and holding an instrument other than the target still settles
+that a change is needed: what to do does not depend on being able to value it.
 
 Prices come from `security_prices` (whatever provider filled them). Every
 *historical* series -- momentum, the performance chart, the backtest -- reads

@@ -265,6 +265,49 @@ describe("GemStrategyService", () => {
       });
     });
 
+    it("resolves what a period switched out of from the entry before it", async () => {
+      // With a period missing from the middle of the history -- one the
+      // current configuration cannot answer for, so `materialize` leaves it
+      // out -- the predecessor is the next entry that is there, and it must be
+      // that period's own instrument. Positional adjacency is only sound
+      // because every row in this array comes from one configuration.
+      signalService.materialize.mockResolvedValue([
+        storedSignal({
+          id: "sig-jul",
+          evaluatedOn: "2025-07-31",
+          effectiveFrom: "2025-08-01",
+          targetRole: "EM_EQUITY",
+          targetSecurityId: "sec-emim",
+          previousRole: "US_EQUITY",
+        }),
+        storedSignal({
+          id: "sig-may",
+          evaluatedOn: "2025-05-31",
+          effectiveFrom: "2025-06-01",
+          targetRole: "US_EQUITY",
+          targetSecurityId: "sec-may-spy",
+        }),
+      ]);
+      securityRepo.find.mockResolvedValue([
+        { id: "sec-emim", symbol: "EMIM", name: "EM IMI ETF" },
+        {
+          id: "sec-may-spy",
+          symbol: "SPY",
+          name: "The fund May actually held",
+        },
+      ]);
+
+      const report = await service.getReport(userId);
+
+      expect(report.history[0].change).toEqual({
+        from: expect.objectContaining({
+          securityId: "sec-may-spy",
+          name: "The fund May actually held",
+        }),
+        to: expect.objectContaining({ securityId: "sec-emim" }),
+      });
+    });
+
     it("shows the instrument a past decision named, not today's", async () => {
       // History used to resolve every role through the current mapping, so
       // replacing the EM fund rewrote the past: an entry from July claimed to

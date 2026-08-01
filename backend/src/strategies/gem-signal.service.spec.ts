@@ -136,7 +136,12 @@ describe("GemSignalService", () => {
       const inserted = savedSignals;
       signalRepo.find
         .mockResolvedValueOnce([]) // stored history: empty
-        .mockResolvedValueOnce([{ id: "sig-latest" } as GemStrategySignal]);
+        .mockResolvedValueOnce([
+          {
+            id: "sig-latest",
+            configFingerprint: gemConfigFingerprint(strategy(), assets()),
+          } as GemStrategySignal,
+        ]);
 
       const signals = await service.materialize(
         userId,
@@ -156,7 +161,7 @@ describe("GemSignalService", () => {
       });
       // Each later period knows what the previous one held.
       expect(inserted[1]).toMatchObject({ previousRole: "EM_EQUITY" });
-      expect(signals).toEqual([{ id: "sig-latest" }]);
+      expect(signals.map((signal) => signal.id)).toEqual(["sig-latest"]);
     });
 
     it("skips a period whose absolute test cannot be run", async () => {
@@ -321,6 +326,57 @@ describe("GemSignalService", () => {
         expect(june?.previousRole).not.toBe("US_EQUITY");
       });
 
+      it("returns nothing the current configuration did not produce", async () => {
+        // A period that cannot be recomputed keeps its old row on a date the
+        // current calendar still uses. Returning it mixed a counterfactual
+        // history with a real one: the backtest replayed a run that never
+        // existed under one configuration, and the history resolves "switched
+        // out of" by position in this array, so a stale row wedged between two
+        // fresh ones was named as the predecessor of a period computed against
+        // an earlier one.
+        const fingerprint = gemConfigFingerprint(strategy(), assets());
+        signalRepo.find.mockResolvedValue([
+          {
+            id: "sig-jul",
+            evaluatedOn: "2025-07-31",
+            targetRole: "SAFE",
+            configFingerprint: fingerprint,
+          },
+          {
+            id: "sig-jun",
+            evaluatedOn: "2025-06-30",
+            targetRole: "EM_EQUITY",
+            targetSecurityId: "sec-retired",
+            configFingerprint: "written-under-other-settings",
+          },
+          {
+            id: "sig-may",
+            evaluatedOn: "2025-05-31",
+            targetRole: "US_EQUITY",
+            configFingerprint: fingerprint,
+          },
+        ] as GemStrategySignal[]);
+        // June cannot be recomputed: the price history does not reach it.
+        priceService.earliestPriceDates.mockResolvedValue(
+          new Map([
+            ["sec-spy", "2030-01-02"],
+            ["sec-ief", "2030-01-02"],
+          ]),
+        );
+
+        const result = await service.materialize(
+          userId,
+          strategy(),
+          assets(),
+          "2025-08-14",
+        );
+
+        expect(result.map((signal) => signal.id)).toEqual([
+          "sig-jul",
+          "sig-may",
+        ]);
+      });
+
       it("refuses to serve a stale row as the current signal", async () => {
         // Recomputation is not always possible -- a lookback stretched past
         // the instrument's first close leaves nothing to evaluate. The row
@@ -393,15 +449,23 @@ describe("GemSignalService", () => {
     });
 
     it("returns the stored history untouched when no role has an instrument", async () => {
-      const stored = [{ id: "sig-1" } as GemStrategySignal];
+      const unassigned = [
+        { role: "SAFE", securityId: null },
+      ] as GemStrategyAsset[];
+      const stored = [
+        {
+          id: "sig-1",
+          configFingerprint: gemConfigFingerprint(strategy(), unassigned),
+        } as GemStrategySignal,
+      ];
       signalRepo.find.mockResolvedValue(stored);
       const result = await service.materialize(
         userId,
         strategy(),
-        [{ role: "SAFE", securityId: null }] as GemStrategyAsset[],
+        unassigned,
         "2025-08-14",
       );
-      expect(result).toBe(stored);
+      expect(result).toEqual(stored);
       expect(priceService.loadSeries).not.toHaveBeenCalled();
     });
 
@@ -416,7 +480,12 @@ describe("GemSignalService", () => {
           ["sec-ief", "2030-01-02"],
         ]),
       );
-      const stored = [{ id: "sig-1" } as GemStrategySignal];
+      const stored = [
+        {
+          id: "sig-1",
+          configFingerprint: gemConfigFingerprint(strategy(), assets()),
+        } as GemStrategySignal,
+      ];
       signalRepo.find.mockResolvedValue(stored);
 
       const result = await service.materialize(
@@ -426,7 +495,7 @@ describe("GemSignalService", () => {
         "2025-08-14",
       );
 
-      expect(result).toBe(stored);
+      expect(result).toEqual(stored);
       expect(priceService.loadSeries).not.toHaveBeenCalled();
     });
 
