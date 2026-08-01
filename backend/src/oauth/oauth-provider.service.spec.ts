@@ -194,6 +194,48 @@ describe("OAuthProviderService", () => {
       expect(svc.getProvider()).toBe(p1);
     });
 
+    // Guard: any artifact the provider can issue whose ttl is left unset makes
+    // node-oidc-provider fall back to its built-in TTL function, which prints a
+    // raw "oidc-provider NOTICE: default ttl.<Model> function called ..." line
+    // via console.info — outside the Nest Logger, so it lands in the backend
+    // logs unformatted. ttl.IdToken was the one that slipped through.
+    it("sets an explicit numeric TTL for every artifact the provider issues", async () => {
+      const svc = new OAuthProviderService(
+        makeConfigService({
+          PUBLIC_APP_URL: "https://app.test",
+          JWT_SECRET: VALID_JWT,
+        }),
+        makeDataSource().dataSource,
+        makeAuthService({
+          id: "u",
+          isActive: true,
+          mustChangePassword: false,
+        }),
+      );
+      await svc.ensureInitialized();
+
+      // Artifacts reachable with the features enabled above. ClientCredentials,
+      // DeviceCode and BackchannelAuthenticationRequest are omitted because the
+      // grants/features that mint them are not enabled.
+      const issuableArtifacts = [
+        "AccessToken",
+        "AuthorizationCode",
+        "Grant",
+        "IdToken",
+        "Interaction",
+        "RefreshToken",
+        "Session",
+      ];
+      const ttl = providerConstructorCalls[0].config.ttl as Record<
+        string,
+        unknown
+      >;
+      for (const artifact of issuableArtifacts) {
+        expect(typeof ttl[artifact]).toBe("number");
+        expect(ttl[artifact] as number).toBeGreaterThan(0);
+      }
+    });
+
     it("returns the same in-flight initPromise when called concurrently", async () => {
       const svc = new OAuthProviderService(
         makeConfigService({
