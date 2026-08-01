@@ -80,8 +80,14 @@ export interface GemHeldAsset {
   quantity: number | null;
   marketValue: number | null;
   /**
-   * Share of this holding already in the target's markets, 0-100. A world
-   * tracker partly covers an emerging-markets target; only the rest moves.
+   * True when this holding is the instrument the signal names -- the same
+   * security, not a fund with similar exposure. What decides keep or sell.
+   */
+  isTargetInstrument: boolean;
+  /**
+   * Estimated share of this holding exposed to the target's markets, 0-100, or
+   * null when it cannot be estimated. Informational: a world tracker partly
+   * covering an emerging-markets target is still sold whole.
    */
   matchPercent: number | null;
   /** True when the ticker decided it, because no breakdown was available. */
@@ -137,8 +143,25 @@ export interface GemPositionView {
   /** The largest holding -- what the accounts are effectively in. */
   current: GemHeldAsset | null;
   target: GemAssetRef | null;
-  /** Share of the accounts' whole market value already in the target, 0-100. */
-  compliancePercent: number | null;
+  /**
+   * Share of the priced securities held in the target instrument itself,
+   * 0-100; null when one of them could not be valued.
+   *
+   * The operational figure: GEM asks for 100% of one fund, and a different
+   * fund with exposure to the same market is not part of the way there. It
+   * drives the progress bar, the change-required badge and the sell list.
+   */
+  exactTargetPercent: number | null;
+  /**
+   * Estimated share of the priced securities exposed to the target's markets,
+   * 0-100; null when the estimate cannot be made. **Informational only** -- it
+   * never keeps a position, reduces a transfer, or completes an operation.
+   */
+  marketExposurePercent: number | null;
+  /** Whether the exposure estimate could be made at all. */
+  marketExposureAvailable: boolean;
+  /** Breakdown the exposure estimate ran on; null when it could not be made. */
+  marketExposureDimension: GemCompositionDimension | null;
   changeRequired: boolean;
   /** Market value of everything held in the accounts, in `currencyCode`. */
   totalMarketValue: number | null;
@@ -164,10 +187,17 @@ export interface GemPositionView {
 
 export interface GemActionView {
   required: boolean;
-  /** Largest holding the switch sells out of. */
-  from: GemHeldAsset | null;
-  /** How many instruments the switch sells out of, `from` included. */
-  fromCount: number;
+  /**
+   * Every security the operation sells, largest first.
+   *
+   * A list, not a headline. Naming only the largest and appending "and 3 more"
+   * described a four-instrument portfolio as though it were in one fund, and
+   * the three the user also has to sell were never named anywhere.
+   *
+   * Cash is not in here: it is off target and funds the purchase, but nobody
+   * places a trade to sell it.
+   */
+  sellPositions: GemHeldAsset[];
   to: GemAssetRef | null;
   targetWeightPercent: number;
   transferValue: number | null;
@@ -175,12 +205,12 @@ export interface GemActionView {
   estimatedTax: number | null;
   taxRatePercent: number | null;
   estimatedCommission: number | null;
-  /** Trades the switch takes: one sell per off-target holding, plus the buy. */
+  /** Trades the switch takes: one sell per sold holding, plus the buy. */
   estimatedTradeCount: number;
   /**
-   * How many of the sold holdings were partly in the target's markets already.
-   * Those count towards compliance but are still sold whole, and a transfer
-   * larger than "everything off target" needs that said rather than inferred.
+   * How many of the sold holdings carry some estimated exposure to the
+   * target's markets already. They are still sold whole, and a transfer larger
+   * than the "off-market" share needs that said rather than inferred.
    */
   partialMatchCount: number;
   accounts: GemAccountRef[];
@@ -200,11 +230,52 @@ export interface GemPerformancePoint {
  * the momentum behind the signal is measured on. Converting them would make the
  * chart disagree with the signal it is meant to explain.
  */
+/** Why the current-composition simulation could not be produced. */
+export type GemSimulationUnavailableReason =
+  | "NO_HOLDINGS"
+  | "UNKNOWN_CURRENT_VALUE"
+  | "MISSING_PRICE_HISTORY";
+
+/**
+ * What today's holdings would have returned over the window, had they been
+ * held in today's proportions throughout.
+ *
+ * A hypothetical, and labelled as one everywhere it appears: it is not the
+ * user's realised performance. It replays no transaction, no deposit or
+ * withdrawal, no cash, no currency movement and no cost, and it never
+ * rebalances -- the weights are struck once at the start and left alone.
+ * What it answers is "how did the things I hold now behave over this window",
+ * which is the question the asset lines beside it are already answering one
+ * instrument at a time.
+ */
+export interface GemCurrentPortfolioSimulation {
+  /** One point per observation date; null before the simulation starts. */
+  points: Array<{ date: string; returnPercent: number | null }>;
+  totalReturnPercent: number | null;
+  /** False when the line starts later than the window the user asked for. */
+  completeRange: boolean;
+  /** First date every included holding could be priced on. */
+  startsOn: string | null;
+  includedHoldings: Array<{
+    securityId: string;
+    symbol: string | null;
+    weightPercent: number;
+  }>;
+  /**
+   * Set when there is no line. A holding nobody can price is never quietly
+   * dropped: a portfolio simulated from the rest is a different portfolio, and
+   * it would be read as this one.
+   */
+  unavailableReason: GemSimulationUnavailableReason | null;
+}
+
 export interface GemPerformanceView {
   range: GemRange;
   points: GemPerformancePoint[];
   totals: Partial<Record<GemAssetRole, number | null>>;
   incomplete: boolean;
+  /** Today's holdings replayed over the window; null when none are held. */
+  currentPortfolio: GemCurrentPortfolioSimulation | null;
 }
 
 export interface GemHistoryEntryView {

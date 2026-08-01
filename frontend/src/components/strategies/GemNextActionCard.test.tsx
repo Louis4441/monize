@@ -2,10 +2,27 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@/test/render';
 import { GemNextActionCard } from './GemNextActionCard';
 import { gemAction } from '@/test/gem-fixtures';
+import { GemHeldAsset } from '@/types/gem-strategy';
 
 const handlers = () => ({
   onMarkExecuted: vi.fn(),
   onAddTransactions: vi.fn(),
+});
+
+/** One sellable position, with only the fields the card renders. */
+const heldAsset = (overrides: Partial<GemHeldAsset>): GemHeldAsset => ({
+  role: null,
+  isCash: false,
+  securityId: `sec-${overrides.symbol?.toLowerCase() ?? 'x'}`,
+  symbol: null,
+  name: null,
+  quantity: 10,
+  marketValue: 1000,
+  isTargetInstrument: false,
+  matchPercent: null,
+  matchedByInstrument: false,
+  matchedMarkets: [],
+  ...overrides,
 });
 
 describe('GemNextActionCard', () => {
@@ -23,7 +40,8 @@ describe('GemNextActionCard', () => {
 
     expect(screen.getByText('The strategy signal changed')).toBeInTheDocument();
     expect(screen.getByText('SPDR S&P 500 ETF (SPY)')).toBeInTheDocument();
-    expect(screen.getByText('51 units')).toBeInTheDocument();
+    // Value and units on one line under each sold position.
+    expect(screen.getByText(/51 units/)).toBeInTheDocument();
     expect(screen.getByText('changes to')).toBeInTheDocument();
     expect(screen.getByText('iShares MSCI EM IMI ETF (EMIM)')).toBeInTheDocument();
     expect(screen.getByText('100% of the strategy accounts')).toBeInTheDocument();
@@ -94,46 +112,69 @@ describe('GemNextActionCard', () => {
     expect(screen.queryByText(/still do not match/)).not.toBeInTheDocument();
   });
 
-  it('says how many other instruments the switch sells out of', () => {
+  it('names every security the operation sells, not just the largest', () => {
+    // The old card printed the largest holding and "and 3 more instruments",
+    // which described a four-fund portfolio as though it were in one of them
+    // and never named the three the user also has to sell.
     const { onMarkExecuted, onAddTransactions } = handlers();
     render(
       <GemNextActionCard
-        action={gemAction({ fromCount: 3 })}
+        action={gemAction({
+          sellPositions: [
+            heldAsset({ symbol: 'IUSQ', marketValue: 22949.5 }),
+            heldAsset({ symbol: 'VWRA', marketValue: 8000 }),
+            heldAsset({ symbol: 'WTAI', marketValue: 543.12 }),
+            heldAsset({ symbol: 'AGGG', marketValue: 250 }),
+          ],
+        })}
         signalUnavailable={false}
         onMarkExecuted={onMarkExecuted}
         onAddTransactions={onAddTransactions}
         isSaving={false}
       />,
     );
-    expect(screen.getByText('and 2 more instruments')).toBeInTheDocument();
-  });
 
-  it('names a single holding without a count', () => {
-    const { onMarkExecuted, onAddTransactions } = handlers();
-    render(
-      <GemNextActionCard
-        action={gemAction({ fromCount: 1 })}
-        signalUnavailable={false}
-        onMarkExecuted={onMarkExecuted}
-        onAddTransactions={onAddTransactions}
-        isSaving={false}
-      />,
-    );
+    for (const symbol of ['IUSQ', 'VWRA', 'WTAI', 'AGGG']) {
+      expect(screen.getByText(new RegExp(symbol))).toBeInTheDocument();
+    }
+    expect(screen.getByText('Sell (4)')).toBeInTheDocument();
+    expect(screen.getByText('Buy')).toBeInTheDocument();
     expect(screen.queryByText(/more instrument/)).toBeNull();
+    // And no "current instrument" anywhere: the accounts are in four things.
+    expect(screen.queryByText('Current instrument')).toBeNull();
   });
 
-  it('marks unknown units and a missing position without zeroes', () => {
+  it('says there is nothing to sell for a purchase funded by cash', () => {
     const { onMarkExecuted, onAddTransactions } = handlers();
     render(
       <GemNextActionCard
-        action={gemAction({ from: null, transferValue: null, realizedGainLoss: null })}
+        action={gemAction({ sellPositions: [] })}
         signalUnavailable={false}
         onMarkExecuted={onMarkExecuted}
         onAddTransactions={onAddTransactions}
         isSaving={false}
       />,
     );
-    expect(screen.getByText('No position held')).toBeInTheDocument();
+
+    expect(screen.getByText('Nothing to sell')).toBeInTheDocument();
+    expect(screen.getByText('Sell (0)')).toBeInTheDocument();
+  });
+
+  it('marks unknown values without zeroes', () => {
+    const { onMarkExecuted, onAddTransactions } = handlers();
+    render(
+      <GemNextActionCard
+        action={gemAction({
+          sellPositions: [],
+          transferValue: null,
+          realizedGainLoss: null,
+        })}
+        signalUnavailable={false}
+        onMarkExecuted={onMarkExecuted}
+        onAddTransactions={onAddTransactions}
+        isSaving={false}
+      />,
+    );
     expect(screen.getAllByText('Not available').length).toBeGreaterThan(1);
   });
 

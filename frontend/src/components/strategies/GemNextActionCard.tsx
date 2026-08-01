@@ -92,31 +92,40 @@ export function GemNextActionCard({
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
         <div className="min-w-0">
+          {/* "Sell", not "current instrument". The operation sells every
+              position that is not the target, and naming only the largest
+              described a four-fund portfolio as though it were in one of them
+              -- while the three the user also has to sell went unnamed. */}
           <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {t('gem.action.fromLabel')}
+            {t('gem.action.sellLabel', { count: action.sellPositions.length })}
           </p>
-          <p className="text-sm font-medium break-words text-gray-900 dark:text-gray-100">
-            {action.from ? (
-              <GemSecurityLink securityId={action.from.securityId}>
-                {assetFullLabel(action.from)}
-              </GemSecurityLink>
-            ) : (
-              <GemUnknown label={t('gem.action.noPosition')} />
-            )}
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {isKnown(action.from?.quantity) ? (
-              t('gem.action.units', { units: formatQuantity(action.from!.quantity!) })
-            ) : (
-              <GemUnknown />
-            )}
-          </p>
-          {/* The switch sells the whole portfolio, so name what else goes with
-              the largest holding rather than implying it is the only one. */}
-          {action.fromCount > 1 && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {t('gem.action.andMore', { count: action.fromCount - 1 })}
+          {action.sellPositions.length === 0 ? (
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <GemUnknown label={t('gem.action.nothingToSell')} />
             </p>
+          ) : (
+            <ul className="scrollbar-slim max-h-32 space-y-1 overflow-y-auto pr-1">
+              {action.sellPositions.map((position) => (
+                <li key={position.securityId ?? position.symbol}>
+                  <p className="text-sm font-medium break-words text-gray-900 dark:text-gray-100">
+                    <GemSecurityLink securityId={position.securityId}>
+                      {assetFullLabel(position)}
+                    </GemSecurityLink>
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {isKnown(position.marketValue) ? (
+                      formatCurrency(position.marketValue, currency)
+                    ) : (
+                      <GemUnknown />
+                    )}
+                    {isKnown(position.quantity) &&
+                      ` · ${t('gem.action.units', {
+                        units: formatQuantity(position.quantity),
+                      })}`}
+                  </p>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
         {/* The arrow is decorative; the transition is announced as text. */}
@@ -129,7 +138,7 @@ export function GemNextActionCard({
         </span>
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-            {t('gem.action.toLabel')}
+            {t('gem.action.buyLabel')}
           </p>
           <p className="text-sm font-medium break-words text-gray-900 dark:text-gray-100">
             {action.to ? (

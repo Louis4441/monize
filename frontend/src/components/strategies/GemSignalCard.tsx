@@ -31,7 +31,7 @@ export function GemSignalCard({
   failed,
 }: GemSignalCardProps) {
   const t = useTranslations('strategies');
-  const { stateLabel, assetFullLabel } = useGemLabels();
+  const { stateLabel, assetLabel, assetFullLabel } = useGemLabels();
   const { formatDate } = useDateFormat();
 
   if (!signal) {
@@ -98,11 +98,22 @@ export function GemSignalCard({
         </div>
       </dl>
 
+      {/* What was decided, in the words the decision was taken in -- not "wins
+          the absolute and the relative test", which says nothing to anyone who
+          has not read the rules. The winner is named because that is the half
+          of the answer the allocation above does not repeat. */}
       <p className="mt-3 flex items-start gap-1.5 text-xs text-gray-600 dark:text-gray-300">
         <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         {isRiskOn
-          ? t('gem.signal.testsRiskOn')
-          : t('gem.signal.testsRiskOff')}
+          ? t('gem.signal.summaryRiskOn', {
+              winner:
+                signal.relative.winner?.symbol ??
+                signal.target?.symbol ??
+                assetLabel(signal.target),
+            })
+          : t('gem.signal.summaryRiskOff', {
+              safe: signal.target?.symbol ?? assetLabel(signal.target),
+            })}
       </p>
     </GemCard>
   );

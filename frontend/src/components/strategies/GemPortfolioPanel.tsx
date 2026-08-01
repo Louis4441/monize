@@ -43,8 +43,14 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
     );
   }
 
-  const percent = compliancePercent(position.compliancePercent);
-  const targetSecurityId = position.target?.securityId ?? null;
+  const percent = compliancePercent(position.exactTargetPercent);
+  /** The securities' total, which is what both percentages are measured over. */
+  const securities = position.holdings.filter((holding) => !holding.isCash);
+  const securitiesValue = securities.some(
+    (holding) => !isKnown(holding.marketValue),
+  )
+    ? null
+    : securities.reduce((sum, holding) => sum + (holding.marketValue ?? 0), 0);
 
 
   return (
@@ -73,8 +79,20 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
           }
         />
         <GemStatRow
-          label={t('gem.portfolio.compliance')}
+          label={t('gem.portfolio.exactTarget')}
           value={percent === null ? <GemUnknown /> : formatPercent(percent, 0)}
+        />
+        {/* The estimate, on its own row and never merged with the one above:
+            exposure to the same market is not holding the named fund. */}
+        <GemStatRow
+          label={t('gem.portfolio.marketExposure')}
+          value={
+            isKnown(position.marketExposurePercent) ? (
+              formatPercent(position.marketExposurePercent, 0)
+            ) : (
+              <GemUnknown label={t('gem.portfolio.marketExposureUnknown')} />
+            )
+          }
         />
         <GemStatRow
           label={t('gem.portfolio.changeRequired')}
@@ -110,9 +128,10 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
           </h4>
           <ul className="space-y-1">
             {position.holdings.map((holding) => {
-              const isTarget =
-                targetSecurityId !== null && holding.securityId === targetSecurityId;
-              // A partial match is worth naming: it is the part that stays put.
+              const isTarget = holding.isTargetInstrument;
+              // Some exposure to the same markets is worth naming -- as an
+              // estimate about this fund, never as a part of the position that
+              // stays put. It is sold whole like everything else.
               const partial =
                 !isTarget &&
                 isKnown(holding.matchPercent) &&
@@ -199,88 +218,87 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                         {t('gem.portfolioPanel.workingValue')}
                       </th>
                       <th scope="col" className="py-1 pr-3 font-medium">
-                        {t('gem.portfolioPanel.workingMatch')}
+                        {t('gem.portfolioPanel.workingIsTarget')}
                       </th>
                       <th scope="col" className="py-1 text-right font-medium">
-                        {t('gem.portfolioPanel.workingCounts')}
+                        {t('gem.portfolioPanel.workingExposure')}
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
-                    {position.holdings.map((holding) => {
-                      const isTargetRow =
-                        targetSecurityId !== null &&
-                        holding.securityId === targetSecurityId;
-                      const share = isKnown(holding.matchPercent)
-                        ? holding.matchPercent / 100
-                        : 0;
-                      const counted = isKnown(holding.marketValue)
-                        ? holding.marketValue * share
-                        : null;
-                      return (
-                        <tr key={holding.isCash ? 'cash' : holding.securityId ?? holding.symbol}>
-                          <td className="py-1 pr-3">
-                            {/* Cash is a balance, not an instrument: there is
-                                nothing to link to and no ticker to print. */}
-                            {holding.isCash ? (
-                              t('gem.portfolioPanel.workingCash')
-                            ) : (
-                              <GemSecurityLink securityId={holding.securityId}>
-                                {holding.symbol ?? t('gem.common.unassigned')}
-                              </GemSecurityLink>
-                            )}
-                          </td>
-                          <td className="py-1 pr-3 text-right tabular-nums">
-                            {isKnown(holding.marketValue) ? (
-                              formatCurrency(holding.marketValue, position.currencyCode)
-                            ) : (
-                              <GemUnknown />
-                            )}
-                          </td>
-                          <td className="py-1 pr-3">
-                            {/* The markets that actually overlap, named. A bare
-                                percentage says a fifth is on target; this says
-                                which fifth, so the figure can be checked. */}
-                            {holding.isCash
-                              ? t('gem.portfolioPanel.workingCashNote')
-                              : position.basis === 'INSTRUMENT'
-                              ? isTargetRow
-                                ? t('gem.portfolioPanel.workingExact')
-                                : t('gem.portfolioPanel.workingNoTargetData')
-                              : isTargetRow
-                              ? t('gem.portfolioPanel.workingExact')
-                              : holding.matchedMarkets.length > 0
-                                ? t('gem.portfolioPanel.workingDerived', {
-                                    markets: holding.matchedMarkets
-                                      .map((market) =>
-                                        t('gem.portfolioPanel.workingMarket', {
-                                          name: market.name,
-                                          percent: formatPercent(
-                                            market.percent,
-                                            0,
-                                          ),
-                                        }),
-                                      )
-                                      .join(', '),
-                                  })
-                                : holding.matchedByInstrument
-                                  ? t('gem.portfolioPanel.workingByInstrument')
-                                  : t('gem.portfolioPanel.workingNoOverlap', {
-                                      dimension: dimensionLabel(
-                                        position.dimension,
-                                      ),
-                                    })}
-                          </td>
-                          <td className="py-1 text-right tabular-nums">
-                            {counted === null ? (
-                              <GemUnknown />
-                            ) : (
-                              formatCurrency(counted, position.currencyCode)
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {position.holdings.map((holding) => (
+                      <tr
+                        key={
+                          holding.isCash
+                            ? 'cash'
+                            : (holding.securityId ?? holding.symbol)
+                        }
+                      >
+                        <td className="py-1 pr-3">
+                          {/* Cash is a balance, not an instrument: there is
+                              nothing to link to and no ticker to print. */}
+                          {holding.isCash ? (
+                            t('gem.portfolioPanel.workingCash')
+                          ) : (
+                            <GemSecurityLink securityId={holding.securityId}>
+                              {holding.symbol ?? t('gem.common.unassigned')}
+                            </GemSecurityLink>
+                          )}
+                        </td>
+                        <td className="py-1 pr-3 text-right tabular-nums">
+                          {isKnown(holding.marketValue) ? (
+                            formatCurrency(
+                              holding.marketValue,
+                              position.currencyCode,
+                            )
+                          ) : (
+                            <GemUnknown />
+                          )}
+                        </td>
+                        {/* The operational column: is this the instrument the
+                            signal named? Yes keeps the position, no sells it,
+                            and no amount of similar exposure changes that. */}
+                        <td className="py-1 pr-3">
+                          {holding.isCash
+                            ? t('gem.portfolioPanel.workingCashNote')
+                            : holding.isTargetInstrument
+                              ? t('gem.portfolioPanel.workingIsTargetYes')
+                              : t('gem.portfolioPanel.workingIsTargetNo')}
+                        </td>
+                        {/* The estimate, beside it and clearly not the same
+                            thing. Unknown stays unknown: a confident 0.00
+                            beside a fund nobody measured is a claim about it. */}
+                        <td className="py-1 text-right tabular-nums">
+                          {holding.isCash ? (
+                            <span className="text-gray-500 dark:text-gray-400">
+                              {formatPercent(0, 0)}
+                            </span>
+                          ) : !isKnown(holding.matchPercent) ? (
+                            // Spelled out rather than dashed: a blank cell in a
+                            // column of percentages reads as zero, which is the
+                            // one thing this is not.
+                            <span className="text-gray-500 dark:text-gray-400">
+                              {t('gem.portfolioPanel.workingNoData')}
+                            </span>
+                          ) : (
+                            <span title={
+                              holding.matchedMarkets.length > 0
+                                ? holding.matchedMarkets
+                                    .map((market) =>
+                                      t('gem.portfolioPanel.workingMarket', {
+                                        name: market.name,
+                                        percent: formatPercent(market.percent, 0),
+                                      }),
+                                    )
+                                    .join(', ')
+                                : undefined
+                            }>
+                              {formatPercent(holding.matchPercent, 0)}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-gray-200 font-medium dark:border-gray-700">
@@ -299,35 +317,32 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                       </td>
                       <td className="py-1 pr-3" />
                       <td className="py-1 text-right tabular-nums">
-                        {percent === null ||
-                        !isKnown(position.totalMarketValue) ? (
-                          <GemUnknown />
+                        {isKnown(position.marketExposurePercent) ? (
+                          formatPercent(position.marketExposurePercent, 0)
                         ) : (
-                          formatCurrency(
-                            (position.totalMarketValue * percent) / 100,
-                            position.currencyCode,
-                          )
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t('gem.portfolioPanel.workingNoData')}
+                          </span>
                         )}
                       </td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
-              {/* A derived percentage is not the same thing as holding the
-                  target fund: it is what the recorded breakdown implies. */}
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                {t('gem.portfolioPanel.workingDerivedNote')}
-              </p>
+              {/* The allocation figure, written out. It is measured over the
+                  securities: idle cash is off target and funds the purchase,
+                  but it is not part of "how much of my equity is in the right
+                  fund". */}
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {percent === null || !isKnown(position.totalMarketValue)
+                {percent === null || securitiesValue === null
                   ? t('gem.portfolioPanel.workingUnknown')
                   : t('gem.portfolioPanel.workingSum', {
                       counted: formatCurrency(
-                        (position.totalMarketValue * percent) / 100,
+                        (securitiesValue * percent) / 100,
                         position.currencyCode,
                       ),
                       total: formatCurrency(
-                        position.totalMarketValue,
+                        securitiesValue,
                         position.currencyCode,
                       ),
                       percent: formatPercent(percent, 0),
@@ -336,8 +351,10 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
             </div>
           )}
 
-          {/* Which comparison produced the compliance figure. Matching by
-              ticker is the weaker answer, so the report says when it had to. */}
+          {/* What the *exposure estimate* could be built from, and what to do
+              when it could not. It says nothing about compliance, which is
+              exact either way: the signal names an instrument, and the accounts
+              either hold it or they do not. */}
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {position.basis === 'COMPOSITION'
               ? t('gem.portfolioPanel.basisComposition', {
@@ -356,6 +373,14 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                   })}
                 </>
               )}
+            {position.basis === 'INSTRUMENT' && (
+              <>
+                {' '}
+                <GemSecurityLink securityId={position.target?.securityId}>
+                  {t('gem.portfolioPanel.basisFillStructure')}
+                </GemSecurityLink>
+              </>
+            )}
           </p>
         </div>
       )}

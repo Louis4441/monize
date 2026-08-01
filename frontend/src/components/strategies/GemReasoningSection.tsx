@@ -57,6 +57,12 @@ export function GemReasoningSection({
     t('gem.common.pp', { value: `${value >= 0 ? '+' : '-'}${formatNumber(Math.abs(value), 2)}` });
 
   const absoluteValues = [absolute.equity.momentum12m, absolute.benchmark.momentum12m];
+  /** A momentum figure for prose, or the unknown marker's words. */
+  const momentumText = (value: number | null): string =>
+    isKnown(value) ? formatSignedPercent(value) : t('gem.common.unknown');
+  const winnerMomentum =
+    relative.ranking.find((asset) => asset.role === relative.winner?.role)
+      ?.momentum12m ?? null;
 
   /** One momentum row: label, coloured bar and the signed 12-month figure. */
   const momentumRow = (asset: GemAssetMomentum, values: Array<number | null>, rank?: number) => (
@@ -101,7 +107,7 @@ export function GemReasoningSection({
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {t('gem.reasoning.step1Title')}
+                {t('gem.reasoning.step1Question')}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {t('gem.reasoning.step1Subtitle', {
@@ -130,22 +136,41 @@ export function GemReasoningSection({
             </span>
           </div>
 
+          {/* The decision in one sentence, with both figures in it. The
+              technical name for the comparison lives in the card's hint; what
+              belongs here is what was compared and what came of it. */}
+          <p className="mt-2 text-sm text-gray-700 dark:text-gray-200">
+            {isRiskOn
+              ? t('gem.reasoning.step1AnswerRiskOn', {
+                  equity: assetLabel(absolute.equity),
+                  equityReturn: momentumText(absolute.equity.momentum12m),
+                  benchmark: assetLabel(absolute.benchmark),
+                  benchmarkReturn: momentumText(absolute.benchmark.momentum12m),
+                })
+              : t('gem.reasoning.step1AnswerRiskOff', {
+                  equity: assetLabel(absolute.equity),
+                  equityReturn: momentumText(absolute.equity.momentum12m),
+                  benchmark: assetLabel(absolute.benchmark),
+                  benchmarkReturn: momentumText(absolute.benchmark.momentum12m),
+                  safe: assetLabel(signal.target),
+                })}
+          </p>
+
+          {/* Not a "buffer": nothing here is hysteresis. The signal flips the
+              moment the equity return stops exceeding the benchmark's, so the
+              figure above is today's margin, and this says what would end it. */}
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            {isKnown(absolute.spreadPp) ? (
-              isRiskOn ? (
-                <>
-                  {t('gem.reasoning.buffer', { value: formatNumber(Math.abs(absolute.spreadPp), 2) })}{' '}
-                  {t('gem.reasoning.bufferExplainerRiskOn')}
-                </>
-              ) : (
-                <>
-                  {t('gem.reasoning.gap', { value: formatNumber(Math.abs(absolute.spreadPp), 2) })}{' '}
-                  {t('gem.reasoning.bufferExplainerRiskOff')}
-                </>
-              )
-            ) : (
-              t('gem.reasoning.bufferUnknown', { months: lookbackMonths })
-            )}
+            {isKnown(absolute.spreadPp)
+              ? isRiskOn
+                ? t('gem.reasoning.thresholdRiskOn', {
+                    equity: assetLabel(absolute.equity),
+                    benchmark: assetLabel(absolute.benchmark),
+                  })
+                : t('gem.reasoning.thresholdRiskOff', {
+                    equity: assetLabel(absolute.equity),
+                    benchmark: assetLabel(absolute.benchmark),
+                  })
+              : t('gem.reasoning.thresholdUnknown', { months: lookbackMonths })}
           </p>
         </div>
 
@@ -154,10 +179,9 @@ export function GemReasoningSection({
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                {t('gem.reasoning.step2Title')}
-                <span className="ml-1 font-normal text-gray-500 dark:text-gray-400">
-                  {t('gem.reasoning.step2Condition')}
-                </span>
+                {relative.applied
+                  ? t('gem.reasoning.step2Question')
+                  : t('gem.reasoning.step2QuestionSkipped')}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {t('gem.reasoning.step2Subtitle', {
@@ -196,6 +220,20 @@ export function GemReasoningSection({
               )}
             </div>
           )}
+
+          {/* And the second answer, or why there is not one. RISK-OFF does not
+              dim a step the reader then has to interpret: it says the step was
+              not applied, and what was done instead. */}
+          <p className="mt-3 text-sm text-gray-700 dark:text-gray-200">
+            {relative.applied
+              ? t('gem.reasoning.step2Answer', {
+                  winner: assetLabel(relative.winner),
+                  winnerReturn: momentumText(relative.winner ? winnerMomentum : null),
+                })
+              : t('gem.reasoning.step2Skipped', {
+                  safe: assetLabel(signal.target),
+                })}
+          </p>
 
           <p className="mt-3 border-t border-gray-200 pt-2 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
             {!relative.applied

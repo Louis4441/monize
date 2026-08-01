@@ -130,7 +130,7 @@ describe("GemPositionService", () => {
 
     expect(result.position).toMatchObject({
       accounts,
-      compliancePercent: 0,
+      exactTargetPercent: 0,
       changeRequired: true,
       currencyCode: "USD",
     });
@@ -198,15 +198,19 @@ describe("GemPositionService", () => {
     // 4000 in SPY plus 6000 in an instrument outside the strategy: none of it
     // is in the EM target, so the whole 10000 has to move.
     expect(result.position?.totalMarketValue).toBe(10000);
-    expect(result.position?.compliancePercent).toBe(0);
+    expect(result.position?.exactTargetPercent).toBe(0);
     expect(result.position?.holdings.map((h) => h.symbol)).toEqual([
       "WTAI",
       "SPY",
     ]);
     expect(result.position?.holdings[0].role).toBeNull();
     expect(result.action?.transferValue).toBe(10000);
-    expect(result.action?.fromCount).toBe(2);
-    expect(result.action?.from?.symbol).toBe("WTAI");
+    // Both are named, largest first. "WTAI and 1 more" described a two-fund
+    // portfolio as though it were in one of them.
+    expect(result.action?.sellPositions.map((held) => held.symbol)).toEqual([
+      "WTAI",
+      "SPY",
+    ]);
   });
 
   it("sells out of the off-target holding, not the largest one", async () => {
@@ -239,8 +243,9 @@ describe("GemPositionService", () => {
 
     // EMIM is the target and the larger position, so the switch sells SPY.
     expect(result.position?.current?.symbol).toBe("EMIM");
-    expect(result.action?.from?.symbol).toBe("SPY");
-    expect(result.action?.fromCount).toBe(1);
+    expect(result.action?.sellPositions.map((held) => held.symbol)).toEqual([
+      "SPY",
+    ]);
     expect(result.action?.transferValue).toBe(2000);
   });
 
@@ -342,8 +347,9 @@ describe("GemPositionService", () => {
     priceService.latestPrices.mockResolvedValue(new Map([["sec-emim", 35]]));
 
     const result = await build();
-    expect(result.position?.compliancePercent).toBe(100);
+    expect(result.position?.exactTargetPercent).toBe(100);
     expect(result.action?.required).toBe(false);
+    expect(result.action?.sellPositions).toEqual([]);
   });
 
   describe("cash in the strategy accounts", () => {
@@ -371,10 +377,14 @@ describe("GemPositionService", () => {
       const result = await build();
 
       expect(result.position?.totalMarketValue).toBe(10000);
-      expect(result.position?.compliancePercent).toBe(50);
+      // Every security held is the target, and the exact-allocation figure is
+      // about the securities -- but half the account is uninvested, which is
+      // still a change: the cash has to be put to work.
+      expect(result.position?.exactTargetPercent).toBe(100);
       expect(result.position?.changeRequired).toBe(true);
       expect(result.action?.required).toBe(true);
-      // The purchase is funded by the cash, so that is what moves.
+      // Nothing is sold; the purchase is funded by the cash.
+      expect(result.action?.sellPositions).toEqual([]);
       expect(result.action?.transferValue).toBe(5000);
     });
 
@@ -420,8 +430,7 @@ describe("GemPositionService", () => {
 
       expect(result.action?.required).toBe(true);
       expect(result.action?.transferValue).toBe(5000);
-      expect(result.action?.from).toBeNull();
-      expect(result.action?.fromCount).toBe(0);
+      expect(result.action?.sellPositions).toEqual([]);
       expect(result.action?.estimatedTradeCount).toBe(1);
     });
 
@@ -443,8 +452,9 @@ describe("GemPositionService", () => {
 
       // Cash is the bigger position and still not what gets sold.
       expect(result.position?.current?.isCash).toBe(true);
-      expect(result.action?.from?.symbol).toBe("SPY");
-      expect(result.action?.fromCount).toBe(1);
+      expect(result.action?.sellPositions.map((held) => held.symbol)).toEqual([
+        "SPY",
+      ]);
       // Both move, though: 9000 of cash plus the whole 4000 of SPY.
       expect(result.action?.transferValue).toBe(13000);
       // And only the sale realizes anything.
@@ -460,7 +470,7 @@ describe("GemPositionService", () => {
       const result = await build();
 
       expect(result.position?.holdings.some((held) => held.isCash)).toBe(false);
-      expect(result.position?.compliancePercent).toBe(100);
+      expect(result.position?.exactTargetPercent).toBe(100);
     });
 
     it("asks for the linked cash account of every strategy account", async () => {
@@ -497,7 +507,7 @@ describe("GemPositionService", () => {
     expect(result.position?.current?.symbol).toBe("FZD2050");
     // Nothing here can be priced, so the share is unknown rather than zero --
     // but holding something other than the target still calls for a switch.
-    expect(result.position?.compliancePercent).toBeNull();
+    expect(result.position?.exactTargetPercent).toBeNull();
     expect(result.action?.required).toBe(true);
   });
 });

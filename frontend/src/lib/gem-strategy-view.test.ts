@@ -147,8 +147,23 @@ describe('gem-strategy-view', () => {
     it('returns undefined without values', () => {
       expect(performanceDomain(null)).toBeUndefined();
       expect(
-        performanceDomain(gemPerformance({ points: [{ date: '2025-01-01', values: {} }] })),
+        performanceDomain(
+          gemPerformance({
+            points: [{ date: '2025-01-01', values: {} }],
+            currentPortfolio: null,
+          }),
+        ),
       ).toBeUndefined();
+    });
+
+    it('makes room for the simulated line even with no asset values', () => {
+      // The simulation is drawn on the same axis, so a domain measured only
+      // over the asset lines would clip it.
+      const domain = performanceDomain(
+        gemPerformance({ points: [{ date: '2025-01-01', values: {} }] }),
+      );
+      expect(domain).toBeDefined();
+      expect(domain![1]).toBeGreaterThanOrEqual(12.8);
     });
   });
 

@@ -393,6 +393,7 @@ export class GemPositionService {
       // column would read as shares.
       quantity: holding.isCash ? null : holding.quantity,
       marketValue: holding.marketValue,
+      isTargetInstrument: holding.isTargetInstrument,
       matchPercent: overlapPercent(holding.overlap),
       matchedByInstrument: holding.matchedByInstrument,
       matchedMarkets: holding.matchedMarkets.map((market) => ({
@@ -406,7 +407,12 @@ export class GemPositionService {
       holdings: math.holdings.map(held),
       current: math.current ? held(math.current) : null,
       target,
-      compliancePercent: math.compliancePercent,
+      exactTargetPercent: math.exactTargetPercent,
+      marketExposurePercent: math.marketExposurePercent,
+      marketExposureAvailable: math.marketExposureAvailable,
+      marketExposureDimension: math.marketExposureAvailable
+        ? math.dimension
+        : null,
       changeRequired: math.changeRequired,
       totalMarketValue: math.totalMarketValue,
       basis: math.basis,
@@ -418,10 +424,10 @@ export class GemPositionService {
 
     const action: GemActionView = {
       required: math.changeRequired && target !== null,
-      // The largest position the switch *sells*. Cash is off target and funds
-      // the purchase, but naming it here would ask for a trade nobody places.
-      from: math.sold[0] ? held(math.sold[0]) : null,
-      fromCount: math.sellCount,
+      // Every position the switch sells, largest first. Cash is off target and
+      // funds the purchase, but naming it here would ask for a trade nobody
+      // places, so `sold` already leaves it out.
+      sellPositions: math.sold.map(held),
       to: target,
       targetWeightPercent: 100,
       transferValue: math.transferValue,
@@ -433,8 +439,9 @@ export class GemPositionService {
         math.sellCount,
       ),
       estimatedTradeCount: math.sellCount + 1,
-      partialMatchCount: math.sold.filter((holding) => holding.overlap > 0)
-        .length,
+      partialMatchCount: math.sold.filter(
+        (holding) => (holding.overlap ?? 0) > 0,
+      ).length,
       accounts,
       currencyCode,
       executed,

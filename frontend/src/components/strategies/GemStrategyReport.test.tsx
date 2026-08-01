@@ -63,13 +63,19 @@ describe('GemStrategyReport', () => {
     expect(screen.getByText('100% iShares MSCI EM IMI ETF')).toBeInTheDocument();
 
     // 2. Why this instrument?
-    expect(screen.getByText('Step 1 – absolute momentum')).toBeInTheDocument();
-    expect(screen.getByText('Step 2 – relative momentum')).toBeInTheDocument();
+    expect(
+      screen.getByText('Stay in equities, or move to bonds?'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Staying in equities — which market?'),
+    ).toBeInTheDocument();
     expect(screen.getByText('EMIM leads SPY by 14.45 pp.')).toBeInTheDocument();
 
     // 3. Is my portfolio aligned?
-    expect(screen.getByText('Match with signal')).toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: 'Match with signal' })).toHaveAttribute(
+    expect(screen.getAllByText('In the target instrument').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('progressbar', { name: 'In the target instrument' }),
+    ).toHaveAttribute(
       'aria-valuenow',
       '64',
     );

@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 import { GemPosition } from '@/types/gem-strategy';
-import { compliancePercent } from '@/lib/gem-strategy-view';
+import { compliancePercent, isKnown } from '@/lib/gem-strategy-view';
 import {
   GemBadge,
   GemCard,
@@ -28,7 +28,7 @@ interface GemPortfolioCardProps {
 export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps) {
   const t = useTranslations('strategies');
   const { assetFullLabel } = useGemLabels();
-  const { formatPercent } = useNumberFormat();
+  const { formatPercent, formatCurrency } = useNumberFormat();
 
   if (!position || noAccount) {
     return (
@@ -41,28 +41,22 @@ export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps)
     );
   }
 
-  const percent = compliancePercent(position.compliancePercent);
+  const percent = compliancePercent(position.exactTargetPercent);
+  const securities = position.holdings.filter((holding) => !holding.isCash);
+  const largest = position.current;
 
   return (
     <GemCard title={t('gem.portfolio.title')} hint={t('gem.portfolio.hint')}>
       <dl className="space-y-1">
+        {/* What the accounts hold, counted. Naming the largest holding as "the
+            current instrument" described a four-fund portfolio as though it
+            were in one of them, and the other three appeared only as "+3". */}
         <GemStatRow
-          label={t('gem.portfolio.current')}
-          value={
-            position.current ? (
-              <span>
-                <GemSecurityLink securityId={position.current.securityId}>
-                  {assetFullLabel(position.current)}
-                </GemSecurityLink>
-                {/* The largest holding names the position, but the count says
-                    the accounts hold more than that one instrument. */}
-                {position.holdings.length > 1 &&
-                  ` +${position.holdings.length - 1}`}
-              </span>
-            ) : (
-              <GemUnknown label={t('gem.portfolio.noPositionTitle')} />
-            )
-          }
+          label={t('gem.portfolio.positions')}
+          value={t('gem.portfolio.positionsValue', {
+            instruments: securities.length,
+            accounts: position.accounts.length,
+          })}
         />
         <GemStatRow
           label={t('gem.portfolio.target')}
@@ -76,12 +70,38 @@ export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps)
             )
           }
         />
+        {/* Secondary, and labelled as what it is: the biggest position, not
+            the portfolio's identity. */}
+        {largest && (
+          <GemStatRow
+            label={t('gem.portfolio.largest')}
+            value={
+              <span>
+                <GemSecurityLink securityId={largest.securityId}>
+                  {largest.isCash
+                    ? t('gem.portfolioPanel.workingCash')
+                    : assetFullLabel(largest)}
+                </GemSecurityLink>
+                {isKnown(largest.marketValue) && (
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {t('gem.portfolio.largestValue', {
+                      value: formatCurrency(
+                        largest.marketValue,
+                        position.currencyCode,
+                      ),
+                    })}
+                  </span>
+                )}
+              </span>
+            }
+          />
+        )}
       </dl>
 
       <div className="mt-3">
         <div className="mb-1 flex items-baseline justify-between text-xs">
           <span className="text-gray-500 dark:text-gray-400">
-            {t('gem.portfolio.compliance')}
+            {t('gem.portfolio.exactTarget')}
           </span>
           <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {percent === null ? <GemUnknown /> : formatPercent(percent, 0)}
@@ -89,7 +109,7 @@ export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps)
         </div>
         <div
           role="progressbar"
-          aria-label={t('gem.portfolio.compliance')}
+          aria-label={t('gem.portfolio.exactTarget')}
           aria-valuemin={0}
           aria-valuemax={100}
           {...(percent === null ? {} : { 'aria-valuenow': percent })}
@@ -102,6 +122,23 @@ export function GemPortfolioCard({ position, noAccount }: GemPortfolioCardProps)
             style={{ width: `${percent ?? 0}%` }}
           />
         </div>
+      </div>
+
+      {/* The estimate, kept apart from the instruction above. Holding a fund
+          with some of the same exposure is not holding the fund the strategy
+          named, and one number for both read as "you are part of the way
+          there" -- which is not true of an instruction to hold one instrument. */}
+      <div className="mt-2 flex items-baseline justify-between text-xs">
+        <span className="text-gray-500 dark:text-gray-400">
+          {t('gem.portfolio.marketExposure')}
+        </span>
+        <span className="font-medium text-gray-700 dark:text-gray-200">
+          {isKnown(position.marketExposurePercent) ? (
+            formatPercent(position.marketExposurePercent, 0)
+          ) : (
+            <GemUnknown label={t('gem.portfolio.marketExposureUnknown')} />
+          )}
+        </span>
       </div>
 
       <div className="mt-3 flex items-center justify-between text-xs">

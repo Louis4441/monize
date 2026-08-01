@@ -140,8 +140,14 @@ export interface GemHeldAsset {
   quantity: number | null;
   marketValue: number | null;
   /**
-   * Share of this holding already in the target's markets, 0-100. A world
-   * tracker partly covers an emerging-markets target; only the rest moves.
+   * True when this holding is the instrument the signal names -- the same
+   * security, not a fund with similar exposure. Decides keep or sell.
+   */
+  isTargetInstrument: boolean;
+  /**
+   * Estimated share of this holding exposed to the target's markets, 0-100, or
+   * null when it cannot be estimated. Informational: a world tracker partly
+   * covering an emerging-markets target is still sold whole.
    */
   matchPercent: number | null;
   /** True when the ticker decided it, because no breakdown was available. */
@@ -163,8 +169,20 @@ export interface GemPosition {
   /** The largest holding -- what the accounts are effectively in; null when empty. */
   current: GemHeldAsset | null;
   target: GemAssetRef | null;
-  /** Share of the accounts' whole market value already in the target, 0-100; null when unknown. */
-  compliancePercent: number | null;
+  /**
+   * Share of the priced securities held in the target instrument itself,
+   * 0-100; null when unknown. The operational figure: GEM asks for 100% of one
+   * fund, and a different fund with exposure to the same market is not part of
+   * the way there.
+   */
+  exactTargetPercent: number | null;
+  /**
+   * Estimated share of the priced securities exposed to the target's markets,
+   * 0-100; null when it cannot be estimated. Informational only.
+   */
+  marketExposurePercent: number | null;
+  marketExposureAvailable: boolean;
+  marketExposureDimension: GemCompositionDimension | null;
   changeRequired: boolean;
   /** Market value of everything held in the accounts; null when nothing can be priced. */
   totalMarketValue: number | null;
@@ -183,10 +201,12 @@ export interface GemPosition {
 export interface GemAction {
   /** False when the portfolio already matches the signal. */
   required: boolean;
-  /** Largest holding the switch sells out of; null when there is nothing to sell. */
-  from: GemHeldAsset | null;
-  /** How many instruments the switch sells out of, `from` included. */
-  fromCount: number;
+  /**
+   * Every security the operation sells, largest first. Empty for a purchase
+   * funded by cash alone. Cash is never in here: nobody places a trade to sell
+   * it.
+   */
+  sellPositions: GemHeldAsset[];
   to: GemAssetRef | null;
   /** Target weight of the destination instrument, in percent. */
   targetWeightPercent: number;
@@ -222,6 +242,34 @@ export interface GemPerformancePoint {
   values: Partial<Record<GemAssetRole, number | null>>;
 }
 
+/** Why the current-composition simulation has no line. */
+export type GemSimulationUnavailableReason =
+  | 'NO_HOLDINGS'
+  | 'UNKNOWN_CURRENT_VALUE'
+  | 'MISSING_PRICE_HISTORY';
+
+/**
+ * Today's holdings, in today's proportions, replayed over the window.
+ *
+ * A hypothetical, never the user's realised performance: no transactions, no
+ * deposits or withdrawals, no cash, no currency movement, no costs, and no
+ * rebalancing after the first day.
+ */
+export interface GemCurrentPortfolioSimulation {
+  points: Array<{ date: string; returnPercent: number | null }>;
+  totalReturnPercent: number | null;
+  /** False when the line starts later than the window the user asked for. */
+  completeRange: boolean;
+  startsOn: string | null;
+  includedHoldings: Array<{
+    securityId: string;
+    symbol: string | null;
+    weightPercent: number;
+  }>;
+  /** Set when there is no line at all; the UI says which of the three it is. */
+  unavailableReason: GemSimulationUnavailableReason | null;
+}
+
 export interface GemPerformance {
   range: GemRange;
   points: GemPerformancePoint[];
@@ -231,6 +279,8 @@ export interface GemPerformance {
   currencyCode: string;
   /** True when at least one asset lacks prices for the whole range. */
   incomplete: boolean;
+  /** Today's holdings replayed over the window; null when none are held. */
+  currentPortfolio: GemCurrentPortfolioSimulation | null;
 }
 
 export interface GemHistoryEntry {

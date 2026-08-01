@@ -198,4 +198,76 @@ describe('GemPerformanceChart', () => {
     expect(labelSets[0].querySelectorAll('text')).toHaveLength(1);
     expect(labelSets[0].querySelector('text')).toHaveTextContent('+29.87%');
   });
+
+  it('draws today\'s composition as a simulation, and says what it is not', () => {
+    render(
+      <GemPerformanceChart
+        {...baseProps}
+        performance={gemPerformance()}
+        onRangeChange={vi.fn()}
+      />,
+    );
+
+    // The line is legible as a hypothetical, in the legend and in the note.
+    expect(
+      screen.getAllByText('Today’s composition — simulated').length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByText(/applies today’s instrument proportions at the start/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/does not reproduce historical transactions, cash flows, cash or currency movements/),
+    ).toBeInTheDocument();
+  });
+
+  it('says why the simulated line starts late', () => {
+    const performance = gemPerformance();
+    render(
+      <GemPerformanceChart
+        {...baseProps}
+        onRangeChange={vi.fn()}
+        performance={{
+          ...performance,
+          currentPortfolio: {
+            ...performance.currentPortfolio!,
+            completeRange: false,
+            startsOn: '2025-02-01',
+          },
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText(/simulation starts later because at least one of the instruments/),
+    ).toBeInTheDocument();
+  });
+
+  it('explains an absent simulation instead of drawing a partial one', () => {
+    const performance = gemPerformance();
+    render(
+      <GemPerformanceChart
+        {...baseProps}
+        onRangeChange={vi.fn()}
+        performance={{
+          ...performance,
+          currentPortfolio: {
+            points: [],
+            totalReturnPercent: null,
+            completeRange: false,
+            startsOn: null,
+            includedHoldings: [],
+            unavailableReason: 'MISSING_PRICE_HISTORY',
+          },
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText(/no usable price history, so the simulation is not shown/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Today’s composition — simulated'),
+    ).not.toBeInTheDocument();
+  });
+
 });

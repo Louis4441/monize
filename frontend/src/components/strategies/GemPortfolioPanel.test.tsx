@@ -46,6 +46,7 @@ describe('GemPortfolioPanel', () => {
               quantity: 51,
               marketValue: 22910.08,
               // A fifth of a world tracker is already in the EM target.
+              isTargetInstrument: false,
               matchPercent: 20,
               matchedByInstrument: false,
               isCash: false,
@@ -62,7 +63,7 @@ describe('GemPortfolioPanel', () => {
       screen.getByRole('link', { name: /iShares MSCI ACWI UCITS ETF/ }),
     ).toHaveAttribute('href', '/securities/sec-iusq');
     expect(screen.getByText(/51 units/)).toHaveTextContent(
-      "20% already in the target's markets",
+      '20% estimated exposure to the target market',
     );
   });
 
@@ -82,13 +83,14 @@ describe('GemPortfolioPanel', () => {
               name: null,
               quantity: null,
               marketValue: 5000,
+              isTargetInstrument: false,
               matchPercent: 0,
               matchedByInstrument: false,
               matchedMarkets: [],
             },
           ],
           totalMarketValue: 10000,
-          compliancePercent: 50,
+          exactTargetPercent: 50,
           // Cash is not an undescribed instrument, so it does not count here.
           instrumentMatchedCount: 0,
         })}
@@ -126,29 +128,28 @@ describe('GemPortfolioPanel', () => {
               name: 'A fund with no price',
               quantity: 10,
               marketValue: null,
+              isTargetInstrument: false,
               matchPercent: 0,
               matchedByInstrument: true,
               matchedMarkets: [],
             },
           ],
           totalMarketValue: null,
-          compliancePercent: null,
+          exactTargetPercent: null,
         })}
         noAccount={false}
         noPosition={false}
       />,
     );
 
-    expect(
-      screen.getByText('How the compliance figure is worked out'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Holding by holding')).toBeInTheDocument();
     expect(screen.getByText('ZZZ')).toBeInTheDocument();
     expect(
       screen.getByText(/The share cannot be worked out until the holdings can be priced/),
     ).toBeInTheDocument();
   });
 
-  it('shows the arithmetic behind the compliance figure', () => {
+  it('shows the allocation arithmetic and the exposure beside it', () => {
     render(
       <GemPortfolioPanel
         position={gemPosition({
@@ -160,6 +161,7 @@ describe('GemPortfolioPanel', () => {
               name: 'iShares MSCI ACWI UCITS ETF',
               quantity: 51,
               marketValue: 10000,
+              isTargetInstrument: false,
               matchPercent: 20,
               matchedByInstrument: false,
               isCash: false,
@@ -170,25 +172,25 @@ describe('GemPortfolioPanel', () => {
             },
           ],
           totalMarketValue: 10000,
-          compliancePercent: 20,
+          exactTargetPercent: 20,
         })}
         noAccount={false}
         noPosition={false}
       />,
     );
 
-    // Which markets overlap, not merely how much: the figure can be checked.
-    expect(screen.getByText(/china 12%/)).toBeInTheDocument();
-    expect(screen.getByText(/india 8%/)).toBeInTheDocument();
-    // And that it is derived from a breakdown, not the target fund itself.
-    expect(screen.getByText(/^≈/)).toBeInTheDocument();
+    // Two separate columns, and the operational one is a yes/no: this fund is
+    // not the instrument the signal named, so it is sold whatever its
+    // exposure. The overlapping markets stay available as the estimate's
+    // working, on the cell's title.
+    expect(screen.getByText('Is this the target instrument?')).toBeInTheDocument();
+    expect(screen.getByText('No — sold')).toBeInTheDocument();
     expect(
-      screen.getByText(/worked out from the breakdown recorded against it/),
-    ).toBeInTheDocument();
-    // 20% of 10,000 is what counts towards the target.
-    expect(screen.getAllByText('$2,000.00').length).toBeGreaterThan(0);
+      screen.getAllByText('Estimated exposure to the target market').length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByTitle('china 12%, india 8%')).toHaveTextContent('20%');
     expect(
-      screen.getByText(/\$2,000\.00 of \$10,000\.00 is already in the target/),
+      screen.getByText(/\$2,000\.00 of \$10,000\.00 is held in the target instrument/),
     ).toBeInTheDocument();
   });
 
@@ -204,35 +206,41 @@ describe('GemPortfolioPanel', () => {
               name: 'AI ETF',
               quantity: 6,
               marketValue: 500,
-              matchPercent: 0,
+              isTargetInstrument: false,
+              // No breakdown of its own: unknown exposure, not zero exposure.
+              matchPercent: null,
               matchedByInstrument: true,
               isCash: false,
               matchedMarkets: [],
             },
           ],
           totalMarketValue: 500,
-          compliancePercent: 0,
+          exactTargetPercent: 0,
         })}
         noAccount={false}
         noPosition={false}
       />,
     );
 
-    expect(
-      screen.getByText('No breakdown recorded; matched by instrument'),
-    ).toBeInTheDocument();
+    // No breakdown of its own: the exposure is unknown, and the row says so
+    // instead of printing a confident zero beside a fund nobody measured.
+    expect(screen.getAllByText('No data').length).toBeGreaterThan(0);
+    expect(screen.getByText('No — sold')).toBeInTheDocument();
   });
 
-  it('says compliance came from contents, and how many fell back', () => {
+  it('says the exposure estimate is an estimate, and where it fell short', () => {
     render(<GemPortfolioPanel position={gemPosition()} noAccount={false} noPosition={false} />);
 
     expect(screen.getByText(/compared by country/)).toBeInTheDocument();
     expect(
-      screen.getByText(/1 holding has no breakdown recorded/),
+      screen.getByText(/only the target instrument itself counts as holding the target/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/1 holding has no structure recorded/),
     ).toBeInTheDocument();
   });
 
-  it('blames the target, not a holding that is described', () => {
+  it('blames the target, and does not print a zero it cannot support', () => {
     // The holding may have a full country split; when the *target* has none
     // there is nothing to compare it with, and saying "no breakdown recorded"
     // on the holding's row sends the reader to fix the wrong instrument.
@@ -250,24 +258,43 @@ describe('GemPortfolioPanel', () => {
               name: 'iShares MSCI ACWI UCITS ETF',
               quantity: 51,
               marketValue: 10000,
-              matchPercent: 0,
+              isTargetInstrument: false,
+              // The target has no structure to compare with, so the exposure
+              // of a fully described holding is unknown all the same.
+              matchPercent: null,
               matchedByInstrument: true,
               isCash: false,
               matchedMarkets: [],
             },
           ],
           totalMarketValue: 10000,
-          compliancePercent: 0,
+          exactTargetPercent: 0,
+          marketExposurePercent: null,
+          marketExposureAvailable: false,
+          marketExposureDimension: null,
         })}
         noAccount={false}
         noPosition={false}
       />,
     );
 
+    // The estimate is unavailable, and the reason names the target's missing
+    // geographic structure rather than the holding, which is fully described.
     expect(
-      screen.getByText('Cannot compare: the target has no breakdown'),
+      screen.getByText(
+        /Market exposure cannot be estimated, because EMIM has no country structure recorded in Monize/,
+      ),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/No breakdown recorded/)).toBeNull();
+    expect(
+      screen.getByText(/Compliance with the signal is still calculated exactly/),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('No data').length).toBeGreaterThan(0);
+    // Never a confident zero for an exposure nobody could measure. The 0% that
+    // does appear is the exact allocation, which really is nothing.
+    const exposureCells = screen
+      .getAllByRole('cell')
+      .filter((cell) => cell.textContent?.includes('%'));
+    expect(exposureCells).toHaveLength(0);
   });
 
   it('says when it could only compare tickers', () => {
@@ -289,8 +316,11 @@ describe('GemPortfolioPanel', () => {
     // that cannot decide an equity role.
     expect(
       screen.getByText(
-        /EMIM has no country breakdown recorded.*Fill in its country split/,
+        /EMIM has no country structure recorded in Monize/,
       ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Fill in the instrument’s geographic structure'),
     ).toBeInTheDocument();
     // The fallback notice stands alone; it must not also claim a comparison.
     expect(screen.queryByText(/compared by country/)).toBeNull();
@@ -338,6 +368,7 @@ describe('GemPortfolioPanel', () => {
               name: 'A fund with no prices',
               quantity: 755.8342,
               marketValue: null,
+              isTargetInstrument: false,
               matchPercent: 0,
               matchedByInstrument: true,
               isCash: false,
@@ -360,7 +391,7 @@ describe('GemPortfolioPanel', () => {
         position={gemPosition({
           holdings: [],
           current: null,
-          compliancePercent: null,
+          exactTargetPercent: null,
           totalMarketValue: null,
         })}
         noAccount={false}

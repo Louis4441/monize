@@ -498,6 +498,10 @@ export class GemStrategyService {
     const performance = await this.performanceService.build({
       range,
       securityByRole,
+      // Today's holdings, for the "what my current mix would have done" line.
+      // They come from the position above, so the chart and the portfolio tab
+      // are describing the same accounts at the same moment.
+      holdings: position?.holdings ?? [],
       asOf,
     });
 

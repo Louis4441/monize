@@ -15,10 +15,20 @@ import {
   rangeSampling,
 } from "./gem-price.service";
 import {
+  GemCurrentPortfolioSimulation,
   GemPerformancePoint,
   GemPerformanceView,
   GemRange,
 } from "./gem-report.types";
+
+/** One security the accounts hold now, as the simulation needs it. */
+export interface GemSimulationHolding {
+  securityId: string | null;
+  symbol: string | null;
+  /** Value today, in any one currency; null when it could not be priced. */
+  marketValue: number | null;
+  isCash: boolean;
+}
 
 /** The earliest date any price series is allowed to start from, for MAX. */
 const MAX_RANGE_START = "1900-01-01";
@@ -86,6 +96,8 @@ export class GemPerformanceService {
     range: GemRange;
     /** Role -> securityId for mapped roles only. */
     securityByRole: Map<GemAssetRole, string>;
+    /** What the strategy accounts hold now, for the composition simulation. */
+    holdings?: GemSimulationHolding[];
     asOf?: string;
   }): Promise<GemPerformanceView | null> {
     const { range, securityByRole } = params;
@@ -95,8 +107,18 @@ export class GemPerformanceService {
 
     const from = this.windowStart(range, asOf);
     const sampling = rangeSampling(range);
+    // The simulation reads the same window at the same sampling, so its
+    // securities ride along on the one query rather than opening a second.
+    const held = (params.holdings ?? []).filter(
+      (holding) => !holding.isCash && holding.securityId !== null,
+    );
     const series = await this.priceService.loadSeries(
-      securityIds,
+      [
+        ...new Set([
+          ...securityIds,
+          ...held.map((holding) => holding.securityId as string),
+        ]),
+      ],
       from,
       sampling,
     );
@@ -150,6 +172,120 @@ export class GemPerformanceService {
       totals[role] = reader(lastDate);
     }
 
-    return { range, points, totals, incomplete };
+    const currentPortfolio = this.simulateCurrentComposition({
+      held,
+      series,
+      dates: orderedDates,
+      expectedStart,
+      sampling,
+    });
+
+    return { range, points, totals, incomplete, currentPortfolio };
+  }
+
+  /**
+   * Today's holdings, in today's proportions, replayed over the window.
+   *
+   *   securityIndex_i(t) = P_i(t) / P_i(t0)
+   *   portfolioIndex(t)  = sum(w_i * securityIndex_i(t))
+   *   returnPercent(t)   = (portfolioIndex(t) - 1) * 100
+   *
+   * `w_i` is the holding's share of today's market value and is struck once, at
+   * `t0`. Nothing rebalances it afterwards: the line is what buy-and-hold from
+   * the start of the window would have done, which is what makes it comparable
+   * with the single-instrument lines beside it. The prices are the same
+   * adjusted closes those lines use, in each instrument's own listing currency,
+   * so no FX movement enters either.
+   *
+   * Three ways it declines to answer, and it says which:
+   *
+   * - nothing is held, so there is no composition to simulate;
+   * - a holding has no current value, so its weight is unknown -- and equal
+   *   weights would be an invention, not a fallback;
+   * - a holding has no usable price history, so it cannot be replayed. The
+   *   others are *not* renormalised into a line without it: that is a
+   *   different portfolio, and it would be read as this one.
+   */
+  private simulateCurrentComposition(params: {
+    held: GemSimulationHolding[];
+    series: Map<string, PricePoint[]>;
+    dates: string[];
+    expectedStart: string;
+    sampling: "day" | "week" | "month";
+  }): GemCurrentPortfolioSimulation | null {
+    const { held, series, dates, expectedStart, sampling } = params;
+    const empty = (
+      unavailableReason: GemCurrentPortfolioSimulation["unavailableReason"],
+    ): GemCurrentPortfolioSimulation => ({
+      points: [],
+      totalReturnPercent: null,
+      completeRange: false,
+      startsOn: null,
+      includedHoldings: [],
+      unavailableReason,
+    });
+
+    if (held.length === 0) return empty("NO_HOLDINGS");
+    if (held.some((holding) => holding.marketValue === null)) {
+      return empty("UNKNOWN_CURRENT_VALUE");
+    }
+    const total = held.reduce(
+      (sum, holding) => sum + (holding.marketValue as number),
+      0,
+    );
+    if (!(total > 0)) return empty("UNKNOWN_CURRENT_VALUE");
+
+    const legs = held.map((holding) => ({
+      securityId: holding.securityId as string,
+      symbol: holding.symbol,
+      weight: (holding.marketValue as number) / total,
+      prices: series.get(holding.securityId as string) ?? [],
+    }));
+    if (legs.some((leg) => leg.prices.length === 0 || !(leg.prices[0].close > 0))) {
+      return empty("MISSING_PRICE_HISTORY");
+    }
+
+    // The simulation opens on the first date every leg can be priced on. A
+    // holding listed halfway through the window does not get carried backwards
+    // at its own first close, which would show a flat stretch nobody held.
+    const startsOn = legs
+      .map((leg) => leg.prices[0].date)
+      .reduce((latest, date) => (date > latest ? date : latest));
+    const bases = legs.map((leg) => ({
+      ...leg,
+      base: priceAsOf(leg.prices, startsOn) as number,
+    }));
+    if (bases.some((leg) => !(leg.base > 0))) {
+      return empty("MISSING_PRICE_HISTORY");
+    }
+
+    const points = dates.map((date) => {
+      if (date < startsOn) return { date, returnPercent: null };
+      let index = 0;
+      for (const leg of bases) {
+        const close = priceAsOf(leg.prices, date);
+        if (close === null) return { date, returnPercent: null };
+        index += leg.weight * (close / leg.base);
+      }
+      return {
+        date,
+        returnPercent: roundToDecimals((index - 1) * 100, GEM_PP_DECIMALS),
+      };
+    });
+
+    const priced = points.filter((point) => point.returnPercent !== null);
+    return {
+      points,
+      totalReturnPercent: priced[priced.length - 1]?.returnPercent ?? null,
+      completeRange:
+        startsOn <= addDays(expectedStart, COVERAGE_TOLERANCE_DAYS[sampling]),
+      startsOn,
+      includedHoldings: bases.map((leg) => ({
+        securityId: leg.securityId,
+        symbol: leg.symbol,
+        weightPercent: roundToDecimals(leg.weight * 100, 2),
+      })),
+      unavailableReason: null,
+    };
   }
 }

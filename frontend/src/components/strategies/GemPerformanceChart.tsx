@@ -21,6 +21,7 @@ import { ChartTooltipPanel } from '@/components/reports/ChartTooltip';
 import { type ChartDatePattern } from '@/lib/utils';
 import { GemAssetRef, GemAssetRole, GemPerformance, GemRange } from '@/types/gem-strategy';
 import {
+  GEM_PORTFOLIO_SERIES,
   GEM_RANGES,
   GEM_ROLE_COLOURS,
   buildPerformanceRows,
@@ -82,6 +83,16 @@ export function GemPerformanceChart({
   const rows = useMemo(() => buildPerformanceRows(performance), [performance]);
   const roles = useMemo(() => rolesWithData(performance), [performance]);
   const domain = useMemo(() => performanceDomain(performance), [performance]);
+  /** The simulation, when there is a line to draw. */
+  const simulated =
+    performance?.currentPortfolio &&
+    performance.currentPortfolio.unavailableReason === null
+      ? performance.currentPortfolio
+      : null;
+  /** Why there is not one, when the accounts hold something. */
+  const unavailableSimulation =
+    performance?.currentPortfolio?.unavailableReason ?? null;
+
   const symbolByRole = useMemo(
     () => new Map(assets.map((asset) => [asset.role, asset.symbol])),
     [assets],
@@ -226,6 +237,22 @@ export function GemPerformanceChart({
                         <p className="mb-1 font-medium text-gray-900 dark:text-gray-100">
                           {formatChartDate(new Date(row.ts), 'MMM d, yyyy')}
                         </p>
+                        {simulated && (
+                          <p className="flex justify-between gap-4 text-sm">
+                            <span style={{ color: chartColors.neutral }}>
+                              {t('gem.chart.currentPortfolio')}
+                            </span>
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {isKnown(row[GEM_PORTFOLIO_SERIES]) ? (
+                                formatSignedPercent(
+                                  row[GEM_PORTFOLIO_SERIES] as number,
+                                )
+                              ) : (
+                                <GemUnknown />
+                              )}
+                            </span>
+                          </p>
+                        )}
                         {roles.map((role) => (
                           <p
                             key={role}
@@ -290,6 +317,22 @@ export function GemPerformanceChart({
                     />
                   );
                 })}
+                {/* The simulation, drawn dashed and in the neutral token: it
+                    is a hypothetical about today's mix, not one of the
+                    strategy's assets, and it must not read as one. */}
+                {simulated && (
+                  <Line
+                    type="monotone"
+                    dataKey={GEM_PORTFOLIO_SERIES}
+                    name={t('gem.chart.currentPortfolio')}
+                    stroke={chartColors.neutral}
+                    strokeWidth={2}
+                    strokeDasharray="5 3"
+                    dot={false}
+                    connectNulls={false}
+                    isAnimationActive={false}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -297,6 +340,25 @@ export function GemPerformanceChart({
             {t('gem.chart.footnote')}
             {performance?.incomplete && ` ${t('gem.chart.incompleteHistory')}`}
           </p>
+          {/* What the dashed line is, and everything it is not. Printed rather
+              than tucked into a tooltip: a portfolio line beside the asset
+              lines reads as "what I actually made" unless it says otherwise. */}
+          {simulated && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t('gem.chart.currentPortfolioNote')}
+              {!simulated.completeRange &&
+                ` ${t('gem.chart.currentPortfolioLateStart')}`}
+            </p>
+          )}
+          {unavailableSimulation && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t(
+                `gem.chart.currentPortfolioUnavailable.${unavailableSimulation}` as Parameters<
+                  typeof t
+                >[0],
+              )}
+            </p>
+          )}
         </>
       )}
     </GemCard>

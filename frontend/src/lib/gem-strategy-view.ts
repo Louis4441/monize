@@ -95,6 +95,14 @@ export function buildPerformanceRows(
   performance: GemPerformance | null,
 ): GemPerformanceRow[] {
   if (!performance) return [];
+  // The simulated line rides on the same rows, keyed apart from the roles so
+  // it can never be mistaken for one: it is a portfolio, not an asset.
+  const simulated = new Map(
+    (performance.currentPortfolio?.points ?? []).map((point) => [
+      point.date,
+      point.returnPercent,
+    ]),
+  );
   return performance.points
     .map((point) => {
       const row: GemPerformanceRow = { ts: parseLocalDate(point.date).getTime() };
@@ -102,10 +110,19 @@ export function buildPerformanceRows(
         const value = point.values[role];
         row[role] = isKnown(value) ? value : null;
       }
+      const portfolio = simulated.get(point.date);
+      row[GEM_PORTFOLIO_SERIES] = isKnown(portfolio) ? portfolio : null;
       return row;
     })
     .sort((a, b) => a.ts - b.ts);
 }
+
+/**
+ * Series key for the simulated current composition. Deliberately not a
+ * `GemAssetRole`: it is a hypothetical portfolio, and a role would put it in
+ * every place the code iterates the strategy's assets.
+ */
+export const GEM_PORTFOLIO_SERIES = 'CURRENT_PORTFOLIO';
 
 /**
  * Index of the last row carrying a value for `role`, or -1 when the role has no
@@ -136,9 +153,15 @@ export function performanceDomain(
   performance: GemPerformance | null,
 ): [number, number] | undefined {
   if (!performance) return undefined;
-  const values = performance.points.flatMap((point) =>
-    GEM_ROLE_ORDER.map((role) => point.values[role]).filter(isKnown),
-  );
+  const values = [
+    ...performance.points.flatMap((point) =>
+      GEM_ROLE_ORDER.map((role) => point.values[role]).filter(isKnown),
+    ),
+    // The simulated line has to fit inside the plot too.
+    ...(performance.currentPortfolio?.points ?? [])
+      .map((point) => point.returnPercent)
+      .filter(isKnown),
+  ];
   if (values.length === 0) return undefined;
   const min = Math.min(0, ...values);
   const max = Math.max(0, ...values);

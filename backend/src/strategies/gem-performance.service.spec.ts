@@ -221,4 +221,209 @@ describe("GemPerformanceService", () => {
       "month",
     );
   });
+
+  describe("today's composition, simulated", () => {
+    /** Two funds and a cash balance, priced today and over the window. */
+    const twoHoldings = (): Array<{
+      securityId: string | null;
+      symbol: string | null;
+      marketValue: number | null;
+      isCash: boolean;
+    }> => {
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          [
+            "sec-spy",
+            [
+              { date: "2024-08-14", close: 100 },
+              { date: "2025-08-14", close: 120 },
+            ],
+          ],
+          [
+            "sec-emim",
+            [
+              { date: "2024-08-14", close: 50 },
+              { date: "2025-08-14", close: 55 },
+            ],
+          ],
+        ]),
+      );
+      return [
+        {
+          securityId: "sec-spy",
+          symbol: "SPY",
+          marketValue: 7500,
+          isCash: false,
+        },
+        {
+          securityId: "sec-emim",
+          symbol: "EMIM",
+          marketValue: 2500,
+          isCash: false,
+        },
+        {
+          securityId: null,
+          symbol: null,
+          marketValue: 4000,
+          isCash: true,
+        },
+      ];
+    };
+
+    it("holds today's weights fixed from the start of the window", async () => {
+      // 75% of a fund up 20% and 25% of one up 10%: 0.75*1.2 + 0.25*1.1 =
+      // 1.175. Fixed weights, struck once -- rebalancing back to 75/25 along
+      // the way would be a different strategy, and one nobody ran.
+      const performance = await build({ holdings: twoHoldings() });
+      const simulation = performance?.currentPortfolio;
+
+      expect(simulation?.unavailableReason).toBeNull();
+      expect(simulation?.points[0]).toEqual({
+        date: "2024-08-14",
+        returnPercent: 0,
+      });
+      expect(simulation?.totalReturnPercent).toBeCloseTo(17.5, 4);
+      expect(simulation?.completeRange).toBe(true);
+      expect(simulation?.startsOn).toBe("2024-08-14");
+    });
+
+    it("weights by market value and leaves cash out of both ends", async () => {
+      const performance = await build({ holdings: twoHoldings() });
+
+      // 7500 and 2500 of securities: 75/25. The 4000 of cash is neither a
+      // weight nor a line -- it has no price history to replay.
+      expect(performance?.currentPortfolio?.includedHoldings).toEqual([
+        { securityId: "sec-spy", symbol: "SPY", weightPercent: 75 },
+        { securityId: "sec-emim", symbol: "EMIM", weightPercent: 25 },
+      ]);
+    });
+
+    it("starts later, and says so, when a holding is younger than the window", async () => {
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          [
+            "sec-spy",
+            [
+              { date: "2024-08-14", close: 100 },
+              { date: "2025-02-14", close: 110 },
+              { date: "2025-08-14", close: 120 },
+            ],
+          ],
+          [
+            // Listed halfway through the window.
+            "sec-new",
+            [
+              { date: "2025-02-14", close: 10 },
+              { date: "2025-08-14", close: 12 },
+            ],
+          ],
+        ]),
+      );
+
+      const simulation = (
+        await build({
+          holdings: [
+            {
+              securityId: "sec-spy",
+              symbol: "SPY",
+              marketValue: 5000,
+              isCash: false,
+            },
+            {
+              securityId: "sec-new",
+              symbol: "NEW",
+              marketValue: 5000,
+              isCash: false,
+            },
+          ],
+        })
+      )?.currentPortfolio;
+
+      expect(simulation?.startsOn).toBe("2025-02-14");
+      expect(simulation?.completeRange).toBe(false);
+      // Nothing is drawn before every leg can be priced: half a portfolio
+      // carried backwards would be a line nobody held.
+      expect(simulation?.points[0]).toEqual({
+        date: "2024-08-14",
+        returnPercent: null,
+      });
+      // 0.5 * (120/110) + 0.5 * (12/10) = 1.1454...
+      expect(simulation?.totalReturnPercent).toBeCloseTo(14.55, 1);
+    });
+
+    it("reports nothing rather than a partial portfolio", async () => {
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          [
+            "sec-spy",
+            [
+              { date: "2024-08-14", close: 100 },
+              { date: "2025-08-14", close: 120 },
+            ],
+          ],
+          [
+            "sec-emim",
+            [
+              { date: "2024-08-14", close: 50 },
+              { date: "2025-08-14", close: 55 },
+            ],
+          ],
+        ]),
+      );
+
+      const simulation = (
+        await build({
+          holdings: [
+            {
+              securityId: "sec-spy",
+              symbol: "SPY",
+              marketValue: 5000,
+              isCash: false,
+            },
+            // Never priced: the remaining fund is a different portfolio, and
+            // the line would be read as this one.
+            {
+              securityId: "sec-unpriced",
+              symbol: "XYZ",
+              marketValue: 5000,
+              isCash: false,
+            },
+          ],
+        })
+      )?.currentPortfolio;
+
+      expect(simulation?.unavailableReason).toBe("MISSING_PRICE_HISTORY");
+      expect(simulation?.points).toEqual([]);
+    });
+
+    it("will not infer equal weights from an unknown value", async () => {
+      const holdings = twoHoldings();
+      holdings[1].marketValue = null;
+
+      const simulation = (await build({ holdings }))?.currentPortfolio;
+
+      expect(simulation?.unavailableReason).toBe("UNKNOWN_CURRENT_VALUE");
+      expect(simulation?.totalReturnPercent).toBeNull();
+    });
+
+    it("says there is nothing to simulate for empty accounts", async () => {
+      twoHoldings();
+      const simulation = (await build({ holdings: [] }))?.currentPortfolio;
+
+      expect(simulation?.unavailableReason).toBe("NO_HOLDINGS");
+    });
+
+    it("prices the simulation from the same adjusted series as the asset lines", async () => {
+      // One query, one basis. A second read could disagree with the lines the
+      // simulation is drawn beside -- and `loadSeries` is the only place the
+      // adjusted-close fallback lives.
+      const holdings = twoHoldings();
+      await build({ holdings });
+
+      expect(priceService.loadSeries).toHaveBeenCalledTimes(1);
+      const [ids] = priceService.loadSeries.mock.calls[0];
+      expect([...ids].sort()).toEqual(["sec-emim", "sec-spy"]);
+    });
+  });
+
 });

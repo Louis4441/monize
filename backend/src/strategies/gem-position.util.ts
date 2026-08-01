@@ -50,10 +50,24 @@ export interface GemHolding {
   isCash?: boolean;
 }
 
-/** A holding plus how much of it already sits in the target's markets. */
+/** A holding plus how much of it is estimated to sit in the target's markets. */
 export interface GemMatchedHolding extends GemHolding {
-  /** Share of this holding in the target's markets, 0-1. */
-  overlap: number;
+  /**
+   * Estimated share of this holding in the target's markets, 0-1, or **null
+   * when it cannot be estimated** -- the target carries no breakdown to compare
+   * with, or this holding carries none and cannot be placed in any market.
+   *
+   * Null rather than zero. Zero is a claim: "this fund holds nothing in those
+   * markets", printed as a confident 0.00 beside a world tracker that may well
+   * be a fifth in them. Not knowing is a different state and reads differently.
+   */
+  overlap: number | null;
+  /**
+   * True when this holding *is* the instrument the signal names -- the same
+   * security, not a fund with similar exposure. What the strategy actually
+   * asks for, and what decides whether the position is kept or sold.
+   */
+  isTargetInstrument: boolean;
   /** True when the ticker was compared because no breakdown was available. */
   matchedByInstrument: boolean;
   /** Which markets that share is made of, largest first. */
@@ -101,13 +115,31 @@ export interface GemPositionMath {
    */
   totalMarketValue: number | null;
   /**
-   * Share of `totalMarketValue` already in the target's markets, 0-100.
+   * Share of the priced non-cash securities that is the target instrument
+   * itself, 0-100. Null when any of them could not be valued.
    *
-   * This is a diagnostic, not a share of the portfolio that stays put. A fund
-   * counting 20% towards the target is still sold whole when the switch runs,
-   * because the 20% cannot be separated from the rest of the units.
+   * **This is the strategy's actual instruction.** GEM says hold 100% of one
+   * fund; a different fund with some exposure to the same market is not
+   * partially holding it. Everything operational follows from this figure --
+   * whether a change is required, what is sold, when the operation is done.
    */
-  compliancePercent: number | null;
+  exactTargetPercent: number | null;
+  /**
+   * Estimated share of the priced non-cash securities exposed to the target's
+   * markets, 0-100. Null when the comparison cannot be made -- the target has
+   * no breakdown recorded, or a holding has none and cannot be placed.
+   *
+   * Informational only, and separate from `exactTargetPercent` because the two
+   * answer different questions. A world tracker one fifth in emerging markets
+   * gives a fifth of the exposure an EM fund would, and none of the compliance:
+   * it is still sold whole when the switch runs, because the fifth cannot be
+   * separated from the rest of the units. Reporting one number for both read as
+   * "you are 20% of the way there", which is not true of an instruction to hold
+   * one instrument.
+   */
+  marketExposurePercent: number | null;
+  /** Whether the exposure estimate could be made at all. */
+  marketExposureAvailable: boolean;
   changeRequired: boolean;
   /**
    * What a switch moves: the **full** market value of every holding that is
@@ -156,40 +188,82 @@ export function buildPositionMath(
   // description there is nothing to compare and every holding is judged by its
   // ticker, exactly as before.
   const dimension = dimensionFor(target.composition, targetRole);
+  /**
+   * Is this holding the instrument the signal names?
+   *
+   * By security id, because that is what "hold 100% of EMIM" means. The role is
+   * accepted too, but only as the same statement said another way: a holding
+   * carries a role precisely because the configuration points that role at its
+   * security.
+   */
+  const isTargetInstrument = (holding: GemHolding): boolean =>
+    !holding.isCash &&
+    targetRole !== null &&
+    (holding.role === targetRole ||
+      (target.securityId !== null &&
+        holding.securityId === target.securityId));
+
   const valued: GemMatchedHolding[] = sized.map((holding) => {
-    // Cash is in no market at all, so it counts towards nothing. Saying it was
-    // "matched by instrument" would be wrong in the other direction: there is
-    // no missing breakdown to fill in, and none would help.
+    // Cash is in no market at all: an exposure of zero here is a fact, not a
+    // gap in the data. Saying it was "matched by instrument" would be wrong in
+    // the other direction -- there is no missing breakdown to fill in, and none
+    // would help.
     if (holding.isCash) {
       return {
         ...holding,
         overlap: 0,
+        isTargetInstrument: false,
         matchedByInstrument: false,
         matchedMarkets: [],
       };
     }
+    const isTarget = isTargetInstrument(holding);
     if (!targetRole) {
       return {
         ...holding,
-        overlap: 0,
+        // No target, so there are no markets to be exposed to: unknown, not
+        // zero, because zero would be an answer to a question nobody asked.
+        overlap: null,
+        isTargetInstrument: false,
+        matchedByInstrument: false,
+        matchedMarkets: [],
+      };
+    }
+    // The target instrument is 100% exposed to its own markets by definition,
+    // whatever breakdowns either side happens to carry.
+    if (isTarget) {
+      return {
+        ...holding,
+        overlap: 1,
+        isTargetInstrument: true,
+        matchedByInstrument: dimension === null,
+        matchedMarkets: [],
+      };
+    }
+    // No dimension to compare on means the exposure of a *different* fund
+    // cannot be estimated at all. It used to fall back to the ticker, which
+    // returns zero for everything that is not the target -- four confident
+    // 0.00 rows beside four funds nobody had measured.
+    if (dimension === null) {
+      return {
+        ...holding,
+        overlap: null,
+        isTargetInstrument: false,
         matchedByInstrument: true,
         matchedMarkets: [],
       };
     }
     const match = matchHolding({
-      // The role settles it as well as the id does, and keeps the fallback
-      // identical to the comparison this report made before compositions.
-      isTarget:
-        holding.role === targetRole ||
-        (target.securityId !== null &&
-          holding.securityId === target.securityId),
+      isTarget: false,
       holding: holding.composition ?? EMPTY_COMPOSITION,
       target: target.composition,
       dimension,
     });
     return {
       ...holding,
-      overlap: match.overlap,
+      // A holding with no breakdown of its own cannot be placed either.
+      overlap: match.byInstrument ? null : match.overlap,
+      isTargetInstrument: false,
       matchedByInstrument: match.byInstrument,
       matchedMarkets: match.matched,
     };
@@ -210,52 +284,103 @@ export function buildPositionMath(
 
   const current = valued[0] ?? null;
 
-  // Value already in the target's markets: a fund a tenth of which tracks them
-  // contributes a tenth of itself, not nothing and not all of it.
-  const targetValue = targetRole
-    ? sumMoney(
-        valued.map((holding) => (holding.marketValue ?? 0) * holding.overlap),
-      )
-    : 0;
+  /**
+   * The denominator both percentages are measured against: the securities.
+   *
+   * Cash is out of it. It is off target and it funds the purchase, but "how
+   * much of my equity allocation is in the right fund" is not a question idle
+   * cash belongs in the bottom of -- a portfolio wholly in the target with a
+   * dividend just paid in would otherwise read as less than fully invested in
+   * a fund it is entirely invested in.
+   */
+  const securities = valued.filter((holding) => !holding.isCash);
+  const securitiesValue = securities.some(
+    (holding) => holding.marketValue === null,
+  )
+    ? null
+    : sumMoney(securities.map((holding) => holding.marketValue as number));
 
-  // A share of a total nobody knows is not a share -- which `totalMarketValue`
-  // being null above already settles, since it is null for exactly that reason.
-  //
-  // An unpriced holding used to be dropped from the denominator while counting
-  // as zero in the numerator, which does not merely blur the figure -- it moves
-  // it in the dangerous direction. A portfolio of 10,000 in the target plus one
-  // off-target holding with no price came out at exactly 100% compliant, and
-  // `changeRequired` then read false: the report said there was nothing to do
-  // about a position it could not see. Unknown says so, and the existing
-  // unknown path settles what to do from what is held rather than from a
-  // percentage.
-  const compliancePercent =
-    targetRole && totalMarketValue !== null && totalMarketValue > 0
-      ? roundToDecimals((targetValue / totalMarketValue) * 100, 2)
+  /**
+   * What the strategy actually asks for: the share held in the named
+   * instrument itself.
+   *
+   * An unpriced holding makes it unknown rather than shrinking the
+   * denominator. Dropping one from the bottom while counting it as zero in the
+   * top moves the figure in the dangerous direction: 10,000 in the target plus
+   * one unpriced position came out at exactly 100%, and the report then said
+   * there was nothing to do about a position it could not see.
+   */
+  const exactTargetPercent =
+    targetRole && securitiesValue !== null && securitiesValue > 0
+      ? roundToDecimals(
+          (sumMoney(
+            securities
+              .filter((holding) => holding.isTargetInstrument)
+              .map((holding) => holding.marketValue as number),
+          ) /
+            securitiesValue) *
+            100,
+          2,
+        )
       : null;
 
-  // Anything not wholly inside the target's markets has to go, and go whole.
-  //
-  // The overlap explains how much of a holding is already where the strategy
-  // wants it, but it is not a fraction of the position that can be kept:
-  // selling 80% of a world tracker sells 80% of its emerging-markets sleeve
-  // along with everything else. Move only the non-overlapping 8,000 of a
-  // 10,000 fund that is 20% EM and the portfolio ends up 84% EM, not the 100%
-  // the signal asked for. GEM wants the whole allocation in one instrument, so
-  // any holding that is not entirely in the target's markets is sold in full.
+  /**
+   * The informational half: how much of the same market the portfolio is
+   * exposed to, however it got there.
+   *
+   * Every security has to be placeable for this to mean anything. One holding
+   * nobody can measure and the sum is not "the exposure" -- it is the exposure
+   * of the part that happened to carry a breakdown, printed where the reader
+   * expects a total. That is the same understatement `totalMarketValue` refuses
+   * to make, so this refuses too: unknown, not a smaller number.
+   */
+  const marketExposureAvailable =
+    targetRole !== null &&
+    securitiesValue !== null &&
+    securitiesValue > 0 &&
+    securities.every((holding) => holding.overlap !== null);
+  const marketExposurePercent = marketExposureAvailable
+    ? roundToDecimals(
+        (sumMoney(
+          securities.map(
+            (holding) =>
+              (holding.marketValue as number) * (holding.overlap as number),
+          ),
+        ) /
+          (securitiesValue as number)) *
+          100,
+        2,
+      )
+    : null;
+
+  /**
+   * Everything that is not the target instrument, sold whole.
+   *
+   * Membership is exact-instrument, not exposure. A world tracker a fifth in
+   * emerging markets is not a fifth of the way to holding EMIM: the fifth
+   * cannot be separated from the rest of the units, so keeping the fund keeps
+   * four fifths of the wrong thing, and GEM asks for one instrument. The
+   * overlap is an explanation of what the portfolio is exposed to today, never
+   * a reason to keep a position.
+   */
   const offTarget = targetRole
-    ? valued.filter((holding) => holding.overlap < 1)
+    ? valued.filter((holding) => !holding.isTargetInstrument)
     : [];
   const sold = offTarget.filter((holding) => !holding.isCash);
 
-  // With no target there is nothing to be compliant with. Otherwise a change is
-  // needed when the portfolio is not fully in the target -- and when the values
-  // are unknown, holding something else (or nothing) still settles it: what to
-  // do does not depend on being able to price it.
+  /**
+   * With no target there is nothing to be compliant with. Otherwise: anything
+   * to sell means a change, and so does idle cash, which is off target and has
+   * to be put to work even when every security is already the right one.
+   *
+   * The percentage decides the rest, and only where it is known -- holding
+   * something other than the target settles it without needing a price.
+   */
   const changeRequired = targetRole
-    ? compliancePercent === null
-      ? valued.length === 0 || offTarget.length > 0
-      : compliancePercent < COMPLIANCE_TOLERANCE_PERCENT
+    ? offTarget.length > 0 ||
+      (exactTargetPercent === null
+        ? valued.length === 0
+        : exactTargetPercent < COMPLIANCE_TOLERANCE_PERCENT)
     : false;
   // The executable trade, therefore, is the whole of each off-target position.
   //
@@ -308,7 +433,9 @@ export function buildPositionMath(
     sold,
     sellCount: sold.length,
     totalMarketValue,
-    compliancePercent,
+    exactTargetPercent,
+    marketExposurePercent,
+    marketExposureAvailable,
     changeRequired,
     transferValue,
     realizedGainLoss,

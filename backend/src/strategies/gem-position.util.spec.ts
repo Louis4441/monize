@@ -38,7 +38,7 @@ describe("gem-position.util", () => {
 
       expect(math.current?.role).toBe("US_EQUITY");
       expect(math.totalMarketValue).toBeCloseTo(23076.23, 2);
-      expect(math.compliancePercent).toBe(0);
+      expect(math.exactTargetPercent).toBe(0);
       expect(math.changeRequired).toBe(true);
       expect(math.transferValue).toBeCloseTo(23076.23, 2);
       expect(math.realizedGainLoss).toBeCloseTo(4794.77, 2);
@@ -59,7 +59,8 @@ describe("gem-position.util", () => {
       );
 
       expect(math.totalMarketValue).toBe(4900);
-      expect(math.compliancePercent).toBe(100);
+      // Both rows are the target instrument, in two accounts.
+      expect(math.exactTargetPercent).toBe(100);
       expect(math.changeRequired).toBe(false);
       expect(math.transferValue).toBeNull();
     });
@@ -76,7 +77,7 @@ describe("gem-position.util", () => {
       );
 
       expect(math.totalMarketValue).toBe(10000);
-      expect(math.compliancePercent).toBe(40);
+      expect(math.exactTargetPercent).toBe(40);
       expect(math.changeRequired).toBe(true);
       expect(math.transferValue).toBe(6000);
       expect(math.offTarget.map((entry) => entry.symbol)).toEqual(["WTAI"]);
@@ -100,7 +101,7 @@ describe("gem-position.util", () => {
         "AGGG",
       ]);
       expect(math.transferValue).toBe(8000);
-      expect(math.compliancePercent).toBe(20);
+      expect(math.exactTargetPercent).toBe(20);
     });
 
     it("treats a partially switched portfolio as non-compliant", () => {
@@ -112,7 +113,7 @@ describe("gem-position.util", () => {
         "EM_EQUITY",
       );
 
-      expect(math.compliancePercent).toBe(64);
+      expect(math.exactTargetPercent).toBe(64);
       expect(math.changeRequired).toBe(true);
       expect(math.transferValue).toBe(3600);
     });
@@ -127,7 +128,7 @@ describe("gem-position.util", () => {
       expect(math.totalMarketValue).toBeNull();
       // An empty set of accounts still needs the target bought.
       expect(math.changeRequired).toBe(true);
-      expect(math.compliancePercent).toBeNull();
+      expect(math.exactTargetPercent).toBeNull();
     });
 
     it("keeps an unpriced holding unvalued rather than worth zero", () => {
@@ -158,7 +159,7 @@ describe("gem-position.util", () => {
         null,
       );
 
-      expect(math.compliancePercent).toBeNull();
+      expect(math.exactTargetPercent).toBeNull();
       expect(math.changeRequired).toBe(false);
       expect(math.offTarget).toEqual([]);
       expect(math.transferValue).toBeNull();
@@ -207,7 +208,10 @@ describe("gem-position.util", () => {
 
       expect(math.basis).toBe("COMPOSITION");
       expect(math.dimension).toBe("COUNTRY");
-      expect(math.compliancePercent).toBe(20);
+      // A fifth of the fund is in the target's markets, which is exposure and
+      // not compliance: none of it is the instrument the signal named.
+      expect(math.marketExposurePercent).toBe(20);
+      expect(math.exactTargetPercent).toBe(0);
       // The executable trade, not the notional off-target slice: moving only
       // 8000 leaves the portfolio 84% emerging markets, never the 100% asked
       // for, because 80% of the fund's own EM sleeve goes out with the sale.
@@ -245,7 +249,7 @@ describe("gem-position.util", () => {
         emergingTarget,
       );
 
-      expect(math.compliancePercent).toBeNull();
+      expect(math.exactTargetPercent).toBeNull();
       expect(math.changeRequired).toBe(true);
       expect(math.sold.map((entry) => entry.securityId)).toEqual([
         "sec-unpriced",
@@ -364,7 +368,9 @@ describe("gem-position.util", () => {
         emergingTarget,
       );
 
-      expect(nearlyThere.compliancePercent).toBe(90);
+      expect(nearlyThere.marketExposurePercent).toBe(90);
+      // Exposure is not compliance: none of it is the target instrument.
+      expect(nearlyThere.exactTargetPercent).toBe(0);
       expect(nearlyThere.transferValue).toBe(10000);
       expect(nearlyThere.realizedGainLoss).toBeCloseTo(6000, 4);
       expect(nearlyThere.changeRequired).toBe(true);
@@ -384,9 +390,12 @@ describe("gem-position.util", () => {
         emergingTarget,
       );
 
-      expect(math.compliancePercent).toBe(100);
-      expect(math.changeRequired).toBe(false);
-      expect(math.transferValue).toBeNull();
+      expect(math.marketExposurePercent).toBe(100);
+      // A different fund with identical contents is still a different fund,
+      // and GEM asks for the named one: the position is sold, not kept.
+      expect(math.exactTargetPercent).toBe(0);
+      expect(math.changeRequired).toBe(true);
+      expect(math.transferValue).toBe(5000);
     });
 
     it("compares by instrument when the target is undescribed, and says so", () => {
@@ -410,7 +419,11 @@ describe("gem-position.util", () => {
       expect(math.basis).toBe("INSTRUMENT");
       expect(math.dimension).toBeNull();
       expect(math.instrumentMatchedCount).toBe(1);
-      expect(math.compliancePercent).toBe(0);
+      expect(math.exactTargetPercent).toBe(0);
+      // Nothing to compare contents with, so the exposure is unknown -- not a
+      // confident zero printed beside a fund nobody measured.
+      expect(math.marketExposurePercent).toBeNull();
+      expect(math.marketExposureAvailable).toBe(false);
     });
 
     it("falls back per holding, and counts how many fell back", () => {
@@ -435,8 +448,168 @@ describe("gem-position.util", () => {
 
       expect(math.basis).toBe("COMPOSITION");
       expect(math.instrumentMatchedCount).toBe(1);
-      // 2500 of the described fund counts; none of the undescribed one does.
-      expect(math.compliancePercent).toBe(25);
+      // One fund cannot be placed at all, so the exposure of the whole is
+      // unknown: 25% would be the exposure of the half that was measurable,
+      // printed where the reader expects the total.
+      expect(math.marketExposurePercent).toBeNull();
+      expect(math.exactTargetPercent).toBe(0);
+    });
+  });
+
+  describe("exact allocation versus estimated exposure", () => {
+    /** The signal names EMIM, described by its country split. */
+    const emim = {
+      securityId: "sec-emim",
+      composition: {
+        COUNTRY: [
+          { name: "China", weight: 0.5 },
+          { name: "India", weight: 0.5 },
+        ],
+        ASSET_CLASS: null,
+        SECTOR: null,
+      },
+    };
+    /** The same target, with nothing recorded about what it holds. */
+    const undescribed = { securityId: "sec-emim", composition: EMPTY_COMPOSITION };
+
+    const worldish = (symbol: string, marketValue: number) =>
+      holding({
+        role: null,
+        securityId: `sec-${symbol.toLowerCase()}`,
+        symbol,
+        marketValue,
+        composition: {
+          COUNTRY: [
+            { name: "United States", weight: 0.8 },
+            { name: "China", weight: 0.2 },
+          ],
+          ASSET_CLASS: null,
+          SECTOR: null,
+        },
+      });
+
+    it("A: none of the target held and no way to estimate exposure", () => {
+      const math = buildPositionMath(
+        [
+          holding({ role: null, securityId: "sec-iusq", symbol: "IUSQ", marketValue: 4000 }),
+          holding({ role: null, securityId: "sec-vwra", symbol: "VWRA", marketValue: 3000 }),
+          holding({ role: null, securityId: "sec-wtai", symbol: "WTAI", marketValue: 2000 }),
+          holding({ role: null, securityId: "sec-aggg", symbol: "AGGG", marketValue: 1000 }),
+        ],
+        "EM_EQUITY",
+        undescribed,
+      );
+
+      expect(math.exactTargetPercent).toBe(0);
+      expect(math.changeRequired).toBe(true);
+      expect(math.sold.map((entry) => entry.symbol)).toEqual([
+        "IUSQ",
+        "VWRA",
+        "WTAI",
+        "AGGG",
+      ]);
+      // Unknown, not four confident zeroes beside four funds nobody measured.
+      expect(math.marketExposurePercent).toBeNull();
+      expect(math.marketExposureAvailable).toBe(false);
+      expect(math.holdings.map((entry) => entry.overlap)).toEqual([
+        null,
+        null,
+        null,
+        null,
+      ]);
+    });
+
+    it("B: none of the target held, but the exposure can be estimated", () => {
+      const math = buildPositionMath(
+        [worldish("IUSQ", 6000), worldish("VWRA", 4000)],
+        "EM_EQUITY",
+        emim,
+      );
+
+      // A fifth of each fund is in the target's markets.
+      expect(math.marketExposurePercent).toBe(20);
+      expect(math.marketExposureAvailable).toBe(true);
+      // And none of it is the instrument the signal named, so all of it goes.
+      expect(math.exactTargetPercent).toBe(0);
+      expect(math.changeRequired).toBe(true);
+      expect(math.sold.map((entry) => entry.symbol)).toEqual(["IUSQ", "VWRA"]);
+      expect(math.transferValue).toBe(10000);
+    });
+
+    it("C: the target plus other holdings keeps the target and sells the rest", () => {
+      const math = buildPositionMath(
+        [
+          holding({
+            role: "EM_EQUITY",
+            securityId: "sec-emim",
+            symbol: "EMIM",
+            marketValue: 5000,
+          }),
+          worldish("IUSQ", 3000),
+          worldish("AGGG", 2000),
+        ],
+        "EM_EQUITY",
+        emim,
+      );
+
+      expect(math.exactTargetPercent).toBe(50);
+      expect(math.changeRequired).toBe(true);
+      expect(math.sold.map((entry) => entry.symbol)).toEqual(["IUSQ", "AGGG"]);
+      expect(math.transferValue).toBe(5000);
+    });
+
+    it("D: only the target held is the finished state", () => {
+      const math = buildPositionMath(
+        [
+          holding({
+            role: "EM_EQUITY",
+            securityId: "sec-emim",
+            symbol: "EMIM",
+            marketValue: 5000,
+          }),
+        ],
+        "EM_EQUITY",
+        emim,
+      );
+
+      expect(math.exactTargetPercent).toBe(100);
+      expect(math.changeRequired).toBe(false);
+      expect(math.sold).toEqual([]);
+      expect(math.transferValue).toBeNull();
+    });
+
+    it("keeps the exposure estimate out of every operational decision", () => {
+      // A fund 90% in the target's markets is nine tenths of the way to the
+      // exposure and none of the way to the instruction. It is sold whole, at
+      // its full value, and the operation is not complete.
+      const math = buildPositionMath(
+        [
+          holding({
+            role: null,
+            securityId: "sec-almost",
+            symbol: "ALMOST",
+            marketValue: 10000,
+            costBasis: 4000,
+            composition: {
+              COUNTRY: [
+                { name: "China", weight: 0.45 },
+                { name: "India", weight: 0.45 },
+                { name: "Japan", weight: 0.1 },
+              ],
+              ASSET_CLASS: null,
+              SECTOR: null,
+            },
+          }),
+        ],
+        "EM_EQUITY",
+        emim,
+      );
+
+      expect(math.marketExposurePercent).toBe(90);
+      expect(math.exactTargetPercent).toBe(0);
+      expect(math.changeRequired).toBe(true);
+      expect(math.transferValue).toBe(10000);
+      expect(math.realizedGainLoss).toBeCloseTo(6000, 4);
     });
   });
 
