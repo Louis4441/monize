@@ -142,8 +142,12 @@ describe("GemPositionService", () => {
     expect(sql).toContain("FROM holdings");
     expect(sql).toContain("SUM(h.quantity)");
     expect(params[0]).toEqual(["acct-1", "acct-2"]);
+    // Scoped by owner as well: the accounts already come from the user's own
+    // strategy, but at RLS_MODE=off nothing else enforces it.
+    expect(sql).toContain("s.user_id = $2");
+    expect(params[1]).toBe("user-1");
     // Every holding counts, not just the strategy's own instruments.
-    expect(params).toHaveLength(1);
+    expect(params).toHaveLength(2);
   });
 
   it("counts an instrument the strategy never assigned", async () => {

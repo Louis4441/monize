@@ -11,6 +11,7 @@ import { GemStrategy } from "./entities/gem-strategy.entity";
 import { GemPriceService, PricesByRole } from "./gem-price.service";
 import {
   addMonthsUtc,
+  benchmarkRoleFor,
   evaluate,
   momentumSnapshot,
   parseYmd,
@@ -31,6 +32,13 @@ export const GEM_HISTORY_PERIODS = 24;
  * covers a weekend plus the longest exchange holiday closures.
  */
 const PRICE_WINDOW_LEAD_DAYS = 14;
+
+/** The date a period's momentum window opens: one lookback before evaluation. */
+function windowStartFor(evaluatedOn: string, lookbackMonths: number): string {
+  return addMonthsUtc(parseYmd(evaluatedOn), -lookbackMonths)
+    .toISOString()
+    .slice(0, 10);
+}
 
 /**
  * Evaluates GEM periods and keeps them in `gem_strategy_signals`.
@@ -104,12 +112,57 @@ export class GemSignalService {
   }
 
   /**
+   * The first period the price history can possibly answer for, or null when it
+   * cannot answer for any.
+   *
+   * The absolute test needs a base close at or before the momentum window's
+   * start for both the US equity leg and the benchmark, so a period whose
+   * window opens before either instrument's first recorded close can never
+   * evaluate. Left unchecked those periods are retried on every single report
+   * load -- a strategy configured with two years of history but instruments
+   * listed last year re-reads the whole price window each time to conclude the
+   * same nothing. One cheap aggregate per load replaces that.
+   *
+   * This is a bound, not a watermark: nothing is remembered, so the moment a
+   * backfill pushes an instrument's history further back the periods it unlocks
+   * are evaluated on the next load with no state to reset.
+   */
+  private async earliestEvaluableWindowStart(
+    assets: GemStrategyAsset[],
+    manager: EntityManager,
+  ): Promise<string | null> {
+    const securityByRole = this.securityByRole(assets);
+    const required = [
+      "US_EQUITY" as GemAssetRole,
+      benchmarkRoleFor([...securityByRole.keys()]),
+    ];
+    const securityIds = required.map((role) => securityByRole.get(role));
+    // A required leg with no instrument at all: nothing can be evaluated.
+    if (securityIds.some((id) => !id)) return null;
+
+    const earliest = await this.priceService.earliestPriceDates(
+      securityIds as string[],
+      manager,
+    );
+    if (earliest.size < new Set(securityIds).size) return null;
+    // Both legs must reach back that far, so the later first close governs.
+    return [...earliest.values()].sort().pop() ?? null;
+  }
+
+  /**
    * Evaluate every period on the strategy's calendar that has no stored signal
    * yet, then return the stored history newest-first.
    *
    * A period whose absolute test cannot be run -- no momentum for the US equity
    * leg or the benchmark -- is skipped rather than stored as a guess, so it can
    * be evaluated later once its prices exist.
+   *
+   * Materializing on a read is deliberate (see the class comment) and writes
+   * nothing the caller supplies: every column is derived from the user's own
+   * stored prices, and the unique index makes a repeat a no-op. That is why it
+   * is not marked `@DemoRestricted()` -- there is no request body to abuse, and
+   * a demo account materializing its own signals is what makes the demo's
+   * report show anything at all.
    */
   async materialize(
     userId: string,
@@ -131,12 +184,28 @@ export class GemSignalService {
         GEM_HISTORY_PERIODS,
       );
       const known = new Set(stored.map((signal) => signal.evaluatedOn));
-      const missing = periods.filter(
+      const unstored = periods.filter(
         (period) => !known.has(period.evaluatedOn),
       );
-      if (missing.length === 0 || assets.every((a) => !a.securityId)) {
+      if (unstored.length === 0 || assets.every((a) => !a.securityId)) {
         return stored;
       }
+
+      // Drop the periods whose momentum window opens before the price history
+      // does. They would evaluate to nothing, and re-reading a year of prices
+      // to establish that on every report load is the whole cost of a strategy
+      // whose instruments are younger than its history window.
+      const earliestWindowStart = await this.earliestEvaluableWindowStart(
+        assets,
+        manager,
+      );
+      if (earliestWindowStart === null) return stored;
+      const missing = unstored.filter(
+        (period) =>
+          windowStartFor(period.evaluatedOn, strategy.lookbackMonths) >=
+          earliestWindowStart,
+      );
+      if (missing.length === 0) return stored;
 
       const prices = await this.loadEvaluationPrices(
         assets,
@@ -144,6 +213,7 @@ export class GemSignalService {
         strategy.lookbackMonths,
         manager,
       );
+      const evaluable = new Set(missing.map((period) => period.evaluatedOn));
       const eligibleRoles = [...this.securityByRole(assets).keys()];
       const securityByRole = this.securityByRole(assets);
 
@@ -156,6 +226,7 @@ export class GemSignalService {
 
       for (const period of periods) {
         if (known.has(period.evaluatedOn)) continue;
+        if (!evaluable.has(period.evaluatedOn)) continue;
 
         const momentum = momentumSnapshot(
           prices,

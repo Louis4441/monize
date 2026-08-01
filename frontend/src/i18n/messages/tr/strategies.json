@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Dağılım kayıtlı değil; enstrümana göre eşleştirildi",
       "workingNoTargetData": "Karşılaştırılamıyor: hedefin dağılımı yok",
-      "workingNoOverlap": "Hedefle ortak piyasa yok",
+      "workingNoOverlap": "Hedefle ortak bir {dimension} kaydı yok — ikisinin de aynı adlandırıldığını kontrol edin",
       "workingTotal": "Toplam",
       "workingSum": "{total} tutarın {counted} kadarı hâlihazırda hedefin piyasalarında; yukarıdaki {percent} bu.",
       "workingUnknown": "Pozisyonlar fiyatlanana kadar bu oran hesaplanamaz.",

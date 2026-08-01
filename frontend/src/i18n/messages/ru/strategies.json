@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Разбивка не указана; сопоставлено по инструменту",
       "workingNoTargetData": "Сравнить нельзя: у цели нет разбивки",
-      "workingNoOverlap": "Нет общих рынков с целью",
+      "workingNoOverlap": "Нет общей позиции по параметру «{dimension}» с целью — проверьте, одинаково ли они названы",
       "workingTotal": "Итого",
       "workingSum": "{counted} из {total} уже находится на рынках цели — это те самые {percent} выше.",
       "workingUnknown": "Долю нельзя рассчитать, пока позиции невозможно оценить.",

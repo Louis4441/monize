@@ -303,6 +303,12 @@ describe("GemStrategyService", () => {
         taxRatePercent: null,
         commissionAmount: null,
       });
+      // No strategy exists yet, so there is no id -- and emphatically not a
+      // stand-in string. The client sends this back as ?strategyId=, which
+      // every endpoint validates as a UUID, so a sentinel here rejected the
+      // first save every new user ever made.
+      expect(report.strategy.id).toBeNull();
+      expect(report.strategies).toEqual([]);
       expect(signalService.materialize).not.toHaveBeenCalled();
     });
 

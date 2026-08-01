@@ -43,6 +43,34 @@ describe("gem-composition.util", () => {
       expect(weights.get("b")).toBeCloseTo(0.5, 6);
     });
 
+    it("folds the spellings this codebase itself produces", () => {
+      // The allocation editor takes free text and Yahoo writes "Stocks", so
+      // one fund described by hand and the next filled by the provider used to
+      // share no name at all and score a confident zero overlap.
+      const weights = weightsByName([
+        { name: "Equities", weight: 0.5 },
+        { name: "stock", weight: 0.5 },
+      ]);
+      expect(weights.size).toBe(1);
+      expect(weights.get("stocks")).toBeCloseTo(1, 6);
+
+      expect([
+        ...weightsByName([{ name: "U.S.A.", weight: 1 }]).keys(),
+      ]).toEqual(["united states"]);
+      expect([
+        ...weightsByName([{ name: "Cash & Equivalents", weight: 1 }]).keys(),
+      ]).toEqual(["cash"]);
+    });
+
+    it("ignores accents and punctuation when matching a name", () => {
+      const weights = weightsByName([
+        { name: "Türkiye", weight: 0.5 },
+        { name: "turkiye", weight: 0.5 },
+      ]);
+      expect(weights.size).toBe(1);
+      expect(weights.get("turkiye")).toBeCloseTo(1, 6);
+    });
+
     it("drops rows that say nothing", () => {
       expect(
         weightsByName([

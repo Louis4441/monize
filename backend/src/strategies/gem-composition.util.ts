@@ -79,10 +79,61 @@ export const EMPTY_COMPOSITION: GemSecurityComposition = {
 };
 
 /**
- * Weights keyed by name, case- and whitespace-insensitively. Rows are summed
- * rather than overwritten so a breakdown that lists a name twice is not
- * silently reduced to its last entry, and the total is capped at 1: a
- * description adding up to more than the whole fund cannot buy extra overlap.
+ * Names for the same thing that this codebase itself produces differently.
+ *
+ * The asset-class column is filled from two places: the allocation editor,
+ * where the user types whatever they like, and Yahoo, which writes "Stocks",
+ * "Bonds", "Cash". A user who typed "Equities" against a fund and let the
+ * provider fill the next one gets two descriptions that share no name at all,
+ * and the comparison then reports a confident zero overlap between two bond
+ * funds. Folding the English synonyms together fixes the collision we create.
+ *
+ * A name in another language is a different problem and is not solved here:
+ * "Obligacje" against "Bonds" still shares nothing, which the report says out
+ * loud rather than guessing -- it tells the user to check the two spellings
+ * match instead of inventing an overlap.
+ */
+const NAME_SYNONYMS: Record<string, string> = {
+  stock: "stocks",
+  equity: "stocks",
+  equities: "stocks",
+  bond: "bonds",
+  "fixed income": "bonds",
+  "cash and equivalents": "cash",
+  "cash equivalents": "cash",
+  preferreds: "preferred",
+  convertibles: "convertible",
+  "united states of america": "united states",
+  usa: "united states",
+  us: "united states",
+  // Punctuation is stripped before the lookup, so "U.S." arrives spaced out.
+  "u s": "united states",
+  "u s a": "united states",
+  uk: "united kingdom",
+  "u k": "united kingdom",
+};
+
+/**
+ * One breakdown row's name, reduced to a comparable key: case, accents,
+ * punctuation and "&"/"and" are noise that two people describing the same
+ * market will differ on, and none of them carry meaning here.
+ */
+export function canonicalName(name: string): string {
+  const normalized = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return NAME_SYNONYMS[normalized] ?? normalized;
+}
+
+/**
+ * Weights keyed by canonical name (see `canonicalName`). Rows are summed rather
+ * than overwritten so a breakdown that lists a name twice is not silently
+ * reduced to its last entry, and the total is capped at 1: a description adding
+ * up to more than the whole fund cannot buy extra overlap.
  */
 export function weightsByName(
   entries: GemWeighting[] | null | undefined,
@@ -90,7 +141,7 @@ export function weightsByName(
   const weights = new Map<string, number>();
   if (!entries) return weights;
   for (const entry of entries) {
-    const name = entry?.name?.trim().toLowerCase();
+    const name = entry?.name ? canonicalName(entry.name) : "";
     const weight = Number(entry?.weight);
     if (!name || !Number.isFinite(weight) || weight <= 0) continue;
     weights.set(name, (weights.get(name) ?? 0) + weight);

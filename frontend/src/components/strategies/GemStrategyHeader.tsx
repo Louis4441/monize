@@ -12,8 +12,11 @@ import { useGemLabels } from './useGemLabels';
 import { GemScenarioSwitcher } from './GemScenarioSwitcher';
 
 interface GemStrategyHeaderProps {
-  /** The scenario on screen, and every saved one, for the switcher. */
-  strategyId: string;
+  /**
+   * The scenario on screen, and every saved one, for the switcher. The id is
+   * null until the first save, when there is a report but no stored strategy.
+   */
+  strategyId: string | null;
   strategyName: string;
   scenarios: readonly GemStrategyRef[];
   onSelectScenario: (id: string) => void;

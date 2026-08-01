@@ -185,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Asignación por clase de activo",
-      "help": "Los proveedores de cotizaciones no ofrecen la exposición por clase de activo de los ETF y fondos. Añádela manualmente en porcentajes: escribe el nombre que quieras y quedará disponible en tus demás valores. Todo lo que quede por debajo del 100 % se muestra como «Otros».",
+      "help": "Un proveedor de precios puede rellenar el reparto entre acciones, bonos y efectivo de un fondo cuando usted no lo ha descrito; lo que introduzca aquí se conserva y nunca se sobrescribe. Añádalo como porcentajes: escriba el nombre de clase que quiera y se ofrecerá después en sus otros valores. Todo lo que quede por debajo del 100 % se muestra como «Otros».",
       "placeholder": "Selecciona o escribe una clase de activo",
       "addRow": "Añadir clase de activo",
       "nameAriaLabel": "Clase de activo",

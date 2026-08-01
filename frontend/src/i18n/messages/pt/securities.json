@@ -185,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Alocação por classe de ativos",
-      "help": "Os fornecedores de cotações não indicam a exposição por classe de ativos de ETF e fundos. Adicione-a manualmente em percentagens — escreva o nome que quiser e ele fica disponível nos seus outros títulos. Tudo o que ficar abaixo de 100% é apresentado como «Outros».",
+      "help": "Um fornecedor de cotações pode preencher a divisão entre ações, obrigações e liquidez de um fundo quando não a descreveu; o que introduzir aqui é mantido e nunca é substituído. Adicione-a em percentagens — escreva o nome de classe que quiser e passará a ser sugerido nos seus outros títulos. Tudo abaixo de 100% é mostrado como \"Outros\".",
       "placeholder": "Selecione ou escreva uma classe de ativos",
       "addRow": "Adicionar classe de ativos",
       "nameAriaLabel": "Classe de ativos",

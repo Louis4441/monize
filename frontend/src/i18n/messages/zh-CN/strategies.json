@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "未记录构成，按标的匹配",
       "workingNoTargetData": "无法比较：目标没有构成",
-      "workingNoOverlap": "与目标没有共同市场",
+      "workingNoOverlap": "与目标没有共同的{dimension}条目——请检查两者的名称是否一致",
       "workingTotal": "合计",
       "workingSum": "{total} 中已有 {counted} 位于目标市场，也就是上面的 {percent}。",
       "workingUnknown": "在持仓能够估值之前，无法算出这个比例。",

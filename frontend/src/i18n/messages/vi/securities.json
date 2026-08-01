@@ -185,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Phân bổ theo loại tài sản",
-      "help": "Các nhà cung cấp giá không cung cấp mức phân bổ theo loại tài sản cho ETF và quỹ. Hãy nhập thủ công theo tỷ lệ phần trăm — gõ tên bất kỳ và tên đó sẽ dùng được cho các chứng khoán khác của bạn. Phần còn thiếu so với 100% được hiển thị là \"Khác\".",
+      "help": "Nhà cung cấp giá có thể điền tỷ trọng cổ phiếu/trái phiếu/tiền mặt của một quỹ khi bạn chưa tự mô tả; những gì bạn nhập ở đây được giữ lại và không bao giờ bị ghi đè. Hãy thêm dưới dạng phần trăm — gõ bất kỳ tên lớp tài sản nào và nó sẽ được gợi ý cho các chứng khoán khác của bạn. Phần dưới 100% được hiển thị là \"Khác\".",
       "placeholder": "Chọn hoặc nhập loại tài sản",
       "addRow": "Thêm loại tài sản",
       "nameAriaLabel": "Loại tài sản",

@@ -271,7 +271,7 @@ export class GemStrategyService {
     name: string,
   ): GemStrategyReportView {
     const meta: GemStrategyMetaView = {
-      id: "gem",
+      id: null,
       name,
       cadence: "MONTHLY",
       lookbackMonths: DEFAULT_LOOKBACK_MONTHS,

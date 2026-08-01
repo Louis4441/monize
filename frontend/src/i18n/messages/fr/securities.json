@@ -185,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Répartition par classe d'actifs",
-      "help": "Les fournisseurs de cotations ne fournissent pas l'exposition par classe d'actifs des ETF et fonds. Ajoutez-la manuellement en pourcentages : saisissez le nom de votre choix, il sera ensuite proposé sur vos autres titres. Tout ce qui est inférieur à 100 % est affiché comme « Autres ».",
+      "help": "Un fournisseur de cours peut renseigner la répartition actions/obligations/liquidités d'un fonds lorsque vous ne l'avez pas décrite vous-même ; ce que vous saisissez ici est conservé et n'est jamais écrasé. Ajoutez-la en pourcentages — saisissez le nom de classe de votre choix, il sera ensuite proposé sur vos autres titres. Tout ce qui reste sous 100 % s'affiche comme « Autres ».",
       "placeholder": "Sélectionnez ou saisissez une classe d'actifs",
       "addRow": "Ajouter une classe d'actifs",
       "nameAriaLabel": "Classe d'actifs",

@@ -185,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Asset Allocation",
-      "help": "Price providers don't supply asset-class exposure for ETFs and funds. Add it manually as percentages — type any class name you like and it is offered on your other securities afterwards. Anything under 100% is shown as \"Other\".",
+      "help": "A price provider may fill in a fund's stock/bond/cash split when you have not described it yourself; whatever you enter here is kept and never overwritten. Add it as percentages — type any class name you like and it is offered on your other securities afterwards. Anything under 100% is shown as \"Other\".",
       "placeholder": "Select or type an asset class",
       "addRow": "Add asset class",
       "nameAriaLabel": "Asset class",

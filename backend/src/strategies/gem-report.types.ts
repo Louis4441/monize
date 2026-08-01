@@ -204,7 +204,14 @@ export interface GemStrategyRef {
 }
 
 export interface GemStrategyMetaView {
-  id: string;
+  /**
+   * The saved scenario's id, or null when nothing is saved yet -- the report a
+   * user gets before their first save describes a strategy that does not exist
+   * in the database. It carried a `"gem"` sentinel before, which the client
+   * then sent back as `?strategyId=gem` and every UUID-validated endpoint
+   * rejected, so the very first save always failed.
+   */
+  id: string | null;
   /** Scenario name shown in the switcher and the report title. */
   name: string;
   cadence: GemCadence;

@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Brak zapisanego podziału; porównano po instrumencie",
       "workingNoTargetData": "Nie da się porównać: cel nie ma podziału",
-      "workingNoOverlap": "Brak wspólnego rynku z celem",
+      "workingNoOverlap": "Brak wspólnej pozycji według {dimension} z celem — sprawdź, czy obie są tak samo nazwane",
       "workingTotal": "Razem",
       "workingSum": "{counted} z {total} jest już w rynkach celu, czyli {percent} powyżej.",
       "workingUnknown": "Udziału nie da się wyliczyć, dopóki pozycji nie można wycenić.",

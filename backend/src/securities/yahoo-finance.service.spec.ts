@@ -1524,6 +1524,47 @@ describe("YahooFinanceService", () => {
     });
   });
 
+  describe("fetchEtfBreakdowns", () => {
+    beforeEach(() => seedCrumb());
+
+    it("returns both breakdowns from a single request", async () => {
+      // Sectors and asset positions arrive in the same topHoldings module, so
+      // fetching them separately was two identical round trips per fund.
+      mockFetchResponse({
+        quoteSummary: {
+          result: [
+            {
+              topHoldings: {
+                stockPosition: { raw: 1 },
+                sectorWeightings: [{ technology: { raw: 0.3 } }],
+              },
+            },
+          ],
+        },
+      });
+      const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
+
+      const result = await service.fetchEtfBreakdowns("VTI");
+
+      expect(result).toEqual({
+        sectors: [{ sector: "Technology", weight: 0.3 }],
+        assets: [{ name: "Stocks", weight: 1 }],
+      });
+      expect((global.fetch as jest.Mock).mock.calls.length - callsBefore).toBe(
+        1,
+      );
+    });
+
+    it("reports both halves as unknown when the request fails", async () => {
+      // Null is "we could not ask", which a caller must not store as "none".
+      mockFetchResponse({}, false, 500);
+      expect(await service.fetchEtfBreakdowns("VTI")).toEqual({
+        sectors: null,
+        assets: null,
+      });
+    });
+  });
+
   describe("fetchEtfSectorWeightings", () => {
     beforeEach(() => seedCrumb());
 

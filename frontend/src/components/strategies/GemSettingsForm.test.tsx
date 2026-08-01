@@ -171,9 +171,11 @@ describe('GemSettingsForm', () => {
       'Broker IRA (USD)',
     );
     expect(screen.getByLabelText('Evaluation frequency')).toHaveValue('MONTHLY');
-    expect(screen.getByLabelText('Momentum window (months)')).toHaveValue(12);
-    expect(screen.getByLabelText('Tax rate (%)')).toHaveValue(19);
-    expect(screen.getByLabelText('Commission per switch')).toHaveValue(29.9);
+    // NumericInput and CurrencyInput are text fields that format on blur, so
+    // the values read back as the formatted strings, not as numbers.
+    expect(screen.getByLabelText('Momentum window (months)')).toHaveValue('12');
+    expect(screen.getByLabelText('Tax rate (%)')).toHaveValue('19.00');
+    expect(screen.getByLabelText('Commission per switch')).toHaveValue('29.90');
     expect(screen.getByLabelText('Text to show for that link')).toHaveValue('example.test/gem');
     expect(roleTrigger('S&P 500')).toHaveTextContent('SPY');
   });
@@ -233,7 +235,7 @@ describe('GemSettingsForm', () => {
       '1Y',
       // The save names the scenario being edited; without it the server would
       // rewrite the user's oldest one instead.
-      'gem',
+      'strategy-1',
     );
     expect(mockToastSuccess).toHaveBeenCalledWith('Strategy configuration saved.');
     expect(onSaved).toHaveBeenCalledWith(refreshed);
@@ -288,15 +290,37 @@ describe('GemSettingsForm', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
     });
-    expect(mockUpdateConfig).toHaveBeenCalledWith(expect.anything(), 'MAX', 'gem');
+    expect(mockUpdateConfig).toHaveBeenCalledWith(expect.anything(), 'MAX', 'strategy-1');
   });
 
-  it('rejects a momentum window outside the allowed range', async () => {
+  it('holds the momentum window at its minimum rather than accepting zero', async () => {
+    // NumericInput enforces `min` as you type, so the invalid value never
+    // reaches the form -- the field settles on 1 instead of erroring.
     await renderForm();
 
     await act(async () => {
       fireEvent.change(screen.getByLabelText('Momentum window (months)'), {
         target: { value: '0' },
+      });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+    });
+
+    expect(mockUpdateConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ lookbackMonths: 1 }),
+      '1Y',
+      'strategy-1',
+    );
+  });
+
+  it('rejects a momentum window longer than the schema allows', async () => {
+    // The shared input has no maximum, so this one is the schema's to catch.
+    await renderForm();
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText('Momentum window (months)'), {
+        target: { value: '999' },
       });
     });
     await act(async () => {
@@ -361,9 +385,28 @@ describe('GemSettingsForm', () => {
     expect(screen.getByLabelText('Strategy accounts')).toHaveTextContent(
       'No account assigned',
     );
-    expect(screen.getByLabelText('Tax rate (%)')).toHaveValue(null);
+    expect(screen.getByLabelText('Tax rate (%)')).toHaveValue('');
     expect(roleTrigger('S&P 500')).toHaveTextContent('No instrument');
     expect(screen.getByText(/Assign an ETF or fund to each role/)).toBeInTheDocument();
+  });
+
+  it('sends no scenario id on the very first save', async () => {
+    // Before the first save there is no stored strategy, so its id is null.
+    // Sending a stand-in in its place put a non-UUID on the query string,
+    // which the endpoint rejects -- every new user's first save failed.
+    await renderForm({
+      strategy: { ...gemReport().strategy, id: null },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }));
+    });
+
+    expect(mockUpdateConfig).toHaveBeenCalledWith(
+      expect.anything(),
+      '1Y',
+      undefined,
+    );
   });
 
   describe('filling the missing roles', () => {

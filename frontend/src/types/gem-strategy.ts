@@ -254,7 +254,12 @@ export interface GemStrategyRef {
 }
 
 export interface GemStrategyMeta {
-  id: string;
+  /**
+   * The saved scenario's id, or null before the first save: the report shown
+   * to a user with no strategy describes one that does not exist yet. Never
+   * send a null id back to the API -- omit the parameter instead.
+   */
+  id: string | null;
   /** Scenario name shown in the switcher and the report title. */
   name: string;
   cadence: GemCadence;

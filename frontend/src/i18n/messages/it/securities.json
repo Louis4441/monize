@@ -185,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Allocazione per classe di attivo",
-      "help": "I fornitori di quotazioni non forniscono l'esposizione per classe di attivo di ETF e fondi. Aggiungila manualmente in percentuale: digita il nome che preferisci e sarà poi disponibile sugli altri tuoi titoli. Tutto ciò che resta sotto il 100% viene mostrato come «Altro».",
+      "help": "Un fornitore di quotazioni può compilare la ripartizione tra azioni, obbligazioni e liquidità di un fondo quando non l’hai descritta tu; quanto inserisci qui viene mantenuto e non viene mai sovrascritto. Aggiungila in percentuale: digita il nome di classe che preferisci e ti verrà proposto anche sugli altri titoli. Tutto ciò che resta sotto il 100% è mostrato come «Altro».",
       "placeholder": "Seleziona o digita una classe di attivo",
       "addRow": "Aggiungi classe di attivo",
       "nameAriaLabel": "Classe di attivo",

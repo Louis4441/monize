@@ -250,7 +250,11 @@ export function GemPortfolioPanel({ position, noAccount, noPosition }: GemPortfo
                                   })
                                 : holding.matchedByInstrument
                                   ? t('gem.portfolioPanel.workingByInstrument')
-                                  : t('gem.portfolioPanel.workingNoOverlap')}
+                                  : t('gem.portfolioPanel.workingNoOverlap', {
+                                      dimension: dimensionLabel(
+                                        position.dimension,
+                                      ),
+                                    })}
                           </td>
                           <td className="py-1 text-right tabular-nums">
                             {counted === null ? (

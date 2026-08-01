@@ -91,6 +91,7 @@ export class GemPositionService {
    * what makes it non-compliant and part of what a switch has to sell.
    */
   private async loadHoldings(
+    userId: string,
     accountIds: string[],
   ): Promise<AggregatedHolding[]> {
     if (accountIds.length === 0) return [];
@@ -128,9 +129,10 @@ export class GemPositionService {
            FROM holdings h
            JOIN securities s ON s.id = h.security_id
           WHERE h.account_id = ANY($1::uuid[])
+            AND s.user_id = $2
           GROUP BY h.security_id, s.symbol, s.name, s.currency_code,
                    s.country_weightings, s.asset_weightings, s.sector_weightings`,
-        [accountIds],
+        [accountIds, userId],
       ),
     );
     return rows.map((row) => ({
@@ -147,8 +149,15 @@ export class GemPositionService {
   /**
    * The breakdowns of one security that is not held -- the signal's target
    * usually is not, which is the whole point of the switch.
+   *
+   * Scoped by `user_id` as well as by id. The id reaching here comes from the
+   * caller's own strategy, so today the filter changes no result; it is there
+   * because at `RLS_MODE=off` the database enforces nothing, and the next
+   * caller to pass an id from somewhere else should get no row rather than
+   * another user's fund breakdown.
    */
   private async loadComposition(
+    userId: string,
     securityId: string | null,
   ): Promise<GemSecurityComposition> {
     if (!securityId) return EMPTY_COMPOSITION;
@@ -160,8 +169,8 @@ export class GemPositionService {
       manager.query(
         `SELECT country_weightings, asset_weightings, sector_weightings
            FROM securities
-          WHERE id = $1`,
-        [securityId],
+          WHERE id = $1 AND user_id = $2`,
+        [securityId, userId],
       ),
     );
     return rows[0] ? toComposition(rows[0]) : EMPTY_COMPOSITION;
@@ -206,6 +215,7 @@ export class GemPositionService {
     currencyCode: string;
   }): Promise<GemPositionResult> {
     const {
+      userId,
       strategy,
       accounts,
       assetRefs,
@@ -227,6 +237,7 @@ export class GemPositionService {
       [...securityByRole].map(([role, securityId]) => [securityId, role]),
     );
     const aggregated = await this.loadHoldings(
+      userId,
       accounts.map((account) => account.id),
     );
     const prices = await this.priceService.latestPrices([
@@ -277,7 +288,10 @@ export class GemPositionService {
 
     const math = buildPositionMath(valued, targetRole, {
       securityId: target?.securityId ?? null,
-      composition: await this.loadComposition(target?.securityId ?? null),
+      composition: await this.loadComposition(
+        userId,
+        target?.securityId ?? null,
+      ),
     });
 
     const held = (holding: GemMatchedHolding): GemHeldAsset => ({

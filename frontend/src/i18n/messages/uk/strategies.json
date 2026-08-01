@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Розподіл не вказано; зіставлено за інструментом",
       "workingNoTargetData": "Порівняти не можна: ціль не має розподілу",
-      "workingNoOverlap": "Немає спільних ринків із ціллю",
+      "workingNoOverlap": "Немає спільної позиції за параметром «{dimension}» із ціллю — перевірте, чи однаково вони названі",
       "workingTotal": "Разом",
       "workingSum": "{counted} із {total} уже на ринках цілі — це ті самі {percent} вище.",
       "workingUnknown": "Частку не можна обчислити, доки позиції неможливо оцінити.",

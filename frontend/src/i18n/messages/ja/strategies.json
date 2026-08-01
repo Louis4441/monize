@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "内訳が未登録のため銘柄で照合",
       "workingNoTargetData": "比較できません：目標に内訳がありません",
-      "workingNoOverlap": "目標と共通の市場なし",
+      "workingNoOverlap": "目標と共通する{dimension}の項目がありません。名称が一致しているか確認してください",
       "workingTotal": "合計",
       "workingSum": "{total} のうち {counted} がすでに目標の市場にあり、これが上の {percent} です。",
       "workingUnknown": "保有を評価できるまで、この割合は計算できません。",

@@ -196,7 +196,7 @@ export function gemHistory(): GemHistoryEntry[] {
 export function gemReport(overrides: Partial<GemStrategyReport> = {}): GemStrategyReport {
   return {
     strategy: {
-      id: 'gem',
+      id: 'strategy-1',
       name: 'GEM',
       cadence: 'MONTHLY',
       lookbackMonths: 12,
@@ -209,7 +209,7 @@ export function gemReport(overrides: Partial<GemStrategyReport> = {}): GemStrate
       rulesSourceLabel: 'example.test/gem',
       accounts: [{ id: 'acct-1', name: 'Broker IRA' }],
     },
-    strategies: [{ id: 'gem', name: 'GEM' }],
+    strategies: [{ id: 'strategy-1', name: 'GEM' }],
     assets: gemAssets,
     signal: gemSignal(),
     position: gemPosition(),

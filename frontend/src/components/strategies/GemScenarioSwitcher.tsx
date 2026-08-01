@@ -11,8 +11,12 @@ import { Button } from '@/components/ui/Button';
 import type { GemStrategyRef } from '@/types/gem-strategy';
 
 interface GemScenarioSwitcherProps {
-  /** The scenario on screen; it is not offered as a destination. */
-  currentId: string;
+  /**
+   * The scenario on screen; it is not offered as a destination. Null before
+   * the first save: there is nothing yet to switch away from or delete, so
+   * only "start another one" is offered.
+   */
+  currentId: string | null;
   currentName: string;
   scenarios: readonly GemStrategyRef[];
   onSelect: (id: string) => void;
@@ -63,7 +67,7 @@ export function GemScenarioSwitcher({
   return (
     <>
       <span className="flex items-center gap-0.5">
-        {items.length > 1 && (
+        {currentId !== null && items.length > 1 && (
           <EntitySwitcher
             currentId={currentId}
             items={items}
@@ -85,7 +89,7 @@ export function GemScenarioSwitcher({
         </button>
         {/* Deleting the only scenario would leave nothing to report on, and the
             unconfigured report is reachable by clearing it instead. */}
-        {scenarios.length > 1 && (
+        {currentId !== null && scenarios.length > 1 && (
           <button
             type="button"
             onClick={() => setConfirmingDelete(true)}
@@ -133,7 +137,7 @@ export function GemScenarioSwitcher({
         isOpen={confirmingDelete}
         onCancel={() => setConfirmingDelete(false)}
         onConfirm={async () => {
-          await onDelete(currentId);
+          if (currentId) await onDelete(currentId);
           setConfirmingDelete(false);
         }}
         pushHistory

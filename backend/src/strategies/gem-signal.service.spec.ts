@@ -56,7 +56,10 @@ describe("GemSignalService", () => {
   let insertedRows: Array<Record<string, unknown>> | null;
   /** Every row the loop managed to insert, in order. */
   let savedSignals: Array<Record<string, unknown>>;
-  let priceService: { loadSeries: jest.Mock };
+  let priceService: {
+    loadSeries: jest.Mock;
+    earliestPriceDates: jest.Mock;
+  };
 
   beforeEach(() => {
     // Inserting a signal goes through an INSERT ... ON CONFLICT DO NOTHING,
@@ -103,6 +106,14 @@ describe("GemSignalService", () => {
           ["sec-ewa", seriesFor(8)],
           ["sec-emim", seriesFor(30)],
           ["sec-ief", seriesFor(4)],
+        ]),
+      ),
+      // The fixtures' series start in January 2022, well before every period
+      // the tests evaluate, so nothing is bounded out by default.
+      earliestPriceDates: jest.fn().mockResolvedValue(
+        new Map([
+          ["sec-spy", "2022-01-28"],
+          ["sec-ief", "2022-01-28"],
         ]),
       ),
     };
@@ -176,6 +187,62 @@ describe("GemSignalService", () => {
       );
       expect(result).toBe(stored);
       expect(priceService.loadSeries).not.toHaveBeenCalled();
+    });
+
+    it("does not re-read prices for periods the history cannot reach", async () => {
+      // Instruments listed this year against a strategy whose calendar goes
+      // back two: every one of those older periods evaluates to nothing, and
+      // re-reading a year of closes to rediscover that on every report load is
+      // what this bound removes.
+      priceService.earliestPriceDates.mockResolvedValue(
+        new Map([
+          ["sec-spy", "2030-01-02"],
+          ["sec-ief", "2030-01-02"],
+        ]),
+      );
+      const stored = [{ id: "sig-1" } as GemStrategySignal];
+      signalRepo.find.mockResolvedValue(stored);
+
+      const result = await service.materialize(
+        userId,
+        strategy(),
+        assets(),
+        "2025-08-14",
+      );
+
+      expect(result).toBe(stored);
+      expect(priceService.loadSeries).not.toHaveBeenCalled();
+    });
+
+    it("evaluates nothing when a required leg has never been priced", async () => {
+      // The absolute test needs both the US equity leg and the benchmark, so
+      // one of them missing settles it without reading any series.
+      priceService.earliestPriceDates.mockResolvedValue(
+        new Map([["sec-spy", "2022-01-28"]]),
+      );
+      await service.materialize(userId, strategy(), assets(), "2025-08-14");
+      expect(priceService.loadSeries).not.toHaveBeenCalled();
+    });
+
+    it("evaluates the periods the history does reach", async () => {
+      // A first close halfway through the calendar bounds out the older
+      // periods and keeps the rest, rather than giving up on the strategy.
+      priceService.earliestPriceDates.mockResolvedValue(
+        new Map([
+          ["sec-spy", "2023-08-31"],
+          ["sec-ief", "2023-08-31"],
+        ]),
+      );
+
+      await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+      expect(priceService.loadSeries).toHaveBeenCalled();
+      expect(savedSignals.length).toBeGreaterThan(0);
+      expect(savedSignals.length).toBeLessThan(GEM_HISTORY_PERIODS);
+      // Every stored period's window opens at or after the first close.
+      for (const signal of savedSignals) {
+        expect(String(signal.evaluatedOn) >= "2024-08-01").toBe(true);
+      }
     });
 
     it("tolerates a concurrent insert of the same period", async () => {

@@ -1502,6 +1502,10 @@ CREATE TABLE gem_strategies (
 
 CREATE INDEX idx_gem_strategies_user ON gem_strategies(user_id);
 
+CREATE TRIGGER update_gem_strategies_updated_at
+  BEFORE UPDATE ON gem_strategies
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- The brokerage accounts a strategy is run in. The signal is the same for all
 -- of them; the report sums the strategy's securities across the set.
 CREATE TABLE gem_strategy_accounts (
@@ -1527,6 +1531,10 @@ CREATE TABLE gem_strategy_assets (
 
 CREATE UNIQUE INDEX idx_gem_strategy_assets_role ON gem_strategy_assets(strategy_id, role);
 CREATE INDEX idx_gem_strategy_assets_user ON gem_strategy_assets(user_id);
+
+CREATE TRIGGER update_gem_strategy_assets_updated_at
+  BEFORE UPDATE ON gem_strategy_assets
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TABLE gem_strategy_signals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

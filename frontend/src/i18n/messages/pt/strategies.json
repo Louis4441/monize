@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Sem repartição registada; comparado por instrumento",
       "workingNoTargetData": "Não é possível comparar: o alvo não tem repartição",
-      "workingNoOverlap": "Nenhum mercado em comum com o alvo",
+      "workingNoOverlap": "Não partilha nenhuma entrada de {dimension} com o alvo — verifique se ambas têm o mesmo nome",
       "workingTotal": "Total",
       "workingSum": "{counted} de {total} já está nos mercados do alvo, ou seja, os {percent} acima.",
       "workingUnknown": "A proporção só pode ser calculada quando as posições tiverem preço.",

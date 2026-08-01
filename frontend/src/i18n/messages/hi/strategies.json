@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "कोई विभाजन दर्ज नहीं; इंस्ट्रुमेंट से मिलान",
       "workingNoTargetData": "तुलना संभव नहीं: लक्ष्य का कोई विभाजन नहीं",
-      "workingNoOverlap": "लक्ष्य से कोई साझा बाज़ार नहीं",
+      "workingNoOverlap": "लक्ष्य के साथ कोई साझा {dimension} प्रविष्टि नहीं — जाँचें कि दोनों के नाम एक जैसे हैं",
       "workingTotal": "कुल",
       "workingSum": "{total} में से {counted} पहले से लक्ष्य के बाज़ारों में है, यानी ऊपर वाला {percent}।",
       "workingUnknown": "जब तक होल्डिंग्स का मूल्य नहीं निकलता, यह अनुपात नहीं निकाला जा सकता।",

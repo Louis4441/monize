@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Geen verdeling vastgelegd; op instrument vergeleken",
       "workingNoTargetData": "Vergelijken kan niet: het doel heeft geen verdeling",
-      "workingNoOverlap": "Geen markt gemeen met het doel",
+      "workingNoOverlap": "Geen gedeelde {dimension}-post met het doel — controleer of beide hetzelfde heten",
       "workingTotal": "Totaal",
       "workingSum": "{counted} van {total} zit al in de markten van het doel, oftewel de {percent} hierboven.",
       "workingUnknown": "Het aandeel is pas te berekenen als de posities gewaardeerd kunnen worden.",

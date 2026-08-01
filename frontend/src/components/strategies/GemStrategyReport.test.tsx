@@ -119,9 +119,12 @@ describe('GemStrategyReport', () => {
       fireEvent.click(screen.getByRole('button', { name: /Mark as executed/ }));
     });
 
-    expect(mockMarkExecuted).toHaveBeenCalledWith('signal-1', '1Y');
+    expect(mockMarkExecuted).toHaveBeenCalledWith('signal-1', '1Y', undefined);
     expect(mockToastSuccess).toHaveBeenCalledWith('Operation marked as executed.');
-    expect(mockGetReport).toHaveBeenCalledTimes(2);
+    // The call answers with the refreshed report, so there is nothing left to
+    // fetch -- re-reading it was a round trip that could only return the same.
+    expect(mockGetReport).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Marked as executed.')).toBeInTheDocument();
   });
 
   it('surfaces a failure to mark the operation as executed', async () => {

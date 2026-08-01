@@ -185,7 +185,7 @@
     },
     "assetAllocation": {
       "sectionTitle": "Alokasi Kelas Aset",
-      "help": "Penyedia harga tidak menyediakan eksposur kelas aset untuk ETF dan reksa dana. Tambahkan secara manual dalam persen — ketik nama apa pun dan nama itu akan tersedia untuk efek Anda yang lain. Sisa di bawah 100% ditampilkan sebagai \"Lainnya\".",
+      "help": "Penyedia harga dapat mengisi pembagian saham/obligasi/kas sebuah reksa dana bila Anda belum menjelaskannya sendiri; apa pun yang Anda masukkan di sini dipertahankan dan tidak pernah ditimpa. Tambahkan sebagai persentase — ketik nama kelas apa pun dan nama itu akan ditawarkan pada efek Anda yang lain. Apa pun di bawah 100% ditampilkan sebagai \"Lainnya\".",
       "placeholder": "Pilih atau ketik kelas aset",
       "addRow": "Tambah kelas aset",
       "nameAriaLabel": "Kelas aset",

@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Chưa có phân bổ; đối chiếu theo công cụ",
       "workingNoTargetData": "Không so sánh được: mục tiêu chưa có phân bổ",
-      "workingNoOverlap": "Không có thị trường chung với mục tiêu",
+      "workingNoOverlap": "Không có mục {dimension} nào chung với mục tiêu — hãy kiểm tra xem cả hai có được đặt tên giống nhau không",
       "workingTotal": "Tổng",
       "workingSum": "{counted} trong {total} đã nằm ở thị trường của mục tiêu, tức là {percent} ở trên.",
       "workingUnknown": "Chưa thể tính tỷ lệ này cho tới khi định giá được các khoản nắm giữ.",

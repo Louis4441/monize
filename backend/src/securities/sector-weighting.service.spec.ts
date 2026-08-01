@@ -80,8 +80,9 @@ describe("SectorWeightingService", () => {
     };
     yahooService = {
       fetchStockSectorInfo: jest.fn().mockResolvedValue(null),
-      fetchEtfSectorWeightings: jest.fn().mockResolvedValue(null),
-      fetchEtfAssetPositions: jest.fn().mockResolvedValue(null),
+      fetchEtfBreakdowns: jest
+        .fn()
+        .mockResolvedValue({ sectors: null, assets: null }),
       getYahooSymbol: jest.fn().mockImplementation((sym) => sym),
     };
     calcService = {
@@ -140,13 +141,19 @@ describe("SectorWeightingService", () => {
         assetWeightings: null,
         sectorDataUpdatedAt: null,
       } as Security;
-      yahooService.fetchEtfAssetPositions.mockResolvedValue([
-        { name: "Bonds", weight: 0.98 },
-      ]);
+      yahooService.fetchEtfBreakdowns.mockResolvedValue({
+        sectors: [{ sector: "Technology", weight: 0.3 }],
+        assets: [{ name: "Bonds", weight: 0.98 }],
+      });
 
       await service.ensureSectorData([sec]);
 
       expect(sec.assetWeightings).toEqual([{ name: "Bonds", weight: 0.98 }]);
+      // Both breakdowns come out of one response, so one request fills both.
+      expect(yahooService.fetchEtfBreakdowns).toHaveBeenCalledTimes(1);
+      expect(sec.sectorWeightings).toEqual([
+        { sector: "Technology", weight: 0.3 },
+      ]);
     });
 
     it("never overwrites an asset-class split the user recorded", async () => {
@@ -159,14 +166,19 @@ describe("SectorWeightingService", () => {
         assetWeightings: own,
         sectorDataUpdatedAt: null,
       } as Security;
-      yahooService.fetchEtfAssetPositions.mockResolvedValue([
-        { name: "Stocks", weight: 1 },
-      ]);
+      yahooService.fetchEtfBreakdowns.mockResolvedValue({
+        sectors: [{ sector: "Technology", weight: 0.3 }],
+        assets: [{ name: "Stocks", weight: 1 }],
+      });
 
       await service.ensureSectorData([sec]);
 
       expect(sec.assetWeightings).toBe(own);
-      expect(yahooService.fetchEtfAssetPositions).not.toHaveBeenCalled();
+      // The request still happens -- the sector half is wanted -- but the
+      // provider's asset split is discarded rather than replacing the user's.
+      expect(sec.sectorWeightings).toEqual([
+        { sector: "Technology", weight: 0.3 },
+      ]);
     });
 
     it("fetches ETF weightings for ETFs missing sector_weightings", async () => {
@@ -175,13 +187,14 @@ describe("SectorWeightingService", () => {
         sectorWeightings: null,
         sectorDataUpdatedAt: null,
       } as Security;
-      yahooService.fetchEtfSectorWeightings.mockResolvedValue([
-        { sector: "Technology", weight: 0.3 },
-      ]);
+      yahooService.fetchEtfBreakdowns.mockResolvedValue({
+        sectors: [{ sector: "Technology", weight: 0.3 }],
+        assets: null,
+      });
 
       await service.ensureSectorData([sec]);
 
-      expect(yahooService.fetchEtfSectorWeightings).toHaveBeenCalled();
+      expect(yahooService.fetchEtfBreakdowns).toHaveBeenCalled();
       expect(sec.sectorWeightings).toEqual([
         { sector: "Technology", weight: 0.3 },
       ]);

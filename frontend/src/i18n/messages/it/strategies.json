@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Nessuna ripartizione registrata; confrontato per strumento",
       "workingNoTargetData": "Confronto impossibile: l'obiettivo non ha ripartizione",
-      "workingNoOverlap": "Nessun mercato in comune con l'obiettivo",
+      "workingNoOverlap": "Nessuna voce di {dimension} in comune con l’obiettivo: verifica che siano scritte allo stesso modo",
       "workingTotal": "Totale",
       "workingSum": "{counted} su {total} è già nei mercati dell'obiettivo, cioè il {percent} qui sopra.",
       "workingUnknown": "La quota non è calcolabile finché le posizioni non hanno un prezzo.",

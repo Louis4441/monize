@@ -9,6 +9,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { Select } from '@/components/ui/Select';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Modal } from '@/components/ui/Modal';
@@ -48,14 +50,15 @@ const logger = createLogger('GemSettingsForm');
 /**
  * Empty-string selects and blank number fields mean "not set", which the API
  * expresses as null. Numbers stay optional so clearing a cost assumption is
- * possible without inventing a zero.
+ * possible without inventing a zero -- `undefined` rather than `''`, because
+ * the numeric fields are `NumericInput`/`CurrencyInput`, which speak numbers.
  */
 const configSchema = z.object({
   accountIds: z.array(z.string()),
   cadence: z.enum(['MONTHLY', 'QUARTERLY']),
   lookbackMonths: z.coerce.number().int().min(1).max(60),
-  taxRatePercent: z.union([z.literal(''), z.coerce.number().min(0).max(100)]),
-  commissionAmount: z.union([z.literal(''), z.coerce.number().min(0)]),
+  taxRatePercent: z.coerce.number().min(0).max(100).optional(),
+  commissionAmount: z.coerce.number().min(0).optional(),
   rulesSourceUrl: z.string().max(500),
   rulesSourceLabel: z.string().max(100),
   US_EQUITY: z.string(),
@@ -68,8 +71,8 @@ const configSchema = z.object({
 type ConfigFormValues = z.infer<typeof configSchema>;
 
 /** Blank number field -> null (unknown), a filled one -> the number. */
-function optionalNumber(value: number | '' | undefined): number | null {
-  return value === '' || value === undefined ? null : Number(value);
+function optionalNumber(value: number | undefined): number | null {
+  return value === undefined || Number.isNaN(value) ? null : Number(value);
 }
 
 function optionalText(value: string): string | null {
@@ -143,8 +146,8 @@ export function GemSettingsForm({
       accountIds: strategy.accounts.map((account) => account.id),
       cadence: strategy.cadence,
       lookbackMonths: strategy.lookbackMonths,
-      taxRatePercent: strategy.taxRatePercent ?? '',
-      commissionAmount: strategy.commissionAmount ?? '',
+      taxRatePercent: strategy.taxRatePercent ?? undefined,
+      commissionAmount: strategy.commissionAmount ?? undefined,
       rulesSourceUrl: strategy.rulesSourceUrl ?? '',
       rulesSourceLabel: strategy.rulesSourceLabel ?? '',
       US_EQUITY: assetBySecurity.get('US_EQUITY') ?? '',
@@ -168,9 +171,10 @@ export function GemSettingsForm({
     }));
   }, [data?.accounts]);
 
-  // MultiSelect is controlled, so the registered array is read back through
-  // the form state rather than a DOM value.
+  // MultiSelect and the numeric inputs are controlled, so their values are read
+  // back through the form state rather than from a DOM value.
   const selectedAccountIds = watch('accountIds');
+  const watchedLookback = watch('lookbackMonths');
 
   // Watching the role selects keeps the "fill the missing roles" prompt in step
   // with what is still unassigned, including roles just filled in.
@@ -325,8 +329,9 @@ export function GemSettingsForm({
         },
         range,
         // Naming the scenario is what keeps the save on the one being edited:
-        // omitted, the server falls back to the user's oldest.
-        strategy.id,
+        // omitted, the server falls back to the user's oldest -- which is also
+        // what the first save needs, because there is no scenario to name yet.
+        strategy.id ?? undefined,
       );
       toast.success(t('gem.settingsForm.saved'));
       onSaved(report);
@@ -380,34 +385,53 @@ export function GemSettingsForm({
               error={errors.cadence?.message}
               {...register('cadence')}
             />
-            <Input
-              type="number"
+            {/* Numbers go through the shared inputs rather than a raw numeric
+                one: no spinner arrows, no scroll-wheel edits, and the money
+                field gets the formatting and calculator the rest of the app
+                has. */}
+            <NumericInput
               label={t('gem.settingsForm.lookbackMonths')}
+              value={watchedLookback || undefined}
+              onChange={(value) =>
+                // Clearing a required field has to fail validation rather than
+                // quietly keep the previous number.
+                setValue('lookbackMonths', value ?? Number.NaN, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
+              decimalPlaces={0}
               min={1}
-              max={60}
-              step={1}
               error={errors.lookbackMonths?.message}
-              {...register('lookbackMonths')}
             />
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                type="number"
+              <NumericInput
                 label={t('gem.settingsForm.taxRatePercent')}
+                suffix="%"
+                value={watch('taxRatePercent')}
+                onChange={(value) =>
+                  setValue('taxRatePercent', value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                decimalPlaces={2}
                 min={0}
-                max={100}
-                step="0.01"
                 placeholder={t('gem.settingsForm.optional')}
                 error={errors.taxRatePercent?.message}
-                {...register('taxRatePercent')}
               />
-              <Input
-                type="number"
+              <CurrencyInput
                 label={t('gem.settingsForm.commissionAmount')}
-                min={0}
-                step="0.01"
+                value={watch('commissionAmount')}
+                onChange={(value) =>
+                  setValue('commissionAmount', value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                allowNegative={false}
                 placeholder={t('gem.settingsForm.optional')}
                 error={errors.commissionAmount?.message}
-                {...register('commissionAmount')}
               />
             </div>
             <Input
@@ -453,7 +477,7 @@ export function GemSettingsForm({
         <GemCard title={t('gem.settings.assetsTitle')}>
           <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
             {t('gem.settingsForm.assetsHint', {
-              months: Number(watch('lookbackMonths')) || strategy.lookbackMonths,
+              months: Number(watchedLookback) || strategy.lookbackMonths,
             })}
           </p>
           {/* A portfolio that has never held a GEM instrument can be filled in

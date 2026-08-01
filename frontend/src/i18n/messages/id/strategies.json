@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "Tidak ada rincian; dicocokkan per instrumen",
       "workingNoTargetData": "Tidak bisa dibandingkan: target belum punya rincian",
-      "workingNoOverlap": "Tidak ada pasar yang sama dengan target",
+      "workingNoOverlap": "Tidak ada entri {dimension} yang sama dengan target — periksa apakah keduanya dinamai sama",
       "workingTotal": "Total",
       "workingSum": "{counted} dari {total} sudah berada di pasar target, yaitu {percent} di atas.",
       "workingUnknown": "Porsinya belum bisa dihitung sampai kepemilikan bisa dinilai.",

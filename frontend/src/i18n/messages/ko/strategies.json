@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "구성 미입력, 종목으로 대조",
       "workingNoTargetData": "비교 불가: 목표에 구성이 없음",
-      "workingNoOverlap": "목표와 공통 시장 없음",
+      "workingNoOverlap": "목표와 공통되는 {dimension} 항목이 없습니다 — 두 이름이 같은지 확인하세요",
       "workingTotal": "합계",
       "workingSum": "{total} 중 {counted}가 이미 목표 시장에 있으며, 이것이 위의 {percent}입니다.",
       "workingUnknown": "보유 종목을 평가할 수 있을 때까지 이 비율은 계산할 수 없습니다.",

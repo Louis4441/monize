@@ -16,6 +16,14 @@ interface UseReportDataResult<T> {
   error: Error | null;
   /** Manually re-run the fetcher (e.g. after a mutation or a retry button). */
   reload: () => void;
+  /**
+   * Adopt data a mutation already returned, instead of fetching it again. An
+   * endpoint that answers with the refreshed report has done the work the next
+   * fetch would repeat, so re-running it is a round trip that can only produce
+   * the same thing -- or, if something changed in between, a surprise. Any
+   * fetch still in flight is retired: this value is the newer one.
+   */
+  setData: (value: T) => void;
 }
 
 /**
@@ -66,10 +74,19 @@ export function useReportData<T>(
       });
   }, []);
 
+  const replace = useCallback((value: T) => {
+    // Retire whatever is in flight: it was started earlier than this value was
+    // produced, so letting it commit would put the stale answer back.
+    runIdRef.current += 1;
+    setData(value);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
   useEffect(() => {
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  return { data, isLoading, error, reload: run };
+  return { data, isLoading, error, reload: run, setData: replace };
 }

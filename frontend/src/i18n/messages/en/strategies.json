@@ -255,7 +255,7 @@
       "workingDerived": "≈ {markets}",
       "workingByInstrument": "No breakdown recorded; matched by instrument",
       "workingNoTargetData": "Cannot compare: the target has no breakdown",
-      "workingNoOverlap": "No market in common with the target",
+      "workingNoOverlap": "Shares no {dimension} entry with the target — check both are named the same way",
       "workingTotal": "Total",
       "workingSum": "{counted} of {total} is already in the target's markets, which is the {percent} above.",
       "workingUnknown": "The share cannot be worked out until the holdings can be priced.",

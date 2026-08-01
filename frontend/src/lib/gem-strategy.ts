@@ -81,16 +81,18 @@ export const gemStrategyApi = {
   /**
    * Record that the user carried out the operation the given signal asked for.
    * Returns the refreshed report so the page reflects the new state in one
-   * round trip.
+   * round trip -- `strategyId` has to name the scenario on screen, or the
+   * server builds the report for the user's first one instead.
    */
   markExecuted: async (
     signalId: string,
     range: GemRange = '1Y',
+    strategyId?: string,
   ): Promise<GemStrategyReport> => {
     const response = await apiClient.post<GemStrategyReport>(
       `/strategies/gem/signals/${signalId}/executed`,
       {},
-      { params: { range } },
+      { params: { range, strategyId } },
     );
     return response.data;
   },

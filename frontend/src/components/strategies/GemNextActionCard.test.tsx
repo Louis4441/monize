@@ -49,7 +49,11 @@ describe('GemNextActionCard', () => {
     );
     expect(screen.getByText('Your portfolio matches the strategy')).toBeInTheDocument();
     expect(screen.getByText(/nothing to do right now/)).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    // The card's own actions, not every button on it: the help trigger is one
+    // too, and has to be, or screen readers announce a nameless tab stop.
+    expect(
+      screen.queryByRole('button', { name: /Mark as executed|Add transactions/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('replaces the buttons once the operation is marked executed', () => {
