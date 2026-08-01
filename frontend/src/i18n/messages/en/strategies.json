@@ -280,6 +280,7 @@
       "hitRate": "Evaluations beating the safe asset",
       "netOfCosts": "Figures are net of estimated taxes and commissions.",
       "grossOfCosts": "Figures exclude taxes and commissions.",
+      "partialCoverage": "Prices covered {coverage} of the evaluated periods. The rest are held flat, and the figures above are annualised over the periods that could be priced — not over the whole span.",
       "emptyTitle": "No backtest available",
       "emptyDescription": "A backtest needs full price history for every strategy asset. Once it exists, its summary appears here."
     },

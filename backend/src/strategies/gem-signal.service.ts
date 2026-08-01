@@ -335,6 +335,8 @@ export class GemSignalService {
           .map((signal) => [signal.evaluatedOn, signal]),
       );
       const written: GemStrategySignal[] = [];
+      /** Periods a concurrent request inserted first, so this one must re-read. */
+      let lostRaces = 0;
 
       for (const period of periods) {
         if (answered.has(period.evaluatedOn)) continue;
@@ -420,13 +422,19 @@ export class GemSignalService {
           } as GemStrategySignal);
           written.push(saved);
         } else {
+          lostRaces += 1;
           this.logger.debug(
             `GEM period ${period.evaluatedOn} was materialized concurrently`,
           );
         }
       }
 
-      if (written.length === 0) return current(stored);
+      // Losing the race is not the same as having nothing to do. The winner's
+      // row exists and this request's `stored` snapshot predates it, so
+      // returning that snapshot renders a report missing the very period the
+      // user came for -- and the next read, finding it already answered, has
+      // no reason to look again. Re-read instead.
+      if (written.length === 0 && lostRaces === 0) return current(stored);
 
       return current(
         await repo.find({

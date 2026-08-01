@@ -69,6 +69,16 @@ export function GemBacktestPanel({ backtest }: GemBacktestPanelProps) {
       <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
         {backtest.netOfCosts ? t('gem.backtest.netOfCosts') : t('gem.backtest.grossOfCosts')}
       </p>
+      {/* Gaps are held flat, which is a return of zero -- the figures are
+          annualised over the priced span so they do not read as though the
+          strategy earned nothing there, and this says how much is missing. */}
+      {backtest.coveragePercent < 100 && (
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {t('gem.backtest.partialCoverage', {
+            coverage: formatPercent(backtest.coveragePercent, 0),
+          })}
+        </p>
+      )}
     </GemCard>
   );
 }

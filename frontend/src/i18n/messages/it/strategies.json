@@ -280,6 +280,7 @@
       "hitRate": "Valutazioni migliori dell'attività sicura",
       "netOfCosts": "I valori sono al netto di imposte e commissioni stimate.",
       "grossOfCosts": "I valori non includono imposte né commissioni.",
+      "partialCoverage": "I prezzi coprivano il {coverage} dei periodi valutati. Il resto è tenuto piatto e i valori qui sopra sono annualizzati solo sui periodi prezzabili, non sull'intero intervallo.",
       "emptyTitle": "Nessun backtest disponibile",
       "emptyDescription": "Un backtest richiede lo storico prezzi completo di ogni attività della strategia. Quando esisterà, qui comparirà il riepilogo."
     },

@@ -265,6 +265,13 @@ export interface GemBacktestSummaryView {
   maxDrawdownPercent: number | null;
   hitRatePercent: number | null;
   netOfCosts: boolean;
+  /**
+   * Share of the evaluated periods the simulation could price, 0-100. Below
+   * 100 there are gaps: they are held flat, and the figures are annualised
+   * over the priced span only, so the run must not be read as covering the
+   * whole window.
+   */
+  coveragePercent: number;
 }
 
 export interface GemStrategyReportView {

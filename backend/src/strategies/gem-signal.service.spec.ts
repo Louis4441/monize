@@ -544,6 +544,36 @@ describe("GemSignalService", () => {
       ).resolves.toEqual({ signals: [], legacyPeriods: 0 });
     });
 
+    it("re-reads after losing the race rather than serving its own snapshot", async () => {
+      // Losing is not the same as having nothing to do: the winner's rows
+      // exist and this request's snapshot predates them. Returning the
+      // snapshot rendered a report without the period the user came for -- and
+      // the next read, finding it answered, had no reason to look again.
+      const fingerprint = gemConfigFingerprint(strategy(), assets());
+      insertedRows = []; // every insert loses
+      signalRepo.find
+        .mockResolvedValueOnce([]) // the snapshot this request started from
+        .mockResolvedValueOnce([
+          {
+            id: "sig-from-the-winner",
+            evaluatedOn: "2025-07-31",
+            configFingerprint: fingerprint,
+          } as GemStrategySignal,
+        ]);
+
+      const result = await service.materialize(
+        userId,
+        strategy(),
+        assets(),
+        "2025-08-14",
+      );
+
+      expect(signalRepo.find).toHaveBeenCalledTimes(2);
+      expect(result.signals.map((signal) => signal.id)).toEqual([
+        "sig-from-the-winner",
+      ]);
+    });
+
     it("propagates a genuine database failure", async () => {
       signalRepo.createQueryBuilder.mockImplementation(() => {
         const builder = {

@@ -280,6 +280,7 @@
       "hitRate": "跑赢避险资产的评估比例",
       "netOfCosts": "数值已扣除预计税款和手续费。",
       "grossOfCosts": "数值未计入税款和手续费。",
+      "partialCoverage": "价格覆盖了已评估周期的 {coverage}。其余按持平处理，上方数字仅按有价格的周期年化，而非整个区间。",
       "emptyTitle": "暂无回测",
       "emptyDescription": "回测需要每项策略资产的完整价格历史。数据齐备后，摘要会显示在这里。"
     },

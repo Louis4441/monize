@@ -280,6 +280,7 @@
       "hitRate": "Số lần đánh giá vượt tài sản an toàn",
       "netOfCosts": "Các số liệu đã trừ thuế và phí dự kiến.",
       "grossOfCosts": "Các số liệu chưa tính thuế và phí.",
+      "partialCoverage": "Giá bao phủ {coverage} số kỳ được đánh giá. Phần còn lại được giữ nguyên, và các con số phía trên chỉ được quy đổi theo năm trên các kỳ có giá — không phải toàn bộ khoảng thời gian.",
       "emptyTitle": "Chưa có kiểm định lịch sử",
       "emptyDescription": "Kiểm định lịch sử cần lịch sử giá đầy đủ của mọi tài sản trong chiến lược. Khi có, bản tóm tắt sẽ xuất hiện ở đây."
     },

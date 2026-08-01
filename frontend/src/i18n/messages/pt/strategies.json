@@ -280,6 +280,7 @@
       "hitRate": "Avaliações que superam o ativo seguro",
       "netOfCosts": "Os valores são líquidos de impostos e comissões estimados.",
       "grossOfCosts": "Os valores não incluem impostos nem comissões.",
+      "partialCoverage": "Os preços cobriram {coverage} dos períodos avaliados. O resto é mantido plano, e os valores acima são anualizados apenas sobre os períodos com preço, não sobre todo o intervalo.",
       "emptyTitle": "Backtest não disponível",
       "emptyDescription": "Um backtest precisa do histórico de preços completo de cada ativo da estratégia. Quando existir, o resumo aparece aqui."
     },

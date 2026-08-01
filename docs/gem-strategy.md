@@ -186,7 +186,16 @@ pro-rated sale never reaches the 100% allocation the signal asks for.
 position, and the transfer card explains it rather than leaving a compliance
 figure and a full-value transfer looking contradictory.
 
-**One unpriced holding makes the compliance share unknown, not approximate.** A
+**One unpriced holding makes the money figures unknown, not approximate.** That
+covers the compliance share, `totalMarketValue` and `transferValue` alike: a sum
+that skips what it could not value is a smaller number printed where the user
+reads the total, and the backtest sizes its commission drag against it too. The
+realized result and the tax follow the same rule over the *sold* positions --
+one without a cost basis makes the estimate unknown, and cash never answers for
+it, because its cost equals its value and would turn an unknowable gain into a
+confident zero.
+
+ A
 share of a total nobody knows is not a share, and the error runs in the
 dangerous direction: an unpriced holding dropped from the denominator while
 counting as zero in the numerator turned 10,000 in the target plus one
@@ -208,6 +217,12 @@ the roles behind it. Taking the maximum let a US quote refreshed this morning
 speak for an ex-US instrument last priced three weeks ago. An assigned
 instrument with no price at all makes the date unknown rather than letting the
 others answer for it. The threshold is five days.
+
+The **backtest** holds an unpriced period flat so the timeline does not
+compress -- but flat is a return of zero, which nobody measured. The
+annualisation therefore counts only the days it could price, and
+`coveragePercent` reports how much of the run that was, so a partially priced
+history cannot be read as a full one.
 `PUT /strategies/gem` tops that history up first: any assigned security whose
 prices do not reach back over the momentum window plus the 24 periods the
 history table shows is backfilled from the quote provider before the signal is

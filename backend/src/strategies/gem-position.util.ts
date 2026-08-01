@@ -94,7 +94,11 @@ export interface GemPositionMath {
    * adds no trade.
    */
   sellCount: number;
-  /** Sum of the market values that could be valued. */
+  /**
+   * Market value of everything in the accounts, or null when any position
+   * could not be valued -- a partial sum is not the total, and it is read as
+   * one both on screen and by the backtest's commission drag.
+   */
   totalMarketValue: number | null;
   /**
    * Share of `totalMarketValue` already in the target's markets, 0-100.
@@ -112,7 +116,11 @@ export interface GemPositionMath {
    * pro-rated sale never reaches the 100% allocation the signal asks for.
    */
   transferValue: number | null;
-  /** Gain (positive) or loss (negative) selling those positions realizes. */
+  /**
+   * Gain (positive) or loss (negative) the sale realizes: the sold positions
+   * only, since cash realizes nothing. Null when any of them lacks a price or
+   * a cost basis -- a partial gain is not the gain that will be taxed.
+   */
   realizedGainLoss: number | null;
 }
 
@@ -190,9 +198,15 @@ export function buildPositionMath(
   const knownValues = valued
     .map((holding) => holding.marketValue)
     .filter((value): value is number => value !== null);
-  const totalMarketValue =
-    knownValues.length > 0 ? sumMoney(knownValues) : null;
   const unpricedCount = valued.length - knownValues.length;
+  // "What these accounts hold" is a total, so it is either the total or it is
+  // unknown. Summing the priced part and labelling it the whole understates
+  // the portfolio -- and it is what the backtest sizes its commission drag
+  // against, so the error does not stay in one number.
+  const totalMarketValue =
+    unpricedCount === 0 && knownValues.length > 0
+      ? sumMoney(knownValues)
+      : null;
 
   const current = valued[0] ?? null;
 
@@ -246,27 +260,42 @@ export function buildPositionMath(
       : compliancePercent < COMPLIANCE_TOLERANCE_PERCENT
     : false;
   // The executable trade, therefore, is the whole of each off-target position.
-  const offTargetValues = offTarget
-    .map((holding) => holding.marketValue)
-    .filter((value): value is number => value !== null);
-  const transferValue =
-    offTargetValues.length > 0 ? sumMoney(offTargetValues) : null;
+  //
+  // A sum that quietly skips what it could not value is not the amount that
+  // moves -- it is a smaller one, printed in the place the user reads to decide
+  // how much cash the switch frees. One unpriced holding makes the figure
+  // unknown, and the report says so rather than understating it.
+  const transferValue = offTarget.some(
+    (holding) => holding.marketValue === null,
+  )
+    ? null
+    : offTarget.length > 0
+      ? sumMoney(offTarget.map((holding) => holding.marketValue as number))
+      : null;
 
-  const realizable = offTarget.filter(
-    (holding) => holding.marketValue !== null && holding.costBasis !== null,
-  );
   // Selling the position whole realizes the whole result on it -- pro-rating
   // this by the overlap understated the tax on exactly the switches where the
   // estimate matters, since a long-held world tracker carries most of the gain.
+  //
+  // Only the sold positions count: cash realizes nothing, and because its
+  // "cost" equals its value it would otherwise answer for the holdings whose
+  // cost is unknown -- turning an unknowable result into a confident zero, and
+  // the tax with it. A single sold position without a cost basis makes the
+  // whole estimate unknown; a partial gain is not the gain that will be taxed.
   const realizedGainLoss =
-    realizable.length > 0
+    sold.length > 0 &&
+    sold.every(
+      (holding) => holding.marketValue !== null && holding.costBasis !== null,
+    )
       ? sumMoney(
-          realizable.map(
+          sold.map(
             (holding) =>
               (holding.marketValue as number) - (holding.costBasis as number),
           ),
         )
-      : null;
+      : sold.length === 0 && offTarget.length > 0
+        ? 0 // Nothing is sold -- a cash-funded purchase realizes nothing.
+        : null;
 
   return {
     holdings: valued,

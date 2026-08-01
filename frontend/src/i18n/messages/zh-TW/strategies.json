@@ -280,6 +280,7 @@
       "hitRate": "勝過避險資產的評估比例",
       "netOfCosts": "數值已扣除預估稅金與手續費。",
       "grossOfCosts": "數值未計入稅金與手續費。",
+      "partialCoverage": "價格涵蓋了已評估週期的 {coverage}。其餘以持平處理，上方數字僅依有價格的週期年化，而非整個區間。",
       "emptyTitle": "尚無回測",
       "emptyDescription": "回測需要每項策略資產的完整價格歷史。資料齊備後，摘要會顯示在這裡。"
     },

@@ -6,6 +6,22 @@ import { gemReport } from '@/test/gem-fixtures';
 const backtest = gemReport().backtest!;
 
 describe('GemBacktestPanel', () => {
+  it('says when the prices did not cover the whole run', () => {
+    // An unpriced stretch is held flat, which is a return of zero. The figures
+    // are annualised over the priced span so they do not read as though the
+    // strategy earned nothing there -- and that has to be said, or the run
+    // looks like it covered the whole window.
+    render(<GemBacktestPanel backtest={{ ...backtest, coveragePercent: 60 }} />);
+    expect(
+      screen.getByText(/Prices covered 60% of the evaluated periods/),
+    ).toBeInTheDocument();
+  });
+
+  it('says nothing about coverage when every period was priced', () => {
+    render(<GemBacktestPanel backtest={backtest} />);
+    expect(screen.queryByText(/Prices covered/)).not.toBeInTheDocument();
+  });
+
   it('summarizes the simulated period net of costs', () => {
     render(<GemBacktestPanel backtest={backtest} />);
 

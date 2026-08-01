@@ -280,6 +280,7 @@
       "hitRate": "Oceny lepsze niż aktywo bezpieczne",
       "netOfCosts": "Wartości po uwzględnieniu szacowanych podatków i prowizji.",
       "grossOfCosts": "Wartości nie uwzględniają podatków ani prowizji.",
+      "partialCoverage": "Ceny pokryły {coverage} ocenianych okresów. Resztę utrzymano na płasko, a powyższe wartości zannualizowano tylko po okresach, które dało się wycenić — nie po całym przedziale.",
       "emptyTitle": "Backtest niedostępny",
       "emptyDescription": "Backtest wymaga pełnej historii cen każdego aktywa strategii. Gdy będzie dostępna, podsumowanie pojawi się tutaj."
     },

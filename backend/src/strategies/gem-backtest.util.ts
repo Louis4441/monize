@@ -52,6 +52,17 @@ export interface GemBacktestResult {
   hitRatePercent: number | null;
   /** True when a configured cost was deducted from the figures. */
   netOfCosts: boolean;
+  /**
+   * Share of the evaluated periods the simulation could actually price, 0-100.
+   *
+   * Below 100 the run has gaps. They are held flat rather than dropped -- the
+   * timeline must not silently compress -- but flat is a *return of zero*, and
+   * the figures above must not be read as though the strategy earned nothing
+   * over them when the truth is that nobody knows. The annualisation therefore
+   * counts only the priced span, and this says how much of the history that
+   * was.
+   */
+  coveragePercent: number;
 }
 
 const DAYS_PER_YEAR = 365.25;
@@ -78,7 +89,10 @@ function growth(
  * Returns null when there is nothing honest to report: fewer than two
  * evaluations, or no period whose prices could be found. A partially priced
  * history is simulated over the periods that can be priced -- the unpriced ones
- * are held flat rather than dropped, so the timeline does not silently compress.
+ * are held flat rather than dropped, so the timeline does not silently
+ * compress. Flat is a return of zero, though, which nobody measured, so the
+ * annualisation counts only the priced span and `coveragePercent` reports how
+ * much of the run that was.
  */
 export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
   const {
@@ -115,6 +129,8 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
   let legEntryEquity = 1;
   let previousSecurityId: string | null = null;
   let pricedPeriods = 0;
+  /** Days the simulation actually priced, which is what it can annualise over. */
+  let pricedDays = 0;
   let beatSafe = 0;
   let comparedToSafe = 0;
 
@@ -146,6 +162,10 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
 
     if (periodGrowth !== null && series) {
       pricedPeriods += 1;
+      pricedDays +=
+        (Date.parse(`${period.endsOn}T00:00:00Z`) -
+          Date.parse(`${period.effectiveFrom}T00:00:00Z`)) /
+        86_400_000;
       const entryPrice = priceAsOf(series, period.effectiveFrom) as number;
       // Walk the daily closes inside the period so the drawdown reflects what
       // the run actually went through, not only its period-end marks.
@@ -182,9 +202,12 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
 
   if (pricedPeriods === 0) return null;
 
-  const years =
-    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
-    (86_400_000 * DAYS_PER_YEAR);
+  // Annualise over the span the simulation could price, not over the calendar.
+  // An unpriced stretch is held flat, and dividing the compounded result by the
+  // whole window would spread that flatness across it as though the strategy
+  // had earned nothing -- turning "we could not price six months" into a
+  // reported six months at zero. `coveragePercent` says how much is missing.
+  const years = pricedDays / DAYS_PER_YEAR;
   const cagrPercent =
     years > 0 && equity > 0
       ? roundToDecimals((Math.pow(equity, 1 / years) - 1) * 100, 2)
@@ -200,5 +223,6 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
         ? roundToDecimals((beatSafe / comparedToSafe) * 100, 2)
         : null,
     netOfCosts: taxRate !== null || commissionFraction !== null,
+    coveragePercent: roundToDecimals((pricedPeriods / bounds.length) * 100, 2),
   };
 }

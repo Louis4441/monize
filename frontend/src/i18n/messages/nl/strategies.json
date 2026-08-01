@@ -280,6 +280,7 @@
       "hitRate": "Evaluaties die de veilige belegging verslaan",
       "netOfCosts": "De cijfers zijn na geschatte belastingen en kosten.",
       "grossOfCosts": "De cijfers bevatten geen belastingen of kosten.",
+      "partialCoverage": "Koersen dekten {coverage} van de geëvalueerde periodes. De rest wordt vlak gehouden, en de cijfers hierboven zijn alleen over de geprijsde periodes geannualiseerd — niet over de hele periode.",
       "emptyTitle": "Geen backtest beschikbaar",
       "emptyDescription": "Een backtest heeft de volledige koershistorie van elke strategiebelegging nodig. Zodra die bestaat, verschijnt de samenvatting hier."
     },

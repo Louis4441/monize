@@ -250,6 +250,91 @@ describe("gem-position.util", () => {
       ]);
     });
 
+    it("reports no total and no transfer while a holding has no price", () => {
+      // A sum that skips what it could not value is not the total, and it is
+      // read as one -- on screen, and by the backtest when it sizes the
+      // commission drag against the portfolio.
+      const math = buildPositionMath(
+        [
+          holding({
+            role: null,
+            securityId: "sec-priced",
+            marketValue: 4000,
+            costBasis: 3000,
+          }),
+          holding({
+            role: null,
+            securityId: "sec-unpriced",
+            marketValue: null,
+            costBasis: null,
+          }),
+        ],
+        "EM_EQUITY",
+        emergingTarget,
+      );
+
+      expect(math.totalMarketValue).toBeNull();
+      expect(math.transferValue).toBeNull();
+      // And the gain is unknown too: one of the positions being sold has no
+      // price and no cost, so a figure from the other is not the result.
+      expect(math.realizedGainLoss).toBeNull();
+    });
+
+    it("does not let cash answer for a holding whose cost is unknown", () => {
+      // Cash "realizes" nothing and its cost equals its value, so counting it
+      // among the realizable positions turned an unknowable gain -- and the
+      // tax on it -- into a confident zero.
+      const math = buildPositionMath(
+        [
+          holding({
+            role: null,
+            securityId: "sec-uncosted",
+            marketValue: 5000,
+            costBasis: null,
+          }),
+          holding({
+            role: null,
+            securityId: null,
+            marketValue: 1000,
+            costBasis: 1000,
+            isCash: true,
+          }),
+        ],
+        "EM_EQUITY",
+        emergingTarget,
+      );
+
+      expect(math.realizedGainLoss).toBeNull();
+      // The transfer is still known: both positions have a market value.
+      expect(math.transferValue).toBe(6000);
+    });
+
+    it("realizes nothing when the switch only spends cash", () => {
+      const math = buildPositionMath(
+        [
+          holding({
+            role: "EM_EQUITY",
+            securityId: "sec-emim",
+            marketValue: 9000,
+            costBasis: 7000,
+          }),
+          holding({
+            role: null,
+            securityId: null,
+            marketValue: 1000,
+            costBasis: 1000,
+            isCash: true,
+          }),
+        ],
+        "EM_EQUITY",
+        emergingTarget,
+      );
+
+      expect(math.sold).toEqual([]);
+      expect(math.realizedGainLoss).toBe(0);
+      expect(math.transferValue).toBe(1000);
+    });
+
     it("sells a partially overlapping fund whole, whatever its overlap", () => {
       // The regression this guards: overlap used to scale the sale, so a fund
       // 90% on target moved only a tenth of itself and the report called the

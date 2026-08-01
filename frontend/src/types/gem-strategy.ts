@@ -265,6 +265,12 @@ export interface GemBacktestSummary {
   hitRatePercent: number | null;
   /** True when taxes and commissions are already deducted from the figures. */
   netOfCosts: boolean;
+  /**
+   * Share of the evaluated periods the simulation could price, 0-100. Below
+   * 100 the run has gaps: they are held flat and the figures are annualised
+   * over the priced span, so it does not cover the whole window.
+   */
+  coveragePercent: number;
 }
 
 /** One saved scenario, for the report's switcher. */

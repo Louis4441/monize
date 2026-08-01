@@ -280,6 +280,7 @@
       "hitRate": "Évaluations battant l'actif sûr",
       "netOfCosts": "Les chiffres sont nets des impôts et frais estimés.",
       "grossOfCosts": "Les chiffres n'incluent ni impôts ni frais.",
+      "partialCoverage": "Les cours couvraient {coverage} des périodes évaluées. Le reste est maintenu à plat, et les chiffres ci-dessus sont annualisés sur les seules périodes valorisées, pas sur l'ensemble de la plage.",
       "emptyTitle": "Aucun backtest disponible",
       "emptyDescription": "Un backtest exige l'historique de cours complet de chaque actif de la stratégie. Dès qu'il existera, son résumé apparaîtra ici."
     },

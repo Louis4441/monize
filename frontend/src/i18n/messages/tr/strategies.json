@@ -280,6 +280,7 @@
       "hitRate": "Güvenli varlığı geçen değerlendirmeler",
       "netOfCosts": "Değerler tahmini vergi ve komisyonlardan sonradır.",
       "grossOfCosts": "Değerler vergi ve komisyonları içermez.",
+      "partialCoverage": "Fiyatlar değerlendirilen dönemlerin {coverage} kadarını kapsadı. Kalanı düz tutuluyor ve yukarıdaki rakamlar tüm aralık üzerinden değil, yalnızca fiyatlanabilen dönemler üzerinden yıllıklandırıldı.",
       "emptyTitle": "Geriye dönük test yok",
       "emptyDescription": "Geriye dönük test, her strateji varlığının tam fiyat geçmişini gerektirir. Var olduğunda özeti burada görünür."
     },

@@ -280,6 +280,7 @@
       "hitRate": "Auswertungen besser als das sichere Anlagegut",
       "netOfCosts": "Die Werte sind nach geschätzten Steuern und Gebühren.",
       "grossOfCosts": "Die Werte enthalten keine Steuern und Gebühren.",
+      "partialCoverage": "Kurse deckten {coverage} der ausgewerteten Perioden ab. Der Rest wird flach gehalten, und die Werte oben sind nur über die Perioden annualisiert, für die Kurse vorlagen — nicht über die gesamte Spanne.",
       "emptyTitle": "Kein Backtest verfügbar",
       "emptyDescription": "Ein Backtest braucht die vollständige Kurshistorie jedes Strategie-Anlageguts. Sobald sie vorliegt, erscheint hier die Zusammenfassung."
     },

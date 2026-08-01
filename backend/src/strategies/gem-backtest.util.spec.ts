@@ -165,13 +165,13 @@ describe("runBacktest", () => {
       input({ commissionAmount: 100, notional: 10_000 }),
     );
 
-    // One buy in each: the empty period adds no trade of its own.
+    // One buy in each: the empty period adds no trade of its own, so the run
+    // with a gap keeps more of its return than a second commission would leave.
     expect(withGap?.netOfCosts).toBe(true);
-    expect(withGap?.cagrPercent).toBeCloseTo(
-      // The gap period is held flat, so only the first half's growth compounds.
-      ((0.99 * 1.1) ** 1 - 1) * 100,
-      0,
-    );
+    expect(withGap?.coveragePercent).toBe(50);
+    expect(withoutGap?.coveragePercent).toBe(100);
+    // Both start from 0.99 after the single buy; the full run compounds the
+    // second half's growth on top, so it ends ahead.
     expect(withoutGap?.cagrPercent).toBeGreaterThan(
       withGap?.cagrPercent as number,
     );
@@ -248,8 +248,13 @@ describe("runBacktest", () => {
       }),
     );
 
+    // The window is still the whole year -- the timeline does not compress --
+    // but the annualisation counts only the half it could price. Spreading the
+    // compounded 10% across twelve months would report the unpriced half as
+    // six months at zero, which is a number nobody measured.
     expect(result?.to).toBe("2025-01-01");
-    // 10% earned in the first half, nothing in the second: 10% over the year.
-    expect(result?.cagrPercent).toBeCloseTo(10, 0);
+    expect(result?.cagrPercent).toBeCloseTo(21, 0);
+    // And the gap is stated rather than absorbed.
+    expect(result?.coveragePercent).toBe(50);
   });
 });

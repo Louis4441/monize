@@ -229,6 +229,7 @@ export function gemReport(overrides: Partial<GemStrategyReport> = {}): GemStrate
       maxDrawdownPercent: -22.6,
       hitRatePercent: 68.2,
       netOfCosts: true,
+      coveragePercent: 100,
     },
     warnings: [],
     ...overrides,
