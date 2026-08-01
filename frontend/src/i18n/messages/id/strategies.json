@@ -332,6 +332,7 @@
     "warnings": {
       "UNMAPPED_ROLE": "Tidak ada instrumen yang ditetapkan untuk:",
       "INCOMPLETE_HISTORY": "Beberapa aset tidak punya harga {months} bulan penuh, jadi momentumnya ditampilkan sebagai tidak tersedia.",
+      "LEGACY_PERIODS": "{count, plural, other {# periode sebelumnya diputuskan dengan konfigurasi lain dari strategi ini dan tidak dapat dihitung ulang dengan konfigurasi saat ini, sehingga tidak masuk ke riwayat maupun backtest.}}",
       "NO_ACCOUNT": "Strategi ini belum punya rekening investasi yang ditetapkan.",
       "NO_POSITION": "Rekening strategi tidak memiliki instrumen apa pun.",
       "FIRST_RUN": "Strategi ini belum dievaluasi – sinyal pertama muncul setelah evaluasi terjadwal berikutnya.",

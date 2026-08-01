@@ -35,6 +35,17 @@ export const GEM_HISTORY_PERIODS = 24;
  */
 const PRICE_WINDOW_LEAD_DAYS = 14;
 
+/** What one materialization produced for the report to render. */
+export interface GemMaterialization {
+  /** Evaluations under the configuration in force now, newest first. */
+  signals: GemStrategySignal[];
+  /**
+   * Periods on the current calendar that only an earlier configuration could
+   * answer for, and so are not in `signals`. Zero in the ordinary case.
+   */
+  legacyPeriods: number;
+}
+
 /** The date a period's momentum window opens: one lookback before evaluation. */
 function windowStartFor(evaluatedOn: string, lookbackMonths: number): string {
   return addMonthsUtc(parseYmd(evaluatedOn), -lookbackMonths)
@@ -184,7 +195,14 @@ export class GemSignalService {
 
   /**
    * Evaluate every period on the strategy's calendar that has no stored signal
-   * yet, then return the stored history newest-first.
+   * yet, then return the stored history newest-first -- together with how many
+   * periods were left out because only an earlier configuration could answer
+   * for them.
+   *
+   * That count is not bookkeeping. Dropping those periods is what keeps the
+   * history, the predecessor chain and the backtest coherent, but a history
+   * that silently shrinks is its own kind of lie: the report says so instead.
+   * It falls back to zero on its own as the 24-period window rolls past them.
    *
    * A period whose absolute test cannot be run -- no momentum for the US equity
    * leg or the benchmark -- is skipped rather than stored as a guess, so it can
@@ -202,7 +220,7 @@ export class GemSignalService {
     strategy: GemStrategy,
     assets: GemStrategyAsset[],
     asOf: string = todayYMD(),
-  ): Promise<GemStrategySignal[]> {
+  ): Promise<GemMaterialization> {
     return withScopedDb(this.dataSource, async (manager) => {
       const repo = manager.getRepository(GemStrategySignal);
       const periods = recentPeriods(
@@ -262,8 +280,12 @@ export class GemSignalService {
        * configuration's history. A period it cannot answer for is absent from
        * the report rather than answered by an earlier set of rules.
        */
-      const current = (rows: GemStrategySignal[]): GemStrategySignal[] =>
-        rows.filter((signal) => signal.configFingerprint === fingerprint);
+      const current = (rows: GemStrategySignal[]): GemMaterialization => {
+        const signals = rows.filter(
+          (signal) => signal.configFingerprint === fingerprint,
+        );
+        return { signals, legacyPeriods: rows.length - signals.length };
+      };
 
       const unstored = periods.filter(
         (period) => !answered.has(period.evaluatedOn),

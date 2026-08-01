@@ -3,6 +3,20 @@ import { render, screen } from '@/test/render';
 import { GemWarningsBanner } from './GemWarningsBanner';
 
 describe('GemWarningsBanner', () => {
+  it('says how many periods an earlier configuration is holding back', () => {
+    // The history and the backtest carry one configuration's decisions only.
+    // Without this the table just comes up short, with nothing saying why.
+    render(
+      <GemWarningsBanner
+        warnings={[{ code: 'LEGACY_PERIODS', count: 3 }]}
+        lookbackMonths={12}
+      />,
+    );
+    expect(
+      screen.getByText(/3 earlier periods were decided under a different configuration/),
+    ).toBeInTheDocument();
+  });
+
   it('renders nothing without warnings', () => {
     const { container } = render(<GemWarningsBanner warnings={[]} lookbackMonths={12} />);
     expect(container).toBeEmptyDOMElement();

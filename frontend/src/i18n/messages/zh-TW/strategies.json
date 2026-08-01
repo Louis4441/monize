@@ -332,6 +332,7 @@
     "warnings": {
       "UNMAPPED_ROLE": "以下角色未指定標的：",
       "INCOMPLETE_HISTORY": "部分資產缺少完整的 {months} 個月價格，因此其動能顯示為無資料。",
+      "LEGACY_PERIODS": "{count, plural, other {先前 # 個週期是在此策略的另一套設定下決定的，無法用目前設定重新計算，因此不計入歷史與回測。}}",
       "NO_ACCOUNT": "此策略未指定任何投資帳戶。",
       "NO_POSITION": "策略帳戶中沒有任何標的。",
       "FIRST_RUN": "此策略尚未評估 — 第一個訊號會在下次排定的評估後出現。",

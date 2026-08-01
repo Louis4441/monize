@@ -332,6 +332,7 @@
     "warnings": {
       "UNMAPPED_ROLE": "Şunlara hiçbir enstrüman atanmadı:",
       "INCOMPLETE_HISTORY": "Bazı varlıkların {months} aylık fiyat geçmişi tam değil, bu yüzden momentumları kullanılamıyor olarak gösteriliyor.",
+      "LEGACY_PERIODS": "{count, plural, one {Önceki bir dönem bu stratejinin başka bir yapılandırmasıyla karara bağlandı ve mevcut yapılandırmayla yeniden hesaplanamıyor; bu yüzden geçmişte ve backtest'te yer almıyor.} other {Önceki # dönem bu stratejinin başka bir yapılandırmasıyla karara bağlandı ve mevcut yapılandırmayla yeniden hesaplanamıyor; bu yüzden geçmişte ve backtest'te yer almıyor.}}",
       "NO_ACCOUNT": "Bu stratejiye hiçbir yatırım hesabı atanmadı.",
       "NO_POSITION": "Strateji hesapları hiçbir enstrüman tutmuyor.",
       "FIRST_RUN": "Bu strateji henüz değerlendirilmedi – ilk sinyal, planlanan sonraki değerlendirmeden sonra görünecek.",

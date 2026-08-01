@@ -161,7 +161,9 @@ describe("GemSignalService", () => {
       });
       // Each later period knows what the previous one held.
       expect(inserted[1]).toMatchObject({ previousRole: "EM_EQUITY" });
-      expect(signals.map((signal) => signal.id)).toEqual(["sig-latest"]);
+      expect(signals.signals.map((signal) => signal.id)).toEqual([
+        "sig-latest",
+      ]);
     });
 
     it("skips a period whose absolute test cannot be run", async () => {
@@ -371,10 +373,13 @@ describe("GemSignalService", () => {
           "2025-08-14",
         );
 
-        expect(result.map((signal) => signal.id)).toEqual([
+        expect(result.signals.map((signal) => signal.id)).toEqual([
           "sig-jul",
           "sig-may",
         ]);
+        // And the report is told what that cost, so the history does not just
+        // come up short with nothing saying why.
+        expect(result.legacyPeriods).toBe(1);
       });
 
       it("refuses to serve a stale row as the current signal", async () => {
@@ -465,7 +470,8 @@ describe("GemSignalService", () => {
         unassigned,
         "2025-08-14",
       );
-      expect(result).toEqual(stored);
+      expect(result.signals).toEqual(stored);
+      expect(result.legacyPeriods).toBe(0);
       expect(priceService.loadSeries).not.toHaveBeenCalled();
     });
 
@@ -495,7 +501,8 @@ describe("GemSignalService", () => {
         "2025-08-14",
       );
 
-      expect(result).toEqual(stored);
+      expect(result.signals).toEqual(stored);
+      expect(result.legacyPeriods).toBe(0);
       expect(priceService.loadSeries).not.toHaveBeenCalled();
     });
 
@@ -534,7 +541,7 @@ describe("GemSignalService", () => {
       signalRepo.save.mockRejectedValue({ code: "23505" });
       await expect(
         service.materialize(userId, strategy(), assets(), "2025-08-14"),
-      ).resolves.toEqual([]);
+      ).resolves.toEqual({ signals: [], legacyPeriods: 0 });
     });
 
     it("propagates a genuine database failure", async () => {

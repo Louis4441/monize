@@ -332,6 +332,7 @@
     "warnings": {
       "UNMAPPED_ROLE": "Chưa gán công cụ nào cho:",
       "INCOMPLETE_HISTORY": "Một số tài sản thiếu đủ {months} tháng dữ liệu giá, nên đà tăng của chúng hiển thị là không có dữ liệu.",
+      "LEGACY_PERIODS": "{count, plural, other {# kỳ trước đó được quyết định theo một cấu hình khác của chiến lược này và không thể tính lại bằng cấu hình hiện tại, nên không có trong lịch sử và backtest.}}",
       "NO_ACCOUNT": "Chiến lược này chưa được gán tài khoản đầu tư nào.",
       "NO_POSITION": "Các tài khoản của chiến lược không nắm giữ công cụ nào.",
       "FIRST_RUN": "Chiến lược này chưa được đánh giá – tín hiệu đầu tiên xuất hiện sau lần đánh giá đã lên lịch tiếp theo.",

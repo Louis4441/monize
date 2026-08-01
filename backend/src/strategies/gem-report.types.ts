@@ -28,6 +28,13 @@ export type GemRange = (typeof GEM_RANGES)[number];
 export type GemWarningCode =
   | "UNMAPPED_ROLE"
   | "INCOMPLETE_HISTORY"
+  /**
+   * Periods decided under an earlier configuration of this strategy are not in
+   * the history or the backtest, because the current one cannot recalculate
+   * them. Everything shown comes from one configuration; this says what that
+   * cost, rather than letting the history quietly come up short.
+   */
+  | "LEGACY_PERIODS"
   | "NO_ACCOUNT"
   | "NO_POSITION"
   | "FIRST_RUN"
@@ -37,6 +44,8 @@ export type GemWarningCode =
 export interface GemWarning {
   code: GemWarningCode;
   roles?: GemAssetRole[];
+  /** How many things the warning is about, when the number is the point. */
+  count?: number;
 }
 
 export interface GemAssetRef {

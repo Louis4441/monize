@@ -440,7 +440,7 @@ export class GemStrategyService {
       (role) => !securityByRole.has(role) && !GEM_OPTIONAL_ROLES.includes(role),
     );
 
-    const signals = await this.signalService.materialize(
+    const { signals, legacyPeriods } = await this.signalService.materialize(
       userId,
       strategy,
       assets,
@@ -515,6 +515,12 @@ export class GemStrategyService {
     }
     if (staleRoles.length > 0) {
       warnings.push({ code: "STALE_PRICES", roles: staleRoles });
+    }
+    // The history and the backtest carry one configuration's decisions only.
+    // When that left periods out, the report says how many rather than letting
+    // the table quietly come up short.
+    if (legacyPeriods > 0) {
+      warnings.push({ code: "LEGACY_PERIODS", count: legacyPeriods });
     }
 
     return {

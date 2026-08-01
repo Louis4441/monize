@@ -332,6 +332,7 @@
     "warnings": {
       "UNMAPPED_ROLE": "Er is geen instrument toegewezen aan:",
       "INCOMPLETE_HISTORY": "Sommige beleggingen hebben geen volledige {months} maanden koersen, hun momentum wordt daarom als niet beschikbaar weergegeven.",
+      "LEGACY_PERIODS": "{count, plural, one {Eén eerdere periode is onder een andere configuratie van deze strategie bepaald en kan met de huidige niet opnieuw worden berekend; die ontbreekt daarom in de historie en de backtest.} other {# eerdere periodes zijn onder een andere configuratie van deze strategie bepaald en kunnen met de huidige niet opnieuw worden berekend; die ontbreken daarom in de historie en de backtest.}}",
       "NO_ACCOUNT": "Aan deze strategie is geen beleggingsrekening toegewezen.",
       "NO_POSITION": "De strategierekeningen bezitten geen instrumenten.",
       "FIRST_RUN": "Deze strategie is nog niet geëvalueerd – het eerste signaal verschijnt na de volgende geplande evaluatie.",

@@ -20,6 +20,7 @@ const BANNER_CODES: GemWarningCode[] = [
   'STALE_PRICES',
   'UNMAPPED_ROLE',
   'INCOMPLETE_HISTORY',
+  'LEGACY_PERIODS',
   'FIRST_RUN',
 ];
 
@@ -90,6 +91,7 @@ export function GemWarningsBanner({
             <p>
               {t(`gem.warnings.${warning.code}` as Parameters<typeof t>[0], {
                 months: lookbackMonths,
+                count: warning.count ?? 0,
               })}
               {roles.length > 0 && (
                 <span className="font-medium">

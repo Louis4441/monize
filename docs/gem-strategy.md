@@ -84,6 +84,10 @@ would replay a hybrid of counterfactual and historical signals. A recomputed
 period likewise takes its `previousRole` only from another period this
 configuration produced. The rows stay in the table -- they are real decisions
 with real `executed` flags -- they are simply not this configuration's history.
+And the report says so: `materialize` returns how many periods it left out, and
+`LEGACY_PERIODS` names the count, because a history that silently comes up short
+is its own kind of lie. The warning clears itself as the 24-period window rolls
+past those dates.
 
 A **cadence change replaces the calendar** rather than editing it: on quarterly,
 31 March is still an evaluation date and 30 April is not. Both the read and the
@@ -124,7 +128,8 @@ role, missing history, no account, unestimable value) and the client renders an
 explicit unknown marker for it -- never a zero.
 
 Warnings the report can carry: `UNMAPPED_ROLE`, `INCOMPLETE_HISTORY`,
-`NO_ACCOUNT`, `NO_POSITION`, `FIRST_RUN`, `STALE_PRICES`, `CALCULATION_FAILED`.
+`LEGACY_PERIODS`, `NO_ACCOUNT`, `NO_POSITION`, `FIRST_RUN`, `STALE_PRICES`,
+`CALCULATION_FAILED`.
 
 `backtest` is always `null` for now: a trustworthy simulation needs full price
 history for every role plus a cost model the configuration does not carry, and

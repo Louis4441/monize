@@ -332,6 +332,7 @@
     "warnings": {
       "UNMAPPED_ROLE": "No instrument is assigned to:",
       "INCOMPLETE_HISTORY": "Some assets lack the full {months} months of prices, so their momentum is shown as unavailable.",
+      "LEGACY_PERIODS": "{count, plural, one {One earlier period was decided under a different configuration of this strategy and cannot be recalculated with the current one, so it is left out of the history and the backtest.} other {# earlier periods were decided under a different configuration of this strategy and cannot be recalculated with the current one, so they are left out of the history and the backtest.}}",
       "NO_ACCOUNT": "No investment account is assigned to this strategy.",
       "NO_POSITION": "The strategy accounts hold no instruments.",
       "FIRST_RUN": "This strategy has not been evaluated yet — the first signal appears after the next scheduled evaluation.",

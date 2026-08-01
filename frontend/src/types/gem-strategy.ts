@@ -42,6 +42,12 @@ export type GemRange = '3M' | '6M' | '1Y' | '3Y' | '5Y' | 'MAX';
 export type GemWarningCode =
   | 'UNMAPPED_ROLE'
   | 'INCOMPLETE_HISTORY'
+  /**
+   * Periods decided under an earlier configuration of this strategy are absent
+   * from the history and the backtest, because the current one cannot
+   * recalculate them.
+   */
+  | 'LEGACY_PERIODS'
   | 'NO_ACCOUNT'
   | 'NO_POSITION'
   | 'FIRST_RUN'
@@ -52,6 +58,8 @@ export interface GemWarning {
   code: GemWarningCode;
   /** Roles the warning applies to, when it is role-specific. */
   roles?: GemAssetRole[];
+  /** How many things the warning is about, when the number is the point. */
+  count?: number;
   /** Server-supplied detail (e.g. the stale price date), already localized. */
   detail?: string | null;
 }

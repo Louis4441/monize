@@ -158,7 +158,9 @@ describe("GemStrategyService", () => {
     manager = mocks.manager;
 
     signalService = {
-      materialize: jest.fn().mockResolvedValue([storedSignal()]),
+      materialize: jest
+        .fn()
+        .mockResolvedValue({ signals: [storedSignal()], legacyPeriods: 0 }),
       currentSignal: jest.fn().mockReturnValue(storedSignal()),
       markExecuted: jest.fn().mockResolvedValue(true),
     };
@@ -271,23 +273,26 @@ describe("GemStrategyService", () => {
       // out -- the predecessor is the next entry that is there, and it must be
       // that period's own instrument. Positional adjacency is only sound
       // because every row in this array comes from one configuration.
-      signalService.materialize.mockResolvedValue([
-        storedSignal({
-          id: "sig-jul",
-          evaluatedOn: "2025-07-31",
-          effectiveFrom: "2025-08-01",
-          targetRole: "EM_EQUITY",
-          targetSecurityId: "sec-emim",
-          previousRole: "US_EQUITY",
-        }),
-        storedSignal({
-          id: "sig-may",
-          evaluatedOn: "2025-05-31",
-          effectiveFrom: "2025-06-01",
-          targetRole: "US_EQUITY",
-          targetSecurityId: "sec-may-spy",
-        }),
-      ]);
+      signalService.materialize.mockResolvedValue({
+        signals: [
+          storedSignal({
+            id: "sig-jul",
+            evaluatedOn: "2025-07-31",
+            effectiveFrom: "2025-08-01",
+            targetRole: "EM_EQUITY",
+            targetSecurityId: "sec-emim",
+            previousRole: "US_EQUITY",
+          }),
+          storedSignal({
+            id: "sig-may",
+            evaluatedOn: "2025-05-31",
+            effectiveFrom: "2025-06-01",
+            targetRole: "US_EQUITY",
+            targetSecurityId: "sec-may-spy",
+          }),
+        ],
+        legacyPeriods: 0,
+      });
       securityRepo.find.mockResolvedValue([
         { id: "sec-emim", symbol: "EMIM", name: "EM IMI ETF" },
         {
@@ -312,9 +317,10 @@ describe("GemStrategyService", () => {
       // History used to resolve every role through the current mapping, so
       // replacing the EM fund rewrote the past: an entry from July claimed to
       // have bought whatever was assigned in August.
-      signalService.materialize.mockResolvedValue([
-        storedSignal({ targetSecurityId: "sec-retired" }),
-      ]);
+      signalService.materialize.mockResolvedValue({
+        signals: [storedSignal({ targetSecurityId: "sec-retired" })],
+        legacyPeriods: 0,
+      });
       securityRepo.find.mockResolvedValue([
         {
           id: "sec-retired",
@@ -339,9 +345,10 @@ describe("GemStrategyService", () => {
       // ON DELETE SET NULL leaves the signal without a security; naming the
       // role's current fund is better than showing an empty row, and the
       // momentum figures beside it are still what was decided on.
-      signalService.materialize.mockResolvedValue([
-        storedSignal({ targetSecurityId: null }),
-      ]);
+      signalService.materialize.mockResolvedValue({
+        signals: [storedSignal({ targetSecurityId: null })],
+        legacyPeriods: 0,
+      });
 
       const report = await service.getReport(userId);
 
@@ -369,9 +376,10 @@ describe("GemStrategyService", () => {
     });
 
     it("reports a HOLD as having nothing to execute", async () => {
-      signalService.materialize.mockResolvedValue([
-        storedSignal({ previousRole: "EM_EQUITY" }),
-      ]);
+      signalService.materialize.mockResolvedValue({
+        signals: [storedSignal({ previousRole: "EM_EQUITY" })],
+        legacyPeriods: 0,
+      });
       const report = await service.getReport(userId);
       expect(report.history[0]).toMatchObject({
         action: "HOLD",
@@ -485,8 +493,33 @@ describe("GemStrategyService", () => {
       );
     });
 
+    it("says how many periods an earlier configuration is holding back", async () => {
+      // The history and the backtest carry one configuration's decisions only.
+      // Left unsaid, the table just comes up short with nothing explaining it.
+      signalService.materialize.mockResolvedValue({
+        signals: [storedSignal()],
+        legacyPeriods: 3,
+      });
+
+      const report = await service.getReport(userId);
+
+      expect(
+        report.warnings.find((warning) => warning.code === "LEGACY_PERIODS"),
+      ).toEqual({ code: "LEGACY_PERIODS", count: 3 });
+    });
+
+    it("says nothing about legacy periods when there are none", async () => {
+      const report = await service.getReport(userId);
+      expect(report.warnings.map((warning) => warning.code)).not.toContain(
+        "LEGACY_PERIODS",
+      );
+    });
+
     it("warns about a first run when nothing has been evaluated", async () => {
-      signalService.materialize.mockResolvedValue([]);
+      signalService.materialize.mockResolvedValue({
+        signals: [],
+        legacyPeriods: 0,
+      });
       signalService.currentSignal.mockReturnValue(null);
       const report = await service.getReport(userId);
       expect(report.warnings.map((w) => w.code)).toContain("FIRST_RUN");

@@ -332,6 +332,7 @@
     "warnings": {
       "UNMAPPED_ROLE": "Aucun instrument n'est attribué à :",
       "INCOMPLETE_HISTORY": "Certains actifs n'ont pas les {months} mois de cours complets, leur momentum est donc affiché comme non disponible.",
+      "LEGACY_PERIODS": "{count, plural, one {Une période antérieure a été décidée sous une autre configuration de cette stratégie et ne peut pas être recalculée avec l'actuelle ; elle est donc absente de l'historique et du backtest.} other {# périodes antérieures ont été décidées sous une autre configuration de cette stratégie et ne peuvent pas être recalculées avec l'actuelle ; elles sont donc absentes de l'historique et du backtest.}}",
       "NO_ACCOUNT": "Aucun compte d'investissement n'est attribué à cette stratégie.",
       "NO_POSITION": "Les comptes de la stratégie ne détiennent aucun instrument.",
       "FIRST_RUN": "Cette stratégie n'a pas encore été évaluée : le premier signal apparaîtra après la prochaine évaluation planifiée.",
