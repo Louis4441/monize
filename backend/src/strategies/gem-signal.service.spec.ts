@@ -174,6 +174,30 @@ describe("GemSignalService", () => {
       expect(signalRepo.save).not.toHaveBeenCalled();
     });
 
+    it("stores nothing for a period an instrument stopped being quoted in", async () => {
+      // The safe asset was last quoted in early 2023 and every later lookup
+      // answers with that one close. Momentum then reads as exactly zero for
+      // every period after it -- a real reading a real market can produce, so
+      // nothing downstream can tell it from a genuine flat year -- and the
+      // absolute test would hand a RISK-ON to whichever equity leg beat that
+      // invented zero, on every period, permanently.
+      const stopped = seriesFor(4).filter(
+        (point) => point.date <= "2023-02-28",
+      );
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          ["sec-spy", seriesFor(15)],
+          ["sec-ewa", seriesFor(8)],
+          ["sec-emim", seriesFor(30)],
+          ["sec-ief", stopped],
+        ]),
+      );
+
+      await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+      expect(savedSignals).toHaveLength(0);
+    });
+
     it("does not re-evaluate a period that is already stored", async () => {
       signalRepo.find.mockResolvedValue([
         {
@@ -590,6 +614,54 @@ describe("GemSignalService", () => {
         where: { strategyId: "strategy-1", evaluatedOn: "2023-08-31" },
       });
       expect(savedSignals[0]).toMatchObject({ previousRole: "US_EQUITY" });
+    });
+
+    it("does not chain onto a winner from another configuration", async () => {
+      // The unique key is (strategy, date), not (strategy, date, fingerprint),
+      // so the row that beat this insert can be a leftover from an earlier
+      // configuration -- or one a concurrent request wrote under different
+      // settings. Taking its target as the predecessor stores the next period
+      // naming a role the current rules never chose, through the same door the
+      // `answered` filter closes on the stored snapshot.
+      const foreignWinner = {
+        id: "sig-foreign",
+        evaluatedOn: "2023-08-31",
+        targetRole: "US_EQUITY",
+        targetSecurityId: "sec-spy",
+        configFingerprint: "written-under-a-6-month-lookback",
+      } as GemStrategySignal;
+      let attempt = 0;
+      signalRepo.createQueryBuilder.mockImplementation(() => {
+        let pending: Record<string, unknown> = {};
+        const builder = {
+          insert: () => builder,
+          values: (row: Record<string, unknown>) => {
+            pending = row;
+            return builder;
+          },
+          orIgnore: () => builder,
+          returning: () => builder,
+          execute: jest.fn(async () => {
+            attempt += 1;
+            const rows =
+              attempt === 1
+                ? []
+                : [{ id: `sig-${pending.evaluatedOn as string}`, ...pending }];
+            savedSignals.push(...rows);
+            return { generatedMaps: rows, raw: rows, identifiers: rows };
+          }),
+        };
+        return builder;
+      });
+      signalRepo.findOne.mockResolvedValue(foreignWinner);
+
+      await service.materialize(userId, strategy(), assets(), "2025-08-14");
+
+      // Null, not "US_EQUITY": this configuration has decided nothing before.
+      expect(savedSignals[0]).toMatchObject({
+        evaluatedOn: "2023-09-30",
+        previousRole: null,
+      });
     });
 
     it("re-reads after losing the race rather than serving its own snapshot", async () => {

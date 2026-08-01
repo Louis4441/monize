@@ -1,6 +1,6 @@
 import { roundToDecimals } from "../common/round.util";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
-import { PricePoint, pointAsOf } from "./gem-momentum.util";
+import { PricePoint, closeAt, daysBetween } from "./gem-momentum.util";
 
 /**
  * Replays the strategy's own stored evaluations against real prices.
@@ -48,19 +48,30 @@ export interface GemBacktestResult {
   cagrPercent: number | null;
   /** Worst peak-to-trough decline, negative. */
   maxDrawdownPercent: number | null;
-  /** Share of periods whose held asset beat the safe asset, 0-100. */
+  /**
+   * Share of the simulated periods whose held asset beat the safe asset,
+   * 0-100. Null when the comparison cannot be made for every simulated period
+   * -- no safe asset configured, or one of them has no safe-asset price.
+   *
+   * Dropping the periods that cannot be compared and reporting the ratio of
+   * what is left would answer a question nobody asked: "of the periods we
+   * happened to be able to check, how many won". With three of eight periods
+   * checkable, two wins reads as 67% and the figure sits next to a run of
+   * eight. A hit rate over an unstated denominator is worse than no hit rate.
+   */
   hitRatePercent: number | null;
   /** True when a configured cost was deducted from the figures. */
   netOfCosts: boolean;
   /**
-   * Share of the evaluated periods the simulation could actually price, 0-100.
+   * Share of the evaluated periods the simulation actually covers, 0-100:
+   * `simulated periods / evaluated periods`.
    *
-   * Below 100 the run has gaps. They are held flat rather than dropped -- the
-   * timeline must not silently compress -- but flat is a *return of zero*, and
-   * the figures above must not be read as though the strategy earned nothing
-   * over them when the truth is that nobody knows. The annualisation therefore
-   * counts only the priced span, and this says how much of the history that
-   * was.
+   * Below 100 the earlier periods are **excluded**, not held flat. The run is
+   * the most recent unbroken stretch of priced periods (see `runBacktest`), so
+   * everything up to and including the last unpriceable period is outside the
+   * simulation entirely -- it contributes nothing to the return, the drawdown
+   * or the hit rate, and `from` is the first period that is in. This is the
+   * share of the strategy's history the figures speak for.
    */
   coveragePercent: number;
 }
@@ -69,35 +80,6 @@ const DAYS_PER_YEAR = 365.25;
 
 /** Two evaluations are the minimum that bound a period with an end price. */
 const MIN_PERIODS = 2;
-
-/**
- * How stale a boundary observation may be and still stand for that boundary.
- *
- * A period opens on the 1st, which is regularly a weekend or a holiday, so the
- * close that prices it is the one a few days earlier -- the same reason the
- * signal path loads a lead window. What this must not do is accept *any* older
- * quote: a security last traded in March answers a lookup for September and one
- * for October with the same number, and the period then reads as opening and
- * closing at the same price rather than as one nobody priced.
- */
-const BOUNDARY_LAG_DAYS = 14;
-
-/** Whole days between two ISO dates. */
-function daysBetween(from: string, to: string): number {
-  return (
-    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
-    86_400_000
-  );
-}
-
-/** The close standing for `date`, or null when the nearest one is too old. */
-function closeAt(series: PricePoint[], date: string): number | null {
-  const point = pointAsOf(series, date);
-  if (!point) return null;
-  return daysBetween(point.date, date) <= BOUNDARY_LAG_DAYS
-    ? point.close
-    : null;
-}
 
 /**
  * Growth of one security between two dates, or null when either boundary has no
@@ -128,6 +110,11 @@ function growth(
  * run restarts after the last gap and `from`/`to` say what was actually
  * simulated. Gaps are usually old -- an instrument younger than the history --
  * so this keeps the recent part rather than the part nobody asked about.
+ *
+ * **A truncated run is reported gross**, whatever costs are configured. The
+ * simulation opening mid-strategy does not know what was held on `from` or
+ * what it cost, so charging an opening commission and dating the tax basis to
+ * `from` would invent both. `netOfCosts` is false and the caller says so.
  *
  * Returns null when there is nothing honest to report: fewer than two
  * evaluations, or no priced period after the last gap.
@@ -169,12 +156,28 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
   const to = run[run.length - 1].endsOn;
   if (to <= from) return null;
 
+  /**
+   * True when the run had to skip history: the simulation opens mid-strategy.
+   *
+   * Costs cannot be modelled from there, so a truncated run is reported gross.
+   * The strategy was already holding something on `from` -- the periods before
+   * it were evaluated, they are simply unpriceable -- and the simulation knows
+   * neither what nor at what cost. Starting a fresh position instead charges a
+   * buy commission for a trade that never happened, and resets the tax basis
+   * to the price on `from`: the first switch after that is taxed on the gain
+   * since the restart rather than since the real purchase, which is a
+   * different, invented number in either direction. "Net of estimated taxes
+   * and commissions" would be a claim about a portfolio the user never held.
+   */
+  const truncated = lastGap >= 0;
+
   // An absolute commission only becomes a drag against a known capital.
   const commissionFraction =
-    commissionAmount !== null && notional !== null && notional > 0
+    !truncated && commissionAmount !== null && notional !== null && notional > 0
       ? commissionAmount / notional
       : null;
-  const taxRate = taxRatePercent !== null ? taxRatePercent / 100 : null;
+  const taxRate =
+    !truncated && taxRatePercent !== null ? taxRatePercent / 100 : null;
 
   let equity = 1;
   let peak = 1;
@@ -249,8 +252,10 @@ export function runBacktest(input: GemBacktestInput): GemBacktestResult | null {
     to,
     cagrPercent,
     maxDrawdownPercent: roundToDecimals(maxDrawdown * 100, 2),
+    // Every simulated period has to be comparable, or the ratio has a
+    // denominator the reader cannot see and would take to be the whole run.
     hitRatePercent:
-      comparedToSafe > 0
+      comparedToSafe === run.length
         ? roundToDecimals((beatSafe / comparedToSafe) * 100, 2)
         : null,
     netOfCosts: taxRate !== null || commissionFraction !== null,

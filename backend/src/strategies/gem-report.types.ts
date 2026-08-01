@@ -241,7 +241,10 @@ export interface GemStrategyMetaView {
   lookbackMonths: number;
   /** Tax rate behind the transfer estimates, in percent; null when unset. */
   taxRatePercent: number | null;
-  /** Commission assumption per switch; null when unset. */
+  /**
+   * Commission assumption **per trade**; null when unset. A switch out of two
+   * holdings is three trades and is charged three times this amount.
+   */
   commissionAmount: number | null;
   nextEvaluationOn: string | null;
   daysUntilNextEvaluation: number | null;
@@ -263,13 +266,23 @@ export interface GemBacktestSummaryView {
   to: string;
   cagrPercent: number | null;
   maxDrawdownPercent: number | null;
+  /**
+   * Share of the simulated periods that beat the safe asset, 0-100. Null
+   * unless every simulated period could be compared, so the figure never has a
+   * denominator smaller than the run it is shown beside.
+   */
   hitRatePercent: number | null;
+  /**
+   * True when configured costs were deducted. False for a truncated run
+   * (`coveragePercent` below 100) whatever the configuration says: a
+   * simulation that opens mid-strategy knows neither the opening position nor
+   * its cost basis, so it reports gross rather than invent them.
+   */
   netOfCosts: boolean;
   /**
-   * Share of the evaluated periods the simulation could price, 0-100. Below
-   * 100 there are gaps: they are held flat, and the figures are annualised
-   * over the priced span only, so the run must not be read as covering the
-   * whole window.
+   * Share of the evaluated periods the simulation covers, 0-100. Below 100 the
+   * earlier periods are excluded, not held flat: the run is the most recent
+   * unbroken stretch of priced periods, and `from` is where it starts.
    */
   coveragePercent: number;
 }

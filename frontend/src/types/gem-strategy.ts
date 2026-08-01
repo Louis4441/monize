@@ -198,7 +198,7 @@ export interface GemAction {
   estimatedTax: number | null;
   /** Tax rate behind `estimatedTax`, in percent; null when unknown. */
   taxRatePercent: number | null;
-  /** Estimated broker commission; null when unknown. */
+  /** Estimated broker commission for every trade the switch takes; null when unknown. */
   estimatedCommission: number | null;
   /** Trades the switch takes: one sell per off-target holding, plus the buy. */
   estimatedTradeCount: number;
@@ -259,14 +259,21 @@ export interface GemBacktestSummary {
   cagrPercent: number | null;
   /** Worst peak-to-trough decline, in percent (negative). */
   maxDrawdownPercent: number | null;
-  /** Share of evaluations whose signal beat the safe asset, in percent. */
+  /**
+   * Share of the simulated periods whose signal beat the safe asset, in
+   * percent. Null unless every simulated period could be compared.
+   */
   hitRatePercent: number | null;
-  /** True when taxes and commissions are already deducted from the figures. */
+  /**
+   * True when taxes and commissions are already deducted from the figures.
+   * Always false for a truncated run (`coveragePercent` below 100).
+   */
   netOfCosts: boolean;
   /**
-   * Share of the evaluated periods the simulation could price, 0-100. Below
-   * 100 the run has gaps: they are held flat and the figures are annualised
-   * over the priced span, so it does not cover the whole window.
+   * Share of the evaluated periods the simulation covers, 0-100. Below 100 the
+   * earlier periods are excluded from the run, not held flat: the simulation
+   * is the most recent unbroken stretch of priced periods and `from` says
+   * where it starts.
    */
   coveragePercent: number;
 }
@@ -291,7 +298,10 @@ export interface GemStrategyMeta {
   lookbackMonths: number;
   /** Tax rate behind the transfer estimates, in percent; null when unset. */
   taxRatePercent: number | null;
-  /** Commission assumption per switch; null when unset. */
+  /**
+   * Commission assumption per trade; null when unset. A switch out of two
+   * holdings is three trades and is charged three times this amount.
+   */
   commissionAmount: number | null;
   /** ISO date of the next scheduled evaluation; null when unscheduled. */
   nextEvaluationOn: string | null;

@@ -167,6 +167,50 @@ describe("runBacktest", () => {
     expect(result?.cagrPercent).toBeCloseTo(21, 0);
   });
 
+  it("reports a truncated run gross, whatever costs are configured", () => {
+    // The run opens on 2024-04-01 because the period before it could not be
+    // priced -- but the strategy was already invested then, in something the
+    // simulation cannot see and at a price it does not know. Charging an
+    // opening commission bills a trade that never happened, and dating the tax
+    // basis to 2024-04-01 taxes the July switch on the gain since the restart
+    // rather than since the real purchase. Both are inventions, so a truncated
+    // run reports gross and says so.
+    const periods: GemBacktestInput["periods"] = [
+      {
+        effectiveFrom: "2024-01-01",
+        targetRole: "US_EQUITY",
+        targetSecurityId: "sec-unpriced",
+      },
+      {
+        effectiveFrom: "2024-04-01",
+        targetRole: "US_EQUITY",
+        targetSecurityId: "sec-spy",
+      },
+      {
+        effectiveFrom: "2024-07-01",
+        targetRole: "EM_EQUITY",
+        targetSecurityId: "sec-emim",
+      },
+    ];
+    const seriesBySecurity = new Map([
+      ["sec-spy", series({ "2024-04-01": 100, "2024-07-01": 200 })],
+      ["sec-emim", series({ "2024-07-01": 10, "2025-01-01": 10 })],
+    ]);
+
+    const taxed = runBacktest(
+      input({ periods, seriesBySecurity, taxRatePercent: 20 }),
+    );
+    const gross = runBacktest(
+      input({ periods, seriesBySecurity, taxRatePercent: null }),
+    );
+
+    expect(taxed?.from).toBe("2024-04-01");
+    expect(taxed?.netOfCosts).toBe(false);
+    // The doubling reaches the end intact: no tax came off the switch.
+    expect(taxed?.cagrPercent).toBe(gross?.cagrPercent);
+    expect(taxed?.coveragePercent).toBeCloseTo(66.67, 1);
+  });
+
   it("has nothing to report when the most recent period is unpriced", () => {
     expect(
       runBacktest(
@@ -265,6 +309,32 @@ describe("runBacktest", () => {
 
     // Equities won the first period (+10% vs +1%) and lost the second.
     expect(result?.hitRatePercent).toBe(50);
+  });
+
+  it("has no hit rate when a simulated period cannot be compared", () => {
+    // The safe asset stops being quoted halfway through. Counting only the
+    // periods that could be checked answers a question nobody asked -- "of the
+    // ones we could check, how many won" -- and prints the ratio beside a run
+    // twice as long, under a denominator the reader cannot see.
+    const result = runBacktest(
+      input({
+        seriesBySecurity: new Map([
+          [
+            "sec-spy",
+            series({ "2024-01-01": 100, "2024-07-01": 110, "2025-01-01": 121 }),
+          ],
+          ["sec-ief", series({ "2024-01-01": 100, "2024-07-01": 101 })],
+        ]),
+        safeSecurityId: "sec-ief",
+      }),
+    );
+
+    expect(result?.cagrPercent).toBeCloseTo(21, 0);
+    expect(result?.hitRatePercent).toBeNull();
+  });
+
+  it("has no hit rate without a safe asset to compare against", () => {
+    expect(runBacktest(input())?.hitRatePercent).toBeNull();
   });
 
   it("has nothing to report without two evaluations or any price", () => {

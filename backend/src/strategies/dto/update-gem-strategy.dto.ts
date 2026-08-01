@@ -92,7 +92,9 @@ export class UpdateGemStrategyDto {
 
   @ApiPropertyOptional({
     nullable: true,
-    description: "Estimated broker commission per switch",
+    description:
+      "Estimated broker commission per trade. A switch costs one sell per " +
+      "off-target holding plus the buy, and each is charged this amount.",
   })
   @IsOptional()
   @IsNumber()

@@ -186,6 +186,13 @@ pro-rated sale never reaches the 100% allocation the signal asks for.
 position, and the transfer card explains it rather than leaving a compliance
 figure and a full-value transfer looking contradictory.
 
+**`commissionAmount` is per trade, not per switch.** A switch sells every
+off-target holding and buys one instrument, so it costs `sellCount + 1` trades
+and the estimate multiplies the configured amount by that count; the transfer
+card names the count beside the figure. Selling out of three funds and buying
+one is four commissions, and charging a single one understated exactly the
+switches that cost the most.
+
 **One unpriced holding makes the money figures unknown, not approximate.** That
 covers the compliance share, `totalMarketValue` and `transferValue` alike: a sum
 that skips what it could not value is a smaller number printed where the user
@@ -223,11 +230,29 @@ off, and every later period compounds from a balance the simulation invented --
 while the drawdown misses whatever happened inside the gap and "net of estimated
 taxes and commissions" stops being true. A discontinuous equity path cannot be
 summarised into one CAGR, so the run restarts after the last gap, `from`/`to`
-report what was actually simulated, and `coveragePercent` says how much of the
-evaluated history that was. A boundary close counts only when it was struck
-within a fortnight of the boundary: a security last quoted months ago would
-otherwise answer both ends of a period with the same number and read as a flat
-period rather than an unpriced one.
+report what was actually simulated, and `coveragePercent` -- simulated periods
+over evaluated periods -- says how much of the evaluated history that was. The
+periods before the last gap are *excluded* from the run, not held flat: they
+contribute nothing to the return, the drawdown or the hit rate.
+
+**A truncated run is reported gross**, whatever costs the configuration
+carries. The simulation opening mid-strategy knows neither what was held on
+`from` nor what it cost: charging a buy commission invents a trade that never
+happened, and dating the tax basis to `from` taxes the first later switch on
+the gain since the restart instead of since the real purchase. `netOfCosts` is
+false and both the panel and `partialCoverage` say so.
+
+`hitRatePercent` is null unless *every* simulated period could be compared with
+the safe asset. A ratio over the periods that happened to be checkable would
+sit beside a longer run under a denominator the reader cannot see.
+
+A boundary close counts only when it was struck within a fortnight of the
+boundary -- `BOUNDARY_LAG_DAYS` in `gem-momentum.util`, and the same rule for
+momentum as for the backtest. A security last quoted months ago would otherwise
+answer both ends of a period with the same number: a flat period rather than an
+unpriced one for the backtest, and for momentum a trailing return of exactly
+zero, computed from one observation, that decides a signal the user is invited
+to trade on.
 `PUT /strategies/gem` tops that history up first: any assigned security whose
 prices do not reach back over the momentum window plus the 24 periods the
 history table shows is backfilled from the quote provider before the signal is

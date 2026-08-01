@@ -175,7 +175,7 @@ describe('GemSettingsForm', () => {
     // the values read back as the formatted strings, not as numbers.
     expect(screen.getByLabelText('Momentum window (months)')).toHaveValue('12');
     expect(screen.getByLabelText('Tax rate (%)')).toHaveValue('19.00');
-    expect(screen.getByLabelText('Commission per switch')).toHaveValue('29.90');
+    expect(screen.getByLabelText('Commission per trade')).toHaveValue('29.90');
     expect(screen.getByLabelText('Text to show for that link')).toHaveValue('example.test/gem');
     expect(roleTrigger('S&P 500')).toHaveTextContent('SPY');
   });
@@ -246,7 +246,7 @@ describe('GemSettingsForm', () => {
 
     await pickInstrument('Safe asset', 'No instrument');
     await act(async () => {
-      fireEvent.change(screen.getByLabelText('Commission per switch'), {
+      fireEvent.change(screen.getByLabelText('Commission per trade'), {
         target: { value: '' },
       });
       fireEvent.click(screen.getByLabelText('Strategy accounts'));

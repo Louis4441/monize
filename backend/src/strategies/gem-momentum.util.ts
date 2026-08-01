@@ -166,16 +166,59 @@ export function pointAsOf(
 }
 
 /**
- * Trailing total return between two dates, in percent. Null when either price
- * is missing or the base is not positive (a zero base would produce Infinity).
+ * How stale a close may be and still stand for a boundary date.
+ *
+ * Every boundary this strategy cares about -- a momentum window's start, a
+ * period's first day, its last -- lands on a calendar date the market may well
+ * have been shut on, so the close that prices it is a few days earlier. Two
+ * weeks covers a weekend plus the longest exchange closures.
+ *
+ * The limit is the point. Without one, a security last quoted in March answers
+ * a lookup for September and one for October with the same number: a momentum
+ * of exactly zero, computed from one observation, indistinguishable from a
+ * market that went nowhere -- and that figure decides a signal the user is
+ * invited to trade on.
+ */
+export const BOUNDARY_LAG_DAYS = 14;
+
+/** Whole days between two ISO dates. */
+export function daysBetween(from: string, to: string): number {
+  return (
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
+    86_400_000
+  );
+}
+
+/**
+ * The close standing for `date`: the most recent one at or before it, but only
+ * when it was struck within `BOUNDARY_LAG_DAYS`. Null otherwise -- an unknown
+ * price, never an old one wearing today's date.
+ */
+export function closeAt(prices: PricePoint[], date: string): number | null {
+  const point = pointAsOf(prices, date);
+  if (!point) return null;
+  return daysBetween(point.date, date) <= BOUNDARY_LAG_DAYS
+    ? point.close
+    : null;
+}
+
+/**
+ * Trailing total return between two dates, in percent. Null when either
+ * boundary has no close near enough in time to stand for it, or the base is not
+ * positive (a zero base would produce Infinity).
+ *
+ * The freshness rule is the same one the backtest applies, and for a stronger
+ * reason: this figure is what picks the instrument the report tells the user to
+ * hold. A momentum computed from a months-old quote is not a cautious estimate,
+ * it is a made-up number with an instruction attached.
  */
 export function trailingReturnPercent(
   prices: PricePoint[],
   from: string,
   to: string,
 ): number | null {
-  const base = priceAsOf(prices, from);
-  const latest = priceAsOf(prices, to);
+  const base = closeAt(prices, from);
+  const latest = closeAt(prices, to);
   if (base === null || latest === null || base <= 0) return null;
   return roundToDecimals((latest / base - 1) * 100, GEM_PP_DECIMALS);
 }

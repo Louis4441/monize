@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@/test/render';
 import { GemTransferCard } from './GemTransferCard';
-import { gemAction } from '@/test/gem-fixtures';
+import { gemAction, gemReport } from '@/test/gem-fixtures';
+import strategiesMessages from '@/i18n/messages/en/strategies.json';
 
 describe('GemTransferCard', () => {
   it('says why a partly matching holding is still sold whole', () => {
@@ -31,6 +32,29 @@ describe('GemTransferCard', () => {
     // The switch sells one holding and buys the target: two commissions.
     expect(screen.getByText('Estimated commission (2 trades)')).toBeInTheDocument();
     expect(screen.getByText('Broker IRA')).toBeInTheDocument();
+  });
+
+  it('charges the configured commission once per trade, and says so', () => {
+    // The contract runs from the settings field to this row: the amount the
+    // user types is per *trade*, and a switch is one sell per off-target
+    // holding plus the buy. Labelling the field "per switch" while the server
+    // multiplies by the trade count understated exactly the switches that cost
+    // the most -- selling out of three funds is four commissions, not one.
+    const report = gemReport();
+    const perTrade = report.strategy.commissionAmount!;
+    const action = report.action!;
+
+    expect(strategiesMessages.gem.settingsForm.commissionAmount).toBe(
+      'Commission per trade',
+    );
+
+    render(<GemTransferCard action={action} />);
+
+    expect(action.estimatedCommission).toBe(perTrade * action.estimatedTradeCount);
+    expect(
+      screen.getByText(`Estimated commission (${action.estimatedTradeCount} trades)`),
+    ).toBeInTheDocument();
+    expect(screen.getByText('$59.80')).toBeInTheDocument();
   });
 
   it('signs a realized loss', () => {

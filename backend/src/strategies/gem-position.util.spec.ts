@@ -1,3 +1,5 @@
+import { readFileSync } from "fs";
+import { join } from "path";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
 import { EMPTY_COMPOSITION } from "./gem-composition.util";
 import {
@@ -466,6 +468,25 @@ describe("gem-position.util", () => {
 
     it("is unknown without a configured commission", () => {
       expect(estimateCommission(null, 3)).toBeNull();
+    });
+
+    it("is described as per trade everywhere the field is named", () => {
+      // The stored amount is charged once per trade, so any copy calling it
+      // "per switch" contradicts the arithmetic above -- and understates
+      // exactly the switches that cost the most, which is the direction that
+      // matters. The frontend half of this contract lives in
+      // `GemTransferCard.test.tsx`, which pins the settings label and the
+      // displayed estimate together.
+      const sources = [
+        "dto/update-gem-strategy.dto.ts",
+        "dto/create-gem-strategy.dto.ts",
+        "entities/gem-strategy.entity.ts",
+        "gem-report.types.ts",
+      ].map((file) => readFileSync(join(__dirname, file), "utf8"));
+
+      for (const source of sources) {
+        expect(source).not.toMatch(/commission[^\n]*per switch/i);
+      }
     });
   });
 });

@@ -69,9 +69,12 @@ export function GemBacktestPanel({ backtest }: GemBacktestPanelProps) {
       <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
         {backtest.netOfCosts ? t('gem.backtest.netOfCosts') : t('gem.backtest.grossOfCosts')}
       </p>
-      {/* Gaps are held flat, which is a return of zero -- the figures are
-          annualised over the priced span so they do not read as though the
-          strategy earned nothing there, and this says how much is missing. */}
+      {/* Below 100 the run is the most recent unbroken stretch of priced
+          periods and everything before the last gap is outside it, so the
+          window the figures describe is shorter than the strategy's history.
+          The server also reports such a run gross, which is why the line above
+          can say "excludes taxes and commissions" on a configuration that
+          sets both. */}
       {backtest.coveragePercent < 100 && (
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           {t('gem.backtest.partialCoverage', {

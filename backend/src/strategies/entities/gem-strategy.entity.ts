@@ -78,7 +78,9 @@ export class GemStrategy {
 
   @ApiProperty({
     required: false,
-    description: "Estimated broker commission per switch",
+    description:
+      "Estimated broker commission per trade. A switch is charged once per " +
+      "off-target holding sold plus once for the buy.",
   })
   @Column({
     type: "decimal",

@@ -426,10 +426,23 @@ export class GemSignalService {
           // it -- and that period is then *stored* with the wrong predecessor,
           // which the final re-read cannot undo. History would call it a BUY
           // for as long as the row lives.
+          //
+          // Only when the winner belongs to *this* configuration. The unique
+          // key is (strategy, date), not (strategy, date, fingerprint), so the
+          // row that beat this insert may be a leftover from an earlier
+          // configuration or one written by a concurrent request carrying
+          // different settings. Seeding the chain with it is the same mistake
+          // the `answered` filter exists to prevent, arriving through a
+          // different door: a later period would be stored naming a
+          // predecessor the current rules never chose. A foreign winner leaves
+          // the slot empty, which reads as "this configuration decided nothing
+          // before" -- the truth.
           const winner = await repo.findOne({
             where: { strategyId: strategy.id, evaluatedOn: period.evaluatedOn },
           });
-          if (winner) byEvaluatedOn.set(period.evaluatedOn, winner);
+          if (winner && winner.configFingerprint === fingerprint) {
+            byEvaluatedOn.set(period.evaluatedOn, winner);
+          }
           this.logger.debug(
             `GEM period ${period.evaluatedOn} was materialized concurrently`,
           );

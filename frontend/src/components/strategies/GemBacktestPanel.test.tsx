@@ -6,20 +6,21 @@ import { gemReport } from '@/test/gem-fixtures';
 const backtest = gemReport().backtest!;
 
 describe('GemBacktestPanel', () => {
-  it('says when the prices did not cover the whole run', () => {
-    // An unpriced stretch is held flat, which is a return of zero. The figures
-    // are annualised over the priced span so they do not read as though the
-    // strategy earned nothing there -- and that has to be said, or the run
-    // looks like it covered the whole window.
+  it('says when the run covers only the recent part of the history', () => {
+    // Below 100% the simulation is the most recent unbroken stretch of priced
+    // periods -- everything before the last gap is left out of it, not held
+    // flat -- so the window the figures describe is shorter than the strategy
+    // has been running. Saying nothing makes them look like the whole record.
     render(<GemBacktestPanel backtest={{ ...backtest, coveragePercent: 60 }} />);
     expect(
-      screen.getByText(/Prices covered 60% of the evaluated periods/),
+      screen.getByText(/Prices cover only the most recent 60% of the evaluated periods/),
     ).toBeInTheDocument();
+    expect(screen.getByText(/left out of the figures above/)).toBeInTheDocument();
   });
 
   it('says nothing about coverage when every period was priced', () => {
     render(<GemBacktestPanel backtest={backtest} />);
-    expect(screen.queryByText(/Prices covered/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Prices cover only/)).not.toBeInTheDocument();
   });
 
   it('summarizes the simulated period net of costs', () => {

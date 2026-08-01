@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
-import { PricePoint } from "./gem-momentum.util";
+import { BOUNDARY_LAG_DAYS, PricePoint } from "./gem-momentum.util";
 import { GemRange } from "./gem-report.types";
 
 /** How far back each chart range reaches, in months. `null` means "all history". */
@@ -32,14 +32,13 @@ const RANGE_SAMPLING: Record<GemRange, "day" | "week" | "month"> = {
 /**
  * Days of prices to load *before* a window opens.
  *
- * Every boundary this module's callers care about -- a momentum window's start,
- * a GEM period's first day -- lands on the 1st or the last of a month, which is
- * regularly a weekend or a holiday. The close that prices it is then the one a
- * few days earlier, and a series loaded from exactly the boundary does not
- * contain it: `price_date >= from` excludes it, and a lookup can only search
- * backwards. Two weeks covers a weekend plus the longest exchange closures.
+ * The same span a boundary close may be old and still count (`BOUNDARY_LAG_DAYS`),
+ * and necessarily so: a series loaded from exactly the boundary does not contain
+ * the close that prices it, because `price_date >= from` excludes it and a
+ * lookup can only search backwards. Loading less than the rule accepts would
+ * discard prices the rule would have used.
  */
-export const PRICE_WINDOW_LEAD_DAYS = 14;
+export const PRICE_WINDOW_LEAD_DAYS = BOUNDARY_LAG_DAYS;
 
 /** ISO date `days` before `date`. */
 export function withLeadDays(date: string, days: number): string {

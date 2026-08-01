@@ -119,6 +119,41 @@ describe("gem-momentum.util", () => {
       );
     });
 
+    it("prices a boundary the market was shut on with a close near it", () => {
+      // The last day of a month is regularly a weekend, so the close that
+      // stands for it is a day or two earlier. Inside a fortnight it counts.
+      expect(
+        trailingReturnPercent(
+          series([
+            ["2024-07-26", 100],
+            ["2025-07-29", 115.42],
+          ]),
+          "2024-07-31",
+          "2025-07-31",
+        ),
+      ).toBe(15.42);
+    });
+
+    it("refuses a boundary whose nearest close is months old", () => {
+      // A security last quoted in March answers a lookup for 31 July and one
+      // for 31 July a year later with the same number: a trailing return of
+      // exactly zero, computed from a single observation, indistinguishable
+      // from a market that went nowhere. That figure decides which instrument
+      // the report tells the user to buy, so it must be unknown instead.
+      const stale = series([
+        ["2024-03-15", 100],
+        ["2025-07-29", 115.42],
+      ]);
+      expect(
+        trailingReturnPercent(stale, "2024-07-31", "2025-07-31"),
+      ).toBeNull();
+
+      const stopped = series([["2024-07-31", 100]]);
+      expect(
+        trailingReturnPercent(stopped, "2024-07-31", "2025-07-31"),
+      ).toBeNull();
+    });
+
     it("is unknown when a price is missing or the base is not positive", () => {
       expect(
         trailingReturnPercent(prices, "2020-01-01", "2025-07-31"),
@@ -158,6 +193,29 @@ describe("gem-momentum.util", () => {
       expect(snapshot.SAFE).toBe(4);
       expect(snapshot.EM_EQUITY).toBeNull();
       expect(snapshot.EX_US_EQUITY).toBeNull();
+    });
+
+    it("reports a role whose quotes stopped as unknown, not as flat", () => {
+      // A delisted or simply unfetched instrument keeps answering both ends of
+      // the window from its last close. Momentum of zero is a real reading a
+      // real market can produce, so nothing downstream can tell the two apart
+      // -- and here it would hand a RISK-OFF to a safe asset nobody is pricing
+      // or drop the strongest equity market out of the ranking.
+      const snapshot = momentumSnapshot(
+        {
+          US_EQUITY: series([
+            ["2024-07-31", 100],
+            ["2025-07-31", 115],
+          ]),
+          SAFE: series([["2024-02-29", 104]]), // last quote 17 months old
+        },
+        "2025-07-31",
+        12,
+      );
+      expect(snapshot.US_EQUITY).toBe(15);
+      expect(snapshot.SAFE).toBeNull();
+      // And the absolute test has no benchmark, so no signal comes out of it.
+      expect(evaluate(snapshot, ["US_EQUITY", "SAFE"])).toBeNull();
     });
 
     it("is why the series must be adjusted closes: a split flips the signal", () => {
