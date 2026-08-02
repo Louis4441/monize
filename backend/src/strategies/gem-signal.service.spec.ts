@@ -768,6 +768,7 @@ describe("GemSignalService", () => {
         // duplicate came from another request materializing the same
         // configuration, not from a save landing mid-flight.
         configChanged: false,
+        strategyMissing: false,
       });
     });
 
@@ -922,6 +923,10 @@ describe("GemSignalService", () => {
         // building a report from, so the caller starts over rather than
         // rendering the snapshot it still holds.
         configChanged: true,
+        // ...and it is told *why*, because the two are answered differently:
+        // an unstable configuration is eventually refused, a deleted scenario
+        // resolves to the unconfigured report.
+        strategyMissing: true,
       });
       expect(savedSignals).toHaveLength(0);
     });
@@ -1091,10 +1096,15 @@ describe("GemSignalService", () => {
     it("stamps the signal as executed", async () => {
       signalRepo.findOne.mockResolvedValue({
         id: "sig-1",
+        strategyId: "strategy-1",
         executed: false,
       } as GemStrategySignal);
 
-      await expect(service.markExecuted(userId, "sig-1")).resolves.toBe(true);
+      // The owning strategy comes back, not a bare boolean: the caller builds
+      // the report from it rather than from whatever scenario it had selected.
+      await expect(service.markExecuted(userId, "sig-1")).resolves.toBe(
+        "strategy-1",
+      );
       const [saved] = signalRepo.save.mock.calls[0];
       expect(saved.executed).toBe(true);
       expect(saved.executedAt).toBeInstanceOf(Date);
@@ -1103,15 +1113,41 @@ describe("GemSignalService", () => {
     it("is idempotent for an already executed signal", async () => {
       signalRepo.findOne.mockResolvedValue({
         id: "sig-1",
+        strategyId: "strategy-1",
         executed: true,
       } as GemStrategySignal);
-      await expect(service.markExecuted(userId, "sig-1")).resolves.toBe(true);
+      await expect(service.markExecuted(userId, "sig-1")).resolves.toBe(
+        "strategy-1",
+      );
       expect(signalRepo.save).not.toHaveBeenCalled();
     });
 
     it("reports an unknown signal", async () => {
       signalRepo.findOne.mockResolvedValue(null);
-      await expect(service.markExecuted(userId, "sig-x")).resolves.toBe(false);
+      await expect(service.markExecuted(userId, "sig-x")).resolves.toBeNull();
+    });
+
+    it("takes the owning strategy's lock before writing", async () => {
+      // Materialization rewrites these rows and carries `executed` across from
+      // a snapshot it read earlier. Without the lock a confirmation landing in
+      // that window was overwritten, and the report asked for the trade again.
+      signalRepo.findOne.mockResolvedValue({
+        id: "sig-1",
+        strategyId: "strategy-1",
+        executed: false,
+      } as GemStrategySignal);
+
+      await service.markExecuted(userId, "sig-1");
+
+      const locks = manager.query.mock.calls.filter(([sql]: [string]) =>
+        sql.includes("pg_advisory_xact_lock"),
+      );
+      expect(locks).toHaveLength(1);
+      expect(locks[0][1]).toEqual(["strategy-1"]);
+      // ...and the lock is taken before the row is written, not after.
+      expect(manager.query.mock.invocationCallOrder[0]).toBeLessThan(
+        signalRepo.save.mock.invocationCallOrder[0],
+      );
     });
 
     it("scopes the lookup to the caller", async () => {

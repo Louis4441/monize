@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { DataSource, In } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
 import { todayYMD } from "../common/date-utils";
@@ -66,6 +70,16 @@ const DEFAULT_LOOKBACK_MONTHS = 12;
  * returned this literal anyway.
  */
 const DEFAULT_STRATEGY_NAME = "GEM";
+
+/**
+ * How many times the report may be built before it gives up.
+ *
+ * One rebuild covers the ordinary race -- a save landing while the first
+ * attempt was in flight. A second mismatch means the settings are being written
+ * faster than a report can be assembled, and there is no coherent answer to
+ * give; see `getReport`.
+ */
+const GEM_REPORT_ATTEMPTS = 2;
 
 /**
  * The GEM strategy read model: one call assembles the whole report page --
@@ -442,10 +456,13 @@ export class GemStrategyService {
    * back null although materialization just produced it.
    *
    * So the report is built again from the top, which re-reads everything --
-   * accounts included -- and materializes nothing new the second time. Once,
-   * not in a loop: a user saving faster than the report can be built twice is
-   * not a state worth spinning on, and the second attempt's answer is coherent
-   * whichever configuration it belongs to.
+   * accounts included. `GEM_REPORT_ATTEMPTS` bounds that: a user saving faster
+   * than the report can be built twice is not a state worth spinning on, and
+   * carrying on regardless is worse than refusing -- the second mismatch used
+   * to be ignored, which is exactly how B's costs and safe asset ended up
+   * describing C's history. Past the budget the request fails with a conflict
+   * the client can retry, rather than returning a report of neither
+   * configuration.
    */
   async getReport(
     userId: string,
@@ -470,10 +487,30 @@ export class GemStrategyService {
       (role) => !securityByRole.has(role) && !GEM_OPTIONAL_ROLES.includes(role),
     );
 
-    const { signals, legacyPeriods, configChanged } =
+    const { signals, legacyPeriods, configChanged, strategyMissing } =
       await this.signalService.materialize(userId, strategy, assets, asOf);
-    if (configChanged && attempt === 0) {
-      return this.getReport(userId, range, strategyId, attempt + 1);
+    // Deleted underneath us. Rebuilding once picks up whatever the user is
+    // actually looking at now -- another scenario, or none -- and if that is
+    // gone too there is nothing to report but the unconfigured page.
+    if (strategyMissing) {
+      return attempt + 1 < GEM_REPORT_ATTEMPTS
+        ? this.getReport(userId, range, strategyId, attempt + 1)
+        : this.emptyReport(this.buildAssetRefs([]), DEFAULT_STRATEGY_NAME);
+    }
+    if (configChanged) {
+      if (attempt + 1 < GEM_REPORT_ATTEMPTS) {
+        return this.getReport(userId, range, strategyId, attempt + 1);
+      }
+      // Out of attempts, and everything below would be built from the halves
+      // of two configurations: this strategy's costs and safe asset against
+      // signals materialized under the newer one. Refusing is the only honest
+      // answer left -- the client retries and gets a whole report.
+      throw new ConflictException(
+        tr(
+          "errors.strategies.configurationChanging",
+          "The strategy settings changed while the report was being built. Please try again.",
+        ),
+      );
     }
     const current = this.signalService.currentSignal(
       signals,
@@ -806,6 +843,15 @@ export class GemStrategyService {
     range: GemRange = "1Y",
   ): Promise<GemStrategyReportView> {
     await withScopedDb(this.dataSource, async (manager) => {
+      // Same lock, same ordering as materialization and the settings save.
+      //
+      // Without it a delete could commit in the window between a materializer
+      // reloading the strategy and its first insert: the insert then hits a
+      // foreign key that is gone, the whole report transaction aborts, and the
+      // user refreshing one tab while deleting a scenario in another gets a
+      // 500. Taking it before the existence check also means the check is made
+      // against a settled world rather than a snapshot.
+      await lockGemStrategy(manager, strategyId);
       const repo = manager.getRepository(GemStrategy);
       const strategy = await repo.findOne({
         where: { id: strategyId, userId },
@@ -827,12 +873,29 @@ export class GemStrategyService {
     range: GemRange = "1Y",
     strategyId?: string,
   ): Promise<GemStrategyReportView> {
-    const updated = await this.signalService.markExecuted(userId, signalId);
-    if (!updated) {
+    const owningStrategyId = await this.signalService.markExecuted(
+      userId,
+      signalId,
+    );
+    if (!owningStrategyId) {
       throw new NotFoundException(
         tr("errors.strategies.signalNotFound", "Strategy signal not found"),
       );
     }
-    return this.getReport(userId, range, strategyId);
+    // The client named a scenario and the signal belongs to another one: its
+    // report and its selection have drifted apart, so neither answer is safe.
+    // Marking A's signal and returning B's report would tell the user the
+    // operation they just confirmed was B's.
+    if (strategyId && strategyId !== owningStrategyId) {
+      throw new ConflictException(
+        tr(
+          "errors.strategies.signalStrategyMismatch",
+          "That signal belongs to a different strategy.",
+        ),
+      );
+    }
+    // The signal's own strategy, never the requested one: the report that comes
+    // back is always the report of what was just marked.
+    return this.getReport(userId, range, owningStrategyId);
   }
 }

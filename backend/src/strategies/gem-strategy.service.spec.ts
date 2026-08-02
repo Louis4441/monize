@@ -162,7 +162,10 @@ describe("GemStrategyService", () => {
         .fn()
         .mockResolvedValue({ signals: [storedSignal()], legacyPeriods: 0 }),
       currentSignal: jest.fn().mockReturnValue(storedSignal()),
-      markExecuted: jest.fn().mockResolvedValue(true),
+      // Returns the owning strategy id, which is what the service builds the
+      // report from -- a bare `true` describes a contract this service no
+      // longer has.
+      markExecuted: jest.fn().mockResolvedValue("strategy-1"),
       hasSignalsBefore: jest.fn().mockResolvedValue(false),
     };
     positionService = {
@@ -588,17 +591,46 @@ describe("GemStrategyService", () => {
       expect(report.warnings.map((w) => w.code)).toContain("FIRST_RUN");
     });
 
-    it("gives up rebuilding after one restart", async () => {
-      // A user saving faster than the report can be built twice is not a state
-      // worth spinning on, and the second attempt is coherent either way.
+    it("rebuilds once when a save lands mid-report", async () => {
+      signalService.materialize
+        .mockResolvedValueOnce({
+          signals: [storedSignal()],
+          legacyPeriods: 0,
+          configChanged: true,
+          strategyMissing: false,
+        })
+        .mockResolvedValueOnce({
+          signals: [storedSignal()],
+          legacyPeriods: 0,
+          configChanged: false,
+          strategyMissing: false,
+        });
+
+      const report = await service.getReport(userId);
+
+      expect(signalService.materialize).toHaveBeenCalledTimes(2);
+      expect(report.strategy.id).toBe("strategy-1");
+    });
+
+    /**
+     * A -> B -> C: the first attempt loads A and materializes B, the rebuild
+     * loads B and materializes C. The second mismatch used to be ignored, and
+     * the report went out with B's costs, B's safe asset and B's accounts over
+     * C's history -- a report of neither configuration, with a null current
+     * signal blamed on missing prices.
+     */
+    it("refuses a report rather than mixing two configurations", async () => {
       signalService.materialize.mockResolvedValue({
         signals: [storedSignal()],
         legacyPeriods: 0,
         configChanged: true,
+        strategyMissing: false,
       });
 
-      await service.getReport(userId);
-
+      await expect(service.getReport(userId)).rejects.toMatchObject({
+        status: 409,
+      });
+      // Bounded: it refuses, it does not spin.
       expect(signalService.materialize).toHaveBeenCalledTimes(2);
     });
 
@@ -845,9 +877,37 @@ describe("GemStrategyService", () => {
     });
 
     it("rejects an unknown signal", async () => {
-      signalService.markExecuted.mockResolvedValue(false);
+      signalService.markExecuted.mockResolvedValue(null);
       await expect(service.markExecuted(userId, "sig-x")).rejects.toThrow(
         NotFoundException,
+      );
+    });
+
+    /**
+     * The client's report and its scenario selection can drift apart: switch
+     * scenario while the new report is still loading and the visible page is
+     * still the old one, with the old signal's id on its button. Marking that
+     * signal and handing back the *selected* scenario's report told the user
+     * the operation they had just confirmed belonged to a scenario it did not.
+     */
+    it("refuses a signal that belongs to another scenario", async () => {
+      signalService.markExecuted.mockResolvedValue("strategy-1");
+
+      await expect(
+        service.markExecuted(userId, "sig-1", "1Y", "strategy-2"),
+      ).rejects.toMatchObject({ status: 409 });
+    });
+
+    it("reports on the signal's own scenario, not the requested one", async () => {
+      signalService.markExecuted.mockResolvedValue("strategy-1");
+
+      await service.markExecuted(userId, "sig-1", "1Y", "strategy-1");
+
+      // The report is loaded for the strategy the signal actually belongs to.
+      expect(strategyRepo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "strategy-1", userId },
+        }),
       );
     });
   });
@@ -927,6 +987,19 @@ describe("GemStrategyService", () => {
       await service.removeStrategy(userId, "strategy-2");
 
       expect(strategyRepo.remove).toHaveBeenCalled();
+      // Serialized with materialization and the settings save, in the same
+      // lock order. Without it a delete could commit between a materializer
+      // reloading the strategy and its first insert, and the insert then hit a
+      // foreign key that was already gone.
+      const locks = manager.query.mock.calls.filter(([sql]: [string]) =>
+        sql.includes("pg_advisory_xact_lock"),
+      );
+      expect(locks[0]?.[1]).toEqual(["strategy-2"]);
+      // The lock comes before the existence check, so the check is made
+      // against a settled world rather than a snapshot.
+      expect(manager.query.mock.invocationCallOrder[0]).toBeLessThan(
+        strategyRepo.remove.mock.invocationCallOrder[0],
+      );
       // The report afterwards names no scenario, so it lands on the first one.
       expect(strategyRepo.findOne).toHaveBeenLastCalledWith({
         where: { userId },

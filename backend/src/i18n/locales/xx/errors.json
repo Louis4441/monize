@@ -504,8 +504,10 @@
   },
   "strategies": {
     "accountNotFound": "[XX-Account not found-XX]",
+    "configurationChanging": "[XX-The strategy settings changed while the report was being built. Please try again.-XX]",
     "securityNotFound": "[XX-Security not found-XX]",
     "signalNotFound": "[XX-Strategy signal not found-XX]",
+    "signalStrategyMismatch": "[XX-That signal belongs to a different strategy.-XX]",
     "strategyNotFound": "[XX-Strategy not found-XX]"
   }
 }

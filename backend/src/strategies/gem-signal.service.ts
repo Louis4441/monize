@@ -54,6 +54,16 @@ export interface GemMaterialization {
    * report of anything; the caller starts over instead.
    */
   configChanged: boolean;
+  /**
+   * True when the strategy was gone by the time the lock was taken -- deleted
+   * between the report's read and this write.
+   *
+   * Distinct from `configChanged`, which it also sets. The caller answers the
+   * two differently: an unstable configuration is a race worth rebuilding for
+   * and, past the budget, worth refusing; a deleted scenario is settled, and
+   * the honest report of it is the unconfigured one, not an error.
+   */
+  strategyMissing: boolean;
 }
 
 /**
@@ -319,7 +329,12 @@ export class GemSignalService {
       // Deleted while the report was being built: nothing to materialize, and
       // nothing to report either.
       if (!strategy)
-        return { signals: [], legacyPeriods: 0, configChanged: true };
+        return {
+          signals: [],
+          legacyPeriods: 0,
+          configChanged: true,
+          strategyMissing: true,
+        };
       const assets = await manager
         .getRepository(GemStrategyAsset)
         .find({ where: { strategyId: strategy.id } });
@@ -446,7 +461,12 @@ export class GemSignalService {
             .map((signal) => signal.evaluatedOn)
             .filter((date) => !answeredDates.has(date)),
         );
-        return { signals, legacyPeriods: unanswered.size, configChanged };
+        return {
+          signals,
+          legacyPeriods: unanswered.size,
+          configChanged,
+          strategyMissing: false,
+        };
       };
 
       const unstored = periods.filter(
@@ -743,16 +763,37 @@ export class GemSignalService {
   }
 
   /** Mark a signal's operation as carried out. Returns false when unknown. */
-  async markExecuted(userId: string, signalId: string): Promise<boolean> {
+  /**
+   * Record that the user carried out a signal's operation.
+   *
+   * Returns the id of the strategy the signal belongs to, or null when there is
+   * no such signal for this user. The **signal** decides which strategy this
+   * was, not the caller: a client whose report is one scenario behind its
+   * selection would otherwise mark scenario A's signal and be handed scenario
+   * B's report, having been told the operation it just confirmed was B's.
+   *
+   * The strategy's lock is taken before the write, in the same order every
+   * other writer takes it. Materialization reads the stored rows and writes
+   * refreshed copies of them, carrying `executed` across; without the lock a
+   * confirmation committed between that read and that write was overwritten by
+   * the snapshot, and the report went back to asking for a trade the user had
+   * just told it about.
+   */
+  async markExecuted(userId: string, signalId: string): Promise<string | null> {
     return withScopedDb(this.dataSource, async (manager) => {
       const repo = manager.getRepository(GemStrategySignal);
+      const found = await repo.findOne({ where: { id: signalId, userId } });
+      if (!found) return null;
+      await lockGemStrategy(manager, found.strategyId);
+      // Re-read under the lock: the row may have been rewritten by a
+      // materializer that was already holding it when we looked.
       const signal = await repo.findOne({ where: { id: signalId, userId } });
-      if (!signal) return false;
-      if (signal.executed) return true;
+      if (!signal) return null;
+      if (signal.executed) return signal.strategyId;
       signal.executed = true;
       signal.executedAt = new Date();
       await repo.save(signal);
-      return true;
+      return signal.strategyId;
     });
   }
 }
