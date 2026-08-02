@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Jumlah dalam {currency}",
-      "estimateCaption": "Sekitar {total} pada 1 {from} = {rate} {to}. Diperbarui harian; saat diposting, kurs pada tanggal posting yang dipakai.",
+      "estimateCaption": "Sekitar {total} pada 1 {from} = {rate} {to}.",
       "noRateWarning": "Tidak ada nilai tukar untuk {from} ke {to}. Pilih mata uang lain, atau masukkan jumlah dalam {to}.",
       "feeCaption": "Termasuk biaya transaksi luar negeri {percent}% ({fee})."
     }

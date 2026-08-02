@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Montante em {currency}",
-      "estimateCaption": "Cerca de {total} a 1 {from} = {rate} {to}. Atualizado diariamente; no lançamento é usada a taxa da data de lançamento.",
+      "estimateCaption": "Cerca de {total} a 1 {from} = {rate} {to}.",
       "noRateWarning": "Não foi encontrada uma taxa de câmbio de {from} para {to}. Escolha outra moeda ou introduza o montante em {to}.",
       "feeCaption": "Inclui uma comissão de transação estrangeira de {percent}% ({fee})."
     }

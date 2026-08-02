@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Сума в {currency}",
-      "estimateCaption": "Приблизно {total} за курсом 1 {from} = {rate} {to}. Оновлюється щодня; під час проведення застосовується курс на дату проведення.",
+      "estimateCaption": "Приблизно {total} за курсом 1 {from} = {rate} {to}.",
       "noRateWarning": "Не знайдено курс обміну {from} на {to}. Виберіть іншу валюту або введіть суму в {to}.",
       "feeCaption": "Включає комісію за закордонну операцію {percent}% ({fee})."
     }

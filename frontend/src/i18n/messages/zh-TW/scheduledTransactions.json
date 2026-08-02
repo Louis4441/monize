@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "以 {currency} 計的金額",
-      "estimateCaption": "約 {total}，按 1 {from} = {rate} {to} 計。每日更新；過帳時使用過帳日期的匯率。",
+      "estimateCaption": "約 {total}，按 1 {from} = {rate} {to} 計。",
       "noRateWarning": "找不到從 {from} 到 {to} 的匯率。請選擇其他貨幣，或以 {to} 輸入金額。",
       "feeCaption": "包含 {percent}% 境外交易手續費（{fee}）。"
     }

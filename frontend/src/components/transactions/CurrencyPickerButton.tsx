@@ -71,7 +71,13 @@ export function CurrencyPickerButton({
         aria-haspopup="dialog"
         aria-expanded={open}
         title={t('form.currencyPicker.label')}
-        className="flex-shrink-0 mt-6 flex items-center justify-center px-2.5 min-w-[2.75rem] border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
+        // `self-stretch` is load-bearing, not decoration: the button carries no
+        // vertical padding or height of its own, so without it the row's
+        // align-items decides how tall it is and any parent that is not
+        // `items-stretch` renders a squat button beside a full-height Amount
+        // input. align-self wins over the parent's align-items, so the button
+        // matches the input whatever the wrapper does.
+        className="flex-shrink-0 self-stretch mt-6 flex items-center justify-center px-2.5 min-w-[2.75rem] border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span className="text-sm font-medium">
           {getCurrencySymbol(effectiveCode)}

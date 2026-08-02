@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Montant en {currency}",
-      "estimateCaption": "Environ {total} au taux 1 {from} = {rate} {to}. Mis à jour quotidiennement ; à l'enregistrement, c'est le taux de la date d'enregistrement qui s'applique.",
+      "estimateCaption": "Environ {total} au taux 1 {from} = {rate} {to}.",
       "noRateWarning": "Aucun taux de change trouvé de {from} vers {to}. Choisissez une autre devise ou saisissez le montant en {to}.",
       "feeCaption": "Comprend des frais de transaction à l'étranger de {percent}% ({fee})."
     }

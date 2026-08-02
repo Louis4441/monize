@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Bedrag in {currency}",
-      "estimateCaption": "Ongeveer {total} bij 1 {from} = {rate} {to}. Dagelijks bijgewerkt; bij het boeken geldt de koers van de boekingsdatum.",
+      "estimateCaption": "Ongeveer {total} bij 1 {from} = {rate} {to}.",
       "noRateWarning": "Geen wisselkoers gevonden voor {from} naar {to}. Kies een andere valuta of voer het bedrag in {to} in.",
       "feeCaption": "Inclusief {percent}% kosten voor buitenlandse transactie ({fee})."
     }

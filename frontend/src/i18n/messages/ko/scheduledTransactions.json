@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "{currency} 기준 금액",
-      "estimateCaption": "약 {total}(1 {from} = {rate} {to}). 매일 갱신되며, 게시할 때는 게시 날짜의 환율이 적용됩니다.",
+      "estimateCaption": "약 {total}(1 {from} = {rate} {to}).",
       "noRateWarning": "{from}에서 {to}로의 환율을 찾을 수 없습니다. 다른 통화를 선택하거나 금액을 {to}로 입력하세요.",
       "feeCaption": "{percent}% 해외 거래 수수료({fee})가 포함됩니다."
     }

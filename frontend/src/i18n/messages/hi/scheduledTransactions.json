@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "{currency} में राशि",
-      "estimateCaption": "लगभग {total}, दर 1 {from} = {rate} {to} पर। यह रोज़ अपडेट होता है; पोस्ट करते समय पोस्टिंग तिथि की दर लागू होती है।",
+      "estimateCaption": "लगभग {total}, दर 1 {from} = {rate} {to} पर।",
       "noRateWarning": "{from} से {to} के लिए कोई विनिमय दर नहीं मिली। दूसरी मुद्रा चुनें या राशि {to} में दर्ज करें।",
       "feeCaption": "इसमें {percent}% विदेशी लेनदेन शुल्क ({fee}) शामिल है।"
     }

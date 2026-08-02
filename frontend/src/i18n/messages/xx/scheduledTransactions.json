@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "[XX-Amount in {currency}-XX]",
-      "estimateCaption": "[XX-About {total} at 1 {from} = {rate} {to}. Updated daily; the rate on the posting date is used when it posts.-XX]",
+      "estimateCaption": "[XX-About {total} at 1 {from} = {rate} {to}.-XX]",
       "noRateWarning": "[XX-No exchange rate found for {from} to {to}. Pick another currency, or enter the amount in {to}.-XX]",
       "feeCaption": "[XX-Includes a {percent}% foreign transaction fee ({fee}).-XX]"
     }

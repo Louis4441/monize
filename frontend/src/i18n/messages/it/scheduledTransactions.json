@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Importo in {currency}",
-      "estimateCaption": "Circa {total} al tasso 1 {from} = {rate} {to}. Aggiornato ogni giorno; alla registrazione si usa il tasso della data di registrazione.",
+      "estimateCaption": "Circa {total} al tasso 1 {from} = {rate} {to}.",
       "noRateWarning": "Nessun tasso di cambio trovato da {from} a {to}. Scegli un'altra valuta oppure inserisci l'importo in {to}.",
       "feeCaption": "Include una commissione per transazione estera del {percent}% ({fee})."
     }

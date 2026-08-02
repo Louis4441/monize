@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Số tiền bằng {currency}",
-      "estimateCaption": "Khoảng {total} theo tỷ giá 1 {from} = {rate} {to}. Cập nhật hằng ngày; khi đăng sẽ dùng tỷ giá của ngày đăng.",
+      "estimateCaption": "Khoảng {total} theo tỷ giá 1 {from} = {rate} {to}.",
       "noRateWarning": "Không tìm thấy tỷ giá từ {from} sang {to}. Hãy chọn đơn vị tiền tệ khác, hoặc nhập số tiền bằng {to}.",
       "feeCaption": "Bao gồm phí giao dịch nước ngoài {percent}% ({fee})."
     }

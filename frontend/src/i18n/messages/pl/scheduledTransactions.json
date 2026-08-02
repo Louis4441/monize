@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Kwota w {currency}",
-      "estimateCaption": "Około {total} przy 1 {from} = {rate} {to}. Aktualizowane codziennie; przy księgowaniu obowiązuje kurs z daty księgowania.",
+      "estimateCaption": "Około {total} przy 1 {from} = {rate} {to}.",
       "noRateWarning": "Nie znaleziono kursu wymiany z {from} na {to}. Wybierz inną walutę lub wprowadź kwotę w {to}.",
       "feeCaption": "Zawiera opłatę za transakcję zagraniczną {percent}% ({fee})."
     }

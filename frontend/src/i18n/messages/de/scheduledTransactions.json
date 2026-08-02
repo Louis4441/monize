@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Betrag in {currency}",
-      "estimateCaption": "Etwa {total} bei 1 {from} = {rate} {to}. Wird täglich aktualisiert; bei der Buchung gilt der Kurs des Buchungsdatums.",
+      "estimateCaption": "Etwa {total} bei 1 {from} = {rate} {to}.",
       "noRateWarning": "Kein Wechselkurs für {from} zu {to} gefunden. Bitte eine andere Währung wählen oder den Betrag in {to} eingeben.",
       "feeCaption": "Enthält eine Fremdwährungsgebühr von {percent}% ({fee})."
     }

@@ -1295,14 +1295,17 @@ export function ScheduledTransactionForm({
           {/* Row 4: Amount, Reference Number */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <div className="flex items-start space-x-2">
+              {/* items-stretch + min-w-0, the same row NormalTransactionFields
+                  and SplitTransactionFields use, so the picker button is the
+                  height of the Amount input beside it. */}
+              <div className="flex items-stretch space-x-2">
                 <CurrencyPickerButton
                   value={entryCurrency}
                   accountCurrencyCode={accountCurrency}
                   onChange={handleEntryCurrencyChange}
                   disabled={isLoading}
                 />
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <CurrencyInput
                     label={
                       isForeign

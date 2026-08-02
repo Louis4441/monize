@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "{currency} cinsinden tutar",
-      "estimateCaption": "Yaklaşık {total}, 1 {from} = {rate} {to} kurundan. Günlük güncellenir; kaydedilirken kayıt tarihindeki kur kullanılır.",
+      "estimateCaption": "Yaklaşık {total}, 1 {from} = {rate} {to} kurundan.",
       "noRateWarning": "{from} biriminden {to} birimine döviz kuru bulunamadı. Başka bir para birimi seçin veya tutarı {to} cinsinden girin.",
       "feeCaption": "%{percent} yurt dışı işlem ücreti ({fee}) içerir."
     }

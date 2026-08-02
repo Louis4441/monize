@@ -266,7 +266,7 @@
     },
     "fx": {
       "amountInCurrency": "Monto en {currency}",
-      "estimateCaption": "Unos {total} a 1 {from} = {rate} {to}. Se actualiza a diario; al registrarse se usa el tipo de la fecha de registro.",
+      "estimateCaption": "Unos {total} a 1 {from} = {rate} {to}.",
       "noRateWarning": "No se encontró un tipo de cambio de {from} a {to}. Elige otra moneda o introduce el importe en {to}.",
       "feeCaption": "Incluye una comisión por transacción en el extranjero del {percent}% ({fee})."
     }
