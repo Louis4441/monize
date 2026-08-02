@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,6 +14,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -599,27 +600,41 @@ function EmergencyAccessSection() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label={t('settings.grantAfterDaysLabel')}
-                type="number"
-                min={2}
-                max={365}
-                disabled={!view.emailConfigured}
-                error={settingsForm.formState.errors.grantAfterDays?.message}
-                {...settingsForm.register('grantAfterDays', {
-                  valueAsNumber: true,
-                })}
+              <Controller
+                name="grantAfterDays"
+                control={settingsForm.control}
+                render={({ field }) => (
+                  <NumericInput
+                    label={t('settings.grantAfterDaysLabel')}
+                    decimalPlaces={0}
+                    max={365}
+                    disabled={!view.emailConfigured}
+                    error={settingsForm.formState.errors.grantAfterDays?.message}
+                    value={field.value}
+                    onChange={field.onChange}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
-              <Input
-                label={t('settings.reminderAfterDaysLabel')}
-                type="number"
-                min={1}
-                max={364}
-                disabled={!view.emailConfigured}
-                error={settingsForm.formState.errors.reminderAfterDays?.message}
-                {...settingsForm.register('reminderAfterDays', {
-                  valueAsNumber: true,
-                })}
+              <Controller
+                name="reminderAfterDays"
+                control={settingsForm.control}
+                render={({ field }) => (
+                  <NumericInput
+                    label={t('settings.reminderAfterDaysLabel')}
+                    decimalPlaces={0}
+                    max={364}
+                    disabled={!view.emailConfigured}
+                    error={settingsForm.formState.errors.reminderAfterDays?.message}
+                    value={field.value}
+                    onChange={field.onChange}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                  />
+                )}
               />
             </div>
 

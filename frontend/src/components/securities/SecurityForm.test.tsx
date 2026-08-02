@@ -737,8 +737,8 @@ describe('SecurityForm', () => {
         expect(screen.getByText('Geographical Allocation')).toBeInTheDocument();
       });
       // Stored decimals are shown as percentages.
-      expect(screen.getByDisplayValue('60')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('25')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('60.00')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('25.00')).toBeInTheDocument();
     });
 
     it('does not surface a provider "Other" slice as a country row', async () => {
@@ -754,9 +754,9 @@ describe('SecurityForm', () => {
         expect(screen.getByText('Geographical Allocation')).toBeInTheDocument();
       });
       // The real country shows as an editable row...
-      expect(screen.getByDisplayValue('60')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('60.00')).toBeInTheDocument();
       // ...but the provider "Other" (10) is not rendered as its own row.
-      expect(screen.queryByDisplayValue('10')).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue('10.00')).not.toBeInTheDocument();
     });
 
     it('submits the country allocation back as decimals (0-1)', async () => {
@@ -867,8 +867,8 @@ describe('SecurityForm', () => {
         expect(screen.getByText('Asset Allocation')).toBeInTheDocument();
       });
       // Stored decimals are shown as percentages.
-      expect(screen.getByDisplayValue('60')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('30')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('60.00')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('30.00')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Equity')).toBeInTheDocument();
     });
 
@@ -985,9 +985,9 @@ describe('SecurityForm', () => {
       });
       // Its row is gone -- the freed 60% becomes the computed "Other" remainder.
       await waitFor(() => {
-        expect(screen.queryByDisplayValue('60')).not.toBeInTheDocument();
+        expect(screen.queryByDisplayValue('60.00')).not.toBeInTheDocument();
       });
-      expect(screen.getByDisplayValue('10')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('10.00')).toBeInTheDocument();
       const remainders = screen.getAllByTestId('allocation-other');
       expect(remainders[remainders.length - 1]).toHaveTextContent('90.00%');
     });
@@ -1014,7 +1014,7 @@ describe('SecurityForm', () => {
       });
 
       expect(investmentsApi.deleteAssetOption).not.toHaveBeenCalled();
-      expect(screen.getByDisplayValue('60')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('60.00')).toBeInTheDocument();
     });
   });
 });

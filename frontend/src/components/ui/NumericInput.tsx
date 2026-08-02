@@ -16,8 +16,15 @@ interface NumericInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   decimalPlaces?: number;
   /** Allow negative values (default: false) */
   allowNegative?: boolean;
-  /** Minimum value allowed */
+  /** Minimum value allowed. Clamped while typing and again on blur. */
   min?: number;
+  /**
+   * Maximum value allowed. Clamped on blur, not while typing: every prefix of
+   * a number is smaller than the number, so a ceiling never blocks a keystroke
+   * the way a floor does, and clamping mid-word would hand the parent a value
+   * for a field the user has not finished typing.
+   */
+  max?: number;
 }
 
 /**
@@ -39,6 +46,7 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
       decimalPlaces = 2,
       allowNegative = false,
       min,
+      max,
       className,
       id,
       onBlur,
@@ -89,6 +97,12 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
 
     const inputId = id || `input-${label?.toLowerCase().replace(/\s+/g, '-')}`;
 
+    function clampToRange(val: number): number {
+      if (min !== undefined && val < min) return min;
+      if (max !== undefined && val > max) return max;
+      return val;
+    }
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       // Filter to only valid characters
       let filtered = e.target.value.replace(/[^0-9.-]/g, '');
@@ -123,8 +137,8 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
       // Format to specified decimal places on blur
       const parsed = parseValue(displayValue);
       if (parsed !== undefined) {
-        // Apply min validation
-        const finalValue = min !== undefined && parsed < min ? min : parsed;
+        // Apply min/max validation
+        const finalValue = clampToRange(parsed);
         setDisplayValue(formatValue(finalValue, decimalPlaces));
         onChange(finalValue);
       } else if (displayValue.trim() === '') {

@@ -59,6 +59,58 @@ describe('date entry goes through DateInput', () => {
   });
 });
 
+describe('numeric entry goes through NumericInput or CurrencyInput', () => {
+  /**
+   * `type="number"` is not exclusive to inputs -- recharts' `<XAxis type="number">`
+   * declares a continuous scale and appears in roughly twenty chart components.
+   * So the check is not "does this file contain the string": it walks back from
+   * each occurrence to the tag it belongs to and only complains about `input`
+   * (the raw element) and `Input` (the shared text field). Anything else --
+   * `XAxis`, `YAxis`, a future chart prop -- is left alone.
+   */
+  const TYPE_NUMBER = /type=["']number["']/g;
+
+  /** The JSX tag an attribute at `index` belongs to, or null if unparseable. */
+  function owningTag(content: string, index: number): string | null {
+    const open = content.lastIndexOf('<', index);
+    if (open === -1) return null;
+    return /^<\s*([A-Za-z][\w.]*)/.exec(content.slice(open, index))?.[1] ?? null;
+  }
+
+  const NUMERIC_ENTRY_TAGS = new Set(['input', 'Input']);
+
+  it('has no <input type="number"> anywhere in the source tree', () => {
+    const offenders: string[] = [];
+    for (const [path, content] of productionSources()) {
+      for (const match of content.matchAll(TYPE_NUMBER)) {
+        const tag = owningTag(content, match.index);
+        if (tag && NUMERIC_ENTRY_TAGS.has(tag)) {
+          offenders.push(`${path}: <${tag} type="number">`);
+        }
+      }
+    }
+
+    // A native number input adds spinner arrows, changes value on scroll wheel,
+    // and hands the form a locale-dependent parse of what was typed. Money goes
+    // through `CurrencyInput` (thousands separators, rounding to cents, the
+    // inline calculator); every other number -- share counts, rates, day-of-month,
+    // retention counts -- through `NumericInput` with `decimalPlaces`.
+    expect(offenders).toEqual([]);
+  });
+
+  it('still resolves the tag an attribute belongs to', () => {
+    // Were `owningTag` to start returning null -- a bad edit, a JSX form it
+    // cannot walk -- the check above would pass over an empty set. Assert both
+    // halves: the raw input is caught, the recharts axis is not.
+    const sample = [
+      '<input type="number" min={0} />',
+      '<XAxis dataKey="t" type="number" scale="time" />',
+    ].join('\n');
+    const tags = [...sample.matchAll(TYPE_NUMBER)].map((m) => owningTag(sample, m.index));
+    expect(tags).toEqual(['input', 'XAxis']);
+  });
+});
+
 describe('a scrollbar you need is not hidden', () => {
   /**
    * `scrollbar-hide` is for a horizontal strip of chips, where the content being

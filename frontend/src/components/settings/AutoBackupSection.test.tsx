@@ -107,9 +107,9 @@ describe('AutoBackupSection', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByLabelText('Backup Folder')).toHaveValue('/backups');
     expect(screen.getByLabelText('Backup Frequency')).toHaveValue('weekly');
-    expect(screen.getByLabelText('Daily backups')).toHaveValue(14);
-    expect(screen.getByLabelText('Weekly backups')).toHaveValue(8);
-    expect(screen.getByLabelText('Monthly backups')).toHaveValue(12);
+    expect(screen.getByLabelText('Daily backups')).toHaveValue('14');
+    expect(screen.getByLabelText('Weekly backups')).toHaveValue('8');
+    expect(screen.getByLabelText('Monthly backups')).toHaveValue('12');
   });
 
   it('enables save button when form is dirty', async () => {
@@ -321,7 +321,7 @@ describe('AutoBackupSection', () => {
       });
     });
 
-    expect(screen.getByLabelText('Daily backups')).toHaveValue(14);
+    expect(screen.getByLabelText('Daily backups')).toHaveValue('14');
   });
 
   it('disables validate button when folder path is empty', async () => {

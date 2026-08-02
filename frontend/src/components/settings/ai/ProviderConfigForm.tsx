@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import '@/lib/zodConfig';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Select } from '@/components/ui/Select';
 import { Modal } from '@/components/ui/Modal';
 import type { AiProviderConfig, AiProviderType, CreateAiProviderConfig, UpdateAiProviderConfig } from '@/types/ai';
@@ -86,6 +87,7 @@ export function ProviderConfigForm({ isOpen, onClose, onSubmit, editConfig }: Pr
     handleSubmit,
     watch,
     setValue,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<ProviderConfigFormData>({
     resolver: zodResolver(buildProviderConfigSchema(t)),
@@ -323,12 +325,21 @@ export function ProviderConfigForm({ isOpen, onClose, onSubmit, editConfig }: Pr
             />
           )}
 
-          <Input
-            label={t('priorityLabel')}
-            type="number"
-            {...register('priority')}
-            error={errors.priority?.message}
-            min={0}
+          <Controller
+            name="priority"
+            control={control}
+            render={({ field }) => (
+              <NumericInput
+                label={t('priorityLabel')}
+                decimalPlaces={0}
+                min={0}
+                error={errors.priority?.message}
+                value={field.value === '' ? undefined : Number(field.value)}
+                onChange={(value) => field.onChange(value === undefined ? '' : String(value))}
+                name={field.name}
+                onBlur={field.onBlur}
+              />
+            )}
           />
           <p className="text-xs text-gray-500 dark:text-gray-400 -mt-3">
             {t('priorityHelp')}
@@ -343,23 +354,39 @@ export function ProviderConfigForm({ isOpen, onClose, onSubmit, editConfig }: Pr
               {t('costRatesHelp')}
             </p>
             <div className="grid grid-cols-2 gap-3">
-              <Input
-                label={t('inputCostLabel')}
-                type="number"
-                step="0.0001"
-                min={0}
-                {...register('inputCostPer1M')}
-                error={errors.inputCostPer1M?.message}
-                placeholder={t('inputCostPlaceholder')}
+              <Controller
+                name="inputCostPer1M"
+                control={control}
+                render={({ field }) => (
+                  <NumericInput
+                    label={t('inputCostLabel')}
+                    decimalPlaces={4}
+                    min={0}
+                    error={errors.inputCostPer1M?.message}
+                    placeholder={t('inputCostPlaceholder')}
+                    value={field.value === '' ? undefined : Number(field.value)}
+                    onChange={(value) => field.onChange(value === undefined ? '' : String(value))}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
-              <Input
-                label={t('outputCostLabel')}
-                type="number"
-                step="0.0001"
-                min={0}
-                {...register('outputCostPer1M')}
-                error={errors.outputCostPer1M?.message}
-                placeholder={t('outputCostPlaceholder')}
+              <Controller
+                name="outputCostPer1M"
+                control={control}
+                render={({ field }) => (
+                  <NumericInput
+                    label={t('outputCostLabel')}
+                    decimalPlaces={4}
+                    min={0}
+                    error={errors.outputCostPer1M?.message}
+                    placeholder={t('outputCostPlaceholder')}
+                    value={field.value === '' ? undefined : Number(field.value)}
+                    onChange={(value) => field.onChange(value === undefined ? '' : String(value))}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                  />
+                )}
               />
             </div>
             <div className="mt-3">

@@ -97,6 +97,17 @@ const mockCategories: Category[] = [
   },
 ];
 
+/**
+ * The four period fields -- [term years, term months, amortization years,
+ * amortization months] -- in DOM order. They are `NumericInput`s, so they are
+ * textboxes rather than the `spinbutton` a native number input exposes.
+ */
+function periodInputs() {
+  const years = screen.getAllByLabelText('Years');
+  const months = screen.getAllByLabelText('Months');
+  return [years[0], months[0], years[1], months[1]];
+}
+
 describe('MortgageFields', () => {
   const mockRegister = vi.fn().mockReturnValue({
     name: 'fieldName', onChange: vi.fn(), onBlur: vi.fn(), ref: vi.fn(),
@@ -179,37 +190,37 @@ describe('MortgageFields', () => {
   it('populates term inputs from termMonths prop', () => {
     render(<MortgageFields {...defaultProps} termMonths={62} />);
     // 62 months = 5 years, 2 months
-    const numberInputs = screen.getAllByRole('spinbutton');
+    const numberInputs = periodInputs();
     // Term years, term months, amort years, amort months
-    expect(numberInputs[0]).toHaveValue(5);
-    expect(numberInputs[1]).toHaveValue(2);
+    expect(numberInputs[0]).toHaveValue('5');
+    expect(numberInputs[1]).toHaveValue('2');
   });
 
   it('populates amortization inputs from amortizationMonths prop', () => {
     render(<MortgageFields {...defaultProps} amortizationMonths={303} />);
     // 303 months = 25 years, 3 months
-    const numberInputs = screen.getAllByRole('spinbutton');
-    expect(numberInputs[2]).toHaveValue(25);
-    expect(numberInputs[3]).toHaveValue(3);
+    const numberInputs = periodInputs();
+    expect(numberInputs[2]).toHaveValue('25');
+    expect(numberInputs[3]).toHaveValue('3');
   });
 
   it('calls setValue when term years are changed', () => {
     render(<MortgageFields {...defaultProps} />);
-    const numberInputs = screen.getAllByRole('spinbutton');
+    const numberInputs = periodInputs();
     fireEvent.change(numberInputs[0], { target: { value: '5' } });
     expect(mockSetValue).toHaveBeenCalledWith('termMonths', 60, { shouldValidate: true, shouldDirty: true });
   });
 
   it('calls setValue when term months are changed', () => {
     render(<MortgageFields {...defaultProps} termMonths={60} />);
-    const numberInputs = screen.getAllByRole('spinbutton');
+    const numberInputs = periodInputs();
     fireEvent.change(numberInputs[1], { target: { value: '6' } });
     expect(mockSetValue).toHaveBeenCalledWith('termMonths', 66, { shouldValidate: true, shouldDirty: true });
   });
 
   it('calls setValue when amortization years are changed', () => {
     render(<MortgageFields {...defaultProps} />);
-    const numberInputs = screen.getAllByRole('spinbutton');
+    const numberInputs = periodInputs();
     fireEvent.change(numberInputs[2], { target: { value: '25' } });
     expect(mockSetValue).toHaveBeenCalledWith('amortizationMonths', 300, { shouldValidate: true, shouldDirty: true });
   });
@@ -347,14 +358,14 @@ describe('MortgageFields', () => {
 
   it('calls setValue when amortization months are changed', () => {
     render(<MortgageFields {...defaultProps} amortizationMonths={300} />);
-    const numberInputs = screen.getAllByRole('spinbutton');
+    const numberInputs = periodInputs();
     fireEvent.change(numberInputs[3], { target: { value: '6' } });
     expect(mockSetValue).toHaveBeenCalledWith('amortizationMonths', 306, { shouldValidate: true, shouldDirty: true });
   });
 
   it('sets amortizationMonths to undefined when both years and months are 0', () => {
     render(<MortgageFields {...defaultProps} amortizationMonths={12} />);
-    const numberInputs = screen.getAllByRole('spinbutton');
+    const numberInputs = periodInputs();
     // Set years to 0
     fireEvent.change(numberInputs[2], { target: { value: '0' } });
     // Set months to 0
@@ -474,7 +485,7 @@ describe('MortgageFields', () => {
 
   it('does not allow term years above 99', () => {
     render(<MortgageFields {...defaultProps} />);
-    const numberInputs = screen.getAllByRole('spinbutton');
+    const numberInputs = periodInputs();
     fireEvent.change(numberInputs[0], { target: { value: '100' } });
     // Value should not change - setValue not called with invalid value
     expect(mockSetValue).not.toHaveBeenCalledWith('termMonths', 1200, expect.anything());
@@ -482,7 +493,7 @@ describe('MortgageFields', () => {
 
   it('does not allow term months above 11', () => {
     render(<MortgageFields {...defaultProps} />);
-    const numberInputs = screen.getAllByRole('spinbutton');
+    const numberInputs = periodInputs();
     fireEvent.change(numberInputs[1], { target: { value: '12' } });
     expect(mockSetValue).not.toHaveBeenCalledWith('termMonths', 12, expect.anything());
   });

@@ -7,23 +7,24 @@ import { loanRateChangesApi } from '@/lib/loan-rate-changes';
 import { LoanRateChange, ScheduledPaymentPreview } from '@/types/loan-rate-change';
 import { Account } from '@/types/account';
 import { getErrorMessage } from '@/lib/errors';
+import { getCurrencySymbol } from '@/lib/format';
 import { useNumberFormat } from '@/hooks/useNumberFormat';
 
 export type RatePaymentMode = 'keep' | 'set' | 'recalculate';
 
 export interface RateFormState {
   effectiveDate: string;
-  annualRate: string;
+  annualRate: number | undefined;
   paymentMode: RatePaymentMode;
-  newPaymentAmount: string;
+  newPaymentAmount: number | undefined;
   note: string;
 }
 
 const emptyForm = (): RateFormState => ({
   effectiveDate: '',
-  annualRate: '',
+  annualRate: undefined,
   paymentMode: 'keep',
-  newPaymentAmount: '',
+  newPaymentAmount: undefined,
   note: '',
 });
 
@@ -60,10 +61,10 @@ export function useLoanRateEditing(account: Account, onChanged: () => void) {
   const openEdit = (change: LoanRateChange) => {
     setForm({
       effectiveDate: change.effectiveDate,
-      annualRate: String(change.annualRate),
+      annualRate: Number(change.annualRate),
       paymentMode: change.newPaymentAmount != null ? 'set' : 'keep',
       newPaymentAmount:
-        change.newPaymentAmount != null ? String(change.newPaymentAmount) : '',
+        change.newPaymentAmount != null ? Number(change.newPaymentAmount) : undefined,
       note: change.note ?? '',
     });
     setFormModal({ mode: 'edit', change });
@@ -77,9 +78,9 @@ export function useLoanRateEditing(account: Account, onChanged: () => void) {
   const openAddWith = (effectiveDate: string, annualRate: number) => {
     setForm({
       effectiveDate: effectiveDate.split('T')[0],
-      annualRate: String(annualRate),
+      annualRate,
       paymentMode: 'keep',
-      newPaymentAmount: '',
+      newPaymentAmount: undefined,
       note: '',
     });
     setFormModal({ mode: 'add' });
@@ -87,8 +88,8 @@ export function useLoanRateEditing(account: Account, onChanged: () => void) {
 
   const closeForm = () => setFormModal(null);
 
-  const parsedRate = Number.parseFloat(form.annualRate);
-  const parsedPayment = Number.parseFloat(form.newPaymentAmount);
+  const parsedRate = form.annualRate ?? NaN;
+  const parsedPayment = form.newPaymentAmount ?? NaN;
   const isFormValid =
     form.effectiveDate.length > 0 &&
     Number.isFinite(parsedRate) &&
@@ -215,6 +216,7 @@ export function useLoanRateEditing(account: Account, onChanged: () => void) {
 
   return {
     isMortgage,
+    currencySymbol: getCurrencySymbol(account.currencyCode),
     // header actions
     openAdd,
     // per-change actions

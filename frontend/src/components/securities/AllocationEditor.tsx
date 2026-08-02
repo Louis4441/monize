@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { Combobox } from '@/components/ui/Combobox';
-import { Input } from '@/components/ui/Input';
+import { NumericInput } from '@/components/ui/NumericInput';
 
 /** A single editable allocation row. `weight` is a percentage string (0-100). */
 export interface AllocationRow {
@@ -124,14 +124,14 @@ export function AllocationEditor({
               />
             </div>
             <div className="w-28">
-              <Input
-                type="number"
+              <NumericInput
+                decimalPlaces={2}
                 min={0}
                 max={100}
-                step="any"
-                inputMode="decimal"
-                value={row.weight}
-                onChange={(e) => updateRow(index, { weight: e.target.value })}
+                value={row.weight === '' ? undefined : parseWeight(row.weight)}
+                onChange={(weight) =>
+                  updateRow(index, { weight: weight === undefined ? '' : String(weight) })
+                }
                 placeholder="0"
                 aria-label={t('form.allocation.weightAriaLabel')}
               />

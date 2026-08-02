@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { DateInput } from '@/components/ui/DateInput';
 import { CurrencyInput } from '@/components/ui/CurrencyInput';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { Combobox } from '@/components/ui/Combobox';
 import { Modal } from '@/components/ui/Modal';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
@@ -352,8 +353,8 @@ export function PostTransactionDialog({
   const investmentSign = scheduledTransaction.investmentAction === 'SELL' ? -1 : 1;
   const investmentCommission = Number(scheduledTransaction.investmentCommission ?? 0);
 
-  const handleInvestmentQuantityChange = (raw: string) => {
-    const qty = raw === '' ? '' : Number(raw);
+  const handleInvestmentQuantityChange = (raw: number | undefined) => {
+    const qty = raw ?? '';
     setInvestmentQuantity(qty);
     if (qty !== '' && investmentPrice !== '' && Number(investmentPrice) > 0) {
       const total = Number(qty) * Number(investmentPrice) + investmentSign * investmentCommission;
@@ -361,8 +362,8 @@ export function PostTransactionDialog({
     }
   };
 
-  const handleInvestmentPriceChange = (raw: string) => {
-    const price = raw === '' ? '' : Number(raw);
+  const handleInvestmentPriceChange = (raw: number | undefined) => {
+    const price = raw ?? '';
     setInvestmentPrice(price);
     if (price !== '' && Number(price) > 0) {
       if (investmentTotalValue !== '') {
@@ -646,35 +647,31 @@ export function PostTransactionDialog({
         {isInvestmentKind && (
           <>
             {(isInvestmentQuantityPrice || isInvestmentQuantityOnly) && (
-              <Input
+              <NumericInput
                 label={t('postDialog.quantityLabel')}
-                type="number"
-                step="0.00000001"
+                decimalPlaces={8}
                 min={0}
-                value={investmentQuantity}
-                onChange={(e) =>
+                value={investmentQuantity === '' ? undefined : investmentQuantity}
+                onChange={(value) =>
                   isInvestmentQuantityPrice
-                    ? handleInvestmentQuantityChange(e.target.value)
-                    : setInvestmentQuantity(
-                        e.target.value === '' ? '' : Number(e.target.value),
-                      )
+                    ? handleInvestmentQuantityChange(value)
+                    : setInvestmentQuantity(value ?? '')
                 }
               />
             )}
             {isInvestmentQuantityPrice && (
               <>
-                <Input
+                <NumericInput
                   label={t('postDialog.pricePerShareLabel')}
-                  type="number"
-                  step="0.000001"
+                  decimalPlaces={6}
                   min={0}
                   placeholder={
                     marketPrice != null
                       ? t('postDialog.latestPlaceholder', { price: formatNumber(marketPrice, 6).replace(/0+$/, '').replace(/\.$/, '') })
                       : undefined
                   }
-                  value={investmentPrice}
-                  onChange={(e) => handleInvestmentPriceChange(e.target.value)}
+                  value={investmentPrice === '' ? undefined : investmentPrice}
+                  onChange={handleInvestmentPriceChange}
                 />
                 <CurrencyInput
                   label={t('postDialog.totalPriceLabel')}

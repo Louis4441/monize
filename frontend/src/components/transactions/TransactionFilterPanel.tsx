@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { MultiSelect, MultiSelectOption } from '@/components/ui/MultiSelect';
 import { exchangeRatesApi } from '@/lib/exchange-rates';
 import { Input } from '@/components/ui/Input';
+import { CurrencyInput } from '@/components/ui/CurrencyInput';
 import { DateInput } from '@/components/ui/DateInput';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
@@ -680,21 +681,23 @@ export function TransactionFilterPanel({
                   }}
                 />
 
-                <Input
+                <CurrencyInput
                   label={t('filter.fields.amountFrom')}
-                  type="number"
-                  step="0.01"
-                  value={filterAmountFrom}
-                  onChange={(e) => handleFilterChange(setFilterAmountFrom, e.target.value)}
+                  allowCalculator={false}
+                  value={filterAmountFrom === '' ? undefined : Number(filterAmountFrom)}
+                  onChange={(value) =>
+                    handleFilterChange(setFilterAmountFrom, value === undefined ? '' : String(value))
+                  }
                   placeholder={t('filter.placeholders.amountMin')}
                 />
 
-                <Input
+                <CurrencyInput
                   label={t('filter.fields.amountTo')}
-                  type="number"
-                  step="0.01"
-                  value={filterAmountTo}
-                  onChange={(e) => handleFilterChange(setFilterAmountTo, e.target.value)}
+                  allowCalculator={false}
+                  value={filterAmountTo === '' ? undefined : Number(filterAmountTo)}
+                  onChange={(value) =>
+                    handleFilterChange(setFilterAmountTo, value === undefined ? '' : String(value))
+                  }
                   placeholder={t('filter.placeholders.amountMax')}
                 />
 
