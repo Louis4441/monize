@@ -124,7 +124,89 @@ sees:
   -- the request that lost the race would return data missing the rows the
   winning request just inserted.
 
-## 7. Testing requirements
+## 7. A rejected command must not already have written
+
+Every check capable of rejecting a command -- ownership, scenario or tenant
+identity, revision or fingerprint, precondition, request consistency, quota --
+runs **before the mutation is committed, inside the same transaction and under
+the same lock that protect the write**.
+
+A response of `400`, `403`, `404`, `409`, or a validation failure states that
+the change did not happen. It must therefore not have happened. The single
+exception is an API that documents partial success as its contract; such an
+endpoint must return **which** operations committed, and the rejection is then
+not a rejection of the whole command.
+
+The sequence this forbids:
+
+```text
+1. Mark strategy A's signal as executed.
+2. Commit.
+3. Discover that the request named strategy B.
+4. Return 409.
+```
+
+What the caller sees:
+
+```text
+Signal belongs to strategy A.
+The request supplies strategy B.
+The API returns 409 Conflict.
+The signal must remain unmodified.
+```
+
+An HTTP status does not undo a committed row. A client acting on that 409 --
+retrying, showing an error, leaving the operation marked outstanding -- is now
+working against a database that disagrees with it.
+
+In practice:
+
+- A **pre-check outside the transaction is not the check.** State can change
+  between reading it and writing, which is the entire reason the write is in a
+  transaction. Re-read and re-validate inside it.
+- Where concurrency matters, validate **under the same lock** as the write, not
+  merely in the same transaction. A check that ran before the lock was taken
+  describes a world the writer no longer inhabits.
+- A service must not return a success-shaped value, having mutated, and leave
+  the rejection to a layer above it. By then the transaction has committed and
+  the caller's only options are an apology or a compensating write. Push the
+  expectation *down* into the operation instead: give it the caller's
+  precondition as a parameter and let it refuse.
+- Distinguish the refusal from the other outcomes in the return type. "No such
+  row", "not yours" and "done" are different answers and collapsing two of them
+  into `null` invites the caller to guess.
+- When a post-read invariant fails, **rolling the transaction back is the
+  default**, not an exceptional path.
+
+### 7.1 Testing a rejection
+
+A test asserting only the thrown error proves the API's manners, not its
+atomicity. Assert both halves:
+
+```typescript
+await expect(command()).rejects.toMatchObject({ status: 409 });
+
+const reloaded = await repository.findOneByOrFail({ id: signalId });
+expect(reloaded.executed).toBe(false);
+expect(reloaded.executedAt).toBeNull();
+```
+
+Reload through the real persistence path wherever that is practical. An
+assertion against an in-memory mock shows the code did not call `save`; it says
+nothing about whether a transaction committed, which is the invariant when the
+validation and the write are separated by a commit boundary. Where transaction
+or driver behaviour *is* the invariant, the test belongs in the integration
+suite; a unit spec is enough where the question is only ordering.
+
+Where the invariant depends on a lock, add the interleaved case:
+
+```text
+read -> competing write -> validation -> attempted mutation
+```
+
+and assert that the rejected command left nothing behind.
+
+## 8. Testing requirements
 
 "Add tests" is not sufficient for financial code -- a test written by the same
 author as the implementation tends to confirm its assumptions. Every financial
@@ -136,13 +218,65 @@ calculation needs:
   simultaneous gains and losses; configuration changes; deleted or replaced
   instruments; concurrent requests; first-time materialization; and payloads
   that pass through the real validation pipeline (not hand-built objects).
+- **Inputs from `docs/testing-contract.md`**, which names the classes that
+  have broken this codebase before and their canonical values. Select the ones
+  the code can actually receive; it is not a checklist to satisfy in full.
 - **At least one adversarial regression test per formula**: a case where a
   naive implementation using `filter(null)`, a default zero, or stale-value
   carry-forward would produce a plausible but incorrect result -- and the test
   fails on it. If the naive implementation would pass the whole suite, the
   suite is missing its most important case.
 
-## 8. Specification before implementation
+### 8.1 A green suite after a behaviour change is a finding
+
+If you changed what a calculation produces and **nothing failed**, exactly one
+of two things is true: the change is a no-op, or the suite had no case for
+that behaviour. Say which, in the change description, before moving on -- and
+if it is the second, add the case in the same commit.
+
+This is the cheapest check in this document and the one that catches the most.
+A rule can be written down, read, agreed with, and violated in code all the
+same; a suite that stays green while the arithmetic changes underneath it is
+evidence rather than opinion.
+
+### 8.2 A test you have never seen fail protects nothing
+
+For each invariant you add, break it on purpose before trusting the test:
+revert the fix in your working tree, run the named test, watch it fail,
+restore the fix. Record in the change description **which test fails on which
+input**.
+
+Doing this is also how you discover that the guard you just wrote is testing a
+misspelled symbol, an interface that no longer exists, or a branch nothing can
+reach.
+
+### 8.3 A fixture is a claim about production data
+
+Before writing one, find the code that *produces* the data and check that your
+fixture is a shape it can actually emit. Two failure modes, both of which
+leave a suite passing over a defect:
+
+- **A fixture the producer could never emit** -- a mock returning a field
+  combination the driver or the collaborator never returns. Every branch that
+  reads it is then green and unreachable.
+- **A fixture that omits a shape the producer *can* emit** -- weightings that
+  always sum to 1 where the storage format explicitly allows a remainder, a
+  price series far sparser or denser than the query supplies, an identifier
+  always present where the column is nullable. The formula is then only ever
+  exercised on the easy half of its input domain.
+
+Where the language can enforce this, let it: type mocked collaborators so the
+compiler rejects a return shape the real method cannot produce.
+
+### 8.4 A second figure inherits the first one's denominator
+
+Adding a new reported number over an existing base -- another percentage over
+the same total, another total over the same conversion -- adopts every known
+defect of that base and republishes it under a new name the reader has no
+reason to distrust. A pre-existing problem you decided not to fix stops being
+pre-existing the moment you build on it. Fix it, or do not add the figure.
+
+## 9. Specification before implementation
 
 A financial feature of any substance starts from a short written design
 document, approved before implementation, containing: the invariants, the
@@ -151,3 +285,31 @@ versioning and recomputation rules, concurrency behaviour, and the test
 matrix. A specification written after the code -- or grown out of review
 findings -- documents decisions; it does not guide them. This is the
 domain-level counterpart of the propose-first workflow in `CONTRIBUTING.md`.
+
+**"Of any substance" means**: it computes or reports money, it materializes a
+derived result, or it reads a time series. Not the size of the diff -- a
+twenty-line change that puts a new percentage on a page is in scope, and a
+large mechanical rename is not.
+
+**The specification is the first commit of the change**, so its date is on the
+record and a reviewer can read the invariants before the code meant to
+implement them. A design document appended at the end is a summary, and a
+summary cannot be wrong in the way a specification can -- which is the whole
+reason for writing one.
+
+## 10. Keep the prose and the code in step
+
+These rules are worth only what the code and the documents agree on.
+
+- A document that names an identifier -- a field, a flag, a helper -- is
+  making a claim about the source. When you rename or remove one, grep the
+  `docs/` tree and every `CLAUDE.md` in the same commit. A document describing
+  a model that no longer exists is worse than no document: it gets read,
+  believed, and built on.
+- A comment or docstring asserting that **every** call site does something --
+  "all writes take this lock", "every read goes through this helper" -- is a
+  test, not a comment. Write the scanning test that enumerates them
+  (`backend/src/backup/backup.service.spec.ts` and
+  `frontend/src/test/ui-conventions.test.ts` are the worked examples). Such a
+  claim is true when written and silently false at the first call site added
+  afterwards, which is exactly when nobody re-reads the comment.
