@@ -98,14 +98,24 @@ export function GemTransferCard({
             />
           }
         />
-        {isKnown(action.estimatedTax) && (
+        {/* The row appears whenever a rate is configured, whether or not the
+            estimate could be made. `estimatedTax: null` means two different
+            things -- "no rate, nothing to estimate" and "a rate of 19%, and
+            the cost basis is missing" -- and dropping the row rendered the
+            second as the first: a 100,000 switch read as costing 15 in
+            commission and nothing in tax. */}
+        {isKnown(action.taxRatePercent) && (
           <GemStatRow
-            label={
-              isKnown(action.taxRatePercent)
-                ? t("gem.transfer.taxWithRate", { rate: action.taxRatePercent })
-                : t("gem.transfer.tax")
+            label={t("gem.transfer.taxWithRate", {
+              rate: action.taxRatePercent,
+            })}
+            value={
+              isKnown(action.estimatedTax) ? (
+                formatCurrency(action.estimatedTax, currency)
+              ) : (
+                <GemUnknown label={t("gem.transfer.taxUnknown")} />
+              )
             }
-            value={formatCurrency(action.estimatedTax, currency)}
           />
         )}
         {isKnown(action.estimatedCommission) && (

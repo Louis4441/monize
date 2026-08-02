@@ -85,6 +85,7 @@ export function GemStrategyReport() {
     error,
     reload,
     setData: setReport,
+    adoptAs,
   } = useReportData<GemStrategyReportData>(
     () => gemStrategyApi.getReport(range, strategyId),
     [range, strategyId],
@@ -124,13 +125,16 @@ export function GemStrategyReport() {
    */
   const adoptScenario = useCallback(
     (report: GemStrategyReportData) => {
-      // Deliberately unkeyed: this response *is* the new selection, so there
-      // is no earlier key for it to match. The id is set from it, which moves
-      // the key to the scenario the server decided on.
+      // Keyed to the scenario the response *is*, not to the one that was
+      // selected a moment ago. Adopting it unkeyed stamped it with the
+      // previous render's key, so the very next render found `dataKey` behind
+      // `requestKey`, called a complete and correct report stale, and fetched
+      // it again -- and if that superfluous request failed, a successful
+      // create or delete was replaced by an error screen.
       setStrategyId(report.strategy.id ?? undefined);
-      setReport(report);
+      adoptAs(report, `${range}|${report.strategy.id ?? ""}`);
     },
-    [setReport],
+    [adoptAs, range],
   );
 
   const codes = useMemo(() => warningCodes(data?.warnings), [data?.warnings]);

@@ -36,6 +36,21 @@ interface UseReportDataResult<T> {
    */
   setData: (value: T, producedFor?: string) => void;
   /**
+   * Adopt a value and **declare** the request key it belongs to, rather than
+   * matching it against the current one.
+   *
+   * For a mutation that changes the selection itself -- creating or deleting
+   * the thing being selected -- there is no earlier key to match: the response
+   * *is* the new selection, and the state that would carry its key has not
+   * rendered yet. Matching there drops a correct response; leaving it unkeyed
+   * stamps it with the outgoing key, so the next render calls it stale and
+   * fetches again. Both are wrong; declaring the key is the third option.
+   *
+   * Use `setData` for a mutation within the current selection. Use this only
+   * where the mutation moved the selection.
+   */
+  adoptAs: (value: T, key: string) => void;
+  /**
    * The `requestKey` the current `data` belongs to, or null before the first
    * load. Compare it with the key you are rendering for: when they differ, the
    * data on screen describes a different request and must not be acted on.
@@ -133,10 +148,48 @@ export function useReportData<T>(
     setIsLoading(false);
   }, []);
 
+  /**
+   * The key `adoptAs` last supplied, so the dependency change it causes does
+   * not immediately re-fetch what it just delivered.
+   *
+   * Moving the selection is what makes the caller's `deps` change, so the
+   * effect below fires on the very next render -- for a report the server has
+   * already returned in full. That round trip can only produce the same thing,
+   * and when it fails it replaces a successful create or delete with an error
+   * screen. Consumed once, so a later deliberate change to the same key still
+   * loads.
+   */
+  const adoptedKeyRef = useRef<string | null>(null);
+
+  const adoptAs = useCallback((value: T, key: string) => {
+    runIdRef.current += 1;
+    adoptedKeyRef.current = key;
+    setData(value);
+    setDataKey(key);
+    setError(null);
+    setIsLoading(false);
+  }, []);
+
   useEffect(() => {
+    if (
+      adoptedKeyRef.current !== null &&
+      adoptedKeyRef.current === requestKeyRef.current
+    ) {
+      adoptedKeyRef.current = null;
+      return;
+    }
+    adoptedKeyRef.current = null;
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 
-  return { data, dataKey, isLoading, error, reload: run, setData: replace };
+  return {
+    data,
+    dataKey,
+    isLoading,
+    error,
+    reload: run,
+    setData: replace,
+    adoptAs,
+  };
 }

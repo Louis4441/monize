@@ -84,9 +84,43 @@ describe("GemTransferCard", () => {
     expect(screen.queryByText(/Estimated commission/)).not.toBeInTheDocument();
   });
 
-  it("labels the tax without a rate when the rate is unknown", () => {
-    render(<GemTransferCard action={gemAction({ taxRatePercent: null })} />);
-    expect(screen.getByText("Estimated tax")).toBeInTheDocument();
+  /**
+   * Invariant: an estimate the server could not make is a dash, not an absent
+   * row.
+   * Canonical adversarial input: aggregation with one unknown component -- a
+   * configured rate against a missing cost basis.
+   * Minimal mutation: gate the row on `estimatedTax` instead of on
+   * `taxRatePercent`. Test that fails under it: the first of these.
+   */
+  it("shows the tax row as unknown when the basis is missing", () => {
+    // A 19% rate is configured and one sold holding has no cost basis, so the
+    // realized result and the tax are both null. The row used to disappear,
+    // and a 100,000 switch then read as costing only its commission.
+    render(
+      <GemTransferCard
+        action={gemAction({
+          taxRatePercent: 19,
+          realizedGainLoss: null,
+          estimatedTax: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Estimated tax (19%)")).toBeInTheDocument();
+    expect(
+      screen.getByText("Cannot be estimated: a cost basis is missing"),
+    ).toBeInTheDocument();
+  });
+
+  it("omits the tax row when no rate is configured", () => {
+    // Nothing to estimate rather than an estimate that failed, and the two
+    // must not look the same.
+    render(
+      <GemTransferCard
+        action={gemAction({ taxRatePercent: null, estimatedTax: null })}
+      />,
+    );
+    expect(screen.queryByText(/Estimated tax/)).not.toBeInTheDocument();
   });
 
   it("marks an unknown transfer value instead of zero", () => {

@@ -14,10 +14,14 @@ vi.mock("next/navigation", () => ({
 
 const mockGetReport = vi.fn();
 const mockMarkExecuted = vi.fn();
+const mockCreateStrategy = vi.fn();
+const mockDeleteStrategy = vi.fn();
 vi.mock("@/lib/gem-strategy", () => ({
   gemStrategyApi: {
     getReport: (...args: unknown[]) => mockGetReport(...args),
     markExecuted: (...args: unknown[]) => mockMarkExecuted(...args),
+    createStrategy: (...args: unknown[]) => mockCreateStrategy(...args),
+    deleteStrategy: (...args: unknown[]) => mockDeleteStrategy(...args),
   },
 }));
 
@@ -408,6 +412,50 @@ describe("GemStrategyReport", () => {
           screen.queryByRole("button", { name: /Mark as executed/ }),
         ).not.toBeInTheDocument(),
       );
+    });
+
+    /**
+     * Invariant: a create or delete response is adopted as the new selection,
+     * and does not trigger a fetch of what it already contains.
+     * Canonical adversarial input: a mutation whose response *moves* the
+     * request key (testing contract, asynchronous operations).
+     * Minimal mutation: stamp the response with the outgoing key, or match it
+     * against the outgoing key instead of declaring the new one.
+     * Test that fails under either: this one -- the first drops the report,
+     * the second refetches it.
+     */
+    it("adopts a new scenario without refetching what it already returned", async () => {
+      await renderReport();
+      const loadsBefore = mockGetReport.mock.calls.length;
+
+      const created = gemReport();
+      created.strategy = { ...created.strategy, id: "strategy-2" };
+      mockCreateStrategy.mockResolvedValue(created);
+      // Any later fetch would answer with the *old* scenario, so if one runs
+      // the assertions below fail rather than passing by coincidence.
+      mockGetReport.mockResolvedValue(gemReport());
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "New scenario" }));
+      });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Scenario name"), {
+          target: { value: "IKZE quarterly" },
+        });
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Create" }));
+      });
+
+      // The response is on screen -- the settings tab it opens is rendered,
+      // which only happens for data the page accepted...
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      // ...and no read was issued for a report the mutation already returned.
+      expect(mockGetReport.mock.calls.length).toBe(loadsBefore);
     });
 
     it("takes the settings form away while a newer report is loading", async () => {

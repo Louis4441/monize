@@ -201,14 +201,18 @@ export function GemNextActionCard({
             />
           }
         />
-        {isKnown(action.estimatedTax) && (
+        {/* Shown whenever a rate is configured: an estimate that could not be
+            made is a dash, not an absent row. See GemTransferCard. */}
+        {isKnown(action.taxRatePercent) && (
           <GemStatRow
-            label={
-              isKnown(action.taxRatePercent)
-                ? t("gem.action.taxWithRate", { rate: action.taxRatePercent })
-                : t("gem.action.tax")
+            label={t("gem.action.taxWithRate", { rate: action.taxRatePercent })}
+            value={
+              isKnown(action.estimatedTax) ? (
+                formatCurrency(action.estimatedTax, currency)
+              ) : (
+                <GemUnknown label={t("gem.action.taxUnknown")} />
+              )
             }
-            value={formatCurrency(action.estimatedTax, currency)}
           />
         )}
         {isKnown(action.estimatedCommission) && (
