@@ -378,6 +378,16 @@ export class GemPositionService {
    *   gain it is mostly the cost of the shares nobody recorded: 100 shares
    *   worth 1,500 against a replayed 500 for half of them shows 1,000 of gain
    *   and 190 of tax where the truth is 500 and 95.
+   *
+   * The quantity check proves the history accounts for the *units*, not that
+   * it accounts for what they cost. `ADD_SHARES` and `SPLIT` move quantity
+   * without money, so a holding of 100 built from a purchase of 50 and an
+   * `ADD_SHARES` of 50 reconciles and reports a basis covering the purchased
+   * half. That is deliberate rather than overlooked: quantity-only actions
+   * carry no cost anywhere in this application, so a zero-cost sleeve is the
+   * app-wide meaning of those rows, and having the GEM report alone treat them
+   * as unknown would make it disagree with every other cost figure the user
+   * sees. If that meaning ever changes, this is a site that changes with it.
    */
   private historicalCostBasis(params: {
     holding: AggregatedHolding;

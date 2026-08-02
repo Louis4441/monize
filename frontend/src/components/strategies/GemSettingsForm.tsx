@@ -163,6 +163,7 @@ export function GemSettingsForm({
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isDirty },
   } = useForm<ConfigFormValues>({
     // The coercing schema's input and output types differ; the project's
@@ -390,6 +391,12 @@ export function GemSettingsForm({
         strategy.id ?? undefined,
       );
       toast.success(t("gem.settingsForm.saved"));
+      // The saved values are the new baseline. Without this the form stays
+      // dirty for the rest of its life: react-hook-form compares against the
+      // mount-time defaults, and the key is the scenario id, which a save does
+      // not change -- so every later tab, scenario or delete asked to discard
+      // edits that had already been written.
+      reset(values);
       onSaved(report);
     } catch (error) {
       logger.error("Failed to save the GEM strategy configuration:", error);

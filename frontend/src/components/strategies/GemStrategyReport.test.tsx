@@ -15,12 +15,14 @@ vi.mock("next/navigation", () => ({
 const mockGetReport = vi.fn();
 const mockMarkExecuted = vi.fn();
 const mockCreateStrategy = vi.fn();
+const mockUpdateConfig = vi.fn();
 const mockDeleteStrategy = vi.fn();
 vi.mock("@/lib/gem-strategy", () => ({
   gemStrategyApi: {
     getReport: (...args: unknown[]) => mockGetReport(...args),
     markExecuted: (...args: unknown[]) => mockMarkExecuted(...args),
     createStrategy: (...args: unknown[]) => mockCreateStrategy(...args),
+    updateConfig: (...args: unknown[]) => mockUpdateConfig(...args),
     deleteStrategy: (...args: unknown[]) => mockDeleteStrategy(...args),
   },
 }));
@@ -549,6 +551,46 @@ describe("GemStrategyReport", () => {
 
       expect(
         screen.queryByLabelText("Evaluation frequency"),
+      ).not.toBeInTheDocument();
+    });
+
+    /**
+     * Invariant: a successful save clears the dirty state.
+     * Canonical adversarial input: stale response + dirty form -- here the
+     * form after its own save.
+     * Minimal mutation: drop the `reset(values)` in `GemSettingsForm.onSubmit`.
+     * Test that fails under it: this one -- the dialog appears after saving.
+     */
+    it("stops asking once the edits have been saved", async () => {
+      mockUpdateConfig.mockResolvedValue(gemReport());
+      await renderReport();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Settings/i }));
+      });
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText("Evaluation frequency"),
+        ).toBeInTheDocument(),
+      );
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("Evaluation frequency"), {
+          target: { value: "QUARTERLY" },
+        });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /^Save/ }));
+      });
+      await act(async () => {});
+
+      // The edits are written, so there is nothing left to discard. Without
+      // the reset the form stayed dirty for good and the guard asked on every
+      // navigation from then on, offering to discard changes already saved.
+      await act(async () => {
+        fireEvent.click(screen.getByRole("tab", { name: /Overview/i }));
+      });
+      expect(
+        screen.queryByRole("heading", { name: "Unsaved Changes" }),
       ).not.toBeInTheDocument();
     });
 

@@ -156,14 +156,19 @@ export function useReportData<T>(
    * effect below fires on the very next render -- for a report the server has
    * already returned in full. That round trip can only produce the same thing,
    * and when it fails it replaces a successful create or delete with an error
-   * screen. Consumed once, so a later deliberate change to the same key still
-   * loads.
+   * screen.
+   *
+   * Only ever set for a key that differs from the current one. Setting it for
+   * the key already selected would strand it: the deps do not change, so the
+   * effect never runs to consume it, and the *next* genuine navigation back to
+   * that key would be skipped and show whatever was on screen. Reachable when
+   * a delete falls back to the scenario already selected.
    */
   const adoptedKeyRef = useRef<string | null>(null);
 
   const adoptAs = useCallback((value: T, key: string) => {
     runIdRef.current += 1;
-    adoptedKeyRef.current = key;
+    adoptedKeyRef.current = key === requestKeyRef.current ? null : key;
     setData(value);
     setDataKey(key);
     setError(null);

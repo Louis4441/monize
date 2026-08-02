@@ -205,7 +205,12 @@ export interface GemActionView {
   estimatedTax: number | null;
   taxRatePercent: number | null;
   estimatedCommission: number | null;
-  /** Trades the switch takes: one sell per sold holding, plus the buy. */
+  /**
+   * Orders the switch takes: one sell per (account, security) pair being sold,
+   * plus one buy per account that has something to put into the target. Zero
+   * when the portfolio already complies, because then there is nothing to
+   * place.
+   */
   estimatedTradeCount: number;
   /**
    * How many of the sold holdings carry some estimated exposure to the

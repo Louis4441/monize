@@ -49,6 +49,15 @@ describe("StrategiesModule dependency graph", () => {
   it("declares providers to check, so the assertion is not vacuous", () => {
     expect(own.size).toBeGreaterThan(5);
     expect(available.size).toBeGreaterThan(0);
+
+    // And the dependency lists are actually readable. Every case below reads
+    // `design:paramtypes`, which only exists while `emitDecoratorMetadata` is
+    // on; without it each provider would present an empty dependency list and
+    // the whole guard would pass having checked nothing.
+    const withDeps = metadata(StrategiesModule, "providers").filter(
+      (provider) => metadata(provider, "design:paramtypes").length > 0,
+    );
+    expect(withDeps.length).toBeGreaterThan(3);
   });
 
   it.each(
