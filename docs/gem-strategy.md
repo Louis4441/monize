@@ -283,10 +283,19 @@ construction and reads as "your portfolio returned nothing" when it is really
 one quote and no second one. **Fewer than two drawable points is an absence,
 not a flat line.**
 
-The practical cause of that state is a held instrument whose prices Monize does
-not have or has not refreshed. The strategy's own assets are kept current
-because the signal depends on them; a fund the user merely holds is not, so it
-is the one that empties the simulation.
+The practical cause of that state is a held instrument with no price *history*.
+Refreshing a quote stores one row for today, and one row cannot be replayed.
+`ensureHistory` runs on a configuration save over the instruments the strategy
+*assigns*, because those are what the signal depends on -- a fund the user
+merely holds was never in that list. So `getReport` now runs the same backfill
+over the held instruments, but only when the simulation actually came back
+`MISSING_PRICE_HISTORY`, and rebuilds the chart only when the backfill reports
+that it fetched something. The provider cooldown and the coverage check inside
+`ensureHistory` keep that from becoming a fetch per read.
+
+`scripts/gem-price-coverage.sql` answers the same question against a live
+database: how many price rows each held instrument has in the window, how stale
+the newest is, and whether they came from a provider or from transactions.
 
 ### Exposure is a floor, not a measurement -- and a floor is shown
 

@@ -948,6 +948,92 @@ describe("GemStrategyService", () => {
       expect(signalService.materialize).toHaveBeenCalled();
     });
 
+    it("fetches history for a held instrument when the simulation has none", async () => {
+      /**
+       * Invariant: the "Today's portfolio" line owns the prices it needs.
+       * Canonical adversarial input: an instrument the strategy does not
+       * assign -- so no save ever backfilled it -- carrying one refreshed
+       * quote and no history.
+       * Minimal mutation: drop the `MISSING_PRICE_HISTORY` branch in
+       * `getReport`.
+       * Test that fails under it: this one -- nothing is fetched for IUSQ, and
+       * the report keeps telling the user the history is unusable with no way
+       * to act on it.
+       */
+      positionService.build.mockResolvedValue({
+        position: {
+          accounts: [{ id: "acct-1", name: "Broker IRA" }],
+          current: null,
+          target: null,
+          compliancePercent: 0,
+          changeRequired: true,
+          currencyCode: "USD",
+          holdings: [
+            { securityId: "sec-iusq", symbol: "IUSQ", isCash: false },
+            // Cash has nothing to fetch, and neither has a row with no
+            // security behind it.
+            { securityId: null, symbol: null, isCash: true },
+          ],
+        },
+        action: { required: true, executed: false },
+        noPosition: false,
+      });
+      const unavailable = {
+        range: "1Y",
+        points: [],
+        totals: {},
+        currencyCode: "USD",
+        incomplete: false,
+        currentPortfolio: {
+          points: [],
+          totalReturnPercent: null,
+          completeRange: false,
+          startsOn: null,
+          includedHoldings: [],
+          unavailableReason: "MISSING_PRICE_HISTORY",
+        },
+      };
+      performanceService.build.mockResolvedValue(unavailable);
+      backfillService.ensureHistory.mockResolvedValue(["sec-iusq"]);
+
+      await service.getReport(userId, "1Y");
+
+      expect(backfillService.ensureHistory).toHaveBeenCalledWith(
+        userId,
+        ["sec-iusq"],
+        12,
+        "MONTHLY",
+      );
+      // And the chart is built again, because the prices it was missing are
+      // now stored: a retry whose inputs did not change would be a comment.
+      expect(performanceService.build).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not rebuild the chart when the backfill fetched nothing", async () => {
+      // The cooldown, or a security that already covers the window: same
+      // prices, same answer, one wasted rebuild.
+      performanceService.build.mockResolvedValue({
+        range: "1Y",
+        points: [],
+        totals: {},
+        currencyCode: "USD",
+        incomplete: false,
+        currentPortfolio: {
+          points: [],
+          totalReturnPercent: null,
+          completeRange: false,
+          startsOn: null,
+          includedHoldings: [],
+          unavailableReason: "MISSING_PRICE_HISTORY",
+        },
+      });
+      backfillService.ensureHistory.mockResolvedValue([]);
+
+      await service.getReport(userId, "1Y");
+
+      expect(performanceService.build).toHaveBeenCalledTimes(1);
+    });
+
     it("clears a role when the security is null", async () => {
       assetRepo.find.mockResolvedValueOnce([
         { role: "SAFE", securityId: "sec-ief" } as GemStrategyAsset,

@@ -592,15 +592,61 @@ export class GemStrategyService {
         currencyCode,
       });
 
-    const performance = await this.performanceService.build({
+    const heldForSimulation = position?.holdings ?? [];
+    let performance = await this.performanceService.build({
       range,
       securityByRole,
       // Today's holdings, for the "what my current mix would have done" line.
       // They come from the position above, so the chart and the portfolio tab
       // are describing the same accounts at the same moment.
-      holdings: position?.holdings ?? [],
+      holdings: heldForSimulation,
       asOf,
     });
+
+    /**
+     * The simulated line needs history for instruments the strategy does not
+     * assign, and nothing else fetches it.
+     *
+     * `ensureHistory` runs on a configuration save, over the *assigned*
+     * securities, because those are what the signal depends on. A fund the user
+     * merely holds is never in that list, so the one thing it is drawn into --
+     * "Today's portfolio" -- had whatever prices happened to exist. Refreshing a
+     * quote stores today's close, which is a single point: the simulation then
+     * had nothing to draw, and the user was told the history was unusable with
+     * no way to act on it.
+     *
+     * Only when the simulation actually failed for want of prices, so the happy
+     * path costs nothing, and only once: `ensureHistory` skips a security that
+     * already covers the window and honours its own provider cooldown, and it
+     * reports which securities it fetched for. Rebuilding when that list is
+     * empty would be a retry with unchanged inputs.
+     */
+    if (
+      performance?.currentPortfolio?.unavailableReason ===
+      "MISSING_PRICE_HISTORY"
+    ) {
+      const heldIds = [
+        ...new Set(
+          heldForSimulation
+            .filter((holding) => !holding.isCash && holding.securityId)
+            .map((holding) => holding.securityId as string),
+        ),
+      ];
+      const fetched = await this.backfillService.ensureHistory(
+        userId,
+        heldIds,
+        strategy.lookbackMonths,
+        strategy.cadence,
+      );
+      if (fetched.length > 0) {
+        performance = await this.performanceService.build({
+          range,
+          securityByRole,
+          holdings: heldForSimulation,
+          asOf,
+        });
+      }
+    }
 
     const { pricesAsOf, staleRoles } = await this.priceFreshness(
       securityByRole,
