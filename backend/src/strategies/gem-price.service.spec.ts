@@ -57,33 +57,44 @@ describe("GemPriceService", () => {
       expect(params).toEqual([["sec-a", "sec-b"], "2025-01-01"]);
     });
 
-    it("reads adjusted closes, falling back to the raw close", async () => {
-      // Every consumer of this series measures a return over time. On raw
-      // closes a 4-for-1 split reads as a 75% loss, which flips the
-      // absolute-momentum test, and distributions vanish from the return of
-      // whichever leg pays the most -- usually the bond one the equities are
-      // measured against.
+    /**
+     * Time-series contract rule 1: never mix adjusted and raw prices for the
+     * same instrument inside one calculation.
+     *
+     * `adjusted_close` is nullable per row and only the provider backfill
+     * writes it -- transaction-derived prices, the MNY import and the demo seed
+     * insert a raw close beside it. A per-row COALESCE therefore spliced raw
+     * rows into an adjusted series for any instrument the user had traded, and
+     * around a split that is a fabricated several-hundred-percent return
+     * running the absolute-momentum test.
+     *
+     * A unit spec with a mocked `query` cannot execute the SQL, so this asserts
+     * the rule is expressed rather than the rows it produces: the per-row
+     * fallback must not come back, and the per-security basis must be there.
+     * The semantics belong in an integration test against a real database.
+     */
+    it("picks one price basis per security instead of per row", async () => {
       manager.query.mockResolvedValue([]);
 
-      await service.loadSeries(
-        ["sec-a"],
-        "2025-01-01",
-        "day",
-        manager as never,
-      );
-      expect(manager.query.mock.calls[0][0]).toContain(
-        "COALESCE(adjusted_close, close_price)",
-      );
+      for (const sampling of ["day", "month"] as const) {
+        manager.query.mockClear();
+        await service.loadSeries(
+          ["sec-a"],
+          "2025-01-01",
+          sampling,
+          manager as never,
+        );
+        const sql = manager.query.mock.calls[0][0] as string;
 
-      await service.loadSeries(
-        ["sec-a"],
-        "2020-01-01",
-        "month",
-        manager as never,
-      );
-      expect(manager.query.mock.calls[1][0]).toContain(
-        "COALESCE(adjusted_close, close_price)",
-      );
+        expect(sql).not.toMatch(/COALESCE\s*\(\s*adjusted_close/i);
+        // One decision per security, over the window being read...
+        expect(sql).toContain("bool_or(adjusted_close IS NOT NULL)");
+        // ...and where there is adjusted data, the unadjusted rows are left
+        // out rather than converted.
+        expect(sql).toContain(
+          "b.has_adjusted = false OR s.adjusted_close IS NOT NULL",
+        );
+      }
     });
 
     it("thins long ranges to one close per bucket and sorts ascending", async () => {
@@ -145,6 +156,28 @@ describe("GemPriceService", () => {
       manager.query.mockResolvedValue([]);
       await service.latestPrices(["sec-a"], manager as never);
       expect(manager.query.mock.calls[0][0]).not.toContain("adjusted_close");
+    });
+
+    /**
+     * Time-series contract rule 2 and financial contract rule 4: a price used
+     * to value "now" must be dated within a bounded window of it.
+     *
+     * Unbounded, 1,000 units of a fund last quoted two years ago at 45 were
+     * reported as a 45,000 position to move and a 25,000 gain to be taxed. No
+     * warning fired either, because the report's staleness banner only checks
+     * the strategy's own roles and a holding outside them filled none.
+     */
+    it("refuses a quote too old to stand for today", async () => {
+      manager.query.mockResolvedValue([]);
+
+      await service.latestPrices(["sec-a"], manager as never, "2025-08-14");
+
+      const [sql, params] = manager.query.mock.calls[0];
+      expect(sql).toContain("price_date >= $2::date");
+      expect(sql).toContain("price_date <= $3::date");
+      // The same fortnight every other boundary in this module is held to.
+      expect(params[1]).toBe("2025-07-31");
+      expect(params[2]).toBe("2025-08-14");
     });
 
     it("skips the query with no securities", async () => {

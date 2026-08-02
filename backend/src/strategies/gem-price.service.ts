@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { DataSource, EntityManager } from "typeorm";
 import { withScopedDb } from "../common/db/scoped-db";
+import { todayYMD } from "../common/date-utils";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
 import { BOUNDARY_LAG_DAYS, PricePoint } from "./gem-momentum.util";
 import { GemRange } from "./gem-report.types";
@@ -74,15 +75,32 @@ export class GemPriceService {
    * the requested sampling. Weekly/monthly sampling keeps the last close of each
    * bucket (DISTINCT ON), which is what a period-end comparison wants.
    *
-   * **Adjusted closes**, falling back to the raw close where the provider gave
-   * none -- the same `COALESCE(adjusted_close, close_price)` the Monte Carlo
-   * report uses, and for the same reason. Everything downstream of this method
-   * measures a *return over time*: momentum, the performance chart, the
-   * backtest. On raw closes a 4-for-1 split reads as a 75% crash, which does
-   * not merely dent the chart -- it flips the absolute-momentum test and hands
-   * the signal to the safe asset -- and every distribution is silently dropped
-   * from the return of whichever instrument pays the most, which is usually the
-   * bond leg the equities are being measured against.
+   * **Adjusted closes, and one basis per series.** Everything downstream of
+   * this method measures a *return over time*: momentum, the performance chart,
+   * the backtest. On raw closes a 4-for-1 split reads as a 75% crash, which
+   * does not merely dent the chart -- it flips the absolute-momentum test and
+   * hands the signal to the safe asset -- and every distribution is silently
+   * dropped from the return of whichever instrument pays the most, which is
+   * usually the bond leg the equities are being measured against.
+   *
+   * A per-row `COALESCE(adjusted_close, close_price)` looked like the same
+   * thing and was not. `adjusted_close` is nullable *per row* and only the
+   * provider backfill writes it; transaction-derived prices, the MNY import and
+   * the demo seed all insert a raw close beside it. The coalesce therefore
+   * spliced raw rows into an adjusted series for any instrument the user has
+   * ever traded -- a security adjusted to 50 around a split, with a purchase
+   * recorded at the unadjusted 205, produced a +310% trailing return that runs
+   * the absolute-momentum test, and a -73% drawdown that never happened. That
+   * is exactly what `docs/time-series-contract.md` rule 1 forbids: never mix
+   * adjusted and raw prices for the same instrument inside one calculation.
+   *
+   * So the basis is decided per security, over the window being read: if any
+   * row in it carries an adjusted close, the series is the adjusted rows only,
+   * and the unadjusted rows are left out rather than converted. If none does,
+   * the series is raw throughout -- consistent, and the only series available
+   * for an instrument nobody has adjusted data for. Splits still distort a
+   * wholly-raw series; that is a data gap to fill, not something a fallback per
+   * row can paper over.
    *
    * Valuing today's holdings is the other case and stays on the raw close:
    * `latestPrices` answers "what is this position worth", where the adjusted
@@ -100,25 +118,44 @@ export class GemPriceService {
     const series = new Map<string, PriceSeries>();
     if (securityIds.length === 0) return series;
 
+    // `scoped` is the window; `basis` decides, per security, whether that
+    // window has any adjusted data at all; `chosen` keeps one basis throughout.
+    const oneBasis = `
+      WITH scoped AS (
+        SELECT security_id, price_date, close_price, adjusted_close
+          FROM security_prices
+         WHERE security_id = ANY($1::uuid[])
+           AND price_date >= $2::date
+           AND close_price IS NOT NULL
+      ),
+      basis AS (
+        SELECT security_id, bool_or(adjusted_close IS NOT NULL) AS has_adjusted
+          FROM scoped
+         GROUP BY security_id
+      ),
+      chosen AS (
+        SELECT s.security_id,
+               s.price_date,
+               CASE WHEN b.has_adjusted THEN s.adjusted_close
+                    ELSE s.close_price END AS close_price
+          FROM scoped s
+          JOIN basis b ON b.security_id = s.security_id
+         WHERE b.has_adjusted = false OR s.adjusted_close IS NOT NULL
+      )`;
+
     const sql =
       sampling === "day"
-        ? `SELECT security_id, price_date::text AS price_date,
-                  COALESCE(adjusted_close, close_price) AS close_price
-             FROM security_prices
-            WHERE security_id = ANY($1::uuid[])
-              AND price_date >= $2::date
-              AND close_price IS NOT NULL
+        ? `${oneBasis}
+           SELECT security_id, price_date::text AS price_date, close_price
+             FROM chosen
             ORDER BY security_id, price_date`
-        : `SELECT DISTINCT ON (security_id, bucket)
+        : `${oneBasis}
+           SELECT DISTINCT ON (security_id, bucket)
                   security_id, price_date::text AS price_date, close_price
              FROM (
-               SELECT security_id, price_date,
-                      COALESCE(adjusted_close, close_price) AS close_price,
+               SELECT security_id, price_date, close_price,
                       date_trunc($3, price_date) AS bucket
-                 FROM security_prices
-                WHERE security_id = ANY($1::uuid[])
-                  AND price_date >= $2::date
-                  AND close_price IS NOT NULL
+                 FROM chosen
              ) sampled
             ORDER BY security_id, bucket, price_date DESC`;
 
@@ -149,12 +186,30 @@ export class GemPriceService {
   }
 
   /**
-   * Latest close per security, for valuing holdings. A security with no price
-   * is absent from the map so callers can tell "not priced" from "worth zero".
+   * Latest close per security, for valuing holdings -- but only where that
+   * close is recent enough to stand for today.
+   *
+   * A security with no usable price is absent from the map so callers can tell
+   * "not priced" from "worth zero". Absent now covers both a security nobody
+   * has ever priced and one whose newest quote is older than
+   * `BOUNDARY_LAG_DAYS`, because valuing a position at an arbitrarily old close
+   * is the same error with a longer fuse. It fed `totalMarketValue`, the
+   * transfer value, the realized gain and the tax estimate: 1,000 units of a
+   * fund last quoted two years ago at 45 were reported as 45,000 to move and a
+   * 25,000 gain to be taxed, with no warning anywhere, because the staleness
+   * check the report does run only looks at the strategy's own roles and this
+   * holding filled none of them.
+   *
+   * The same fortnight every other boundary in this module is held to
+   * (`docs/time-series-contract.md` rule 2, `docs/financial-calculation-contract.md`
+   * rule 4). The report's five-day `STALE_PRICES` banner is a softer, separate
+   * signal: it says "this is getting old", where this says "this is not a
+   * price of today at all".
    */
   async latestPrices(
     securityIds: string[],
     manager?: EntityManager,
+    asOf: string = todayYMD(),
   ): Promise<Map<string, number>> {
     const prices = new Map<string, number>();
     if (securityIds.length === 0) return prices;
@@ -162,10 +217,15 @@ export class GemPriceService {
                    FROM security_prices
                   WHERE security_id = ANY($1::uuid[])
                     AND close_price IS NOT NULL
+                    AND price_date >= $2::date
+                    AND price_date <= $3::date
                   ORDER BY security_id, price_date DESC`;
+    const oldest = new Date(`${asOf}T00:00:00Z`);
+    oldest.setUTCDate(oldest.getUTCDate() - BOUNDARY_LAG_DAYS);
+    const params = [securityIds, oldest.toISOString().slice(0, 10), asOf];
     const rows: Array<{ security_id: string; close_price: string }> = manager
-      ? await manager.query(sql, [securityIds])
-      : await withScopedDb(this.dataSource, (m) => m.query(sql, [securityIds]));
+      ? await manager.query(sql, params)
+      : await withScopedDb(this.dataSource, (m) => m.query(sql, params));
     for (const row of rows) {
       prices.set(row.security_id, Number(row.close_price));
     }

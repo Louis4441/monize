@@ -6,6 +6,7 @@ import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
 import { GemStrategy } from "./entities/gem-strategy.entity";
 import { GemPriceService } from "./gem-price.service";
+import { BOUNDARY_LAG_DAYS } from "./gem-momentum.util";
 import {
   EMPTY_COMPOSITION,
   GemSecurityComposition,
@@ -33,6 +34,15 @@ export interface GemPositionResult {
   /** True when the strategy has accounts but none of them holds anything. */
   noPosition: boolean;
 }
+
+/**
+ * How old a stored exchange rate may be and still convert a reported figure.
+ *
+ * The same window the prices are held to, for the same reason: both are
+ * observations of a market, and a total built from a fresh price and a stale
+ * rate is no more knowable than one built from a stale price.
+ */
+const RATE_MAX_AGE_DAYS = BOUNDARY_LAG_DAYS;
 
 /** One security's holdings summed over the strategy's accounts. */
 interface AggregatedHolding {
@@ -249,11 +259,24 @@ export class GemPositionService {
     if (!from || from === to) return amount;
     const key = `${from}->${to}`;
     if (!cache.has(key)) {
-      const direct = await this.exchangeRateService.getLatestRate(from, to);
+      // Bounded to the same fortnight as the prices these amounts are struck
+      // from. An unbounded rate fails the way the unbounded price did, only
+      // more quietly: nothing on the page is denominated in the rate, so a
+      // nine-month-old one simply makes every converted figure wrong by the
+      // year's currency move.
+      const direct = await this.exchangeRateService.getLatestRate(
+        from,
+        to,
+        RATE_MAX_AGE_DAYS,
+      );
       if (direct !== null) {
         cache.set(key, direct);
       } else {
-        const reverse = await this.exchangeRateService.getLatestRate(to, from);
+        const reverse = await this.exchangeRateService.getLatestRate(
+          to,
+          from,
+          RATE_MAX_AGE_DAYS,
+        );
         cache.set(key, reverse !== null && reverse !== 0 ? 1 / reverse : null);
       }
     }

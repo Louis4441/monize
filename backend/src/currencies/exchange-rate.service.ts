@@ -659,11 +659,35 @@ export class ExchangeRateService implements OnModuleInit {
   /**
    * Get the latest rate for a specific currency pair
    */
-  async getLatestRate(from: string, to: string): Promise<number | null> {
+  async getLatestRate(
+    from: string,
+    to: string,
+    /**
+     * Reject a stored rate older than this many days, returning null instead.
+     *
+     * Omitted, the newest rate is returned whatever its age -- which is what
+     * every caller that only needs an indicative conversion has always got. A
+     * caller whose output is a money figure the user acts on should supply a
+     * bound: a rate is a price like any other, and one from nine months ago
+     * converts a 10,000 USD holding into a confident PLN total that is off by
+     * the year's currency move, with nothing in the payload saying so
+     * (`docs/financial-calculation-contract.md` rules 3 and 4).
+     */
+    maxAgeDays?: number,
+  ): Promise<number | null> {
     if (from === to) return 1;
+    const where: Record<string, unknown> = {
+      fromCurrency: from,
+      toCurrency: to,
+    };
+    if (maxAgeDays !== undefined) {
+      const oldest = new Date();
+      oldest.setUTCDate(oldest.getUTCDate() - maxAgeDays);
+      where.rateDate = MoreThanOrEqual(oldest.toISOString().slice(0, 10));
+    }
     const rate = await withScopedDb(this.dataSource, (manager) =>
       manager.getRepository(ExchangeRate).findOne({
-        where: { fromCurrency: from, toCurrency: to },
+        where,
         order: { rateDate: "DESC" },
       }),
     );

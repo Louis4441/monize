@@ -289,7 +289,9 @@ describe("GemPositionService", () => {
 
     const result = await build();
 
-    expect(exchangeRates.getLatestRate).toHaveBeenCalledWith("EUR", "USD");
+    // Bounded by age: a rate is a price, and a nine-month-old one converts
+    // every figure on the page by the wrong amount without saying so.
+    expect(exchangeRates.getLatestRate).toHaveBeenCalledWith("EUR", "USD", 14);
     expect(result.position?.current?.marketValue).toBeCloseTo(2200, 2);
     // 2200 market value against a 1100 cost basis, both converted.
     expect(result.action?.realizedGainLoss).toBeCloseTo(1100, 2);
