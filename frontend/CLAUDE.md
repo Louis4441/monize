@@ -153,6 +153,77 @@ it in the catalog, not in JSX. `"{units} ({share})"` is one string a translator
 can reorder; `{value}{' ('}{share}{')'}` in a component is three fragments they
 cannot reach.
 
+### Asynchronous data carries the request that produced it
+
+**Asynchronous data is not only a payload. It is the payload plus the complete
+request key that produced it.** A component holding `data` without knowing
+which request answered cannot tell "the report you are looking at" from "the
+report you were looking at a moment ago", and every action it offers is aimed
+at whichever of the two it happens to read.
+
+The request key is every selector that changes the *meaning* of the response,
+not merely its freshness. Typically: the scenario or strategy id, the account
+id, the date range, the reporting currency, the active filters, the locale
+where the server localizes its output, and the revision or version where one
+exists. If changing it would make the same payload mean something else, it is
+part of the key.
+
+**Stale data may stay on screen; it may not stay actionable.** Keeping the
+previous view during a load is often the better read -- a blank page loses the
+user's place. It is allowed while all of the following hold:
+
+- it is visually marked as stale or loading;
+- editable controls are disabled;
+- mutations are disabled;
+- no action can submit an id taken from the stale payload under the new
+  selection;
+- assistive technology is told the same thing the pixels say (`aria-busy`, or
+  an equivalent that does not rely on the greyed-out styling alone).
+
+Clearing the screen is not required. Non-actionable is.
+
+**A mutation captures an immutable origin key when it starts**, and its
+response is adopted only when
+
+```text
+mutationOriginKey === currentRequestKey
+```
+
+*and* the entity the response describes is the one the mutation targeted. A
+late response from scenario A must never replace scenario B merely by arriving
+last. Derive that origin from the data the component was rendering, not from
+current React state read after the request began -- state has already moved by
+the time the response lands, which is the whole problem.
+
+**A failed lookup is not an empty dataset.** A failed accounts request is not
+`accounts = []`, a failed securities request is not `securities = []`, and a
+failed report is not a report of zeros. Rendering the failure as emptiness
+turns an outage into a plausible answer, and leaves the save button live over
+prerequisites that never loaded. Five states have to stay distinguishable:
+loaded-and-empty, loading, failed, stale-previous, and current. Where a
+prerequisite failed, use the shared retryable error presentation, keep the
+stored ids, and disable the actions that depend on it.
+
+**A dirty keyed form is data.** Changing the request key while a form has
+unsaved edits calls for a confirmation, a preserved draft, or an explicit
+save/discard flow; silently unmounting it is data loss, and remounting it under
+a new key is the same loss with extra steps. A form rendered for scenario A
+must also stop being editable once scenario B is the current selection -- those
+are two obligations, and meeting the second by discarding the first is not
+meeting both.
+
+Regression tests for this class need deferred promises, and must assert on what
+the user *can do*, not only on what is rendered (`docs/testing-contract.md`
+carries the wider list of adversarial inputs, including the asynchronous ones):
+
+| Case | Assertion |
+| --- | --- |
+| A starts, B starts, B resolves, A resolves late | the display is still B |
+| A shown, B selected and loading | A's form cannot submit |
+| Save for A starts, user selects B, A resolves | A's response is discarded and does not retire B's request |
+| A shown, B selected, B fails | the failure is shown; A is not presented as B |
+| Form dirty, user selects B | confirmation is asked for, or the draft survives |
+
 ### An unknown value must not render as a measured zero
 
 The server goes to real trouble to send `null` rather than `0` for anything it

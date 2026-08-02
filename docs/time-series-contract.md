@@ -150,7 +150,8 @@ For strategies that materialize periodic signals and simulate acting on them:
 ## 6. Testing
 
 Time-series code inherits the testing requirements of
-`docs/financial-calculation-contract.md` section 7. The adversarial cases
+`docs/financial-calculation-contract.md` section 8, and draw inputs from
+`docs/testing-contract.md`. The adversarial cases
 specific to this contract: a gap in the middle of a backtest, a stale quote
 just outside the boundary window, a first period with no starting price, and
 an instrument whose history starts after the requested range -- each must
