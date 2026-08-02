@@ -675,6 +675,7 @@ export class GemPositionService {
       marketValue: holding.marketValue,
       isTargetInstrument: holding.isTargetInstrument,
       matchPercent: overlapPercent(holding.overlap),
+      matchIsFloor: holding.overlapIsFloor,
       matchedByInstrument: holding.matchedByInstrument,
       matchedMarkets: holding.matchedMarkets.map((market) => ({
         name: market.name,
@@ -690,6 +691,7 @@ export class GemPositionService {
       exactTargetPercent: math.exactTargetPercent,
       marketExposurePercent: math.marketExposurePercent,
       marketExposureAvailable: math.marketExposureAvailable,
+      marketExposureIsFloor: math.marketExposureIsFloor,
       marketExposureDimension: math.marketExposureAvailable
         ? math.dimension
         : null,

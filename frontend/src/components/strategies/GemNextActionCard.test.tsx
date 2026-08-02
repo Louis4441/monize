@@ -20,6 +20,7 @@ const heldAsset = (overrides: Partial<GemHeldAsset>): GemHeldAsset => ({
   marketValue: 1000,
   isTargetInstrument: false,
   matchPercent: null,
+  matchIsFloor: false,
   matchedByInstrument: false,
   matchedMarkets: [],
   ...overrides,

@@ -70,6 +70,23 @@ export function GemPortfolioPanel({
           .filter((holding) => holding.isTargetInstrument)
           .reduce((sum, holding) => sum + (holding.marketValue ?? 0), 0);
 
+  /**
+   * An exposure figure, marked as a lower bound when it is one.
+   *
+   * A floor printed as a plain percentage is the only misreading this can
+   * produce, so the two are never formatted the same way. See the product
+   * decision in `backend/src/strategies/gem-composition.util.ts`.
+   */
+  const exposureText = (percent: number, isFloor: boolean): string =>
+    isFloor
+      ? t("gem.common.atLeast", { value: formatPercent(percent, 0) })
+      : formatPercent(percent, 0);
+
+  /** True when any figure on screen is a floor, so the note is worth showing. */
+  const anyFloor =
+    position.marketExposureIsFloor ||
+    position.holdings.some((holding) => holding.matchIsFloor);
+
   return (
     <GemCard
       title={t("gem.portfolioPanel.title")}
@@ -108,7 +125,10 @@ export function GemPortfolioPanel({
           label={t("gem.portfolio.marketExposure")}
           value={
             isKnown(position.marketExposurePercent) ? (
-              formatPercent(position.marketExposurePercent, 0)
+              exposureText(
+                position.marketExposurePercent,
+                position.marketExposureIsFloor,
+              )
             ) : (
               <GemUnknown label={t("gem.portfolio.marketExposureUnknown")} />
             )
@@ -206,9 +226,9 @@ export function GemPortfolioPanel({
                           <>
                             <span aria-hidden="true"> &middot; </span>
                             {t("gem.portfolioPanel.partialMatch", {
-                              percent: formatPercent(
+                              percent: exposureText(
                                 holding.matchPercent as number,
-                                0,
+                                holding.matchIsFloor,
                               ),
                             })}
                           </>
@@ -339,7 +359,10 @@ export function GemPortfolioPanel({
                                   : undefined
                               }
                             >
-                              {formatPercent(holding.matchPercent, 0)}
+                              {exposureText(
+                                holding.matchPercent,
+                                holding.matchIsFloor,
+                              )}
                             </span>
                           )}
                         </td>
@@ -436,6 +459,9 @@ export function GemPortfolioPanel({
                   </GemSecurityLink>
                 </>
               )}
+              {/* Why some figures read "at least". Shown only when one does:
+                  a standing caveat about a case that did not arise is noise. */}
+              {anyFloor && <> {t("gem.portfolioPanel.workingFloorNote")}</>}
             </p>
           )}
         </div>

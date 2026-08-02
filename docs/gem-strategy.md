@@ -220,9 +220,10 @@ asset the switch can move, and is ignored.
   what decides `changeRequired`, what is sold, and when the operation is done;
 - `marketExposurePercent` is the estimated share of those securities exposed to
   the target's *markets*, however it got there -- informational only, null
-  whenever any security cannot be placed, and never mixed with the figure above:
-  a world tracker a fifth in emerging markets gives a fifth of the exposure and
-  none of the compliance;
+  whenever any security cannot be placed, a **lower bound** whenever a
+  breakdown describes only part of a fund (see "Exposure is a floor" below),
+  and never mixed with the figure above: a world tracker a fifth in emerging
+  markets gives a fifth of the exposure and none of the compliance;
 - cash sits in neither denominator (see below), but it is off target, so it
   still makes a change required and still funds the purchase;
 - `action.sellPositions` names every position the switch sells, largest first,
@@ -252,6 +253,51 @@ pro-rated sale never reaches the 100% allocation the signal asks for.
 `action.partialMatchCount` says how many of the sold holdings were in that
 position, and the transfer card explains it rather than leaving a compliance
 figure and a full-value transfer looking contradictory.
+
+### Exposure is a floor, not a measurement -- and a floor is shown
+
+**Product decision. Do not revert it in code review; a change here needs the
+product owner, not a reviewer's judgement about statistical hygiene.**
+
+Country and asset-class breakdowns in the wild name the top handful of markets
+and stop, and the securities editor deliberately drops the "Other" bucket, so
+most real funds are described in part. Requiring both sides of the comparison
+to account for their whole fund before an exposure could be reported therefore
+blanked the entire column: a portfolio of four world and thematic trackers, two
+of them visibly holding the target's largest markets, showed "No data" against
+every row and 0% overall. That reads as "Monize cannot see the overlap", which
+is a worse falsehood than the imprecision it was avoiding.
+
+So the overlap of the *described* parts is reported, and it is reported as a
+lower bound. `matchIsFloor` (per holding) and `marketExposureIsFloor` (the
+total) travel with the figure, and the UI renders them as "at least N%" with a
+note saying why. Two rules survive unchanged:
+
+- **A floor is never printed as a measurement.** Rendering a floor with the
+  plain percentage formatter is the one presentation that is wrong.
+- **No description, no estimate.** With no usable breakdown on one side there
+  is still nothing to compare, and the row says so rather than showing a zero.
+  A floor of zero derived from descriptions that share no names is a real
+  floor; a zero invented because nobody described the fund is not.
+
+The estimate remains informational: it never keeps a position, reduces a
+transfer, or completes an operation. `backend/src/strategies/gem-composition.util.ts`
+carries the same note beside the code.
+
+### An instrument the user already holds is one the picker must offer
+
+**Product decision, same standing as the one above.** `SecuritiesService.create`
+allows one security per symbol per user, so the GEM picker decides "you already
+hold this" on the **symbol** alone -- `symbolKey` in
+`frontend/src/lib/gem-suggested-securities.ts`. Matching the exchange and the
+trading currency as well is a truer model of the world and a false model of
+this application: the second listing cannot exist, so the stricter match
+offered a create the server was bound to refuse ("Security with symbol EXUS
+already exists"), both from a role's suggestion list and from the one-click
+"add the missing instruments". The suggestion regions still decide *what gets
+created* when nothing holds the symbol; they do not decide whether anything
+does. Deactivated instruments count as held -- they own their symbol -- and
+assigning one through its suggestion makes it selectable again.
 
 **`commissionAmount` is per order, and orders are counted per account.** A
 sell is placed once per **(account, security)** pair, and a purchase once per

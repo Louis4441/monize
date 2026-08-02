@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "Tidak tersedia",
+      "atLeast": "setidaknya {value}",
       "unassigned": "Belum ditetapkan",
       "yes": "Ya",
       "no": "Tidak",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "Ya — dipertahankan",
       "workingIsTargetNo": "Tidak — dijual",
       "workingExposure": "Perkiraan eksposur ke pasar target",
+      "workingFloorNote": "Bila rincian sebuah dana hanya mencakup sebagiannya, eksposur ditampilkan sebagai batas bawah: pasar yang tidak disebutkan dapat menambahnya.",
       "workingNoData": "Tidak ada data",
       "workingSum": "{counted} dari {total} yang ada di instrumen berada di instrumen target, yaitu {percent} di atas.",
       "basisFillStructure": "Lengkapi struktur geografis instrumen"

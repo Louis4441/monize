@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "데이터 없음",
+      "atLeast": "{value} 이상",
       "unassigned": "지정되지 않음",
       "yes": "예",
       "no": "아니요",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "예 — 유지",
       "workingIsTargetNo": "아니요 — 매도",
       "workingExposure": "목표 시장에 대한 추정 익스포저",
+      "workingFloorNote": "펀드의 구성 정보가 일부만 기재된 경우 익스포저는 하한값으로 표시됩니다. 기재되지 않은 시장이 이를 늘릴 수 있습니다.",
       "workingNoData": "데이터 없음",
       "workingSum": "종목으로 보유한 {total} 중 {counted}이(가) 목표 종목에 있으며, 이는 위의 {percent}입니다.",
       "basisFillStructure": "종목의 지역 구성을 입력하세요"

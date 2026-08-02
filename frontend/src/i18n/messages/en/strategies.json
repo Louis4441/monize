@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "Not available",
+      "atLeast": "at least {value}",
       "unassigned": "Not assigned",
       "yes": "Yes",
       "no": "No",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "Yes — kept",
       "workingIsTargetNo": "No — sold",
       "workingExposure": "Estimated exposure to the target market",
+      "workingFloorNote": "Where a fund's breakdown covers only part of it, the exposure is shown as a lower bound: the markets it does not name may add to it.",
       "workingNoData": "No data",
       "workingSum": "{counted} of the {total} held in instruments is in the target instrument, which is the {percent} above.",
       "basisFillStructure": "Fill in the instrument’s geographic structure"

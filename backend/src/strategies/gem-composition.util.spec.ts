@@ -226,30 +226,33 @@ describe("gem-composition.util", () => {
     });
 
     /**
-     * Partial coverage is the storage format, not an edge case: the securities
-     * editor drops the "Other" bucket so its weight falls into the computed
-     * remainder, and the DTO says the slices need not sum to 1. Unaccounted
-     * weight is unknown, and scoring it as known-absent turns a floor into a
-     * figure -- the same false zero this module already refuses when a
-     * breakdown is missing altogether.
+     * PRODUCT DECISION -- see `matchHolding`. Partial coverage is the storage
+     * format, not an edge case: the securities editor drops the "Other" bucket
+     * and the DTO says the slices need not sum to 1. The overlap computed over
+     * it is a floor, and the floor is shown -- withholding it turned the whole
+     * exposure column into "no data" for real funds, which reads as "Monize
+     * cannot see the overlap" rather than "the description is partial".
+     *
+     * Minimal mutation: return `overlap: null` when either side is partial.
+     * Test that fails under it: this one.
      */
-    it("refuses to measure against a partially described target", () => {
+    it("reports a floor against a partially described target", () => {
       const match = matchHolding({
         isTarget: false,
         // A China-only fund against a target recorded as 30% China and nothing
-        // else. The old answer was 0.30; the truth is somewhere in 0.30-1.00.
+        // else: at least 0.30, possibly as much as 1.00.
         holding: composition({ COUNTRY: [{ name: "China", weight: 1 }] }),
         target: composition({ COUNTRY: [{ name: "China", weight: 0.3 }] }),
         dimension: "COUNTRY",
       });
 
-      expect(match.overlap).toBeNull();
-      // What *is* known is still shown: the shared market and its size.
+      expect(match.overlap).toBeCloseTo(0.3, 6);
+      expect(match.partial).toBe(true);
       expect(match.matched).toEqual([{ name: "China", weight: 0.3 }]);
       expect(match.byInstrument).toBe(false);
     });
 
-    it("refuses a confident zero against a partially described target", () => {
+    it("reports a floor of zero when a partial description shares nothing", () => {
       const match = matchHolding({
         isTarget: false,
         holding: composition({ COUNTRY: [{ name: "Brazil", weight: 1 }] }),
@@ -257,20 +260,22 @@ describe("gem-composition.util", () => {
         dimension: "COUNTRY",
       });
 
-      // "0.00% exposure to the target market" was printed for a target 70% of
-      // which nobody had described.
-      expect(match.overlap).toBeNull();
+      // Zero of the *described* part is shared, and the 70% nobody described
+      // may add to it -- which is exactly what "at least 0%" says.
+      expect(match.overlap).toBe(0);
+      expect(match.partial).toBe(true);
       expect(match.matched).toEqual([]);
     });
 
-    it("refuses to measure a partially described holding", () => {
+    it("reports a floor for a partially described holding", () => {
       const match = matchHolding({
         isTarget: false,
         holding: composition({ COUNTRY: [{ name: "China", weight: 0.2 }] }),
         target,
         dimension: "COUNTRY",
       });
-      expect(match.overlap).toBeNull();
+      expect(match.overlap).toBeCloseTo(0.2, 6);
+      expect(match.partial).toBe(true);
     });
 
     it("tolerates rounding in an otherwise complete breakdown", () => {
@@ -299,11 +304,13 @@ describe("gem-composition.util", () => {
       expect(matchHolding({ isTarget: true, ...undescribed })).toEqual({
         overlap: 1,
         byInstrument: true,
+        partial: false,
         matched: [],
       });
       expect(matchHolding({ isTarget: false, ...undescribed })).toEqual({
         overlap: 0,
         byInstrument: true,
+        partial: false,
         matched: [],
       });
     });
@@ -315,7 +322,12 @@ describe("gem-composition.util", () => {
         target: EMPTY_COMPOSITION,
         dimension: null,
       });
-      expect(match).toEqual({ overlap: 0, byInstrument: true, matched: [] });
+      expect(match).toEqual({
+        overlap: 0,
+        byInstrument: true,
+        partial: false,
+        matched: [],
+      });
     });
 
     it("counts the target instrument in full despite a partial breakdown", () => {
@@ -330,6 +342,8 @@ describe("gem-composition.util", () => {
       expect(match).toEqual({
         overlap: 1,
         byInstrument: false,
+        // Not a floor either: holding the named instrument is 100%, full stop.
+        partial: false,
         matched: [{ name: "China", weight: 0.7 }],
       });
     });

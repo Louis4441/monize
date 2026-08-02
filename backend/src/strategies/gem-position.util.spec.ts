@@ -482,6 +482,69 @@ describe("gem-position.util", () => {
       composition: EMPTY_COMPOSITION,
     };
 
+    /**
+     * PRODUCT DECISION -- see `matchHolding` and `docs/gem-strategy.md`. A
+     * breakdown that names the top few markets and stops is what providers
+     * actually store, so the estimate is a floor rather than nothing: the real
+     * portfolio this came from showed "no data" against every one of four
+     * funds, two of which visibly hold the target's largest markets.
+     *
+     * Minimal mutation: make a partial description unavailable again.
+     * Test that fails under it: this one -- the exposure is null and the
+     * report is back to four blank rows.
+     */
+    it("estimates a floor from breakdowns that describe part of a fund", () => {
+      const partiallyDescribed = holding({
+        role: null,
+        securityId: "sec-iusq",
+        symbol: "IUSQ",
+        marketValue: 1000,
+        composition: {
+          // A provider's top-countries list: Taiwan is named, the rest of the
+          // fund is not described at all.
+          COUNTRY: [
+            { name: "United States", weight: 0.6 },
+            { name: "Taiwan", weight: 0.05 },
+          ],
+          ASSET_CLASS: null,
+          SECTOR: null,
+        },
+      });
+      const target = {
+        securityId: "sec-emim",
+        composition: {
+          COUNTRY: [
+            { name: "China", weight: 0.3 },
+            { name: "Taiwan", weight: 0.2 },
+          ],
+          ASSET_CLASS: null,
+          SECTOR: null,
+        },
+      };
+
+      const math = buildPositionMath([partiallyDescribed], "EM_EQUITY", target);
+
+      // Taiwan is shared and both descriptions are partial, so: at least 5%.
+      expect(math.marketExposurePercent).toBe(5);
+      expect(math.marketExposureAvailable).toBe(true);
+      expect(math.marketExposureIsFloor).toBe(true);
+      expect(math.holdings[0].overlapIsFloor).toBe(true);
+      // The estimate never touches compliance: none of EMIM is held.
+      expect(math.exactTargetPercent).toBe(0);
+      expect(math.changeRequired).toBe(true);
+    });
+
+    it("does not call a complete estimate a floor", () => {
+      const math = buildPositionMath(
+        [worldish("VWRA", 1000)],
+        "EM_EQUITY",
+        emim,
+      );
+
+      expect(math.marketExposurePercent).toBe(20);
+      expect(math.marketExposureIsFloor).toBe(false);
+    });
+
     const worldish = (symbol: string, marketValue: number) =>
       holding({
         role: null,

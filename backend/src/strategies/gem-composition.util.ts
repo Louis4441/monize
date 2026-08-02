@@ -278,12 +278,19 @@ function accountsForWholeFund(
 export interface GemHoldingMatch {
   /**
    * Share of the holding already in the target's markets, 0-1, or null when
-   * neither side describes enough of itself for that share to be a
-   * measurement rather than a lower bound.
+   * there is nothing to compare -- no usable breakdown on one side or the
+   * other. A description that covers only part of a fund still produces a
+   * figure; see `partial`.
    */
   overlap: number | null;
   /** True when the ticker was compared because no breakdown was available. */
   byInstrument: boolean;
+  /**
+   * The overlap is a floor, not a measurement: one side's breakdown does not
+   * account for the whole fund, so the markets it does not name may add to it.
+   * Shown as "at least", never as a plain percentage.
+   */
+  partial: boolean;
   /**
    * Which markets the overlap is made of, largest first. Empty when the ticker
    * decided it, or when the two breakdowns share nothing.
@@ -310,7 +317,12 @@ export function matchHolding(params: {
   const { isTarget, holding, target, dimension } = params;
 
   if (dimension === null || !hasWeightings(holding[dimension])) {
-    return { overlap: isTarget ? 1 : 0, byInstrument: true, matched: [] };
+    return {
+      overlap: isTarget ? 1 : 0,
+      byInstrument: true,
+      partial: false,
+      matched: [],
+    };
   }
   // The target instrument counts in full even when its own breakdown is
   // partial: holding exactly what was asked for is complete by definition.
@@ -318,24 +330,40 @@ export function matchHolding(params: {
     return {
       overlap: 1,
       byInstrument: false,
+      partial: false,
       matched: overlapContributions(holding[dimension], target[dimension]),
     };
   }
   const matched = overlapContributions(holding[dimension], target[dimension]);
-  // A partially described fund on either side makes the overlap a floor, not a
-  // figure. A target recorded only as "China 30%" against a China-only holding
-  // scored 0.30 -- the honest answer is somewhere between 30% and 100% -- and
-  // against a Brazil fund it printed a confident "0.00% exposure to the target
-  // market", which is the same false zero this module already refuses when a
-  // breakdown is missing altogether.
-  const measurable =
-    accountsForWholeFund(holding[dimension]) &&
-    accountsForWholeFund(target[dimension]);
+  /**
+   * PRODUCT DECISION -- do not "fix" this back in review.
+   *
+   * A partially described fund on either side used to make the whole estimate
+   * unavailable, on the reasoning that an overlap computed over an incomplete
+   * description is a floor rather than a figure. The floor is true; withholding
+   * it is not an improvement. Real country breakdowns list the top handful of
+   * markets and stop, so the stricter rule turned the entire column into "no
+   * data" -- an emerging-markets target against a world tracker that visibly
+   * holds Taiwan and China reported nothing at all, which the user reads as
+   * "Monize cannot see the overlap", not as "the description is partial".
+   *
+   * So the number is shown, and it is labelled as a lower bound: at least this
+   * much of the holding is in the target's markets, possibly more. `partial`
+   * carries that up to the UI, and the UI must render it as "at least" -- the
+   * one thing that would be wrong is printing a floor as a measurement.
+   *
+   * The rule this does NOT relax: with no usable breakdown there is still no
+   * estimate. A floor of zero derived from a description that shares no names
+   * is a real floor; a zero invented because nobody described the fund is not.
+   * See `docs/gem-strategy.md`, "Exposure is a floor, not a measurement".
+   */
+  const partial =
+    !accountsForWholeFund(holding[dimension]) ||
+    !accountsForWholeFund(target[dimension]);
   return {
-    overlap: measurable
-      ? compositionOverlap(holding[dimension], target[dimension])
-      : null,
+    overlap: compositionOverlap(holding[dimension], target[dimension]),
     byInstrument: false,
+    partial,
     matched,
   };
 }

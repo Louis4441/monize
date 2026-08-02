@@ -492,6 +492,54 @@ describe("GemPerformanceService", () => {
       expect(simulation?.points).toEqual([]);
     });
 
+    it("explains a holding whose feed stops before every plotted date", async () => {
+      /**
+       * Invariant: a simulation with no drawable point is reported as
+       * unavailable, with a reason.
+       * Canonical adversarial input: a feed that is fresh at its own last
+       * close and stale at every date the chart draws -- the holding is
+       * priceable, so it passes the base check, and then carries forward to
+       * nothing.
+       * Minimal mutation: drop the all-null check in
+       * `simulateCurrentComposition`.
+       * Test that fails under it: this one -- `unavailableReason` is null, so
+       * the legend gains "Today's composition" for a line that is never drawn
+       * and the chart says nothing about why.
+       */
+      priceService.loadSeries.mockResolvedValue(
+        new Map([
+          [
+            "sec-spy",
+            [
+              { date: "2024-08-14", close: 100 },
+              { date: "2025-08-14", close: 120 },
+            ],
+          ],
+          // Its own last close is what the simulation is based on, and it is
+          // three weeks before the only later date the chart plots -- beyond
+          // the carry-forward window, so that point is unknown too.
+          ["sec-stale", [{ date: "2025-07-20", close: 10 }]],
+        ]),
+      );
+
+      const simulation = (
+        await build({
+          holdings: [
+            {
+              securityId: "sec-stale",
+              symbol: "STALE",
+              marketValue: 5000,
+              isCash: false,
+            },
+          ],
+        })
+      )?.currentPortfolio;
+
+      expect(simulation?.unavailableReason).toBe("MISSING_PRICE_HISTORY");
+      expect(simulation?.points).toEqual([]);
+      expect(simulation?.totalReturnPercent).toBeNull();
+    });
+
     it("says there is nothing to simulate for empty accounts", async () => {
       twoHoldings();
       const simulation = (await build({ holdings: [] }))?.currentPortfolio;

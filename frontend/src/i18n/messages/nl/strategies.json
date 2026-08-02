@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "Niet beschikbaar",
+      "atLeast": "minstens {value}",
       "unassigned": "Niet toegewezen",
       "yes": "Ja",
       "no": "Nee",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "Ja — blijft",
       "workingIsTargetNo": "Nee — wordt verkocht",
       "workingExposure": "Geschatte blootstelling aan de doelmarkt",
+      "workingFloorNote": "Als de opbouw van een fonds slechts een deel ervan beschrijft, wordt de blootstelling als ondergrens getoond: de niet-genoemde markten kunnen er nog bij komen.",
       "workingNoData": "Geen gegevens",
       "workingSum": "{counted} van de {total} in instrumenten zit in het doelinstrument, dat is de {percent} hierboven.",
       "basisFillStructure": "Vul de geografische structuur van het instrument aan"

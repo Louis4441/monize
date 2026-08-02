@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "Không có dữ liệu",
+      "atLeast": "ít nhất {value}",
       "unassigned": "Chưa gán",
       "yes": "Có",
       "no": "Không",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "Có — giữ lại",
       "workingIsTargetNo": "Không — bán ra",
       "workingExposure": "Mức tiếp xúc ước tính với thị trường mục tiêu",
+      "workingFloorNote": "Khi phần mô tả cơ cấu của một quỹ chỉ bao gồm một phần, mức phơi nhiễm được hiển thị dưới dạng giới hạn dưới: những thị trường không được nêu tên có thể làm tăng nó.",
       "workingNoData": "Không có dữ liệu",
       "workingSum": "{counted} trong {total} nắm giữ ở các công cụ nằm ở công cụ mục tiêu, tức {percent} ở trên.",
       "basisFillStructure": "Bổ sung cơ cấu địa lý của công cụ"

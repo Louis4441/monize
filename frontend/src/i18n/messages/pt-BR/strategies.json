@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "Não disponível",
+      "atLeast": "pelo menos {value}",
       "unassigned": "Não atribuído",
       "yes": "Sim",
       "no": "Não",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "Sim — mantém-se",
       "workingIsTargetNo": "Não — vende-se",
       "workingExposure": "Exposição estimada ao mercado alvo",
+      "workingFloorNote": "Quando a composição de um fundo cobre apenas parte dele, a exposição é apresentada como um limite inferior: os mercados que não são citados podem aumentá-la.",
       "workingNoData": "Sem dados",
       "workingSum": "{counted} dos {total} mantidos em instrumentos está no instrumento alvo, que é os {percent} acima.",
       "basisFillStructure": "Preencha a estrutura geográfica do instrumento"

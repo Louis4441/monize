@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "Brak danych",
+      "atLeast": "co najmniej {value}",
       "unassigned": "Nieprzypisane",
       "yes": "Tak",
       "no": "Nie",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "Tak — zostaje",
       "workingIsTargetNo": "Nie — do sprzedaży",
       "workingExposure": "Szacowana ekspozycja na rynek docelowy",
+      "workingFloorNote": "Gdy opis funduszu obejmuje tylko jego część, ekspozycja jest podana jako dolne ograniczenie: rynki, których opis nie wymienia, mogą ją zwiększyć.",
       "workingNoData": "Brak danych",
       "workingSum": "{counted} z {total} ulokowanych w instrumentach jest w instrumencie docelowym, co daje {percent} powyżej.",
       "basisFillStructure": "Uzupełnij strukturę geograficzną instrumentu"

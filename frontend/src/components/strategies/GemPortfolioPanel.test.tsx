@@ -66,6 +66,7 @@ describe("GemPortfolioPanel", () => {
               // A fifth of a world tracker is already in the EM target.
               isTargetInstrument: false,
               matchPercent: 20,
+              matchIsFloor: false,
               matchedByInstrument: false,
               isCash: false,
               matchedMarkets: [],
@@ -103,6 +104,7 @@ describe("GemPortfolioPanel", () => {
               marketValue: 5000,
               isTargetInstrument: false,
               matchPercent: 0,
+              matchIsFloor: false,
               matchedByInstrument: false,
               matchedMarkets: [],
             },
@@ -155,6 +157,7 @@ describe("GemPortfolioPanel", () => {
               marketValue: null,
               isTargetInstrument: false,
               matchPercent: 0,
+              matchIsFloor: false,
               matchedByInstrument: true,
               matchedMarkets: [],
             },
@@ -190,6 +193,7 @@ describe("GemPortfolioPanel", () => {
               marketValue: 10000,
               isTargetInstrument: false,
               matchPercent: 20,
+              matchIsFloor: false,
               matchedByInstrument: false,
               isCash: false,
               matchedMarkets: [
@@ -246,6 +250,7 @@ describe("GemPortfolioPanel", () => {
               marketValue: 333333.33,
               isTargetInstrument: true,
               matchPercent: 100,
+              matchIsFloor: false,
               matchedByInstrument: false,
               isCash: false,
               matchedMarkets: [],
@@ -259,6 +264,7 @@ describe("GemPortfolioPanel", () => {
               marketValue: 666666.67,
               isTargetInstrument: false,
               matchPercent: 0,
+              matchIsFloor: false,
               matchedByInstrument: false,
               isCash: false,
               matchedMarkets: [],
@@ -292,6 +298,7 @@ describe("GemPortfolioPanel", () => {
               isTargetInstrument: false,
               // No breakdown of its own: unknown exposure, not zero exposure.
               matchPercent: null,
+              matchIsFloor: false,
               matchedByInstrument: true,
               isCash: false,
               matchedMarkets: [],
@@ -353,6 +360,7 @@ describe("GemPortfolioPanel", () => {
               // The target has no structure to compare with, so the exposure
               // of a fully described holding is unknown all the same.
               matchPercent: null,
+              matchIsFloor: false,
               matchedByInstrument: true,
               isCash: false,
               matchedMarkets: [],
@@ -388,6 +396,57 @@ describe("GemPortfolioPanel", () => {
       .getAllByRole("cell")
       .filter((cell) => cell.textContent?.includes("%"));
     expect(exposureCells).toHaveLength(0);
+  });
+
+  it("shows a partial-description estimate as a lower bound", () => {
+    /**
+     * PRODUCT DECISION -- see `backend/src/strategies/gem-composition.util.ts`
+     * and `docs/gem-strategy.md`. Providers describe the top few markets and
+     * stop, so refusing to estimate over a partial description blanked the
+     * whole column. The figure is shown, and it is shown as a floor.
+     *
+     * Minimal mutation: render `formatPercent` regardless of `matchIsFloor`.
+     * Test that fails under it: this one -- a floor is printed as if it were
+     * a measurement.
+     */
+    render(
+      <GemPortfolioPanel
+        position={gemPosition({
+          holdings: [
+            {
+              role: null,
+              securityId: "sec-iusq",
+              symbol: "IUSQ",
+              name: "iShares MSCI ACWI UCITS ETF",
+              quantity: 51,
+              marketValue: 10000,
+              isTargetInstrument: false,
+              matchPercent: 5,
+              matchIsFloor: true,
+              matchedByInstrument: false,
+              isCash: false,
+              matchedMarkets: [{ name: "Taiwan", percent: 5 }],
+            },
+          ],
+          totalMarketValue: 10000,
+          exactTargetPercent: 0,
+          marketExposurePercent: 5,
+          marketExposureAvailable: true,
+          marketExposureIsFloor: true,
+        })}
+        noAccount={false}
+        noPosition={false}
+      />,
+    );
+
+    // Both the per-holding figure and the total say "at least", and the note
+    // explains why it is one.
+    expect(screen.getAllByText(/at least 5%/).length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        /the exposure is shown as a lower bound: the markets it does not name may add to it/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("says when it could only compare tickers", () => {
@@ -460,6 +519,7 @@ describe("GemPortfolioPanel", () => {
               marketValue: null,
               isTargetInstrument: false,
               matchPercent: 0,
+              matchIsFloor: false,
               matchedByInstrument: true,
               isCash: false,
               matchedMarkets: [],

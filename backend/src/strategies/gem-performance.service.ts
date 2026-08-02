@@ -347,6 +347,18 @@ export class GemPerformanceService {
       };
     });
 
+    // A simulation with no drawable point is not a simulation.
+    //
+    // Every leg can be based and still produce nothing: a feed that stops
+    // before the window opens fails the freshness rule at every plotted date,
+    // and `carriedClose` then returns null right across the range. The result
+    // passed every check above, so it came back with `unavailableReason: null`
+    // -- which put "Today's composition" in the legend, drew no line, and
+    // offered no explanation. An absence has to say why it is absent.
+    if (points.every((point) => point.returnPercent === null)) {
+      return empty("MISSING_PRICE_HISTORY");
+    }
+
     // The return over the window, which means the value at the *end* of it.
     //
     // Taking the last point that happened to be priceable answered a different

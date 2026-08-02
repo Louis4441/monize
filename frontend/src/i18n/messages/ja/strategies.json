@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "データなし",
+      "atLeast": "{value} 以上",
       "unassigned": "未割り当て",
       "yes": "はい",
       "no": "いいえ",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "はい — 保有継続",
       "workingIsTargetNo": "いいえ — 売却",
       "workingExposure": "目標市場への推定エクスポージャー",
+      "workingFloorNote": "ファンドの内訳が一部しか示していない場合、エクスポージャーは下限として表示されます。記載のない市場がこれを上回る可能性があります。",
       "workingNoData": "データなし",
       "workingSum": "銘柄で保有する{total}のうち{counted}が目標銘柄で、これが上の{percent}です。",
       "basisFillStructure": "銘柄の地域構成を入力する"

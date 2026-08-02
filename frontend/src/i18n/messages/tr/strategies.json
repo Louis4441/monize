@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "Kullanılamıyor",
+      "atLeast": "en az {value}",
       "unassigned": "Atanmadı",
       "yes": "Evet",
       "no": "Hayır",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "Evet — tutuluyor",
       "workingIsTargetNo": "Hayır — satılıyor",
       "workingExposure": "Hedef piyasaya tahmini maruziyet",
+      "workingFloorNote": "Bir fonun dağılımı yalnızca bir bölümünü kapsıyorsa, maruziyet alt sınır olarak gösterilir: adı geçmeyen piyasalar bunu artırabilir.",
       "workingNoData": "Veri yok",
       "workingSum": "Enstrümanlarda tutulan {total} tutarın {counted} kadarı hedef enstrümanda, bu da yukarıdaki {percent} değeridir.",
       "basisFillStructure": "Enstrümanın coğrafi yapısını tamamlayın"

@@ -149,7 +149,15 @@ export function GemPortfolioCard({
         </span>
         <span className="font-medium text-gray-700 dark:text-gray-200">
           {isKnown(position.marketExposurePercent) ? (
-            formatPercent(position.marketExposurePercent, 0)
+            // A lower bound is never printed as a measurement; see the product
+            // decision in `backend/src/strategies/gem-composition.util.ts`.
+            position.marketExposureIsFloor ? (
+              t("gem.common.atLeast", {
+                value: formatPercent(position.marketExposurePercent, 0),
+              })
+            ) : (
+              formatPercent(position.marketExposurePercent, 0)
+            )
           ) : (
             <GemUnknown label={t("gem.portfolio.marketExposureUnknown")} />
           )}

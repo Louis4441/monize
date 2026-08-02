@@ -98,6 +98,13 @@ export interface GemHeldAsset {
    * covering an emerging-markets target is still sold whole.
    */
   matchPercent: number | null;
+  /**
+   * `matchPercent` is a floor, not a measurement: the breakdowns describe only
+   * part of one fund or the other, so the markets they do not name may add to
+   * it. The UI renders it as "at least"; see the product decision in
+   * `gem-composition.util.ts` and `docs/gem-strategy.md`.
+   */
+  matchIsFloor: boolean;
   /** True when the ticker decided it, because no breakdown was available. */
   matchedByInstrument: boolean;
   /**
@@ -168,6 +175,8 @@ export interface GemPositionView {
   marketExposurePercent: number | null;
   /** Whether the exposure estimate could be made at all. */
   marketExposureAvailable: boolean;
+  /** The estimate is a lower bound: at least this much, possibly more. */
+  marketExposureIsFloor: boolean;
   /** Breakdown the exposure estimate ran on; null when it could not be made. */
   marketExposureDimension: GemCompositionDimension | null;
   changeRequired: boolean;

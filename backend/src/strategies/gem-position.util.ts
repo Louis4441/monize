@@ -70,6 +70,12 @@ export interface GemMatchedHolding extends GemHolding {
    */
   overlap: number | null;
   /**
+   * The overlap is a floor rather than a measurement, because one side's
+   * breakdown does not describe the whole fund. Shown as "at least"; see the
+   * product decision in `matchHolding`.
+   */
+  overlapIsFloor: boolean;
+  /**
    * True when this holding *is* the instrument the signal names -- the same
    * security, not a fund with similar exposure. What the strategy actually
    * asks for, and what decides whether the position is kept or sold.
@@ -166,6 +172,8 @@ export interface GemPositionMath {
   marketExposurePercent: number | null;
   /** Whether the exposure estimate could be made at all. */
   marketExposureAvailable: boolean;
+  /** The estimate is a lower bound: at least this much, possibly more. */
+  marketExposureIsFloor: boolean;
   changeRequired: boolean;
   /**
    * What a switch moves: the **full** market value of every holding that is
@@ -241,6 +249,7 @@ export function buildPositionMath(
       return {
         ...holding,
         overlap: 0,
+        overlapIsFloor: false,
         isTargetInstrument: false,
         matchedByInstrument: false,
         matchedMarkets: [],
@@ -253,6 +262,7 @@ export function buildPositionMath(
         // No target, so there are no markets to be exposed to: unknown, not
         // zero, because zero would be an answer to a question nobody asked.
         overlap: null,
+        overlapIsFloor: false,
         isTargetInstrument: false,
         matchedByInstrument: false,
         matchedMarkets: [],
@@ -264,6 +274,7 @@ export function buildPositionMath(
       return {
         ...holding,
         overlap: 1,
+        overlapIsFloor: false,
         isTargetInstrument: true,
         matchedByInstrument: dimension === null,
         matchedMarkets: [],
@@ -277,6 +288,7 @@ export function buildPositionMath(
       return {
         ...holding,
         overlap: null,
+        overlapIsFloor: false,
         isTargetInstrument: false,
         matchedByInstrument: true,
         matchedMarkets: [],
@@ -292,6 +304,7 @@ export function buildPositionMath(
       ...holding,
       // A holding with no breakdown of its own cannot be placed either.
       overlap: match.byInstrument ? null : match.overlap,
+      overlapIsFloor: !match.byInstrument && match.partial,
       isTargetInstrument: false,
       matchedByInstrument: match.byInstrument,
       matchedMarkets: match.matched,
@@ -386,6 +399,15 @@ export function buildPositionMath(
     securitiesValue !== null &&
     securitiesValue > 0 &&
     securities.every((holding) => holding.overlap !== null);
+  /**
+   * The aggregate is a floor when any holding's share is one. Mixing a floor
+   * into a sum makes the sum a floor -- the parts nobody described can only
+   * add to it -- and printing that as a measurement is the one thing the
+   * product decision in `matchHolding` does not allow.
+   */
+  const marketExposureIsFloor =
+    marketExposureAvailable &&
+    securities.some((holding) => holding.overlapIsFloor);
   const marketExposurePercent = marketExposureAvailable
     ? roundToDecimals(
         (sumMoney(
@@ -510,6 +532,7 @@ export function buildPositionMath(
     exactTargetPercent,
     marketExposurePercent,
     marketExposureAvailable,
+    marketExposureIsFloor,
     changeRequired,
     transferValue,
     realizedGainLoss,

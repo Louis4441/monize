@@ -150,6 +150,12 @@ export interface GemHeldAsset {
    * covering an emerging-markets target is still sold whole.
    */
   matchPercent: number | null;
+  /**
+   * `matchPercent` is a lower bound rather than a measurement, because the
+   * breakdowns describe only part of one fund or the other. Render it as "at
+   * least"; a floor printed as a figure is the one reading that is wrong.
+   */
+  matchIsFloor: boolean;
   /** True when the ticker decided it, because no breakdown was available. */
   matchedByInstrument: boolean;
   /**
@@ -182,6 +188,8 @@ export interface GemPosition {
    */
   marketExposurePercent: number | null;
   marketExposureAvailable: boolean;
+  /** The estimate is a lower bound: at least this much, possibly more. */
+  marketExposureIsFloor: boolean;
   marketExposureDimension: GemCompositionDimension | null;
   changeRequired: boolean;
   /** Market value of everything held in the accounts; null when nothing can be priced. */

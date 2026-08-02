@@ -2,6 +2,7 @@
   "gem": {
     "common": {
       "unknown": "無資料",
+      "atLeast": "至少 {value}",
       "unassigned": "未指定",
       "yes": "是",
       "no": "否",
@@ -278,6 +279,7 @@
       "workingIsTargetYes": "是 — 保留",
       "workingIsTargetNo": "否 — 卖出",
       "workingExposure": "對目標市場的估計曝險",
+      "workingFloorNote": "當某檔基金的成分說明只涵蓋其中一部分時，曝險以下限形式顯示：未列出的市場可能使其更高。",
       "workingNoData": "無資料",
       "workingSum": "持有的標的共 {total}，其中 {counted} 在目標標的，即上方的 {percent}。",
       "basisFillStructure": "補充該標的的地域結構"
