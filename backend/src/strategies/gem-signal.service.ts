@@ -32,6 +32,13 @@ import {
  */
 export const GEM_HISTORY_PERIODS = 24;
 
+/**
+ * `markExecuted` refused the request because the signal belongs to a strategy
+ * other than the one the caller named. Distinct from `null`, which means there
+ * is no such signal at all, because the two are different HTTP answers.
+ */
+export const GEM_SIGNAL_STRATEGY_MISMATCH = "STRATEGY_MISMATCH" as const;
+
 /** What one materialization produced for the report to render. */
 export interface GemMaterialization {
   /** Evaluations under the configuration in force now, newest first. */
@@ -766,11 +773,19 @@ export class GemSignalService {
   /**
    * Record that the user carried out a signal's operation.
    *
-   * Returns the id of the strategy the signal belongs to, or null when there is
-   * no such signal for this user. The **signal** decides which strategy this
-   * was, not the caller: a client whose report is one scenario behind its
-   * selection would otherwise mark scenario A's signal and be handed scenario
-   * B's report, having been told the operation it just confirmed was B's.
+   * Returns the id of the strategy the signal belongs to, `null` when there is
+   * no such signal for this user, or `MISMATCH` when `expectedStrategyId` names
+   * a different one. The **signal** decides which strategy this was, not the
+   * caller: a client whose report is one scenario behind its selection would
+   * otherwise mark scenario A's signal and be handed scenario B's report,
+   * having been told the operation it just confirmed was B's.
+   *
+   * `expectedStrategyId` is checked **here**, inside the transaction and under
+   * the lock, rather than by the caller afterwards. Comparing after this method
+   * returned was too late by a whole commit: the row was already `executed` and
+   * the request then answered 409, so a stale client got a failure on screen
+   * and a completed operation in the database -- the one outcome a rejected
+   * request must never produce.
    *
    * The strategy's lock is taken before the write, in the same order every
    * other writer takes it. Materialization reads the stored rows and writes
@@ -779,7 +794,11 @@ export class GemSignalService {
    * the snapshot, and the report went back to asking for a trade the user had
    * just told it about.
    */
-  async markExecuted(userId: string, signalId: string): Promise<string | null> {
+  async markExecuted(
+    userId: string,
+    signalId: string,
+    expectedStrategyId?: string,
+  ): Promise<string | null | typeof GEM_SIGNAL_STRATEGY_MISMATCH> {
     return withScopedDb(this.dataSource, async (manager) => {
       const repo = manager.getRepository(GemStrategySignal);
       const found = await repo.findOne({ where: { id: signalId, userId } });
@@ -789,6 +808,11 @@ export class GemSignalService {
       // materializer that was already holding it when we looked.
       const signal = await repo.findOne({ where: { id: signalId, userId } });
       if (!signal) return null;
+      // Before any write, and before the early return for an already-executed
+      // signal: a mismatched request is refused whatever state the row is in.
+      if (expectedStrategyId && expectedStrategyId !== signal.strategyId) {
+        return GEM_SIGNAL_STRATEGY_MISMATCH;
+      }
       if (signal.executed) return signal.strategyId;
       signal.executed = true;
       signal.executedAt = new Date();

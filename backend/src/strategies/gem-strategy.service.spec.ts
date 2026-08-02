@@ -7,6 +7,7 @@ import { GemStrategyAccount } from "./entities/gem-strategy-account.entity";
 import { GemStrategyAsset } from "./entities/gem-strategy-asset.entity";
 import { GemStrategySignal } from "./entities/gem-strategy-signal.entity";
 import { GemStrategyService } from "./gem-strategy.service";
+import { GEM_SIGNAL_STRATEGY_MISMATCH } from "./gem-signal.service";
 import {
   createScopedDbMocks,
   ManagerMock,
@@ -925,7 +926,11 @@ describe("GemStrategyService", () => {
   describe("markExecuted", () => {
     it("records the execution and returns the refreshed report", async () => {
       const report = await service.markExecuted(userId, "sig-1", "3M");
-      expect(signalService.markExecuted).toHaveBeenCalledWith(userId, "sig-1");
+      expect(signalService.markExecuted).toHaveBeenCalledWith(
+        userId,
+        "sig-1",
+        undefined,
+      );
       expect(performanceService.build).toHaveBeenCalledWith(
         expect.objectContaining({ range: "3M" }),
       );
@@ -947,11 +952,21 @@ describe("GemStrategyService", () => {
      * the operation they had just confirmed belonged to a scenario it did not.
      */
     it("refuses a signal that belongs to another scenario", async () => {
-      signalService.markExecuted.mockResolvedValue("strategy-1");
+      signalService.markExecuted.mockResolvedValue(
+        GEM_SIGNAL_STRATEGY_MISMATCH,
+      );
 
       await expect(
         service.markExecuted(userId, "sig-1", "1Y", "strategy-2"),
       ).rejects.toMatchObject({ status: 409 });
+      // The expectation is passed down so the refusal happens inside the
+      // transaction, before the row is touched -- not compared here, after a
+      // commit that already marked it.
+      expect(signalService.markExecuted).toHaveBeenCalledWith(
+        userId,
+        "sig-1",
+        "strategy-2",
+      );
     });
 
     it("reports on the signal's own scenario, not the requested one", async () => {

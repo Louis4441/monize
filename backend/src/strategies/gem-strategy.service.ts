@@ -34,7 +34,11 @@ import { GemBacktestService } from "./gem-backtest.service";
 import { GemPerformanceService } from "./gem-performance.service";
 import { GemPositionService } from "./gem-position.service";
 import { GemPriceService } from "./gem-price.service";
-import { GemSignalService, lockGemStrategy } from "./gem-signal.service";
+import {
+  GEM_SIGNAL_STRATEGY_MISMATCH,
+  GemSignalService,
+  lockGemStrategy,
+} from "./gem-signal.service";
 import {
   GemAccountRef,
   GemAssetMomentum,
@@ -888,25 +892,29 @@ export class GemStrategyService {
     range: GemRange = "1Y",
     strategyId?: string,
   ): Promise<GemStrategyReportView> {
+    // The expectation goes *in*, so the mismatch is decided inside the
+    // transaction and before the write. Checking the returned id here left the
+    // row already marked by the time the conflict was raised: the client saw a
+    // failure and the database recorded a completed operation.
     const owningStrategyId = await this.signalService.markExecuted(
       userId,
       signalId,
+      strategyId,
     );
-    if (!owningStrategyId) {
-      throw new NotFoundException(
-        tr("errors.strategies.signalNotFound", "Strategy signal not found"),
-      );
-    }
-    // The client named a scenario and the signal belongs to another one: its
-    // report and its selection have drifted apart, so neither answer is safe.
-    // Marking A's signal and returning B's report would tell the user the
-    // operation they just confirmed was B's.
-    if (strategyId && strategyId !== owningStrategyId) {
+    if (owningStrategyId === GEM_SIGNAL_STRATEGY_MISMATCH) {
+      // The client named a scenario and the signal belongs to another one: its
+      // report and its selection have drifted apart, so neither answer is
+      // safe. Nothing was written.
       throw new ConflictException(
         tr(
           "errors.strategies.signalStrategyMismatch",
           "That signal belongs to a different strategy.",
         ),
+      );
+    }
+    if (!owningStrategyId) {
+      throw new NotFoundException(
+        tr("errors.strategies.signalNotFound", "Strategy signal not found"),
       );
     }
     // The signal's own strategy, never the requested one: the report that comes

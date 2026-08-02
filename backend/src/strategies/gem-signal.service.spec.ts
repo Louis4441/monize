@@ -3,6 +3,7 @@ import {
   GemSignalService,
   GEM_HISTORY_PERIODS,
   GEM_SIGNAL_ALGORITHM_VERSION,
+  GEM_SIGNAL_STRATEGY_MISMATCH,
   gemConfigFingerprint,
 } from "./gem-signal.service";
 import { GemStrategySignal } from "./entities/gem-strategy-signal.entity";
@@ -1125,6 +1126,55 @@ describe("GemSignalService", () => {
     it("reports an unknown signal", async () => {
       signalRepo.findOne.mockResolvedValue(null);
       await expect(service.markExecuted(userId, "sig-x")).resolves.toBeNull();
+    });
+
+    /**
+     * A rejected request must not change persistent state. The ownership check
+     * used to sit in the caller, *after* this method had committed: the row
+     * came back `executed`, the client got a 409, and a stale tab could mark
+     * the wrong scenario's operation as done while being told it had failed.
+     */
+    it("writes nothing when the expected strategy does not match", async () => {
+      signalRepo.findOne.mockResolvedValue({
+        id: "sig-1",
+        strategyId: "strategy-1",
+        executed: false,
+        executedAt: null,
+      } as GemStrategySignal);
+
+      await expect(
+        service.markExecuted(userId, "sig-1", "strategy-2"),
+      ).resolves.toBe(GEM_SIGNAL_STRATEGY_MISMATCH);
+
+      expect(signalRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("refuses a mismatch even for an already executed signal", async () => {
+      // The early return for an executed row must not become a way past the
+      // ownership check.
+      signalRepo.findOne.mockResolvedValue({
+        id: "sig-1",
+        strategyId: "strategy-1",
+        executed: true,
+      } as GemStrategySignal);
+
+      await expect(
+        service.markExecuted(userId, "sig-1", "strategy-2"),
+      ).resolves.toBe(GEM_SIGNAL_STRATEGY_MISMATCH);
+      expect(signalRepo.save).not.toHaveBeenCalled();
+    });
+
+    it("proceeds when the expected strategy is the owning one", async () => {
+      signalRepo.findOne.mockResolvedValue({
+        id: "sig-1",
+        strategyId: "strategy-1",
+        executed: false,
+      } as GemStrategySignal);
+
+      await expect(
+        service.markExecuted(userId, "sig-1", "strategy-1"),
+      ).resolves.toBe("strategy-1");
+      expect(signalRepo.save).toHaveBeenCalled();
     });
 
     it("takes the owning strategy's lock before writing", async () => {

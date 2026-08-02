@@ -5,6 +5,7 @@ import { roundMoney, sumMoney } from "../common/round.util";
 import { ExchangeRateService } from "../currencies/exchange-rate.service";
 import { GemAssetRole } from "./entities/gem-strategy-asset.entity";
 import { GemStrategy } from "./entities/gem-strategy.entity";
+import { PortfolioCalculationService } from "../securities/portfolio-calculation.service";
 import { GemPriceService } from "./gem-price.service";
 import { BOUNDARY_LAG_DAYS } from "./gem-momentum.util";
 import {
@@ -94,7 +95,26 @@ export class GemPositionService {
     private dataSource: DataSource,
     private priceService: GemPriceService,
     private exchangeRateService: ExchangeRateService,
+    private portfolioCalculation: PortfolioCalculationService,
   ) {}
+
+  /** Currency each strategy account keeps its books in. */
+  private async accountCurrencies(
+    userId: string,
+    accountIds: string[],
+  ): Promise<Map<string, string>> {
+    if (accountIds.length === 0) return new Map();
+    const rows: Array<{ id: string; currency_code: string }> =
+      await withScopedDb(this.dataSource, (manager) =>
+        manager.query(
+          `SELECT a.id, a.currency_code
+             FROM accounts a
+            WHERE a.id = ANY($1::uuid[]) AND a.user_id = $2`,
+          [accountIds, userId],
+        ),
+      );
+    return new Map(rows.map((row) => [row.id, row.currency_code]));
+  }
 
   /**
    * Everything held in the strategy's accounts, summed per security across
@@ -325,6 +345,42 @@ export class GemPositionService {
     return rate === null ? null : amount * rate;
   }
 
+  /**
+   * A holding's cost basis in the report currency, or null when it cannot be
+   * established from what the transactions recorded.
+   *
+   * Three ways it stays unknown, and each is a real state rather than a
+   * shortcut:
+   *
+   * - a lot with no average cost at all, which the holdings query already
+   *   reports (an imported position nobody costed);
+   * - an account whose books are in a currency other than the report's. The
+   *   per-transaction rate translated the purchase into the *account's*
+   *   currency, so a further conversion to the report currency would have to
+   *   pick a rate for an aggregate spanning years -- there is no such rate,
+   *   and today's is the wrong answer this method exists to avoid;
+   * - a derived basis of zero, which for a position that is held means the
+   *   transactions do not describe how it was acquired, not that it was free.
+   */
+  private historicalCostBasis(params: {
+    holding: AggregatedHolding;
+    accountCostBases: Map<string, number>;
+    currencyByAccount: Map<string, string>;
+    currencyCode: string;
+  }): number | null {
+    const { holding, accountCostBases, currencyByAccount, currencyCode } =
+      params;
+    if (holding.costBasis === null) return null;
+    let total = 0;
+    for (const accountId of holding.accountIds) {
+      if (currencyByAccount.get(accountId) !== currencyCode) return null;
+      const basis = accountCostBases.get(`${accountId}:${holding.securityId}`);
+      if (basis === undefined) return null;
+      total += basis;
+    }
+    return total > 0 ? roundMoney(total) : null;
+  }
+
   /** `convert` rounded to money, keeping the unknown state. */
   private async convertMoney(
     amount: number,
@@ -382,6 +438,29 @@ export class GemPositionService {
       ]),
     ]);
 
+    /**
+     * Cost basis per (account, security), already translated at each
+     * transaction's **own** exchange rate.
+     *
+     * The holdings table's `average_cost` is in the security's currency, and
+     * converting that aggregate at today's rate answers a different question:
+     * ten units bought at 100 USD when USD/PLN was 3.00 cost 3,000 PLN, and
+     * re-converting the 1,000 USD at today's 4.00 says 4,000 PLN -- so an
+     * unchanged foreign price reports a gain of exactly zero and a tax of
+     * zero, when the truth is 1,000 PLN and 190 PLN. Historical cost needs
+     * historical rates, which is what this already does when it walks the
+     * transactions.
+     */
+    const accountCostBases =
+      await this.portfolioCalculation.calculateCostBasesInAccountCurrency(
+        userId,
+        accounts.map((account) => account.id),
+      );
+    const currencyByAccount = await this.accountCurrencies(
+      userId,
+      accounts.map((account) => account.id),
+    );
+
     const rateCache = new Map<string, number | null>();
     const valued: GemHolding[] = [];
     for (const holding of aggregated) {
@@ -396,15 +475,12 @@ export class GemPositionService {
               currencyCode,
               rateCache,
             );
-      const costBasis =
-        holding.costBasis === null
-          ? null
-          : await this.convertMoney(
-              holding.costBasis,
-              holding.currencyCode,
-              currencyCode,
-              rateCache,
-            );
+      const costBasis = this.historicalCostBasis({
+        holding,
+        accountCostBases,
+        currencyByAccount,
+        currencyCode,
+      });
       valued.push({
         role,
         securityId: holding.securityId,
