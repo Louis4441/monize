@@ -14,45 +14,45 @@
 
 /** The four roles a GEM strategy assigns an instrument to. */
 /** How the report decided whether a holding counts towards the target. */
-export type GemCompositionBasis = 'COMPOSITION' | 'INSTRUMENT';
+export type GemCompositionBasis = "COMPOSITION" | "INSTRUMENT";
 
 /** The breakdown a composition comparison ran on. */
-export type GemCompositionDimension = 'COUNTRY' | 'ASSET_CLASS' | 'SECTOR';
+export type GemCompositionDimension = "COUNTRY" | "ASSET_CLASS" | "SECTOR";
 
 export type GemAssetRole =
-  | 'US_EQUITY'
-  | 'EX_US_EQUITY'
-  | 'EM_EQUITY'
-  | 'SAFE'
-  | 'RISK_FREE';
+  | "US_EQUITY"
+  | "EX_US_EQUITY"
+  | "EM_EQUITY"
+  | "SAFE"
+  | "RISK_FREE";
 
 /** Absolute-momentum outcome: equities in (RISK_ON) or safe asset (RISK_OFF). */
-export type GemSignalState = 'RISK_ON' | 'RISK_OFF';
+export type GemSignalState = "RISK_ON" | "RISK_OFF";
 
 /** How often the strategy re-evaluates its signal. */
-export type GemCadence = 'MONTHLY' | 'QUARTERLY';
+export type GemCadence = "MONTHLY" | "QUARTERLY";
 
 /** What a historical evaluation asked the investor to do. */
-export type GemHistoryAction = 'BUY' | 'HOLD' | 'SWITCH';
+export type GemHistoryAction = "BUY" | "HOLD" | "SWITCH";
 
 /** Selectable window for the asset-performance chart. */
-export type GemRange = '3M' | '6M' | '1Y' | '3Y' | '5Y' | 'MAX';
+export type GemRange = "3M" | "6M" | "1Y" | "3Y" | "5Y" | "MAX";
 
 /** Conditions the server flags so the UI can explain incomplete output. */
 export type GemWarningCode =
-  | 'UNMAPPED_ROLE'
-  | 'INCOMPLETE_HISTORY'
+  | "UNMAPPED_ROLE"
+  | "INCOMPLETE_HISTORY"
   /**
    * Periods decided under an earlier configuration of this strategy are absent
    * from the history and the backtest, because the current one cannot
    * recalculate them.
    */
-  | 'LEGACY_PERIODS'
-  | 'NO_ACCOUNT'
-  | 'NO_POSITION'
-  | 'FIRST_RUN'
-  | 'STALE_PRICES'
-  | 'CALCULATION_FAILED';
+  | "LEGACY_PERIODS"
+  | "NO_ACCOUNT"
+  | "NO_POSITION"
+  | "FIRST_RUN"
+  | "STALE_PRICES"
+  | "CALCULATION_FAILED";
 
 export interface GemWarning {
   code: GemWarningCode;
@@ -244,9 +244,9 @@ export interface GemPerformancePoint {
 
 /** Why the current-composition simulation has no line. */
 export type GemSimulationUnavailableReason =
-  | 'NO_HOLDINGS'
-  | 'UNKNOWN_CURRENT_VALUE'
-  | 'MISSING_PRICE_HISTORY';
+  | "NO_HOLDINGS"
+  | "UNKNOWN_CURRENT_VALUE"
+  | "MISSING_PRICE_HISTORY";
 
 /**
  * Today's holdings, in today's proportions, replayed over the window.
@@ -275,8 +275,6 @@ export interface GemPerformance {
   points: GemPerformancePoint[];
   /** Cumulative total return per role at the end of the range, in percent. */
   totals: Partial<Record<GemAssetRole, number | null>>;
-  /** Currency the returns are expressed in (the strategy account's base currency). */
-  currencyCode: string;
   /** True when at least one asset lacks prices for the whole range. */
   incomplete: boolean;
   /** Today's holdings replayed over the window; null when none are held. */

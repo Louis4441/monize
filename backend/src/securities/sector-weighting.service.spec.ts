@@ -201,6 +201,91 @@ describe("SectorWeightingService", () => {
       expect(securityRepo.save).toHaveBeenCalledWith([sec]);
     });
 
+    /**
+     * The provider distinguishes a failed request (`null`) from a fund with
+     * nothing to report (`[]`), and only the second is knowledge. Stamping
+     * freshness on a failure hid the fund behind an up-to-date-looking row for
+     * a week, so a transient outage became missing asset-class data with no
+     * way back until the timestamp aged out.
+     */
+    it("leaves a failed ETF fetch stale and retryable", async () => {
+      const sec = {
+        ...mockEtfSecurity,
+        sectorWeightings: null,
+        assetWeightings: null,
+        sectorDataUpdatedAt: null,
+      } as Security;
+      yahooService.fetchEtfBreakdowns.mockResolvedValue({
+        sectors: null,
+        assets: null,
+      });
+
+      await service.ensureSectorData([sec]);
+
+      expect(sec.sectorDataUpdatedAt).toBeNull();
+      expect(securityRepo.save).not.toHaveBeenCalled();
+      // Nothing was learned, so nothing was written over either.
+      expect(sec.sectorWeightings).toBeNull();
+      expect(sec.assetWeightings).toBeNull();
+    });
+
+    it("counts an empty but successful response as fresh", async () => {
+      // The fund was described; it simply has no breakdown. Re-asking every
+      // sweep would not change that.
+      const sec = {
+        ...mockEtfSecurity,
+        sectorWeightings: null,
+        assetWeightings: null,
+        sectorDataUpdatedAt: null,
+      } as Security;
+      yahooService.fetchEtfBreakdowns.mockResolvedValue({
+        sectors: [],
+        assets: [],
+      });
+
+      await service.ensureSectorData([sec]);
+
+      expect(sec.sectorDataUpdatedAt).toBeInstanceOf(Date);
+      expect(securityRepo.save).toHaveBeenCalledWith([sec]);
+    });
+
+    it("keeps the half that arrived and counts the fetch as fresh", async () => {
+      const sec = {
+        ...mockEtfSecurity,
+        sectorWeightings: null,
+        assetWeightings: null,
+        sectorDataUpdatedAt: null,
+      } as Security;
+      yahooService.fetchEtfBreakdowns.mockResolvedValue({
+        sectors: null,
+        assets: [{ name: "Bonds", weight: 1 }],
+      });
+
+      await service.ensureSectorData([sec]);
+
+      expect(sec.assetWeightings).toEqual([{ name: "Bonds", weight: 1 }]);
+      expect(sec.sectorDataUpdatedAt).toBeInstanceOf(Date);
+    });
+
+    it("leaves a failed refresh of stale data exactly as stale", async () => {
+      const stale = new Date("2024-01-01T00:00:00Z");
+      const sec = {
+        ...mockEtfSecurity,
+        sectorWeightings: [{ sector: "Technology", weight: 0.3 }],
+        assetWeightings: null,
+        sectorDataUpdatedAt: stale,
+      } as unknown as Security;
+      yahooService.fetchEtfBreakdowns.mockResolvedValue({
+        sectors: null,
+        assets: null,
+      });
+
+      await service.ensureSectorData([sec]);
+
+      expect(sec.sectorDataUpdatedAt).toBe(stale);
+      expect(securityRepo.save).not.toHaveBeenCalled();
+    });
+
     it("skips securities with skipPriceUpdates = true", async () => {
       const sec = {
         ...mockStockSecurity,

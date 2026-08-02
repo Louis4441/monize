@@ -6,7 +6,7 @@ import {
   GemPosition,
   GemSignal,
   GemStrategyReport,
-} from '@/types/gem-strategy';
+} from "@/types/gem-strategy";
 
 /**
  * Fixtures for the GEM strategy report tests. Kept under `src/test` so no
@@ -15,26 +15,51 @@ import {
  */
 
 export const gemAssets: GemAssetRef[] = [
-  { role: 'US_EQUITY', securityId: 'sec-spy', symbol: 'SPY', name: 'SPDR S&P 500 ETF' },
-  { role: 'EX_US_EQUITY', securityId: 'sec-ewa', symbol: 'EWA', name: 'MSCI World ex-US ETF' },
-  { role: 'EM_EQUITY', securityId: 'sec-emim', symbol: 'EMIM', name: 'iShares MSCI EM IMI ETF' },
-  { role: 'SAFE', securityId: 'sec-ief', symbol: 'IEF', name: 'Treasury Bond ETF' },
-  { role: 'RISK_FREE', securityId: 'sec-bil', symbol: 'BIL', name: '1-3 Month T-Bill ETF' },
+  {
+    role: "US_EQUITY",
+    securityId: "sec-spy",
+    symbol: "SPY",
+    name: "SPDR S&P 500 ETF",
+  },
+  {
+    role: "EX_US_EQUITY",
+    securityId: "sec-ewa",
+    symbol: "EWA",
+    name: "MSCI World ex-US ETF",
+  },
+  {
+    role: "EM_EQUITY",
+    securityId: "sec-emim",
+    symbol: "EMIM",
+    name: "iShares MSCI EM IMI ETF",
+  },
+  {
+    role: "SAFE",
+    securityId: "sec-ief",
+    symbol: "IEF",
+    name: "Treasury Bond ETF",
+  },
+  {
+    role: "RISK_FREE",
+    securityId: "sec-bil",
+    symbol: "BIL",
+    name: "1-3 Month T-Bill ETF",
+  },
 ];
 
 export function gemSignal(overrides: Partial<GemSignal> = {}): GemSignal {
   return {
-    id: 'signal-1',
-    state: 'RISK_ON',
+    id: "signal-1",
+    state: "RISK_ON",
     target: gemAssets[2],
     targetWeightPercent: 100,
-    effectiveFrom: '2025-08-01',
-    evaluatedOn: '2025-08-01',
+    effectiveFrom: "2025-08-01",
+    evaluatedOn: "2025-08-01",
     absolute: {
       equity: { ...gemAssets[0], momentum12m: 15.42, rank: 2 },
       benchmark: { ...gemAssets[3], momentum12m: 4.21, rank: null },
       spreadPp: 11.21,
-      result: 'RISK_ON',
+      result: "RISK_ON",
     },
     relative: {
       ranking: [
@@ -52,7 +77,7 @@ export function gemSignal(overrides: Partial<GemSignal> = {}): GemSignal {
 
 export function gemPosition(overrides: Partial<GemPosition> = {}): GemPosition {
   return {
-    accounts: [{ id: 'acct-1', name: 'Broker IRA' }],
+    accounts: [{ id: "acct-1", name: "Broker IRA" }],
     holdings: [
       {
         ...gemAssets[0],
@@ -77,9 +102,9 @@ export function gemPosition(overrides: Partial<GemPosition> = {}): GemPosition {
       // A holding the strategy never assigned still counts.
       {
         role: null,
-        securityId: 'sec-wtai',
-        symbol: 'WTAI',
-        name: 'WisdomTree Artificial Intelligence UCITS ETF',
+        securityId: "sec-wtai",
+        symbol: "WTAI",
+        name: "WisdomTree Artificial Intelligence UCITS ETF",
         quantity: 6,
         marketValue: 543.12,
         isTargetInstrument: false,
@@ -103,14 +128,14 @@ export function gemPosition(overrides: Partial<GemPosition> = {}): GemPosition {
     exactTargetPercent: 64,
     marketExposurePercent: 64,
     marketExposureAvailable: true,
-    marketExposureDimension: 'COUNTRY',
+    marketExposureDimension: "COUNTRY",
     changeRequired: true,
     totalMarketValue: 64643.84,
-    basis: 'COMPOSITION',
-    dimension: 'COUNTRY',
-    requiredDimension: 'COUNTRY',
+    basis: "COMPOSITION",
+    dimension: "COUNTRY",
+    requiredDimension: "COUNTRY",
     instrumentMatchedCount: 1,
-    currencyCode: 'CAD',
+    currencyCode: "CAD",
     ...overrides,
   };
 }
@@ -131,9 +156,9 @@ export function gemAction(overrides: Partial<GemAction> = {}): GemAction {
       },
       {
         role: null,
-        securityId: 'sec-wtai',
-        symbol: 'WTAI',
-        name: 'WisdomTree Artificial Intelligence UCITS ETF',
+        securityId: "sec-wtai",
+        symbol: "WTAI",
+        name: "WisdomTree Artificial Intelligence UCITS ETF",
         quantity: 6,
         marketValue: 543.12,
         isTargetInstrument: false,
@@ -152,45 +177,61 @@ export function gemAction(overrides: Partial<GemAction> = {}): GemAction {
     estimatedCommission: 59.8,
     estimatedTradeCount: 2,
     partialMatchCount: 0,
-    accounts: [{ id: 'acct-1', name: 'Broker IRA' }],
-    currencyCode: 'CAD',
+    accounts: [{ id: "acct-1", name: "Broker IRA" }],
+    currencyCode: "CAD",
     executed: false,
     ...overrides,
   };
 }
 
-export function gemPerformance(overrides: Partial<GemPerformance> = {}): GemPerformance {
+export function gemPerformance(
+  overrides: Partial<GemPerformance> = {},
+): GemPerformance {
   return {
-    range: '1Y',
+    range: "1Y",
     points: [
       {
-        date: '2024-08-01',
+        date: "2024-08-01",
         values: { US_EQUITY: 0, EX_US_EQUITY: 0, EM_EQUITY: 0, SAFE: 0 },
       },
       {
-        date: '2025-02-01',
-        values: { US_EQUITY: 8.1, EX_US_EQUITY: 4.2, EM_EQUITY: 12.4, SAFE: 2.1 },
+        date: "2025-02-01",
+        values: {
+          US_EQUITY: 8.1,
+          EX_US_EQUITY: 4.2,
+          EM_EQUITY: 12.4,
+          SAFE: 2.1,
+        },
       },
       {
-        date: '2025-08-01',
-        values: { US_EQUITY: 15.42, EX_US_EQUITY: 8.31, EM_EQUITY: 29.87, SAFE: 4.21 },
+        date: "2025-08-01",
+        values: {
+          US_EQUITY: 15.42,
+          EX_US_EQUITY: 8.31,
+          EM_EQUITY: 29.87,
+          SAFE: 4.21,
+        },
       },
     ],
-    totals: { US_EQUITY: 15.42, EX_US_EQUITY: 8.31, EM_EQUITY: 29.87, SAFE: 4.21 },
-    currencyCode: 'CAD',
+    totals: {
+      US_EQUITY: 15.42,
+      EX_US_EQUITY: 8.31,
+      EM_EQUITY: 29.87,
+      SAFE: 4.21,
+    },
     incomplete: false,
     currentPortfolio: {
       points: [
-        { date: '2024-08-01', returnPercent: 0 },
-        { date: '2025-02-01', returnPercent: 6.4 },
-        { date: '2025-08-01', returnPercent: 12.8 },
+        { date: "2024-08-01", returnPercent: 0 },
+        { date: "2025-02-01", returnPercent: 6.4 },
+        { date: "2025-08-01", returnPercent: 12.8 },
       ],
       totalReturnPercent: 12.8,
       completeRange: true,
-      startsOn: '2024-08-01',
+      startsOn: "2024-08-01",
       includedHoldings: [
-        { securityId: 'sec-spy', symbol: 'SPY', weightPercent: 60 },
-        { securityId: 'sec-emim', symbol: 'EMIM', weightPercent: 40 },
+        { securityId: "sec-spy", symbol: "SPY", weightPercent: 60 },
+        { securityId: "sec-emim", symbol: "EMIM", weightPercent: 40 },
       ],
       unavailableReason: null,
     },
@@ -201,58 +242,75 @@ export function gemPerformance(overrides: Partial<GemPerformance> = {}): GemPerf
 export function gemHistory(): GemHistoryEntry[] {
   return [
     {
-      id: 'hist-1',
-      evaluatedOn: '2025-08-01',
-      effectiveFrom: '2025-08-01',
+      id: "hist-1",
+      evaluatedOn: "2025-08-01",
+      effectiveFrom: "2025-08-01",
       winner: gemAssets[2],
-      state: 'RISK_ON',
-      action: 'SWITCH',
-      momentum: { US_EQUITY: 15.42, EX_US_EQUITY: 8.31, EM_EQUITY: 29.87, SAFE: 4.21 },
+      state: "RISK_ON",
+      action: "SWITCH",
+      momentum: {
+        US_EQUITY: 15.42,
+        EX_US_EQUITY: 8.31,
+        EM_EQUITY: 29.87,
+        SAFE: 4.21,
+      },
       change: { from: gemAssets[0], to: gemAssets[2] },
       executed: false,
     },
     {
-      id: 'hist-2',
-      evaluatedOn: '2025-07-01',
-      effectiveFrom: '2025-07-01',
+      id: "hist-2",
+      evaluatedOn: "2025-07-01",
+      effectiveFrom: "2025-07-01",
       winner: gemAssets[1],
-      state: 'RISK_ON',
-      action: 'SWITCH',
-      momentum: { US_EQUITY: 7.12, EX_US_EQUITY: 8.31, EM_EQUITY: 8.31, SAFE: 4.08 },
+      state: "RISK_ON",
+      action: "SWITCH",
+      momentum: {
+        US_EQUITY: 7.12,
+        EX_US_EQUITY: 8.31,
+        EM_EQUITY: 8.31,
+        SAFE: 4.08,
+      },
       change: { from: gemAssets[2], to: gemAssets[1] },
       executed: true,
     },
     {
-      id: 'hist-3',
-      evaluatedOn: '2025-06-01',
-      effectiveFrom: '2025-06-01',
+      id: "hist-3",
+      evaluatedOn: "2025-06-01",
+      effectiveFrom: "2025-06-01",
       winner: gemAssets[3],
-      state: 'RISK_OFF',
-      action: 'HOLD',
-      momentum: { US_EQUITY: -1.28, EX_US_EQUITY: 1.45, EM_EQUITY: 3.12, SAFE: 3.76 },
+      state: "RISK_OFF",
+      action: "HOLD",
+      momentum: {
+        US_EQUITY: -1.28,
+        EX_US_EQUITY: 1.45,
+        EM_EQUITY: 3.12,
+        SAFE: 3.76,
+      },
       change: null,
       executed: null,
     },
   ];
 }
 
-export function gemReport(overrides: Partial<GemStrategyReport> = {}): GemStrategyReport {
+export function gemReport(
+  overrides: Partial<GemStrategyReport> = {},
+): GemStrategyReport {
   return {
     strategy: {
-      id: 'strategy-1',
-      name: 'GEM',
-      cadence: 'MONTHLY',
+      id: "strategy-1",
+      name: "GEM",
+      cadence: "MONTHLY",
       lookbackMonths: 12,
       taxRatePercent: 19,
       commissionAmount: 29.9,
-      nextEvaluationOn: '2025-08-31',
+      nextEvaluationOn: "2025-08-31",
       daysUntilNextEvaluation: 28,
-      pricesAsOf: '2025-08-02',
-      rulesSourceUrl: 'https://example.test/gem',
-      rulesSourceLabel: 'example.test/gem',
-      accounts: [{ id: 'acct-1', name: 'Broker IRA' }],
+      pricesAsOf: "2025-08-02",
+      rulesSourceUrl: "https://example.test/gem",
+      rulesSourceLabel: "example.test/gem",
+      accounts: [{ id: "acct-1", name: "Broker IRA" }],
     },
-    strategies: [{ id: 'strategy-1', name: 'GEM' }],
+    strategies: [{ id: "strategy-1", name: "GEM" }],
     assets: gemAssets,
     signal: gemSignal(),
     position: gemPosition(),
@@ -260,8 +318,8 @@ export function gemReport(overrides: Partial<GemStrategyReport> = {}): GemStrate
     performance: gemPerformance(),
     history: gemHistory(),
     backtest: {
-      from: '2000-01-01',
-      to: '2025-08-01',
+      from: "2000-01-01",
+      to: "2025-08-01",
       cagrPercent: 11.4,
       maxDrawdownPercent: -22.6,
       hitRatePercent: 68.2,
